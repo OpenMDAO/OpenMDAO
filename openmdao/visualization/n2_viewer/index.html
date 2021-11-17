@@ -246,11 +246,14 @@
     <div id="toolbar-help-container" class='window-inactive'>
         <p><b>Left-click</b> on a node in the model hierarchy to navigate to that node.<br>
             <b>Right-click</b> on a node to collapse/expand it.
-            <b>Shift-right-click</b> on a node with variables to select which ones to hide.<br>
+            <b>Alt-right-click</b> on a node with variables to select which ones to hide.<br>
+            Note: Right-click in Firefox displays a browser menu. To disable that,
+            visit <b>about:config</b> and set <code>dom.event.contextmenu.enabled</code>
+            to <b>true</b>.<br>
             <b>Hover</b> over any cell in the matrix to display its connections
             as arrows. Click that cell to make those arrows persistent.
         </p>
-        <h1>Toolbar Help</h1>
+        <h3>Toolbar Help</h3>
         <div class='help-graphic'>
             <img id="toolbar-snapshot" alt="Snapshot of toolbar buttons"
                 src="data:image/png;base64,{{n2toolbar_png}}" />

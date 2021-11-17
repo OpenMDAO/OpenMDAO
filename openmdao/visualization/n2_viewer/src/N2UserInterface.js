@@ -321,13 +321,13 @@ class N2UserInterface {
     }
 
     /**
-     * When a node with variables is shift-right-clicked, present a dialog with the
+     * When a node with variables is alt-right-clicked, present a dialog with the
      * list of variables and allow the user to select which ones should be displayed.
-     * @param {N2TreeNode} node The node that was shift-right-clicked.
+     * @param {N2TreeNode} node The node that was alt-right-clicked.
      * @param {String} color The color of the clicked node, to use for the dialog ribbons.
      */
-    shiftRightClick(node, color) {
-        testThis(this, 'N2UserInterface', 'shiftRightClick');
+    altRightClick(node, color) {
+        testThis(this, 'N2UserInterface', 'altRightClick');
         d3.event.preventDefault();
         d3.event.stopPropagation();
         window.getSelection().empty();
@@ -951,6 +951,11 @@ class ChildSelectDialog extends N2WindowDraggable {
         this.title(this.node.name);
         this.tableContainer = this.body.append('div').attr('class', 'table-container');
         this.table = this.tableContainer.append('table');
+        const UA = navigator.userAgent;
+        if (/Chrom/.test(UA)) {
+            // Chrome puts the scrollbar outside the element, other browsers inside
+            this.table.style('margin-right', '0');
+        }
 
         this.thead = this.table.append('thead');
         this.tbody = this.table.append('tbody');

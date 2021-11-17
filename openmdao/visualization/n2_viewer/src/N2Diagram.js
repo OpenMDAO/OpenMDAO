@@ -387,9 +387,9 @@ class N2Diagram {
                 else { self.ui.nodeInfoBox.pin(); } // Create a persistent panel
             })
             .on("contextmenu", function (d) {
-                if (d3.event.shiftKey) {
+                if (d3.event.altKey) {
                     const color = d3.select(this).select('rect').style('fill');
-                    self.ui.shiftRightClick(d, color);
+                    self.ui.altRightClick(d, color);
                 }
                 else {
                     self.ui.rightClick(d, this);

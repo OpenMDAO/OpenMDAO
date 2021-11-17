@@ -230,11 +230,11 @@ n2_gui_test_scripts = {
         },
         { "test": "root" },
         {
-            "desc": "Shift-right-click the n1 component",
+            "desc": "Alt-right-click the n1 component",
             "test": "click",
             "selector": "rect#circuit_n1",
             "button": "right",
-            "modifiers": [ "Shift" ]
+            "modifiers": [ "Alt" ]
         },
         {
             "desc": "Check that variable selection dialog appears",

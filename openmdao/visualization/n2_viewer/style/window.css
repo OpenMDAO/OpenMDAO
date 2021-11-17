@@ -613,7 +613,7 @@
     height: 100%;
 }
 
-.window-theme-help .window-body h1 {
+.window-theme-help h3 {
     padding: 0;
     margin: 0;
 }
@@ -913,10 +913,10 @@ i.help-text-icon {
 .window-theme-child-select .table-container table {
 	overflow: hidden;
 	background-color: white;
-    min-width: 250px;
+    min-width: 300px;
     border-collapse: separate;
     border-spacing: 0;
-    margin: 0;
+    margin: 0 14px 0 0;
     padding: 0;
     border: 0;
 }
@@ -931,7 +931,7 @@ i.help-text-icon {
     background-color: #c0c0c0;
     padding: 3px;
     white-space: nowrap;
-    position: sticky;
+    position: sticky; /* Only seems to work on Firefox */
     top: 0px;
 
     color: #202020;
