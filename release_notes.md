@@ -24,6 +24,8 @@ and significantly increased interpolation performance when the training data is 
 - Added a new method 'lagrange3D' for interpolation on a fixed 3D grid. This method is vectorized and caches the coefficients for each cell, which results in a much more efficient execution. [#2314](https://github.com/OpenMDAO/OpenMDAO/pull/2314)
 - Added implementation of ImplicitFuncComp for implicit function wrapping capability described in [POEM 056](https://github.com/OpenMDAO/POEMs/blob/master/POEM_056.md) and [POEM 057](https://github.com/OpenMDAO/POEMs/blob/master/POEM_057.md). [#2321](https://github.com/OpenMDAO/OpenMDAO/pull/2321)
 - Added a fixed '3D-lagrange2' interpolant, and implemented some other performance improvements. [#2337](https://github.com/OpenMDAO/OpenMDAO/pull/2337)
+- Added a variable selection dialog added to N2 diagram, use Shift+Right Click to access it. [#2339](https://github.com/OpenMDAO/OpenMDAO/pull/2339)
+- Added warning when user calls list_inputs before final_setup [#2341](https://github.com/OpenMDAO/OpenMDAO/pull/2341)
 
 ## Bug Fixes
 
