@@ -28,7 +28,7 @@ class SetValuesUI(object):
         self._tree = None
         self.ui_widget = None
         self._refresh_in_progress = False
-        self._output = Output(layout={'border': '1px solid black', 'width': '35%'})
+        self._output = Output(layout={'border': '1px solid black', 'width': '30%'})
         self._inputs_connected_to_ivc = self.get_inputs_connected_to_ivc()
 
     def setup(self):
@@ -37,7 +37,7 @@ class SetValuesUI(object):
                                 "GUI cannot be created before Problem.setup is called.")
 
         self._tree = Tree(stripes=True, multiple_selection=True, layout={'border': '1px solid black', 'width' :'30%'})
-        self._value_widget_box = VBox([Label("Model Variables") ,], layout={'border': '1px solid black', 'width' :'50'})
+        self._value_widget_box = VBox([Label("Model Variables") ,], layout={'border': '1px solid black', 'width' :'30%'})
         self.set_vars_from_model_with_initial_list_v2(self._prob.model, self._tree, 0,
                                                    vars_to_set=self._vars_to_set )
         self._tree.observe(self.on_selected_change, names='selected_nodes')
@@ -56,16 +56,6 @@ class SetValuesUI(object):
             return
             # pass
 
-        if sys.pathname == 'DESIGN.fc.conv.fs.exit_static.flow_static':
-            print(sys.name)
-
-        if sys.pathname == 'DESIGN.fc.conv.fs.exit_static':
-            print(sys.name)
-
-        if sys.pathname == 'DESIGN.fc.conv.fs':
-            print(sys.name)
-
-
         name = sys.name if sys.name else 'root'
         new_node = Node(name)
         node.add_node(new_node)
@@ -73,13 +63,29 @@ class SetValuesUI(object):
         if depth > self._initial_depth - 1:
             new_node.opened = False
 
-        model = sys._problem_meta['model_ref']()
+        model = sys._problem_meta['model_ref']()  # TODO put as self._model
 
-        var_names_at_this_level = get_var_names_at_this_level(model, sys)
+        var_names_at_this_level = get_var_names_at_this_level(model, sys) # list of prom name at this level and abs name tuples
 
-        for input_varname in var_names_at_this_level:
-            full_varname = f"{sys.pathname}.{input_varname}"
-            if self._ivc_only and (full_varname not in self._inputs_connected_to_ivc):
+        if sys.name == 'em_properties': #   _AutoIndepVarComp
+            f = 1
+
+
+
+
+        for input_varname, input_abs_name in var_names_at_this_level:
+            if input_varname == 'n_slots':
+                e = 1
+            full_varname = f"{sys.pathname}.{input_varname}"   # sort of abs, sort of prom!
+
+
+
+            # abs_name = model._var_allprocs_prom2abs_list['input'][full_varname]
+            prom_name = model._var_allprocs_abs2prom['input'][input_abs_name]
+
+
+            if self._ivc_only and (prom_name not in self._inputs_connected_to_ivc):
+            # if self._ivc_only and (abs_name not in self._inputs_connected_to_ivc):
                 continue
             input_node = Node(input_varname)
             input_node._comp = sys
@@ -90,9 +96,12 @@ class SetValuesUI(object):
             if vars_to_set is not None:
                 if input_varname in vars_to_set:
                     input_node.icon_style = 'success' # green
+                    self._output.append_stdout(
+                        f"Calling add_value_widget_with_component with {input_varname}\n")
                     self.add_value_widget_with_component(sys, input_varname, input_node)
             else:
                 input_node.icon_style = 'success' # green
+                self._output.append_stdout(f"Calling add_value_widget_with_component with {input_varname}\n")
                 self.add_value_widget_with_component(sys, input_varname, input_node)
 
         if isinstance(sys, Component):
@@ -102,7 +111,7 @@ class SetValuesUI(object):
             for s in sys._subsystems_myproc:
                 self.set_vars_from_model_with_initial_list_v2(s, new_node, depth + 1, vars_to_set )
 
-    def get_inputs_connected_to_ivc(self):
+    def get_inputs_connected_to_ivc(self):  # returns prom names
         '''
             That sounds like a reasonable approach.  You could also loop over the
         top level var_allprocs_prom2abs_list['input'] entries and do a lookup
@@ -117,20 +126,21 @@ class SetValuesUI(object):
 
         inputs_connected_to_ivc = []
         for prom, alist in self._prob.model._var_allprocs_prom2abs_list['input'].items():
-            var = alist[0]
+            var = alist[0]  # var is an abs name because that is what _conn_global_abs_in2out uses
             connected_source = self._prob.model._conn_global_abs_in2out[var]
             compname = connected_source.rsplit('.', 1)[0]
             comp = self._prob.model._get_subsystem(compname)
             if isinstance(comp, IndepVarComp):  # _AutoIndepVarComp is subclass so those caught too
-                inputs_connected_to_ivc.append(var)
+                # inputs_connected_to_ivc.append(var)
+                inputs_connected_to_ivc.append(prom)
 
-        return inputs_connected_to_ivc
+        return inputs_connected_to_ivc # returns list of prom names
 
 
     def add_value_widget_with_component(self, comp, var_name, tree_node):
+        # TODO actually comp is sys
 
-        if var_name in self.get_widget_var_names():
-            return # already there
+        self._output.append_stdout(f"in add_value_widget_with_component: {var_name}\n")
         val = comp.get_val(var_name)
 
         inputs_metadata = comp.get_io_metadata(('input',), ['units', ],
@@ -140,6 +150,22 @@ class SetValuesUI(object):
         prom2abs_list = comp._var_allprocs_prom2abs_list['input']
 
         full_var_name = prom2abs_list[var_name][0]
+
+        self._output.append_stdout(f"In add_value_widget_with_component: {comp.pathname}, {var_name} {full_var_name}\n")
+
+        self._output.append_stdout(f"len(prom2abs_list[var_name]) : {len(prom2abs_list[var_name])}\n")
+
+
+        model = comp._problem_meta['model_ref']()
+
+        # get the promoted name from the top level
+        model_abs2prom = model._var_allprocs_abs2prom['input']
+
+        promoted_name_from_top_level = model_abs2prom[full_var_name]
+        if promoted_name_from_top_level in self.get_widget_var_names():
+            return # already there
+        # self._output.append_stdout(f"in add_value_widget_with_component, promoted_name_from_top_level : {promoted_name_from_top_level}\n")
+
 
         metadata = inputs_metadata[full_var_name]
         units = metadata['units']
@@ -151,15 +177,21 @@ class SetValuesUI(object):
                 return # skip arrays for now
             val = val.item()
 
+        style = {'description_width': 'initial'}
+
+
+        self._output.append_stdout(f"adding widget for {promoted_name_from_top_level}\n")
         # Value widget
         val_widget = Text(
             value=str(val),
-            description=var_name,
+            # description=var_name,
+            description=promoted_name_from_top_level,
             disabled=False,
             continuous_update=False,
+            style = style,
             step=None,
             layout = {'border': '1px solid black',
-                      'width': '150px',
+                      'width': '350px',
                       'display': 'flex',
                       'justify_content': 'center'}
         )
@@ -172,8 +204,8 @@ class SetValuesUI(object):
                                                         'width' :'60px',
                                                         'display':'flex',
                                                         'justify_content':'center'})
-        units_widget._var_name = var_name
-        units_widget._var_name = var_name
+        # units_widget._var_name = var_name
+        units_widget._var_name = promoted_name_from_top_level
         units_widget.observe(self.update_prob_unit, 'value')
 
         # remove button widget
@@ -181,7 +213,8 @@ class SetValuesUI(object):
                                                         'width' :'20px',
                                                         'display':'flex',
                                                         'justify_content':'center'})
-        remove_button._var_name = var_name # so each Button instance know what variable it is
+        # remove_button._var_name = var_name # so each Button instance know what variable it is
+        remove_button._var_name = promoted_name_from_top_level # so each Button instance know what variable it is
         # associated with
         remove_button.on_click(self.remove_val_widget)
 
@@ -259,6 +292,7 @@ class SetValuesUI(object):
         for box in self._value_widget_box.children[1:]:
             float_text_widget = box.children[0]
             var_names.append(float_text_widget.description)
+        self._output.append_stdout(f"result of get_widget_var_names is {var_names}\n")
         return var_names
 
     def display(self):
@@ -269,9 +303,9 @@ def set_values_gui(prob, vars_to_set=None, initial_depth = None, ivc_only = True
     ui.setup()
     return ui.ui_widget
 
-def get_var_names_at_this_level(model, sys):
+def get_var_names_at_this_level(model, sys): # returns list of prom name at this level and abs name
 
-    var_names_at_this_level = set()
+    var_names_at_this_level = []
     model_abs2prom = model._var_allprocs_abs2prom['input']
     current_group_absolute_path = sys.pathname
     if current_group_absolute_path == 'DESIGN.fc.conv.fs.exit_static':
@@ -297,7 +331,7 @@ def get_var_names_at_this_level(model, sys):
             if "." not in current_group_var_promoted_name:  # this seems sufficient
                 # if promoted_name_from_top_level.endswith(f"{sys.name}.{prom_name}"):
                 if not does_parent_sys_have_this_var_promoted(model, sys, abs_name):
-                        var_names_at_this_level.add(prom_name)
+                        var_names_at_this_level.append((prom_name,abs_name))
     else: # Group
         for abs_name, prom_name in sys._var_allprocs_abs2prom['input'].items():
             promoted_name_from_top_level = model_abs2prom[abs_name]
@@ -310,17 +344,24 @@ def get_var_names_at_this_level(model, sys):
 
             if sys.pathname == '':  # root
                 if not "." in prom_name:
-                    var_names_at_this_level.add(prom_name)
+                    if prom_name not in [a[0] for a in var_names_at_this_level]: # don't want dups based on the prom_name, which is the first item in the tuple
+                        var_names_at_this_level.append((prom_name,abs_name))
             else:
                 if "." not in current_group_var_promoted_name:  # this seems sufficient
                     # WHAT IF a group higher up has the same name and the var is promoted to that level?
                     # if promoted_name_from_top_level.endswith(f"{sys.name}.{prom_name}"):
                     if not does_parent_sys_have_this_var_promoted(model, sys, abs_name):
-                            var_names_at_this_level.add(prom_name)
+                        if prom_name not in [a[0] for a in var_names_at_this_level]: # don't want dups based on the prom_name, which is the first item in the tuple
+                                var_names_at_this_level.append((prom_name,abs_name))
                 # if promoted_name_from_top_level == current_group_pathname:   # DO I really need this?
                 #     var_names_at_this_level.add(prom_name)
 
+    # need to sort them
+    # import operator
+    var_names_at_this_level.sort(key = lambda x: x[0].lower())
     return var_names_at_this_level
+
+
 
 def does_parent_sys_have_this_var_promoted(model, sys, abs_name): # so not at this level
     #  TODO. It works for when sys is model, but should really handle that explicitly
