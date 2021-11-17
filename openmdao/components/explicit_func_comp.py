@@ -1,5 +1,6 @@
 """Define the FuncComponent class."""
 
+from functools import partial
 import numpy as np
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.constants import INT_DTYPE
@@ -8,12 +9,48 @@ from openmdao.components.func_comp_common import _check_var_name, _copy_with_ign
 
 try:
     import jax
-    from jax import jit, jacfwd
+    from jax import jit, jacfwd, jacrev, vmap, jvp, linear_util
+    import jax.numpy as jnp
     from jax.numpy import DeviceArray
     from jax.config import config
+    from jax.api_util import argnums_partial
+    from jax._src.api import _jvp
     config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
-except ImportError:
+except ImportError as err:
     jax = None
+
+
+def jac_forward(fun, argnums, seed_mat):
+    """
+    Similar to the jax.jacfwd function but allows specification of the seed matrix.
+
+    Parameters
+    ----------
+    fun : function
+        The function to be differentiated.
+    argnums : tuple of int or None
+        Specifies which positional args are dynamic.  None means all positional args are dynamic.
+    seed_mat : ndarray
+        Array of 1.0's and 0's that is used to compute the value of the jacobian matrix.
+        jax calls these 'tangents'.
+
+    Returns
+    -------
+    function
+        A function that returns rows of the jacobian grouped by output variable, e.g., if there were
+        2 output variables of size 3 and 4, the function would return a list with two entries. The
+        first entry would contain the first 3 rows of J and the second would contain the next
+        4 rows of J.
+    """
+    def jacfun(*args, **kwargs):
+        f = linear_util.wrap_init(fun, kwargs)
+        if argnums is not None:
+            f_partial, dyn_args = argnums_partial(f, argnums, args)
+            pushfwd = partial(_jvp, f_partial, dyn_args)
+        else:
+            pushfwd = partial(_jvp, f, args)
+        return vmap(pushfwd, out_axes=(None, -1))(seed_mat)[1]
+    return jacfun
 
 
 class ExplicitFuncComp(ExplicitComponent):
@@ -37,6 +74,8 @@ class ExplicitFuncComp(ExplicitComponent):
         Function decorated to ensure use of jax numpy.
     _compute_partials : function or None
         If not None, call this function when computing partials.
+    _jaxseeds : tuple
+        Tuple of parts of the seed matrix cached for jax derivative computation.
     """
 
     def __init__(self, compute, compute_partials=None, **kwargs):
@@ -56,10 +95,12 @@ class ExplicitFuncComp(ExplicitComponent):
         if self.options['use_jax']:
             self._compute_jax = omf.jax_decorate(self._compute._f)
 
+        self._jaxseeds = None
+
         self._compute_partials = compute_partials
         if self.options['use_jax'] and self.options['use_jit']:
-            static_argnums = np.where(np.array(['is_option' in m for m in
-                                                self._compute._inputs.values()], dtype=bool))[0]
+            static_argnums = [i for i, m in enumerate(self._compute._inputs.values())
+                              if 'is_option' in m]
             try:
                 self._compute_jax = jit(self._compute_jax, static_argnums=static_argnums)
             except Exception as err:
@@ -119,26 +160,60 @@ class ExplicitFuncComp(ExplicitComponent):
             self._jvp = None
             self._vjp = None
             # argnums specifies which position args are to be differentiated
-            argnums = np.where(
-                np.array(['is_option' not in m for m in self._compute._inputs.values()],
-                         dtype=bool))[0]
-            onames = list(self._compute.get_output_names())
+            argnums = [i for i, m in enumerate(self._compute._inputs.values())
+                       if 'is_option' not in m]
             inames = list(self._compute.get_input_names())
+            onames = list(self._compute.get_output_names())
             nouts = len(onames)
-            jf = jacfwd(self._compute_jax, argnums)(*self._func_values(self._inputs))
-            if nouts == 1:
-                for col, inp in zip(argnums, inames):
-                    abs_key = self._jacobian._get_abs_key((onames[0], inp))
-                    if abs_key in self._jacobian:
-                        self._jacobian[abs_key] = np.asarray(jf[col])
+            osize = len(self._outputs)
+            isize = len(self._inputs)
+            invals = list(self._func_values(self._inputs))
+
+            # since rev mode is more expensive, adjust size comparison a little to pick fwd
+            # in some cases where input size is slightly larger than output size
+            if osize * 1.3 < isize:  # use reverse mode to compute derivs
+                j = jacrev(self._compute_jax, argnums)(*invals)
+                if nouts == 1:
+                    for col, inp in zip(argnums, inames):
+                        abs_key = self._jacobian._get_abs_key((onames[0], inp))
+                        if abs_key in self._jacobian:
+                            self._jacobian[abs_key] = np.asarray(j[col])
+                else:
+                    for col, inp in zip(argnums, inames):
+                        for row, out in enumerate(onames):
+                            abs_key = self._jacobian._get_abs_key((out, inp))
+                            if abs_key in self._jacobian:
+                                self._jacobian[abs_key] = np.asarray(j[row][col])
             else:
-                for col, inp in zip(argnums, inames):
-                    for row, out in enumerate(onames):
+                # j = jacfwd(self._compute_jax, argnums)(*invals)
+                if len(argnums) == len(inames):
+                    argnums = None
+                j = [np.asarray(a) for a in jac_forward(self._compute_jax, argnums,
+                                                        self._get_seeds(invals))(*invals)]
+                start = end = 0
+                for inp, meta in self._compute.get_input_meta():
+                    if 'is_option' in meta:
+                        continue
+                    end += int(np.product(meta['shape']))
+                    for out, sub in zip(onames, j):
                         abs_key = self._jacobian._get_abs_key((out, inp))
                         if abs_key in self._jacobian:
-                            self._jacobian[abs_key] = np.asarray(jf[row][col])
+                            self._jacobian[abs_key] = sub[:, start:end]
+                    start = end
         else:
             super()._linearize(jac, sub_do_ln)
+
+    def _get_seeds(self, invals):
+        if self._jaxseeds is None:
+            sizes = [np.size(a) for a in invals]
+            ndim = np.sum(sizes)
+            seedmat = jnp.eye(ndim)
+            inds = np.cumsum(sizes[:-1])
+            axis = 1
+            shapes = [seedmat.shape[:axis] + np.shape(v) + seedmat.shape[axis + 1:] for v in invals]
+            self._jaxseeds = tuple([jnp.reshape(a, shp) for a, shp in
+                                    zip(jnp.split(seedmat, inds, axis=axis), shapes)])
+        return self._jaxseeds
 
     def _setup_jax(self):
         pass

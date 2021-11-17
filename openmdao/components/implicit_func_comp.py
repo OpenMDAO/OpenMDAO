@@ -83,9 +83,8 @@ class ImplicitFuncComp(ImplicitComponent):
             self._apply_nonlinear_func_jax = omf.jax_decorate(self._apply_nonlinear_func._f)
 
         if self.options['use_jax'] and self.options['use_jit']:
-            static_argnums = np.where(np.array(['is_option' in m for m in
-                                                self._apply_nonlinear_func._inputs.values()],
-                                               dtype=bool))[0]
+            static_argnums = [i for i, m in enumerate(self._apply_nonlinear_func._inputs.values())
+                              if 'is_option' in m]
             try:
                 with omf.jax_context(self._apply_nonlinear_func._f.__globals__):
                     self._apply_nonlinear_func_jax = jit(self._apply_nonlinear_func_jax,
@@ -208,10 +207,7 @@ class ImplicitFuncComp(ImplicitComponent):
             self._vjp = None
             func = self._apply_nonlinear_func
             # argnums specifies which position args are to be differentiated
-            argnums = np.where(
-                np.array(['is_option' not in m for m in func._inputs.values()],
-                         dtype=bool))[0]
-
+            argnums = [i for i, m in enumerate(func._inputs.values()) if 'is_option' not in m]
             onames = list(func.get_output_names())
             nouts = len(onames)
             jf = jacfwd(self._apply_nonlinear_func_jax, argnums)(

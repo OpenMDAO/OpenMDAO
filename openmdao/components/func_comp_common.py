@@ -4,6 +4,12 @@ Define functions and objects common to the ExplicitFuncComp and ImplicitFuncComp
 
 import re
 from openmdao.utils.om_warnings import issue_warning
+from openmdao.vectors.vector import Vector
+try:
+    import jax
+    from jax.tree_util import register_pytree_node
+except ImportError:
+    jax = None
 
 
 # regex to check for variable names.

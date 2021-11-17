@@ -733,32 +733,23 @@ def jax_decorate(func):
         The wrapped function.
     """
     g = func.__globals__
-    savenp = savenumpy = False
 
     try:
         src = inspect.getsource(func)
     except OSError:
         src = None
 
-    if 'np' in g and g['np'] is np:
-        if src is None or 'np.' in src:
-            savenp = g['np']
-        else:
-            savenp = False
-    if 'numpy' in g:
-        if src is None or 'numpy' in src:
-            savenumpy = g['numpy']
-        else:
-            savenumpy = False
+    savenp = g['np'] if 'np' in g and g['np'] is np and (src is None or 'np.' in src) else False
+    savenumpy = g['numpy'] if 'numpy' in g and (src is None or 'numpy' in src) else False
 
     if savenp or savenumpy:
-        def _wrap(*args, **kwargs):
+        def _wrap(*args):
             if savenp:
                 g['np'] = jnp
             if savenumpy:
                 g['numpy'] = jnp
             try:
-                ret = func(*args, **kwargs)
+                ret = func(*args)
             finally:
                 if savenp:
                     g['np'] = savenp
