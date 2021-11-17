@@ -937,6 +937,14 @@ class Problem(object):
         }
         model._setup(model_comm, mode, self._metadata)
 
+        des_vars = self.model.get_design_vars()
+        prom2abs = self._metadata['prom2abs']
+        if des_vars:
+            for key in des_vars.keys():
+                if key in prom2abs['output'] and key in prom2abs['input']:
+                    raise RuntimeError(f"Cannot connect the design variable '{key}' to output "
+                                       f"'{prom2abs['output'][key][0]}'.")
+
         # set static mode back to True in all systems in this Problem
         self._metadata['static_mode'] = True
 
