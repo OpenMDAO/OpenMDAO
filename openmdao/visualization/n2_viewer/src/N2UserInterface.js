@@ -981,6 +981,9 @@ class ChildSelectDialog extends N2WindowDraggable {
         this.tbody = this.table.select('tbody');
 
         this.searchContainer = this.body.select('div.search-container');
+
+
+
         this.buttonContainer = this.body.select('div.button-container');
 
         // The Select All button makes all variables visible.
@@ -1042,7 +1045,7 @@ class ChildSelectDialog extends N2WindowDraggable {
         // Add an empty cell to account for scrollbar width
         if (this.scrollbarIsVisible()) { topRow.append('th').text(' '); }
 
-        this.sizeToContent(3,30)
+        this.sizeToContent(3,57)
             .modal(true)
             .moveNearMouse(d3.event)
             .show();

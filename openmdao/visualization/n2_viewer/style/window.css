@@ -993,6 +993,33 @@ i.help-text-icon {
     background-color: #d8ffff;
 }
 
+.window-theme-child-select .search-container {
+    height: 21px;
+    width: 100%;
+    bottom: 23px;
+    text-align: left;
+    font-size: 8pt;
+    border-top: 1px solid #a0a0a0;
+    border-bottom: 1px solid #a0a0a0;
+    padding: 2px 0 2px 0;
+    background-color: #c0c0c0;
+    white-space: nowrap;
+    color: #202020;
+}
+
+.window-theme-child-select .search-container span {
+    padding-left: 10px;
+    font-style: italic;
+}
+
+.window-theme-child-select .search-container input {
+    padding-left: 10px;
+    border-radius: 5px;
+    border: 1px solid #a0a0a0;
+    background-color: #e0e0e0;
+    width: 75%;
+}
+
 .window-theme-child-select .button-container {
     height: 21px;
     width: 100%;
