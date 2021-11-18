@@ -243,6 +243,23 @@ class SerialTests(unittest.TestCase):
         for key, meta in totals.items():
             np.testing.assert_allclose(meta['abs error'][0], 0.)
 
+    def test_set_val_auto_ivc(self):
+        p = om.Problem()
+        p.model.add_subsystem('exec',
+                              om.ExecComp('z = a + b**2 + c**3',
+                                          z={'shape': (100,)},
+                                          a={'shape': (100,)},
+                                          b={'shape': (100,)},
+                                          c={'shape': (100,)}))
+
+        p.setup()
+
+        p.set_val('exec.a', np.linspace(5, 10, 100))
+        p.set_val('exec.b', np.linspace(10, 20, 15))
+        p.set_val('exec.c', np.linspace(1, 3, 23))
+
+        p.final_setup()
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITests(SerialTests):
