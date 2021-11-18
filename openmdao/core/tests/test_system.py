@@ -374,6 +374,7 @@ class TestSystem(unittest.TestCase):
             root.get_source('f')
 
     def test_list_inputs_before_final_setup(self):
+
         class SpeedComp(ExplicitComponent):
 
             def setup(self):
