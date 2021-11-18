@@ -201,7 +201,7 @@ class N2UserInterface {
                         .on('mousemove', null)
                         .on('mouseup', null);
                 })
-                .on('input', e => {
+                .on('mousemove', e => {
                     const newHeight = d3.event.clientY - offset.y;
                     if (newHeight + n2Diag.layout.gapDist * 2 >= window.innerHeight * .5) {
                         newDims = {
@@ -317,6 +317,24 @@ class N2UserInterface {
             this.addBackButtonHistory();
             node.manuallyExpanded = false;
             this.collapse();
+        }
+    }
+
+    /**
+     * When a node with variables is alt-right-clicked, present a dialog with the
+     * list of variables and allow the user to select which ones should be displayed.
+     * @param {N2TreeNode} node The node that was alt-right-clicked.
+     * @param {String} color The color of the clicked node, to use for the dialog ribbons.
+     */
+    altRightClick(node, color) {
+        testThis(this, 'N2UserInterface', 'altRightClick');
+        d3.event.preventDefault();
+        d3.event.stopPropagation();
+        window.getSelection().empty();
+
+        // Make sure node is collapsible and window doesn't exist yet.
+        if (this.isCollapsible(node) && d3.select('#childSelect-' + node.toId()).empty()) {
+            new ChildSelectDialog(node, color); // Create the modal dialog
         }
     }
 
@@ -586,7 +604,8 @@ class N2UserInterface {
         node.varIsHidden = false;
 
         if (node.hasChildren()) {
-            for (let child of node.children) {
+            for (const child of node.children) {
+                if ('hiddenVars' in node && node.hiddenVars.indexOf(child) == -1)
                 this._uncollapse(child);
             }
         }
@@ -862,6 +881,201 @@ class N2UserInterface {
     loadState() {
         document.getElementById('state-file-input').click();
     }
+}
 
+/**
+ * Manage a window that allows the user to select which variables to display.
+ * TODO: Make column headers sticky, improve autosizing
+ * without using sizeToContent(3,30)
+ * @typedef ChildSelectDialog
+ */
+class ChildSelectDialog extends N2WindowDraggable {
+    /**
+     * Setup the basic structure of the variable selection dialog.
+     * @param {N2TreeNode} node The node to examine the variables of.
+     * @param {String} color The color to make the window header/footer ribbons.
+     */
+     constructor(node, color) {
+        super('childSelect-' + node.toId());
+        this.node = node;
+        this.nodeColor = color;
+        
+        // Don't do anything else if the node has no variables
+        if ( ! this._fetchVarNames() ) { this.close(); }
+        else { this._initialSetup(); }
+    }
+    
+    /**
+     * Find all the children of the node that are variables.
+     * @returns {Boolean} True if any variables were found, otherwise false.
+     */
+    _fetchVarNames() {
+        // Only add children that are variables.
+        let foundVariables = false;
 
+        this.varNames = {};
+        this.varNameArr = []; // For sorting purposes
+
+        for (const child of this.node.children) {
+            if (!child.isInputOrOutput()) { continue; }
+            foundVariables = true;
+
+            // Use N2Layout.getText() because Auto-IVC variable names are not usually descriptive.
+            const varName = n2Diag.layout.getText(child);
+            this.varNames[varName] = child;
+            this.varNameArr.push(varName)
+
+        }
+
+        return foundVariables;
+    }
+
+    /**
+     * Configure the window structure, then call repopulate() to list the variable names.
+     */
+    _initialSetup() {
+        const self = this;
+        if ('hiddenVars' in this.node) {
+            this.hiddenVars = this.node.hiddenVars;
+            this.existingHiddenVars = true;
+        }
+        else {
+            this.hiddenVars = [];
+            this.existingHiddenVars = false;
+        }
+
+        this.minWidth = 300;
+        this.minHeight = 100;
+        this.theme('child-select');
+        
+        this.title(this.node.name);
+        this.tableContainer = this.body.append('div').attr('class', 'table-container');
+        this.table = this.tableContainer.append('table');
+        const UA = navigator.userAgent;
+        if (/Chrom/.test(UA)) {
+            // Chrome puts the scrollbar outside the element, other browsers inside
+            this.table.style('margin-right', '0');
+        }
+
+        this.thead = this.table.append('thead');
+        this.tbody = this.table.append('tbody');
+
+        this.buttonContainer = this.body.append('div').attr('class', 'button-container');
+
+        this.ribbonColor(this.nodeColor);
+
+        const topRow = this.thead.append('tr');
+        const childName = topRow.append('th');
+        childName.append('span')
+            .attr('class', 'sort-up')
+            .html('&#9650;') // Up-arrow
+            .on('click', e => {
+                self.varNameArr.sort();
+                self.repopulate();
+            })
+        childName.append('span').text('Child Name');
+        childName.append('span')
+            .attr('class', 'sort-down')
+            .html('&#9660;') // Down-arrow
+            .on('click', e => {
+                self.varNameArr.sort();
+                self.varNameArr.reverse();
+                self.repopulate();
+            })
+        topRow.append('th').text('Visible');
+
+        // The Select All button makes all variables visible.
+        this.buttonContainer.append('button')
+            .on('click', e => {
+                d3.selectAll('.window-theme-child-select input[type="checkbox"]')
+                    .property('checked', true);
+                this.hiddenVars = [];
+            })
+            .text('Select All');
+
+        // The Select None button hides all variables.
+        this.buttonContainer.append('button')
+            .on('click', e => {
+                d3.selectAll('.window-theme-child-select input[type="checkbox"]')
+                    .property('checked', false);
+                this.hiddenVars = [];
+                for (const child of self.node.children) {
+                    this.hiddenVars.push(child);
+                }
+            })
+            .text('Select None');
+
+        // Hitting Apply closes the dialog and updates the diagram.
+        this.buttonContainer.append('button')
+            .on('click', e => {
+                if (self.hiddenVars.length == self.node.children.length ) {
+                    // If every variable was hidden, just collapse the node if it's expanded
+                    if (! self.node.isMinimized) { n2Diag.ui.rightClick(self.node); }
+                }
+                else {
+                    n2Diag.ui.rightClickedNode = self.node;
+                    n2Diag.ui.addBackButtonHistory();
+                    self.node.hiddenVars = self.hiddenVars;
+                    
+                    if (self.node.isMinimized) {
+                        // If node itself is collapsed, expand it
+                        self.node.manuallyExpanded = true;
+                        self.node.expand();
+                        self.node.varIsHidden = false;
+                    }
+                    for (const child of self.node.children) {
+                        // Need to check every child because some may be newly visible
+                        child.varIsHidden = (self.hiddenVars.indexOf(child) >= 0);
+                    }
+                    n2Diag.update();
+                }
+                self.close();
+            })
+            .text('Apply');
+        
+        this.repopulate()
+            .sizeToContent(3,30)
+            .modal(true)
+            .moveNearMouse(d3.event)
+            .show();
+    }
+
+    /**
+     * Add all the variables, their display status, and the control buttons.
+     */
+    repopulate() {
+        const self = this;
+        this.tbody.html('');
+
+        let isEven = true;
+        for (const varName of this.varNameArr) {
+            const child = this.varNames[varName];
+
+            // Alternate row colors:
+            const row = this.tbody.append('tr').attr('class', isEven? 'even' : 'odd');
+            isEven = !isEven;
+
+            row.append('td').text(varName);
+            const checkId = `${child.toId()}-visible-check`;
+            if (child.varIsHidden && ! this.existingHiddenVars) { this.hiddenVars.push(child); }
+
+            // Add a checkbox. When checked, the variable will be displayed.
+            row.append('td')
+                .append('input')
+                .attr('type', 'checkbox')
+                .property('checked', !child.varIsHidden)
+                .attr('id', checkId)
+                .on('change', e => {
+                    const isVisible = d3.select(`#${checkId}`).property('checked');
+                    if (!isVisible) { this.hiddenVars.push(child); }
+                    else { 
+                        const idx = this.hiddenVars.indexOf(child);
+                        if (idx > -1 ) { this.hiddenVars.splice(idx, 1); }
+                        else { console.warning("Could not find child in hiddenVars array."); }
+                    }
+                })
+        }
+
+        return this;
+    }
 }

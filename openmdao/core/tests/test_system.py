@@ -373,5 +373,30 @@ class TestSystem(unittest.TestCase):
         with assert_warning(UserWarning, msg):
             root.get_source('f')
 
+    def test_list_inputs_before_final_setup(self):
+        class SpeedComp(ExplicitComponent):
+
+            def setup(self):
+                self.add_input('distance', val=1.0, units='km')
+                self.add_input('time', val=1.0, units='h')
+                self.add_output('speed', val=1.0, units='km/h')
+
+            def compute(self, inputs, outputs):
+                outputs['speed'] = inputs['distance'] / inputs['time']
+
+        prob = Problem()
+        prob.model.add_subsystem('c1', SpeedComp(), promotes=['*'])
+        prob.model.add_subsystem('c2', ExecComp('f=speed',speed={'units': 'm/s'}), promotes=['*'])
+
+        prob.setup()
+
+        msg = ("Calling `list_inputs` before `final_setup` will only "
+              "display the default values of variables and will not show the result of "
+              "any `set_val` calls.")
+
+        with assert_warning(UserWarning, msg):
+            prob.model.list_inputs(units=True, prom_name=True)
+
+
 if __name__ == "__main__":
     unittest.main()
