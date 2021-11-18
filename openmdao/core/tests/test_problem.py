@@ -2071,6 +2071,27 @@ class TestProblem(unittest.TestCase):
             prob.set_val('x', 0.)
         self.assertEqual(str(cm.exception), "Problem: 'x' Cannot call set_val before setup.")
 
+    def test_design_var_connected_to_output(self):
+         prob = om.Problem()
+         root = prob.model
+
+         prob.driver = om.ScipyOptimizeDriver()
+
+         root.add_subsystem('initial_comp', om.ExecComp(['x = 10']), promotes_outputs=['x'])
+
+         outer_group = root.add_subsystem('outer_group', om.Group(), promotes_inputs=['x'])
+         inner_group = outer_group.add_subsystem('inner_group', om.Group(), promotes_inputs=['x'])
+
+         c1 = inner_group.add_subsystem('c1', om.ExecComp(['y = x * 2.0',  'z = x ** 2']),
+                                        promotes_inputs=['x'])
+
+         c1.add_design_var('x', lower=0, upper=5)
+
+         msg = "Cannot connect the design variable 'x' to output 'initial_comp.x'."
+         with self.assertRaises(RuntimeError) as cm:
+             prob.setup()
+         self.assertEqual(str(cm.exception), msg)
+
 
 class NestedProblemTestCase(unittest.TestCase):
 
