@@ -361,6 +361,17 @@ class TestSystem(unittest.TestCase):
 
         self.assertEqual(str(cm.exception), "'comp' <class BadComp>: You forget to call super() in setup()")
 
+    def test_missing_source(self):
+        prob = Problem()
+        root = prob.model
+
+        root.add_subsystem('initial_comp', ExecComp(['x = 10']), promotes_outputs=['x'])
+
+        prob.setup()
+
+        msg = "'f' not found."
+        with assert_warning(UserWarning, msg):
+            root.get_source('f')
 
 if __name__ == "__main__":
     unittest.main()

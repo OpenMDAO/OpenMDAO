@@ -799,7 +799,7 @@ class System(object):
         if name in model._conn_global_abs_in2out:
             return model._conn_global_abs_in2out[name]
 
-        return name
+        issue_warning(f"'{name}' not found.")
 
     def _setup(self, comm, mode, prob_meta):
         """
