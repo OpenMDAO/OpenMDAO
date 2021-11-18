@@ -6,6 +6,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.constants import INT_DTYPE
 import openmdao.func_api as omf
 from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore, _add_options
+import openmdao.utils.coloring as coloring_mod
 
 try:
     import jax
@@ -23,6 +24,8 @@ except ImportError as err:
 def jac_forward(fun, argnums, seed_mat):
     """
     Similar to the jax.jacfwd function but allows specification of the seed matrix.
+
+    This allows us to generate a compressed jacobian based on coloring.
 
     Parameters
     ----------
@@ -50,6 +53,45 @@ def jac_forward(fun, argnums, seed_mat):
         else:
             pushfwd = partial(_jvp, f, args)
         return vmap(pushfwd, out_axes=(None, -1))(seed_mat)[1]
+    return jacfun
+
+
+def jacvec_prod(fun, argnums, invals, seed):
+    """
+    Similar to the jvp function but gives back a flat column.
+
+    Parameters
+    ----------
+    fun : function
+        The function to be differentiated.
+    argnums : tuple of int or None
+        Specifies which positional args are dynamic.  None means all positional args are dynamic.
+    seed : ndarray
+        Array of 1.0's and 0's that is used to compute a column of the jacobian matrix.
+        jax calls these 'tangents'.
+
+    Returns
+    -------
+    function
+        A function to compute the jacobian vector product.
+    """
+    f = linear_util.wrap_init(fun)
+    if argnums is not None:
+        _, invals = argnums_partial(f, argnums, invals)
+
+    # compute shaped seeds to use later
+    sizes = jnp.array([jnp.size(a) for a in invals])
+    inds = jnp.cumsum(sizes[:-1])
+    shaped_seeds = [a.reshape(s.shape) for a, s in zip(jnp.split(seed, inds, axis=0), invals)]
+
+    if argnums is None:
+        def jacfun(inps):
+            return _jvp(f, inps, shaped_seeds)[1]
+    else:
+        def jacfun(inps):
+            f_partial, dyn_args = argnums_partial(f, argnums, inps)
+            return _jvp(f_partial, dyn_args, shaped_seeds)[1]
+
     return jacfun
 
 
@@ -203,6 +245,7 @@ class ExplicitFuncComp(ExplicitComponent):
         else:
             super()._linearize(jac, sub_do_ln)
 
+    # TODO: modify this to give seeds for jac_forward (uses vmap) OR seeds for jvp/vjp
     def _get_seeds(self, invals):
         if self._jaxseeds is None:
             sizes = [np.size(a) for a in invals]
@@ -315,3 +358,14 @@ class ExplicitFuncComp(ExplicitComponent):
                 yield self.options[name]
             else:
                 yield next(inps)
+
+    def _update_rand_jac(self):
+        """
+        Compute a jacobian using randomized inputs to generate a sparsity matrix.
+        
+        This is called 1 or more times from compute_coloring.
+        """
+        seed = np.zeros(self._inputs._data.size)
+        seed[0] = 1.0
+        jcol = jacvec_prod(self._compute_jax, argnums, invals, seed)
+        col = jcol(invals)

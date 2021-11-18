@@ -1814,7 +1814,7 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
             model.declare_coloring(**kwargs)
         if run_model:
             problem.run_model()
-        coloring = model._compute_approx_coloring(wrt_patterns='*',
+        coloring = model._compute_coloring(wrt_patterns='*',
                                                   method=list(model._approx_schemes)[0],
                                                   num_full_jacs=num_full_jacs, tol=tol,
                                                   orders=orders)[0]
@@ -2118,7 +2118,7 @@ def _partial_coloring_cmd(options, user_args):
                                 if c in to_find:
                                     found.add(c)
                                 try:
-                                    coloring = s._compute_approx_coloring(**kwargs)[0]
+                                    coloring = s._compute_coloring(**kwargs)[0]
                                 except Exception:
                                     tb = traceback.format_exc()
                                     print("The following error occurred while attempting to "
@@ -2133,7 +2133,7 @@ def _partial_coloring_cmd(options, user_args):
                             raise RuntimeError("Failed to find any instance of classes %s" %
                                                sorted(to_find - found))
                 else:
-                    colorings = system._compute_approx_coloring(**kwargs)
+                    colorings = system._compute_coloring(**kwargs)
                     if not colorings:
                         print("No coloring found.")
                     else:

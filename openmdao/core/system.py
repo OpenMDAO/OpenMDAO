@@ -1045,7 +1045,7 @@ class System(object):
 
         self._coloring_info = options
 
-    def _compute_approx_coloring(self, recurse=False, **overrides):
+    def _compute_coloring(self, recurse=False, **overrides):
         """
         Compute a coloring of the approximated derivatives.
 
@@ -1075,15 +1075,22 @@ class System(object):
             for s in self.system_iter(include_self=True, recurse=True):
                 if my_coloring is None or s in grad_systems:
                     if s._coloring_info['coloring'] is not None:
-                        coloring = s._compute_approx_coloring(recurse=False, **overrides)[0]
+                        coloring = s._compute_coloring(recurse=False, **overrides)[0]
                         colorings.append(coloring)
                         if coloring is not None:
                             coloring._meta['pathname'] = s.pathname
                             coloring._meta['class'] = type(s).__name__
             return [c for c in colorings if c is not None] or [None]
 
-        # don't override metadata if it's already declared
         info = self._coloring_info
+
+        use_jax = False
+        try:
+            if self.options['use_jax']:
+                info['method'] = 'jax'
+                use_jax = True
+        except KeyError:
+            pass
 
         info.update(**overrides)
         if isinstance(info['wrt_patterns'], str):
@@ -1093,7 +1100,7 @@ class System(object):
             info['method'] = list(self._approx_schemes)[0]
 
         if info['coloring'] is None:
-            # check to see if any approx derivs have been declared
+            # check to see if any approx or jax derivs have been declared
             for meta in self._subjacs_info.values():
                 if 'method' in meta and meta['method']:
                     break
@@ -1114,12 +1121,13 @@ class System(object):
                                 s.declare_partials('*', '*', method=info['method'])
                     self._setup_partials()
 
-        approx_scheme = self._get_approx_scheme(info['method'])
+        if not use_jax:
+            approx_scheme = self._get_approx_scheme(info['method'])
 
         if info['coloring'] is None and info['static'] is None:
             info['dynamic'] = True
 
-        coloring_fname = self.get_approx_coloring_fname()
+        coloring_fname = self.get_coloring_fname()
 
         # if we find a previously computed class coloring for our class, just use that
         # instead of regenerating a coloring.
@@ -1134,11 +1142,9 @@ class System(object):
                                                                         type(self).__name__))
                 info.update(coloring._meta)
                 # force regen of approx groups during next compute_approximations
-                approx_scheme._reset()
+                if not use_jax:
+                    approx_scheme._reset()
             return [coloring]
-
-        from openmdao.core.group import Group
-        is_total = isinstance(self, Group)
 
         # compute perturbations
         starting_inputs = self._inputs.asarray(copy=True)
@@ -1153,12 +1159,12 @@ class System(object):
 
         starting_resids = self._residuals.asarray(copy=True)
 
-        # for groups, this does some setup of approximations
-        self._setup_approx_coloring()
-
         save_first_call = self._first_call_to_linearize
         self._first_call_to_linearize = False
         sparsity_start_time = time.time()
+
+        # for groups, this does some setup of approximations
+        self._setup_approx_coloring()
 
         # tell approx scheme to limit itself to only colored columns
         approx_scheme._reset()
@@ -1170,6 +1176,9 @@ class System(object):
 
         # use special sparse jacobian to collect sparsity info
         self._jacobian = _ColSparsityJac(self, info)
+
+        from openmdao.core.group import Group
+        is_total = isinstance(self, Group)
 
         for i in range(info['num_full_jacs']):
             # randomize inputs (and outputs if implicit)
@@ -1183,19 +1192,24 @@ class System(object):
                 else:
                     self._apply_nonlinear()
 
-                for scheme in self._approx_schemes.values():
-                    scheme._reset()  # force a re-initialization of approx
-                    scheme._during_sparsity_comp = True
+                if not use_jax:
+                    for scheme in self._approx_schemes.values():
+                        scheme._reset()  # force a re-initialization of approx
+                        scheme._during_sparsity_comp = True
 
-            self.run_linearize(sub_do_ln=False)
+            if use_jax:
+                self._update_rand_jac()
+            else:
+                self.run_linearize(sub_do_ln=False)
 
         sparsity, sp_info = self._jacobian.get_sparsity()
 
         self._jacobian = save_jac
 
-        # revert uncolored approx back to normal
-        for scheme in self._approx_schemes.values():
-            scheme._reset()
+        if not use_jax:
+            # revert uncolored approx back to normal
+            for scheme in self._approx_schemes.values():
+                scheme._reset()
 
         sparsity_time = time.time() - sparsity_start_time
 
@@ -1240,12 +1254,13 @@ class System(object):
 
         info['coloring'] = coloring
 
-        approx = self._get_approx_scheme(coloring._meta['method'])
-        # force regen of approx groups during next compute_approximations
-        approx._reset()
+        if not use_jax:
+            approx = self._get_approx_scheme(coloring._meta['method'])
+            # force regen of approx groups during next compute_approximations
+            approx._reset()
 
         if info['show_sparsity'] or info['show_summary']:
-            print("\nApprox coloring for '%s' (class %s)" % (self.pathname, type(self).__name__))
+            print("\nColoring for '%s' (class %s)" % (self.pathname, type(self).__name__))
 
         if info['show_sparsity']:
             coloring.display_txt()
@@ -1270,7 +1285,7 @@ class System(object):
     def _setup_approx_coloring(self):
         pass
 
-    def get_approx_coloring_fname(self):
+    def get_coloring_fname(self):
         """
         Return the full pathname to a coloring file.
 
@@ -1306,7 +1321,7 @@ class System(object):
         # under MPI, only save on proc 0
         if ((self._full_comm is not None and self._full_comm.rank == 0) or
                 (self._full_comm is None and self.comm.rank == 0)):
-            coloring.save(self.get_approx_coloring_fname())
+            coloring.save(self.get_coloring_fname())
 
     def _get_static_coloring(self):
         """
@@ -1327,7 +1342,7 @@ class System(object):
         static = info['static']
         if static is _STD_COLORING_FNAME or isinstance(static, str):
             if static is _STD_COLORING_FNAME:
-                fname = self.get_approx_coloring_fname()
+                fname = self.get_coloring_fname()
             else:
                 fname = static
             print("%s: loading coloring from file %s" % (self.msginfo, fname))
@@ -1364,7 +1379,7 @@ class System(object):
         """
         coloring = self._get_static_coloring()
         if coloring is None and self._coloring_info['dynamic']:
-            self._coloring_info['coloring'] = coloring = self._compute_approx_coloring()[0]
+            self._coloring_info['coloring'] = coloring = self._compute_coloring()[0]
             if coloring is not None:
                 self._coloring_info.update(coloring._meta)
 
