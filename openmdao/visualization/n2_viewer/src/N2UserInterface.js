@@ -900,6 +900,8 @@ class ChildSelectDialog extends N2WindowDraggable {
         this.node = node;
         this.nodeColor = color;
         this.scrollbarWidth = 14;
+
+        this.ribbonColor(this.nodeColor);
         
         // Don't do anything else if the node has no variables
         if ( ! this._fetchVarNames() ) { this.close(); }
@@ -948,55 +950,49 @@ class ChildSelectDialog extends N2WindowDraggable {
         this.minWidth = 300;
         this.minHeight = 100;
         this.theme('child-select');
-        
         this.title(this.node.name);
+        this.copyBody('#variable-selection-body');
 
-        this.headerTable = this.body.append('table').attr('class', 'header');
+        this.headerTable = this.body.select('table.header');
+        const topRow = this.headerTable.select('tr');
+        const childName = topRow.select('th:first-child');
 
-        const topRow = this.headerTable.append('tr');
-        const childName = topRow.append('th');
-        childName.append('span')
-            .attr('class', 'sort-up')
-            .html('&#9650;') // Up-arrow
+        childName.select('span.sort-up') // Up arrow
             .on('click', e => {
                 self.varNameArr.sort();
                 self.repopulate();
-            })
-        childName.append('span').text('Variable Name');
-        childName.append('span')
-            .attr('class', 'sort-down')
-            .html('&#9660;') // Down-arrow
+            });
+
+        childName.select('span.sort-down') // Down arrow
             .on('click', e => {
                 self.varNameArr.sort();
                 self.varNameArr.reverse();
                 self.repopulate();
-            })
-        topRow.append('th').attr('class','varvis').text('Visible');
+            });
 
-        this.tableContainer = this.body.append('div').attr('class', 'table-container');
-        this.table = this.tableContainer.append('table').attr('class', 'variables');
+        this.tableContainer = this.body.select('div.table-container');
+        this.table = this.tableContainer.select('table.variables');
         const UA = navigator.userAgent;
         if (! /Chrom/.test(UA)) {
             // Chrome puts the scrollbar outside the element, other browsers inside
             this.table.style('margin-right', `${this.scrollbarWidth}px`);
         }
 
-        this.tbody = this.table.append('tbody');
-        this.buttonContainer = this.body.append('div').attr('class', 'button-container');
+        this.tbody = this.table.select('tbody');
 
-        this.ribbonColor(this.nodeColor);
+        this.searchContainer = this.body.select('div.search-container');
+        this.buttonContainer = this.body.select('div.button-container');
 
         // The Select All button makes all variables visible.
-        this.buttonContainer.append('button')
+        this.buttonContainer.select('button.select-all-variables')
             .on('click', e => {
                 d3.selectAll('.window-theme-child-select input[type="checkbox"]')
                     .property('checked', true);
                 this.hiddenVars = [];
-            })
-            .text('Select All');
+            });
 
         // The Select None button hides all variables.
-        this.buttonContainer.append('button')
+        this.buttonContainer.select('button.select-no-variables')
             .on('click', e => {
                 d3.selectAll('.window-theme-child-select input[type="checkbox"]')
                     .property('checked', false);
@@ -1004,11 +1000,10 @@ class ChildSelectDialog extends N2WindowDraggable {
                 for (const child of self.node.children) {
                     this.hiddenVars.push(child);
                 }
-            })
-            .text('Select None');
+            });
 
         // Hitting Apply closes the dialog and updates the diagram.
-        this.buttonContainer.append('button')
+        this.buttonContainer.select('button.apply-variable-selection')
             .on('click', e => {
                 if (self.hiddenVars.length == self.node.children.length ) {
                     // If every variable was hidden, just collapse the node if it's expanded
@@ -1032,22 +1027,20 @@ class ChildSelectDialog extends N2WindowDraggable {
                     n2Diag.update();
                 }
                 self.close();
-            })
-            .text('Apply');
+            });
         
         this.repopulate();
 
         this.tableContainer.style('width', `${this.table.node().scrollWidth +
                 this.scrollbarWidth}px`);
         this.headerTable.style('width', this.tableContainer.style('width'));
-        this.headerTable.select('th:first-child')
+        this.headerTable.select('th.varname')
             .style('width', this.table.select('td:first-child').style('width'));
         this.headerTable.select('th.varvis')
             .style('width', this.table.select('td.varvis').style('width'));
 
-            if (this.scrollbarIsVisible()) {
-                topRow.append('th').text(' ');
-            }
+        // Add an empty cell to account for scrollbar width
+        if (this.scrollbarIsVisible()) { topRow.append('th').text(' '); }
 
         this.sizeToContent(3,30)
             .modal(true)
