@@ -899,6 +899,7 @@ class ChildSelectDialog extends N2WindowDraggable {
         super('childSelect-' + node.toId());
         this.node = node;
         this.nodeColor = color;
+        this.scrollbarWidth = 14;
         
         // Don't do anything else if the node has no variables
         if ( ! this._fetchVarNames() ) { this.close(); }
@@ -949,22 +950,10 @@ class ChildSelectDialog extends N2WindowDraggable {
         this.theme('child-select');
         
         this.title(this.node.name);
-        this.tableContainer = this.body.append('div').attr('class', 'table-container');
-        this.table = this.tableContainer.append('table');
-        const UA = navigator.userAgent;
-        if (/Chrom/.test(UA)) {
-            // Chrome puts the scrollbar outside the element, other browsers inside
-            this.table.style('margin-right', '0');
-        }
 
-        this.thead = this.table.append('thead');
-        this.tbody = this.table.append('tbody');
+        this.headerTable = this.body.append('table').attr('class', 'header');
 
-        this.buttonContainer = this.body.append('div').attr('class', 'button-container');
-
-        this.ribbonColor(this.nodeColor);
-
-        const topRow = this.thead.append('tr');
+        const topRow = this.headerTable.append('tr');
         const childName = topRow.append('th');
         childName.append('span')
             .attr('class', 'sort-up')
@@ -973,7 +962,7 @@ class ChildSelectDialog extends N2WindowDraggable {
                 self.varNameArr.sort();
                 self.repopulate();
             })
-        childName.append('span').text('Child Name');
+        childName.append('span').text('Variable Name');
         childName.append('span')
             .attr('class', 'sort-down')
             .html('&#9660;') // Down-arrow
@@ -982,7 +971,20 @@ class ChildSelectDialog extends N2WindowDraggable {
                 self.varNameArr.reverse();
                 self.repopulate();
             })
-        topRow.append('th').text('Visible');
+        topRow.append('th').attr('class','varvis').text('Visible');
+
+        this.tableContainer = this.body.append('div').attr('class', 'table-container');
+        this.table = this.tableContainer.append('table').attr('class', 'variables');
+        const UA = navigator.userAgent;
+        if (! /Chrom/.test(UA)) {
+            // Chrome puts the scrollbar outside the element, other browsers inside
+            this.table.style('margin-right', `${this.scrollbarWidth}px`);
+        }
+
+        this.tbody = this.table.append('tbody');
+        this.buttonContainer = this.body.append('div').attr('class', 'button-container');
+
+        this.ribbonColor(this.nodeColor);
 
         // The Select All button makes all variables visible.
         this.buttonContainer.append('button')
@@ -1033,8 +1035,21 @@ class ChildSelectDialog extends N2WindowDraggable {
             })
             .text('Apply');
         
-        this.repopulate()
-            .sizeToContent(3,30)
+        this.repopulate();
+
+        this.tableContainer.style('width', `${this.table.node().scrollWidth +
+                this.scrollbarWidth}px`);
+        this.headerTable.style('width', this.tableContainer.style('width'));
+        this.headerTable.select('th:first-child')
+            .style('width', this.table.select('td:first-child').style('width'));
+        this.headerTable.select('th.varvis')
+            .style('width', this.table.select('td.varvis').style('width'));
+
+            if (this.scrollbarIsVisible()) {
+                topRow.append('th').text(' ');
+            }
+
+        this.sizeToContent(3,30)
             .modal(true)
             .moveNearMouse(d3.event)
             .show();
@@ -1055,12 +1070,12 @@ class ChildSelectDialog extends N2WindowDraggable {
             const row = this.tbody.append('tr').attr('class', isEven? 'even' : 'odd');
             isEven = !isEven;
 
-            row.append('td').text(varName);
+            row.append('td').attr('class', 'varname').text(varName);
             const checkId = `${child.toId()}-visible-check`;
             if (child.varIsHidden && ! this.existingHiddenVars) { this.hiddenVars.push(child); }
 
             // Add a checkbox. When checked, the variable will be displayed.
-            row.append('td')
+            row.append('td').attr('class', 'varvis')
                 .append('input')
                 .attr('type', 'checkbox')
                 .property('checked', !child.varIsHidden)
@@ -1077,5 +1092,9 @@ class ChildSelectDialog extends N2WindowDraggable {
         }
 
         return this;
+    }
+
+    scrollbarIsVisible() {
+        return (this.tableContainer.node().scrollHeight > this.tableContainer.node().clientHeight);
     }
 }
