@@ -900,6 +900,7 @@ class ChildSelectDialog extends N2WindowDraggable {
         this.node = node;
         this.nodeColor = color;
         this.scrollbarWidth = 14;
+        this.searchTerm = ('searchTerm' in node)? node.searchTerm : null;
 
         this.ribbonColor(this.nodeColor);
         
@@ -981,56 +982,28 @@ class ChildSelectDialog extends N2WindowDraggable {
         this.tbody = this.table.select('tbody');
 
         this.searchContainer = this.body.select('div.search-container');
+        this.searchBox = this.searchContainer.select('input');
+        if (this.searchTerm) { this.searchBox.property('value', this.searchTerm); }
 
-
+        this.searchBox.on('change', e => {
+            this.searchTerm = self.searchBox.property('value');
+            self.repopulate();
+            self.sizeToContent(3,4);
+        });
 
         this.buttonContainer = this.body.select('div.button-container');
 
-        // The Select All button makes all variables visible.
+        // Apply button
         this.buttonContainer.select('button.select-all-variables')
-            .on('click', e => {
-                d3.selectAll('.window-theme-child-select input[type="checkbox"]')
-                    .property('checked', true);
-                this.hiddenVars = [];
-            });
+            .on('click', self.selectAll.bind(self));
 
-        // The Select None button hides all variables.
+        // Select None button
         this.buttonContainer.select('button.select-no-variables')
-            .on('click', e => {
-                d3.selectAll('.window-theme-child-select input[type="checkbox"]')
-                    .property('checked', false);
-                this.hiddenVars = [];
-                for (const child of self.node.children) {
-                    this.hiddenVars.push(child);
-                }
-            });
+            .on('click', self.selectNone.bind(self));
 
-        // Hitting Apply closes the dialog and updates the diagram.
+        // Select All button
         this.buttonContainer.select('button.apply-variable-selection')
-            .on('click', e => {
-                if (self.hiddenVars.length == self.node.children.length ) {
-                    // If every variable was hidden, just collapse the node if it's expanded
-                    if (! self.node.isMinimized) { n2Diag.ui.rightClick(self.node); }
-                }
-                else {
-                    n2Diag.ui.rightClickedNode = self.node;
-                    n2Diag.ui.addBackButtonHistory();
-                    self.node.hiddenVars = self.hiddenVars;
-                    
-                    if (self.node.isMinimized) {
-                        // If node itself is collapsed, expand it
-                        self.node.manuallyExpanded = true;
-                        self.node.expand();
-                        self.node.varIsHidden = false;
-                    }
-                    for (const child of self.node.children) {
-                        // Need to check every child because some may be newly visible
-                        child.varIsHidden = (self.hiddenVars.indexOf(child) >= 0);
-                    }
-                    n2Diag.update();
-                }
-                self.close();
-            });
+            .on('click', self.apply.bind(self));
         
         this.repopulate();
 
@@ -1057,10 +1030,29 @@ class ChildSelectDialog extends N2WindowDraggable {
     repopulate() {
         const self = this;
         this.tbody.html('');
+        
+        // If a search term was used, treat it as a regular expression.
+        const matchRe = this.searchTerm? new RegExp(this.searchTerm, 'i') : null;
+        this.foundSearchVars = [];
 
         let isEven = true;
+        let count = 0;
         for (const varName of this.varNameArr) {
             const child = this.varNames[varName];
+
+            if (matchRe) {
+                // Variable names not matching the regexp are hidden.
+                if (! matchRe.test(varName)) { 
+                    this.hiddenVars.push(child);
+                    continue;
+                }
+                // Matching variable names are remembered.
+                else {
+                    this.foundSearchVars.push(child);
+                }
+            }
+            
+            count++;
 
             // Alternate row colors:
             const row = this.tbody.append('tr').attr('class', isEven? 'even' : 'odd');
@@ -1087,10 +1079,77 @@ class ChildSelectDialog extends N2WindowDraggable {
                 })
         }
 
+        if (count == 0) {
+            this.tbody.append('tr')
+                .append('td')
+                .style('text-align', 'center')
+                .attr('colspan','2')
+                .text('No matching variables found.')
+        }
+
         return this;
     }
 
     scrollbarIsVisible() {
         return (this.tableContainer.node().scrollHeight > this.tableContainer.node().clientHeight);
+    }
+
+    /** Clicking Apply closes the dialog and updates the diagram. */
+    apply() {
+        if (this.hiddenVars.length == this.node.children.length ) {
+            // If every variable was hidden, just collapse the node if it's expanded
+            if (! this.node.isMinimized) { n2Diag.ui.rightClick(this.node); }
+        }
+        else {
+            n2Diag.ui.rightClickedNode = this.node;
+            n2Diag.ui.addBackButtonHistory();
+
+            this.node.searchTerm = this.searchTerm;
+            this.node.hiddenVars = this.hiddenVars;
+            
+            if (this.node.isMinimized) {
+                // If node itself is collapsed, expand it
+                this.node.manuallyExpanded = true;
+                this.node.expand();
+                this.node.varIsHidden = false;
+            }
+            for (const child of this.node.children) {
+                // Need to check every child because some may be newly visible
+                child.varIsHidden = (this.hiddenVars.indexOf(child) >= 0);
+            }
+            n2Diag.update();
+        }
+        this.close();
+    }
+
+    /**
+     * Make all variable names visible. If a search term is active, make all
+     * matching variable names visible.
+     */
+    selectAll() {
+        d3.selectAll('.window-theme-child-select input[type="checkbox"]')
+            .property('checked', true);
+        this.hiddenVars = [];
+
+        if (this.foundSearchVars.length > 0) {
+            // Select variables not found by search
+            for (const child of this.node.children) {
+                if (this.foundSearchVars.indexOf(child) < 0) {
+                    this.hiddenVars.push(child);
+                }
+            }
+        }
+    }
+
+    /** Hide all variable names */
+    selectNone() {
+        d3.selectAll('.window-theme-child-select input[type="checkbox"]')
+            .property('checked', false);
+        this.hiddenVars = [];
+
+        for (const child of this.node.children) {
+            this.hiddenVars.push(child);
+        }
+
     }
 }
