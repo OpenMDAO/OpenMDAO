@@ -946,7 +946,7 @@ class Problem(object):
             for key in des_vars.keys():
                 if key in prom2abs['output'] and key in prom2abs['input']:
                     raise RuntimeError(f"Cannot connect the design variable '{key}' to output "
-                                    f"'{prom2abs['output'][key][0]}'.")
+                                       f"'{prom2abs['output'][key][0]}'.")
 
         # Cache all args for final setup.
         self._check = check
