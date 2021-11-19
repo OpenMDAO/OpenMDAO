@@ -8,7 +8,9 @@ import numpy as np
 from numpy.testing import assert_almost_equal
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials, \
+     assert_check_totals
+
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.testing_utils import use_tempdirs
 
@@ -875,6 +877,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
         comp = om.MetaModelStructuredComp(method='slinear', extrapolate=True, vec_size=3)
+        comp._no_check_partials = False  # override skipping of check_partials
 
         for param in params:
             comp.add_input(param['name'], np.array([param['default'], param['default'], param['default']]),
@@ -894,7 +897,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         prob.run_model()
 
         partials = prob.check_partials(method='cs', out_stream=None)
-        assert_check_partials(partials, rtol=1e-10)
+        assert_check_partials(partials, rtol=1e-8)
 
     def test_vectorized_lagrange2(self):
         prob = om.Problem()
@@ -917,6 +920,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
         comp = om.MetaModelStructuredComp(method='lagrange2', extrapolate=True, vec_size=3)
+        comp._no_check_partials = False  # override skipping of check_partials
 
         for param in params:
             comp.add_input(param['name'], np.array([param['default'], param['default'], param['default']]),
@@ -950,6 +954,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         outs = mapdata.output_data
 
         comp = om.MetaModelStructuredComp(method='lagrange3', extrapolate=True, vec_size=3)
+        comp._no_check_partials = False  # override skipping of check_partials
 
         for param in params:
             comp.add_input(param['name'], np.array([param['default'], param['default'], param['default']]),
@@ -993,6 +998,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
         comp = om.MetaModelStructuredComp(method='akima', extrapolate=True, vec_size=3)
+        comp._no_check_partials = False  # override skipping of check_partials
 
         for param in params:
             comp.add_input(param['name'], np.array([param['default'], param['default'], param['default']]),
@@ -1036,6 +1042,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
         comp = om.MetaModelStructuredComp(method='cubic', extrapolate=True, vec_size=3)
+        comp._no_check_partials = False  # override skipping of check_partials
 
         for param in params:
             comp.add_input(param['name'], np.array([param['default'], param['default'], param['default']]),
@@ -1236,10 +1243,72 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         actual_msg = str(cm.exception)
         self.assertTrue(actual_msg.endswith(msg))
 
+    def test_vectorized_1D_akima(self):
+        model = om.Group()
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        outs = mapdata.output_data
+        nn = 2
+
+        comp = om.MetaModelStructuredComp(extrapolate=True,
+                                          method='akima', vec_size=nn)
+        comp.add_input('x', 0.0, np.array([.1, .2, .3, .4, .5, .6, .7]))
+        comp.add_output('f', 0.0, np.array([.3, .7, .5, .6, .3, .4, .2]))
+        comp.add_output('g', 0.0, np.array([3.3, 4, 2, 1.5, 1.4, 1.7, 1.8]))
+
+        model.add_subsystem('comp',
+                            comp,
+                            promotes=["*"])
+
+        prob = om.Problem(model)
+        prob.setup(force_alloc_complex=True)
+        prob.set_val('x', np.array([0.45, 0.75]))
+
+        prob.run_model()
+
+        totals = prob.compute_totals(of='f', wrt='x')
+        assert_near_equal(totals['f', 'x'][0, 0], -4.14285714, tolerance=1e-7)
+        assert_near_equal(totals['f', 'x'][1, 1], -3.5, tolerance=1e-7)
+
+    def test_vectorized_3D_lagrange3(self):
+        prob = om.Problem()
+        model = prob.model
+
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        x, y, _ = params
+        outs = mapdata.output_data
+
+        comp = om.MetaModelStructuredComp(method='3D-lagrange3', extrapolate=True, vec_size=3)
+
+        for param in params:
+            comp.add_input(param['name'], np.array([param['default'], param['default'], param['default']]),
+                           param['values'], units=param['units'])
+
+        for out in outs:
+            comp.add_output(out['name'], np.array([out['default'], out['default'], out['default']]),
+                            out['values'])
+
+        model.add_subsystem('comp', comp, promotes=["*"])
+
+        prob.setup(force_alloc_complex=True)
+        prob.set_val('x', np.array([1.0, 10.0, 90.0]))
+        prob.set_val('y', np.array([0.75, 0.81, 1.2]))
+        prob.set_val('z', np.array([-1.7, 1.1, 2.1]))
+
+        prob.run_model()
+
+        totals = prob.check_totals(of='f', wrt=['x', 'y', 'z'], out_stream=None)
+        # Derivatives have large magniudes, so tols are high.
+        assert_check_totals(totals, atol=1e3, rtol=1e-4)
+
     def test_deprecated(self):
         # Make sure deprecated methods are still in the table_methods list.
         om.MetaModelStructuredComp(method='trilinear')
         om.MetaModelStructuredComp(method='akima1D')
+
 
 @use_tempdirs
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
@@ -1250,6 +1319,7 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
 
         # Create regular grid interpolator instance
         xor_interp = om.MetaModelStructuredComp(method='scipy_slinear')
+        xor_interp._no_check_partials = False  # override skipping of check_partials
 
         # set up inputs and outputs
         xor_interp.add_input('x', 0.0, training_data=np.array([0.0, 1.0]), units=None)
@@ -1297,6 +1367,8 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
 
         # Create regular grid interpolator instance
         interp = om.MetaModelStructuredComp(method='scipy_cubic')
+        interp._no_check_partials = False  # override skipping of check_partials
+
         interp.add_input('p1', 0.5, training_data=p1)
         interp.add_input('p2', 0.0, training_data=p2)
         interp.add_input('p3', 3.14, training_data=p3)
@@ -1379,6 +1451,8 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
 
         # Create regular grid interpolator instance
         interp = om.MetaModelStructuredComp(method='scipy_cubic', training_data_gradients=True)
+        interp._no_check_partials = False  # override skipping of check_partials
+
         interp.add_input('p1', 0.5, p1)
         interp.add_input('p2', 0.0, p2)
         interp.add_input('p3', 3.14, p3)
