@@ -2,16 +2,10 @@
 Routines to compute coloring for use with simultaneous derivatives.
 """
 import os
-import sys
 import time
-import warnings
-import json
 import pickle
-import inspect
 import traceback
-from collections import OrderedDict, defaultdict
-from itertools import combinations, chain
-from distutils.version import LooseVersion
+from itertools import combinations
 from contextlib import contextmanager
 from pprint import pprint
 from itertools import groupby
@@ -20,8 +14,6 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 
 from openmdao.core.constants import INT_DTYPE
-from openmdao.jacobians.jacobian import Jacobian
-from openmdao.utils.array_utils import array_viz
 from openmdao.utils.general_utils import _prom2ivc_src_dict, \
     _prom2ivc_src_name_iter, _prom2ivc_src_item_iter
 import openmdao.utils.hooks as hooks
@@ -204,6 +196,56 @@ class Coloring(object):
         nz_rows = self.get_row_col_map(direction)
         for col_chunk in self.color_iter(direction):
             yield col_chunk, [nz_rows[c] for c in col_chunk]
+
+    def tangent_iter(self, direction, arr):
+        """
+        Given a direction, return input (fwd) or output (rev) tangent arrays.
+
+        Each array will contain multiple columns/rows of the identity matrix that share the
+        same color.
+
+        Parameters
+        ----------
+        direction : str
+            Indicates which coloring subdict ('fwd' or 'rev') to use.
+        arr : ndarray
+            Storage for the current array value.
+
+        Yields
+        -------
+        ndarray
+            tangent array for inputs (fwd) or outputs (rev)
+        """
+        if direction == 'fwd':
+            size = self._shape[1]
+        else:
+            size = self._shape[0]
+
+        if size != arr.size:
+            raise RuntimeError("Size of given storage array doesn't match shape of the coloring for"
+                               f"the '{direction}' direction.")
+
+        for nzs, nzparts in self.color_nonzero_iter(direction):
+            arr[:] = 0
+            arr[nzs] = 1
+            yield arr, nzs, nzparts
+
+    # def sub_result_iter(self, result, offset, direction):
+    #     """
+    #     Given a direction, split a compressed result up into its parts based on coloring.
+
+    #     Parameters
+    #     ----------
+    #     result : ndarray
+    #         Compressed result array.
+    #     offset : int
+    #         Offset into the compressed tangent matrix.
+    #     direction : str
+    #         Indicates where to use 'fwd' or 'rev' coloring.
+    #     """
+    #     scratch = result.copy()
+    #     for _, nzlist in self.color_nonzero_iter(direction):
+    #         pass
 
     def get_row_col_map(self, direction):
         """
@@ -795,6 +837,39 @@ class Coloring(object):
         J[self._nzrows, self._nzcols] = True
         return J
 
+    def _jac2subjac_sparsity(self):
+        """
+        Given a boolean jacobian and variable names and sizes, compute subjac sparsity.
+
+        Returns
+        -------
+        dict
+            Nested dict of form sparsity[of][wrt] = (rows, cols, shape)
+        """
+        sparsity = {}
+        row_start = row_end = 0
+
+        for of, of_size in zip(self._row_vars, self._row_var_sizes):
+            sparsity[of] = {}
+            row_end += of_size
+            rowbool = np.logical_and(self._nzrows >= row_start, self._nzrows < row_end)
+
+            col_start = col_end = 0
+            for wrt, wrt_size in zip(self._col_vars, self._col_var_sizes):
+                col_end += wrt_size
+                colbool = np.logical_and(self._nzcols >= col_start, self._nzcols < col_end)
+                mask = np.logical_and(rowbool, colbool)
+
+                # save sparsity structure as  (rows, cols, shape)
+                sparsity[of][wrt] = (self._nzrows[mask] - row_start, self._nzcols[mask] - col_start,
+                                    (of_size, wrt_size))
+
+                col_start = col_end
+
+            row_start = row_end
+
+        return sparsity
+
     def get_subjac_sparsity(self):
         """
         Compute the sparsity structure of each subjacobian based on the full jac sparsity.
@@ -807,8 +882,7 @@ class Coloring(object):
             Mapping of (of, wrt) keys to their corresponding (nzrows, nzcols, shape).
         """
         if self._row_vars and self._col_vars and self._row_var_sizes and self._col_var_sizes:
-            return _jac2subjac_sparsity(self._nzrows, self._nzcols, self._row_vars, self._col_vars,
-                                        self._row_var_sizes, self._col_var_sizes)
+            return self._jac2subjac_sparsity()
 
     def _subjac_sparsity_iter(self):
         subjac_sparsity = self.get_subjac_sparsity()
@@ -1481,15 +1555,15 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
         fullJ = None
         for i in range(num_full_jacs):
             if use_driver:
-                Jabs = np.abs(prob.driver._compute_totals(of=of, wrt=wrt, return_format='array',
-                                                          use_abs_names=use_abs_names))
+                Jabs = prob.driver._compute_totals(of=of, wrt=wrt, return_format='array',
+                                                   use_abs_names=use_abs_names)
             else:
-                Jabs = np.abs(prob.compute_totals(of=of, wrt=wrt, return_format='array',
-                                                  use_abs_names=use_abs_names))
+                Jabs = prob.compute_totals(of=of, wrt=wrt, return_format='array',
+                                           use_abs_names=use_abs_names)
             if fullJ is None:
-                fullJ = Jabs
+                fullJ = np.abs(Jabs)
             else:
-                fullJ += Jabs
+                fullJ += np.abs(Jabs)
 
         Jabs = None
         elapsed = time.time() - start_time
@@ -1510,55 +1584,6 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
     fullJ = None
 
     return coo_matrix((np.ones(nzrows.size, dtype=bool), (nzrows, nzcols)), shape=shape), info
-
-
-def _jac2subjac_sparsity(nzrows, nzcols, ofs, wrts, of_sizes, wrt_sizes):
-    """
-    Given a boolean jacobian and variable names and sizes, compute subjac sparsity.
-
-    Parameters
-    ----------
-    nzrows : ndarray
-        Nonzero row indices.
-    nzcols : ndarray
-        Nonzero column indices.
-    ofs : list of str
-        List of variables corresponding to rows.
-    wrts : list of str
-        List of variables corresponding to columns.
-    of_sizes : ndarray of int
-        Sizes of ofs variables.
-    wrt_sizes : ndarray of int
-        Sizes of wrts variables.
-
-    Returns
-    -------
-    dict
-        Nested dict of form sparsity[of][wrt] = (rows, cols, shape)
-    """
-    sparsity = {}
-    row_start = row_end = 0
-
-    for of, of_size in zip(ofs, of_sizes):
-        sparsity[of] = {}
-        row_end += of_size
-        rowbool = np.logical_and(nzrows >= row_start, nzrows < row_end)
-
-        col_start = col_end = 0
-        for wrt, wrt_size in zip(wrts, wrt_sizes):
-            col_end += wrt_size
-            colbool = np.logical_and(nzcols >= col_start, nzcols < col_end)
-            mask = np.logical_and(rowbool, colbool)
-
-            # save sparsity structure as  (rows, cols, shape)
-            sparsity[of][wrt] = (nzrows[mask] - row_start, nzcols[mask] - col_start,
-                                 (of_size, wrt_size))
-
-            col_start = col_end
-
-        row_start = row_end
-
-    return sparsity
 
 
 def _get_desvar_info(driver, names=None, use_abs_names=True):
@@ -1616,51 +1641,6 @@ def _get_response_info(driver, names=None, use_abs_names=True):
     return abs_names, sizes
 
 
-def get_tot_jac_sparsity(problem, mode='fwd',
-                         num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
-                         tol=_DEF_COMP_SPARSITY_ARGS['tol'],
-                         setup=False, run_model=False):
-    """
-    Compute derivative sparsity for the given problem.
-
-    Parameters
-    ----------
-    problem : Problem
-        The Problem being analyzed.
-    mode : str
-        Derivative direction.
-    num_full_jacs : int
-        Number of times to repeat total jacobian computation.
-    tol : float
-        Tolerance used to determine if an array entry is nonzero.
-    setup : bool
-        If True, run setup before calling compute_totals.
-    run_model : bool
-        If True, run run_model before calling compute_totals.
-
-    Returns
-    -------
-    dict
-        A nested dict specifying subjac sparsity for each total deriv, e.g., sparsity[resp][dv].
-    ndarray
-        Boolean sparsity matrix.
-    """
-    driver = problem.driver
-
-    J, _ = _get_bool_total_jac(problem, num_full_jacs=num_full_jacs, tol=tol, setup=setup,
-                               run_model=run_model)
-
-    ofs, of_sizes = _get_response_info(driver)
-    wrts, wrt_sizes = _get_desvar_sizes(driver)
-
-    nzrows, nzcols = np.nonzero(J)
-    sparsity = _jac2subjac_sparsity(nzrows, nzcols, ofs, wrts, of_sizes, wrt_sizes)
-
-    driver._total_jac = None
-
-    return sparsity, J
-
-
 def _compute_coloring(J, mode):
     """
     Compute a good coloring in a specified dominant direction.
@@ -1668,7 +1648,7 @@ def _compute_coloring(J, mode):
     Parameters
     ----------
     J : ndarray or coo_matrix
-        The boolean total jacobian.
+        The sparsity matrix.
     mode : str
         The direction for solving for total derivatives.  Must be 'fwd', 'rev' or 'auto'.
         If 'auto', use bidirectional coloring.
@@ -1687,7 +1667,7 @@ def _compute_coloring(J, mode):
     if mode == 'auto':  # use bidirectional coloring
         if isinstance(J, np.ndarray):
             nzrows, nzcols = np.nonzero(J)
-            J = coo_matrix((np.ones(nzrows.size), (nzrows, nzcols)), shape=J.shape)
+            J = coo_matrix((np.ones(nzrows.size, dtype=bool), (nzrows, nzcols)), shape=J.shape)
 
         coloring = MNCO_bidir(J)
         fallback = _compute_coloring(J, 'fwd')

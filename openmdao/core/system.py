@@ -1011,15 +1011,17 @@ class System(object):
         show_sparsity : bool
             If True, display sparsity with coloring info after generating coloring.
         """
-        if method not in ('fd', 'cs'):
-            raise RuntimeError("{}: method must be one of ['fd', 'cs'].".format(self.msginfo))
+        if method not in ('fd', 'cs', 'jax'):
+            raise RuntimeError("{}: method must be one of ['fd', 'cs', 'jax'].".format(self.msginfo))
 
         self._has_approx = True
-        approx = self._get_approx_scheme(method)
 
         # start with defaults
         options = _DEFAULT_COLORING_META.copy()
-        options.update(approx.DEFAULT_OPTIONS)
+
+        if method != 'jax':
+            approx = self._get_approx_scheme(method)
+            options.update(approx.DEFAULT_OPTIONS)
 
         if self._coloring_info['static'] is None:
             options['dynamic'] = True
@@ -1167,8 +1169,9 @@ class System(object):
         self._setup_approx_coloring()
 
         # tell approx scheme to limit itself to only colored columns
-        approx_scheme._reset()
-        approx_scheme._during_sparsity_comp = True
+        if not use_jax:
+            approx_scheme._reset()
+            approx_scheme._during_sparsity_comp = True
 
         self._update_wrt_matches(info)
 
@@ -1198,7 +1201,7 @@ class System(object):
                         scheme._during_sparsity_comp = True
 
             if use_jax:
-                self._update_rand_jac()
+                self._update_jac_cols()
             else:
                 self.run_linearize(sub_do_ln=False)
 

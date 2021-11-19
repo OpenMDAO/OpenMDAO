@@ -16,7 +16,8 @@ except ImportError:
 
 import openmdao.api as om
 from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.utils.coloring import _compute_coloring, array_viz, compute_total_coloring
+from openmdao.utils.array_utils import array_viz
+from openmdao.utils.coloring import _compute_coloring, compute_total_coloring
 from openmdao.utils.mpi import MPI
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder
