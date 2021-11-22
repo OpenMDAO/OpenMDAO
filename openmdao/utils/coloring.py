@@ -197,7 +197,7 @@ class Coloring(object):
         for col_chunk in self.color_iter(direction):
             yield col_chunk, [nz_rows[c] for c in col_chunk]
 
-    def tangent_iter(self, direction, arr):
+    def tangent_iter(self, direction, arr=None):
         """
         Given a direction, return input (fwd) or output (rev) tangent arrays.
 
@@ -208,7 +208,7 @@ class Coloring(object):
         ----------
         direction : str
             Indicates which coloring subdict ('fwd' or 'rev') to use.
-        arr : ndarray
+        arr : ndarray or None
             Storage for the current array value.
 
         Yields
@@ -221,7 +221,9 @@ class Coloring(object):
         else:
             size = self._shape[0]
 
-        if size != arr.size:
+        if arr is None:
+            arr = np.empty(size)
+        elif size != arr.size:
             raise RuntimeError("Size of given storage array doesn't match shape of the coloring for"
                                f"the '{direction}' direction.")
 
@@ -230,22 +232,29 @@ class Coloring(object):
             arr[nzs] = 1
             yield arr, nzs, nzparts
 
-    # def sub_result_iter(self, result, offset, direction):
-    #     """
-    #     Given a direction, split a compressed result up into its parts based on coloring.
+    def tangent_matrix(self, direction):
+        if direction == 'fwd':
+            shape = (self.total_solves(rev=False), self._shape[1])
+            tangent = np.empty(shape)
+            for i, (arr, _, _) in enumerate(self.tangent_iter(direction)):
+                tangent[i, :] = arr
+        else:  # rev
+            shape = (self._shape[0], self.total_solves(fwd=False))
+            tangent = np.empty(shape)
+            for i, (arr, _, _) in enumerate(self.tangent_iter(direction)):
+                tangent[:, i] = arr
 
-    #     Parameters
-    #     ----------
-    #     result : ndarray
-    #         Compressed result array.
-    #     offset : int
-    #         Offset into the compressed tangent matrix.
-    #     direction : str
-    #         Indicates where to use 'fwd' or 'rev' coloring.
-    #     """
-    #     scratch = result.copy()
-    #     for _, nzlist in self.color_nonzero_iter(direction):
-    #         pass
+        return tangent
+
+    def expand_jac(self, compressed_j, direction):
+        if direction == 'fwd':
+            J = np.zeros(self._shape)
+            for i, (nzs, nzparts) in enumerate(self.color_nonzero_iter(direction)):
+                for nz, nzpart in zip(nzs, nzparts):
+                    J[nzpart, nz] = compressed_j[nzpart, i]
+            return J
+        else:  # rev
+            assert False
 
     def get_row_col_map(self, direction):
         """
@@ -341,15 +350,15 @@ class Coloring(object):
 
         return tot_size, tot_solves, fwd_solves, rev_solves, pct
 
-    def total_solves(self, do_fwd=True, do_rev=True):
+    def total_solves(self, fwd=True, rev=True):
         """
         Return total number of solves required based on the given coloring info.
 
         Parameters
         ----------
-        do_fwd : bool
+        fwd : bool
             If True, add fwd colors to total.
-        do_rev : bool
+        rev : bool
             If True, add rev colors to total.
 
         Returns
@@ -359,9 +368,9 @@ class Coloring(object):
         """
         total = 0
 
-        if do_fwd and self._fwd:
+        if fwd and self._fwd:
             total += len(self._fwd[0])
-        if do_rev and self._rev:
+        if rev and self._rev:
             total += len(self._rev[0])
 
         return total

@@ -1153,6 +1153,9 @@ class TestJax2retvals(unittest.TestCase):
         assert_near_equal(J['comp.y', 'comp.b'], I * -2.5)
         assert_near_equal(J['comp.y', 'comp.c'], I * 5.)
 
+    def test_fwd3x1(self):
+        self.check_derivs('fwd', (3,1), use_jit=False)
+
     def test_fwd3x2(self):
         self.check_derivs('fwd', (3,2), use_jit=False)
 

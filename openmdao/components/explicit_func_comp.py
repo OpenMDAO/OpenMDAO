@@ -199,10 +199,6 @@ class ExplicitFuncComp(ExplicitComponent):
         if self.options['use_jax']:
             self._check_first_linearize()
 
-            # force _jvp and/or _vjp to be re-initialized the next time they are needed
-            # is called
-            self._jvp = None
-            self._vjp = None
             # argnums specifies which position args are to be differentiated
             argnums = [i for i, m in enumerate(self._compute._inputs.values())
                        if 'is_option' not in m]
@@ -216,7 +212,8 @@ class ExplicitFuncComp(ExplicitComponent):
 
             # since rev mode is more expensive, adjust size comparison a little to pick fwd
             # in some cases where input size is slightly larger than output size
-            if osize * 1.3 < isize:  # use reverse mode to compute derivs
+            if self._mode != 'fwd' and osize * 1.3 < isize:  # use reverse mode to compute derivs
+                assert coloring is None, "no coloring defined yet for rev mode"
                 j = jacrev(self._compute_jax, argnums)(*invals)
                 if nouts == 1:
                     for col, inp in zip(argnums, inames):
@@ -230,46 +227,64 @@ class ExplicitFuncComp(ExplicitComponent):
                             if abs_key in self._jacobian:
                                 self._jacobian[abs_key] = np.asarray(j[row][col])
             else:
-                # j = jacfwd(self._compute_jax, argnums)(*invals)
                 if len(argnums) == len(inames):
                     argnums = None  # speedup if there are no static args
 
+                tangents = self._get_tangents(invals, coloring, argnums)
                 if coloring is not None:
-                    self._update_jac_cols(direction='fwd')
+                    j = [np.asarray(a).reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1]))
+                         for a in jac_forward(self._compute_jax, argnums, tangents)(*invals)]
+                    J = coloring.expand_jac(np.vstack(j), 'fwd')
+                    self._jacobian.set_dense_jac(self, J)
+                    # for col in range(J.shape[1]):
+                    #     self._jacobian.set_col(self, col, J[:, col])
                 else:
-                    j = [np.asarray(a) for a in jac_forward(self._compute_jax, argnums,
-                                                            self._get_tangents(invals))(*invals)]
+                    j = []
+                    for a in jac_forward(self._compute_jax, argnums, tangents)(*invals):
+                        if a.ndim > 2:
+                            j.append(np.asarray(a).reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1])))
+                        else:  # a scalar
+                            j.append(np.atleast_2d(a))
+                    J = np.vstack(j)
 
-                    start = end = 0
-                    for inp, meta in self._compute.get_input_meta():
-                        if 'is_option' in meta:
-                            continue
-                        end += int(np.product(meta['shape']))
-                        for out, sub in zip(onames, j):
-                            abs_key = self._jacobian._get_abs_key((out, inp))
-                            if abs_key in self._jacobian:
-                                self._jacobian[abs_key] = sub[:, start:end]
-                        start = end
+                    #j = [np.asarray(a) for a in jac_forward(self._compute_jax, argnums, tangents)(*invals)]
+
+                    #j = np.vstack([a if a.ndim == 2 else a.reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1]))
+                                   #for a in j])
+                    self._jacobian.set_dense_jac(self, J)
+
+                    #start = end = 0
+                    #for inp, meta in self._compute.get_input_meta():
+                        #if 'is_option' in meta:
+                            #continue
+                        #end += np.prod(meta['shape'], dtype=INT_DTYPE)
+                        #for out, sub in zip(onames, j):
+                            #abs_key = self._jacobian._get_abs_key((out, inp))
+                            #if abs_key in self._jacobian:
+                                #self._jacobian[abs_key] = sub[:, start:end]
+                        #start = end
         else:
             super()._linearize(jac, sub_do_ln)
 
     # TODO: modify this to give tangents for jac_forward (uses vmap) OR tangents for jvp/vjp
-    def _get_tangents(self, invals):
+    def _get_tangents(self, invals, coloring=None, argnums=None):
         if self._tangents is None:
-            sizes = [np.size(a) for a in invals]
-            ndim = np.sum(sizes)
-            tangent = jnp.eye(ndim)
+            if argnums is None:
+                ins = invals
+            else:
+                ins = [invals[i] for i in argnums]
+            sizes = [np.size(a) for a in ins]
             inds = np.cumsum(sizes[:-1])
             axis = 1
-            shapes = [tangent.shape[:axis] + np.shape(v) + tangent.shape[axis + 1:] for v in invals]
+            ndim = np.sum(sizes)
+            if coloring is None:
+                tangent = jnp.eye(ndim)
+            else:
+                tangent = coloring.tangent_matrix('fwd')
+            shapes = [tangent.shape[:axis] + np.shape(v) + tangent.shape[axis + 1:] for v in ins]
             self._tangents = tuple([jnp.reshape(a, shp) for a, shp in
                                     zip(jnp.split(tangent, inds, axis=axis), shapes)])
         return self._tangents
-
-    def _setup_jax(self):
-        pass
-        # self.matrix_free = True
-        # self.compute_jacvec_product = self._compute_jacvec_product_
 
     def compute(self, inputs, outputs):
         """
@@ -306,9 +321,6 @@ class ExplicitFuncComp(ExplicitComponent):
         """
         Check that all partials are declared.
         """
-        if self.options['use_jax']:
-            self._setup_jax()
-
         for kwargs in self._compute.get_declare_partials():
             self.declare_partials(**kwargs)
 
@@ -355,6 +367,11 @@ class ExplicitFuncComp(ExplicitComponent):
                 yield self.options[name]
             else:
                 yield next(inps)
+
+    def _compute_coloring(self, recurse=False, **overrides):
+        ret = super()._compute_coloring(recurse, **overrides)
+        self._tangents = None  # reset to compute new colored tangents later
+        return ret
 
     def _update_jac_cols(self, direction=None):
         """
