@@ -236,8 +236,6 @@ class ExplicitFuncComp(ExplicitComponent):
                          for a in jac_forward(self._compute_jax, argnums, tangents)(*invals)]
                     J = coloring.expand_jac(np.vstack(j), 'fwd')
                     self._jacobian.set_dense_jac(self, J)
-                    # for col in range(J.shape[1]):
-                    #     self._jacobian.set_col(self, col, J[:, col])
                 else:
                     j = []
                     for a in jac_forward(self._compute_jax, argnums, tangents)(*invals):
@@ -245,24 +243,8 @@ class ExplicitFuncComp(ExplicitComponent):
                             j.append(np.asarray(a).reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1])))
                         else:  # a scalar
                             j.append(np.atleast_2d(a))
-                    J = np.vstack(j)
-
-                    #j = [np.asarray(a) for a in jac_forward(self._compute_jax, argnums, tangents)(*invals)]
-
-                    #j = np.vstack([a if a.ndim == 2 else a.reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1]))
-                                   #for a in j])
+                    J = np.vstack(j).reshape((osize, isize))
                     self._jacobian.set_dense_jac(self, J)
-
-                    #start = end = 0
-                    #for inp, meta in self._compute.get_input_meta():
-                        #if 'is_option' in meta:
-                            #continue
-                        #end += np.prod(meta['shape'], dtype=INT_DTYPE)
-                        #for out, sub in zip(onames, j):
-                            #abs_key = self._jacobian._get_abs_key((out, inp))
-                            #if abs_key in self._jacobian:
-                                #self._jacobian[abs_key] = sub[:, start:end]
-                        #start = end
         else:
             super()._linearize(jac, sub_do_ln)
 
