@@ -4,11 +4,14 @@ import time
 import numpy as np
 from ipytree import Tree, Node
 from ipywidgets import Label, HBox, VBox, Output, Button, Text
+from IPython.display import HTML, display
 
 from openmdao.core.component import Component
 from openmdao.core.group import Group
 from openmdao.core.constants import _SetupStatus
 from openmdao.core.indepvarcomp import IndepVarComp
+
+from openmdao.utils.units import is_compatible
 
 # Because ipywidgets has a lot of backend<->frontend comm going on, for large
 #  model hierarchies, a lot of widgets are created and you get buffer overruns. Need to slow it
@@ -81,8 +84,10 @@ class SetValuesUI(object):
         self.ui_widget = None
         self._refresh_in_progress = False
 
-        self._inputs_connected_to_ivc = self._get_inputs_connected_to_ivc()
         self._abs2prom_inputs = self._prob.model._var_allprocs_abs2prom['input']
+        self._prom2abs_inputs = self._prob.model._var_allprocs_prom2abs_list['input']
+
+        self._inputs_connected_to_ivc = self._get_inputs_connected_to_ivc()
 
         # debugging
         self._output = Output(layout={'border': '1px solid black', 'width': '30%'})
@@ -181,7 +186,7 @@ class SetValuesUI(object):
 
             # make a Model Variables widget, depending on value of vars_to_set
             if vars_to_set is not None:
-                if input_varname in vars_to_set:
+                if prom_name in vars_to_set:
                     self._add_value_widget(sys, input_varname, input_node)
             else:  # if vars_to_set is None, then add Model Variables widgets for all variables
                 self._add_value_widget(sys, input_varname, input_node)
@@ -215,7 +220,7 @@ class SetValuesUI(object):
 
         model = self._prob.model
         inputs_connected_to_ivc = []
-        for prom, alist in model._var_allprocs_prom2abs_list['input'].items():
+        for prom, alist in self._prom2abs_inputs.items():
             var = alist[0]  # var is an abs name because that is what _conn_global_abs_in2out uses
             connected_source = model._conn_global_abs_in2out[var]
             compname = connected_source.rsplit('.', 1)[0]
@@ -277,7 +282,8 @@ class SetValuesUI(object):
             layout = {'border': '1px solid black',
                       'width': '350px',
                       'display': 'flex',
-                      'justify_content': 'center'}
+                      'padding': '0px 0px 0px 20px',
+                      }
         )
         val_widget.observe(self._update_prob_val, 'value')
 
@@ -303,8 +309,10 @@ class SetValuesUI(object):
         # group all 3 widgets into an HBox
         val_and_units_remove_widget = HBox([val_widget, units_widget, remove_button])
 
-        # Button needs to know which box to remove
+        # Need some linking of widgets so handlers have the info they need
         remove_button._val_and_units_remove_widget = val_and_units_remove_widget
+        val_widget._units_widget = units_widget
+        units_widget._val_widget = val_widget
 
         # need to know which node & var it is associated with so handlers can do all they need to do
         val_and_units_remove_widget._tree_node = tree_node
@@ -347,16 +355,6 @@ class SetValuesUI(object):
 
         """
         box_to_remove = button._val_and_units_remove_widget
-
-        # # Cannot use remove on tuples, which children are so
-        # if box_to_remove:
-        #     # rebuild the children list minus the box to remove
-        #     self._value_widget_box.children = tuple \
-        #         (box for box in self._value_widget_box.children if box != box_to_remove)
-        #     box_to_remove.close()
-        #     associated_tree_node = box_to_remove._tree_node
-        #     associated_tree_node.icon = _ICON_VARIABLE_NOT_SELECTED
-        #     associated_tree_node.icon_style = _ICON_STYLE_VARIABLE_NOT_SELECTED
 
         # Cannot use remove on tuples, which children are so
         # rebuild the children list minus the box to remove
@@ -407,15 +405,16 @@ class SetValuesUI(object):
         # in the widget
         if not self._refresh_in_progress:
             val = float(change['new']) if change['new'] else 0.0
-
-            # get the units also for the set_val call
             var_name = change['owner'].description
-            corresponding_units_widget = self._get_unit_widget(var_name)  # TODO need a link here
-            units = corresponding_units_widget.value
+
+            # get units for set_val
+            val_widget = change['owner']
+            units_widget = val_widget._units_widget
+            units = units_widget.value
             if units == 'None':
                 units = None
 
-            self._prob.set_val(change['owner'].description, val, units=units)
+            self._prob.set_val(var_name, val, units=units)
 
     def _update_prob_unit(self, change):
         """
@@ -427,42 +426,39 @@ class SetValuesUI(object):
             A dictionary holding the information about the change
 
         """
-        var_name = change['owner']._var_name
+        units_old = change['old']
+
         units = change['new']
+        units_widget = change['owner']
 
-        corresponding_val_widget = self._get_val_widget(var_name) # TODO use links
+        # Check if units are compatible
+        inputs_metadata = self._prob.model.get_io_metadata(('input',), ['units', ],
+                                     get_remote=True, return_rel_names=False)
 
-        val = float(corresponding_val_widget.value)
+        prom_name = units_widget._var_name  # promoted name
+        # metadata keys are abs names
+        abs_name = self._prom2abs_inputs[prom_name][0]  # it is a list
+        metadata = inputs_metadata[abs_name]
+        units_default = metadata['units']
+        if not is_compatible(units_default, units):
+            display(HTML(f"<script>alert('Units \"{units}\" is not compatible with units \"{units_old}\"');</script>"))
+            units_widget.value = units_old
+            return
+
+        # get value for the call to set_val
+        val_widget = units_widget._val_widget
+        val = float(val_widget.value)
+
+        var_name = units_widget._var_name
+
+
         self._prob.set_val(var_name, val, units=units)
-
-    def _get_unit_widget(self, var_name):   # TODO - still need it?
-        corresponding_units_widget = None
-        for box in self._value_widget_box.children[1:]:
-            units_widget = box.children[1]
-            if units_widget._var_name == var_name:
-                corresponding_units_widget = units_widget
-                break
-        if not corresponding_units_widget:
-            raise (f"Corresponding units widget for {var_name} not found")
-        return corresponding_units_widget
-
-    def _get_val_widget(self, var_name):   # TODO - still need it?
-        corresponding_val_widget = None
-        for box in self._value_widget_box.children[1:]:
-            val_widget = box.children[0]
-            if val_widget.description == var_name:
-                corresponding_val_widget = val_widget
-                break
-        if not corresponding_val_widget:
-            raise (f"Corresponding val widget for {var_name} not found")
-        return corresponding_val_widget
 
     def _get_widget_var_names(self): # TODO - more efficient way?
         var_names = []
         for box in self._value_widget_box.children[1:]:
             float_text_widget = box.children[0]
             var_names.append(float_text_widget.description)
-        self._output.append_stdout(f"result of _get_widget_var_names is {var_names}\n")
         return var_names
 
     def _get_var_names_at_this_level(self, sys):
@@ -473,56 +469,64 @@ class SetValuesUI(object):
         Parameters
         ----------
         sys : OpenMDAO System
-            The OpenMDAO System that the caller wants the promoted variables from
+            The OpenMDAO System that the caller wants the promoted variables of
 
         Returns
         -------
-        list
+        list of tuples
             List of variables that have been promoted to this System, sys, and no higher.
+            Both the promoted and absolute name are put in the list as a tuple
         """
+        # TODO Should be able to just pass back the abs or prom of the variable
         var_names_at_this_level = []
-        # current_group_absolute_path = sys.pathname
         if isinstance(sys, Component):
             for abs_name, prom_name in sys._var_allprocs_abs2prom['input'].items():
                 current_group_var_promoted_name = prom_name
-                # if they're different you would know that someone above the current group promoted it
-                # current_group_pathname = f"{current_group_absolute_path}.{current_group_var_promoted_name}"
-                # if promoted_name_from_top_level == current_group_pathname:
-                #     var_names_at_this_level.add(prom_name)
 
                 if "." not in current_group_var_promoted_name:  # this seems sufficient
-                    # if promoted_name_from_top_level.endswith(f"{sys.name}.{prom_name}"):
                     if not self._does_parent_sys_have_this_var_promoted( sys, abs_name):
                             var_names_at_this_level.append((prom_name,abs_name))
         else: # Group
             for abs_name, prom_name in sys._var_allprocs_abs2prom['input'].items():
-                # promoted_name_from_top_level = model_abs2prom[abs_name]
                 current_group_var_promoted_name = prom_name
-                # if they're different you would know that someone above the current group promoted it
-                # current_group_pathname = f"{current_group_absolute_path}.{current_group_var_promoted_name}"
 
                 if sys.pathname == '':  # root
                     if not "." in prom_name:
-                        # don't want dups based on the prom_name, which is the first item in the
-                        # tuple
+                        # don't want dups based on prom_name, which is the first item in the tuple
                         if prom_name not in [a[0] for a in var_names_at_this_level]:
                             var_names_at_this_level.append((prom_name,abs_name))
                 else:
                     if "." not in current_group_var_promoted_name:  # this seems sufficient
-                        # WHAT IF a group higher up has the same name and the var is promoted to that level?
+                        # What if a group higher up has the same name and the var is promoted to
+                        #    that level?
                         if not self._does_parent_sys_have_this_var_promoted(sys, abs_name):
-                            # don't want dups based on the prom_name, which is the first item in
-                            # the tuple
+                            # don't want dups based on prom_name, which is the first item in tuple
                             if prom_name not in [a[0] for a in var_names_at_this_level]:
                                     var_names_at_this_level.append((prom_name,abs_name))
-                    # if promoted_name_from_top_level == current_group_pathname:   # DO I really need this?
-                    #     var_names_at_this_level.add(prom_name)
 
         # need to sort them
         var_names_at_this_level.sort(key = lambda x: x[0].lower())
         return var_names_at_this_level
 
     def _does_parent_sys_have_this_var_promoted(self, sys, abs_name):
+        """
+        Check to see if the parent System of 'sys' has the variable 'abs_name' promoted to it's
+        level.
+
+        Parameters
+        ----------
+        sys : OpenMDAO System
+            The OpenMDAO System of interest. This method will determine if it's parent has
+            the variable 'abs_name' promoted to it's level
+
+        abs_name : OpenMDAO System
+            The absolute name of the variable of interest
+
+        Returns
+        -------
+        boot
+            True of the variable 'abs_name' is promoted to the parent of 'sys', or higher.
+        """
         #  TODO. It works for when sys is model, but should really handle that explicitly
         parent_pathname_and_child = sys.pathname.rsplit('.', 1)
         if len(parent_pathname_and_child) > 1:
@@ -535,7 +539,8 @@ class SetValuesUI(object):
             if "." in parent_vars[abs_name]:
                 return False # so it is at this level
             else:
-                return True  # parent has same var and it's promoted name in that group has no .
-                             # so it has it at that level at least. Definitely not at this sys level
+                return True  # parent has same var and it's promoted name in that group
+                             # has no period in it so that system has it at that level at least.
+                             # Definitely not at this 'sys' level
         else:
             raise(f"shouldn't happen! {abs_name} not found in var for {parent_pathname}")
