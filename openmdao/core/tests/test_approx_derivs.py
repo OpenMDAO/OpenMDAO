@@ -1,12 +1,6 @@
 """ Testing for group finite differencing."""
-import itertools
 import time
 import unittest
-
-try:
-    from parameterized import parameterized
-except ImportError:
-    from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 import numpy as np
 
@@ -969,13 +963,7 @@ class TestGroupComplexStep(unittest.TestCase):
         except Exception:
             pass
 
-    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
-                          name_func=lambda f, n, p:
-                          'test_paraboloid_'+'_'.join(title(a) for a in p.args))
-    def test_paraboloid(self, vec_class):
-
-        if not vec_class:
-            raise unittest.SkipTest("PETSc is not installed")
+    def test_paraboloid(self):
 
         prob = self.prob
         model = prob.model
@@ -986,7 +974,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.linear_solver = om.ScipyKrylov()
         model.approx_totals(method='cs')
 
-        prob.setup(check=False, mode='fwd', local_vector_class=vec_class)
+        prob.setup(mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -1000,13 +988,7 @@ class TestGroupComplexStep(unittest.TestCase):
         # 1 output x 2 inputs
         self.assertEqual(np.sum(v.size for v in derivs.values()), 2)
 
-    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
-                          name_func=lambda f, n, p:
-                          'test_paraboloid_subbed_'+'_'.join(title(a) for a in p.args))
-    def test_paraboloid_subbed(self, vec_class):
-
-        if not vec_class:
-            raise unittest.SkipTest("PETSc is not installed")
+    def test_paraboloid_subbed(self):
 
         prob = self.prob
         model = prob.model
@@ -1018,7 +1000,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.linear_solver = om.ScipyKrylov()
         sub.approx_totals(method='cs')
 
-        prob.setup(check=False, mode='fwd', local_vector_class=vec_class)
+        prob.setup(mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -1036,13 +1018,7 @@ class TestGroupComplexStep(unittest.TestCase):
         # 1 output x 2 inputs
         self.assertEqual(len(sub._approx_schemes['cs']._wrt_meta), 2)
 
-    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
-                          name_func=lambda f, n, p:
-                          'test_parab_subbed_with_connections_'+'_'.join(title(a) for a in p.args))
-    def test_paraboloid_subbed_with_connections(self, vec_class):
-
-        if not vec_class:
-            raise unittest.SkipTest("PETSc is not installed")
+    def test_paraboloid_subbed_with_connections(self):
 
         prob = self.prob
         model = prob.model
@@ -1061,7 +1037,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.linear_solver = om.ScipyKrylov()
         sub.approx_totals(method='cs')
 
-        prob.setup(check=False, mode='fwd', local_vector_class=vec_class)
+        prob.setup(mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -1076,13 +1052,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(Jfd['sub.comp.f_xy', 'sub.bx.xin'], [[-6.0]], 1e-6)
         assert_near_equal(Jfd['sub.comp.f_xy', 'sub.by.yin'], [[8.0]], 1e-6)
 
-    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
-                          name_func=lambda f, n, p:
-                          'test_array_comp_'+'_'.join(title(a) for a in p.args))
-    def test_array_comp(self, vec_class):
-
-        if not vec_class:
-            raise unittest.SkipTest("PETSc is not installed")
+    def test_array_comp(self):
 
         class DoubleArrayFD(DoubleArrayComp):
 
@@ -1104,7 +1074,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.linear_solver = om.ScipyKrylov()
         model.approx_totals(method='cs')
 
-        prob.setup(check=False, local_vector_class=vec_class)
+        prob.setup()
         prob.run_model()
         model.run_linearize()
 
@@ -1114,13 +1084,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(Jfd['comp.y2', 'p1.x1'], comp.JJ[2:4, 0:2], 1e-6)
         assert_near_equal(Jfd['comp.y2', 'p2.x2'], comp.JJ[2:4, 2:4], 1e-6)
 
-    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
-                          name_func=lambda f, n, p:
-                          'test_unit_conv_group_'+'_'.join(title(a) for a in p.args))
-    def test_unit_conv_group(self, vec_class):
-
-        if not vec_class:
-            raise unittest.SkipTest("PETSc is not installed")
+    def test_unit_conv_group(self):
 
         prob = self.prob
         prob.model.add_subsystem('px1', om.IndepVarComp('x1', 100.0), promotes=['x1'])
@@ -1139,7 +1103,7 @@ class TestGroupComplexStep(unittest.TestCase):
 
         sub2.approx_totals(method='cs')
 
-        prob.setup(check=False, local_vector_class=vec_class)
+        prob.setup()
         prob.run_model()
 
         assert_near_equal(prob['sub1.src.x2'], 100.0, 1e-6)
@@ -1156,7 +1120,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(J['sub2.tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
         # Check the total derivatives in reverse mode
-        prob.setup(check=False, mode='rev', local_vector_class=vec_class)
+        prob.setup(mode='rev')
         prob.run_model()
         J = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
@@ -1164,14 +1128,8 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
         assert_near_equal(J['sub2.tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
-    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
-                          name_func=lambda f, n, p:
-                          'test_sellar_'+'_'.join(title(a) for a in p.args))
-    def test_sellar(self, vec_class):
+    def test_sellar(self):
         # Basic sellar test.
-
-        if not vec_class:
-            raise unittest.SkipTest("PETSc is not installed")
 
         prob = self.prob
         model = prob.model
@@ -1195,7 +1153,7 @@ class TestGroupComplexStep(unittest.TestCase):
 
         model.approx_totals(method='cs')
 
-        prob.setup(check=False, local_vector_class=vec_class)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -1329,14 +1287,8 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(J['y1', 'x1'][2][0], Jbase[2, 1], 1e-8)
         assert_near_equal(J['y1', 'x1'][2][1], Jbase[2, 3], 1e-8)
 
-    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
-                          name_func=lambda f, n, p:
-                          'test_newton_with_direct_solver_'+'_'.join(title(a) for a in p.args))
-    def test_newton_with_direct_solver(self, vec_class):
+    def test_newton_with_direct_solver(self):
         # Basic sellar test.
-
-        if not vec_class:
-            raise unittest.SkipTest("PETSc is not installed")
 
         prob = om.Problem()
         model = prob.model
@@ -1362,7 +1314,7 @@ class TestGroupComplexStep(unittest.TestCase):
 
         model.approx_totals(method='cs')
 
-        prob.setup(check=False, local_vector_class=vec_class)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -1380,14 +1332,8 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
         assert_near_equal(J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
 
-    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
-                          name_func=lambda f, n, p:
-                          'test_newton_with_direct_solver_dense_'+'_'.join(title(a) for a in p.args))
-    def test_newton_with_direct_solver_dense(self, vec_class):
+    def test_newton_with_direct_solver_dense(self):
         # Basic sellar test.
-
-        if not vec_class:
-            raise unittest.SkipTest("PETSc is not installed")
 
         prob = om.Problem()
         model = prob.model
@@ -1415,7 +1361,7 @@ class TestGroupComplexStep(unittest.TestCase):
 
         model.approx_totals(method='cs')
 
-        prob.setup(check=False, local_vector_class=vec_class)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -1433,14 +1379,8 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
         assert_near_equal(J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
 
-    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
-                          name_func=lambda f, n, p:
-                          'test_newton_with_direct_solver_csc_'+'_'.join(title(a) for a in p.args))
-    def test_newton_with_direct_solver_csc(self, vec_class):
+    def test_newton_with_direct_solver_csc(self):
         # Basic sellar test.
-
-        if not vec_class:
-            raise unittest.SkipTest("PETSc is not installed")
 
         prob = om.Problem()
         model = prob.model
@@ -1468,7 +1408,7 @@ class TestGroupComplexStep(unittest.TestCase):
 
         model.approx_totals(method='cs')
 
-        prob.setup(check=False, local_vector_class=vec_class)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -1486,13 +1426,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
         assert_near_equal(J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
 
-    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
-                          name_func=lambda f, n, p:
-                          'test_subbed_newton_gs_'+'_'.join(title(a) for a in p.args))
-    def test_subbed_newton_gs(self, vec_class):
-
-        if not vec_class:
-            raise unittest.SkipTest("PETSc is not installed")
+    def test_subbed_newton_gs(self):
 
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
         class SellarDerivatives(om.Group):
@@ -1542,13 +1476,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
         assert_near_equal(J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
 
-    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
-                          name_func=lambda f, n, p:
-                          'test_subbed_newton_gs_csc_external_mtx_'+'_'.join(title(a) for a in p.args))
-    def test_subbed_newton_gs_csc_external_mtx(self, vec_class):
-
-        if not vec_class:
-            raise unittest.SkipTest("PETSc is not installed")
+    def test_subbed_newton_gs_csc_external_mtx(self):
 
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
         class SellarDerivatives(om.Group):
@@ -1598,13 +1526,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
         assert_near_equal(J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
 
-    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
-                          name_func=lambda f, n, p:
-                          'test_subbed_newton_gs_dense_external_mtx_'+'_'.join(title(a) for a in p.args))
-    def test_subbed_newton_gs_dense_external_mtx(self, vec_class):
-
-        if not vec_class:
-            raise unittest.SkipTest("PETSc is not installed")
+    def test_subbed_newton_gs_dense_external_mtx(self):
 
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
         class SellarDerivatives(om.Group):
@@ -1654,14 +1576,8 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
         assert_near_equal(J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
 
-    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
-                          name_func=lambda f, n, p:
-                          'test_newton_with_krylov_solver_'+'_'.join(title(a) for a in p.args))
-    def test_newton_with_krylov_solver(self, vec_class):
+    def test_newton_with_krylov_solver(self):
         # Basic sellar test.
-
-        if not vec_class:
-            raise unittest.SkipTest("PETSc is not installed")
 
         prob = om.Problem()
         model = prob.model
@@ -1688,7 +1604,7 @@ class TestGroupComplexStep(unittest.TestCase):
 
         model.approx_totals(method='cs', step=1e-14)
 
-        prob.setup(check=False, local_vector_class=vec_class)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 

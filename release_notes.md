@@ -1,4 +1,123 @@
 ***********************************
+# Release Notes for OpenMDAO 3.14.0
+
+November 18, 2021
+
+OpenMDAO 3.14.0 features new function wrapping capability that makes it easier to tie existing code into OpenMDAO,
+and significantly increased interpolation performance when the training data is fixed.
+
+## New Deprecations
+
+- Renamed fixed interp methods to follow convention in [POEM 058](https://github.com/OpenMDAO/POEMs/blob/master/POEM_058.md), 'trilinear' and 'akima1D' are now deprecated and changed to '3D-slinear' and '1D-akima', respectively. [#2329](https://github.com/OpenMDAO/OpenMDAO/pull/2329) [#2332](https://github.com/OpenMDAO/OpenMDAO/pull/2332)
+
+## Backwards Incompatible API Changes
+
+- None
+
+## Backwards Incompatible Non-API Changes
+
+- None
+
+## New Features
+
+- Added implementation of ExplicitFuncComp, the explicit function wrapping capability described in [POEM 056](https://github.com/OpenMDAO/POEMs/blob/master/POEM_056.md) and [POEM 057](https://github.com/OpenMDAO/POEMs/blob/master/POEM_057.md). [#2309](https://github.com/OpenMDAO/OpenMDAO/pull/2309)
+- Added a new method '3D-lagrange3' for interpolation on a fixed 3D grid. This method is vectorized and caches the coefficients for each cell, which results in a much more efficient execution. [#2314](https://github.com/OpenMDAO/OpenMDAO/pull/2314)
+- Added implementation of ImplicitFuncComp for implicit function wrapping capability described in [POEM 056](https://github.com/OpenMDAO/POEMs/blob/master/POEM_056.md) and [POEM 057](https://github.com/OpenMDAO/POEMs/blob/master/POEM_057.md). [#2321](https://github.com/OpenMDAO/OpenMDAO/pull/2321)
+- Added a fixed '3D-lagrange2' interpolant, and implemented some other performance improvements. [#2337](https://github.com/OpenMDAO/OpenMDAO/pull/2337)
+- Added a variable selection dialog added to N2 diagram, use Alt+Right Click to access it. [#2339](https://github.com/OpenMDAO/OpenMDAO/pull/2339)
+- Added warning when user calls list_inputs before final_setup [#2341](https://github.com/OpenMDAO/OpenMDAO/pull/2341)
+
+## Bug Fixes
+
+- Fixed output of reverse mode partials in check_partials if they were divided by comm size. [#2310](https://github.com/OpenMDAO/OpenMDAO/pull/2310)
+- Handle recording of constraints that use input names, which is how bounds are implemented when using COBYLA. [#2323](https://github.com/OpenMDAO/OpenMDAO/pull/2323)
+- Fixed documentation pages that use automethod but were missing eval-rst. [#2331](https://github.com/OpenMDAO/OpenMDAO/pull/2331)
+
+## Miscellaneous
+
+- Pinned playwight version to <1.15 so GUI testing still works on RHEL/CentOS. [#2311](https://github.com/OpenMDAO/OpenMDAO/pull/2311)
+- Changed GitHub actions to use Python <3.9. [#2313](https://github.com/OpenMDAO/OpenMDAO/pull/2313)
+- Added step to GitHub workflow to check for security vulnerabilities. [#2317](https://github.com/OpenMDAO/OpenMDAO/pull/2317)
+- Fixed an issue with documentation upload. [#2318](https://github.com/OpenMDAO/OpenMDAO/pull/2318)
+- Updated advanced recording documentation page. [#2322](https://github.com/OpenMDAO/OpenMDAO/pull/2322)
+- Additional speed improvements for interpolation. [#2325](https://github.com/OpenMDAO/OpenMDAO/pull/2325)
+- Improved performance for setting jacobian elements. [#2335](https://github.com/OpenMDAO/OpenMDAO/pull/2335)
+
+***********************************
+# Release Notes for OpenMDAO 3.13.1
+
+October 13, 2021
+
+OpenMDAO 3.13.1 is a patch release to fix a minor bug in the new trilinear interpolant.
+
+## New Deprecations
+
+- None
+
+## Backwards Incompatible API Changes
+
+- None
+
+## Backwards Incompatible Non-API Changes
+
+- None
+
+## New Features
+
+- The implementations for Trilinear and akima1D are now vectorized with coefficient caching. [#2300](https://github.com/OpenMDAO/OpenMDAO/pull/2300)
+
+## Bug Fixes
+
+- Fixed a bug where extrapolation was mistakenly not handled in the Trilinear method. [#2300](https://github.com/OpenMDAO/OpenMDAO/pull/2300)
+- Prevent mpi4py & petsc4py from importing when they're not wanted [#2290](https://github.com/OpenMDAO/OpenMDAO/pull/2290)
+
+## Miscellaneous
+
+- Remove reference to since-deleted code regarding 2-3 compatibility [#2299](https://github.com/OpenMDAO/OpenMDAO/pull/2299)
+
+***********************************
+# Release Notes for OpenMDAO 3.13.0
+
+October 06, 2021
+
+OpenMDAO 3.13.0 implements a change in the way indices are handled.
+See [POEM 053](https://github.com/OpenMDAO/POEMs/blob/master/POEM_053.md) and [POEM 054](https://github.com/OpenMDAO/POEMs/blob/master/POEM_054.md)
+for more information.
+
+We've also added some security to the OpenMDAO repository by requiring GPG-signed commits when accepting pull requests.
+This is an extra layer of security that helps prevent nefarious pull-requests from being made to the code-base.
+See the documentation [here](http://openmdao.org/twodocs/versions/latest/other_useful_docs/developer_docs/signing_commits.html) for more information.
+
+## New Deprecations
+
+- Behavior of `'rel'` step_calc for finite difference is changed and issues a deprecation warning if used, see [#2209](https://github.com/OpenMDAO/OpenMDAO/pull/2209) for more information.
+
+## Backwards Incompatible API Changes
+
+- When indexing into multi-dimensional arrays while connecting or adding design variables, constraints, or objectives, the indices will now behave like numpy indices.  Flattened behavior can be achieved using `flat_src_indices` (in connections) or `flat_indices` (in other methods).
+
+## Backwards Incompatible Non-API Changes
+
+- None
+
+## New Features
+
+- Completed the transition to numpy style indexing described in POEM_054. [#2279](https://github.com/OpenMDAO/OpenMDAO/pull/2279)
+- Added information on min and max values of array variables in our list methods per [POEM 055](https://github.com/OpenMDAO/POEMs/blob/master/POEM_055.md).  Thank you @andrewellis55 for the contribution. [#2280](https://github.com/OpenMDAO/OpenMDAO/pull/2280)
+- Added an implementation of the function metadata API per [POEM 056](https://github.com/OpenMDAO/POEMs/blob/master/POEM_056.md) [#2281](https://github.com/OpenMDAO/OpenMDAO/pull/2281)
+- Improved performance of cubic metamodel interpolation, and added interpolants `akima1d` and `trilinear` that are limited to fixed dimensions and no derivatives wrt the training data, but are significantly faster. These interpolants are currently under development so some changes to the API may occur. [#2285](https://github.com/OpenMDAO/OpenMDAO/pull/2285)
+
+## Bug Fixes
+
+- None
+
+## Miscellaneous
+
+- Added docs for signing/verifying commits [#2273](https://github.com/OpenMDAO/OpenMDAO/pull/2273)
+- remove unused travis CI files [#2274](https://github.com/OpenMDAO/OpenMDAO/pull/2274)
+- Fix test that was failing due to varying precision in warning message. [#2287](https://github.com/OpenMDAO/OpenMDAO/pull/2287)
+
+***********************************
 # Release Notes for OpenMDAO 3.12.0
 
 September 15, 2021

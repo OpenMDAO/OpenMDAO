@@ -245,7 +245,7 @@ class IndepVarComp(ExplicitComponent):
 
 class _AutoIndepVarComp(IndepVarComp):
     """
-    Class to use when all output variables are independent.
+    IndepVarComp whose outputs are automatically connected to all unconnected inputs.
 
     Attributes
     ----------

@@ -20,6 +20,8 @@ class DictionaryJacobian(Jacobian):
     ----------
     _iter_keys : list of (vname, vname) tuples
         List of tuples of variable names that match subjacs in the this Jacobian.
+    _is_explicit : bool
+        True if corresponding system is an ExplicitComponent
     """
 
     def __init__(self, system, **kwargs):
@@ -27,9 +29,14 @@ class DictionaryJacobian(Jacobian):
         Initialize all attributes.
         """
         super().__init__(system, **kwargs)
-        self._iter_keys = {}
+        self._iter_keys = None
 
-    def _iter_abs_keys(self, system, vec_name):
+        # avoid circular import
+        from openmdao.core.explicitcomponent import ExplicitComponent
+
+        self._is_explicit = isinstance(system, ExplicitComponent)
+
+    def _iter_abs_keys(self, system):
         """
         Iterate over subjacs keyed by absolute names.
 
@@ -39,17 +46,13 @@ class DictionaryJacobian(Jacobian):
         ----------
         system : System
             System that is updating this jacobian.
-        vec_name : str
-            The name of the current RHS vector.
 
         Returns
         -------
         list
             List of keys matching this jacobian for the current system.
         """
-        entry = (system.pathname, vec_name)
-
-        if entry not in self._iter_keys:
+        if self._iter_keys is None:
             subjacs = self._subjacs_info
             keys = []
             for res_name in system._var_abs2meta['output']:
@@ -59,9 +62,9 @@ class DictionaryJacobian(Jacobian):
                         if key in subjacs:
                             keys.append(key)
 
-            self._iter_keys[entry] = keys
+            self._iter_keys = keys
 
-        return self._iter_keys[entry]
+        return self._iter_keys
 
     def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """
@@ -80,9 +83,6 @@ class DictionaryJacobian(Jacobian):
         mode : str
             'fwd' or 'rev'.
         """
-        # avoid circular import
-        from openmdao.core.explicitcomponent import ExplicitComponent
-
         fwd = mode == 'fwd'
         d_res_names = d_residuals._names
         d_out_names = d_outputs._names
@@ -95,15 +95,14 @@ class DictionaryJacobian(Jacobian):
         oflat = d_outputs._abs_get_val
         iflat = d_inputs._abs_get_val
         subjacs_info = self._subjacs_info
-        is_explicit = isinstance(system, ExplicitComponent)
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-            for abs_key in self._iter_abs_keys(system, d_residuals._name):
+            for abs_key in self._iter_abs_keys(system):
                 res_name, other_name = abs_key
                 if res_name in d_res_names:
                     if other_name in d_out_names:
                         # skip the matvec mult completely for identity subjacs
-                        if is_explicit and res_name is other_name:
+                        if self._is_explicit and res_name is other_name:
                             if fwd:
                                 val = rflat(res_name)
                                 val -= oflat(other_name)
@@ -202,12 +201,15 @@ class _CheckingJacobian(DictionaryJacobian):
         for of, start, end, _, _ in system._jac_of_iter():
             nrows = end - start
             for wrt, wstart, wend, _, _, _ in system._jac_wrt_iter():
-                ncols = wend - wstart
-                loc_wrt = wrt.rsplit('.', 1)[-1]
-                directional = (local_opts is not None and loc_wrt in local_opts and
-                               local_opts[loc_wrt]['directional'])
+                if local_opts:
+                    loc_wrt = wrt.rsplit('.', 1)[-1]
+                    directional = (loc_wrt in local_opts and
+                                   local_opts[loc_wrt]['directional'])
+                else:
+                    directional = False
                 key = (of, wrt)
                 if key not in self._subjacs_info:
+                    ncols = wend - wstart
                     # create subjacs_info objects for matrix_free systems that don't have them
                     self._subjacs_info[key] = {
                         'rows': None,
@@ -241,12 +243,11 @@ class _CheckingJacobian(DictionaryJacobian):
         column : ndarray
             Column value.
         """
-        if self._colnames is None:
+        if self._col_varnames is None:
             self._setup_index_maps(system)
 
-        wrt = self._colnames[self._col2name_ind[icol]]
-        _, offset, _, _, _, _ = self._col_var_info[wrt]
-        loc_idx = icol - offset  # local col index into subjacs
+        wrt = self._col_varnames[self._col2name_ind[icol]]
+        loc_idx = icol - self._col_var_offset[wrt]  # local col index into subjacs
 
         scratch = np.zeros(column.shape)
 

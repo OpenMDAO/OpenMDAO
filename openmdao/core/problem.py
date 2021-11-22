@@ -31,9 +31,8 @@ from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data, \
     record_model_options
 from openmdao.utils.record_util import create_local_meta
-from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, _slice_indices, \
-    LocalRangeIterable
-from openmdao.utils.mpi import MPI, FakeComm, multi_proc_exception_check
+from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable
+from openmdao.utils.mpi import MPI, FakeComm, multi_proc_exception_check, check_mpi_env
 from openmdao.utils.name_maps import name2abs_names
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import simplify_unit
@@ -144,11 +143,15 @@ class Problem(object):
         self._warned = False
 
         if comm is None:
-            try:
-                from mpi4py import MPI
-                comm = MPI.COMM_WORLD
-            except ImportError:
+            use_mpi = check_mpi_env()
+            if use_mpi is False:
                 comm = FakeComm()
+            else:
+                try:
+                    from mpi4py import MPI
+                    comm = MPI.COMM_WORLD
+                except ImportError:
+                    comm = FakeComm()
 
         if model is None:
             self.model = Group()
@@ -1345,6 +1348,7 @@ class Problem(object):
                                                 # apply the correction to undo the component's
                                                 # internal Allreduce.
                                                 derivs *= mult
+                                                partials_data[c_name][inp, out]['j_rev_mult'] = mult
 
                                         key = inp, out
                                         deriv = partials_data[c_name][key]
@@ -1496,6 +1500,7 @@ class Problem(object):
                 if wrt in local_opts and local_opts[wrt]['directional']:
                     deriv = partials_data[c_name][rel_key]
                     deriv['J_fwd'] = np.atleast_2d(np.sum(deriv['J_fwd'], axis=1)).T
+
                     if comp.matrix_free:
                         deriv['J_rev'] = np.atleast_2d(np.sum(deriv['J_rev'], axis=0)).T
 
@@ -1723,7 +1728,7 @@ class Problem(object):
             # Display whether indices were declared when response was added.
             of = key[0]
             if of in resp and resp[of]['indices'] is not None:
-                data[''][key]['indices'] = len(resp[of]['indices'])
+                data[''][key]['indices'] = resp[of]['indices'].indexed_src_size
 
         fd_args['method'] = method
 
@@ -1841,13 +1846,13 @@ class Problem(object):
             List of optional columns to be displayed in the desvars table.
             Allowed values are:
             ['lower', 'upper', 'ref', 'ref0', 'indices', 'adder', 'scaler', 'parallel_deriv_color',
-            'cache_linear_solution', 'units'].
+            'cache_linear_solution', 'units', 'min', 'max'].
         cons_opts : list of str
             List of optional columns to be displayed in the cons table.
             Allowed values are:
             ['lower', 'upper', 'equals', 'ref', 'ref0', 'indices', 'index', 'adder', 'scaler',
             'linear', 'parallel_deriv_color',
-            'cache_linear_solution', 'units'].
+            'cache_linear_solution', 'units', 'min', 'max'].
         objs_opts : list of str
             List of optional columns to be displayed in the objs table.
             Allowed values are:
@@ -1913,6 +1918,11 @@ class Problem(object):
         """
         abs2prom = self.model._var_abs2prom
 
+        # Gets the current numpy print options for consistent decimal place
+        #   printing between arrays and floats
+        print_options = np.get_printoptions()
+        np_precision = print_options['precision']
+
         # Get the values for all the elements in the tables
         rows = []
         for name, meta in meta.items():
@@ -1933,6 +1943,14 @@ class Problem(object):
 
                 elif col_name == 'val':
                     row[col_name] = vals[name]
+                elif col_name == 'min':
+                    min_val = min(vals[name])
+                    # Rounding to match float precision to numpy precision
+                    row[col_name] = np.round(min_val, np_precision)
+                elif col_name == 'max':
+                    max_val = max(vals[name])
+                    # Rounding to match float precision to numpy precision
+                    row[col_name] = np.round(max_val, np_precision)
                 else:
                     row[col_name] = meta[col_name]
             rows.append(row)
@@ -1950,7 +1968,8 @@ class Problem(object):
             for col_name in col_names:
                 cell = row[col_name]
                 if isinstance(cell, np.ndarray) and cell.size > 1:
-                    out = '|{}|'.format(str(np.linalg.norm(cell)))
+                    norm = np.linalg.norm(cell)
+                    out = '|{}|'.format(str(np.round(norm, np_precision)))
                 else:
                     out = str(cell)
                 max_width[col_name] = max(len(out), max_width[col_name])
@@ -1971,7 +1990,8 @@ class Problem(object):
             for col_name in col_names:
                 cell = row[col_name]
                 if isinstance(cell, np.ndarray) and cell.size > 1:
-                    out = '|{}|'.format(str(np.linalg.norm(cell)))
+                    norm = np.linalg.norm(cell)
+                    out = '|{}|'.format(str(np.round(norm, np_precision)))
                     have_array_values.append(col_name)
                 else:
                     out = str(cell)
@@ -2223,6 +2243,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             return 0. if arr is None or arr.size == 0 else np.linalg.norm(arr)
 
         for of, wrt in sorted_keys:
+            mult = None
 
             if totals:
                 fd_opts = global_options['']
@@ -2244,6 +2265,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
             if do_rev:
                 reverse = derivative_info.get('J_rev')
+                if 'j_rev_mult' in derivative_info:
+                    mult = derivative_info['j_rev_mult']
 
             fwd_error = safe_norm(forward - fd)
             if do_rev_dp:
@@ -2484,6 +2507,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     if not totals and matrix_free:
                         if out_stream:
                             if not directional:
+                                if mult is not None:
+                                    reverse /= mult
                                 out_buffer.write('    Raw Reverse Derivative (Jrev)\n')
                                 out_buffer.write(str(reverse) + '\n')
                                 out_buffer.write('\n')

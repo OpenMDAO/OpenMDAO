@@ -572,7 +572,7 @@ class LintTestCase(unittest.TestCase):
                                 except:
                                     continue
 
-                                failures.update(self._failure_dict(full_class_path, result))
+                                failures.update(self._failure_dict(full_method_path, result))
 
                     tree = ast.parse(inspect.getsource(mod))
 
@@ -590,7 +590,7 @@ class LintTestCase(unittest.TestCase):
                             except:
                                 continue
 
-                            failures.update(self._failure_dict(full_class_path, result))
+                            failures.update(self._failure_dict(full_function_path, result))
 
         if failures:
             msg = '\n'

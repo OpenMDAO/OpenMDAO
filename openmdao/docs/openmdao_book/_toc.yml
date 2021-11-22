@@ -78,6 +78,7 @@ parts:
   - file: _srcdocs/index
   - file: other_useful_docs/developer_docs/developer_docs
     sections:
+    - file: other_useful_docs/developer_docs/signing_commits.ipynb
     - file: other_useful_docs/developer_docs/doc_build.ipynb
     - file: other_useful_docs/developer_docs/doc_style_guide.ipynb
     - file: other_useful_docs/developer_docs/sphinx_decorators.ipynb

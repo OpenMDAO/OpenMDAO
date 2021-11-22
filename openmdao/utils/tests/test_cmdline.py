@@ -84,7 +84,7 @@ class CmdlineTestCase(unittest.TestCase):
         # check the expected output at all.  The underlying functions that implement the
         # commands should be tested seperately.
         try:
-            output = subprocess.check_output(cmd.split())
+            output = subprocess.check_output(cmd.split())  # nosec: trusted input
         except subprocess.CalledProcessError as err:
             self.fail("Command '{}' failed.  Return code: {}".format(cmd, err.returncode))
 
@@ -94,7 +94,8 @@ class CmdlineTestCaseCheck(unittest.TestCase):
         cmd = 'openmdao check -c auto_ivc_warnings {}'.format(os.path.join(scriptdir, 'auto_ivc_warnings.py'))
         msg = "WARNING: Groups 'G1' and 'G1.G2' called set_input_defaults for the input 'x' with conflicting 'value'. The value (14.0) from 'G1' will be used."
 
-        output = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        output = subprocess.Popen(cmd.split(),  # nosec: trusted input
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, _ = output.communicate()
         for i in out.decode('utf-8').split("\n"):
             if "WARNING:" in i:
@@ -116,7 +117,7 @@ class CmdlineTestfuncTestCase(unittest.TestCase):
         # check the expected output at all.  The underlying functions that implement the
         # commands should be tested seperately.
         try:
-            output = subprocess.check_output(cmd.split())
+            output = subprocess.check_output(cmd.split())  # nosec: trusted input
         except subprocess.CalledProcessError as err:
             self.fail("Command '{}' failed.  Return code: {}".format(cmd, err.returncode))
 
@@ -129,10 +130,13 @@ test_cmd_err = [
 class CmdlineTestErrTestCase(unittest.TestCase):
     @parameterized.expand(test_cmd_err, name_func=_test_func_name)
     def test_cmd(self, cmd):
-        proc = subprocess.run(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='UTF-8')
+        proc = subprocess.run(cmd.split(),   # nosec: trusted input
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
+                              encoding='UTF-8')
         if 'argument : invalid choice:' not in proc.stderr:
             self.fail(f"Command '{cmd}' didn't fail in the expected way.\n"
                       f"Return code: {proc.returncode}.\nstderr: {proc.stderr}\nstdout: {proc.stdout}")
+
 
 if __name__ == '__main__':
     unittest.main()

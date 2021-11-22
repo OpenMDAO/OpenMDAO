@@ -11,7 +11,7 @@ on:
 jobs:
 
   ubuntu_tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     timeout-minutes: 90
 
@@ -28,12 +28,13 @@ jobs:
             PYOPTSPARSE: 'v2.1.5'
             SNOPT: 7.7
             OPTIONAL: '[all]'
+            BANDIT: True,
             BUILD_DOCS: True
             PUBLISH_DOCS: True
 
           # latest versions
           - NAME: Latest
-            PY: 3
+            PY: <3.9
             NUMPY: 1
             SCIPY: 1
             PETSc: 3
@@ -43,7 +44,7 @@ jobs:
 
           # minimal install
           - NAME: Minimal
-            PY: 3
+            PY: <3.9
             NUMPY: 1
             SCIPY: 1
             PYOPTSPARSE: 'conda-forge'
@@ -258,6 +259,18 @@ jobs:
           else
             echo "Docs destination not available."
           fi
+
+      - name: Scan for security issues
+        if: matrix.BANDIT
+        id: bandit
+        shell: bash -l {0}
+        run: |
+          pip install bandit
+          echo "============================================================="
+          echo "Run bandit scan for high/medium severity issues"
+          echo "============================================================="
+          cd $GITHUB_WORKSPACE
+          bandit -c bandit.yml -ll -r openmdao
 
       - name: Notify slack
         uses: act10ns/slack@v1

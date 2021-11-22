@@ -119,7 +119,7 @@ class SpeedComputationWithUnits(om.ExplicitComponent):
 
 
 class ScalingTestComp(om.ImplicitComponent):
-    """Explicit component used to test output and residual scaling.
+    """Implicit component used to test output and residual scaling.
 
     This component helps assemble a system of the following form with
     [ 10. r1 c1 ,  1. r1 c2 ] [u1] = [r1]

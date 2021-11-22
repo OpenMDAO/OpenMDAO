@@ -279,4 +279,6 @@ class N2TreeNode {
             }[c];
         })
     }
+
+    toId() { return N2TreeNode.absPathToId(this.absPathName); }
 }

@@ -199,7 +199,7 @@ class ExperimentalDriver(object):
                     val = vec[name][indices]
             else:
                 if indices is not None:
-                    size = len(indices)
+                    size = indices.indexed_src_size
                 val = np.empty(size)
             comm.Bcast(val, root=owner)
         else:

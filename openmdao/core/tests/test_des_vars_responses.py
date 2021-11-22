@@ -13,6 +13,11 @@ try:
 except ImportError:
     PETScVector = None
 
+try:
+    from parameterized import parameterized
+except ImportError:
+    from openmdao.utils.assert_utils import SkipParameterized as parameterized
+
 
 class TestDesVarsResponses(unittest.TestCase):
 
@@ -702,7 +707,7 @@ def constraintExample(inds):
     prob.model.add_design_var("exampleComp.y")
 
     # Declaring Constraints by Using True Dimensioned Array Indices
-    prob.model.add_constraint("exampleComp.c_xy", indices=inds, lower=[0.0, 75.0], upper=[25.0, 100.0])
+    prob.model.add_constraint("exampleComp.c_xy", indices=inds, flat_indices=False, lower=[0.0, 75.0], upper=[25.0, 100.0])
 
     # Declare Objective
     prob.model.add_objective("exampleComp.f_xy")
@@ -841,47 +846,59 @@ class TestObjectiveOnModel(unittest.TestCase):
         self.assertAlmostEqual( obj_scaler*(obj_ref + obj_adder), 1.0,
                                 places=12)
 
-    def test_desvar_size_err(self):
+    @parameterized.expand(['lower', 'upper', 'adder', 'scaler', 'ref', 'ref0'], 
+                          name_func=lambda f, n, p: 'test_desvar_size_err_' + '_'.join(a for a in p.args))
+    def test_desvar_size_err(self, name):
 
         prob = om.Problem()
 
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
-        for name in ['lower', 'upper', 'adder', 'scaler', 'ref', 'ref0']:
-            args = {name: -np.ones(2)*100}
-            with self.assertRaises(Exception) as context:
-                prob.model.add_design_var('z', indices=[1], **args)
-            self.assertEqual(str(context.exception),
-                             "<class SellarDerivatives>: When adding design var 'z', %s should have size 1 but instead has size 2." % name)
+        args = {name: -np.ones(2)*100}
+        prob.model.add_design_var('z', indices=[1], **args)
+        with self.assertRaises(Exception) as context:
+            prob.setup()
+            prob.run_model()
 
-    def test_constraint_size_err(self):
+        self.assertEqual(str(context.exception),
+                         f"<model> <class SellarDerivatives>: When adding design var 'z', {name} should have size 1 but instead has size 2.")
 
-        prob = om.Problem()
-
-        prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = om.NonlinearBlockGS()
-
-        for name in ['lower', 'upper', 'equals', 'adder', 'scaler', 'ref', 'ref0']:
-            args = {name: -np.ones(2)*100}
-            with self.assertRaises(Exception) as context:
-                prob.model.add_constraint('z', indices=[1], **args)
-            self.assertEqual(str(context.exception),
-                             "<class SellarDerivatives>: When adding constraint 'z', %s should have size 1 but instead has size 2." % name)
-
-    def test_objective_size_err(self):
+    @parameterized.expand(['lower', 'upper', 'equals', 'adder', 'scaler', 'ref', 'ref0'], 
+                          name_func=lambda f, n, p: 'test_constraint_size_err_' + '_'.join(a for a in p.args))
+    def test_constraint_size_err(self, name):
 
         prob = om.Problem()
 
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
-        for name in ['adder', 'scaler', 'ref', 'ref0']:
-            args = {name: -np.ones(2)*100}
-            with self.assertRaises(Exception) as context:
-                prob.model.add_objective('z', index=1, **args)
-            self.assertEqual(str(context.exception),
-                             "<class SellarDerivatives>: When adding objective 'z', %s should have size 1 but instead has size 2." % name)
+        args = {name: -np.ones(2)*100}
+        prob.model.add_constraint('z', indices=[1], **args)
+        with self.assertRaises(Exception) as context:
+            prob.setup()
+            prob.run_model()
+
+        self.assertEqual(str(context.exception),
+                         f"<model> <class SellarDerivatives>: When adding constraint 'z', {name} should have size 1 but instead has size 2.")
+
+    @parameterized.expand(['adder', 'scaler', 'ref', 'ref0'], 
+                          name_func=lambda f, n, p: 'test_objective_size_err_' + '_'.join(a for a in p.args))
+    def test_objective_size_err(self, name):
+
+        prob = om.Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
+
+        args = {name: -np.ones(2)*100}
+        prob.model.add_objective('z', index=1, **args)
+        with self.assertRaises(Exception) as context:
+            prob.setup()
+            prob.run_model()
+
+        self.assertEqual(str(context.exception),
+                         f"<model> <class SellarDerivatives>: When adding objective 'z', {name} should have size 1 but instead has size 2.")
 
     def test_objective_invalid_name(self):
 

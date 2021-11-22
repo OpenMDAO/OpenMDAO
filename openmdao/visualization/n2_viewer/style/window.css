@@ -42,7 +42,7 @@
     display: none;
 }
 
-.window-draggable-header {
+.window-draggable-ribbon {
     cursor: grab;
 }
 
@@ -613,7 +613,7 @@
     height: 100%;
 }
 
-.window-theme-help .window-body h1 {
+.window-theme-help h3 {
     padding: 0;
     margin: 0;
 }
@@ -801,3 +801,211 @@ i.help-text-icon {
 }
 
 /* ^^^^^^^^^^ End Legend N2 Window theme ^^^^^^^^^^ */
+
+/* vvvvvvvvvv Begin Child Select N2 Window theme vvvvvvvvvv */
+.window-theme-child-select {
+    --header-height: 26px;
+    --footer-height: 15px;
+    --ribbon-color: #0000a0;
+
+    background-color: white;
+    border: 1px solid #a0a0a0;
+    /* transition: opacity 0.25s; */
+    box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    
+    overflow: hidden;
+}
+
+.window-theme-child-select .window-header {
+    background-color: var(--ribbon-color);
+    margin: 0;
+    font-size: 11pt;
+    text-align: right;
+    white-space: nowrap;
+    height: var(--header-height);
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: auto;
+}
+
+.window-theme-child-select .window-close-button::before {
+    content: '\2715'
+}
+
+.window-theme-child-select .window-close-button {
+    color: none;
+    opacity: 0.4;
+    text-shadow: -0.5px -0.5px 0.5px black, 0.5px 0.5px 0.5px white;
+    position: absolute;
+    top: 0px;
+    right: 8px;
+    cursor: pointer;
+    margin: 0;
+    font-size: 11pt;
+    font-weight: bold;
+    line-height: var(--header-height);
+    padding: 0;
+}
+
+.window-theme-child-select .window-close-button:hover,
+.window-theme-child-select .window-close-button:focus {
+    color: #333;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.window-theme-child-select .window-header .window-title {
+    color: white;
+    display: block;
+    font-weight: bold;
+    line-height: var(--header-height);
+    position: relative;
+
+    /* Stuff to prevent title bar from being too long */
+    text-overflow: ellipsis;
+    width: auto;
+    direction: rtl;
+    text-align: center;
+    margin-left: 15px;
+    margin-right: 25px;
+}
+
+.window-theme-child-select .window-header .window-title::after {
+    content: ' Variables';
+}
+
+.window-theme-child-select .window-body {
+    color: black;
+    border: 0;
+    margin: 0;
+    padding: 0;
+
+    top: var(--header-height);
+    left: 0;
+    right: 0;
+    bottom: var(--footer-height);
+    overflow: hidden;
+    visibility: visible;
+    border: 1px solid gray;
+
+}
+
+.window-theme-child-select .window-footer {
+    background-color: var(--ribbon-color);
+    color: white;
+
+    height: var(--footer-height);
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+
+/* Child select window table */
+.window-theme-child-select .window-body .table-container {
+    max-height: 280px;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.window-theme-child-select .table-container table {
+	overflow: hidden;
+	background-color: white;
+    min-width: 300px;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 0 14px 0 0;
+    padding: 0;
+    border: 0;
+}
+
+.window-theme-child-select thead th {
+    text-align: center;
+    font-size: 8pt;
+    margin: 0;
+    border-top: 0;
+    border-bottom: 1px solid #a0a0a0;
+    border-right: 1px solid #a0a0a0;
+    background-color: #c0c0c0;
+    padding: 3px;
+    white-space: nowrap;
+    position: sticky; /* Only seems to work on Firefox */
+    top: 0px;
+
+    color: #202020;
+    min-width: 30px;
+    font-weight: 300;
+}
+
+.window-theme-child-select tbody tr th:last-child,
+.window-theme-child-select tbody tr td:last-child {
+    border-right: 0;
+}
+
+.window-theme-child-select tbody tr:last-child th,
+.window-theme-child-select tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.window-theme-child-select tbody td {
+    font-size: 9pt;
+    margin: 0;    
+    border-top: 0;
+    border-left: 0;
+    border-bottom: 1px solid #a0a0a0;
+    border-right: 1px solid #a0a0a0;
+    padding: 3px;
+    white-space: nowrap;
+}
+
+.window-theme-child-select tbody tr td:first-child {
+    text-align: left;
+}
+
+.window-theme-child-select tbody tr td:not(first-child) {
+    text-align: center;
+}
+
+.window-theme-child-select tbody tr.even td {
+    background-color:white;
+}
+
+.window-theme-child-select tbody tr.odd td {
+    background-color: #d8ffff;
+}
+
+.window-theme-child-select .button-container {
+    height: 21px;
+    width: 100%;
+    bottom: 2px;
+    text-align: center;
+}
+
+.window-theme-child-select .button-container:not(:first-child) button {
+    margin-left: 5px;
+}
+
+.window-theme-child-select .button-container button {
+    font-size: 8pt;
+}
+
+.window-theme-child-select .sort-up,
+.window-theme-child-select .sort-down {
+    padding-right: 3px;
+    padding-left: 3px;
+    color: #404040;
+    font-size: 8pt;
+}
+
+.window-theme-child-select .sort-up:hover,
+.window-theme-child-select .sort-up:focus,
+.window-theme-child-select .sort-down:hover,
+.window-theme-child-select .sort-down:focus {
+    color:blue;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* ^^^^^^^^^^ End Child Select Window theme ^^^^^^^^^^ */

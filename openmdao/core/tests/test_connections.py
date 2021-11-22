@@ -64,7 +64,7 @@ class TestConnections(unittest.TestCase):
                 self.add_output('y1', np.zeros((3, )))
                 self.add_output('y2', shape=((3, )))
 
-            def solve_nonlinear(self, inputs, outputs, resids):
+            def compute(self, inputs, outputs):
                 x = inputs['x']
 
                 outputs['y1'] = x * np.array([1.0, 2.0, 3.0])
@@ -79,7 +79,7 @@ class TestConnections(unittest.TestCase):
                 self.add_output('y1', 0.0)
                 self.add_output('y2', 0.0)
 
-            def solve_nonlinear(self, inputs, outputs, resids):
+            def compute(self, inputs, outputs):
                 x1 = inputs['x1']
                 x2 = inputs['x2']
 
@@ -111,7 +111,7 @@ class TestConnections(unittest.TestCase):
                 self.add_output('y2', shape=((3, )))
                 self.add_output('y3', 3.0)
 
-            def solve_nonlinear(self, inputs, outputs, resids):
+            def compute(self, inputs, outputs):
                 """ counts up. """
 
                 x = inputs['x']
@@ -131,7 +131,7 @@ class TestConnections(unittest.TestCase):
                 self.add_output('y2', 0.0)
                 self.add_output('y3', 0.0)
 
-            def solve_nonlinear(self, inputs, outputs, resids):
+            def compute(self, inputs, outputs):
                 """ counts up. """
 
                 x1 = inputs['x1']
@@ -703,9 +703,9 @@ class TestConnectionsMPIBug(unittest.TestCase):
                 self.add_subsystem('linkages', Linkages())
 
             def configure(self):
-                self.connect('phases.burn1.y', 'linkages.linkage.in1', src_indices=np.array([[0, 3], [4, 6], [2, 1]]), flat_src_indices=True)
-                self.connect('phases.burn2.y', 'linkages.linkage.in2', src_indices=np.array([[0, 3], [4, 6], [2, 1]]), flat_src_indices=True)
-        
+                self.connect('phases.burn1.y', 'linkages.linkage.in1', src_indices=np.array([0, 3, 4, 6, 2, 1]), flat_src_indices=True)
+                self.connect('phases.burn2.y', 'linkages.linkage.in2', src_indices=np.array([0, 3, 4, 6, 2, 1]), flat_src_indices=True)
+
         prob = om.Problem(model=Traj())
         prob.setup()
         prob.run_model()

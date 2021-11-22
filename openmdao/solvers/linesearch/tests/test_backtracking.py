@@ -1,6 +1,7 @@
 """ Test for the Backtracking Line Search"""
 
 import sys
+import os
 import unittest
 from math import atan
 
@@ -14,6 +15,7 @@ from openmdao.test_suite.components.implicit_newton_linesearch \
     import ImplCompTwoStates, ImplCompTwoStatesArrays
 from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2withDerivatives
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.general_utils import printoptions
 
 
 class TestArmejoGoldsteinBounds(unittest.TestCase):
@@ -442,9 +444,10 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         for ind in range(3):
             assert_near_equal(top['comp.z'][ind], [1.5], 1e-8)
 
-        msg = (f"'comp.z' exceeds lower bounds\n  Val: [1.33333333 1.33333333 1.33333333]\n  Lower: [1.5 1.5 1.5]\n")
-        with assert_warning(om.SolverWarning, msg):
-            top.run_model()
+        with printoptions(precision=3):
+            msg = (f"'comp.z' exceeds lower bounds\n  Val: [1.333 1.333 1.333]\n  Lower: [1.5 1.5 1.5]\n")
+            with assert_warning(om.SolverWarning, msg):
+                top.run_model()
 
         top.setup()
         # Test upper bounds: should go to the minimum upper bound and stall
@@ -452,9 +455,10 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         top['comp.y'] = 0.
         top['comp.z'] = 2.4
 
-        msg = (f"'comp.z' exceeds upper bounds\n  Val: [2.66666667 2.66666667 2.66666667]\n  Upper: [2.6  2.5  2.65]\n")
-        with assert_warning(om.SolverWarning, msg):
-            top.run_model()
+        with printoptions(precision=3):
+            msg = (f"'comp.z' exceeds upper bounds\n  Val: [2.667 2.667 2.667]\n  Upper: [2.6  2.5  2.65]\n")
+            with assert_warning(om.SolverWarning, msg):
+                top.run_model()
 
         for ind in range(3):
             assert_near_equal(top['comp.z'][ind], [2.5], 1e-8)

@@ -227,6 +227,38 @@ n2_gui_test_scripts = {
             "test": "count",
             "selector": "g#n2arrows > g",
             "count": 0
+        },
+        { "test": "root" },
+        {
+            "desc": "Alt-right-click the n1 component",
+            "test": "click",
+            "selector": "rect#circuit_n1",
+            "button": "right",
+            "modifiers": [ "Alt" ]
+        },
+        {
+            "desc": "Check that variable selection dialog appears",
+            "test": "count",
+            "selector": "#childSelect-circuit_n1",
+            "count": 1
+        },
+        {
+            "desc": "Select a variable to hide",
+            "test": "click",
+            "selector": "input#circuit_n1_V-visible-check",
+            "button": "left"
+        },
+        {
+            "desc": "Click the Apply button",
+            "test": "click",
+            "selector": ".button-container button:last-child",
+            "button": "left"
+        },
+        {
+            "desc": "Check that the V variable is no longer displayed",
+            "test": "count",
+            "selector": "rect#circuit_n1_V",
+            "count": 0
         }
     ],
     "bug_arrow": [
@@ -449,7 +481,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Drag Value Info window to new location",
             "test": "drag",
-            "selector": '[id^="persistentNodeInfo"]  .window-draggable-header',
+            "selector": '[id^="persistentNodeInfo"]  .window-draggable-ribbon:first-child',
             "x": 700, "y": 700
         },
         {
@@ -571,7 +603,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Drag Legend to new location",
             "test": "drag",
-            "selector": "#n2win-legend .window-draggable-header",
+            "selector": "#n2win-legend .window-draggable-ribbon:first-child",
             "x": 700, "y": 500
         },
         {
@@ -604,15 +636,13 @@ class n2_gui_test_case(_GuiTestCase):
         self.scripts = n2_gui_test_scripts
         self.known_model_names = n2_gui_test_models
 
-        n2file = os.path.join(
-            self.modelDir, self.current_model + GUI_N2_SUFFIX)
+        n2file = os.path.join(self.modelDir, self.current_model + GUI_N2_SUFFIX)
         pyfile = os.path.join(self.modelDir, self.current_model + '.py')
         self.n2files[self.current_model] = n2file
         print("Creating " + n2file)
 
-        subprocess.run(
-            ['openmdao', 'n2', '-o', n2file,  '--no_browser', pyfile],
-            stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        cmd = ['openmdao', 'n2', '-o', n2file,  '--no_browser', pyfile]
+        subprocess.run(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE)  # nosec: trusted input
 
     async def load_test_page(self):
         """ Load the specified HTML file from the local filesystem. """
@@ -899,7 +929,7 @@ class n2_gui_test_case(_GuiTestCase):
             try:
                 for n2html in self.n2files:
                     os.remove(self.n2files[n2html])
-            except:
+            except OSError:
                 # Don't want the test to fail if the test file is
                 # already removed
                 pass

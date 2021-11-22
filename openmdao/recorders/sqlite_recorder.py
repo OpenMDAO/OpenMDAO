@@ -275,6 +275,8 @@ class SqliteRecorder(CaseRecorder):
                               "solver_options BLOB, solver_class TEXT)")
 
         self._database_initialized = True
+        if MPI is not None:
+            MPI.COMM_WORLD.barrier()
 
     def _cleanup_abs2meta(self):
         """
@@ -347,8 +349,8 @@ class SqliteRecorder(CaseRecorder):
             if driver is None:
                 desvars = system.get_design_vars(True, get_sizes=False, use_prom_ivc=False)
                 responses = system.get_responses(True, get_sizes=False)
-                objectives = OrderedDict()
                 constraints = OrderedDict()
+                objectives = OrderedDict()
                 for name, data in responses.items():
                     if data['type'] == 'con':
                         constraints[name] = data
@@ -356,9 +358,9 @@ class SqliteRecorder(CaseRecorder):
                         objectives[name] = data
             else:
                 desvars = driver._designvars.copy()
+                responses = driver._responses.copy()
                 constraints = driver._cons.copy()
                 objectives = driver._objs.copy()
-                responses = driver._responses.copy()
 
             inputs = list(system.abs_name_iter('input', local=False, discrete=True))
             outputs = list(system.abs_name_iter('output', local=False, discrete=True))
@@ -393,8 +395,8 @@ class SqliteRecorder(CaseRecorder):
             for var_set, var_type in full_var_set:
                 for name in var_set:
 
-                    # Design variables can be requested by input name.
-                    if var_type == 'desvar':
+                    # Design variables, constraints and objectives can be requested by input name.
+                    if var_type != 'output':
                         name = var_set[name]['ivc_source']
 
                     if name not in self._abs2meta:
@@ -443,7 +445,7 @@ class SqliteRecorder(CaseRecorder):
 
             if self._record_metadata:
                 with self.metadata_connection as m:
-                    m.execute("UPDATE metadata SET " +
+                    m.execute("UPDATE metadata SET " +   # nosec: trusted input
                               "abs2prom=?, prom2abs=?, abs2meta=?, var_settings=?, conns=?",
                               (abs2prom, prom2abs, abs2meta, var_settings_json, conns))
 

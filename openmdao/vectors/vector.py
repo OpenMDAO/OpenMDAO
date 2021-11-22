@@ -4,12 +4,16 @@ import os
 import weakref
 
 import numpy as np
+from numpy import isscalar
 
 from openmdao.utils.name_maps import prom_name2abs_name, rel_name2abs_name
 from openmdao.utils.indexer import Indexer, indexer
 
 
 _full_slice = slice(None)
+_flat_full_indexer = indexer(_full_slice, flat_src=True)
+_full_indexer = indexer(_full_slice, flat_src=False)
+
 _type_map = {
     'input': 'input',
     'output': 'output',
@@ -165,6 +169,17 @@ class Vector(object):
         """
         return self._len
 
+    def nvars(self):
+        """
+        Return the number of variables in this Vector.
+
+        Returns
+        -------
+        int
+            Number of variables in this Vector.
+        """
+        return len(self._views)
+
     def _copy_views(self):
         """
         Return a dictionary containing just the views.
@@ -191,15 +206,19 @@ class Vector(object):
         """
         Return values of variables contained in this vector.
 
-        Returns
-        -------
-        list
-            The variable values.
+        Yields
+        ------
+        ndarray or float
+            Value of each variable.
         """
         if self._under_complex_step:
-            return [v for n, v in self._views.items() if n in self._names]
+            for n, v in self._views.items():
+                if n in self._names:
+                    yield v
         else:
-            return [v.real for n, v in self._views.items() if n in self._names]
+            for n, v in self._views.items():
+                if n in self._names:
+                    yield v.real
 
     def _name2abs_name(self, name):
         """
@@ -230,7 +249,7 @@ class Vector(object):
 
     def __iter__(self):
         """
-        Yield an iterator over variables involved in the current mat-vec product (relative names).
+        Return an iterator over variables involved in the current mat-vec product (relative names).
 
         Returns
         -------
@@ -251,12 +270,18 @@ class Vector(object):
         ----------
         flat : bool
             If True, return the flattened values.
+
+        Yields
+        ------
+        str
+            Name of each variable.
+        ndarray or float
+            Value of each variable.
         """
         arrs = self._views_flat if flat else self._views
 
         if self._under_complex_step:
-            for name, val in arrs.items():
-                yield name, val
+            yield from arrs.items()
         else:
             for name, val in arrs.items():
                 yield name, val.real
@@ -264,9 +289,13 @@ class Vector(object):
     def _abs_iter(self):
         """
         Iterate over the absolute names in the vector.
+
+        Yields
+        ------
+        str
+            Name of each variable.
         """
-        for name in self._views:
-            yield name
+        yield from self._views
 
     def __contains__(self, name):
         """
@@ -316,13 +345,9 @@ class Vector(object):
         """
         abs_name = self._name2abs_name(name)
         if abs_name is not None:
-            val = self._views[abs_name]
+            return self._abs_get_val(abs_name, flat=False)
         else:
             raise KeyError(f"{self._system().msginfo}: Variable name '{name}' not found.")
-
-        if self._under_complex_step:
-            return val
-        return val.real
 
     def _abs_get_val(self, name, flat=True):
         """
@@ -510,6 +535,35 @@ class Vector(object):
         raise NotImplementedError('set_arr not defined for vector type %s' %
                                   type(self).__name__)
 
+    def set_vals(self, vals):
+        """
+        Set the data array of this vector using a value or iter of values, one for each variable.
+
+        The values must be in the same order as the variables appear in this Vector.
+
+        Parameters
+        ----------
+        vals : ndarray, float, or iter of ndarrays and/or floats
+            Values for each variable contained in this vector, in the proper order.
+        """
+        arr = self.asarray()
+
+        if self.nvars() == 1:
+            if isscalar(vals):
+                arr[:] = vals
+            else:
+                arr[:] = vals.ravel()
+        else:
+            start = end = 0
+            for v in vals:
+                if isscalar(v):
+                    end += 1
+                    arr[start] = v
+                else:
+                    end += v.size
+                    arr[start:end] = v.ravel()
+                start = end
+
     def set_var(self, name, val, idxs=_full_slice, flat=False):
         """
         Set the array view corresponding to the named variable, with optional indexing.
@@ -533,25 +587,38 @@ class Vector(object):
             raise ValueError(f"{self._system().msginfo}: Attempt to set value of '{name}' in "
                              f"{self._kind} vector when it is read only.")
 
-        if not isinstance(idxs, Indexer):
-            idxs = indexer(idxs, flat=flat)
+        if idxs is _full_slice:
+            if flat:
+                idxs = _flat_full_indexer
+            else:
+                idxs = _full_indexer
+
+        elif not isinstance(idxs, Indexer):
+            idxs = indexer(idxs, flat_src=flat)
 
         if flat:
             if isinstance(val, float):
-                self._views_flat[abs_name][idxs()] = val
+                self._views_flat[abs_name][idxs.flat()] = val
             else:
                 self._views_flat[abs_name][idxs.flat()] = np.asarray(val).flat
         else:
             value = np.asarray(val)
+            view = self._views[abs_name]
             try:
-                self._views[abs_name][idxs()] = value
+                if view.shape:
+                    view[idxs()] = value
+                else:
+                    # view is a scalar so we can't update it without breaking its connection
+                    # to the underlying array, so set the value into the
+                    # array using the flat view, which is an array of size 1.
+                    self._views_flat[abs_name][0] = value
             except Exception as err:
                 try:
-                    value = value.reshape(self._views[abs_name][idxs()].shape)
+                    value = value.reshape(view[idxs()].shape)
                 except Exception:
                     raise ValueError(f"{self._system().msginfo}: Failed to set value of "
                                      f"'{name}': {str(err)}.")
-                self._views[abs_name][idxs()] = value
+                view[idxs()] = value
 
     def dot(self, vec):
         """
