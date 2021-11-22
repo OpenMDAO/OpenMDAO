@@ -258,7 +258,12 @@ class SerialTests(unittest.TestCase):
         p.set_val('exec.b', np.linspace(10, 20, 15))
         p.set_val('exec.c', np.linspace(1, 3, 23))
 
-        p.final_setup()
+        with self.assertRaises(ValueError) as cm:
+            p.final_setup()
+
+        self.assertEqual(str(cm.exception), 
+                         "<model> <class Group>: Failed to set value of 'exec.b': "
+                         "could not broadcast input array from shape (15,) into shape (100,).")
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
