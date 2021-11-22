@@ -3272,7 +3272,11 @@ class Group(System):
                 if val is None:
                     val = value
                 else:
-                    val[:] = value
+                    try:
+                        val[:] = value
+                    except ValueError:
+                        raise ValueError(f"Could not broadcast input array '{tgt}' from shape "
+                                         f"{value.shape} into shape {val.shape}.")
 
                 if tgt not in vars_to_gather:
                     found_dup = True

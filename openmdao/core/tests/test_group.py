@@ -1408,6 +1408,36 @@ class TestGroup(unittest.TestCase):
         with assert_warning(PromotionWarning, msg):
             problem.model.set_input_defaults("b", 4)
 
+    def test_set_input_defaults_promotes_error(self):
+
+        class Foo(om.ExplicitComponent):
+
+            def setup(self):
+                nn = 5
+
+                self.add_input('test_param', val=np.zeros(nn))
+                self.add_output('bar', val=np.ones(nn))
+
+            def compute(self, inputs, outputs):
+                outputs['bar'] = inputs['test_param'] ** 2
+
+
+        p = om.Problem()
+
+        g = p.model.add_subsystem('G', om.Group())
+
+        g.add_subsystem('foo', Foo())
+
+        g.promotes('foo', ['test_param'])
+
+        p.model.set_input_defaults('G.test_param', val=7.0)
+
+        with self.assertRaises(ValueError) as cm:
+            p.setup()
+
+        msg = "Could not broadcast input array 'G.foo.test_param' from shape (5,) into shape (1,)."
+        self.assertEqual(str(cm.exception), msg)
+
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestGroupMPISlice(unittest.TestCase):
     N_PROCS = 2
