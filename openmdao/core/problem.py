@@ -942,11 +942,12 @@ class Problem(object):
 
         des_vars = self.model.get_design_vars()
         prom2abs = self._metadata['prom2abs']
-        if des_vars:
-            for key in des_vars.keys():
-                if key in prom2abs['output'] and key in prom2abs['input']:
-                    raise RuntimeError(f"Cannot connect the design variable '{key}' to output "
-                                       f"'{prom2abs['output'][key][0]}'.")
+
+        for des_var in des_vars:
+            if des_var in prom2abs['output'] and des_var in prom2abs['input']:
+                if "_auto_ivc" not in prom2abs['input'][des_var]:
+                    raise RuntimeError(f"Cannot connect the design variable '{des_var}' to "
+                                       f"'{prom2abs['input'][des_var][0]}' as an input.")
 
         # Cache all args for final setup.
         self._check = check
