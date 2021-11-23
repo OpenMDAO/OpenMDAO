@@ -261,9 +261,9 @@ class SerialTests(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             p.final_setup()
 
-        self.assertEqual(str(cm.exception), 
-                         "<model> <class Group>: Failed to set value of 'exec.b': "
-                         "could not broadcast input array from shape (15,) into shape (100,).")
+        # can not broadcast input array from shape (15,) into shape (100,) for exec.b
+        self.assertTrue(str(cm.exception).startswith(
+                        "<model> <class Group>: Failed to set value of 'exec.b': "))
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
