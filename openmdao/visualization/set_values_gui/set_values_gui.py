@@ -11,7 +11,7 @@ from openmdao.core.group import Group
 from openmdao.core.constants import _SetupStatus
 from openmdao.core.indepvarcomp import IndepVarComp
 
-from openmdao.utils.units import is_compatible
+from openmdao.utils.units import is_compatible, _find_unit
 
 # Because ipywidgets has a lot of backend<->frontend comm going on, for large
 #  model hierarchies, a lot of widgets are created and you get buffer overruns. Need to slow it
@@ -83,6 +83,7 @@ class SetValuesUI(object):
         self._tree = None
         self.ui_widget = None
         self._refresh_in_progress = False
+        self._units_update_due_to_handler = False
 
         self._abs2prom_inputs = self._prob.model._var_allprocs_abs2prom['input']
         self._prom2abs_inputs = self._prob.model._var_allprocs_prom2abs_list['input']
@@ -426,8 +427,11 @@ class SetValuesUI(object):
             A dictionary holding the information about the change
 
         """
-        units_old = change['old']
+        if self._units_update_due_to_handler: # if handler made the change, no need to do this
+            self._units_update_due_to_handler = False
+            return
 
+        units_old = change['old']
         units = change['new']
         units_widget = change['owner']
 
@@ -440,8 +444,10 @@ class SetValuesUI(object):
         abs_name = self._prom2abs_inputs[prom_name][0]  # it is a list
         metadata = inputs_metadata[abs_name]
         units_default = metadata['units']
-        if not is_compatible(units_default, units):
+
+        if not is_compatible_handles_None(units_default, units):
             display(HTML(f"<script>alert('Units \"{units}\" is not compatible with units \"{units_old}\"');</script>"))
+            self._units_update_due_to_handler = True
             units_widget.value = units_old
             return
 
@@ -451,7 +457,8 @@ class SetValuesUI(object):
 
         var_name = units_widget._var_name
 
-
+        if units == "None":
+            units = None
         self._prob.set_val(var_name, val, units=units)
 
     def _get_widget_var_names(self): # TODO - more efficient way?
@@ -544,3 +551,16 @@ class SetValuesUI(object):
                              # Definitely not at this 'sys' level
         else:
             raise(f"shouldn't happen! {abs_name} not found in var for {parent_pathname}")
+
+def is_compatible_handles_None(old_units, new_units):
+    old_units = _find_unit(old_units, error=False)
+    new_units = _find_unit(new_units, error=False)
+
+    if old_units and not new_units:
+        return False
+    elif new_units and not old_units:
+        return False
+    elif not new_units and not old_units:
+        return True
+    else:
+        return old_units.is_compatible(new_units)
