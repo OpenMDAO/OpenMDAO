@@ -33,7 +33,7 @@ The new unit `'percent'`, is also added, which is defined as `unitless/100`.
 
 ## Bug Fixes
 
-- Fix for deriv calc on vectorized 1D-akima [#2355](https://github.com/OpenMDAO/OpenMDAO/pull/2355)
+- Fix for deriv calc on vectorized 1D-akima [#2352](https://github.com/OpenMDAO/OpenMDAO/pull/2352)
 - Provide a better error message when setting an invalid value to an auto_ivc output. [#2355](https://github.com/OpenMDAO/OpenMDAO/pull/2355)
 
 ## Miscellaneous
