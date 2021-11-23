@@ -1205,7 +1205,7 @@ class System(object):
             else:
                 self.run_linearize(sub_do_ln=False)
 
-        sparsity, sp_info = self._jacobian.get_sparsity()
+        sparsity, sp_info = self._jacobian.get_sparsity(self)
 
         self._jacobian = save_jac
 

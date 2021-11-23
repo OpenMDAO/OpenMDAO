@@ -2329,9 +2329,14 @@ class _ColSparsityJac(object):
         # ignore any setting of subjacs based on analytic derivs
         pass
 
-    def get_sparsity(self):
+    def get_sparsity(self, system):
         """
         Assemble the sparsity matrix (COO) based on data collected earlier via set_col.
+
+        Parameters
+        ----------
+        system : System
+            The system that owns this jacobian.
 
         Returns
         -------

@@ -45,13 +45,12 @@ def jac_forward(fun, argnums, tangents):
         first entry would contain the first 3 rows of J and the second would contain the next
         4 rows of J.
     """
+    f = linear_util.wrap_init(fun)
     if argnums is None:
         def jacfunf(*args, **kwargs):
-            f = linear_util.wrap_init(fun, kwargs)
             return vmap(partial(_jvp, f, args), out_axes=(None, -1))(tangents)[1]
     else:
         def jacfunf(*args, **kwargs):
-            f = linear_util.wrap_init(fun, kwargs)
             f_partial, dyn_args = argnums_partial(f, argnums, args)
             return vmap(partial(_jvp, f_partial, dyn_args), out_axes=(None, -1))(tangents)[1]
     return jacfunf
@@ -80,12 +79,13 @@ def jac_reverse(fun, argnums, tangents):
         first entry would contain the first 3 rows of J and the second would contain the next
         4 rows of J.
     """
+    f = linear_util.wrap_init(fun)
     if argnums is None:
-        def jacfunr(*args, **kwargs):
-            return vmap(_vjp(linear_util.wrap_init(fun, kwargs), *args)[1])(tangents)
+        def jacfunr(*args):
+            return vmap(_vjp(f, *args)[1])(tangents)
     else:
-        def jacfunr(*args, **kwargs):
-            f_partial, dyn_args = argnums_partial(linear_util.wrap_init(fun, kwargs), argnums, args)
+        def jacfunr(*args):
+            f_partial, dyn_args = argnums_partial(f, argnums, args)
             return vmap(_vjp(f_partial, *dyn_args)[1])(tangents)
 
     return jacfunr
@@ -302,13 +302,13 @@ class ExplicitFuncComp(ExplicitComponent):
             inds = np.cumsum(sizes[:-1])
             ndim = np.sum(sizes)
             if coloring is None:
-                tangent = jnp.eye(ndim)
+                tangent = np.eye(ndim)
             else:
                 tangent = coloring.tangent_matrix(direction)
             axis = 1
             shapes = [tangent.shape[:1] + np.shape(v) for v in leaves]
-            self._tangents = tuple([jnp.reshape(a, shp) for a, shp in
-                                    zip(jnp.split(tangent, inds, axis=axis), shapes)])
+            self._tangents = tuple([np.reshape(a, shp) for a, shp in
+                                    zip(np.split(tangent, inds, axis=axis), shapes)])
             if len(vals) == 1:
                 self._tangents = self._tangents[0]
         return self._tangents
