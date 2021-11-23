@@ -524,7 +524,7 @@ def sparse_subinds(orig, inds):
 
 def identity_column_iter(column):
     """
-    Yields the given column with a 1 in each position.
+    Yield the given column with a 1 in each position.
 
     This is useful if you don't want to allocate memory for the full sized identity matrix.
     Note that this reuses the column array and assumes that the column array has not

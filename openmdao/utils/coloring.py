@@ -907,7 +907,7 @@ class Coloring(object):
 
                 # save sparsity structure as  (rows, cols, shape)
                 sparsity[of][wrt] = (self._nzrows[mask] - row_start, self._nzcols[mask] - col_start,
-                                    (of_size, wrt_size))
+                                     (of_size, wrt_size))
 
                 col_start = col_end
 
@@ -1839,10 +1839,8 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
             model.declare_coloring(**kwargs)
         if run_model:
             problem.run_model()
-        coloring = model._compute_coloring(wrt_patterns='*',
-                                                  method=list(model._approx_schemes)[0],
-                                                  num_full_jacs=num_full_jacs, tol=tol,
-                                                  orders=orders)[0]
+        coloring = model._compute_coloring(wrt_patterns='*', method=list(model._approx_schemes)[0],
+                                           num_full_jacs=num_full_jacs, tol=tol, orders=orders)[0]
     else:
         J, sparsity_info = _get_bool_total_jac(problem, num_full_jacs=num_full_jacs, tol=tol,
                                                orders=orders, setup=setup,

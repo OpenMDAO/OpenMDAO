@@ -94,6 +94,7 @@ def jac_reverse(fun, argnums, tangents):
 
     return jacfunr
 
+
 def jacvec_prod(fun, argnums, invals, tangent):
     """
     Similar to the jvp function but gives back a flat column.
@@ -106,6 +107,8 @@ def jacvec_prod(fun, argnums, invals, tangent):
         The function to be differentiated.
     argnums : tuple of int or None
         Specifies which positional args are dynamic.  None means all positional args are dynamic.
+    invals : tuple of float or ndarray
+        Dynamic function input values.
     tangent : ndarray
         Array of 1.0's and 0's that is used to compute a column of the jacobian matrix.
 
@@ -243,8 +246,7 @@ class ExplicitFuncComp(ExplicitComponent):
 
     def _jax_linearize(self, jac=None, sub_do_ln=False):
         # argnums specifies which position args are to be differentiated
-        argnums = [i for i, m in enumerate(self._compute._inputs.values())
-                    if 'is_option' not in m]
+        argnums = [i for i, m in enumerate(self._compute._inputs.values()) if 'is_option' not in m]
         inames = list(self._compute.get_input_names())
         onames = list(self._compute.get_output_names())
         nouts = len(onames)
@@ -264,7 +266,7 @@ class ExplicitFuncComp(ExplicitComponent):
             tangents = self._get_tangents(outvals, 'rev', coloring)
             if coloring is not None:
                 j = [np.asarray(a).reshape((a.shape[0], np.prod(a.shape[1:], dtype=INT_DTYPE)))
-                        for a in jac_reverse(self._compute_jax, argnums, tangents)(*invals)]
+                     for a in jac_reverse(self._compute_jax, argnums, tangents)(*invals)]
                 J = coloring.expand_jac(np.hstack(j), 'rev')
             else:
                 j = []
@@ -286,14 +288,15 @@ class ExplicitFuncComp(ExplicitComponent):
             tangents = self._get_tangents(invals, 'fwd', coloring, argnums)
             if coloring is not None:
                 j = [np.asarray(a).reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1]))
-                        for a in jac_forward(self._compute_jax, argnums, tangents)(*invals)]
+                     for a in jac_forward(self._compute_jax, argnums, tangents)(*invals)]
                 J = coloring.expand_jac(np.vstack(j), 'fwd')
                 self._jacobian.set_dense_jac(self, J)
             else:
                 j = []
                 for a in jac_forward(self._compute_jax, argnums, tangents)(*invals):
                     if a.ndim > 2:
-                        j.append(np.asarray(a).reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1])))
+                        j.append(np.asarray(a).reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE),
+                                                        a.shape[-1])))
                     else:  # a scalar
                         j.append(np.atleast_2d(a))
                 J = np.vstack(j).reshape((osize, isize))

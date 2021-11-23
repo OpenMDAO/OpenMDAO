@@ -1012,7 +1012,8 @@ class System(object):
             If True, display sparsity with coloring info after generating coloring.
         """
         if method not in ('fd', 'cs', 'jax'):
-            raise RuntimeError("{}: method must be one of ['fd', 'cs', 'jax'].".format(self.msginfo))
+            raise RuntimeError(
+                "{}: method must be one of ['fd', 'cs', 'jax'].".format(self.msginfo))
 
         self._has_approx = True
 
