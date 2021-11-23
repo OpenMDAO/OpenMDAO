@@ -2,21 +2,21 @@
 
 from functools import partial
 import numpy as np
+
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.constants import INT_DTYPE
 import openmdao.func_api as omf
 from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore, _add_options
-import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import identity_column_iter
 
 try:
     import jax
-    from jax import jit, jacfwd, jacrev, vmap, jvp, linear_util
+    from jax import jit, vmap, linear_util
     import jax.numpy as jnp
     from jax.numpy import DeviceArray
     from jax.config import config
     from jax.api_util import argnums_partial
-    from jax._src.api import _jvp, _vjp, tree_map
+    from jax._src.api import _jvp, _vjp
     config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
 except ImportError as err:
     jax = None
@@ -245,7 +245,6 @@ class ExplicitFuncComp(ExplicitComponent):
         argnums = [i for i, m in enumerate(self._compute._inputs.values()) if 'is_option' not in m]
         inames = list(self._compute.get_input_names())
         onames = list(self._compute.get_output_names())
-        nouts = len(onames)
         osize = len(self._outputs)
         isize = len(self._inputs)
         invals = list(self._func_values(self._inputs))
@@ -263,7 +262,7 @@ class ExplicitFuncComp(ExplicitComponent):
             if coloring is not None:
                 j = [np.asarray(a).reshape((a.shape[0], np.prod(a.shape[1:], dtype=INT_DTYPE)))
                      for a in jac_reverse(self._compute_jax, argnums, tangents)(*invals)]
-                J = coloring.expand_jac(np.hstack(j), 'rev')
+                j = coloring.expand_jac(np.hstack(j), 'rev')
             else:
                 j = []
                 for a in jac_reverse(self._compute_jax, argnums, tangents)(*invals):
@@ -275,8 +274,7 @@ class ExplicitFuncComp(ExplicitComponent):
                     else:
                         a = np.asarray(a)
                     j.append(a.reshape((a.shape[0], np.prod(a.shape[1:], dtype=INT_DTYPE))))
-                J = np.hstack(j).reshape((osize, isize))
-            self._jacobian.set_dense_jac(self, J)
+                j = np.hstack(j) #.reshape((osize, isize))
         else:
             if len(argnums) == len(inames):
                 argnums = None  # speedup if there are no static args
@@ -285,18 +283,14 @@ class ExplicitFuncComp(ExplicitComponent):
             if coloring is not None:
                 j = [np.asarray(a).reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1]))
                      for a in jac_forward(self._compute_jax, argnums, tangents)(*invals)]
-                J = coloring.expand_jac(np.vstack(j), 'fwd')
-                self._jacobian.set_dense_jac(self, J)
+                j = coloring.expand_jac(np.vstack(j), 'fwd')
             else:
                 j = []
                 for a in jac_forward(self._compute_jax, argnums, tangents)(*invals):
-                    if a.ndim > 2:
-                        j.append(np.asarray(a).reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE),
-                                                        a.shape[-1])))
-                    else:  # a scalar
-                        j.append(np.atleast_2d(a))
-                J = np.vstack(j).reshape((osize, isize))
-                self._jacobian.set_dense_jac(self, J)
+                    a = np.atleast_2d(a)
+                    j.append(a.reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1])))
+                j = np.vstack(j).reshape((osize, isize))
+        self._jacobian.set_dense_jac(self, j)
 
     def _get_tangents(self, vals, direction, coloring=None, argnums=None):
         if self._tangents is None:
@@ -412,13 +406,6 @@ class ExplicitFuncComp(ExplicitComponent):
 
         This is called 1 or more times from compute_coloring.
         """
-        # coloring = self._coloring_info['coloring']
-        # if coloring is not None:
-        #     for i, result in self._colored_col_iter(direction):
-        #         self._jacobian.set_col(self, i, result)
-        # else:
-        #     for i, result in self._uncolored_col_iter(direction):
-        #         self._jacobian.set_col(self, i, result)
         self._jax_linearize()
 
     def _colored_col_iter(self, direction):
