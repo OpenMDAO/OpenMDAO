@@ -540,7 +540,7 @@ class Problem(object):
                 src_is_auto_ivc = src.rsplit('.', 1)[0] == '_auto_ivc'
                 # when setting auto_ivc output, error messages should refer
                 # to the promoted name used in the set_val call
-                var_name = name if src_is_auto_ivc else abs_name
+                var_name = name if src_is_auto_ivc else src
                 if model._outputs._contains_abs(src):  # src is local
                     if (model._outputs._abs_get_val(src).size == 0 and
                             src_is_auto_ivc and
