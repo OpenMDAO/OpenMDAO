@@ -555,7 +555,7 @@ class Problem(object):
                                 src_indices = inds
 
                             if src_indices is None:
-                                model._outputs.set_var(src, value, _full_slice, flat, 
+                                model._outputs.set_var(src, value, _full_slice, flat,
                                                        var_name=var_name)
                             else:
                                 if tmeta['distributed']:
