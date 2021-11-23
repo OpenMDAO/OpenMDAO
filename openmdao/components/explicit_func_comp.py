@@ -80,17 +80,13 @@ def jac_reverse(fun, argnums, tangents):
         first entry would contain the first 3 rows of J and the second would contain the next
         4 rows of J.
     """
-    def jacfunr(*args, **kwargs):
-        f = linear_util.wrap_init(fun, kwargs)
-        if argnums is None:
-            f_partial = f
-            dyn_args = args
-        else:
-            f_partial, dyn_args = argnums_partial(f, argnums, args)
-
-        y, pullback = _vjp(f_partial, *dyn_args)
-        jac = vmap(pullback)(tangents)
-        return jac
+    if argnums is None:
+        def jacfunr(*args, **kwargs):
+            return vmap(_vjp(linear_util.wrap_init(fun, kwargs), *args)[1])(tangents)
+    else:
+        def jacfunr(*args, **kwargs):
+            f_partial, dyn_args = argnums_partial(linear_util.wrap_init(fun, kwargs), argnums, args)
+            return vmap(_vjp(f_partial, *dyn_args)[1])(tangents)
 
     return jacfunr
 
