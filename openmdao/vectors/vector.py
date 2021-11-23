@@ -580,17 +580,16 @@ class Vector(object):
             If True, set into flattened variable.
         var_name : str or None
             If specified, the variable name to use when reporting errors. This is useful
-            when setting an IVC value that the user only knows by a connected input name.
+            when setting an AutoIVC value that the user only knows by a connected input name.
         """
-        if not var_name:
-            var_name = name
-
         abs_name = self._name2abs_name(name)
         if abs_name is None:
-            raise KeyError(f"{self._system().msginfo}: Variable name '{var_name}' not found.")
+            raise KeyError(f"{self._system().msginfo}: Variable name "
+                           f"'{var_name if var_name else name}' not found.")
 
         if self.read_only:
-            raise ValueError(f"{self._system().msginfo}: Attempt to set value of '{var_name}' in "
+            raise ValueError(f"{self._system().msginfo}: Attempt to set value of "
+                             f"'{var_name if var_name else name}' in "
                              f"{self._kind} vector when it is read only.")
 
         if idxs is _full_slice:
@@ -623,7 +622,7 @@ class Vector(object):
                     value = value.reshape(view[idxs()].shape)
                 except Exception:
                     raise ValueError(f"{self._system().msginfo}: Failed to set value of "
-                                     f"'{var_name}': {str(err)}.")
+                                     f"'{var_name if var_name else name}': {str(err)}.")
                 view[idxs()] = value
 
     def dot(self, vec):
