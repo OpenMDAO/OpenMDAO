@@ -1,7 +1,7 @@
 ***********************************
 # Release Notes for OpenMDAO 3.14.0
 
-November 23, 2021
+November 24, 2021
 
 OpenMDAO 3.15.0 is released to address a derivative bug in the new 1D-akima interpolant.
 
@@ -38,7 +38,7 @@ The new unit `'percent'`, is also added, which is defined as `unitless/100`.
 
 ## Miscellaneous
 
-- 
+- None
 
 ***********************************
 # Release Notes for OpenMDAO 3.14.0
