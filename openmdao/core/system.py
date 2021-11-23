@@ -1049,10 +1049,9 @@ class System(object):
 
     def _compute_coloring(self, recurse=False, **overrides):
         """
-        Compute a coloring of the approximated derivatives.
+        Compute a coloring of the partial jacobian.
 
-        This assumes that the current System is in a proper state for computing approximated
-        derivatives.
+        This assumes that the current System is in a proper state for computing derivatives.
 
         Parameters
         ----------
@@ -1201,7 +1200,7 @@ class System(object):
                         scheme._during_sparsity_comp = True
 
             if use_jax:
-                self._update_jac_cols()
+                self._update_jac_sparsity()
             else:
                 self.run_linearize(sub_do_ln=False)
 
@@ -1228,7 +1227,11 @@ class System(object):
             ordered_of_info = self._jac_var_info_abs2prom(ordered_of_info)
             ordered_wrt_info = self._jac_var_info_abs2prom(ordered_wrt_info)
 
-        coloring = _compute_coloring(sparsity, 'fwd')
+        if use_jax:
+            direction = self._mode
+        else:
+            direction = 'fwd'
+        coloring = _compute_coloring(sparsity, direction)
 
         # if the improvement wasn't large enough, don't use coloring
         pct = coloring._solves_info()[-1]

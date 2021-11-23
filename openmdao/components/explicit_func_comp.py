@@ -16,7 +16,7 @@ try:
     from jax.numpy import DeviceArray
     from jax.config import config
     from jax.api_util import argnums_partial
-    from jax._src.api import _jvp
+    from jax._src.api import _jvp, _vjp, tree_map
     config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
 except ImportError as err:
     jax = None
@@ -46,20 +46,59 @@ def jac_forward(fun, argnums, tangents):
         4 rows of J.
     """
     if argnums is None:
-        def jacfun(*args, **kwargs):
+        def jacfunf(*args, **kwargs):
             f = linear_util.wrap_init(fun, kwargs)
             return vmap(partial(_jvp, f, args), out_axes=(None, -1))(tangents)[1]
     else:
-        def jacfun(*args, **kwargs):
+        def jacfunf(*args, **kwargs):
             f = linear_util.wrap_init(fun, kwargs)
             f_partial, dyn_args = argnums_partial(f, argnums, args)
             return vmap(partial(_jvp, f_partial, dyn_args), out_axes=(None, -1))(tangents)[1]
-    return jacfun
+    return jacfunf
 
+
+def jac_reverse(fun, argnums, tangents):
+    """
+    Similar to the jax.jacrev function but allows specification of the tangent matrix.
+
+    This allows us to generate a compressed jacobian based on coloring.
+
+    Parameters
+    ----------
+    fun : function
+        The function to be differentiated.
+    argnums : tuple of int or None
+        Specifies which positional args are dynamic.  None means all positional args are dynamic.
+    tangents : ndarray
+        Array of 1.0's and 0's that is used to compute the value of the jacobian matrix.
+
+    Returns
+    -------
+    function
+        A function that returns rows of the jacobian grouped by output variable, e.g., if there were
+        2 output variables of size 3 and 4, the function would return a list with two entries. The
+        first entry would contain the first 3 rows of J and the second would contain the next
+        4 rows of J.
+    """
+    def jacfunr(*args, **kwargs):
+        f = linear_util.wrap_init(fun, kwargs)
+        if argnums is None:
+            f_partial = f
+            dyn_args = args
+        else:
+            f_partial, dyn_args = argnums_partial(f, argnums, args)
+
+        y, pullback = _vjp(f_partial, *dyn_args)
+        jac = vmap(pullback)(tangents)
+        return jac
+
+    return jacfunr
 
 def jacvec_prod(fun, argnums, invals, tangent):
     """
     Similar to the jvp function but gives back a flat column.
+
+    Note: this is significantly slower (when producing a full jacobian) than jac_forward.
 
     Parameters
     ----------
@@ -198,74 +237,87 @@ class ExplicitFuncComp(ExplicitComponent):
     def _linearize(self, jac=None, sub_do_ln=False):
         if self.options['use_jax']:
             self._check_first_linearize()
-
-            # argnums specifies which position args are to be differentiated
-            argnums = [i for i, m in enumerate(self._compute._inputs.values())
-                       if 'is_option' not in m]
-            inames = list(self._compute.get_input_names())
-            onames = list(self._compute.get_output_names())
-            nouts = len(onames)
-            osize = len(self._outputs)
-            isize = len(self._inputs)
-            invals = list(self._func_values(self._inputs))
-            coloring = self._coloring_info['coloring']
-
-            # since rev mode is more expensive, adjust size comparison a little to pick fwd
-            # in some cases where input size is slightly larger than output size
-            if self._mode != 'fwd' and osize * 1.3 < isize:  # use reverse mode to compute derivs
-                assert coloring is None, "no coloring defined yet for rev mode"
-                j = jacrev(self._compute_jax, argnums)(*invals)
-                if nouts == 1:
-                    for col, inp in zip(argnums, inames):
-                        abs_key = self._jacobian._get_abs_key((onames[0], inp))
-                        if abs_key in self._jacobian:
-                            self._jacobian[abs_key] = np.asarray(j[col])
-                else:
-                    for col, inp in zip(argnums, inames):
-                        for row, out in enumerate(onames):
-                            abs_key = self._jacobian._get_abs_key((out, inp))
-                            if abs_key in self._jacobian:
-                                self._jacobian[abs_key] = np.asarray(j[row][col])
-            else:
-                if len(argnums) == len(inames):
-                    argnums = None  # speedup if there are no static args
-
-                tangents = self._get_tangents(invals, coloring, argnums)
-                if coloring is not None:
-                    j = [np.asarray(a).reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1]))
-                         for a in jac_forward(self._compute_jax, argnums, tangents)(*invals)]
-                    J = coloring.expand_jac(np.vstack(j), 'fwd')
-                    self._jacobian.set_dense_jac(self, J)
-                else:
-                    j = []
-                    for a in jac_forward(self._compute_jax, argnums, tangents)(*invals):
-                        if a.ndim > 2:
-                            j.append(np.asarray(a).reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1])))
-                        else:  # a scalar
-                            j.append(np.atleast_2d(a))
-                    J = np.vstack(j).reshape((osize, isize))
-                    self._jacobian.set_dense_jac(self, J)
+            self._jax_linearize(jac, sub_do_ln)
         else:
             super()._linearize(jac, sub_do_ln)
 
-    # TODO: modify this to give tangents for jac_forward (uses vmap) OR tangents for jvp/vjp
-    def _get_tangents(self, invals, coloring=None, argnums=None):
+    def _jax_linearize(self, jac=None, sub_do_ln=False):
+        # argnums specifies which position args are to be differentiated
+        argnums = [i for i, m in enumerate(self._compute._inputs.values())
+                    if 'is_option' not in m]
+        inames = list(self._compute.get_input_names())
+        onames = list(self._compute.get_output_names())
+        nouts = len(onames)
+        osize = len(self._outputs)
+        isize = len(self._inputs)
+        invals = list(self._func_values(self._inputs))
+        coloring = self._coloring_info['coloring']
+
+        # since rev mode is more expensive, adjust size comparison a little to pick fwd
+        # in some cases where input size is slightly larger than output size
+        # TODO: figure out the optimal multiplier
+        if self._mode != 'fwd' and osize * 1.1 < isize:  # use reverse mode to compute derivs
+            if len(argnums) == len(inames):
+                argnums = None  # speedup if there are no static args
+
+            outvals = tuple(self._outputs.values())
+            tangents = self._get_tangents(outvals, 'rev', coloring)
+            if coloring is not None:
+                j = [np.asarray(a).reshape((a.shape[0], np.prod(a.shape[1:], dtype=INT_DTYPE)))
+                        for a in jac_reverse(self._compute_jax, argnums, tangents)(*invals)]
+                J = coloring.expand_jac(np.hstack(j), 'rev')
+            else:
+                j = []
+                for a in jac_reverse(self._compute_jax, argnums, tangents)(*invals):
+                    if a.ndim < 2:
+                        if a.ndim == 1:
+                            a = np.atleast_2d(a).T
+                        else:
+                            a = np.atleast_2d(a)
+                    else:
+                        a = np.asarray(a)
+                    j.append(a.reshape((a.shape[0], np.prod(a.shape[1:], dtype=INT_DTYPE))))
+                J = np.hstack(j).reshape((osize, isize))
+            self._jacobian.set_dense_jac(self, J)
+        else:
+            if len(argnums) == len(inames):
+                argnums = None  # speedup if there are no static args
+
+            tangents = self._get_tangents(invals, 'fwd', coloring, argnums)
+            if coloring is not None:
+                j = [np.asarray(a).reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1]))
+                        for a in jac_forward(self._compute_jax, argnums, tangents)(*invals)]
+                J = coloring.expand_jac(np.vstack(j), 'fwd')
+                self._jacobian.set_dense_jac(self, J)
+            else:
+                j = []
+                for a in jac_forward(self._compute_jax, argnums, tangents)(*invals):
+                    if a.ndim > 2:
+                        j.append(np.asarray(a).reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1])))
+                    else:  # a scalar
+                        j.append(np.atleast_2d(a))
+                J = np.vstack(j).reshape((osize, isize))
+                self._jacobian.set_dense_jac(self, J)
+
+    def _get_tangents(self, vals, direction, coloring=None, argnums=None):
         if self._tangents is None:
             if argnums is None:
-                ins = invals
+                leaves = vals
             else:
-                ins = [invals[i] for i in argnums]
-            sizes = [np.size(a) for a in ins]
+                leaves = [vals[i] for i in argnums]
+            sizes = [np.size(a) for a in leaves]
             inds = np.cumsum(sizes[:-1])
-            axis = 1
             ndim = np.sum(sizes)
             if coloring is None:
                 tangent = jnp.eye(ndim)
             else:
-                tangent = coloring.tangent_matrix('fwd')
-            shapes = [tangent.shape[:axis] + np.shape(v) + tangent.shape[axis + 1:] for v in ins]
+                tangent = coloring.tangent_matrix(direction)
+            axis = 1
+            shapes = [tangent.shape[:1] + np.shape(v) for v in leaves]
             self._tangents = tuple([jnp.reshape(a, shp) for a, shp in
                                     zip(jnp.split(tangent, inds, axis=axis), shapes)])
+            if len(vals) == 1:
+                self._tangents = self._tangents[0]
         return self._tangents
 
     def compute(self, inputs, outputs):
@@ -355,19 +407,20 @@ class ExplicitFuncComp(ExplicitComponent):
         self._tangents = None  # reset to compute new colored tangents later
         return ret
 
-    def _update_jac_cols(self, direction=None):
+    def _update_jac_sparsity(self, direction=None):
         """
         Compute a jacobian using randomized inputs to generate a sparsity matrix.
 
         This is called 1 or more times from compute_coloring.
         """
-        coloring = self._coloring_info['coloring']
-        if coloring is not None:
-            for i, result in self._colored_col_iter(direction):
-                self._jacobian.set_col(self, i, result)
-        else:
-            for i, result in self._uncolored_col_iter(direction):
-                self._jacobian.set_col(self, i, result)
+        # coloring = self._coloring_info['coloring']
+        # if coloring is not None:
+        #     for i, result in self._colored_col_iter(direction):
+        #         self._jacobian.set_col(self, i, result)
+        # else:
+        #     for i, result in self._uncolored_col_iter(direction):
+        #         self._jacobian.set_col(self, i, result)
+        self._jax_linearize()
 
     def _colored_col_iter(self, direction):
         coloring = self._coloring_info['coloring']

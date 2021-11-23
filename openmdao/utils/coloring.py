@@ -5,10 +5,12 @@ import os
 import time
 import pickle
 import traceback
+import weakref
 from itertools import combinations
 from contextlib import contextmanager
 from pprint import pprint
 from itertools import groupby
+from collections import defaultdict
 
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
@@ -20,6 +22,7 @@ import openmdao.utils.hooks as hooks
 from openmdao.utils.mpi import MPI
 from openmdao.utils.file_utils import _load_and_exec
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
+from openmdao.utils.name_maps import key2abs_key
 from openmdao.devtools.memory import mem_usage
 
 
@@ -212,7 +215,7 @@ class Coloring(object):
             Storage for the current array value.
 
         Yields
-        -------
+        ------
         ndarray
             tangent array for inputs (fwd) or outputs (rev)
         """
@@ -233,6 +236,19 @@ class Coloring(object):
             yield arr, nzs, nzparts
 
     def tangent_matrix(self, direction):
+        """
+        Return a tangent or cotangent matrix for use with jax.
+
+        Parameters
+        ----------
+        direction : str
+            Derivative computation direction ('fwd' or 'rev').
+
+        Returns
+        -------
+        ndarray
+            The tangent or cotangent matrix.
+        """
         if direction == 'fwd':
             shape = (self.total_solves(rev=False), self._shape[1])
             tangent = np.empty(shape)
@@ -243,10 +259,26 @@ class Coloring(object):
             tangent = np.empty(shape)
             for i, (arr, _, _) in enumerate(self.tangent_iter(direction)):
                 tangent[:, i] = arr
+            tangent = tangent.T
 
         return tangent
 
     def expand_jac(self, compressed_j, direction):
+        """
+        Expand the given compressed jacobian into a full jacobian.
+
+        Parameters
+        ----------
+        compressed_j : ndarray
+            The compressed jacobian.
+        direction : str
+            Derivative computation direction ('fwd' or 'rev').
+
+        Returns
+        -------
+        ndarray
+            The full jacobian.
+        """
         if direction == 'fwd':
             J = np.zeros(self._shape)
             for i, (nzs, nzparts) in enumerate(self.color_nonzero_iter(direction)):
@@ -254,7 +286,11 @@ class Coloring(object):
                     J[nzpart, nz] = compressed_j[nzpart, i]
             return J
         else:  # rev
-            assert False
+            J = np.zeros(self._shape)
+            for i, (nzs, nzparts) in enumerate(self.color_nonzero_iter(direction)):
+                for nz, nzpart in zip(nzs, nzparts):
+                    J[nz, nzpart] = compressed_j[i, nzpart]
+            return J
 
     def get_row_col_map(self, direction):
         """
@@ -2276,6 +2312,20 @@ class _ColSparsityJac(object):
                 scratch[nzs] += np.abs(column[nzs])
                 newnzs = np.nonzero(scratch)[0]
                 self._col_list[i] = [newnzs, scratch[newnzs]]
+
+    def set_dense_jac(self, system, jac):
+        """
+        Assign a dense jacobian to this jacobian.
+
+        Parameters
+        ----------
+        system : System
+            The system that owns this jacobian.
+        jac : ndarray
+            Dense jacobian.
+        """
+        for i, col in enumerate(jac.T):
+            self.set_col(system, i, col)
 
     def __setitem__(self, key, value):
         # ignore any setting of subjacs based on analytic derivs

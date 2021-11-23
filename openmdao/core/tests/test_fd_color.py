@@ -338,7 +338,7 @@ class TestColoringExplicit(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
-        coloring = comp._compute_approx_coloring(wrt_patterns='x*', method=method)[0]
+        coloring = comp._compute_coloring(wrt_patterns='x*', method=method)[0]
         comp._save_coloring(coloring)
 
         # now make a second problem to use the coloring
@@ -476,7 +476,7 @@ class TestColoringImplicit(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
-        coloring = comp._compute_approx_coloring(wrt_patterns='x*', method=method)[0]
+        coloring = comp._compute_coloring(wrt_patterns='x*', method=method)[0]
         comp._save_coloring(coloring)
 
         # now create a new problem and set the static coloring
@@ -595,7 +595,7 @@ class TestColoringSemitotals(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
-        coloring = sub._compute_approx_coloring(wrt_patterns='comp.x*', method=method)[0]
+        coloring = sub._compute_coloring(wrt_patterns='comp.x*', method=method)[0]
         sub._save_coloring(coloring)
 
         # now create a second problem and use the static coloring
@@ -1081,7 +1081,7 @@ class TestStaticColoring(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
-        coloring = comp._compute_approx_coloring(wrt_patterns='x*', method=method)[0]
+        coloring = comp._compute_coloring(wrt_patterns='x*', method=method)[0]
         comp._save_coloring(coloring)
 
         # now make a second problem to use the coloring
@@ -1522,7 +1522,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
-        coloring = sub._compute_approx_coloring(wrt_patterns='*', method=method)[0]
+        coloring = sub._compute_coloring(wrt_patterns='*', method=method)[0]
         sub._save_coloring(coloring)
 
         # make sure coloring file exists by the time we try to load the spec
@@ -1598,7 +1598,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
-        coloring = comp._compute_approx_coloring(wrt_patterns='x*', method=method)[0]
+        coloring = comp._compute_coloring(wrt_patterns='x*', method=method)[0]
         comp._save_coloring(coloring)
 
         prob = Problem(coloring_dir=self.tempdir)
@@ -1669,7 +1669,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
-        coloring = comp._compute_approx_coloring(wrt_patterns='x*', method=method)[0]
+        coloring = comp._compute_coloring(wrt_patterns='x*', method=method)[0]
         comp._save_coloring(coloring)
 
         # now create a new problem and use the previously generated coloring
