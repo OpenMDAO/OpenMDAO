@@ -11,7 +11,7 @@ from openmdao.api import IndepVarComp, Group, Problem, \
                          ExplicitComponent, ImplicitComponent, ExecComp, \
                          NewtonSolver, ScipyKrylov, \
                          LinearBlockGS, DirectSolver
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.utils.array_utils import rand_sparsity
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.api import ScipyOptimizeDriver
@@ -254,6 +254,11 @@ class TestJacobian(unittest.TestCase):
             self.prob.model.run_linearize()
         self._check_fwd(self.prob, fwd_check)
         self._check_rev(self.prob, rev_check)
+
+        # Make sure that checking jacobian works for sparse subjacs.
+        if comp_jac_class in [coo_matrix, csr_matrix, inverted_coo, inverted_csr]:
+            partials = self.prob.check_partials(out_stream=None)
+            assert_check_partials(partials, atol=1e-5, rtol=1e-5)
 
     def _setup_model(self, assembled_jac, comp_jac_class, nested, lincalls):
         self.prob = prob = Problem()

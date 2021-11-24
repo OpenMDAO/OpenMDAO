@@ -1,5 +1,6 @@
 """Define the DictionaryJacobian class."""
 import numpy as np
+import scipy.sparse as sp
 
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.core.constants import INT_DTYPE
@@ -166,6 +167,12 @@ class _CheckingJacobian(DictionaryJacobian):
     def __init__(self, system):
         super().__init__(system)
         self._subjacs_info = self._subjacs_info.copy()
+
+        # Convert any scipy.sparse subjacs to dense.
+        for key, subjac in self._subjacs_info.items():
+            if sp.issparse(subjac['val']):
+                self._subjacs_info[key]['val'] = subjac['val'].toarray()
+
         self._errors = []
 
     def __iter__(self):
