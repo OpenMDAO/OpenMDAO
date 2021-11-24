@@ -977,7 +977,17 @@ class ChildSelectDialog extends N2WindowDraggable {
         this.searchContainer = this.body.select('div.search-container');
         this.searchBox = this.searchContainer.select('input');
         if (this.searchTerm) { this.searchBox.property('value', this.searchTerm); }
-        this.searchBox.on('change', self.updateSearch.bind(self));
+        this.searchBox.on('keyup', self.updateSearch.bind(self));
+
+        this.searchContainer.select('.search-clear').on('click', e => {
+            self.searchTerm = '';
+            self.searchBox.property('value', '');
+            self.updateSearch(true);
+        });
+
+        this.searchContainer.select('.search-perform').on('click', e => {
+            self.updateSearch(true);
+        });
 
         this.buttonContainer = this.body.select('div.button-container');
 
@@ -1173,10 +1183,12 @@ class ChildSelectDialog extends N2WindowDraggable {
         return this;
     }
 
-    updateSearch() {
-        this.searchTerm = this.searchBox.property('value');
-        this.repopulate();
-        this.resize();
+    updateSearch(clicked = false) {
+        if (d3.event.keyCode == 13 || clicked) {
+                this.searchTerm = this.searchBox.property('value');
+                this.repopulate();
+                this.resize();
+        }
 
         return this;
     }
