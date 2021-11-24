@@ -939,14 +939,6 @@ class ChildSelectDialog extends N2WindowDraggable {
      */
     _initialSetup() {
         const self = this;
-        if ('hiddenVars' in this.node) {
-            this.hiddenVars = this.node.hiddenVars;
-            this.existingHiddenVars = true;
-        }
-        else {
-            this.hiddenVars = [];
-            this.existingHiddenVars = false;
-        }
 
         this.minWidth = 300;
         this.minHeight = 100;
@@ -974,22 +966,18 @@ class ChildSelectDialog extends N2WindowDraggable {
         this.tableContainer = this.body.select('div.table-container');
         this.table = this.tableContainer.select('table.variables');
         const UA = navigator.userAgent;
-        if (! /Chrom/.test(UA)) {
+        if (! /Chrom/.test(UA)) {          
             // Chrome puts the scrollbar outside the element, other browsers inside
             this.table.style('margin-right', `${this.scrollbarWidth}px`);
         }
 
         this.tbody = this.table.select('tbody');
 
+        // Search
         this.searchContainer = this.body.select('div.search-container');
         this.searchBox = this.searchContainer.select('input');
         if (this.searchTerm) { this.searchBox.property('value', this.searchTerm); }
-
-        this.searchBox.on('change', e => {
-            this.searchTerm = self.searchBox.property('value');
-            self.repopulate();
-            self.sizeToContent(3,4);
-        });
+        this.searchBox.on('change', self.updateSearch.bind(self));
 
         this.buttonContainer = this.body.select('div.button-container');
 
@@ -1004,24 +992,24 @@ class ChildSelectDialog extends N2WindowDraggable {
         // Select All button
         this.buttonContainer.select('button.apply-variable-selection')
             .on('click', self.apply.bind(self));
-        
+
+        this.scrollbarSpacer = topRow.select('th.scrollbar-spacer');
         this.repopulate();
-
-        this.tableContainer.style('width', `${this.table.node().scrollWidth +
-                this.scrollbarWidth}px`);
-        this.headerTable.style('width', this.tableContainer.style('width'));
-        this.headerTable.select('th.varname')
-            .style('width', this.table.select('td:first-child').style('width'));
-        this.headerTable.select('th.varvis')
-            .style('width', this.table.select('td.varvis').style('width'));
-
-        // Add an empty cell to account for scrollbar width
-        if (this.scrollbarIsVisible()) { topRow.append('th').text(' '); }
-
-        this.sizeToContent(3,57)
-            .modal(true)
+        this.resize();
+        this.modal(true)
             .moveNearMouse(d3.event)
             .show();
+    }
+
+    _initHiddenVars() {
+        if ('hiddenVars' in this.node) {
+            this.hiddenVars = this.node.hiddenVars;
+            this.existingHiddenVars = true;
+        }
+        else {
+            this.hiddenVars = [];
+            this.existingHiddenVars = false;
+        }
     }
 
     /**
@@ -1033,10 +1021,11 @@ class ChildSelectDialog extends N2WindowDraggable {
         
         // If a search term was used, treat it as a regular expression.
         const matchRe = this.searchTerm? new RegExp(this.searchTerm, 'i') : null;
+        this._initHiddenVars();
         this.foundSearchVars = [];
 
         let isEven = true;
-        let count = 0;
+        this.varCount = 0;
         for (const varName of this.varNameArr) {
             const child = this.varNames[varName];
 
@@ -1052,7 +1041,7 @@ class ChildSelectDialog extends N2WindowDraggable {
                 }
             }
             
-            count++;
+            this.varCount++;
 
             // Alternate row colors:
             const row = this.tbody.append('tr').attr('class', isEven? 'even' : 'odd');
@@ -1079,7 +1068,7 @@ class ChildSelectDialog extends N2WindowDraggable {
                 })
         }
 
-        if (count == 0) {
+        if (this.varCount == 0) {
             this.tbody.append('tr')
                 .append('td')
                 .style('text-align', 'center')
@@ -1096,7 +1085,7 @@ class ChildSelectDialog extends N2WindowDraggable {
 
     /** Clicking Apply closes the dialog and updates the diagram. */
     apply() {
-        if (this.hiddenVars.length == this.node.children.length ) {
+        if (this.hiddenVars.length == this.node.children.length || this.varCount == 0) {
             // If every variable was hidden, just collapse the node if it's expanded
             if (! this.node.isMinimized) { n2Diag.ui.rightClick(this.node); }
         }
@@ -1151,5 +1140,44 @@ class ChildSelectDialog extends N2WindowDraggable {
             this.hiddenVars.push(child);
         }
 
+    }
+
+    resize() {
+        const headerTableNode = this.headerTable.node(),
+            searchConNode = this.searchContainer.node(),
+            newHeight =
+                `${headerTableNode.scrollHeight +
+                this.tableContainer.node().clientHeight +
+                searchConNode.scrollHeight +
+                this.buttonContainer.node().scrollHeight + 7}px`,
+            newWidth = `${this.table.node().scrollWidth + this.scrollbarWidth}px`;
+
+        this.body.style('height', newHeight).style('width', newWidth);
+        this.tableContainer.style('width', newWidth);
+        this.headerTable.style('width', newWidth);
+
+        if (this.varCount > 0) {
+            this.headerTable.select('th.varname')
+                .style('width', this.table.select('td.varname').style('width'));
+            this.headerTable.select('th.varvis')
+                .style('width', this.table.select('td.varvis').style('width'));
+        }
+
+        this.searchContainer.style('width', newWidth);
+
+        const displayScrollbar = this.scrollbarIsVisible()? null : 'none';
+        this.scrollbarSpacer.style('display', displayScrollbar);
+        
+        this.sizeToContent(3,4);
+
+        return this;
+    }
+
+    updateSearch() {
+        this.searchTerm = this.searchBox.property('value');
+        this.repopulate();
+        this.resize();
+
+        return this;
     }
 }

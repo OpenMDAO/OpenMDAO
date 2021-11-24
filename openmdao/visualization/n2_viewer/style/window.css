@@ -952,6 +952,7 @@ i.help-text-icon {
     margin: 0;
     padding: 0;
     border: 0;
+    max-height: 280px;
 }
 
 
@@ -1051,5 +1052,12 @@ i.help-text-icon {
     text-decoration: none;
     cursor: pointer;
 }
+
+.window-theme-child-select .scrollbar-spacer {
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+}
+
 
 /* ^^^^^^^^^^ End Child Select Window theme ^^^^^^^^^^ */
