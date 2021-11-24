@@ -1432,11 +1432,9 @@ class TestGroup(unittest.TestCase):
 
         p.model.set_input_defaults('G.test_param', val=7.0)
 
-        with self.assertRaises(ValueError) as cm:
+        msg = "Input 'G.foo.test_param': could not broadcast input array from shape \(5.*\) into shape \(1.*\)"
+        with self.assertRaisesRegex(ValueError, msg) as cm:
             p.setup()
-
-        msg = "Input 'G.foo.test_param': could not broadcast input array from shape (5) into shape (1)"
-        self.assertEqual(str(cm.exception), msg)
 
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestGroupMPISlice(unittest.TestCase):
