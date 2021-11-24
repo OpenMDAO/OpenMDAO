@@ -3274,9 +3274,8 @@ class Group(System):
                 else:
                     try:
                         val[:] = value
-                    except ValueError:
-                        raise ValueError(f"Could not broadcast input array '{tgt}' from shape "
-                                         f"{value.shape} into shape {val.shape}.")
+                    except ValueError as err:
+                        raise ValueError(f"Input '{tgt}': {str(err)}")
 
                 if tgt not in vars_to_gather:
                     found_dup = True

@@ -1435,7 +1435,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             p.setup()
 
-        msg = "Could not broadcast input array 'G.foo.test_param' from shape (5,) into shape (1,)."
+        msg = "Input 'G.foo.test_param': could not broadcast input array from shape (5) into shape (1)"
         self.assertEqual(str(cm.exception), msg)
 
 @unittest.skipUnless(MPI, "MPI is required.")
