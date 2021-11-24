@@ -979,12 +979,14 @@ class ChildSelectDialog extends N2WindowDraggable {
         if (this.searchTerm) { this.searchBox.property('value', this.searchTerm); }
         this.searchBox.on('keyup', self.updateSearch.bind(self));
 
+        // Clear the search box and repopulate the variable list by clicking on the X button
         this.searchContainer.select('.search-clear').on('click', e => {
             self.searchTerm = '';
             self.searchBox.property('value', '');
             self.updateSearch(true);
         });
 
+        // Execute the search by clicking on the arrow button
         this.searchContainer.select('.search-perform').on('click', e => {
             self.updateSearch(true);
         });
@@ -1011,6 +1013,7 @@ class ChildSelectDialog extends N2WindowDraggable {
             .show();
     }
 
+    /** Reset the array of hidden vars from the node's array if it exists. */
     _initHiddenVars() {
         if ('hiddenVars' in this.node) {
             this.hiddenVars = this.node.hiddenVars;
@@ -1022,9 +1025,7 @@ class ChildSelectDialog extends N2WindowDraggable {
         }
     }
 
-    /**
-     * Add all the variables, their display status, and the control buttons.
-     */
+    /** Add all the variables, their display status, and the control buttons. */
     repopulate() {
         const self = this;
         this.tbody.html('');
@@ -1089,6 +1090,10 @@ class ChildSelectDialog extends N2WindowDraggable {
         return this;
     }
 
+    /**
+     * If the container scroll height is larger than the visible height the scrollbar is there.
+     * @returns {Boolean} True if the scrollbar is visible, false otherwise.
+     */
     scrollbarIsVisible() {
         return (this.tableContainer.node().scrollHeight > this.tableContainer.node().clientHeight);
     }
@@ -1152,6 +1157,7 @@ class ChildSelectDialog extends N2WindowDraggable {
 
     }
 
+    /** Adjust the size of the window body object based on the size of their contents. */
     resize() {
         const headerTableNode = this.headerTable.node(),
             searchConNode = this.searchContainer.node(),
@@ -1183,6 +1189,7 @@ class ChildSelectDialog extends N2WindowDraggable {
         return this;
     }
 
+    /** Update the variable list based on the provided search term. */
     updateSearch(clicked = false) {
         if (d3.event.keyCode == 13 || clicked) {
                 this.searchTerm = this.searchBox.property('value');
