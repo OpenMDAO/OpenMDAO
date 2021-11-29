@@ -263,6 +263,31 @@ class Coloring(object):
 
         return tangent
 
+    def colored_jac_iter(self, compressed_j, direction):
+        """
+        Yield full columns (fwd) or rows (rev) of a colored jacobian.
+
+        Parameters
+        ----------
+        compressed_j : ndarray
+            The compressed jacobian.
+        direction : str
+            Derivative computation direction ('fwd' or 'rev').
+
+        Yields
+        ------
+        (ndarray, )
+            The full jacobian.
+        """
+        if direction == 'fwd':
+            for i, (nzs, nzparts) in enumerate(self.color_nonzero_iter(direction)):
+                for jac_col, nzpart in zip(nzs, nzparts):
+                    yield compressed_j[nzpart, i], nzpart, jac_col
+        else:  # rev
+            for i, (nzs, nzparts) in enumerate(self.color_nonzero_iter(direction)):
+                for jac_row, nzpart in zip(nzs, nzparts):
+                    yield compressed_j[i, nzpart], nzpart, jac_row
+
     def expand_jac(self, compressed_j, direction):
         """
         Expand the given compressed jacobian into a full jacobian.
@@ -281,15 +306,13 @@ class Coloring(object):
         """
         if direction == 'fwd':
             J = np.zeros(self._shape)
-            for i, (nzs, nzparts) in enumerate(self.color_nonzero_iter(direction)):
-                for nz, nzpart in zip(nzs, nzparts):
-                    J[nzpart, nz] = compressed_j[nzpart, i]
+            for col, nzpart, icol in self.colored_jac_iter(compressed_j, direction):
+                J[nzpart, icol] = col
             return J
         else:  # rev
             J = np.zeros(self._shape)
-            for i, (nzs, nzparts) in enumerate(self.color_nonzero_iter(direction)):
-                for nz, nzpart in zip(nzs, nzparts):
-                    J[nz, nzpart] = compressed_j[i, nzpart]
+            for row, nzpart, irow in self.colored_jac_iter(compressed_j, direction):
+                J[irow, nzpart] = row
             return J
 
     def get_row_col_map(self, direction):

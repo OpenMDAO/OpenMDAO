@@ -274,7 +274,7 @@ class ExplicitFuncComp(ExplicitComponent):
                     else:
                         a = np.asarray(a)
                     j.append(a.reshape((a.shape[0], np.prod(a.shape[1:], dtype=INT_DTYPE))))
-                j = np.hstack(j) #.reshape((osize, isize))
+                j = np.hstack(j).reshape((osize, isize))
         else:
             if len(argnums) == len(inames):
                 argnums = None  # speedup if there are no static args
