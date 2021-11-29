@@ -876,8 +876,7 @@ class Group(System):
                 elif in_dist and not out_dist:
                     issue_warning(f"Connecting a serial output '{abs_out}' and distributed input "
                                   f"'{abs_in}' is not common. While legal in OM, verify "
-                                  f"connections are as expected.",
-                                  category=DistributedComponentWarning)
+                                  "connections are as expected.", category=DistributedComponentWarning)
 
     def _get_group_input_meta(self, prom_in, meta_name):
         if prom_in in self._group_inputs:

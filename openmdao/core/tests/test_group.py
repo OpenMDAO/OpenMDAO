@@ -1442,7 +1442,7 @@ class TestGroupMPISlice(unittest.TestCase):
         p.model = SimpleGroup()
 
         msg = ("Connecting a serial output 'serial_ivc.global_a' and distributed input "
-              "'parallel_sum.local_a' is not common. While legal in OM, verify connections are as expected")
+               "'parallel_sum.local_a' is not common. While legal in OM, verify connections are as expected.")
         with assert_warning(DistributedComponentWarning, msg):
             p.setup()
 
