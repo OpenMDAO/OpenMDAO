@@ -1,6 +1,48 @@
 ***********************************
 # Release Notes for OpenMDAO 3.14.0
 
+November 24, 2021
+
+OpenMDAO 3.15.0 is released to address a derivative bug in the new 1D-akima interpolant.
+
+Calling `set_val` on a variable that is ultimately sourced from 'AutoIVC' was causing a poorly worded error when the given value was not compatible.
+This has ben fixed.
+
+It also adds a new explicitly `'unitless'` unit.
+Currently the standard practice is to use `None` as the units for dimensionless quantities.
+Variables with units `None` are allowed to be connected to variables of other units, and no conversion is performed.
+Using `'unitless'` will all users more rigorous checking when connecting a dimensionless unit to another variable.
+
+The new unit `'percent'`, is also added, which is defined as `unitless/100`.
+
+## New Deprecations
+
+- None
+
+## Backwards Incompatible API Changes
+
+- None
+
+## Backwards Incompatible Non-API Changes
+
+- None
+
+## New Features
+
+- Added 'unitless' and 'percent' quantities, from [POEM 059](https://github.com/OpenMDAO/POEMs/blob/master/POEM_059.md) [#2340](https://github.com/OpenMDAO/OpenMDAO/pull/2340)
+
+## Bug Fixes
+
+- Fix for deriv calc on vectorized 1D-akima [#2352](https://github.com/OpenMDAO/OpenMDAO/pull/2352)
+- Provide a better error message when setting an invalid value to an auto_ivc output. [#2355](https://github.com/OpenMDAO/OpenMDAO/pull/2355)
+
+## Miscellaneous
+
+- None
+
+***********************************
+# Release Notes for OpenMDAO 3.14.0
+
 November 18, 2021
 
 OpenMDAO 3.14.0 features new function wrapping capability that makes it easier to tie existing code into OpenMDAO,
