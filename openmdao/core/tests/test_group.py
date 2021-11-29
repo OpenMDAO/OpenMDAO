@@ -17,7 +17,8 @@ from openmdao.test_suite.components.sellar import SellarDis2
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_no_warning
 from openmdao.utils.logger_utils import TestLogger
-from openmdao.utils.om_warnings import PromotionWarning, OMDeprecationWarning
+from openmdao.utils.om_warnings import PromotionWarning, OMDeprecationWarning, \
+    DistributedComponentWarning
 from openmdao.utils.name_maps import name2abs_names
 
 try:
@@ -1442,7 +1443,7 @@ class TestGroupMPISlice(unittest.TestCase):
 
         msg = ("Connecting a serial output 'serial_ivc.global_a' and distributed input "
               "'parallel_sum.local_a' is not common. While legal in OM, verify connections are as expected")
-        with assert_warning(UserWarning, msg):
+        with assert_warning(DistributedComponentWarning, msg):
             p.setup()
 
     def test_om_slice_2d_mpi(self):
