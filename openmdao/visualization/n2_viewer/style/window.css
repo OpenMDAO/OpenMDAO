@@ -889,7 +889,7 @@ i.help-text-icon {
     overflow: hidden;
     visibility: visible;
     border: 1px solid gray;
-
+    min-width: 300px;
 }
 
 .window-theme-child-select .window-footer {
@@ -903,53 +903,70 @@ i.help-text-icon {
     right: 0;
 }
 
-/* Child select window table */
-.window-theme-child-select .window-body .table-container {
-    max-height: 280px;
-    overflow-x: hidden;
-    overflow-y: auto;
-}
-
-.window-theme-child-select .table-container table {
+.window-theme-child-select table.header {
 	overflow: hidden;
-	background-color: white;
-    min-width: 300px;
+    width: 100%;
     border-collapse: separate;
     border-spacing: 0;
-    margin: 0 14px 0 0;
+    margin: 0;
     padding: 0;
     border: 0;
+    top: 0px;
 }
 
-.window-theme-child-select thead th {
+.window-theme-child-select table.header th {
     text-align: center;
     font-size: 8pt;
     margin: 0;
+
     border-top: 0;
     border-bottom: 1px solid #a0a0a0;
     border-right: 1px solid #a0a0a0;
     background-color: #c0c0c0;
-    padding: 3px;
+
+    padding: 2px 3px 2px 3px;
     white-space: nowrap;
-    position: sticky; /* Only seems to work on Firefox */
-    top: 0px;
 
     color: #202020;
-    min-width: 30px;
     font-weight: 300;
 }
 
-.window-theme-child-select tbody tr th:last-child,
-.window-theme-child-select tbody tr td:last-child {
+.window-theme-child-select table.header th.varvis {
+    min-width: 40px;
+}
+
+/* Child select window table */
+.window-theme-child-select .window-body .table-container {
+    max-height: 280px;
+    width: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.window-theme-child-select .table-container table.variables {
+	overflow: hidden;
+	background-color: white;
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    max-height: 280px;
+}
+
+
+.window-theme-child-select table.variables tr th:last-child,
+.window-theme-child-select table.variables tr td:last-child {
     border-right: 0;
 }
 
-.window-theme-child-select tbody tr:last-child th,
-.window-theme-child-select tbody tr:last-child td {
+.window-theme-child-select table.variables tr:last-child th,
+.window-theme-child-select table.variables tr:last-child td {
     border-bottom: 0;
 }
 
-.window-theme-child-select tbody td {
+.window-theme-child-select table.variables td {
     font-size: 9pt;
     margin: 0;    
     border-top: 0;
@@ -960,20 +977,73 @@ i.help-text-icon {
     white-space: nowrap;
 }
 
-.window-theme-child-select tbody tr td:first-child {
+.window-theme-child-select table.variables td.varname {
     text-align: left;
 }
 
-.window-theme-child-select tbody tr td:not(first-child) {
+.window-theme-child-select table.variables td.varvis {
     text-align: center;
+    min-width: 40px;
 }
 
-.window-theme-child-select tbody tr.even td {
+.window-theme-child-select table.variables tr.even td {
     background-color:white;
 }
 
-.window-theme-child-select tbody tr.odd td {
+.window-theme-child-select table.variables tr.odd td {
     background-color: #d8ffff;
+}
+
+.window-theme-child-select .search-container {
+    height: 21px;
+    width: 100%;
+    bottom: 23px;
+    text-align: left;
+    font-size: 8pt;
+    border-top: 1px solid #a0a0a0;
+    border-bottom: 1px solid #a0a0a0;
+    padding: 2px 0 2px 0;
+    background-color: #c0c0c0;
+    white-space: nowrap;
+    color: #202020;
+}
+
+.window-theme-child-select .search-label {
+    padding-left: 10px;
+    padding-right: 3px;
+    font-style: italic;
+}
+
+.window-theme-child-select .search-container input {
+    padding-left: 10px;
+    border-radius: 5px;
+    border: 1px solid #a0a0a0;
+    background-color: #e0e0e0;
+    width: 65%;
+}
+
+.window-theme-child-select .search-clear,
+.window-theme-child-select .search-perform
+ {
+    height: 17px;
+    width: 17px;
+    border: 1px solid #808080;
+    border-radius: 7px;
+    text-align: center;
+    padding: 0 2px 0 2px;
+    margin: 0 0 0 3px;
+    font-size: 8pt;
+    color: #c0c0c0;
+    background-color: #909090;
+}
+
+.window-theme-child-select .search-clear:hover,
+.window-theme-child-select .search-perform:hover,
+.window-theme-child-select .search-clear:focus,
+.window-theme-child-select .search-perform:focus {
+    color:black;
+    text-decoration: none;
+    cursor: pointer;
 }
 
 .window-theme-child-select .button-container {
@@ -1007,5 +1077,12 @@ i.help-text-icon {
     text-decoration: none;
     cursor: pointer;
 }
+
+.window-theme-child-select .scrollbar-spacer {
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+}
+
 
 /* ^^^^^^^^^^ End Child Select Window theme ^^^^^^^^^^ */
