@@ -1412,6 +1412,39 @@ class TestGroup(unittest.TestCase):
 class TestGroupMPISlice(unittest.TestCase):
     N_PROCS = 2
 
+    def test_serial_input_to_distrib_output(self):
+        class ParallelSum(om.ExplicitComponent):
+            """Simple parallel summation."""
+
+            def setup(self):
+                self.add_input('local_a', shape=1, distributed=True, desc='local slice of parallel a vector.')
+                self.add_output('sum')
+
+            def compute(self, inputs, outputs):
+                outputs['sum'] = self.comm.allreduce(inputs['local_a'])
+
+        class SerialIVC(om.IndepVarComp):
+            """Simple serial vector independent variable component"""
+            def setup(self):
+                size = self.comm.size
+                self.add_output('global_a', val=np.arange(size), shape=size, desc='global a vector.')
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                indx = self.comm.rank
+                self.add_subsystem('serial_ivc', SerialIVC())
+                self.add_subsystem('parallel_sum', ParallelSum())
+                # Split serial vector across each processor
+                self.connect('serial_ivc.global_a', 'parallel_sum.local_a', src_indices=[indx])
+
+        p = om.Problem()
+        p.model = SimpleGroup()
+
+        msg = ("Connecting a serial output 'serial_ivc.global_a' and distributed input "
+              "'parallel_sum.local_a' is not common. While legal in OM, verify connections are as expected")
+        with assert_warning(UserWarning, msg):
+            p.setup()
+
     def test_om_slice_2d_mpi(self):
         class MyComp1(om.ExplicitComponent):
             def setup(self):
