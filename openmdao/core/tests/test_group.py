@@ -1413,7 +1413,7 @@ class TestGroup(unittest.TestCase):
 class TestGroupMPISlice(unittest.TestCase):
     N_PROCS = 2
 
-    def test_serial_input_to_distrib_output(self):
+    def test_distrib_input_to_serial_output(self):
         class ParallelSum(om.ExplicitComponent):
             """Simple parallel summation."""
 
