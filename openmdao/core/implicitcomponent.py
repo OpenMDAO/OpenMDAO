@@ -5,6 +5,7 @@ import numpy as np
 from openmdao.core.component import Component
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.class_util import overrides_method
+from openmdao.utils.general_utils import make_set
 from openmdao.utils.om_warnings import warn_deprecation
 
 _inst_functs = ['apply_linear']
@@ -30,6 +31,11 @@ class ImplicitComponent(Component):
         Store some bound methods so we can detect runtime overrides.
         """
         super().__init__(**kwargs)
+
+        if 'tags' not in kwargs:
+            kwargs['tags'] = {'allow_desvar'}
+        else:
+            kwargs['tags'] = make_set(kwargs['tags'], name='tags') | {'allow_desvar'}
 
         self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
 
@@ -288,6 +294,37 @@ class ImplicitComponent(Component):
 
         if (jac is None or jac is self._assembled_jac) and self._assembled_jac is not None:
             self._assembled_jac._update(self)
+
+    def add_output(self, name, val=1.0, **kwargs):
+        """
+        Add an output variable to the component.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable in this component's namespace.
+        val : float or list or tuple or ndarray
+            The initial value of the variable being added in user-defined units. Default is 1.0.
+        **kwargs : dict
+            Keyword args to store.  The value corresponding to each key is a dict containing the
+            metadata for the input name that matches that key.
+
+        Returns
+        -------
+        dict
+            Metadata for added variable.
+        """
+        metadata = super().add_output(name, val, **kwargs)
+
+        if "tags" in metadata:
+            if isinstance(metadata["tags"], list):
+                metadata["tags"].append('allow_desvar')
+            elif isinstance(metadata["tags"], set):
+                metadata["tags"].add('allow_desvar')
+        else:
+            metadata["tags"] = 'allow_desvar'
+
+        return metadata
 
     def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs=None,
                         discrete_outputs=None):

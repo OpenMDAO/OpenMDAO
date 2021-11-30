@@ -2950,6 +2950,7 @@ class System(object):
         model = self._problem_meta['model_ref']()
         conns = model._conn_global_abs_in2out
         abs2meta_out = model._var_allprocs_abs2meta['output']
+        abs2meta_in = model._var_allprocs_abs2meta['input']
 
         # Human readable error message during Driver setup.
         out = OrderedDict()
@@ -3054,6 +3055,14 @@ class System(object):
                                 out[name] = my_out[name]
                             else:
                                 out[name] = meta
+
+        if out:
+            for conn_in, conn_out in conns.items():
+                conn_out_attr = conn_out in abs2meta_out
+                if conn_out in out and conn_out_attr:
+                    if "allow_desvar" not in abs2meta_out[conn_out]['tags']:
+                        raise RuntimeError(f"Cannot connect the design variable '{conn_out}' to "
+                                           f"'{conn_in}' as an input.")
 
         return out
 

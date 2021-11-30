@@ -2087,7 +2087,7 @@ class TestProblem(unittest.TestCase):
 
         c1.add_design_var('x', lower=0, upper=5)
 
-        msg = "Cannot connect the design variable 'x' to 'outer_group.inner_group.c1.x' as an input."
+        msg = "Cannot connect the design variable 'initial_comp.x' to 'outer_group.inner_group.c1.x' as an input."
         with self.assertRaises(RuntimeError) as cm:
             prob.setup()
         self.assertEqual(str(cm.exception), msg)

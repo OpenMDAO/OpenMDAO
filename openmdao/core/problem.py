@@ -940,15 +940,6 @@ class Problem(object):
         # set static mode back to True in all systems in this Problem
         self._metadata['static_mode'] = True
 
-        des_vars = self.model.get_design_vars()
-        prom2abs = self._metadata['prom2abs']
-
-        for des_var in des_vars:
-            if des_var in prom2abs['output'] and des_var in prom2abs['input']:
-                if "_auto_ivc" not in prom2abs['input'][des_var]:
-                    raise RuntimeError(f"Cannot connect the design variable '{des_var}' to "
-                                       f"'{prom2abs['input'][des_var][0]}' as an input.")
-
         # Cache all args for final setup.
         self._check = check
         self._logger = logger
