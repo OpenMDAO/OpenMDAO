@@ -99,13 +99,15 @@ class CaseViewer(object):
         variables = list(set(variables['inputs'] + variables['outputs'] + variables['residuals']))
         var_list = []
         case_vars = []
-        special_case_vars = [self._num_points_str, self._case_iter_str]
+        special_case_vars = {'Other': [self._num_points_str, self._case_iter_str]}
+        special_case_vals = special_case_vars.values()
 
         for var_dict in [self.case.outputs, self.case.inputs, self.case.residuals]:
             if var_dict is not None:
                 case_vars += list(var_dict.keys())
 
-        if var_to_compare in special_case_vars:
+        if var_to_compare in special_case_vals:
+            print("here")
             return self.io_options_x
 
         self._case_reader_to_dict()
@@ -113,14 +115,15 @@ class CaseViewer(object):
         for variable in variables:
             vars_are_arrays = isinstance(variable, np.ndarray) and \
                 isinstance(var_to_compare, np.ndarray)
-            if variable in case_vars and variable not in special_case_vars:
+            if variable in case_vars and variable not in special_case_vals:
                 if vars_are_arrays and self.case_dict[variable].size == \
                         self.case_dict[var_to_compare].size:
                     var_list.append(variable)
 
         if var_list:
-            return sorted(var_list) + special_case_vars
-        elif variables != special_case_vars:
+            print("here")
+            return sorted(var_list).update(special_case_vals)
+        elif variables != special_case_vals:
             return special_case_vars
 
     def _case_options(self, source):
@@ -160,6 +163,7 @@ class CaseViewer(object):
             if self.io_options_x[key]:
                 io_starting_option = self.io_options_x[key][0]
             self.io_options_x[key] = sorted(self.io_options_x[key])
+        self.io_options_x['Other'] = [self._num_points_str, self._case_iter_str]
 
         self.variables_plot = figure(title="Problem Variables", x_axis_label="Variable Length",
                                      y_axis_label="Variable X")
@@ -210,8 +214,8 @@ class CaseViewer(object):
 
         self.io_select_y.options = self._var_compatability_check(self.io_options_x,
                                                                  self.io_select_x.value)
-        for key, val in self.io_select_x.options.items():
-            self.io_select_x.options[key] = val + [self._num_points_str] + [self._case_iter_str]
+        # for key, val in self.io_select_x.options.items():
+        #     self.io_select_x.options[key] = val
 
         self.doc.add_root(self.layout)
 
@@ -372,7 +376,6 @@ class CaseViewer(object):
                 y_variable = np.zeros(1)
                 self.warning_box.text = "NOTE: Cannot compare Number of Points to Case Iterations"
             elif num_points_y or self._case_iter_y:
-                print(x_io)
                 if isinstance(x_io[self.io_select_x.value], (np.ndarray, list, float)):
                     x_variable = x_io[self.io_select_x.value].flatten()
                 else:
