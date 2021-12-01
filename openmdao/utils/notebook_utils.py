@@ -100,8 +100,8 @@ def show_options_table(reference, recording_options=False):
 
     Parameters
     ----------
-    reference : str
-        Dot path of desired class or function.
+    reference : str or object
+        Dot path of desired class or function or an instance.
 
     recording_options : bool
         If True, display recording options instead of options.
@@ -111,7 +111,10 @@ def show_options_table(reference, recording_options=False):
     IPython.display
         Options table of the given class or function.
     """
-    obj = _get_object_from_reference(reference)()
+    if isinstance(reference, str):
+        obj = _get_object_from_reference(reference)()
+    else:
+        obj = reference
 
     if ipy:
         if not hasattr(obj, "options"):

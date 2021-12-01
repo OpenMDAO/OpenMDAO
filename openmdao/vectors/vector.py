@@ -4,12 +4,16 @@ import os
 import weakref
 
 import numpy as np
+from numpy import isscalar
 
 from openmdao.utils.name_maps import prom_name2abs_name, rel_name2abs_name
 from openmdao.utils.indexer import Indexer, indexer
 
 
 _full_slice = slice(None)
+_flat_full_indexer = indexer(_full_slice, flat_src=True)
+_full_indexer = indexer(_full_slice, flat_src=False)
+
 _type_map = {
     'input': 'input',
     'output': 'output',
@@ -165,6 +169,17 @@ class Vector(object):
         """
         return self._len
 
+    def nvars(self):
+        """
+        Return the number of variables in this Vector.
+
+        Returns
+        -------
+        int
+            Number of variables in this Vector.
+        """
+        return len(self._views)
+
     def _copy_views(self):
         """
         Return a dictionary containing just the views.
@@ -201,7 +216,7 @@ class Vector(object):
                 if n in self._names:
                     yield v
         else:
-            for n, v in self._views_flat.items():
+            for n, v in self._views.items():
                 if n in self._names:
                     yield v.real
 
@@ -520,7 +535,36 @@ class Vector(object):
         raise NotImplementedError('set_arr not defined for vector type %s' %
                                   type(self).__name__)
 
-    def set_var(self, name, val, idxs=_full_slice, flat=False):
+    def set_vals(self, vals):
+        """
+        Set the data array of this vector using a value or iter of values, one for each variable.
+
+        The values must be in the same order as the variables appear in this Vector.
+
+        Parameters
+        ----------
+        vals : ndarray, float, or iter of ndarrays and/or floats
+            Values for each variable contained in this vector, in the proper order.
+        """
+        arr = self.asarray()
+
+        if self.nvars() == 1:
+            if isscalar(vals):
+                arr[:] = vals
+            else:
+                arr[:] = vals.ravel()
+        else:
+            start = end = 0
+            for v in vals:
+                if isscalar(v):
+                    end += 1
+                    arr[start] = v
+                else:
+                    end += v.size
+                    arr[start:end] = v.ravel()
+                start = end
+
+    def set_var(self, name, val, idxs=_full_slice, flat=False, var_name=None):
         """
         Set the array view corresponding to the named variable, with optional indexing.
 
@@ -534,16 +578,27 @@ class Vector(object):
             The locations where the data array should be updated.
         flat : bool
             If True, set into flattened variable.
+        var_name : str or None
+            If specified, the variable name to use when reporting errors. This is useful
+            when setting an AutoIVC value that the user only knows by a connected input name.
         """
         abs_name = self._name2abs_name(name)
         if abs_name is None:
-            raise KeyError(f"{self._system().msginfo}: Variable name '{name}' not found.")
+            raise KeyError(f"{self._system().msginfo}: Variable name "
+                           f"'{var_name if var_name else name}' not found.")
 
         if self.read_only:
-            raise ValueError(f"{self._system().msginfo}: Attempt to set value of '{name}' in "
+            raise ValueError(f"{self._system().msginfo}: Attempt to set value of "
+                             f"'{var_name if var_name else name}' in "
                              f"{self._kind} vector when it is read only.")
 
-        if not isinstance(idxs, Indexer):
+        if idxs is _full_slice:
+            if flat:
+                idxs = _flat_full_indexer
+            else:
+                idxs = _full_indexer
+
+        elif not isinstance(idxs, Indexer):
             idxs = indexer(idxs, flat_src=flat)
 
         if flat:
@@ -558,15 +613,16 @@ class Vector(object):
                 if view.shape:
                     view[idxs()] = value
                 else:
-                    # view is a scalar (so not really a view), so set the value into the
-                    # array using the flat view (which is actually a view)
+                    # view is a scalar so we can't update it without breaking its connection
+                    # to the underlying array, so set the value into the
+                    # array using the flat view, which is an array of size 1.
                     self._views_flat[abs_name][0] = value
             except Exception as err:
                 try:
                     value = value.reshape(view[idxs()].shape)
                 except Exception:
                     raise ValueError(f"{self._system().msginfo}: Failed to set value of "
-                                     f"'{name}': {str(err)}.")
+                                     f"'{var_name if var_name else name}': {str(err)}.")
                 view[idxs()] = value
 
     def dot(self, vec):

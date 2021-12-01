@@ -387,7 +387,7 @@ class InterpAlgorithmFixed(object):
             bracket is above the last table element, 0 for normal interpolation.
         """
         for j in range(self.dim):
-            if self._vectorized:
+            if self.vectorized(x):
                 self.last_index[j] = np.searchsorted(self.grid[j], x[..., j], side='left') - 1
             else:
                 self.last_index[j], _ = self._bracket_dim(self.grid[j], x[j],
@@ -516,6 +516,32 @@ class InterpAlgorithmFixed(object):
         Parameters
         ----------
         x : ndarray
+            The coordinates to interpolate on this grid.
+        idx : int
+            List of interval indices for x.
+
+        Returns
+        -------
+        ndarray
+            Interpolated values.
+        ndarray
+            Derivative of interpolated values with respect to independents.
+        ndarray
+            Derivative of interpolated values with respect to values.
+        ndarray
+            Derivative of interpolated values with respect to grid.
+        """
+        raise NotImplementedError()
+
+    def interpolate_vectorized(self, x_vec, idx):
+        """
+        Compute the interpolated value for multiple points.
+
+        This method must be defined by child classes.
+
+        Parameters
+        ----------
+        x_vec : ndarray
             The coordinates to interpolate on this grid.
         idx : int
             List of interval indices for x.

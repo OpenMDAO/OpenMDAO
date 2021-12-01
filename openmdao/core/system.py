@@ -18,7 +18,8 @@ import numpy as np
 import networkx as nx
 
 from openmdao.core.configinfo import _ConfigInfo
-from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE, INF_BOUND
+from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE, INF_BOUND, \
+    _SetupStatus
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import _full_slice
@@ -637,7 +638,6 @@ class System(object):
         sizes_out = self._var_sizes['output']
 
         tometa_in = self._var_allprocs_abs2meta['input']
-        tometa_out = self._var_allprocs_abs2meta['output']
 
         local_ins = self._var_abs2meta['input']
         local_outs = self._var_abs2meta['output']
@@ -1222,6 +1222,11 @@ class System(object):
             issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
             if not info['per_instance']:
                 coloring_mod._CLASS_COLORINGS[coloring_fname] = None
+
+            # make sure we have no leftover garbage from sparsity/coloring computations
+            self._inputs.set_val(starting_inputs)
+            self._outputs.set_val(starting_outputs)
+            self._residuals.set_val(starting_resids)
             return [None]
 
         coloring._row_vars = [t[0] for t in ordered_of_info]
@@ -3485,6 +3490,11 @@ class System(object):
         else:
             values = val
 
+        if self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
+            issue_warning("Calling `list_inputs` before `final_setup` will only "
+                          "display the default values of variables and will not show the result of "
+                          "any `set_val` calls.")
+
         metavalues = values and self._inputs is None
 
         keynames = ['val', 'units', 'shape', 'global_shape', 'desc', 'tags']
@@ -5222,7 +5232,7 @@ class System(object):
         for key in sorted(self._conn_global_abs_in2out):
             data.append(self._conn_global_abs_in2out[key])
 
-        return hashlib.md5(str(data).encode()).hexdigest()
+        return hashlib.md5(str(data).encode()).hexdigest()  # nosec: content not sensitive
 
     def _get_full_dist_shape(self, abs_name, local_shape):
         """

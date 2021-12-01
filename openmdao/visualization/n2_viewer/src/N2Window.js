@@ -392,6 +392,38 @@ class N2Window {
         this._enabledModal = enable;
         return this;
     }
+
+    /**
+     * Take ownership of a predefined DOM object, usually a div, by appending
+     * its children to the window body. This allows the definition of more
+     * complex window contents to be located in index.html for example.
+     * @param {String} id HTML id of the object to copy.
+     */
+    absorbBody(id) {
+      const newParent = this.body.node();
+      const oldParent = d3.select(id).node();
+
+        while (oldParent.childNodes.length > 0) {
+            newParent.appendChild(oldParent.childNodes[0]);
+        }
+
+        oldParent.remove();
+    }
+
+    /**
+     * Copy the structure of a predefined DOM object, usually a div, by cloning
+     * its children to the window body. This allows the definition of more
+     * complex window contents to be located in index.html for example.
+     * @param {String} id HTML id of the object to copy.
+     */
+     copyBody(id) {
+        const dstParent = this.body.node();
+        const srcParent = d3.select(id).node();
+  
+          for (const child of srcParent.childNodes) {
+              dstParent.appendChild(child.cloneNode(true));
+          }
+      }
 }
 
 
@@ -412,6 +444,7 @@ class N2WindowDraggable extends N2Window {
     /** Execute the base class constructor and set up drag event handler */
     constructor(newId = null, cloneId = null) {
         super(newId, cloneId);
+        this.boundaryMargin = 10;
         this._setupDrag();
     }
 
@@ -421,45 +454,74 @@ class N2WindowDraggable extends N2Window {
         super.close();
     }
 
-    /**
-     * Listen for the event to begin dragging the window. The start of the event
+    _doDragHeader() { this._doDrag('.window-header'); }
+    _doDragFooter() { this._doDrag('.window-footer'); }
+
+    /** Prevent the window from being dragged off the left or right of the browser. */
+    _applyHorizontalBounds(testX) {
+        return (testX < this.boundaryMargin ?
+            this.boundaryMargin : 
+                    (testX > window.innerWidth - this.boundaryMargin?
+                        window.innerWidth - this.boundaryMargin : testX));
+    }
+
+    /** Prevent the window from being dragged off the top or bottom of the browser. */
+    _applyVerticalBounds(testY) {
+        return (testY < this.boundaryMargin ?
+            this.boundaryMargin : 
+                    (testY > window.innerHeight - this.boundaryMargin?
+                        window.innerHeight - this.boundaryMargin : testY));
+    }
+
+    /** 
+     * Perform the dragging operation on either header or footer. The start of the event
      * also brings the window to the front.
      */
+    _doDrag(ribbonClass) {
+        const self = this;
+        const dragDiv = self.window;
+
+        self.bringToFront();
+        dragDiv.style('cursor', 'grabbing')
+            .select(ribbonClass).style('cursor', 'grabbing');
+
+        const dragStart = [d3.event.pageX, d3.event.pageY];
+        let newTrans = [0, 0];
+
+        const w = d3.select(window)
+            .on("mousemove", e => {
+                const x = self._applyHorizontalBounds(d3.event.pageX),
+                    y = self._applyVerticalBounds(d3.event.pageY);
+                newTrans = [x - dragStart[0], y - dragStart[1]];
+                dragDiv.style('transform', `translate(${newTrans[0]}px, ${newTrans[1]}px)`)
+            })
+            .on("mouseup", e => {
+                // Convert the translate to style position
+                self._setPos(self._getPos());
+
+                dragDiv.style('cursor', 'auto')
+                    .style('transform', null)
+                    .select(ribbonClass)
+                    .style('cursor', 'grab');
+
+                // Remove event listeners
+                w.on("mousemove", null).on("mouseup", null);
+            });
+
+        d3.event.preventDefault();
+    }
+
+    /** Listen for the mousedown event to begin dragging the window. */
     _setupDrag() {
         const self = this;
 
         this.header
-            .classed('window-draggable-header', true)
-            .on('mousedown', function () {
-                const dragDiv = self.window;
+            .classed('window-draggable-ribbon', true)
+            .on('mousedown', self._doDragHeader.bind(self));
 
-                self.bringToFront();
-                dragDiv.style('cursor', 'grabbing')
-                    .select('.window-header').style('cursor', 'grabbing');
-
-                const dragStart = [d3.event.pageX, d3.event.pageY];
-                let newTrans = [0, 0];
-
-                const w = d3.select(window)
-                    .on("mousemove", e => {
-                        newTrans = [d3.event.pageX - dragStart[0], d3.event.pageY - dragStart[1]];
-                        dragDiv.style('transform', `translate(${newTrans[0]}px, ${newTrans[1]}px)`)
-                    })
-                    .on("mouseup", e => {
-                        // Convert the translate to style position
-                        self._setPos(self._getPos());
-
-                        dragDiv.style('cursor', 'auto')
-                            .style('transform', null)
-                            .select('.window-header')
-                            .style('cursor', 'grab');
-
-                        // Remove event listeners
-                        w.on("mousemove", null).on("mouseup", null);
-                    });
-
-                d3.event.preventDefault();
-            });
+        this.footer
+            .classed('window-draggable-ribbon', true)
+            .on('mousedown', self._doDragFooter.bind(self));
     }
 }
 

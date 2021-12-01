@@ -2632,6 +2632,41 @@ class TestSqliteRecorder(unittest.TestCase):
         with assert_warning(OMDeprecationWarning, msg):
             rec_mgr.record_metadata(None)
 
+    def test_cobyla_constraints(self):
+        """
+        When using the COBYLA optimizer, bounds are managed by adding constraints on input
+        variables. Check that SqliteRecorder and CaseReader handle this properly.
+        """
+        prob = om.Problem()
+        model = prob.model
+
+        model.set_input_defaults("x", val=50.0)
+        model.set_input_defaults("y", val=50.0)
+
+        model.add_subsystem("comp", Paraboloid(), promotes=["*"])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.ScipyOptimizeDriver(optimizer="COBYLA", tol=1e-9, disp=False)
+        prob.driver.add_recorder(self.recorder)
+
+        model.add_design_var("x", lower=-50.0, upper=50.0)
+        model.add_design_var("y", lower=-50.0, upper=50.0)
+        model.add_objective("f_xy")
+
+        prob.setup()
+        prob.run_driver()
+
+        cr = om.CaseReader(self.filename)
+        case = cr.get_case(-1)
+
+        dvs = case.get_design_vars()
+        con = case.get_constraints()
+        obj = case.get_objectives()
+
+        assert_near_equal(dvs, {'x': 6.66666669, 'y': -7.33333338}, tolerance=1e-8)
+        assert_near_equal(con, {'x': 6.66666669, 'y': -7.33333338}, tolerance=1e-8)
+        assert_near_equal(obj, {'f_xy': -27.33333333}, tolerance=1e-8)
 
 @use_tempdirs
 class TestFeatureSqliteRecorder(unittest.TestCase):

@@ -1,13 +1,5 @@
-"""Define the PETSc Vector classe."""
-import sys
-import numpy as np
-from petsc4py import PETSc
-
-from openmdao.core.constants import INT_DTYPE
-from openmdao.vectors.default_vector import DefaultVector, _full_slice
-from openmdao.vectors.petsc_transfer import PETScTransfer
+"""Define the PETSc Vector class."""
 from openmdao.utils.mpi import MPI
-
 
 CITATION = '''@InProceedings{petsc-efficient,
     Author = "Satish Balay and William D. Gropp and Lois Curfman McInnes and Barry F. Smith",
@@ -19,160 +11,169 @@ CITATION = '''@InProceedings{petsc-efficient,
     Year = "1997"
 }'''
 
+if MPI is None:
+    PETScVector = None
+else:
+    import numpy as np
 
-class PETScVector(DefaultVector):
-    """
-    PETSc Vector implementation for running in parallel.
+    from petsc4py import PETSc
+    from openmdao.core.constants import INT_DTYPE
+    from openmdao.vectors.default_vector import DefaultVector, _full_slice
+    from openmdao.vectors.petsc_transfer import PETScTransfer
 
-    Most methods use the DefaultVector's implementation.
-
-    Parameters
-    ----------
-    name : str
-        The name of the vector: 'nonlinear' or 'linear'.
-    kind : str
-        The kind of vector, 'input', 'output', or 'residual'.
-    system : <System>
-        Pointer to the owning system.
-    root_vector : <Vector>
-        Pointer to the vector owned by the root system.
-    alloc_complex : bool
-        Whether to allocate any imaginary storage to perform complex step. Default is False.
-
-    Attributes
-    ----------
-    _dup_inds : ndarray of int
-        Array of indices of variables that aren't locally owned, meaning that they duplicate
-        variables that are 'owned' by a different process. Used by certain distributed
-        calculations, e.g., get_norm(), where including duplicate values would result in
-        the wrong answer.
-    """
-
-    TRANSFER = PETScTransfer
-    cite = CITATION
-    distributed = True
-
-    def __init__(self, name, kind, system, root_vector=None, alloc_complex=False):
+    class PETScVector(DefaultVector):
         """
-        Initialize all attributes.
-        """
-        super().__init__(name, kind, system, root_vector=root_vector,
-                         alloc_complex=alloc_complex)
+        PETSc Vector implementation for running in parallel.
 
-        self._dup_inds = None
-
-    def _initialize_data(self, root_vector):
-        """
-        Internally allocate vectors.
+        Most methods use the DefaultVector's implementation.
 
         Parameters
         ----------
-        root_vector : Vector or None
-            the root's vector instance or None, if we are at the root.
+        name : str
+            The name of the vector: 'nonlinear' or 'linear'.
+        kind : str
+            The kind of vector, 'input', 'output', or 'residual'.
+        system : <System>
+            Pointer to the owning system.
+        root_vector : <Vector>
+            Pointer to the vector owned by the root system.
+        alloc_complex : bool
+            Whether to allocate any imaginary storage to perform complex step. Default is False.
+
+        Attributes
+        ----------
+        _dup_inds : ndarray of int
+            Array of indices of variables that aren't locally owned, meaning that they duplicate
+            variables that are 'owned' by a different process. Used by certain distributed
+            calculations, e.g., get_norm(), where including duplicate values would result in
+            the wrong answer.
         """
-        super()._initialize_data(root_vector)
 
-        self._petsc = {}
-        self._imag_petsc = {}
-        data = self._data.real
+        TRANSFER = PETScTransfer
+        cite = CITATION
+        distributed = True
 
-        if self._alloc_complex:
-            self._petsc = PETSc.Vec().createWithArray(data.copy(), comm=self._system().comm)
-        else:
-            self._petsc = PETSc.Vec().createWithArray(data, comm=self._system().comm)
+        def __init__(self, name, kind, system, root_vector=None, alloc_complex=False):
+            """
+            Initialize all attributes.
+            """
+            super().__init__(name, kind, system, root_vector=root_vector,
+                             alloc_complex=alloc_complex)
 
-        # Allocate imaginary for complex step
-        if self._alloc_complex:
-            data = self._data.imag
-            self._imag_petsc = PETSc.Vec().createWithArray(data, comm=self._system().comm)
+            self._dup_inds = None
 
-    def _get_dup_inds(self):
-        """
-        Compute the indices into the data vector corresponding to duplicated variables.
+        def _initialize_data(self, root_vector):
+            """
+            Internally allocate vectors.
 
-        Returns
-        -------
-        ndarray of int
-            Index array corresponding to duplicated variables.
-        """
-        if self._dup_inds is None:
-            system = self._system()
-            if system.comm.size > 1:
-                # Here, we find the indices that are not locally owned so that we can
-                # temporarilly zero them out for the norm calculation.
-                dup_inds = []
-                abs2meta = system._var_allprocs_abs2meta[self._typ]
-                for name, idx_slice in self.get_slice_dict().items():
-                    owning_rank = system._owning_rank[name]
-                    if not abs2meta[name]['distributed'] and owning_rank != system.comm.rank:
-                        dup_inds.extend(range(idx_slice.start, idx_slice.stop))
+            Parameters
+            ----------
+            root_vector : Vector or None
+                the root's vector instance or None, if we are at the root.
+            """
+            super()._initialize_data(root_vector)
 
-                self._dup_inds = np.array(dup_inds, dtype=INT_DTYPE)
+            self._petsc = {}
+            self._imag_petsc = {}
+            data = self._data.real
+
+            if self._alloc_complex:
+                self._petsc = PETSc.Vec().createWithArray(data.copy(), comm=self._system().comm)
             else:
-                self._dup_inds = np.array([], dtype=INT_DTYPE)
+                self._petsc = PETSc.Vec().createWithArray(data, comm=self._system().comm)
 
-        return self._dup_inds
+            # Allocate imaginary for complex step
+            if self._alloc_complex:
+                data = self._data.imag
+                self._imag_petsc = PETSc.Vec().createWithArray(data, comm=self._system().comm)
 
-    def _get_nodup(self):
-        """
-        Retrieve a version of the data vector with any duplicate variables zeroed out.
+        def _get_dup_inds(self):
+            """
+            Compute the indices into the data vector corresponding to duplicated variables.
 
-        Returns
-        -------
-        ndarray
-            Array the same size as our data array with duplicate variables zeroed out.
-            If all variables are owned by this process, then the data array itself is
-            returned without copying.
-        """
-        dup_inds = self._get_dup_inds()
-        has_dups = dup_inds.size > 0
+            Returns
+            -------
+            ndarray of int
+                Index array corresponding to duplicated variables.
+            """
+            if self._dup_inds is None:
+                system = self._system()
+                if system.comm.size > 1:
+                    # Here, we find the indices that are not locally owned so that we can
+                    # temporarilly zero them out for the norm calculation.
+                    dup_inds = []
+                    abs2meta = system._var_allprocs_abs2meta[self._typ]
+                    for name, idx_slice in self.get_slice_dict().items():
+                        owning_rank = system._owning_rank[name]
+                        if not abs2meta[name]['distributed'] and owning_rank != system.comm.rank:
+                            dup_inds.extend(range(idx_slice.start, idx_slice.stop))
 
-        if has_dups:
-            data_cache = self.asarray(copy=True)
-            data_cache[dup_inds] = 0.0
-        else:
-            data_cache = self._get_data()
+                    self._dup_inds = np.array(dup_inds, dtype=INT_DTYPE)
+                else:
+                    self._dup_inds = np.array([], dtype=INT_DTYPE)
 
-        return data_cache
+            return self._dup_inds
 
-    def _restore_dups(self):
-        """
-        Restore our petsc array so that it corresponds once again to our local data array.
+        def _get_nodup(self):
+            """
+            Retrieve a version of the data vector with any duplicate variables zeroed out.
 
-        This is done to restore the petsc array after we previously zeroed out all duplicated
-        values.
-        """
-        self._petsc.array = self._get_data()
+            Returns
+            -------
+            ndarray
+                Array the same size as our data array with duplicate variables zeroed out.
+                If all variables are owned by this process, then the data array itself is
+                returned without copying.
+            """
+            dup_inds = self._get_dup_inds()
+            has_dups = dup_inds.size > 0
 
-    def get_norm(self):
-        """
-        Return the norm of this vector.
+            if has_dups:
+                data_cache = self.asarray(copy=True)
+                data_cache[dup_inds] = 0.0
+            else:
+                data_cache = self._get_data()
 
-        Returns
-        -------
-        float
-            Norm of this vector.
-        """
-        nodup = self._get_nodup()
-        self._petsc.array = nodup.real
-        distributed_norm = self._petsc.norm()
-        self._restore_dups()
-        return distributed_norm
+            return data_cache
 
-    def dot(self, vec):
-        """
-        Compute the dot product of the real parts of the current vec and the incoming vec.
+        def _restore_dups(self):
+            """
+            Restore our petsc array so that it corresponds once again to our local data array.
 
-        Parameters
-        ----------
-        vec : <Vector>
-            The incoming vector being dotted with self.
+            This is done to restore the petsc array after we previously zeroed out all duplicated
+            values.
+            """
+            self._petsc.array = self._get_data()
 
-        Returns
-        -------
-        float
-            The computed dot product value.
-        """
-        nodup = self._get_nodup()
-        # we don't need to _resore_dups here since we don't modify _petsc.array.
-        return self._system().comm.allreduce(np.dot(nodup, vec._get_data()))
+        def get_norm(self):
+            """
+            Return the norm of this vector.
+
+            Returns
+            -------
+            float
+                Norm of this vector.
+            """
+            nodup = self._get_nodup()
+            self._petsc.array = nodup.real
+            distributed_norm = self._petsc.norm()
+            self._restore_dups()
+            return distributed_norm
+
+        def dot(self, vec):
+            """
+            Compute the dot product of the real parts of the current vec and the incoming vec.
+
+            Parameters
+            ----------
+            vec : <Vector>
+                The incoming vector being dotted with self.
+
+            Returns
+            -------
+            float
+                The computed dot product value.
+            """
+            nodup = self._get_nodup()
+            # we don't need to _resore_dups here since we don't modify _petsc.array.
+            return self._system().comm.allreduce(np.dot(nodup, vec._get_data()))

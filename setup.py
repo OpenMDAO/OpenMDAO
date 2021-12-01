@@ -42,7 +42,7 @@ optional_dependencies = {
 }
 
 if sys.version_info >= (3, 7):
-    optional_dependencies['test'].append('playwright')
+    optional_dependencies['test'].append('playwright<1.15')
 
 # Add an optional dependency that concatenates all others
 optional_dependencies['all'] = sorted([
@@ -197,6 +197,8 @@ setup(
             'dotproductcomp=openmdao.components.dot_product_comp:DotProductComp',
             'eqconstraintcomp=openmdao.components.eq_constraint_comp:EQConstraintComp',
             'execcomp=openmdao.components.exec_comp:ExecComp',
+            'explicitfunccomp=openmdao.components.explicit_func_comp:ExplicitFuncComp',
+            'implicitfunccomp=openmdao.components.implicit_func_comp:ImplicitFuncComp',
             'externalcodecomp=openmdao.components.external_code_comp:ExternalCodeComp',
             'externalcodeimplicitcomp=openmdao.components.external_code_comp:ExternalCodeImplicitComp',
             'kscomp=openmdao.components.ks_comp:KSComp',

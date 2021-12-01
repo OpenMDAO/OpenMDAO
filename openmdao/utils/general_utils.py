@@ -440,7 +440,7 @@ def find_matches(pattern, var_list):
     Parameters
     ----------
     pattern : str
-        String pattern.
+        Glob pattern or variable name.
     var_list : list of str
         List of variable names to search for pattern.
 
@@ -890,6 +890,9 @@ def match_prom_or_abs(name, prom_name, includes=None, excludes=None):
     return False
 
 
+_falsey = {'0', 'false', 'no', ''}
+
+
 def env_truthy(env_var):
     """
     Return True if the given environment variable is 'truthy'.
@@ -904,7 +907,7 @@ def env_truthy(env_var):
     bool
         True if the specified environment variable is 'truthy'.
     """
-    return os.environ.get(env_var, '0').lower() not in ('0', 'false', 'no', '')
+    return os.environ.get(env_var, '0').lower() not in _falsey
 
 
 def common_subpath(pathnames):

@@ -194,7 +194,7 @@ def _load_and_exec(script_name, user_args):
         '__cached__': None,
     }
 
-    exec(code, globals_dict)
+    exec(code, globals_dict)  # nosec: private, internal use only
 
 
 def _load_and_run_test(testspec):

@@ -900,8 +900,6 @@ class Group(System):
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
         abs2meta_in = self._var_abs2meta['input']
         abs2prom = self._var_abs2prom['input']
-        src_sizes = self._var_sizes['output']
-        src_size_idxs = self._var_allprocs_abs2idx
 
         tdict = {}
         for tgt, src in self._conn_global_abs_in2out.items():
@@ -1484,8 +1482,6 @@ class Group(System):
 
                 if inparts[:nparts] == outparts[:nparts]:
                     global_abs_in2out[abs_in] = abs_out
-
-                    gmeta_in = all_abs2meta_in[abs_in]
 
                     # if connection is contained in a subgroup, add to conns
                     # to pass down to subsystems.
@@ -2932,7 +2928,7 @@ class Group(System):
                     dist_sizes = None
                 if of in approx_of_idx:
                     end += approx_of_idx[of].indexed_src_size
-                    yield of, start, end, approx_of_idx[of].shaped_array().flat[:], dist_sizes
+                    yield of, start, end, approx_of_idx[of].shaped_array().ravel(), dist_sizes
                 else:
                     end += abs2meta[of][szname]
                     yield of, start, end, _full_slice, dist_sizes
@@ -3276,7 +3272,10 @@ class Group(System):
                 if val is None:
                     val = value
                 else:
-                    val[:] = value
+                    try:
+                        val[:] = value
+                    except ValueError as err:
+                        raise ValueError(f"Input '{tgt}': {str(err)}")
 
                 if tgt not in vars_to_gather:
                     found_dup = True

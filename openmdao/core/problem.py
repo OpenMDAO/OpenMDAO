@@ -32,7 +32,7 @@ from openmdao.recorders.recording_manager import RecordingManager, record_viewer
     record_model_options
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable
-from openmdao.utils.mpi import MPI, FakeComm, multi_proc_exception_check
+from openmdao.utils.mpi import MPI, FakeComm, multi_proc_exception_check, check_mpi_env
 from openmdao.utils.name_maps import name2abs_names
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import simplify_unit
@@ -143,11 +143,15 @@ class Problem(object):
         self._warned = False
 
         if comm is None:
-            try:
-                from mpi4py import MPI
-                comm = MPI.COMM_WORLD
-            except ImportError:
+            use_mpi = check_mpi_env()
+            if use_mpi is False:
                 comm = FakeComm()
+            else:
+                try:
+                    from mpi4py import MPI
+                    comm = MPI.COMM_WORLD
+                except ImportError:
+                    comm = FakeComm()
 
         if model is None:
             self.model = Group()
@@ -533,9 +537,13 @@ class Problem(object):
             if model._outputs._contains_abs(abs_name):
                 model._outputs.set_var(abs_name, value, indices)
             elif abs_name in conns:  # input name given. Set value into output
+                src_is_auto_ivc = src.rsplit('.', 1)[0] == '_auto_ivc'
+                # when setting auto_ivc output, error messages should refer
+                # to the promoted name used in the set_val call
+                var_name = name if src_is_auto_ivc else src
                 if model._outputs._contains_abs(src):  # src is local
                     if (model._outputs._abs_get_val(src).size == 0 and
-                            src.rsplit('.', 1)[0] == '_auto_ivc' and
+                            src_is_auto_ivc and
                             all_meta['output'][src]['distributed']):
                         pass  # special case, auto_ivc dist var with 0 local size
                     elif tmeta['has_src_indices']:
@@ -547,7 +555,8 @@ class Problem(object):
                                 src_indices = inds
 
                             if src_indices is None:
-                                model._outputs.set_var(src, value, _full_slice, flat)
+                                model._outputs.set_var(src, value, _full_slice, flat,
+                                                       var_name=var_name)
                             else:
                                 if tmeta['distributed']:
                                     src_indices = src_indices.shaped_array()
@@ -564,10 +573,11 @@ class Problem(object):
                                         src_indices = src_indices - start
                                     src_indices = indexer(src_indices)
                                 if indices is _full_slice:
-                                    model._outputs.set_var(src, value, src_indices, flat)
+                                    model._outputs.set_var(src, value, src_indices, flat,
+                                                           var_name=var_name)
                                 else:
                                     model._outputs.set_var(src, value, src_indices.apply(indices),
-                                                           True)
+                                                           True, var_name=var_name)
                         else:
                             raise RuntimeError(f"{model.msginfo}: Can't set {abs_name}: remote"
                                                " connected inputs with src_indices currently not"
@@ -576,7 +586,7 @@ class Problem(object):
                         value = np.asarray(value)
                         if indices is not _full_slice:
                             indices = indexer(indices)
-                        model._outputs.set_var(src, value, indices)
+                        model._outputs.set_var(src, value, indices, var_name=var_name)
                 elif src in model._discrete_outputs:
                     model._discrete_outputs[src] = value
                 # also set the input
@@ -1344,6 +1354,7 @@ class Problem(object):
                                                 # apply the correction to undo the component's
                                                 # internal Allreduce.
                                                 derivs *= mult
+                                                partials_data[c_name][inp, out]['j_rev_mult'] = mult
 
                                         key = inp, out
                                         deriv = partials_data[c_name][key]
@@ -1495,6 +1506,7 @@ class Problem(object):
                 if wrt in local_opts and local_opts[wrt]['directional']:
                     deriv = partials_data[c_name][rel_key]
                     deriv['J_fwd'] = np.atleast_2d(np.sum(deriv['J_fwd'], axis=1)).T
+
                     if comp.matrix_free:
                         deriv['J_rev'] = np.atleast_2d(np.sum(deriv['J_rev'], axis=0)).T
 
@@ -2237,6 +2249,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             return 0. if arr is None or arr.size == 0 else np.linalg.norm(arr)
 
         for of, wrt in sorted_keys:
+            mult = None
 
             if totals:
                 fd_opts = global_options['']
@@ -2258,6 +2271,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
             if do_rev:
                 reverse = derivative_info.get('J_rev')
+                if 'j_rev_mult' in derivative_info:
+                    mult = derivative_info['j_rev_mult']
 
             fwd_error = safe_norm(forward - fd)
             if do_rev_dp:
@@ -2498,6 +2513,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     if not totals and matrix_free:
                         if out_stream:
                             if not directional:
+                                if mult is not None:
+                                    reverse /= mult
                                 out_buffer.write('    Raw Reverse Derivative (Jrev)\n')
                                 out_buffer.write(str(reverse) + '\n')
                                 out_buffer.write('\n')

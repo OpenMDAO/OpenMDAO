@@ -304,7 +304,7 @@ def _create_profile_callback(stack, matches=None, do_call=None, do_ret=None, con
                     inst = frame.f_locals['self']
                     for class_, filt in filters:
                         if isinstance(inst, class_):
-                            pred = eval(filt, globals(), frame.f_locals)
+                            pred = eval(filt, globals(), frame.f_locals)  # nosec: internal use
                             break
                 if pred:
                     stack.append(id(frame))

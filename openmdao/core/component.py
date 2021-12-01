@@ -1032,6 +1032,7 @@ class Component(System):
             msg = '{}: d({})/d({}): method "{}" is not supported, method must be one of {}'
             raise ValueError(msg.format(self.msginfo, of, wrt, method, sorted(_supported_methods)))
 
+        # lists aren't hashable so convert to tuples
         if isinstance(of, list):
             of = tuple(of)
         if isinstance(wrt, list):
@@ -1255,6 +1256,8 @@ class Component(System):
             Dictionary keyed by name with tuples of options (method, form, step, step_calc,
             minimum_step, directional)
         """
+        if not self._declared_partial_checks:
+            return {}
         opts = {}
         of, wrt = self._get_partials_varlists()
         invalid_wrt = []

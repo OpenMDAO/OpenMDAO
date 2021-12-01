@@ -76,16 +76,16 @@ class TestScaffold(unittest.TestCase):
             cname = 'My' + base
             pkgname = 'my_' + base.lower() + '999'
             if base == 'command':
-                check_call(['openmdao', 'scaffold', '--cmd', cname.lower(), '-p', pkgname])
+                check_call(['openmdao', 'scaffold', '--cmd', cname.lower(), '-p', pkgname])   # nosec: trusted input
                 tgtname = '_' + cname.lower() + '_setup'
             else:
-                check_call(['openmdao', 'scaffold', '-c', cname, '-b', base, '-p', pkgname])
+                check_call(['openmdao', 'scaffold', '-c', cname, '-b', base, '-p', pkgname])  # nosec: trusted input
                 tgtname = cname
 
             os.chdir(pkgname)
 
             # install it
-            check_call(['pip', 'install', '-q', '--no-cache-dir', '--no-deps', '.'])
+            check_call(['pip', 'install', '-q', '--no-cache-dir', '--no-deps', '.'])  # nosec: trusted input
 
             try:
                 modname = _camel_case_split(cname)
@@ -99,7 +99,7 @@ class TestScaffold(unittest.TestCase):
 
                 try:
                     # uninstall it
-                    check_call(['pip', 'uninstall', '-q', '-y', pkgname])
+                    check_call(['pip', 'uninstall', '-q', '-y', pkgname])  # nosec: trusted input
                 except CalledProcessError:
                     self.fail("Package '{}' failed to uninstall.  "
                               "You'll have to do it manually.".format(pkgname))
