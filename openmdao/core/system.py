@@ -1108,8 +1108,8 @@ class System(object):
                     break
             else:  # no approx derivs found
                 if not (self._owns_approx_of or self._owns_approx_wrt):
-                    issue_warning("No approx partials found but coloring was requested.  "
-                                  "Declaring ALL partials as dense and approx "
+                    issue_warning("No partials found but coloring was requested.  "
+                                  "Declaring ALL partials as dense "
                                   "(method='{}')".format(info['method']),
                                   prefix=self.msginfo, category=DerivativesWarning)
                     try:

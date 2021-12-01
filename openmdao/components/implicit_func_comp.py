@@ -5,10 +5,11 @@ import numpy as np
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.constants import INT_DTYPE
 import openmdao.func_api as omf
-from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore, _add_options
+from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore, _add_options, \
+    jac_forward, jac_reverse, _get_tangents
 
 try:
-    from jax import jit, jacfwd
+    from jax import jit, jacfwd, jacrev
     from jax.config import config
     config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
 except ImportError:
@@ -52,6 +53,12 @@ class ImplicitFuncComp(ImplicitComponent):
         Local override of linearize method.
     _linearize_info : object
         Some state information to compute in _linearize_func and pass to _solve_linear_func
+    _tangents : tuple
+        Tuple of parts of the tangent matrix cached for jax derivative computation.
+    _jac2func_inds : ndarray
+        Translation array from jacobian indices to function array indices.
+    _func2jac_inds : ndarray
+        Translation array from function array indices to jacobian indices.
     """
 
     def __init__(self, apply_nonlinear, solve_nonlinear=None, linearize=None, solve_linear=None,
@@ -65,12 +72,16 @@ class ImplicitFuncComp(ImplicitComponent):
         self._solve_linear_func = solve_linear
         self._linearize_func = linearize
         self._linearize_info = None
+        self._tangents = None
+        self._jac2func_inds = None
+        self._func2jac_inds = None
+
         if solve_nonlinear:
-            self.solve_nonlinear = self._solve_nonlinear_
+            self.solve_nonlinear = self._user_solve_nonlinear
         if linearize:
-            self.linearize = self._linearize_
+            self.linearize = self._user_linearize
         if solve_linear:
-            self.solve_linear = self._solve_linear_
+            self.solve_linear = self._user_solve_linear
 
         if self._apply_nonlinear_func._use_jax:
             self.options['use_jax'] = True
@@ -177,63 +188,80 @@ class ImplicitFuncComp(ImplicitComponent):
         """
         if self.options['use_jax'] and not self.options['use_jit']:
             with omf.jax_context(self._apply_nonlinear_func._f.__globals__):
-                results = self._ordered_values(inputs, outputs)
+                results = self._ordered_func_invals(inputs, outputs)
         else:
-            results = self._ordered_values(inputs, outputs)
+            results = self._ordered_func_invals(inputs, outputs)
 
         residuals.set_vals(self._apply_nonlinear_func(*results))
 
-    def _solve_nonlinear_(self, inputs, outputs):
+    def _user_solve_nonlinear(self, inputs, outputs):
         """
         Compute outputs. The model is assumed to be in a scaled state.
         """
-        self._outputs.set_vals(self._solve_nonlinear_func(*self._ordered_values(inputs, outputs)))
+        self._outputs.set_vals(self._solve_nonlinear_func(*self._ordered_func_invals(inputs,
+                                                                                     outputs)))
 
     def _linearize(self, jac=None, sub_do_ln=False):
-        """
-        Compute jacobian / factorization. The model is assumed to be in a scaled state.
-
-        Parameters
-        ----------
-        jac : Jacobian or None
-            If None, use local jacobian, else use assembled jacobian jac.
-        sub_do_ln : bool
-            Flag indicating if the children should call linearize on their linear solvers.
-        """
         if self.options['use_jax']:
-            # force _jvp and/or _vjp to be re-initialized the next time they are needed
-            # is called
-            self._jvp = None
-            self._vjp = None
-            func = self._apply_nonlinear_func
-            # argnums specifies which position args are to be differentiated
-            argnums = [i for i, m in enumerate(func._inputs.values()) if 'is_option' not in m]
-            onames = list(func.get_output_names())
-            nouts = len(onames)
-            jf = jacfwd(self._apply_nonlinear_func_jax, argnums)(
-                *self._ordered_values(self._inputs, self._outputs))
-            if nouts == 1:
-                for col, (inp, meta) in enumerate(func._inputs.items()):
-                    if 'is_option' in meta:
-                        continue
-                    abs_key = self._jacobian._get_abs_key((onames[0], inp))
-                    if abs_key in self._jacobian:
-                        self._jacobian[abs_key] = np.asarray(jf[col])
-            else:
-                for col, (inp, meta) in enumerate(func._inputs.items()):
-                    if 'is_option' in meta:
-                        continue
-                    for row, out in enumerate(onames):
-                        abs_key = self._jacobian._get_abs_key((out, inp))
-                        if abs_key in self._jacobian:
-                            self._jacobian[abs_key] = np.asarray(jf[row][col])
-
+            self._check_first_linearize()
+            self._jax_linearize(jac, sub_do_ln)
             if (jac is None or jac is self._assembled_jac) and self._assembled_jac is not None:
                 self._assembled_jac._update(self)
         else:
             super()._linearize(jac, sub_do_ln)
 
-    def _linearize_(self, inputs, outputs, jacobian):
+    def _jax_linearize(self, jac=None, sub_do_ln=False):
+        func = self._apply_nonlinear_func
+        # argnums specifies which position args are to be differentiated
+        inames = list(func.get_input_names())
+        argnums = aa = [i for i, m in enumerate(func._inputs.values()) if 'is_option' not in m]
+        if len(argnums) == len(inames):
+            argnums = None  # speedup if there are no static args
+        osize = len(self._outputs)
+        isize = len(self._inputs) + osize
+        invals = list(self._ordered_func_invals(self._inputs, self._outputs))
+        coloring = self._coloring_info['coloring']
+
+        if self._mode == 'rev':  # use reverse mode to compute derivs
+            outvals = tuple(self._outputs.values())
+            tangents = self._get_tangents(outvals, 'rev', coloring)
+            if coloring is not None:
+                j = [np.asarray(a).reshape((a.shape[0], np.prod(a.shape[1:], dtype=INT_DTYPE)))
+                     for a in jac_reverse(self._apply_nonlinear_func_jax, argnums,
+                                          tangents)(*invals)]
+                j = coloring.expand_jac(np.hstack(self._reorder_col_chunks(j)), 'rev')
+            else:
+                j = []
+                for a in jac_reverse(self._apply_nonlinear_func_jax, argnums, tangents)(*invals):
+                    if a.ndim < 2:
+                        if a.ndim == 1:
+                            a = np.atleast_2d(a).T
+                        else:
+                            a = np.atleast_2d(a)
+                    else:
+                        a = np.asarray(a)
+                    j.append(a.reshape((a.shape[0], np.prod(a.shape[1:], dtype=INT_DTYPE))))
+                j = np.hstack(self._reorder_col_chunks(j)).reshape((osize, isize))
+        else:
+            if coloring is not None:
+                tangents = self._get_tangents(invals, 'fwd', coloring, argnums,
+                                              trans=self._get_jac2func_inds(self._inputs,
+                                                                            self._outputs))
+                j = [np.asarray(a).reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1]))
+                     for a in jac_forward(self._apply_nonlinear_func_jax, argnums,
+                                          tangents)(*invals)]
+                j = coloring.expand_jac(np.vstack(j), 'fwd')
+            else:
+                tangents = self._get_tangents(invals, 'fwd', coloring, argnums)
+                j = []
+                for a in jac_forward(self._apply_nonlinear_func_jax, argnums, tangents)(*invals):
+                    a = np.atleast_2d(a)
+                    j.append(a.reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1])))
+                j = self._reorder_cols(np.vstack(j).reshape((osize, isize)))
+
+        self._jacobian.set_dense_jac(self, j)
+
+    def _user_linearize(self, inputs, outputs, jacobian):
         """
         Calculate the partials of the residual for each balance.
 
@@ -246,10 +274,11 @@ class ImplicitFuncComp(ImplicitComponent):
         jacobian : Jacobian
             Sub-jac components written to jacobian[output_name, input_name].
         """
-        self._linearize_info = self._linearize_func(*chain(self._ordered_values(inputs, outputs),
+        self._linearize_info = self._linearize_func(*chain(self._ordered_func_invals(inputs,
+                                                                                     outputs),
                                                            (jacobian,)))
 
-    def _solve_linear_(self, d_outputs, d_residuals, mode):
+    def _user_solve_linear(self, d_outputs, d_residuals, mode):
         r"""
         Run solve_linear function if there is one.
 
@@ -269,7 +298,7 @@ class ImplicitFuncComp(ImplicitComponent):
             d_residuals.set_vals(self._solve_linear_func(*chain(d_outputs.values(),
                                                                 (mode, self._linearize_info))))
 
-    def _ordered_values(self, inputs, outputs):
+    def _ordered_func_invals(self, inputs, outputs):
         """
         Yield function input args in their proper order.
 
@@ -299,3 +328,137 @@ class ImplicitFuncComp(ImplicitComponent):
                 yield next(outs)
             else:
                 yield next(inps)
+
+    def _get_func2jac_inds(self, inputs, outputs):
+        """
+        Return a translation array from function input ordering into jac column indices.
+
+        Parameters
+        ----------
+        inputs : Vector
+            The input vector.
+        outputs : Vector
+            The output vector (contains the states).
+
+        Returns
+        -------
+        ndarray
+            Index translation array
+        """
+        if self._func2jac_inds is None:
+            jac_inds = np.arange(len(outputs) + len(inputs), dtype=INT_DTYPE)
+            indict = {}
+            start = end = 0
+            for name, val in chain(outputs.items(), inputs.items()):
+                end += val.size
+                indict[name.rsplit('.', 1)[-1]] = jac_inds[start:end]
+                start = end
+
+            inds = [indict[n] for n in self._apply_nonlinear_func._inputs if n in indict]
+            self._func2jac_inds = np.concatenate(inds)
+
+        return self._func2jac_inds
+
+    def _get_jac2func_inds(self, inputs, outputs):
+        """
+        Return a translation array from jac column indices into function input ordering.
+
+        Parameters
+        ----------
+        inputs : Vector
+            The input vector.
+        outputs : Vector
+            The output vector (contains the states).
+
+        Returns
+        -------
+        ndarray
+            Index translation array
+        """
+        if self._jac2func_inds is None:
+            inds = np.arange(len(outputs) + len(inputs), dtype=INT_DTYPE)
+            indict = {}
+            start = end = 0
+            for n, meta in self._apply_nonlinear_func._inputs.items():
+                if 'is_option' not in meta:
+                    end += np.prod(meta['shape'], dtype=INT_DTYPE)
+                    indict[n] = inds[start:end]
+                    start = end
+
+            inds = [indict[n] for n in chain(outputs, inputs)]
+            self._jac2func_inds = np.concatenate(inds)
+
+        return self._jac2func_inds
+
+    def _reorder_col_chunks(self, col_chunks):
+        """
+        Yield jacobian column chunks in correct OpenMDAO order (outputs first, then inputs).
+
+        This is needed in rev mode because the return values of the jacrev function are ordered
+        based on the order of the function inputs, which may be different than OpenMDAO's
+        required order.
+
+        Parameters
+        ----------
+        col_chunks : list of ndarray
+            List of column chunks to be reordered
+
+        Yields
+        ------
+        ndarray
+            Chunk in OpenMDAO jacobian order.
+        """
+        inps = []
+        chunk_iter = iter(col_chunks)
+        for meta in self._apply_nonlinear_func._inputs.values():
+            if 'is_option' in meta:  # it's an option
+                pass  # skip it (don't include in jacobian)
+            elif 'resid' in meta:  # it's a state
+                yield next(chunk_iter)
+            else:
+                inps.append(next(chunk_iter))
+        yield from inps
+
+    def _reorder_cols(self, arr, coloring=None):
+        """
+        Reorder the columns of jacobian row chunks in fwd mode.
+
+        Parameters
+        ----------
+        arr : ndarray
+            Jacobian or compressed jacobian.
+        coloring : Coloring or None
+            Coloring object.
+
+        Returns
+        -------
+        ndarray
+            Reordered array.
+        """
+        if coloring is None:
+            trans = self._get_jac2func_inds(self._inputs, self._outputs)
+            return arr[:, trans]
+        else:
+            trans = self._get_jac2func_inds(self._inputs, self._outputs)
+            J = np.zeros(coloring._shape)
+            for col, nzpart, icol in coloring.colored_jac_iter(arr, 'fwd', trans):
+                J[nzpart, icol] = col
+            return J
+
+    def _get_tangents(self, vals, direction, coloring=None, argnums=None, trans=None):
+        if self._tangents is None:
+            self._tangents = _get_tangents(vals, direction, coloring, argnums, trans)
+        return self._tangents
+
+    def _compute_coloring(self, recurse=False, **overrides):
+        ret = super()._compute_coloring(recurse, **overrides)
+        self._tangents = None  # reset to compute new colored tangents later
+        return ret
+
+    def _update_jac_sparsity(self, direction=None):
+        """
+        Compute a jacobian using randomized inputs to generate a sparsity matrix.
+
+        This is called 1 or more times from compute_coloring.
+        """
+        self._jax_linearize()

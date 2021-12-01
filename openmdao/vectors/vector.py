@@ -220,6 +220,26 @@ class Vector(object):
                 if n in self._names:
                     yield v.real
 
+    def items(self):
+        """
+        Return (name, value) for variables contained in this vector.
+
+        Yields
+        ------
+        str
+            Name of each variable.
+        ndarray or float
+            Value of each variable.
+        """
+        if self._under_complex_step:
+            for n, v in self._views.items():
+                if n in self._names:
+                    yield n, v
+        else:
+            for n, v in self._views.items():
+                if n in self._names:
+                    yield n, v.real
+
     def _name2abs_name(self, name):
         """
         Map the given promoted or relative name to the absolute name.

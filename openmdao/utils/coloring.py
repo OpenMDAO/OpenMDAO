@@ -18,6 +18,7 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.general_utils import _prom2ivc_src_dict, \
     _prom2ivc_src_name_iter, _prom2ivc_src_item_iter
+from openmdao.utils.array_utils import array_viz
 import openmdao.utils.hooks as hooks
 from openmdao.utils.mpi import MPI
 from openmdao.utils.file_utils import _load_and_exec
@@ -200,72 +201,9 @@ class Coloring(object):
         for col_chunk in self.color_iter(direction):
             yield col_chunk, [nz_rows[c] for c in col_chunk]
 
-    def tangent_iter(self, direction, arr=None):
+    def colored_jac_iter(self, compressed_j, direction, trans=None):
         """
-        Given a direction, return input (fwd) or output (rev) tangent arrays.
-
-        Each array will contain multiple columns/rows of the identity matrix that share the
-        same color.
-
-        Parameters
-        ----------
-        direction : str
-            Indicates which coloring subdict ('fwd' or 'rev') to use.
-        arr : ndarray or None
-            Storage for the current array value.
-
-        Yields
-        ------
-        ndarray
-            tangent array for inputs (fwd) or outputs (rev)
-        """
-        if direction == 'fwd':
-            size = self._shape[1]
-        else:
-            size = self._shape[0]
-
-        if arr is None:
-            arr = np.empty(size)
-        elif size != arr.size:
-            raise RuntimeError("Size of given storage array doesn't match shape of the coloring for"
-                               f"the '{direction}' direction.")
-
-        for nzs, nzparts in self.color_nonzero_iter(direction):
-            arr[:] = 0
-            arr[nzs] = 1
-            yield arr, nzs, nzparts
-
-    def tangent_matrix(self, direction):
-        """
-        Return a tangent or cotangent matrix for use with jax.
-
-        Parameters
-        ----------
-        direction : str
-            Derivative computation direction ('fwd' or 'rev').
-
-        Returns
-        -------
-        ndarray
-            The tangent or cotangent matrix.
-        """
-        if direction == 'fwd':
-            shape = (self.total_solves(rev=False), self._shape[1])
-            tangent = np.empty(shape)
-            for i, (arr, _, _) in enumerate(self.tangent_iter(direction)):
-                tangent[i, :] = arr
-        else:  # rev
-            shape = (self._shape[0], self.total_solves(fwd=False))
-            tangent = np.empty(shape)
-            for i, (arr, _, _) in enumerate(self.tangent_iter(direction)):
-                tangent[:, i] = arr
-            tangent = tangent.T
-
-        return tangent
-
-    def colored_jac_iter(self, compressed_j, direction):
-        """
-        Yield full columns (fwd) or rows (rev) of a colored jacobian.
+        Yield nonzero parts of columns (fwd) or rows (rev) of a colored jacobian.
 
         Parameters
         ----------
@@ -273,20 +211,28 @@ class Coloring(object):
             The compressed jacobian.
         direction : str
             Derivative computation direction ('fwd' or 'rev').
+        trans : ndarray
+            Index array to translate from compressed jac in function context to openmdao jac.
 
         Yields
         ------
-        (ndarray, )
-            The full jacobian.
+        ndarray
+            Nonzero part of current jacobian column or row.
+        ndarray
+            Indices into full jacobian column or row where nonzero values should be placed.
+        int
+            Index into the full jacobian of the current column or row.
         """
         if direction == 'fwd':
             for i, (nzs, nzparts) in enumerate(self.color_nonzero_iter(direction)):
-                for jac_col, nzpart in zip(nzs, nzparts):
-                    yield compressed_j[nzpart, i], nzpart, jac_col
+                for jac_icol, nzpart in zip(nzs, nzparts):
+                    if trans is not None:
+                        jac_icol = trans[jac_icol]
+                    yield compressed_j[nzpart, i], nzpart, jac_icol
         else:  # rev
             for i, (nzs, nzparts) in enumerate(self.color_nonzero_iter(direction)):
-                for jac_row, nzpart in zip(nzs, nzparts):
-                    yield compressed_j[i, nzpart], nzpart, jac_row
+                for jac_irow, nzpart in zip(nzs, nzparts):
+                    yield compressed_j[i, nzpart], nzpart, jac_irow
 
     def expand_jac(self, compressed_j, direction):
         """
@@ -1068,6 +1014,80 @@ class Coloring(object):
                                          self._local_array[mode][inds])]
 
         return var_name_and_sub_indices
+
+    def tangent_iter(self, direction, arr=None, trans=None):
+        """
+        Given a direction, return input (fwd) or output (rev) tangent arrays.
+
+        Each array will contain multiple columns/rows of the identity matrix that share the
+        same color.
+
+        Parameters
+        ----------
+        direction : str
+            Indicates which coloring subdict ('fwd' or 'rev') to use.
+        arr : ndarray or None
+            Storage for the current array value.
+        trans : ndarray or None
+            Index translation array.
+
+        Yields
+        ------
+        ndarray
+            tangent array for inputs (fwd) or outputs (rev)
+        """
+        if direction == 'fwd':
+            size = self._shape[1]
+            fwd = True
+        else:
+            size = self._shape[0]
+            fwd = False
+
+        if arr is None:
+            arr = np.empty(size)
+        elif size != arr.size:
+            raise RuntimeError("Size of given storage array doesn't match shape of the coloring for"
+                               f" the '{direction}' direction.")
+
+        for nzs, nzparts in self.color_nonzero_iter(direction):
+            if trans is not None:
+                if fwd:
+                    nzs = trans[nzs]
+                else:
+                    nzparts = trans[nzparts]
+            arr[:] = 0
+            arr[nzs] = 1
+            yield arr, nzs, nzparts
+
+    def tangent_matrix(self, direction, trans=None):
+        """
+        Return a tangent or cotangent matrix for use with jax.
+
+        Parameters
+        ----------
+        direction : str
+            Derivative computation direction ('fwd' or 'rev').
+        trans : ndarray or None
+            Index translation array.
+
+        Returns
+        -------
+        ndarray
+            The tangent or cotangent matrix.
+        """
+        if direction == 'fwd':
+            shape = (self.total_solves(rev=False), self._shape[1])
+            tangent = np.empty(shape)
+            for i, (arr, _, _) in enumerate(tangent_iter(self, direction, trans=trans)):
+                tangent[i, :] = arr
+        else:  # rev
+            shape = (self._shape[0], self.total_solves(fwd=False))
+            tangent = np.empty(shape)
+            for i, (arr, _, _) in enumerate(tangent_iter(self, direction, trans=trans)):
+                tangent[:, i] = arr
+            tangent = tangent.T
+
+        return tangent
 
 
 def _order_by_ID(col_adj_matrix):

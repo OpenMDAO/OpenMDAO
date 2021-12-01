@@ -59,10 +59,12 @@ class TestImplicitFuncComp(unittest.TestCase):
             val = model.lingrp.lin._residuals['x']
             assert_near_equal(val, np.zeros((3, )), tolerance=1e-8)
 
-    def test_apply_nonlinear_linsys_coloring(self):
+    def setup_apply_nonlinear_linsys_coloring(self, method, mode):
 
-        x_=np.array([1, 2, -3])
+        x_=np.array([[1], [2], [-3]])
         A = np.array([[5.0, 0., 2.0], [1.0, 7.0, 0.], [1.0, 0.0, 0.]])
+        if mode == 'rev':
+            A = A.T
         b = A.dot(x_)
 
         def resid_func(A, b, x):
@@ -73,7 +75,7 @@ class TestImplicitFuncComp(unittest.TestCase):
                 .add_input('A', shape=A.shape)
                 .add_input('b', shape=b.shape)
                 .add_output('x', resid='rx', val=x_)
-                .declare_coloring(wrt='*', method='cs')
+                .declare_coloring(wrt='*', method=method)
                 )
 
         prob = om.Problem()
@@ -90,12 +92,28 @@ class TestImplicitFuncComp(unittest.TestCase):
         model.connect('p1.A', 'comp.A')
         model.connect('p2.b', 'comp.b')
 
-        prob.setup()
+        prob.setup(mode=mode)
 
         prob.set_solver_print(level=0)
         prob.run_model()
+        return prob
 
-        assert_check_partials(prob.check_partials(includes=['comp'], out_stream=None), atol=1e-5)
+    def test_apply_nonlinear_linsys_coloring_cs(self):
+        prob = self.setup_apply_nonlinear_linsys_coloring('cs', 'fwd')
+        partials = prob.check_partials(includes=['comp'], out_stream=None)
+        assert_check_partials(partials, atol=1e-5)
+        assert_check_totals(prob.check_totals(of=['comp.x'], wrt=['comp.A', 'comp.b'], out_stream=None), atol=3e-5, rtol=3e-5)
+
+    def test_apply_nonlinear_linsys_coloring_jax_fwd(self):
+        prob = self.setup_apply_nonlinear_linsys_coloring('jax', 'fwd')
+        partials = prob.check_partials(includes=['comp'], out_stream=None)
+        assert_check_partials(partials, atol=1e-5)
+        assert_check_totals(prob.check_totals(of=['comp.x'], wrt=['comp.A', 'comp.b'], out_stream=None), atol=3e-5, rtol=3e-5)
+
+    def test_apply_nonlinear_linsys_coloring_jax_rev(self):
+        prob = self.setup_apply_nonlinear_linsys_coloring('jax', 'rev')
+        partials = prob.check_partials(includes=['comp'], out_stream=None)
+        assert_check_partials(partials, atol=1e-5)
         assert_check_totals(prob.check_totals(of=['comp.x'], wrt=['comp.A', 'comp.b'], out_stream=None), atol=3e-5, rtol=3e-5)
 
     def test_component_model_w_linearize(self):

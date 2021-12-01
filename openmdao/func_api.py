@@ -194,6 +194,10 @@ class OMWrappedFunc(object):
         if name in self._inputs:
             if 'resid' in kwargs:
                 self._inputs[name]['resid'] = kwargs['resid']
+                if 'val' in kwargs:
+                    self._inputs[name]['shape'] = np.asarray(kwargs['val']).shape
+                elif 'shape' in kwargs:
+                    self._inputs[name]['shape'] = kwargs['shape']
             else:
                 raise RuntimeError(f"In add_output, '{name}' already registered as an input.")
         if name in self._outputs:
@@ -304,6 +308,8 @@ class OMWrappedFunc(object):
             _update_from_defaults(kwargs, self._coloring_defaults)
             self._declare_coloring = kwargs.copy()
             self._declare_coloring['wrt'] = wrt
+            if 'method' in kwargs and kwargs['method'] == 'jax':
+                self._use_jax = True
             return self
         raise RuntimeError("declare_coloring has already been called.")
 
