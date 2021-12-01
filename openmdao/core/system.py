@@ -3056,13 +3056,12 @@ class System(object):
                             else:
                                 out[name] = meta
 
-        if out:
-            for conn_in, conn_out in conns.items():
-                conn_out_attr = conn_out in abs2meta_out
-                if conn_out in out and conn_out_attr:
-                    if "allow_desvar" not in abs2meta_out[conn_out]['tags']:
-                        raise RuntimeError(f"Cannot connect the design variable '{conn_out}' to "
-                                           f"'{conn_in}' as an input.")
+        if out and 'model' in self.msginfo:
+            for var in out:
+                if var in abs2meta_out:
+                    if "openmdao:allow_desvar" not in abs2meta_out[var]['tags']:
+                        raise RuntimeError(f"Design variable '{var}' is not an IndepVarComp or "
+                                           f"ImplicitComp output.")
 
         return out
 

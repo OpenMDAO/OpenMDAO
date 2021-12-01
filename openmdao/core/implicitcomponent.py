@@ -33,9 +33,9 @@ class ImplicitComponent(Component):
         super().__init__(**kwargs)
 
         if 'tags' not in kwargs:
-            kwargs['tags'] = {'allow_desvar'}
+            kwargs['tags'] = {'openmdao:allow_desvar'}
         else:
-            kwargs['tags'] = make_set(kwargs['tags'], name='tags') | {'allow_desvar'}
+            kwargs['tags'] = make_set(kwargs['tags'], name='tags') | {'openmdao:allow_desvar'}
 
         self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
 
@@ -318,11 +318,11 @@ class ImplicitComponent(Component):
 
         if "tags" in metadata:
             if isinstance(metadata["tags"], list):
-                metadata["tags"].append('allow_desvar')
+                metadata["tags"].append('openmdao:allow_desvar')
             elif isinstance(metadata["tags"], set):
-                metadata["tags"].add('allow_desvar')
+                metadata["tags"].add('openmdao:allow_desvar')
         else:
-            metadata["tags"] = 'allow_desvar'
+            metadata["tags"] = 'openmdao:allow_desvar'
 
         return metadata
 

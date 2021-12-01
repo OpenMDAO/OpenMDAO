@@ -132,7 +132,7 @@ class ImplCompTestCase(unittest.TestCase):
             'size': 1,
             'units': 'ft',
             'desc': '',
-            'tags': {'allow_desvar'},
+            'tags': {'openmdao:allow_desvar'},
         }
         expected_discrete = {
             'val': 3,
