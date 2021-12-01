@@ -2950,7 +2950,6 @@ class System(object):
         model = self._problem_meta['model_ref']()
         conns = model._conn_global_abs_in2out
         abs2meta_out = model._var_allprocs_abs2meta['output']
-        abs2meta_in = model._var_allprocs_abs2meta['input']
 
         # Human readable error message during Driver setup.
         out = OrderedDict()
@@ -3056,7 +3055,7 @@ class System(object):
                             else:
                                 out[name] = meta
 
-        if out and 'model' in self.msginfo:
+        if out and self is model:
             for var in out:
                 if var in abs2meta_out:
                     if "openmdao:allow_desvar" not in abs2meta_out[var]['tags']:
