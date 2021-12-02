@@ -365,7 +365,7 @@ class N2Diagram {
     }
 
     _createPartitionCells() {
-        let self = this; // For callbacks that change "this". Alternative to using .bind().
+        const self = this; // For callbacks that change "this". Alternative to using .bind().
 
         let selection = this.dom.pTreeGroup.selectAll(".partition_group")
             .data(this.layout.zoomedNodes, function (node) {
@@ -387,12 +387,18 @@ class N2Diagram {
                 else { self.ui.nodeInfoBox.pin(); } // Create a persistent panel
             })
             .on("contextmenu", function (d) {
-                self.ui.rightClick(d, this);
+                if (d3.event.altKey) {
+                    const color = d3.select(this).select('rect').style('fill');
+                    self.ui.altRightClick(d, color);
+                }
+                else {
+                    self.ui.rightClick(d, this);
+                }
             })
             .on("mouseover", function (d) {
                 self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'));
             })
-            .on("mouseleave", function (d) {
+            .on("mouseleave", function () {
                 self.ui.nodeInfoBox.clear();
             })
             .on("mousemove", function () {
@@ -929,6 +935,10 @@ class N2Diagram {
         if (!hiddenList) return;
 
         const foundEntry = hiddenList.find(item => item.node === node);
+
+        // If variables were selectively hidden, force the variable selection
+        // dialog to rebuild the hiddenVars array.
+        if ('hiddenVars' in node) { delete node.hiddenVars; }
 
         if (!foundEntry) { // Not found, reset values to default
             node.isMinimized = false;

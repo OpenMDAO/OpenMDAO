@@ -9,7 +9,7 @@ import numpy as np
 from openmdao.components.interp_util.interp_akima import InterpAkima, Interp1DAkima
 from openmdao.components.interp_util.interp_bsplines import InterpBSplines
 from openmdao.components.interp_util.interp_cubic import InterpCubic
-from openmdao.components.interp_util.interp_lagrange2 import InterpLagrange2
+from openmdao.components.interp_util.interp_lagrange2 import InterpLagrange2, Interp3DLagrange2
 from openmdao.components.interp_util.interp_lagrange3 import InterpLagrange3, Interp3DLagrange3
 from openmdao.components.interp_util.interp_scipy import InterpScipy
 from openmdao.components.interp_util.interp_slinear import InterpLinear, Interp3DSlinear
@@ -29,6 +29,7 @@ INTERP_METHODS = {
     'scipy_quintic': InterpScipy,
     'bsplines': InterpBSplines,
     '3D-slinear': Interp3DSlinear,
+    '3D-lagrange2': Interp3DLagrange2,
     '3D-lagrange3': Interp3DLagrange3,
     '1D-akima': Interp1DAkima,
     'trilinear': Interp3DSlinear,  # Deprecated
@@ -37,7 +38,8 @@ INTERP_METHODS = {
 
 TABLE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima',
                  'scipy_cubic', 'scipy_slinear', 'scipy_quintic',
-                 '3D-slinear', '1D-akima', '3D-lagrange3']
+                 'trilinear', 'akima1D',  # all Deprecated
+                 '3D-slinear', '1D-akima', '3D-lagrange2', '3D-lagrange3']
 SPLINE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima', 'bsplines',
                   'scipy_cubic', 'scipy_slinear', 'scipy_quintic']
 
@@ -250,6 +252,9 @@ class InterpND(object):
             # Input is a list or tuple of separate points.
             x = np.atleast_2d(x)
 
+        # cache latest evaluation point for gradient method's use later
+        self._xi = x
+
         xnew = self._interpolate(x)
 
         if compute_derivative:
@@ -282,6 +287,9 @@ class InterpND(object):
         if len(values.shape) == 1:
             values = np.expand_dims(values, axis=0)
 
+        # cache latest evaluation point for gradient method's use later
+        self._xi = self.x_interp.copy()
+
         result = self._evaluate_spline(values)
         if result.shape[0] == 1:
             # Not vectorized, so drop the extra dimension.
@@ -311,9 +319,6 @@ class InterpND(object):
         ndarray
             Value of interpolant at all sample points.
         """
-        # cache latest evaluation point for gradient method's use later
-        self._xi = xi
-
         if not self.extrapolate:
             for i, p in enumerate(xi.T):
                 if np.isnan(p).any():
@@ -346,7 +351,6 @@ class InterpND(object):
             result, derivs_x, derivs_val, derivs_grid = table.evaluate_vectorized(xi)
 
         else:
-            xi = np.atleast_2d(xi)
             n_nodes, nx = xi.shape
             result = np.empty((n_nodes, ), dtype=xi.dtype)
             derivs_x = np.empty((n_nodes, nx), dtype=xi.dtype)
@@ -354,7 +358,7 @@ class InterpND(object):
 
             # TODO: it might be possible to vectorize over n_nodes.
             for j in range(n_nodes):
-                val, d_x, d_values, d_grid = table.evaluate(xi[j, :])
+                val, d_x, d_values, d_grid = table.evaluate(xi[j, ...])
                 result[j] = val
                 derivs_x[j, :] = d_x.ravel()
                 if d_values is not None:
@@ -392,9 +396,6 @@ class InterpND(object):
         """
         xi = self.x_interp
         self.values = values
-
-        # cache latest evaluation point for gradient method's use later
-        self._xi = xi.copy()
 
         table = self.table
         if table._vectorized:
@@ -481,7 +482,18 @@ class InterpND(object):
             # If inputs have changed since last computation, then re-interpolate.
             self.interpolate(xi)
 
-        return self._d_dx.reshape(np.asarray(xi).shape)
+        return self._gradient().reshape(np.asarray(xi).shape)
+
+    def _gradient(self):
+        """
+        Return the pre-computed gradients.
+
+        Returns
+        -------
+        ndarray
+            Vector of gradients of the interpolated values with respect to each value in xi.
+        """
+        return self._d_dx
 
     def training_gradients(self, pt):
         """

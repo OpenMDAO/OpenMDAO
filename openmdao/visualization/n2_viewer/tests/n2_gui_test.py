@@ -227,7 +227,70 @@ n2_gui_test_scripts = {
             "test": "count",
             "selector": "g#n2arrows > g",
             "count": 0
-        }
+        },
+        { "test": "root" },
+        {
+            "desc": "Alt-right-click the n1 component",
+            "test": "click",
+            "selector": "rect#circuit_n1",
+            "button": "right",
+            "modifiers": [ "Alt" ]
+        },
+        {
+            "desc": "Check that variable selection dialog appears",
+            "test": "count",
+            "selector": "#childSelect-circuit_n1",
+            "count": 1
+        },
+        {
+            "desc": "Select a variable to hide",
+            "test": "click",
+            "selector": "input#circuit_n1_V-visible-check",
+            "button": "left"
+        },
+        {
+            "desc": "Click the Apply button",
+            "test": "click",
+            "selector": ".button-container button:last-child",
+            "button": "left"
+        },
+        {
+            "desc": "Check that the V variable is no longer displayed",
+            "test": "count",
+            "selector": "rect#circuit_n1_V",
+            "count": 0
+        },
+        {
+            "desc": "Alt-right-click the n1 component",
+            "test": "click",
+            "selector": "rect#circuit_n1",
+            "button": "right",
+            "modifiers": [ "Alt" ]
+        },
+        {
+            "desc": "Click the Clear Search button",
+            "test": "click",
+            "selector": ".search-clear",
+            "button": "left"
+        },
+        {
+            "desc": "Perform a search on out in the variable selection dialog",
+            "test": "var_select_search",
+            "searchString": "out",
+            "foundVariableCount": 2
+        },
+        {
+            "desc": "Click the Apply button",
+            "test": "click",
+            "selector": ".button-container button:last-child",
+            "button": "left"
+        },
+        {
+            "desc": "Check the number of cells in the N2 Matrix",
+            "test": "count",
+            "selector": "g#n2elements > g.n2cell",
+            "count": 32
+        },
     ],
     "bug_arrow": [
         {
@@ -449,7 +512,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Drag Value Info window to new location",
             "test": "drag",
-            "selector": '[id^="persistentNodeInfo"]  .window-draggable-header',
+            "selector": '[id^="persistentNodeInfo"]  .window-draggable-ribbon:first-child',
             "x": 700, "y": 700
         },
         {
@@ -571,7 +634,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Drag Legend to new location",
             "test": "drag",
-            "selector": "#n2win-legend .window-draggable-header",
+            "selector": "#n2win-legend .window-draggable-ribbon:first-child",
             "x": 700, "y": 500
         },
         {
@@ -818,6 +881,21 @@ class n2_gui_test_case(_GuiTestCase):
 
         await self.assert_element_count("g.n2cell", options['n2ElementCount'])
 
+    async def var_select_search_and_check_result(self, options):
+        """
+        Enter a string in the variable selection search textbox and check the result.
+        """
+        searchString = options['searchString']
+        self.log_test(options['desc'] if 'desc' in options else
+                      "Searching for '" + options['searchString'] +
+                      "' and checking for " +
+                      str(options['foundVariableCount']) + " table rows after.")
+
+        searchbar = await self.page.wait_for_selector('.search-container input', state='visible')
+        await searchbar.type(searchString + "\n", delay=50)
+
+        await self.assert_element_count("td.varname", options['foundVariableCount'])
+
     async def run_model_script(self, script):
         """
         Iterate through the supplied script array and perform each
@@ -845,6 +923,8 @@ class n2_gui_test_case(_GuiTestCase):
                 await self.return_to_root()
             elif test_type == 'search':
                 await self.search_and_check_result(script_item)
+            elif test_type == 'var_select_search':
+                await self.var_select_search_and_check_result(script_item)
             elif test_type == 'toolbar':
                 await self.generic_toolbar_tests()
             elif test_type == 'count':

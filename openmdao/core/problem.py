@@ -537,9 +537,13 @@ class Problem(object):
             if model._outputs._contains_abs(abs_name):
                 model._outputs.set_var(abs_name, value, indices)
             elif abs_name in conns:  # input name given. Set value into output
+                src_is_auto_ivc = src.rsplit('.', 1)[0] == '_auto_ivc'
+                # when setting auto_ivc output, error messages should refer
+                # to the promoted name used in the set_val call
+                var_name = name if src_is_auto_ivc else src
                 if model._outputs._contains_abs(src):  # src is local
                     if (model._outputs._abs_get_val(src).size == 0 and
-                            src.rsplit('.', 1)[0] == '_auto_ivc' and
+                            src_is_auto_ivc and
                             all_meta['output'][src]['distributed']):
                         pass  # special case, auto_ivc dist var with 0 local size
                     elif tmeta['has_src_indices']:
@@ -551,7 +555,8 @@ class Problem(object):
                                 src_indices = inds
 
                             if src_indices is None:
-                                model._outputs.set_var(src, value, _full_slice, flat)
+                                model._outputs.set_var(src, value, _full_slice, flat,
+                                                       var_name=var_name)
                             else:
                                 if tmeta['distributed']:
                                     src_indices = src_indices.shaped_array()
@@ -568,10 +573,11 @@ class Problem(object):
                                         src_indices = src_indices - start
                                     src_indices = indexer(src_indices)
                                 if indices is _full_slice:
-                                    model._outputs.set_var(src, value, src_indices, flat)
+                                    model._outputs.set_var(src, value, src_indices, flat,
+                                                           var_name=var_name)
                                 else:
                                     model._outputs.set_var(src, value, src_indices.apply(indices),
-                                                           True)
+                                                           True, var_name=var_name)
                         else:
                             raise RuntimeError(f"{model.msginfo}: Can't set {abs_name}: remote"
                                                " connected inputs with src_indices currently not"
@@ -580,7 +586,7 @@ class Problem(object):
                         value = np.asarray(value)
                         if indices is not _full_slice:
                             indices = indexer(indices)
-                        model._outputs.set_var(src, value, indices)
+                        model._outputs.set_var(src, value, indices, var_name=var_name)
                 elif src in model._discrete_outputs:
                     model._discrete_outputs[src] = value
                 # also set the input

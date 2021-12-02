@@ -102,8 +102,6 @@
             </div>
         </div>
 
-
-
         <div id="d3_content_div">
             <!-- 2D Matrix Showing All Inputs/Outputs and Functions -->
             <div id="svgDiv">
@@ -244,16 +242,44 @@
     </div>
 
     <div id="toolbar-help-container" class='window-inactive'>
-        <p>Left clicking on a node in the model hierarchy will navigate to that node.<br>
-            Right clicking on a node in the model hierarchy will collapse/expand it.<br>
-            Hovering over any cell in the matrix will display its connections
-            as arrows. Clicking that cell will cause those arrows to persist.
+        <p><b>Left-click</b> on a node in the model hierarchy to navigate to that node.<br>
+            <b>Right-click</b> on a node to collapse/expand it.
+            <b>Alt-right-click</b> on a node with variables to select which ones to hide.<br>
+            Note: Right-click in Firefox displays a browser menu. To disable that,
+            visit <b>about:config</b> and set <code>dom.event.contextmenu.enabled</code>
+            to <b>true</b>.<br>
+            <b>Hover</b> over any cell in the matrix to display its connections
+            as arrows. Click that cell to make those arrows persistent.
         </p>
-        <h1>Toolbar Help</h1>
+        <h3>Toolbar Help</h3>
         <div class='help-graphic'>
             <img id="toolbar-snapshot" alt="Snapshot of toolbar buttons"
                 src="data:image/png;base64,{{n2toolbar_png}}" />
             <svg id='help-graphic-svg'></svg>
+        </div>
+    </div>
+
+    <div id="variable-selection-body">
+        <table class="header">
+            <tr>
+                <th class="varname"><span class="sort-up">&#9650;</span><span>Variable Name</span><span class="sort-down">&#9660;</span></th>
+                <th class="varvis">Visible</th>
+                <th class="scrollbar-spacer"></th>
+            </tr>
+        </table>
+        <div class="table-container">
+            <table class="variables">
+                <tbody></tbody>
+            </table>
+        </div>
+        <div class="search-container">
+            <span class='search-label'>Search</span><input class='variable-selection-search' type='text'>
+            <span class='search-clear'>&#x2715;</span><span class='search-perform'>&#x27a4;</span>
+        </div>
+        <div class="button-container">
+            <button class="select-all-variables">Select All</button>
+            <button class="select-no-variables">Select None</button>
+            <button class="apply-variable-selection">Apply</button>
         </div>
     </div>
 

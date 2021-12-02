@@ -476,7 +476,7 @@ class Interp3DLagrange3(InterpAlgorithmFixed):
 
         if idx not in self.coeffs:
             self.coeffs[idx] = self.compute_coeffs(idx)
-        a = self.coeffs[idx].copy()
+        a = self.coeffs[idx]
 
         x, y, z = x
 
@@ -709,19 +709,19 @@ class Interp3DLagrange3(InterpAlgorithmFixed):
         xx = np.empty((vec_size, 4), dtype=dtype)
         xx[:, 0] = 1.0
         xx[:, 1] = x
-        xx[:, 2] = xx[:, 1] * x
+        xx[:, 2] = x * x
         xx[:, 3] = xx[:, 2] * x
 
         yy = np.empty((vec_size, 4), dtype=dtype)
         yy[:, 0] = 1.0
         yy[:, 1] = y
-        yy[:, 2] = yy[:, 1] * y
+        yy[:, 2] = y * y
         yy[:, 3] = yy[:, 2] * y
 
         zz = np.empty((vec_size, 4), dtype=dtype)
         zz[:, 0] = 1.0
         zz[:, 1] = z
-        zz[:, 2] = zz[:, 1] * z
+        zz[:, 2] = z * z
         zz[:, 3] = zz[:, 2] * z
 
         val = np.einsum('qi,qj,qk,qijk->q', xx, yy, zz, a)

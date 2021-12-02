@@ -3272,7 +3272,10 @@ class Group(System):
                 if val is None:
                     val = value
                 else:
-                    val[:] = value
+                    try:
+                        val[:] = value
+                    except ValueError as err:
+                        raise ValueError(f"Input '{tgt}': {str(err)}")
 
                 if tgt not in vars_to_gather:
                     found_dup = True

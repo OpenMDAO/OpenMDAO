@@ -584,7 +584,7 @@ class Vector(object):
                     arr[start:end] = v.ravel()
                 start = end
 
-    def set_var(self, name, val, idxs=_full_slice, flat=False):
+    def set_var(self, name, val, idxs=_full_slice, flat=False, var_name=None):
         """
         Set the array view corresponding to the named variable, with optional indexing.
 
@@ -598,13 +598,18 @@ class Vector(object):
             The locations where the data array should be updated.
         flat : bool
             If True, set into flattened variable.
+        var_name : str or None
+            If specified, the variable name to use when reporting errors. This is useful
+            when setting an AutoIVC value that the user only knows by a connected input name.
         """
         abs_name = self._name2abs_name(name)
         if abs_name is None:
-            raise KeyError(f"{self._system().msginfo}: Variable name '{name}' not found.")
+            raise KeyError(f"{self._system().msginfo}: Variable name "
+                           f"'{var_name if var_name else name}' not found.")
 
         if self.read_only:
-            raise ValueError(f"{self._system().msginfo}: Attempt to set value of '{name}' in "
+            raise ValueError(f"{self._system().msginfo}: Attempt to set value of "
+                             f"'{var_name if var_name else name}' in "
                              f"{self._kind} vector when it is read only.")
 
         if idxs is _full_slice:
@@ -612,6 +617,7 @@ class Vector(object):
                 idxs = _flat_full_indexer
             else:
                 idxs = _full_indexer
+
         elif not isinstance(idxs, Indexer):
             idxs = indexer(idxs, flat_src=flat)
 
@@ -636,7 +642,7 @@ class Vector(object):
                     value = value.reshape(view[idxs()].shape)
                 except Exception:
                     raise ValueError(f"{self._system().msginfo}: Failed to set value of "
-                                     f"'{name}': {str(err)}.")
+                                     f"'{var_name if var_name else name}': {str(err)}.")
                 view[idxs()] = value
 
     def dot(self, vec):
