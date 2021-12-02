@@ -206,7 +206,7 @@ def _get_tangents(vals, direction, coloring=None, argnums=None, trans=None):
     shapes = [tangent.shape[:1] + np.shape(v) for v in leaves]
     tangents = tuple([np.reshape(a, shp) for a, shp in zip(np.split(tangent, inds, axis=1),
                                                            shapes)])
-    if len(vals) == 1:
+    if len(leaves) == 1:
         tangents = tangents[0]
 
     return tangents

@@ -12,8 +12,16 @@ except ImportError:
 import numpy as np
 from scipy.sparse import coo_matrix
 
+try:
+    import jax
+    import jax.numpy as jnp
+except ImportError:
+    jax = None
+
 from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent, ExecComp, \
-    ExplicitComponent, NonlinearBlockGS, ScipyOptimizeDriver, NewtonSolver, DirectSolver
+    ExplicitComponent, NonlinearBlockGS, ScipyOptimizeDriver, NewtonSolver, DirectSolver, \
+        ImplicitFuncComp
+import openmdao.func_api as omf
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.array_utils import evenly_distrib_idxs, rand_sparsity
 from openmdao.utils.mpi import MPI
@@ -137,6 +145,90 @@ class SparseCompImplicit(ImplicitComponent):
             end += outputs[outname].size
             residuals[outname] = prod[start:end]
             start = end
+        self._nruns += 1
+
+    # this is defined so we can more easily test coloring of approx totals in a Group above this comp
+    def solve_nonlinear(self, inputs, outputs):
+        prod = self.sparsity.dot(inputs.asarray())
+        start = end = 0
+        for i in range(self.osplit):
+            outname = 'y%d' % i
+            end += outputs[outname].size
+            outputs[outname] = prod[start:end]
+            start = end
+        self._nruns += 1
+
+
+class SpObj(object):
+    def __init__(self, sparsity):
+        self.mat = sparsity
+        self._nruns = 0
+
+
+class SparseFuncCompImplicit(ImplicitFuncComp):
+
+    def __init__(self, sparsity, method='cs', isplit=1, osplit=1, **kwargs):
+        self.sparsity = sparsity
+        self.isplit = isplit
+        self.osplit = osplit
+        self.method = method
+        self._nruns = 0
+
+        isizes, _ = evenly_distrib_idxs(self.isplit, self.sparsity.shape[1])
+        wrts = [(f"x{i}", sz) for i, sz in enumerate(isizes)]
+
+        osizes, _ = evenly_distrib_idxs(self.osplit, self.sparsity.shape[0])
+        ofs = [(f"y{i}", sz) for i, sz in enumerate(osizes)]
+
+        # define apply_nonlinear function
+        iparams = ','.join([n for n,_ in wrts])
+        oparams = ','.join([n for n,_ in ofs])
+        params = ','.join((iparams, oparams))
+        flines = ['def func(' + params + ',sparsity):']
+        flines.append(f'    if {len(wrts)} > 1:')
+        flines.append(f'         iarr = np.concatenate(({iparams}))')
+        flines.append(f'    else:')
+        flines.append(f'         iarr = {iparams[0]}0')
+        flines.append(f'    if {len(ofs)} > 1:')
+        flines.append(f'         oarr = np.concatenate(({oparams}))')
+        flines.append(f'    else:')
+        flines.append(f'         oarr = {oparams[0]}0')
+        flines.append('    prod = sparsity.mat.dot(iarr) - oarr')
+        flines.append('    sparsity._nruns += 1')
+        start = end = 0
+        for name, sz in ofs:
+            end += sz
+            flines.append(f"    r{name} = prod[{start}:{end}]")
+            start = end
+        flines.append('    return ' + ','.join([f"r{n}" for n,_ in ofs]))
+        fbody = '\n'.join(flines)
+
+        print(fbody)
+
+        exec(fbody)
+        f = omf.wrap(locals()['func'])
+
+        # def func(x0, y0, sparsity):
+        #     iarr = x0
+        #     oarr = y0
+        #     prod = sparsity.dot(iarr) - oarr
+        #     ry0 = prod
+        #     return ry0
+
+        # f = omf.wrap(func)
+
+        for name, sz in wrts:
+            f.add_input(name, shape=sz)
+        for name, sz in ofs:
+            f.add_output(name, shape=sz, resid=f"r{name}")
+        f.declare_option('sparsity', default=SpObj(sparsity))
+        f.declare_partials(of='*', wrt='*', method=self.method)
+
+        super().__init__(f, **kwargs)
+
+    # this is defined for easier testing of coloring of approx partials
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        super().apply_nonlinear(inputs, outputs, residuals)
         self._nruns += 1
 
     # this is defined so we can more easily test coloring of approx totals in a Group above this comp
@@ -501,6 +593,54 @@ class TestColoringImplicit(unittest.TestCase):
         comp._linearize()
         # add 5 to number of runs to cover the 5 uncolored output columns
         self.assertEqual(comp._nruns - start_nruns, sparsity.shape[0] + 10)
+        jac = comp._jacobian._subjacs_info
+        _check_partial_matrix(comp, jac, sparsity, method)
+
+
+class TestColoringImplicitFuncComp(unittest.TestCase):
+    def setUp(self):
+        np.random.seed(11)
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix=self.__class__.__name__ + '_')
+        os.chdir(self.tempdir)
+
+    def tearDown(self):
+        os.chdir(self.startdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
+
+    @parameterized.expand(itertools.product(
+        [('fd', 'fwd'), ('cs', 'fwd'), ('jax', 'fwd'), ('jax', 'rev')] if jax else [('fd', 'fwd'), ('cs', 'fwd')],
+        [1,2,7,19],
+        [1,2,5,11]
+        ), name_func=_test_func_name
+    )
+    def test_partials_implicit_funccomp(self, methodtup, isplit, osplit):
+        method, direction = methodtup
+        prob = Problem(coloring_dir=self.tempdir)
+        model = prob.model
+
+        sparsity = setup_sparsity(_BIGMASK)
+        indeps, conns = setup_indeps(isplit, _BIGMASK.shape[1], 'indeps', 'comp')
+        model.add_subsystem('indeps', indeps)
+        if method == 'jax':
+            sparsity = jnp.array(sparsity)
+        comp = model.add_subsystem('comp', SparseFuncCompImplicit(sparsity, method,
+                                                                  isplit=isplit, osplit=osplit))
+        comp.declare_coloring('*', method=method)
+
+        for conn in conns:
+            model.connect(*conn)
+
+        prob.setup(check=False, mode=direction)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        comp.run_linearize()
+        prob.run_model()
+        comp.run_linearize()
         jac = comp._jacobian._subjacs_info
         _check_partial_matrix(comp, jac, sparsity, method)
 

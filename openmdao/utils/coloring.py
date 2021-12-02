@@ -1078,12 +1078,12 @@ class Coloring(object):
         if direction == 'fwd':
             shape = (self.total_solves(rev=False), self._shape[1])
             tangent = np.empty(shape)
-            for i, (arr, _, _) in enumerate(tangent_iter(self, direction, trans=trans)):
+            for i, (arr, _, _) in enumerate(self.tangent_iter(direction, trans=trans)):
                 tangent[i, :] = arr
         else:  # rev
             shape = (self._shape[0], self.total_solves(fwd=False))
             tangent = np.empty(shape)
-            for i, (arr, _, _) in enumerate(tangent_iter(self, direction, trans=trans)):
+            for i, (arr, _, _) in enumerate(self.tangent_iter(direction, trans=trans)):
                 tangent[:, i] = arr
             tangent = tangent.T
 

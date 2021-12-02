@@ -424,7 +424,7 @@ class OMWrappedFunc(object):
         outlist = []
         try:
             outlist = [(n, {}) for n in self.get_return_names()]
-        except RuntimeError as err:
+        except (RuntimeError, OSError) as err:
             # this could happen if function is compiled or has multiple return lines that are
             # not all consistent
             msg = (f"During AST processing to determine the number and name of return values, the "
