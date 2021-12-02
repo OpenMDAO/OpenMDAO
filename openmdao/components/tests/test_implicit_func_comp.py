@@ -12,7 +12,7 @@ try:
     import jax.numpy as jnp
 except ImportError:
     jax = None
-from openmdao.core.tests.test_fd_color import _check_partial_matrix
+from openmdao.core.tests.test_partial_color import _check_partial_matrix
 
 
 class TestImplicitFuncComp(unittest.TestCase):
@@ -398,9 +398,6 @@ class TestImplicitFuncComp(unittest.TestCase):
 
         assert_check_partials(p.check_partials(includes=['comp'], out_stream=None), atol=1e-5)
         assert_check_totals(p.check_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'], out_stream=None))
-
-
-from openmdao.core.tests.test_fd_color import _check_partial_matrix
 
 
 @unittest.skipIf(omf.jax is None, "jax is not installed")
