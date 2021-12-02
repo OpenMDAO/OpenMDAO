@@ -186,13 +186,7 @@ class ImplicitFuncComp(ImplicitComponent):
         discrete_outputs : _DictValues or None
             Dict-like object containing discrete outputs.
         """
-        if self.options['use_jax'] and not self.options['use_jit']:
-            with omf.jax_context(self._apply_nonlinear_func._f.__globals__):
-                results = self._ordered_func_invals(inputs, outputs)
-        else:
-            results = self._ordered_func_invals(inputs, outputs)
-
-        residuals.set_vals(self._apply_nonlinear_func(*results))
+        residuals.set_vals(self._apply_nonlinear_func(*self._ordered_func_invals(inputs, outputs)))
 
     def _user_solve_nonlinear(self, inputs, outputs):
         """
