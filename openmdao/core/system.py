@@ -796,11 +796,12 @@ class System(object):
 
         if name in prom2abs['input']:
             name = prom2abs['input'][name][0]
+
         model = self._problem_meta['model_ref']()
         if name in model._conn_global_abs_in2out:
             return model._conn_global_abs_in2out[name]
 
-        issue_warning(f"'{name}' not found.")
+        raise KeyError(f"{self.msginfo}: source for '{name}' not found.")
 
     def _setup(self, comm, mode, prob_meta):
         """
@@ -859,8 +860,27 @@ class System(object):
         self._setup_connections()
 
     def _top_level_post_connections(self, mode):
-        # this runs after all connections are known
-        pass
+        # this runs after all connections are known, and only if this is the top level system
+        self._problem_meta['prom2abs'] = self._get_all_promotes()
+
+    def _get_all_promotes(self):
+        """
+        Create the top level mapping of all promoted names to absolute names for all local systems.
+
+        Note that this will only be called on a component that is the top level model.
+
+        Returns
+        -------
+        dict
+            Mapping of all promoted names to absolute names.
+        """
+        prom2abs = {}
+        for typ in ('input', 'output'):
+            t_prom2abs = prom2abs[typ] = defaultdict(list)
+            for prom, abslist in self._var_allprocs_prom2abs_list[typ].items():
+                t_prom2abs[prom] = abslist
+
+        return prom2abs
 
     def _top_level_post_sizes(self):
         # this runs after the variable sizes are known
