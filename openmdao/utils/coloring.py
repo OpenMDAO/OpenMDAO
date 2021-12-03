@@ -5,12 +5,10 @@ import os
 import time
 import pickle
 import traceback
-import weakref
 from itertools import combinations
 from contextlib import contextmanager
 from pprint import pprint
 from itertools import groupby
-from collections import defaultdict
 
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix

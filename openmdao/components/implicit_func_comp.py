@@ -57,8 +57,6 @@ class ImplicitFuncComp(ImplicitComponent):
         Tuple of parts of the tangent matrix cached for jax derivative computation.
     _jac2func_inds : ndarray
         Translation array from jacobian indices to function array indices.
-    _func2jac_inds : ndarray
-        Translation array from function array indices to jacobian indices.
     """
 
     def __init__(self, apply_nonlinear, solve_nonlinear=None, linearize=None, solve_linear=None,
@@ -74,7 +72,6 @@ class ImplicitFuncComp(ImplicitComponent):
         self._linearize_info = None
         self._tangents = None
         self._jac2func_inds = None
-        self._func2jac_inds = None
 
         if solve_nonlinear:
             self.solve_nonlinear = self._user_solve_nonlinear
@@ -323,36 +320,6 @@ class ImplicitFuncComp(ImplicitComponent):
             else:
                 yield next(inps)
 
-    def _get_func2jac_inds(self, inputs, outputs):
-        """
-        Return a translation array from function input ordering into jac column indices.
-
-        Parameters
-        ----------
-        inputs : Vector
-            The input vector.
-        outputs : Vector
-            The output vector (contains the states).
-
-        Returns
-        -------
-        ndarray
-            Index translation array
-        """
-        if self._func2jac_inds is None:
-            jac_inds = np.arange(len(outputs) + len(inputs), dtype=INT_DTYPE)
-            indict = {}
-            start = end = 0
-            for name, val in chain(outputs.items(), inputs.items()):
-                end += val.size
-                indict[name.rsplit('.', 1)[-1]] = jac_inds[start:end]
-                start = end
-
-            inds = [indict[n] for n in self._apply_nonlinear_func._inputs if n in indict]
-            self._func2jac_inds = np.concatenate(inds)
-
-        return self._func2jac_inds
-
     def _get_jac2func_inds(self, inputs, outputs):
         """
         Return a translation array from jac column indices into function input ordering.
@@ -448,11 +415,3 @@ class ImplicitFuncComp(ImplicitComponent):
         ret = super()._compute_coloring(recurse, **overrides)
         self._tangents = None  # reset to compute new colored tangents later
         return ret
-
-    def _update_jac_sparsity(self, direction=None):
-        """
-        Compute a jacobian using randomized inputs to generate a sparsity matrix.
-
-        This is called 1 or more times from compute_coloring.
-        """
-        self._jax_linearize()

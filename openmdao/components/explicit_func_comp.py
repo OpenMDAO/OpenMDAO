@@ -258,14 +258,6 @@ class ExplicitFuncComp(ExplicitComponent):
         self._tangents = None  # reset to compute new colored tangents later
         return ret
 
-    def _update_jac_sparsity(self, direction=None):
-        """
-        Compute a jacobian using randomized inputs to generate a sparsity matrix.
-
-        This is called 1 or more times from compute_coloring.
-        """
-        self._jax_linearize()
-
     # def _colored_col_iter(self, direction):
     #     coloring = self._coloring_info['coloring']
 
