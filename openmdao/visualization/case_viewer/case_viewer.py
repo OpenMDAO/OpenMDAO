@@ -354,7 +354,7 @@ class CaseViewer(object):
             if len(self.case_select.value) == 1:
                 current_val = int(self.case_select.value[0])
                 if current_val == len(self.case_options) - 1:
-                    self.case_select.value.insert(current_val-1, str(current_val-1))
+                    self.case_select.value.insert(current_val - 1, str(current_val - 1))
                 else:
                     self.case_select.value.append(str(current_val + 1))
 
@@ -452,20 +452,20 @@ class CaseViewer(object):
         list
             List of colors for multi_line or circle data.
         """
-        length = len(x_var_vals)
+        var_length = len(x_var_vals)
 
         if vector_lines:
-            return ["#000000" for i in range(0,length)]
+            return ["#000000" for i in range(0, var_length)]
 
-        if length <= 3:
+        if var_length <= 3:
             colors = list(Category20[3])
-            while len(colors) > length:
+            while len(colors) > var_length:
                 colors.pop()
         else:
-            if length > 20 and length < 256:
-                colors = list(Turbo256[:length])
-            elif length < 20:
-                colors = list(Category20[length])
+            if var_length > 20 and var_length < 256:
+                colors = list(Turbo256[:var_length])
+            elif var_length < 20:
+                colors = list(Category20[var_length])
             else:
                 self.warning_box.text = "NOTE: Cannot compare more than 256 cases"
                 colors = list(Turbo256)
