@@ -99,15 +99,13 @@ class CaseViewer(object):
         variables = list(set(variables['inputs'] + variables['outputs'] + variables['residuals']))
         var_list = []
         case_vars = []
-        special_case_vars = {'Other': [self._num_points_str, self._case_iter_str]}
-        special_case_vals = special_case_vars.values()
+        special_case_vals = [self._num_points_str, self._case_iter_str]
 
         for var_dict in [self.case.outputs, self.case.inputs, self.case.residuals]:
             if var_dict is not None:
                 case_vars += list(var_dict.keys())
 
         if var_to_compare in special_case_vals:
-            print("here")
             return self.io_options_x
 
         self._case_reader_to_dict()
@@ -121,10 +119,9 @@ class CaseViewer(object):
                     var_list.append(variable)
 
         if var_list:
-            print("here")
             return sorted(var_list).update(special_case_vals)
         elif variables != special_case_vals:
-            return special_case_vars
+            return special_case_vals
 
     def _case_options(self, source):
         cases = self.cr.list_cases(source, out_stream=None)
@@ -163,7 +160,6 @@ class CaseViewer(object):
             if self.io_options_x[key]:
                 io_starting_option = self.io_options_x[key][0]
             self.io_options_x[key] = sorted(self.io_options_x[key])
-        self.io_options_x['Other'] = [self._num_points_str, self._case_iter_str]
 
         self.variables_plot = figure(title="Problem Variables", x_axis_label="Variable Length",
                                      y_axis_label="Variable X")
@@ -214,8 +210,6 @@ class CaseViewer(object):
 
         self.io_select_y.options = self._var_compatability_check(self.io_options_x,
                                                                  self.io_select_x.value)
-        # for key, val in self.io_select_x.options.items():
-        #     self.io_select_x.options[key] = val
 
         self.doc.add_root(self.layout)
 
@@ -359,7 +353,10 @@ class CaseViewer(object):
         if len(self.case_options) != 1 and (self._case_iter_x or self._case_iter_y):
             if len(self.case_select.value) == 1:
                 current_val = int(self.case_select.value[0])
-                self.case_select.value.append(str(current_val + 1))
+                if current_val == len(self.case_options) - 1:
+                    self.case_select.value.insert(current_val-1, str(current_val-1))
+                else:
+                    self.case_select.value.append(str(current_val + 1))
 
         for i in self.case_select.value:
             self.case = self.cr.get_case(self.case_select.options[int(i)][1])
@@ -412,14 +409,14 @@ class CaseViewer(object):
                 self.warning_box.text = ("NOTE: Both X and Y values contain zeros for values, "
                                          "unable to plot")
 
-            if self._case_iter_x:
-                new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T
-                new_data['y_vals'], new_data['x_vals'] = self._case_plot_calc(new_data['y_vals'],
-                                                                              new_data['x_vals'])
-            elif self._case_iter_y:
+            if self._case_iter_y:
                 new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).T
                 new_data['x_vals'], new_data['y_vals'] = self._case_plot_calc(new_data['x_vals'],
                                                                               new_data['y_vals'])
+
+                if self.case_iter_select.value == "Vector Lines":
+                    new_data['cases'] = new_data['cases'][0:len(new_data['x_vals'])]
+                    new_data['color'] = self._line_color_list(new_data['x_vals'], True)
 
             new_data['x_vals'] = new_data['x_vals'].tolist()
             new_data['y_vals'] = new_data['y_vals'].tolist()
@@ -431,10 +428,9 @@ class CaseViewer(object):
                 new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T
                 new_data['y_vals'], new_data['x_vals'] = self._case_plot_calc(new_data['y_vals'],
                                                                               new_data['x_vals'])
-            elif self._case_iter_y:
-                new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).T
-                new_data['x_vals'], new_data['y_vals'] = self._case_plot_calc(new_data['x_vals'],
-                                                                              new_data['y_vals'])
+                if self.case_iter_select.value == "Vector Lines":
+                    new_data['cases'] = new_data['cases'][0:len(new_data['x_vals'])]
+                    new_data['color'] = self._line_color_list(new_data['x_vals'], True)
 
             new_data['x_vals'] = new_data['x_vals'].flatten().tolist()
             new_data['y_vals'] = new_data['y_vals'].flatten().tolist()
@@ -442,7 +438,7 @@ class CaseViewer(object):
             self.circle_data.data = new_data
             self.multi_line_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}
 
-    def _line_color_list(self, x_var_vals):
+    def _line_color_list(self, x_var_vals, vector_lines=False):
         """
         Create list of colors for multi line plots.
 
@@ -457,6 +453,10 @@ class CaseViewer(object):
             List of colors for multi_line or circle data.
         """
         length = len(x_var_vals)
+
+        if vector_lines:
+            return ["#000000" for i in range(0,length)]
+
         if length <= 3:
             colors = list(Category20[3])
             while len(colors) > length:
