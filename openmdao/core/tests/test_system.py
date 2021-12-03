@@ -369,9 +369,10 @@ class TestSystem(unittest.TestCase):
 
         prob.setup()
 
-        msg = "'f' not found."
-        with assert_warning(UserWarning, msg):
+        with self.assertRaises(KeyError) as cm:
             root.get_source('f')
+
+        self.assertEqual(cm.exception.args[0], "<model> <class Group>: source for 'f' not found.")
 
     def test_list_inputs_before_final_setup(self):
         class SpeedComp(ExplicitComponent):
