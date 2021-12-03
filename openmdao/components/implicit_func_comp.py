@@ -353,7 +353,7 @@ class ImplicitFuncComp(ImplicitComponent):
 
     def _reorder_col_chunks(self, col_chunks):
         """
-        Yield jacobian column chunks in correct OpenMDAO order (outputs first, then inputs).
+        Return jacobian column chunks in correct OpenMDAO order (outputs first, then inputs).
 
         This is needed in rev mode because the return values of the jacrev function are ordered
         based on the order of the function inputs, which may be different than OpenMDAO's
@@ -364,21 +364,22 @@ class ImplicitFuncComp(ImplicitComponent):
         col_chunks : list of ndarray
             List of column chunks to be reordered
 
-        Yields
-        ------
-        ndarray
-            Chunk in OpenMDAO jacobian order.
+        Returns
+        -------
+        list
+            Chunks in OpenMDAO jacobian order.
         """
         inps = []
+        ordered_chunks = []
         chunk_iter = iter(col_chunks)
         for meta in self._apply_nonlinear_func._inputs.values():
             if 'is_option' in meta:  # it's an option
                 pass  # skip it (don't include in jacobian)
             elif 'resid' in meta:  # it's a state
-                yield next(chunk_iter)
+                ordered_chunks.append(next(chunk_iter))
             else:
                 inps.append(next(chunk_iter))
-        yield from inps
+        return ordered_chunks + inps
 
     def _reorder_cols(self, arr, coloring=None):
         """

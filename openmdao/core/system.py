@@ -1202,7 +1202,7 @@ class System(object):
                         scheme._during_sparsity_comp = True
 
             if use_jax:
-                self._update_jac_sparsity()
+                self._jax_linearize()
             else:
                 self.run_linearize(sub_do_ln=False)
 

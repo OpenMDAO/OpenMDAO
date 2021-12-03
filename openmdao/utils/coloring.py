@@ -836,16 +836,21 @@ class Coloring(object):
 
         pyplot.show()
 
-    def get_dense_sparsity(self):
+    def get_dense_sparsity(self, dtype=bool):
         """
-        Return a dense bool array representing the full sparsity.
+        Return a dense array representing the full sparsity.
+
+        Parameters
+        ----------
+        dtype : object
+            Data type of returned numpy array.
 
         Returns
         -------
         ndarray
             Dense sparsity matrix.
         """
-        J = np.zeros(self._shape, dtype=bool)
+        J = np.zeros(self._shape, dtype=dtype)
         J[self._nzrows, self._nzcols] = True
         return J
 
