@@ -192,6 +192,29 @@ def jacvec_prod(fun, argnums, invals, tangent):
 
 
 def _get_tangents(vals, direction, coloring=None, argnums=None, trans=None):
+    """
+    Return a tuple of tangents values for use with vmap.
+
+    Parameters
+    ----------
+    vals : list
+        List of function input values.
+    direction : str
+        Derivative computation direction ('fwd' or 'rev').
+    coloring : Coloring or None
+        If not None, the Coloring object used to compute a compressed tangent array.
+    argnums : list of int or None
+        Indices of dynamic (differentiable) function args.
+    trans : ndarray
+        Translation array from jacobian indices into function arg indices.  This is needed
+        because OpenMDAO expects ordering to be outputs first, then inputs, but function args
+        could be in any order.
+
+    Returns
+    -------
+    tuple of ndarray or ndarray
+        The tangents values to be passed to vmap.
+    """
     if argnums is None:
         leaves = vals
     else:

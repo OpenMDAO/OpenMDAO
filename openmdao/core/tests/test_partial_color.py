@@ -159,6 +159,7 @@ class SparseCompImplicit(ImplicitComponent):
         self._nruns += 1
 
 
+# needed to wrap the sparsity array in this class in order to make it hashable so jax would be happy
 class SpObj(object):
     def __init__(self, sparsity):
         self.mat = sparsity
