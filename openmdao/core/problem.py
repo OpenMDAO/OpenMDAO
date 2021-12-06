@@ -56,6 +56,10 @@ from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
 _contains_all = ContainsAll()
 
+# Used for naming Problems when no explicit name is given
+# Also handles sub problems
+_problem_names = []
+_problem_counter = 0
 
 CITATION = """@article{openmdao_2019,
     Author={Justin S. Gray and John T. Hwang and Joaquim R. R. A.
@@ -123,7 +127,9 @@ class Problem(object):
     _logger : object or None
         Object for logging config checks if _check is True.
     _name : str
-        Problem name.
+        Problem name. If no name given, a default name of the form 'problemN', where N is an
+        integer, will be given to the problem so it can be referenced in command line tools
+        that have an optional problem name argument
     _system_options_recorded : bool
         A flag to indicate whether the system options for all the systems have been recorded
     _metadata : dict
@@ -138,8 +144,30 @@ class Problem(object):
         """
         Initialize attributes.
         """
+        global _problem_counter
+
         self.cite = CITATION
-        self._name = name
+
+        # Code to give non-empty names to Problems so that they can be
+        # referenced from command line tools (e.g. check) that accept a Problem argument
+        _problem_counter += 1
+        if name:  # if name hasn't been used yet, use it. Otherwise, error
+            if name not in _problem_names:
+                self._name = name
+            else:
+                raise ValueError(f"The problem name '{name}' already exists")
+        else:  # No name given: look for a name, of the form, 'problemN', that hasn't been used yet
+            _name = f"problem{_problem_counter}"
+            if _name in _problem_names:  # need to make it unique so append string of form '.N'
+                i = 1
+                while True:
+                    _name = f"problem{_problem_counter}.{i}"
+                    if _name not in _problem_names:
+                        break
+                    i += 1
+            self._name = _name
+        _problem_names.append(self._name)
+
         self._warned = False
 
         if comm is None:
