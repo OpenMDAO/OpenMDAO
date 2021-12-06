@@ -361,6 +361,19 @@ class TestSystem(unittest.TestCase):
 
         self.assertEqual(str(cm.exception), "'comp' <class BadComp>: You forget to call super() in setup()")
 
+    def test_missing_source(self):
+        prob = Problem()
+        root = prob.model
+
+        root.add_subsystem('initial_comp', ExecComp(['x = 10']), promotes_outputs=['x'])
+
+        prob.setup()
+
+        with self.assertRaises(KeyError) as cm:
+            root.get_source('f')
+
+        self.assertEqual(cm.exception.args[0], "<model> <class Group>: source for 'f' not found.")
+
     def test_list_inputs_before_final_setup(self):
         class SpeedComp(ExplicitComponent):
 

@@ -707,7 +707,7 @@ class Group(System):
             myrank = self.comm.rank
             vars_to_gather = self._vars_to_gather
 
-            for s in self.system_iter(recurse=True):
+            for s in self.system_iter(recurse=True, include_self=True):
                 prefix = s.pathname + '.' if s.pathname else ''
                 for typ in iotypes:
                     # use abs2prom to determine locality since prom2abs is for allprocs
@@ -737,7 +737,7 @@ class Group(System):
                 prom2abs = self.comm.bcast(None, root=0)
         else:  # serial
             prom2abs = {'input': defaultdict(list), 'output': defaultdict(list)}
-            for s in self.system_iter(recurse=True):
+            for s in self.system_iter(recurse=True, include_self=True):
                 prefix = s.pathname + '.' if s.pathname else ''
                 for typ in iotypes:
                     t_prom2abs = prom2abs[typ]
