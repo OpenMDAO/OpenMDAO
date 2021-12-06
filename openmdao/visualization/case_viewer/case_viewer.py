@@ -424,13 +424,10 @@ class CaseViewer(object):
             self.multi_line_data.data = new_data
             self.circle_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}
         else:
-            if self._case_iter_x:
-                new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T
-                new_data['y_vals'], new_data['x_vals'] = self._case_plot_calc(new_data['y_vals'],
-                                                                              new_data['x_vals'])
-                if self.case_iter_select.value == "Vector Lines":
-                    new_data['cases'] = new_data['cases'][0:len(new_data['x_vals'])]
-                    new_data['color'] = self._line_color_list(new_data['x_vals'], True)
+            if self._case_iter_y:
+                new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).T
+                new_data['x_vals'], new_data['y_vals'] = self._case_plot_calc(new_data['x_vals'],
+                                                                              new_data['y_vals'])
 
             new_data['x_vals'] = new_data['x_vals'].flatten().tolist()
             new_data['y_vals'] = new_data['y_vals'].flatten().tolist()

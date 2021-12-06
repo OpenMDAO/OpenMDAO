@@ -32,6 +32,7 @@ class TestCaseViewer(unittest.TestCase):
         prob.model.add_objective('paraboloid.f')
 
         prob.driver.add_recorder(self.recorder)
+        prob.add_recorder(self.recorder)
 
         prob.driver.recording_options['record_objectives'] = True
         prob.driver.recording_options['record_constraints'] = True
@@ -43,6 +44,7 @@ class TestCaseViewer(unittest.TestCase):
         prob.set_val('paraboloid.y', -4.0)
 
         prob.run_driver()
+        prob.record("after_run_driver")
 
         cv = om.CaseViewer(self.filename)
 
@@ -72,6 +74,16 @@ class TestCaseViewer(unittest.TestCase):
                                               'rank0:ScipyOptimize_SLSQP|4'])
         self.assertEqual(circ_data['color'], ['#1f77b4', '#aec7e8', '#ff7f0e', '#ffbb78',
                                               '#2ca02c'])
+
+        cv = om.CaseViewer(self.filename)
+
+        cv.source_select.value = 'problem'
+        circ_data = cv.circle_data.data
+
+        assert_near_equal(circ_data['x_vals'], [6.666666666666667])
+        self.assertEqual(circ_data['y_vals'], [0.])
+        self.assertEqual(circ_data['color'], ['#1f77b4'])
+        self.assertEqual(circ_data['cases'], ['rank0:ScipyOptimize_SLSQP|0'])
 
     def test_vectorized_case_data(self):
 
