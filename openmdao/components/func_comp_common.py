@@ -130,10 +130,12 @@ def jac_reverse(fun, argnums, tangents):
     Returns
     -------
     function
-        A function that returns rows of the jacobian grouped by output variable, e.g., if there were
-        2 output variables of size 3 and 4, the function would return a list with two entries. The
-        first entry would contain the first 3 rows of J and the second would contain the next
-        4 rows of J.
+        A function that returns rows of the jacobian grouped by function input variable, e.g., if
+        there were 3 input variables of size 5 and 7 and 9, the function
+        would return a list with 3 entries. The first entry would contain the first 5 columns of J,
+        the second the next 7 columns of J, and the third the next 9 columns of J.  Note that for
+        implicit systems, the function inputs will contain both inputs and outputs in the context
+        of OpenMDAO.
     """
     f = linear_util.wrap_init(fun)
     if argnums is None:
