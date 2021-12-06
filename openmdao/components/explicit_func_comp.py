@@ -114,13 +114,28 @@ class ExplicitFuncComp(ExplicitComponent):
                 meta['val'] = np.asarray(meta['val'])
 
     def _linearize(self, jac=None, sub_do_ln=False):
+        """
+        Compute jacobian / factorization. The model is assumed to be in a scaled state.
+
+        Parameters
+        ----------
+        jac : Jacobian or None
+            Ignored.
+        sub_do_ln : bool
+            Flag indicating if the children should call linearize on their linear solvers.
+        """
         if self.options['use_jax']:
             self._check_first_linearize()
-            self._jax_linearize(jac, sub_do_ln)
+            self._jax_linearize()
         else:
             super()._linearize(jac, sub_do_ln)
 
-    def _jax_linearize(self, jac=None, sub_do_ln=False):
+    def _jax_linearize(self):
+        """
+        Compute the jacobian using jax.
+
+        This updates self._jacobian.
+        """
         inames = list(self._compute.get_input_names())
         # argnums specifies which position args are to be differentiated
         argnums = [i for i, m in enumerate(self._compute._inputs.values()) if 'is_option' not in m]
@@ -167,6 +182,25 @@ class ExplicitFuncComp(ExplicitComponent):
         self._jacobian.set_dense_jac(self, j)
 
     def _get_tangents(self, vals, direction, coloring=None, argnums=None):
+        """
+        Return a tuple of tangents values for use with vmap.
+
+        Parameters
+        ----------
+        vals : list
+            List of function input values.
+        direction : str
+            Derivative computation direction ('fwd' or 'rev').
+        coloring : Coloring or None
+            If not None, the Coloring object used to compute a compressed tangent array.
+        argnums : list of int or None
+            Indices of dynamic (differentiable) function args.
+
+        Returns
+        -------
+        tuple of ndarray or ndarray
+            The tangents values to be passed to vmap.
+        """
         if self._tangents is None:
             self._tangents = _get_tangents(vals, direction, coloring, argnums)
         return self._tangents
@@ -254,6 +288,29 @@ class ExplicitFuncComp(ExplicitComponent):
                 yield next(inps)
 
     def _compute_coloring(self, recurse=False, **overrides):
+        """
+        Compute a coloring of the partial jacobian.
+
+        This assumes that the current System is in a proper state for computing derivatives.
+        It just calls the base class version and then resets the tangents so that after coloring
+        a new set of compressed tangents values can be computed.
+
+        Parameters
+        ----------
+        recurse : bool
+            If True, recurse from this system down the system hierarchy.  Whenever a group
+            is encountered that has specified its coloring metadata, we don't recurse below
+            that group unless that group has a subsystem that has a nonlinear solver that uses
+            gradients.
+        **overrides : dict
+            Any args that will override either default coloring settings or coloring settings
+            resulting from an earlier call to declare_coloring.
+
+        Returns
+        -------
+        list of Coloring
+            The computed colorings.
+        """
         ret = super()._compute_coloring(recurse, **overrides)
         self._tangents = None  # reset to compute new colored tangents later
         return ret
