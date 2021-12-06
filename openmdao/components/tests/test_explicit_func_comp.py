@@ -1039,6 +1039,7 @@ class TestComputePartials(unittest.TestCase):
         assert_check_totals(p.check_totals(of=['comp.foo', 'comp.bar'], wrt=['comp.x', 'comp.y', 'comp.z'], method='cs'))
 
 
+@unittest.skipIf(omf.jax is None, "jax is not installed")
 class TestJax(unittest.TestCase):
     def check_derivs(self, mode, shape, use_jit):
         def func(a, b, c):
@@ -1082,6 +1083,7 @@ class TestJax(unittest.TestCase):
         self.check_derivs('rev', (), use_jit=True)
 
 
+@unittest.skipIf(omf.jax is None, "jax is not installed")
 class TestJaxNumpy(unittest.TestCase):
     def check_derivs(self, mode, shape, use_jit):
         def func(a, b, c):
@@ -1131,6 +1133,7 @@ class TestJaxNumpy(unittest.TestCase):
         self.check_derivs('rev', (), use_jit=True)
 
 
+@unittest.skipIf(omf.jax is None, "jax is not installed")
 class TestJax2retvals(unittest.TestCase):
     def check_derivs(self, mode, shape, use_jit):
         def func(a, b, c):
@@ -1181,6 +1184,7 @@ class TestJax2retvals(unittest.TestCase):
         self.check_derivs('rev', (), use_jit=True)
 
 
+@unittest.skipIf(omf.jax is None, "jax is not installed")
 class TestJaxNonDifferentiableArgs(unittest.TestCase):
     def check_derivs(self, mode, use_jit, method):
         def func(a, b, c, ex1, ex2):
@@ -1228,6 +1232,7 @@ class TestJaxNonDifferentiableArgs(unittest.TestCase):
         self.check_derivs('rev', use_jit=False, method='cs')
 
 
+@unittest.skipIf(omf.jax is None, "jax is not installed")
 class TestJax2retvalsColoring(unittest.TestCase):
     def check_derivs(self, mode, shape, use_jit):
         def func(a, b, c):
