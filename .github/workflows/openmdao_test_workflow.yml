@@ -106,6 +106,14 @@ jobs:
           echo "============================================================="
           pip install .${{ matrix.OPTIONAL }}
 
+      - name: Install jax
+        shell: bash -l {0}
+        run: |
+          echo "============================================================="
+          echo "Install jax"
+          echo "============================================================="
+          pip install jax
+
       - name: Install PETSc
         if: matrix.PETSc
         shell: bash -l {0}
