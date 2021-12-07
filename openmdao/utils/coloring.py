@@ -394,21 +394,30 @@ class Coloring(object):
             See docstring for Coloring class.
         """
         with open(fname, 'rb') as f:
-            coloring = pickle.load(f)
-            if 'version' not in coloring._meta:
-                # old format, have to update color groups
-                if coloring._fwd:
-                    old = coloring._fwd[0]
-                    newgrps = [[c] for c in old[0]]
-                    newgrps.extend(old[1:])
-                    coloring._fwd = (newgrps, coloring._fwd[1])
-                if coloring._rev:
-                    old = coloring._rev[0]
-                    newgrps = [[c] for c in old[0]]
-                    newgrps.extend(old[1:])
-                    coloring._rev = (newgrps, coloring._rev[1])
+            bad = False
+            try:
+                coloring = pickle.load(f)
+            except pickle.UnpicklingError:
+                bad = True
+            else:
+                bad = not isinstance(coloring, Coloring)
+            if bad:
+                raise RuntimeError(f"File '{fname}' is not a valid coloring file.")
 
-            return coloring
+        if 'version' not in coloring._meta:
+            # old format, have to update color groups
+            if coloring._fwd:
+                old = coloring._fwd[0]
+                newgrps = [[c] for c in old[0]]
+                newgrps.extend(old[1:])
+                coloring._fwd = (newgrps, coloring._fwd[1])
+            if coloring._rev:
+                old = coloring._rev[0]
+                newgrps = [[c] for c in old[0]]
+                newgrps.extend(old[1:])
+                coloring._rev = (newgrps, coloring._rev[1])
+
+        return coloring
 
     def save(self, fname):
         """
