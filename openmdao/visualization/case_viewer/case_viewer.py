@@ -111,7 +111,7 @@ class CaseViewer(object):
         self._case_reader_to_dict()
 
         for variable in variables:
-            if variable in case_vars and variable not in special_case_vals:
+            if variable in case_vars:
                 if self.case_dict[variable].size == self.case_dict[var_to_compare].size:
                     var_list.append(variable)
 
@@ -157,6 +157,7 @@ class CaseViewer(object):
             if self.io_options_x[key]:
                 io_starting_option = self.io_options_x[key][0]
             self.io_options_x[key] = sorted(self.io_options_x[key])
+        self.io_options_x['Other'] = [self._num_points_str, self._case_iter_str]
 
         self.variables_plot = figure(title="Problem Variables", x_axis_label="Variable Length",
                                      y_axis_label="Variable X")
@@ -311,14 +312,10 @@ class CaseViewer(object):
         else:
             self.case_iter_select.options = ["N/A"]
 
-        if self.io_select_x.value == self._num_points_str or new == self._case_iter_str:
-            self.variables_plot.xaxis.axis_label = new
-            self.variables_plot.yaxis.axis_label = self.io_select_y.value
-        else:
-            self.io_select_y.options = self._var_compatability_check(self.io_options_x, new)
+        self.io_select_y.options = self._var_compatability_check(self.io_options_x, new)
 
-            self.variables_plot.xaxis.axis_label = new
-            self.variables_plot.yaxis.axis_label = self.io_select_y.value
+        self.variables_plot.xaxis.axis_label = new
+        self.variables_plot.yaxis.axis_label = self.io_select_y.value
 
         self._update()
 
