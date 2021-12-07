@@ -102,8 +102,6 @@
             </div>
         </div>
 
-
-
         <div id="d3_content_div">
             <!-- 2D Matrix Showing All Inputs/Outputs and Functions -->
             <div id="svgDiv">
@@ -258,6 +256,30 @@
             <img id="toolbar-snapshot" alt="Snapshot of toolbar buttons"
                 src="data:image/png;base64,{{n2toolbar_png}}" />
             <svg id='help-graphic-svg'></svg>
+        </div>
+    </div>
+
+    <div id="variable-selection-body">
+        <table class="header">
+            <tr>
+                <th class="varname"><span class="sort-up">&#9650;</span><span>Variable Name</span><span class="sort-down">&#9660;</span></th>
+                <th class="varvis">Visible</th>
+                <th class="scrollbar-spacer"></th>
+            </tr>
+        </table>
+        <div class="table-container">
+            <table class="variables">
+                <tbody></tbody>
+            </table>
+        </div>
+        <div class="search-container">
+            <span class='search-label'>Search</span><input class='variable-selection-search' type='text'>
+            <span class='search-clear'>&#x2715;</span><span class='search-perform'>&#x27a4;</span>
+        </div>
+        <div class="button-container">
+            <button class="select-all-variables">Select All</button>
+            <button class="select-no-variables">Select None</button>
+            <button class="apply-variable-selection">Apply</button>
         </div>
     </div>
 
