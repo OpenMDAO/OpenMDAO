@@ -9,6 +9,7 @@ from openmdao.components.func_comp_common import _check_var_name, _copy_with_ign
     jac_forward, jac_reverse, _get_tangents
 
 try:
+    import jax
     from jax import jit, jacfwd, jacrev
     from jax.config import config
     config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats

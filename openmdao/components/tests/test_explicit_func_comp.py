@@ -14,6 +14,7 @@ from openmdao.utils.coloring import compute_total_coloring
 
 
 try:
+    import jax
     import jax.numpy as jnp
 except ImportError:
     jax = None
