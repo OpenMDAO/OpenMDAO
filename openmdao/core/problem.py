@@ -59,7 +59,6 @@ _contains_all = ContainsAll()
 # Used for naming Problems when no explicit name is given
 # Also handles sub problems
 _problem_names = []
-_problem_counter = 0
 
 CITATION = """@article{openmdao_2019,
     Author={Justin S. Gray and John T. Hwang and Joaquim R. R. A.
@@ -144,24 +143,24 @@ class Problem(object):
         """
         Initialize attributes.
         """
-        global _problem_counter
+        global _problem_names
 
         self.cite = CITATION
 
         # Code to give non-empty names to Problems so that they can be
         # referenced from command line tools (e.g. check) that accept a Problem argument
-        _problem_counter += 1
         if name:  # if name hasn't been used yet, use it. Otherwise, error
             if name not in _problem_names:
                 self._name = name
             else:
                 raise ValueError(f"The problem name '{name}' already exists")
-        else:  # No name given: look for a name, of the form, 'problemN', that hasn't been used yet
-            _name = f"problem{_problem_counter}"
+        else:  # No name given: look for a name, of the form, 'problemN', that hasn't been used
+            problem_counter = len(_problem_names) + 1
+            _name = f"problem{problem_counter}"
             if _name in _problem_names:  # need to make it unique so append string of form '.N'
                 i = 1
                 while True:
-                    _name = f"problem{_problem_counter}.{i}"
+                    _name = f"problem{problem_counter}.{i}"
                     if _name not in _problem_names:
                         break
                     i += 1
