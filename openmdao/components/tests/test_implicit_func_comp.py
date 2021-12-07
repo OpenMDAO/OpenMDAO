@@ -105,12 +105,14 @@ class TestImplicitFuncComp(unittest.TestCase):
         assert_check_partials(partials, atol=1e-5)
         assert_check_totals(prob.check_totals(of=['comp.x'], wrt=['comp.A', 'comp.b'], out_stream=None), atol=3e-5, rtol=3e-5)
 
+    @unittest.skipIf(omf.jax is None, "jax is not installed")
     def test_apply_nonlinear_linsys_coloring_jax_fwd(self):
         prob = self.setup_apply_nonlinear_linsys_coloring('jax', 'fwd')
         partials = prob.check_partials(includes=['comp'], out_stream=None)
         assert_check_partials(partials, atol=1e-5)
         assert_check_totals(prob.check_totals(of=['comp.x'], wrt=['comp.A', 'comp.b'], out_stream=None), atol=3e-5, rtol=3e-5)
 
+    @unittest.skipIf(omf.jax is None, "jax is not installed")
     def test_apply_nonlinear_linsys_coloring_jax_rev(self):
         prob = self.setup_apply_nonlinear_linsys_coloring('jax', 'rev')
         partials = prob.check_partials(includes=['comp'], out_stream=None)
