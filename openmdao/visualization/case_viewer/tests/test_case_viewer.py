@@ -92,7 +92,12 @@ class TestCaseViewer(unittest.TestCase):
         self.assertEqual(cv.io_select_y.options, ['paraboloid.f', 'paraboloid.x', 'paraboloid.y',
                                                   'Number of Points', 'Case Iterations'])
 
+        cv = om.CaseViewer(self.filename)
+        cv.io_select_x.value = "Number of Points"
+        cv.source_select.value = 'driver'
 
+        self.assertEqual(cv.io_select_y.options['outputs'], ['paraboloid.f', 'paraboloid.x', 'paraboloid.y'])
+        self.assertEqual(cv.io_select_y.options['Other'], ['Number of Points', 'Case Iterations'])
 
     def test_vectorized_case_data(self):
 
