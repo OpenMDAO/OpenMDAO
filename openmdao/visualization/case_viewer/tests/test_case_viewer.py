@@ -85,6 +85,15 @@ class TestCaseViewer(unittest.TestCase):
         self.assertEqual(circ_data['color'], ['#1f77b4'])
         self.assertEqual(circ_data['cases'], ['rank0:ScipyOptimize_SLSQP|0'])
 
+        cv = om.CaseViewer(self.filename)
+        cv.io_select_x.value = "paraboloid.f"
+        cv.source_select.value = 'driver'
+
+        self.assertEqual(cv.io_select_y.options, ['paraboloid.f', 'paraboloid.x', 'paraboloid.y',
+                                                  'Number of Points', 'Case Iterations'])
+
+
+
     def test_vectorized_case_data(self):
 
         prob = om.Problem()

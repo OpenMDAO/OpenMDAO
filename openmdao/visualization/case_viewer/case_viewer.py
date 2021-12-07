@@ -111,15 +111,12 @@ class CaseViewer(object):
         self._case_reader_to_dict()
 
         for variable in variables:
-            vars_are_arrays = isinstance(variable, np.ndarray) and \
-                isinstance(var_to_compare, np.ndarray)
             if variable in case_vars and variable not in special_case_vals:
-                if vars_are_arrays and self.case_dict[variable].size == \
-                        self.case_dict[var_to_compare].size:
+                if self.case_dict[variable].size == self.case_dict[var_to_compare].size:
                     var_list.append(variable)
 
         if var_list:
-            return sorted(var_list).update(special_case_vals)
+            return sorted(var_list) + special_case_vals
         elif variables != special_case_vals:
             return special_case_vals
 
