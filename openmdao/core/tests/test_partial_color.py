@@ -203,7 +203,7 @@ class SparseFuncCompImplicit(ImplicitFuncComp):
             start = end
         flines.append('    return ' + ','.join([f"r{n}" for n,_ in ofs]))
         fbody = '\n'.join(flines)
-        exec(fbody)  # nosec
+        exec(fbody)  # nosec trusted input
         f = omf.wrap(locals()['func'])
 
         for name, sz in wrts:
