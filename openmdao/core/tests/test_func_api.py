@@ -241,7 +241,7 @@ class TestFuncAPI(unittest.TestCase):
         self.assertEqual(meta[0], {'of': 'x', 'wrt': ['a', 'b'], 'method': 'cs'})
         self.assertEqual(meta[1], {'of': 'y', 'wrt': ['a', 'b'], 'method': 'fd'})
 
-    @unittest.skipIf(omf.jax is None, "jax is not installed")
+    @unittest.skipIf(jax is None, "jax is not installed")
     def test_declare_partials_jax_mixed(self):
         def func(a, b):
             x = a * b
@@ -256,7 +256,7 @@ class TestFuncAPI(unittest.TestCase):
         self.assertEqual(cm.exception.args[0],
                          "If multiple calls to declare_partials() are made on the same function object and any set method='jax', then all must set method='jax'.")
 
-    @unittest.skipIf(omf.jax is None, "jax is not installed")
+    @unittest.skipIf(jax is None, "jax is not installed")
     def test_declare_partials_jax_mixed2(self):
         def func(a, b):
             x = a * b
@@ -292,7 +292,7 @@ class TestFuncAPI(unittest.TestCase):
                          "declare_coloring has already been called.")
 
 
-    @unittest.skipIf(omf.jax is None, "jax is not installed")
+    @unittest.skipIf(jax is None, "jax is not installed")
     def test_jax_out_shape_compute(self):
         def func(a=np.ones((3,3)), b=np.ones((3,3))):
             x = a * b
@@ -307,7 +307,7 @@ class TestFuncAPI(unittest.TestCase):
         self.assertEqual(outvar_meta[1][0], 'y')
         self.assertEqual(outvar_meta[1][1]['shape'], (3,2))
 
-    @unittest.skipIf(omf.jax is None, "jax is not installed")
+    @unittest.skipIf(jax is None, "jax is not installed")
     def test_jax_out_shape_check(self):
         def func(a=np.ones((3,3)), b=np.ones((3,3))):
             x = a * b
