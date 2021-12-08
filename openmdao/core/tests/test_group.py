@@ -1343,10 +1343,9 @@ class TestGroup(unittest.TestCase):
         prob.setup()
         prob.model.set_order(['C2', 'C1'])
 
-        msg = "Problem: Cannot call set_order without calling setup after"
-        with self.assertRaises(RuntimeError) as cm:
+        msg = "Problem .*: Cannot call set_order without calling setup after"
+        with self.assertRaisesRegex(RuntimeError, msg):
             prob.run_model()
-        self.assertEqual(str(cm.exception), msg)
 
     def test_set_order_normal(self):
 

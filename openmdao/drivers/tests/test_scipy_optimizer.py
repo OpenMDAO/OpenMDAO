@@ -1537,12 +1537,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        with self.assertRaises(RuntimeError) as cm:
+        expected_msg = \
+            "Problem .*: run_model must be called before total derivatives can be checked\."
+        with self.assertRaisesRegex(RuntimeError, expected_msg):
             totals = prob.check_totals(method='fd', out_stream=False)
-
-        expected_msg = "Problem: run_model must be called before total derivatives can be checked."
-
-        self.assertEqual(expected_msg, str(cm.exception))
 
     def test_cobyla_linear_constraint(self):
         # Bug where ScipyOptimizeDriver tried to compute and cache the constraint derivatives for the
