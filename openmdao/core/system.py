@@ -2728,9 +2728,9 @@ class System(object):
             resp['equals'] = equals
             resp['linear'] = linear
             if indices is not None:
-                if (name in self._responses or name in self._static_responses):
-                    if (indices != int(self._static_responses[name]['indices']())):
-                        indices.append(int(self._static_responses[name]['indices']()))
+                # if (name in self._responses or name in self._static_responses):
+                #     if (indices != int(self._static_responses[name]['indices']())):
+                #         indices.append(int(self._static_responses[name]['indices']()))
                 indices, size = self._create_indexer(indices, resp_types[type_], name,
                                                      flat_src=flat_indices)
                 if size is not None:
