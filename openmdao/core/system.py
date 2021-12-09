@@ -2588,7 +2588,7 @@ class System(object):
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, index=None, units=None,
                      adder=None, scaler=None, linear=False, parallel_deriv_color=None,
-                     cache_linear_solution=False, flat_indices=None):
+                     cache_linear_solution=False, flat_indices=None, alias=None):
         r"""
         Add a response variable to this system.
 
@@ -2662,8 +2662,9 @@ class System(object):
                 raise(ValueError(f"{str(e)[:-1]} for response '{name}'."))
 
         typemap = {'con': 'Constraint', 'obj': 'Objective'}
-        if name in self._responses or name in self._static_responses:
-            msg = "{}: {} '{}' already exists.".format(self.msginfo, typemap[type_], name)
+        if (name in self._responses or name in self._static_responses) and alias is None:
+            msg = ("{}: {} '{}' already exists. Use the 'alias' argument to apply a second "
+                   "constraint".format(self.msginfo, typemap[type_], name))
             raise RuntimeError(msg.format(name))
 
         # Convert ref/ref0 to ndarray/float as necessary
@@ -2727,6 +2728,9 @@ class System(object):
             resp['equals'] = equals
             resp['linear'] = linear
             if indices is not None:
+                if (name in self._responses or name in self._static_responses):
+                    if (indices != int(self._static_responses[name]['indices']())):
+                        indices.append(int(self._static_responses[name]['indices']()))
                 indices, size = self._create_indexer(indices, resp_types[type_], name,
                                                      flat_src=flat_indices)
                 if size is not None:
@@ -2763,13 +2767,14 @@ class System(object):
         resp['cache_linear_solution'] = cache_linear_solution
         resp['parallel_deriv_color'] = parallel_deriv_color
         resp['flat_indices'] = flat_indices
+        resp['alias'] = alias
 
         responses[name] = resp
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None, units=None,
                        indices=None, linear=False, parallel_deriv_color=None,
-                       cache_linear_solution=False, flat_indices=False):
+                       cache_linear_solution=False, flat_indices=False, alias=None):
         r"""
         Add a constraint variable to this system.
 
@@ -2826,7 +2831,7 @@ class System(object):
                           ref0=ref0, indices=indices, linear=linear, units=units,
                           parallel_deriv_color=parallel_deriv_color,
                           cache_linear_solution=cache_linear_solution,
-                          flat_indices=flat_indices)
+                          flat_indices=flat_indices, alias=alias)
 
     def add_objective(self, name, ref=None, ref0=None, index=None, units=None,
                       adder=None, scaler=None, parallel_deriv_color=None,
