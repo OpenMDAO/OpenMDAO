@@ -904,9 +904,8 @@ class Problem(object):
             the direction resulting in the smallest number of linear solves required to
             compute derivatives.
         force_alloc_complex : bool
-            Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
-            detect when you need to do this, but in some cases (e.g., complex step is used
-            after a reconfiguration) you may need to set this to True.
+            If True, sufficient memory will be allocated to allow nonlinear vectors to store
+            complex values while operating under complex step.
         distributed_vector_class : type
             Reference to the <Vector> class or factory function used to instantiate vectors
             and associated transfers involved in interprocess communication.
