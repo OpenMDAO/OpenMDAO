@@ -404,9 +404,9 @@ class CaseViewer(object):
                                          "unable to plot")
 
             if self._case_iter_x:
-                 new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T
-                 new_data['y_vals'], new_data['x_vals'] = self._case_plot_calc(new_data['y_vals'],
-                                                                               new_data['x_vals'])
+                new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T
+                new_data['y_vals'], new_data['x_vals'] = self._case_plot_calc(new_data['y_vals'],
+                                                                              new_data['x_vals'])
             elif self._case_iter_y:
                 new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).T
                 new_data['x_vals'], new_data['y_vals'] = self._case_plot_calc(new_data['x_vals'],
@@ -423,9 +423,9 @@ class CaseViewer(object):
             self.circle_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}
         else:
             if self._case_iter_x:
-                 new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T
-                 new_data['y_vals'], new_data['x_vals'] = self._case_plot_calc(new_data['y_vals'],
-                                                                               new_data['x_vals'])
+                new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T
+                new_data['y_vals'], new_data['x_vals'] = self._case_plot_calc(new_data['y_vals'],
+                                                                              new_data['x_vals'])
             elif self._case_iter_y:
                 new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).T
                 new_data['x_vals'], new_data['y_vals'] = self._case_plot_calc(new_data['x_vals'],
