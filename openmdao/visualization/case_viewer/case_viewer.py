@@ -221,9 +221,9 @@ class CaseViewer(object):
         self.case_select.options = self._case_options(new)
 
         self.io_select_x.options = self.cr.list_source_vars(new, out_stream=None)
-        for key in self.io_select_x.options:
-            if self.io_select_x.options[key]:
-                self.io_select_x.value = self.io_select_x.options[key][0]
+        # for key in self.io_select_x.options:
+        #     if self.io_select_x.options[key]:
+        #         self.io_select_x.value = self.io_select_x.options[key][0]
 
         self.source_select.value = new
         self.case_select.value = ['0']
