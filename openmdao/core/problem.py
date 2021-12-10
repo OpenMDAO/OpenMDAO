@@ -2117,7 +2117,7 @@ class Problem(object):
                                "`Problem.run_model()`, `Problem.run_driver()`, or "
                                "`Problem.final_setup()`.")
 
-        if active and not self._metadata['force_alloc_complex']:
+        if active and not self.model._outputs._alloc_complex:
             raise RuntimeError(f"{self.msginfo}: To enable complex step, specify "
                                "'force_alloc_complex=True' when calling setup on the problem, "
                                "e.g. 'problem.setup(force_alloc_complex=True)'")

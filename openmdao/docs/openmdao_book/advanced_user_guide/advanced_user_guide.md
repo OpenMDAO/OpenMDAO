@@ -20,3 +20,6 @@ These tutorials cover more advanced topics. This guide assumes that you have rea
 
 ## Using OpenMDAO as a Part of a Larger Process
 - [Cannonball Example with Euler Integration and an External Optimizer](example/euler_integration_example.ipynb)
+
+## Details about Complex Step
+- [Using Complex Step to Compute Derivatives](complex_step.ipynb)

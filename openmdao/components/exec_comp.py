@@ -923,6 +923,7 @@ else:
 
 _expr_dict['abs'] = cs_safe.abs
 _expr_dict['arctan2'] = cs_safe.arctan2
+_expr_dict['norm'] = cs_safe.norm
 
 
 class _NumpyMsg(object):
