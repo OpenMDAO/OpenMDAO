@@ -67,6 +67,7 @@ class CaseViewer(object):
             warnings.simplefilter(action='ignore', category=BokehUserWarning)
             show(self._make_plot, notebook_handle=True, notebook_url=f"http://localhost:{port}")
         else:
+            warnings.simplefilter(action='ignore', category=BokehUserWarning)
             if not doc:
                 doc = curdoc()
             self._make_plot(doc)
@@ -412,9 +413,9 @@ class CaseViewer(object):
                 new_data['x_vals'], new_data['y_vals'] = self._case_plot_calc(new_data['x_vals'],
                                                                               new_data['y_vals'])
 
-                if self.case_iter_select.value == "Vector Lines":
-                    new_data['cases'] = new_data['cases'][0:len(new_data['x_vals'])]
-                    new_data['color'] = self._line_color_list(new_data['x_vals'], True)
+            if self.case_iter_select.value == "Vector Lines":
+                new_data['cases'] = new_data['cases'][0:len(new_data['x_vals'])]
+                new_data['color'] = self._line_color_list(new_data['x_vals'], True)
 
             new_data['x_vals'] = new_data['x_vals'].tolist()
             new_data['y_vals'] = new_data['y_vals'].tolist()
@@ -430,6 +431,10 @@ class CaseViewer(object):
                 new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).T
                 new_data['x_vals'], new_data['y_vals'] = self._case_plot_calc(new_data['x_vals'],
                                                                               new_data['y_vals'])
+
+            if self.case_iter_select.value == "Vector Lines":
+                new_data['cases'] = new_data['cases'][0:len(new_data['x_vals'])]
+                new_data['color'] = self._line_color_list(new_data['x_vals'], True)
 
             new_data['x_vals'] = new_data['x_vals'].flatten().tolist()
             new_data['y_vals'] = new_data['y_vals'].flatten().tolist()
