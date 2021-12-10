@@ -148,7 +148,7 @@ def format_nan_error(system, matrix):
     # need to associate each index with a variable.
     varsizes = np.sum(system._owned_sizes, axis=0)
 
-    nanrows = np.zeros(matrix.shape[0], dtype=np.bool)
+    nanrows = np.zeros(matrix.shape[0], dtype=bool)
     nanrows[np.where(np.isnan(matrix))[0]] = True
 
     varnames = []
