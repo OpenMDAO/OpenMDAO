@@ -699,15 +699,15 @@ class System(object):
                                           'output': OrderedDict(),
                                           'residual': OrderedDict()}
 
-        nl_alloc_complex = force_alloc_complex = self._problem_meta['force_alloc_complex']
+        force_alloc_complex = self._problem_meta['force_alloc_complex']
 
         # Check for complex step to set vectors up appropriately.
         # If any subsystem needs complex step, then we need to allocate it everywhere.
-        if not nl_alloc_complex:
-            for sub in self.system_iter(include_self=True, recurse=True):
-                nl_alloc_complex |= 'cs' in sub._approx_schemes
-                if nl_alloc_complex:
-                    break
+        nl_alloc_complex = force_alloc_complex
+        for sub in self.system_iter(include_self=True, recurse=True):
+            nl_alloc_complex |= 'cs' in sub._approx_schemes
+            if nl_alloc_complex:
+                break
 
         # Linear vectors allocated complex only if subsolvers require derivatives.
         if nl_alloc_complex:
@@ -725,6 +725,8 @@ class System(object):
             self._vector_class = self._local_vector_class
 
         for vec_name in ('nonlinear', 'linear'):
+            sizes = self._var_sizes['output']
+            ncol = 1
             if vec_name == 'nonlinear':
                 alloc_complex = nl_alloc_complex
             else:
