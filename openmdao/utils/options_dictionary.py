@@ -1,7 +1,13 @@
 """Define the OptionsDictionary class."""
 
+import re
+
 from openmdao.utils.om_warnings import warn_deprecation
 from openmdao.core.constants import _UNDEFINED
+
+
+# regex to check for valid names.
+namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
 
 
 #
@@ -324,16 +330,20 @@ class OptionsDictionary(object):
             If None, it is not deprecated. If a str, use as a DeprecationWarning
             during __setitem__ and __getitem__.
         """
+        match = namecheck_rgx.match(name)
+        if match is None or match.group() != name:
+            self._raise(f"'{name}' is not a valid option name.", exc_type=NameError)
+
         if values is not None and not isinstance(values, (set, list, tuple)):
-            self._raise("In declaration of option '%s', the 'values' arg must be of type None,"
-                        " list, or tuple - not %s." % (name, values), exc_type=TypeError)
+            self._raise(f"In declaration of option '{name}', the 'values' arg must be of type None,"
+                        f" list, or tuple - not {values}.", exc_type=TypeError)
 
         if types is not None and not isinstance(types, (type, set, list, tuple)):
-            self._raise("In declaration of option '%s', the 'types' arg must be None, a type "
-                        "or a tuple - not %s." % (name, types), exc_type=TypeError)
+            self._raise(f"In declaration of option '{name}', the 'types' arg must be None, a type "
+                        f"or a tuple - not {types}.", exc_type=TypeError)
 
         if types is not None and values is not None:
-            self._raise("'types' and 'values' were both specified for option '%s'." % name)
+            self._raise(f"'types' and 'values' were both specified for option '{name}'.")
 
         if types is bool:
             values = (True, False)

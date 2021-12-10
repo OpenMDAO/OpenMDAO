@@ -361,6 +361,14 @@ class TestOptionsDict(unittest.TestCase):
         with assert_no_warning(OMDeprecationWarning, msg):
             option = self.dict['test2']
 
+    def test_bad_option_name(self):
+        opt = OptionsDictionary()
+        with self.assertRaises(NameError) as context:
+            opt.declare('foo:bar', 1.0)
+
+        expected = "'foo:bar' is not a valid option name."
+        self.assertEqual(expected, context.exception.args[0])
+
 
 if __name__ == "__main__":
     unittest.main()
