@@ -2,6 +2,8 @@
 
 import warnings
 
+from openmdao.utils.om_warnings import issue_warning
+
 try:
     from bokeh.io import show, output_notebook, curdoc
     from bokeh.models import Select, HoverTool, MultiSelect, Paragraph
@@ -220,10 +222,9 @@ class CaseViewer(object):
         """
         self.case_select.options = self._case_options(new)
 
-        self.io_select_x.options = self.cr.list_source_vars(new, out_stream=None)
-        # for key in self.io_select_x.options:
-        #     if self.io_select_x.options[key]:
-        #         self.io_select_x.value = self.io_select_x.options[key][0]
+        self.io_options_x = self.cr.list_source_vars(new, out_stream=None)
+        self.io_options_x['Other'] = [self._num_points_str, self._case_iter_str]
+        self.io_select_x.options = self.io_options_x
 
         self.source_select.value = new
         self.case_select.value = ['0']
@@ -347,102 +348,108 @@ class CaseViewer(object):
         if self.io_select_x.value == self._case_iter_str:
             self._case_iter_x = True
 
+        min_case_iter = True
         if len(self.case_options) != 1 and (self._case_iter_x or self._case_iter_y):
-            if len(self.case_select.value) == 1:
+            if len(self.case_select.options) > 1 and len(self.case_select.value) == 1:
                 current_val = int(self.case_select.value[0])
                 if current_val == len(self.case_options) - 1:
                     self.case_select.value.insert(current_val - 1, str(current_val - 1))
                 else:
                     self.case_select.value.append(str(current_val + 1))
+            elif len(self.case_select.options) == 1:
+                min_case_iter = False
+                self.warning_box.text = "Case Iterations needs 2 or more cases to function"
 
-        for i in self.case_select.value:
-            self.case = self.cr.get_case(self.case_select.options[int(i)][1])
+        if min_case_iter:
+            for i in self.case_select.value:
+                self.case = self.cr.get_case(self.case_select.options[int(i)][1])
 
-            self._case_reader_to_dict()
+                self._case_reader_to_dict()
 
-            x_io = y_io = self.case_dict
+                x_io = y_io = self.case_dict
 
-            if (num_points_y and num_points_x) or (self._case_iter_x and self._case_iter_y):
-                x_variable = np.zeros(1)
-                y_variable = np.zeros(1)
-            elif (num_points_x and self._case_iter_y) or (num_points_y and self._case_iter_x):
-                x_variable = np.zeros(1)
-                y_variable = np.zeros(1)
-                self.warning_box.text = "NOTE: Cannot compare Number of Points to Case Iterations"
-            elif num_points_y or self._case_iter_y:
-                if isinstance(x_io[self.io_select_x.value], (np.ndarray, list, float)):
-                    x_variable = x_io[self.io_select_x.value].flatten()
-                else:
+                if (num_points_y and num_points_x) or (self._case_iter_x and self._case_iter_y):
                     x_variable = np.zeros(1)
-                    print(f"X is a non compatible type")
-                y_variable = np.arange(len(x_variable))
-            elif num_points_x or self._case_iter_x:
-                if isinstance(y_io[self.io_select_y.value], (np.ndarray, list, float)):
-                    y_variable = y_io[self.io_select_y.value].flatten()
-                else:
                     y_variable = np.zeros(1)
-                    print(f"Y is a non compatible type")
-                x_variable = np.arange(len(y_variable))
+                elif (num_points_x and self._case_iter_y) or (num_points_y and self._case_iter_x):
+                    x_variable = np.zeros(1)
+                    y_variable = np.zeros(1)
+                    self.warning_box.text = ("NOTE: Cannot compare Number of Points to Case "
+                                             "Iterations")
+                elif num_points_y or self._case_iter_y:
+                    if isinstance(x_io[self.io_select_x.value], (np.ndarray, list, float)):
+                        x_variable = x_io[self.io_select_x.value].flatten()
+                    else:
+                        x_variable = np.zeros(1)
+                        print(f"X is a non compatible type")
+                    y_variable = np.arange(len(x_variable))
+                elif num_points_x or self._case_iter_x:
+                    if isinstance(y_io[self.io_select_y.value], (np.ndarray, list, float)):
+                        y_variable = y_io[self.io_select_y.value].flatten()
+                    else:
+                        y_variable = np.zeros(1)
+                        print(f"Y is a non compatible type")
+                    x_variable = np.arange(len(y_variable))
+                else:
+                    x_variable = x_io[self.io_select_x.value].flatten()
+                    y_variable = y_io[self.io_select_y.value].flatten()
+
+                if not isinstance(new_data['x_vals'], np.ndarray):
+                    new_data['x_vals'] = np.empty((0, len(x_variable)), float)
+                    new_data['y_vals'] = np.empty((0, len(y_variable)), float)
+
+                new_data['x_vals'] = np.vstack((new_data['x_vals'], x_variable))
+                new_data['y_vals'] = np.vstack((new_data['y_vals'], y_variable))
+
+            x_len = new_data['x_vals'].shape[1]
+            y_len = new_data['y_vals'].shape[1]
+            new_data['color'] = self._line_color_list(new_data['x_vals'])
+            new_data['cases'] = [self.case_options[int(case)][1] for case in self.case_select.value]
+            case_len = len(new_data['cases'])
+
+            if new_data['x_vals'].shape[1] > 1:
+                if (new_data['x_vals'].shape[0], new_data['y_vals'].shape[0]) == (1, 1) and \
+                (set(new_data['x_vals'][0]), set(new_data['y_vals'][0])) == ({0.}, {0.}):
+                    self.warning_box.text = ("NOTE: Both X and Y values contain zeros for values, "
+                                            "unable to plot")
+
+                if self._case_iter_x:
+                    new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T
+                    new_data['y_vals'], new_data['x_vals'] = \
+                        self._case_plot_calc(new_data['y_vals'],new_data['x_vals'])
+                elif self._case_iter_y:
+                    new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).T
+                    new_data['x_vals'], new_data['y_vals'] = \
+                        self._case_plot_calc(new_data['x_vals'],new_data['y_vals'])
+
+                if self.case_iter_select.value == "Vector Lines":
+                    new_data['cases'] = new_data['cases'][0:len(new_data['x_vals'])]
+                    new_data['color'] = self._line_color_list(new_data['x_vals'], True)
+
+                new_data['x_vals'] = new_data['x_vals'].tolist()
+                new_data['y_vals'] = new_data['y_vals'].tolist()
+
+                self.multi_line_data.data = new_data
+                self.circle_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}
             else:
-                x_variable = x_io[self.io_select_x.value].flatten()
-                y_variable = y_io[self.io_select_y.value].flatten()
+                if self._case_iter_x:
+                    new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T
+                    new_data['y_vals'], new_data['x_vals'] = \
+                        self._case_plot_calc(new_data['y_vals'],new_data['x_vals'])
+                elif self._case_iter_y:
+                    new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).T
+                    new_data['x_vals'], new_data['y_vals'] = \
+                        self._case_plot_calc(new_data['x_vals'],new_data['y_vals'])
 
-            if not isinstance(new_data['x_vals'], np.ndarray):
-                new_data['x_vals'] = np.empty((0, len(x_variable)), float)
-                new_data['y_vals'] = np.empty((0, len(y_variable)), float)
+                if self.case_iter_select.value == "Vector Lines":
+                    new_data['cases'] = new_data['cases'][0:len(new_data['x_vals'])]
+                    new_data['color'] = self._line_color_list(new_data['x_vals'], True)
 
-            new_data['x_vals'] = np.vstack((new_data['x_vals'], x_variable))
-            new_data['y_vals'] = np.vstack((new_data['y_vals'], y_variable))
+                new_data['x_vals'] = new_data['x_vals'].flatten().tolist()
+                new_data['y_vals'] = new_data['y_vals'].flatten().tolist()
 
-        x_len = new_data['x_vals'].shape[1]
-        y_len = new_data['y_vals'].shape[1]
-        new_data['color'] = self._line_color_list(new_data['x_vals'])
-        new_data['cases'] = [self.case_options[int(case)][1] for case in self.case_select.value]
-        case_len = len(new_data['cases'])
-
-        if new_data['x_vals'].shape[1] > 1:
-            if (new_data['x_vals'].shape[0], new_data['y_vals'].shape[0]) == (1, 1) and \
-               (set(new_data['x_vals'][0]), set(new_data['y_vals'][0])) == ({0.}, {0.}):
-                self.warning_box.text = ("NOTE: Both X and Y values contain zeros for values, "
-                                         "unable to plot")
-
-            if self._case_iter_x:
-                new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T
-                new_data['y_vals'], new_data['x_vals'] = self._case_plot_calc(new_data['y_vals'],
-                                                                              new_data['x_vals'])
-            elif self._case_iter_y:
-                new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).T
-                new_data['x_vals'], new_data['y_vals'] = self._case_plot_calc(new_data['x_vals'],
-                                                                              new_data['y_vals'])
-
-            if self.case_iter_select.value == "Vector Lines":
-                new_data['cases'] = new_data['cases'][0:len(new_data['x_vals'])]
-                new_data['color'] = self._line_color_list(new_data['x_vals'], True)
-
-            new_data['x_vals'] = new_data['x_vals'].tolist()
-            new_data['y_vals'] = new_data['y_vals'].tolist()
-
-            self.multi_line_data.data = new_data
-            self.circle_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}
-        else:
-            if self._case_iter_x:
-                new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T
-                new_data['y_vals'], new_data['x_vals'] = self._case_plot_calc(new_data['y_vals'],
-                                                                              new_data['x_vals'])
-            elif self._case_iter_y:
-                new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).T
-                new_data['x_vals'], new_data['y_vals'] = self._case_plot_calc(new_data['x_vals'],
-                                                                              new_data['y_vals'])
-
-            if self.case_iter_select.value == "Vector Lines":
-                new_data['cases'] = new_data['cases'][0:len(new_data['x_vals'])]
-                new_data['color'] = self._line_color_list(new_data['x_vals'], True)
-
-            new_data['x_vals'] = new_data['x_vals'].flatten().tolist()
-            new_data['y_vals'] = new_data['y_vals'].flatten().tolist()
-
-            self.circle_data.data = new_data
-            self.multi_line_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}
+                self.circle_data.data = new_data
+                self.multi_line_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}
 
     def _line_color_list(self, x_var_vals, vector_lines=False):
         """

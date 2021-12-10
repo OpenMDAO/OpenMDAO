@@ -106,6 +106,24 @@ class TestCaseViewer(unittest.TestCase):
         self.assertEqual(circ_data['color'], ['#1f77b4'])
         self.assertEqual(circ_data['cases'], ['rank0:ScipyOptimize_SLSQP|0'])
 
+        # Test single Problem case iteration error
+        cv = om.CaseViewer(self.filename)
+
+        cv.source_select.value = 'problem'
+        cv.case_select.value = ['0']
+        cv.io_select_y.value = 'Case Iterations'
+
+        self.assertEqual(cv.warning_box.text, "Case Iterations needs 2 or more cases to function")
+
+        # Test single Problem case iteration error (Reversed)
+        cv = om.CaseViewer(self.filename)
+
+        cv.source_select.value = 'problem'
+        cv.case_select.value = ['0']
+        cv.io_select_x.value = 'Case Iterations'
+
+        self.assertEqual(cv.warning_box.text, "Case Iterations needs 2 or more cases to function")
+
         # Test change of X values and check y value filtering
         cv = om.CaseViewer(self.filename)
 
