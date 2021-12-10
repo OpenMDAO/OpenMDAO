@@ -102,6 +102,8 @@ class CaseViewer(object):
         case_vars = []
         special_case_vals = [self._num_points_str, self._case_iter_str]
 
+        self._case_reader_to_dict()
+
         for var_dict in [self.case.outputs, self.case.inputs, self.case.residuals]:
             if var_dict is not None:
                 case_vars += list(var_dict.keys())
@@ -109,10 +111,8 @@ class CaseViewer(object):
         if var_to_compare in special_case_vals:
             return self.io_options_x
 
-        self._case_reader_to_dict()
-
         for variable in variables:
-            if variable in case_vars:
+            if variable in case_vars and var_to_compare in case_vars:
                 if self.case_dict[variable].size == self.case_dict[var_to_compare].size:
                     var_list.append(variable)
 
