@@ -409,9 +409,9 @@ class CaseViewer(object):
 
             if new_data['x_vals'].shape[1] > 1:
                 if (new_data['x_vals'].shape[0], new_data['y_vals'].shape[0]) == (1, 1) and \
-                (set(new_data['x_vals'][0]), set(new_data['y_vals'][0])) == ({0.}, {0.}):
+                        (set(new_data['x_vals'][0]), set(new_data['y_vals'][0])) == ({0.}, {0.}):
                     self.warning_box.text = ("NOTE: Both X and Y values contain zeros for values, "
-                                            "unable to plot")
+                                             "unable to plot")
 
                 if self._case_iter_x:
                     new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T
