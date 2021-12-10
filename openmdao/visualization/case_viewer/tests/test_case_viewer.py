@@ -108,6 +108,7 @@ class TestCaseViewer(unittest.TestCase):
 
         # Test change of X values and check y value filtering
         cv = om.CaseViewer(self.filename)
+
         cv.io_select_x.value = "paraboloid.f"
         cv.source_select.value = 'driver'
 

@@ -113,8 +113,8 @@ class CaseViewer(object):
 
         for variable in variables:
             if variable in case_vars and var_to_compare in case_vars and \
-                    not (isinstance(self.case_dict[variable], object) or
-                         isinstance(self.case_dict[var_to_compare], object)):
+                    (isinstance(self.case_dict[variable], np.ndarray) and
+                     isinstance(self.case_dict[var_to_compare], np.ndarray)):
                 if self.case_dict[variable].size == self.case_dict[var_to_compare].size:
                     var_list.append(variable)
 
