@@ -59,8 +59,6 @@ class OptionsDictionary(object):
         If True, no options can be set after declaration.
     _all_recordable : bool
         Flag to determine if all options in UserOptions are recordable.
-    _deprecation_warning_issued : list
-        Option names that are deprecated and a warning has been issued for their use.
     """
 
     def __init__(self, parent_name=None, read_only=False):
@@ -70,10 +68,7 @@ class OptionsDictionary(object):
         self._dict = {}
         self._parent_name = parent_name
         self._read_only = read_only
-
         self._all_recordable = True
-
-        self._deprecation_warning_issued = []
 
     def __getstate__(self):
         """
@@ -168,7 +163,8 @@ class OptionsDictionary(object):
 
             deprecation = options['deprecation']
             if deprecation is not None:
-                tlist.append([key, default, acceptable_values, acceptable_types, desc, deprecation])
+                tlist.append([key, default, acceptable_values, acceptable_types, desc,
+                              deprecation[0]])
             else:
                 tlist.append([key, default, acceptable_values, acceptable_types, desc])
 
@@ -326,13 +322,17 @@ class OptionsDictionary(object):
             If True, allow None as a value regardless of values or types.
         recordable : bool
             If True, add to recorder.
-        deprecation : str or None
+        deprecation : str or tuple or None
             If None, it is not deprecated. If a str, use as a DeprecationWarning
-            during __setitem__ and __getitem__.
+            during __setitem__ and __getitem__.  If a tuple of the form (msg, new_name),
+            display msg as with str, and forward any __setitem__/__getitem__ to new_name.
         """
         match = namecheck_rgx.match(name)
         if match is None or match.group() != name:
-            self._raise(f"'{name}' is not a valid option name.", exc_type=NameError)
+            warn_deprecation(f"'{name}' is not a valid python name and will become an invalid "
+                             "option name in a future release. You can prevent this warning (and "
+                             "future exceptions) by declaring this option using a valid python "
+                             "name.")
 
         if values is not None and not isinstance(values, (set, list, tuple)):
             self._raise(f"In declaration of option '{name}', the 'values' arg must be of type None,"
@@ -356,6 +356,18 @@ class OptionsDictionary(object):
         if default_provided and default is None:
             # specifying default=None implies allow_none
             allow_none = True
+
+        alias = None
+        if deprecation is not None:
+            if isinstance(deprecation, (list, tuple)):
+                if len(deprecation) != 2:
+                    self._raise("deprecation must be None, str, or a tuple or list containing "
+                                "(str, str).", RuntimeError)
+                dep, alias = deprecation
+                # message, alias, display warning (becomes False after first display)
+                deprecation = [dep, alias, True]
+            else:
+                deprecation = [deprecation, None, True]
 
         self._dict[name] = {
             'val': default,
@@ -440,16 +452,15 @@ class OptionsDictionary(object):
         try:
             meta = self._dict[name]
         except KeyError:
-            # The key must have been declared.
-            msg = "Option '{}' cannot be set because it has not been declared."
-            self._raise(msg.format(name), exc_type=KeyError)
-
-        if meta['deprecation'] is not None and name not in self._deprecation_warning_issued:
-            warn_deprecation(meta['deprecation'])
-            self._deprecation_warning_issued.append(name)
+            # The key must not have been declared.
+            self._raise(f"Option '{name}' cannot be set because it has not been declared.",
+                        exc_type=KeyError)
 
         if self._read_only:
-            self._raise("Tried to set read-only option '{}'.".format(name), exc_type=KeyError)
+            self._raise(f"Tried to set read-only option '{name}'.", exc_type=KeyError)
+
+        if meta['deprecation'] is not None:
+            name, meta = self._handle_deprecation(name, meta)
 
         self._assert_valid(name, value)
 
@@ -473,15 +484,16 @@ class OptionsDictionary(object):
         # If the option has been set in this system, return the set value
         try:
             meta = self._dict[name]
-            if meta['deprecation'] is not None and name not in self._deprecation_warning_issued:
-                warn_deprecation(meta['deprecation'])
-                self._deprecation_warning_issued.append(name)
-            if meta['has_been_set']:
-                return meta['val']
-            else:
-                self._raise("Option '{}' is required but has not been set.".format(name))
         except KeyError:
-            self._raise("Option '{}' cannot be found".format(name), exc_type=KeyError)
+            self._raise(f"Option '{name}' has not been declared.", exc_type=KeyError)
+
+        if meta['deprecation'] is not None:
+            name, meta = self._handle_deprecation(name, meta)
+
+        if meta['has_been_set']:
+            return meta['val']
+        else:
+            self._raise(f"Option '{name}' is required but has not been set.")
 
     def items(self):
         """
@@ -499,3 +511,19 @@ class OptionsDictionary(object):
                 yield key, val['val']
             except KeyError:
                 yield key, val['value']
+
+    def _handle_deprecation(self, name, meta):
+        msg, alias, show_warn = meta['deprecation']
+        if show_warn:
+            warn_deprecation(msg)
+            meta['deprecation'][2] = False  # turn off later warnings for this variable
+
+        if alias:
+            try:
+                meta = self._dict[alias]
+            except KeyError:
+                msg = f"Can't find aliased option '{alias}' for deprecated option '{name}'."
+                self._raise(msg, exc_type=KeyError)
+            name = alias
+
+        return name, meta

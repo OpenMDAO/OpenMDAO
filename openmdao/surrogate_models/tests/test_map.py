@@ -37,13 +37,13 @@ class TestMap(unittest.TestCase):
         alpha = np.array([0.0, 1.0])
         Nc_mat, Rline_mat, alpha_mat = np.meshgrid(Nc, Rline, alpha, sparse=False)
 
-        m['train:Nc'] = Nc_mat.flatten()
-        m['train:Rline'] = Rline_mat.flatten()
-        m['train:alpha'] = alpha_mat.flatten()
+        m['train_Nc'] = Nc_mat.flatten()
+        m['train_Rline'] = Rline_mat.flatten()
+        m['train_alpha'] = alpha_mat.flatten()
 
-        m['train:PR'] = m['train:Nc']*m['train:Rline']+m['train:alpha']
-        m['train:eff'] = m['train:Nc']*m['train:Rline']**2+m['train:alpha']
-        m['train:Wc'] = m['train:Nc']**2*m['train:Rline']**2+m['train:alpha']
+        m['train_PR'] = m['train_Nc']*m['train_Rline']+m['train_alpha']
+        m['train_eff'] = m['train_Nc']*m['train_Rline']**2+m['train_alpha']
+        m['train_Wc'] = m['train_Nc']**2*m['train_Rline']**2+m['train_alpha']
 
         # check predicted values
         p['compmap.Nc'] = 0.9

@@ -33,9 +33,9 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
     Generalize MetaModel to be able to train surrogates with multi-fidelity training inputs.
 
     For a given number of levels of fidelity **nfi** (given at initialization)
-    the corresponding training input variables *train:[invar]_fi[2..nfi]* and
-    *train:[outvar]_fi[2..nfi]* are automatically created
-    besides the given *train:[invar]* and *train:[outvar]* variables.
+    the corresponding training input variables *train_[invar]_fi[2..nfi]* and
+    *train_[outvar]_fi[2..nfi]* are automatically created
+    besides the given *train_[invar]* and *train_[outvar]* variables.
     Note the index starts at 2, the index 1 is omitted considering
     the simple name *var* is equivalent to *var_fi1* which is intended
     to be the data of highest fidelity.
@@ -44,7 +44,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
     ndarrays built from the various training input data. By convention,
     the fidelities are intended to be ordered from highest to lowest fidelity.
     Obviously for a given level of fidelity corresponding lists
-    *train:[var]_fi[n]* have to be of the same size.
+    *train_[var]_fi[n]* have to be of the same size.
 
     Thus given the initialization::
 
@@ -181,8 +181,14 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         for fi in range(self._nfi):
             if fi > 0:
                 name_with_fi = 'train:' + _get_name_fi(name, fi)
+                good_name = 'train_' + _get_name_fi(name, fi)
                 self.options.declare(
-                    name_with_fi, default=None, desc='Training data for %s' % name_with_fi)
+                    name_with_fi, default=None, desc='Training data for %s' % name_with_fi,
+                    deprecation=(f"The option '{name_with_fi}' has been deprecated because "
+                                 f"it's not a valid python name.  Use '{good_name}' "
+                                 "instead.", good_name))
+                self.options.declare(
+                    good_name, default=None, desc='Training data for %s' % good_name)
                 if self._static_mode:
                     self._static_input_sizes[fi] += input_size
                 else:
@@ -259,8 +265,14 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         for fi in range(self._nfi):
             if fi > 0:
                 name_with_fi = 'train:' + _get_name_fi(name, fi)
+                good_name = 'train_' + _get_name_fi(name, fi)
                 self.options.declare(
-                    name_with_fi, default=None, desc='Training data for %s' % name_with_fi)
+                    name_with_fi, default=None, desc='Training data for %s' % name_with_fi,
+                    deprecation=(f"The option '{name_with_fi}' has been deprecated because "
+                                 f"it's not a valid python name.  Use '{good_name}' "
+                                 "instead.", good_name))
+                self.options.declare(
+                    good_name, default=None, desc='Training data for %s' % good_name)
 
     def _train(self):
         """
