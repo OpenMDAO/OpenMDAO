@@ -152,11 +152,7 @@ class ExplicitFuncComp(ExplicitComponent):
         if self._mode == 'rev':  # use reverse mode to compute derivs
             outvals = tuple(self._outputs.values())
             tangents = self._get_tangents(outvals, 'rev', coloring)
-            if coloring is not None:
-                j = [np.asarray(a).reshape((a.shape[0], np.prod(a.shape[1:], dtype=INT_DTYPE)))
-                     for a in jac_reverse(func, argnums, tangents)(*invals)]
-                j = coloring.expand_jac(np.hstack(j), 'rev')
-            else:
+            if coloring is None:
                 j = []
                 for a in jac_reverse(func, argnums, tangents)(*invals):
                     if a.ndim < 2:
@@ -168,18 +164,22 @@ class ExplicitFuncComp(ExplicitComponent):
                         a = np.asarray(a)
                     j.append(a.reshape((a.shape[0], np.prod(a.shape[1:], dtype=INT_DTYPE))))
                 j = np.hstack(j).reshape((osize, isize))
+            else:
+                j = [np.asarray(a).reshape((a.shape[0], np.prod(a.shape[1:], dtype=INT_DTYPE)))
+                     for a in jac_reverse(func, argnums, tangents)(*invals)]
+                j = coloring.expand_jac(np.hstack(j), 'rev')
         else:
             tangents = self._get_tangents(invals, 'fwd', coloring, argnums)
-            if coloring is not None:
-                j = [np.asarray(a).reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1]))
-                     for a in jac_forward(func, argnums, tangents)(*invals)]
-                j = coloring.expand_jac(np.vstack(j), 'fwd')
-            else:
+            if coloring is None:
                 j = []
                 for a in jac_forward(func, argnums, tangents)(*invals):
                     a = np.atleast_2d(a)
                     j.append(a.reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1])))
                 j = np.vstack(j).reshape((osize, isize))
+            else:
+                j = [np.asarray(a).reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1]))
+                     for a in jac_forward(func, argnums, tangents)(*invals)]
+                j = coloring.expand_jac(np.vstack(j), 'fwd')
 
         self._jacobian.set_dense_jac(self, j)
 
