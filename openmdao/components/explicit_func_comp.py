@@ -141,6 +141,8 @@ class ExplicitFuncComp(ExplicitComponent):
         inames = list(self._compute.get_input_names())
         # argnums specifies which position args are to be differentiated
         argnums = [i for i, m in enumerate(self._compute._inputs.values()) if 'is_option' not in m]
+        # keep this around for use locally even if we pass None as argnums to jax
+        argidxs = argnums
         if len(argnums) == len(inames):
             argnums = None  # speedup if there are no static args
         osize = len(self._outputs)
@@ -153,17 +155,19 @@ class ExplicitFuncComp(ExplicitComponent):
             outvals = tuple(self._outputs.values())
             tangents = self._get_tangents(outvals, 'rev', coloring)
             if coloring is None:
-                j = []
-                for a in jac_reverse(func, argnums, tangents)(*invals):
+                j = np.empty((osize, isize), dtype=float)
+                cstart = cend = 0
+                for i, a in zip(argidxs, jac_reverse(func, argnums, tangents)(*invals)):
+                    if isinstance(invals[i], np.ndarray):
+                        cend += invals[i].size
+                    else:  # must be a scalar
+                        cend += 1
+                    a = np.asarray(a)
                     if a.ndim < 2:
-                        if a.ndim == 1:
-                            a = np.atleast_2d(a).T
-                        else:
-                            a = np.atleast_2d(a)
+                        j[:, cstart:cend] = a.reshape((a.size, 1))
                     else:
-                        a = np.asarray(a)
-                    j.append(a.reshape((a.shape[0], np.prod(a.shape[1:], dtype=INT_DTYPE))))
-                j = np.hstack(j).reshape((osize, isize))
+                        j[:, cstart:cend] = a.reshape((a.shape[0], cend - cstart))
+                    cstart = cend
             else:
                 j = [np.asarray(a).reshape((a.shape[0], np.prod(a.shape[1:], dtype=INT_DTYPE)))
                      for a in jac_reverse(func, argnums, tangents)(*invals)]
@@ -171,11 +175,20 @@ class ExplicitFuncComp(ExplicitComponent):
         else:
             tangents = self._get_tangents(invals, 'fwd', coloring, argnums)
             if coloring is None:
-                j = []
+                j = np.empty((osize, isize), dtype=float)
+                start = end = 0
                 for a in jac_forward(func, argnums, tangents)(*invals):
-                    a = np.atleast_2d(a)
-                    j.append(a.reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1])))
-                j = np.vstack(j).reshape((osize, isize))
+                    a = np.asarray(a)
+                    if a.ndim < 2:
+                        a = a.reshape((1, a.size))
+                    else:
+                        a = a.reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1]))
+                    end += a.shape[0]
+                    if osize == 1:
+                        j[0, start:end] = a
+                    else:
+                        j[start:end, :] = a
+                    start = end
             else:
                 j = [np.asarray(a).reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1]))
                      for a in jac_forward(func, argnums, tangents)(*invals)]

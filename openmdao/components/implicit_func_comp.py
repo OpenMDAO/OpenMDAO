@@ -242,14 +242,12 @@ class ImplicitFuncComp(ImplicitComponent):
             else:
                 j = []
                 for a in jac_reverse(self._apply_nonlinear_func_jax, argnums, tangents)(*invals):
+                    a = np.asarray(a)
                     if a.ndim < 2:
-                        if a.ndim == 1:
-                            a = np.atleast_2d(a).T
-                        else:
-                            a = np.atleast_2d(a)
+                        a = a.reshape((a.size, 1))
                     else:
-                        a = np.asarray(a)
-                    j.append(a.reshape((a.shape[0], np.prod(a.shape[1:], dtype=INT_DTYPE))))
+                        a = a.reshape((a.shape[0], np.prod(a.shape[1:], dtype=INT_DTYPE)))
+                    j.append(a)
                 j = np.hstack(self._reorder_col_chunks(j)).reshape((osize, isize))
         else:
             if coloring is not None:
@@ -264,8 +262,12 @@ class ImplicitFuncComp(ImplicitComponent):
                 tangents = self._get_tangents(invals, 'fwd', coloring, argnums)
                 j = []
                 for a in jac_forward(self._apply_nonlinear_func_jax, argnums, tangents)(*invals):
-                    a = np.atleast_2d(a)
-                    j.append(a.reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1])))
+                    a = np.asarray(a)
+                    if a.ndim < 2:
+                        a = a.reshape((1, a.size))
+                    else:
+                        a = a.reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1]))
+                    j.append(a)
                 j = self._reorder_cols(np.vstack(j).reshape((osize, isize)))
 
         self._jacobian.set_dense_jac(self, j)

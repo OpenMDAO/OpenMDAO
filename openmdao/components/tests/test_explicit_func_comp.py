@@ -1054,7 +1054,7 @@ class TestJax(unittest.TestCase):
         p.run_model()
         J = p.compute_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'])
 
-        I = np.eye(np.product(shape)) if shape else np.eye(1)
+        I = np.eye(np.product(shape, dtype=int))
         assert_near_equal(J['comp.x', 'comp.a'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.b'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.c'], I * 3.)
@@ -1082,6 +1082,133 @@ class TestJax(unittest.TestCase):
 
     def test_rev_jit(self):
         self.check_derivs('rev', (), use_jit=True)
+
+
+@unittest.skipIf(jax is None, "jax is not installed")
+class TestJaxMixedShapes1output(unittest.TestCase):
+    def check_derivs(self, mode, m, n, o):
+        def func(a, b, c):
+            x = 2. * a.dot(b) + c
+            return x
+
+        f = omf.wrap(func).declare_partials(of='*', wrt='*', method='jax')
+        ishapes = {'a': (n,m), 'b': (m,o), 'c': (n,o)}
+        oshapes = {'x': (n,o)}
+
+        for name in ['a', 'b', 'c']:
+            f.add_input(name, shape=ishapes[name])
+
+        for name in ['x']:
+            f.add_output(name, shape=oshapes[name])
+
+        rand_inputs = {
+            n: np.random.random(ishapes[n]) for n in ('a', 'b', 'c')
+        }
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True))
+        p.setup(mode=mode)
+
+        for n in ('a', 'b', 'c'):
+            p[f"comp.{n}"] = rand_inputs[n]
+
+        p.run_model()
+        J = p.compute_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'])
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExecComp(['x=2.*a.dot(b)+c'],
+                                                  x={'shape':oshapes['x']},
+                                                  a={'shape':ishapes['a']},
+                                                  b={'shape':ishapes['b']},
+                                                  c={'shape':ishapes['c']},
+                                                  ))
+        p.setup(mode=mode)
+
+        for n in ('a', 'b', 'c'):
+            p[f"comp.{n}"] = rand_inputs[n]
+
+        p.run_model()
+        Jchk = p.compute_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'])
+
+        for inp in ['comp.a', 'comp.b', 'comp.c']:
+            assert_near_equal(J['comp.x', inp], Jchk['comp.x', inp])
+
+    def test1fwd(self):
+        self.check_derivs('fwd', 2, 3, 5)
+
+    def test1rev(self):
+        self.check_derivs('rev', 2, 3, 5)
+
+    def test2fwd(self):
+        self.check_derivs('fwd', 9, 3, 5)
+
+    def test2rev(self):
+        self.check_derivs('rev', 9, 3, 5)
+
+
+@unittest.skipIf(jax is None, "jax is not installed")
+class TestJaxMixedShapes2outputs(unittest.TestCase):
+    def check_derivs(self, mode, m, n, o, p, q):
+        def func(a, b, c):
+            x = 2. * a.dot(b)
+            y = 3. * c
+            return x, y
+
+        f = omf.wrap(func).declare_partials(of='*', wrt='*', method='jax')
+        ishapes = {'a': (n,m), 'b': (m,o), 'c': (p,q)}
+        oshapes = {'x': (n,o), 'y': (p,q)}
+
+        for name in ['a', 'b', 'c']:
+            f.add_input(name, shape=ishapes[name])
+
+        for name in ['x', 'y']:
+            f.add_output(name, shape=oshapes[name])
+
+        rand_inputs = {
+            n: np.random.random(ishapes[n]) for n in ('a', 'b', 'c')
+        }
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True))
+        p.setup(mode=mode)
+
+        for n in ('a', 'b', 'c'):
+            p[f"comp.{n}"] = rand_inputs[n]
+
+        p.run_model()
+        J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExecComp(['x=2.*a.dot(b)', 'y=3.*c'],
+                                                  x={'shape':oshapes['x']},
+                                                  y={'shape':oshapes['y']},
+                                                  a={'shape':ishapes['a']},
+                                                  b={'shape':ishapes['b']},
+                                                  c={'shape':ishapes['c']},
+                                                  ))
+        p.setup(mode=mode)
+
+        for n in ('a', 'b', 'c'):
+            p[f"comp.{n}"] = rand_inputs[n]
+
+        p.run_model()
+        Jchk = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
+
+        for out in ['comp.x', 'comp.y']:
+            for inp in ['comp.a', 'comp.b', 'comp.c']:
+                assert_near_equal(J[out, inp], Jchk[out, inp])
+
+    def test1fwd(self):
+        self.check_derivs('fwd', 2, 3, 5, 7, 1)
+
+    def test1rev(self):
+        self.check_derivs('rev', 2, 3, 5, 7, 1)
+
+    def test2fwd(self):
+        self.check_derivs('fwd', 9, 3, 5, 7, 2)
+
+    def test2rev(self):
+        self.check_derivs('rev', 9, 3, 5, 7, 2)
 
 
 @unittest.skipIf(jax is None, "jax is not installed")

@@ -96,10 +96,11 @@ def jac_forward(fun, argnums, tangents):
     Returns
     -------
     function
-        A function that returns rows of the jacobian grouped by output variable, e.g., if there were
-        2 output variables of size 3 and 4, the function would return a list with two entries. The
-        first entry would contain the first 3 rows of J and the second would contain the next
-        4 rows of J.
+        If there are multiple output variables, returns a function that returns rows of the
+        jacobian grouped by output variable, e.g., if there were 2 output variables of size 3 and 4,
+        the function would return a list with two entries. The first entry would contain the first 3
+        rows of J and the second would contain the next 4 rows of J.  If there is only 1 output
+        variable, the values returned are grouped by input variable.
     """
     f = linear_util.wrap_init(fun)
     if argnums is None:
