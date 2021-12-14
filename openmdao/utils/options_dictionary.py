@@ -364,7 +364,7 @@ class OptionsDictionary(object):
                     self._raise("deprecation must be None, str, or a tuple or list containing "
                                 "(str, str).", RuntimeError)
                 dep, alias = deprecation
-                # message, alias, display warning (becomes False after first display)
+                # [message, alias, display warning (becomes False after first display)]
                 deprecation = [dep, alias, True]
             else:
                 deprecation = [deprecation, None, True]
@@ -513,10 +513,28 @@ class OptionsDictionary(object):
                 yield key, val['value']
 
     def _handle_deprecation(self, name, meta):
+        """
+        Update the warning counter and do name translation of deprecated variable if needed.
+
+        Parameters
+        ----------
+        name : str
+            Name of the deprecated variable.
+        meta : dict
+            Metadata dictionary corresponding to the deprecated variable.
+
+        Returns
+        -------
+        str
+            The variable name, updated to the non-deprecated name if found.
+        dict
+            Metadata dictionary corresponding to either the original variable or to the
+            non-deprecated varsion if found.
+        """
         msg, alias, show_warn = meta['deprecation']
         if show_warn:
             warn_deprecation(msg)
-            meta['deprecation'][2] = False  # turn off later warnings for this variable
+            meta['deprecation'][2] = False  # turn off future warnings for this variable
 
         if alias:
             try:

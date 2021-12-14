@@ -16,7 +16,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
     Class that creates a reduced order model for outputs from inputs.
 
     Each output may have its own surrogate model.
-    Training inputs and outputs are automatically created with 'train_' prepended to the
+    Training inputs and outputs are automatically created with 'train\_' prepended to the
     corresponding input/output name.
 
     For a Float variable, the training data is an array of length m,

@@ -55,9 +55,9 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
     >>> mm.add_output('y2', 0.)
 
     the following supplementary training input variables
-    ``train:x1_fi2`` and ``train:x2_fi2`` are created together with the classic
-    ones ``train:x1`` and ``train:x2`` and the output variables ``train:y1_fi2``
-    and ``train:y2_fi2`` are created as well.
+    ``train_x1_fi2`` and ``train_x2_fi2`` are created together with the classic
+    ones ``train_x1`` and ``train_x2`` and the output variables ``train_y1_fi2``
+    and ``train_y2_fi2`` are created as well.
     The embedded surrogate for y1 will be trained with a couple (X, Y).
 
     Where X is the list [X_fi1, X_fi2] where X_fi1 is an (m1, 2) ndarray
@@ -177,10 +177,10 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         else:
             self._input_sizes[0] += input_size
 
-        # Add train:<invar>_fi<n>
+        # Add train_<invar>_fi<n>
         for fi in range(self._nfi):
             if fi > 0:
-                name_with_fi = 'train:' + _get_name_fi(name, fi)
+                name_with_fi = 'train_' + _get_name_fi(name, fi)
                 good_name = 'train_' + _get_name_fi(name, fi)
                 self.options.declare(
                     name_with_fi, default=None, desc='Training data for %s' % name_with_fi,
@@ -261,10 +261,10 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
                            distributed=distributed)
         self._training_output[name] = self._nfi * [np.empty(0)]
 
-        # Add train:<outvar>_fi<n>
+        # Add train_<outvar>_fi<n>
         for fi in range(self._nfi):
             if fi > 0:
-                name_with_fi = 'train:' + _get_name_fi(name, fi)
+                name_with_fi = 'train_' + _get_name_fi(name, fi)
                 good_name = 'train_' + _get_name_fi(name, fi)
                 self.options.declare(
                     name_with_fi, default=None, desc='Training data for %s' % name_with_fi,
@@ -287,7 +287,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         for name_root, _ in chain(self._surrogate_input_names, self._surrogate_output_names):
             for fi in range(self._nfi):
                 name = _get_name_fi(name_root, fi)
-                val = self.options['train:' + name]
+                val = self.options['train_' + name]
                 if num_sample[fi] is None:
                     num_sample[fi] = len(val)
                 elif len(val) != num_sample[fi]:
@@ -304,7 +304,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         for name_root, sz in self._surrogate_input_names:
             for fi in range(self._nfi):
                 name = _get_name_fi(name_root, fi)
-                val = self.options['train:' + name]
+                val = self.options['train_' + name]
                 if isinstance(val[0], float):
                     inputs[fi][:, idx[fi]] = val
                     idx[fi] += 1
@@ -321,7 +321,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
                 name_fi = _get_name_fi(name_root, fi)
                 outputs[fi] = np.zeros((num_sample[fi], output_size))
 
-                val = self.options['train:' + name_fi]
+                val = self.options['train_' + name_fi]
 
                 if isinstance(val[0], float):
                     outputs[fi][:, 0] = val
