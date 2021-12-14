@@ -12,7 +12,7 @@ from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 
 
 class MetaModelUnStructuredComp(ExplicitComponent):
-    """
+    r"""
     Class that creates a reduced order model for outputs from inputs.
 
     Each output may have its own surrogate model.
