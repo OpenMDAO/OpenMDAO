@@ -54,7 +54,7 @@ class TestEntryPoints(unittest.TestCase):
                 reg.add(str(ep).split('=', 1)[1].strip())
 
         found_eps = compute_entry_points('openmdao',
-                                         dir_excludes=('test_suite', 'docs', 'docs_experiment'),
+                                         dir_excludes=('test_suite', 'docs'),
                                          outstream=None)
 
         for epgroup in _allowed_types.values():
