@@ -748,22 +748,6 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         p.run_model()
         np.testing.assert_allclose(p.get_val('indeps.x'), p.get_val('comp.x'))
 
-<<<<<<< HEAD
-    def test_ser_known_dist_unknown(self):
-        p = om.Problem()
-        indeps = p.model.add_subsystem('indeps', om.IndepVarComp())
-
-        indeps.add_output('x', val=np.random.random(2))
-        p.model.add_subsystem('comp', DistCompUnknownInput())
-        p.model.connect('indeps.x', 'comp.x')
-        msg = "Connection between duplicated output 'indeps.x' and distributed input 'comp.x' is deprecated and will become an error in a future release."
-        with assert_warning(OMDeprecationWarning, msg):
-            p.setup()
-        p.run_model()
-        np.testing.assert_allclose(p.get_val('indeps.x'), p.get_val('comp.x'))
-
-=======
->>>>>>> 41dd50867661cd1262ebd87bcd816a889bf59ed3
     def test_ser_unknown_dist_known_err(self):
         p = om.Problem()
         indeps = p.model.add_subsystem('indeps', om.IndepVarComp())
