@@ -873,10 +873,6 @@ class Group(System):
                         raise RuntimeError(f"{self.msginfo}: Can't connect distributed output "
                                            f"'{abs_out}' to serial input '{abs_in}' without "
                                            "specifying src_indices.")
-                elif in_dist and not out_dist:
-                    warn_deprecation(f"Connection between serial output '{abs_out}' and distributed"
-                                     f" input '{abs_in}' is deprecated and will become an error "
-                                     "in a future release.")
 
     def _get_group_input_meta(self, prom_in, meta_name):
         if prom_in in self._group_inputs:
