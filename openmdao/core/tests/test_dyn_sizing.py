@@ -220,7 +220,7 @@ class TestPassSizeDistributed(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.setup()
 
-        msg = "<model> <class Group>: dynamic sizing of serial input 'E.in' from distributed output 'D.out' is not supported."
+        msg = "<model> <class Group>: dynamic sizing of duplicated input 'E.in' from distributed output 'D.out' is not supported."
         self.assertEquals(str(cm.exception), msg)
 
     def test_distributed_start(self):
@@ -247,7 +247,7 @@ class TestPassSizeDistributed(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.setup()
 
-        msg = "<model> <class Group>: dynamic sizing of serial output 'A.out' from distributed input 'B.in' is not supported because not all B.in ranks are the same size (sizes=[1 2 0])."
+        msg = "<model> <class Group>: dynamic sizing of duplicated output 'A.out' from distributed input 'B.in' is not supported because not all B.in ranks are the same size (sizes=[1 2 0])."
         self.assertEquals(str(cm.exception), msg)
 
 class ResizableComp(om.ExplicitComponent):
@@ -755,7 +755,7 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         indeps.add_output('x', val=np.random.random(2))
         p.model.add_subsystem('comp', DistCompUnknownInput())
         p.model.connect('indeps.x', 'comp.x')
-        msg = "Connection between serial output 'indeps.x' and distributed input 'comp.x' is deprecated and will become an error in a future release."
+        msg = "Connection between duplicated output 'indeps.x' and distributed input 'comp.x' is deprecated and will become an error in a future release."
         with assert_warning(OMDeprecationWarning, msg):
             p.setup()
         p.run_model()
@@ -770,7 +770,7 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
         self.assertEquals(cm.exception.args[0],
-                          "<model> <class Group>: dynamic sizing of serial output 'indeps.x' from distributed input 'comp.x' is not supported because not all comp.x ranks are the same size (sizes=[3 6 9]).")
+                          "<model> <class Group>: dynamic sizing of duplicated output 'indeps.x' from distributed input 'comp.x' is not supported because not all comp.x ranks are the same size (sizes=[3 6 9]).")
 
     def test_ser_unknown_dist_known(self):
         p = om.Problem()
@@ -778,7 +778,7 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         indeps.add_output('x', shape_by_conn=True)
         p.model.add_subsystem('comp', DistCompKnownInput())
         p.model.connect('indeps.x', 'comp.x')
-        msg = "Connection between serial output 'indeps.x' and distributed input 'comp.x' is deprecated and will become an error in a future release."
+        msg = "Connection between duplicated output 'indeps.x' and distributed input 'comp.x' is deprecated and will become an error in a future release."
         with assert_warning(OMDeprecationWarning, msg):
             p.setup()
         p.run_model()
@@ -795,7 +795,7 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
         self.assertEquals(cm.exception.args[0],
-                          "<model> <class Group>: dynamic sizing of serial input 'comp.x' from distributed output 'indeps.x' is not supported.")
+                          "<model> <class Group>: dynamic sizing of duplicated input 'comp.x' from distributed output 'indeps.x' is not supported.")
 
     def test_dist_unknown_ser_known(self):
         p = om.Problem()
@@ -806,7 +806,7 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
         self.assertEquals(cm.exception.args[0],
-                          "<model> <class Group>: Can't connect distributed output 'indeps.x' to serial input 'comp.x' without specifying src_indices.")
+                          "<model> <class Group>: Can't connect distributed output 'indeps.x' to duplicated input 'comp.x' without specifying src_indices.")
 
     def test_dist_known_dist_unknown(self):
         p = om.Problem()

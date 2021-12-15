@@ -735,6 +735,126 @@ class MPITests2(unittest.TestCase):
             assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-14)
             assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][0], 0.0, 1e-14)
 
+    def test_distrib_cascade(self):
+        # Tests the derivatives on a complicated model that is the distributed equivalent
+        # of a double diamond.
+        class MixedDistrib2(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('in_dist', shape_by_conn=True, distributed=True)
+                self.add_input('in_dup', shape_by_conn=True)
+                self.add_output('out_dist', copy_shape='in_dist', distributed=True)
+                self.add_output('out_dup', copy_shape='in_dup')
+
+            def compute(self, inputs, outputs):
+                x = inputs['in_dist']
+                y = inputs['in_dup']
+
+                f_x = x**2 - 2.0*x + 4.0
+                f_y = y ** 0.5
+                g_y = y**2 + 3.0*y - 5.0
+                g_x = x ** 0.5
+
+                # Distributed output
+                outputs['out_dist'] = f_x + np.sum(f_y)
+
+                # We need to gather the summed values to compute the total sum over all procs.
+                local_sum = np.array(np.sum(g_x))
+                total_sum = local_sum.copy()
+                self.comm.Allreduce(local_sum, total_sum, op=MPI.SUM)
+                outputs['out_dup'] = g_y + total_sum
+
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                x = inputs['in_dist']
+                y = inputs['in_dup']
+
+                df_dx = 2.0 * x - 2.0
+                df_dy = 0.5 / y ** 0.5
+                dg_dx = 0.5 / x ** 0.5
+                dg_dy = 2.0 * y + 3.0
+
+                nx = len(x)
+                ny = len(y)
+
+                if mode == 'fwd':
+                    if 'out_dist' in d_outputs:
+                        if 'in_dist' in d_inputs:
+                            d_outputs['out_dist'] += df_dx * d_inputs['in_dist']
+                        if 'in_dup' in d_inputs:
+                            d_outputs['out_dist'] += np.tile(df_dy, nx).reshape((nx, ny)).dot(d_inputs['in_dup'])
+                    if 'out_dup' in d_outputs:
+                        if 'in_dist' in d_inputs:
+                            deriv = np.tile(dg_dx, ny).reshape((ny, nx)).dot(d_inputs['in_dist'])
+                            deriv_sum = np.zeros(deriv.size)
+                            self.comm.Allreduce(deriv, deriv_sum, op=MPI.SUM)
+                            d_outputs['out_dup'] += deriv_sum
+                        if 'in_dup' in d_inputs:
+                            d_outputs['out_dup'] += dg_dy * d_inputs['in_dup']
+
+                else:
+                    if 'out_dist' in d_outputs:
+                        if 'in_dist' in d_inputs:
+                            d_inputs['in_dist'] += df_dx * d_outputs['out_dist']
+                        if 'in_dup' in d_inputs:
+                            d_inputs['in_dup'] += np.tile(df_dy, nx).reshape((nx, ny)).T.dot(d_outputs['out_dist'])
+
+                    if 'out_dup' in d_outputs:
+                        if 'out_dup' in d_outputs:
+                            if 'in_dist' in d_inputs:
+                                full = np.zeros(d_outputs['out_dup'].size)
+                                self.comm.Allreduce(d_outputs['out_dup'], full, op=MPI.SUM)
+                                d_inputs['in_dist'] += np.tile(dg_dx, ny).reshape((ny, nx)).T.dot(full)
+                        if 'in_dup' in d_inputs:
+                            d_inputs['in_dup'] += dg_dy * d_outputs['out_dup']
+
+        size = 5
+        comm = MPI.COMM_WORLD
+        rank = comm.rank
+        sizes, offsets = evenly_distrib_idxs(comm.size, size)
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x_dist', np.zeros(sizes[rank]), distributed=True)
+        ivc.add_output('x_dup', np.zeros(size))
+
+        model.add_subsystem("indep", ivc)
+        model.add_subsystem("D1", MixedDistrib2())
+        model.add_subsystem("D2", MixedDistrib2())
+        model.add_subsystem("D3", MixedDistrib2())
+        model.add_subsystem("D4", MixedDistrib2())
+
+        model.connect('indep.x_dist', 'D1.in_dist')
+        model.connect('indep.x_dup', 'D1.in_dup')
+        model.connect('D1.out_dist', 'D2.in_dist')
+        model.connect('D1.out_dup', 'D2.in_dup')
+        model.connect('D2.out_dist', 'D3.in_dist')
+        model.connect('D2.out_dup', 'D3.in_dup')
+        model.connect('D3.out_dist', 'D4.in_dist')
+        model.connect('D3.out_dup', 'D4.in_dup')
+
+        model.add_design_var('indep.x_dup')
+        model.add_design_var('indep.x_dist')
+        model.add_constraint('D4.out_dist', lower=0.0)
+        model.add_constraint('D4.out_dup', lower=0.0)
+
+        prob.setup(force_alloc_complex=True, mode='rev')
+
+        # Set initial values of distributed variable.
+        x_dist_init = 3.0 + np.arange(size)[offsets[rank]:offsets[rank] + sizes[rank]]
+        prob.set_val('indep.x_dist', x_dist_init)
+
+        # Set initial values of serial variable.
+        x_dup_init = 1.0 + 2.0*np.arange(size)
+        prob.set_val('indep.x_dup', x_dup_init)
+
+        prob.run_model()
+
+        totals = prob.check_totals(method='cs', out_stream=None)
+        for key, val in totals.items():
+            assert_near_equal(val['rel error'][0], 0.0, 1e-12)
+
 
 class DistribStateImplicit(om.ImplicitComponent):
     """
@@ -1445,7 +1565,7 @@ class Distrib_Derivs(om.ExplicitComponent):
         Is = inputs['in_serial']
 
         # Our local distributed output is a function of the local distributed input and
-        # the serial input.
+        # the duplicated input.
         outputs['out_dist'] = f_out_dist(Id, Is)
 
         if self.comm.size > 1:
@@ -1455,7 +1575,7 @@ class Distrib_Derivs(om.ExplicitComponent):
             total_sum = local_sum.copy()
             self.comm.Allreduce(local_sum, total_sum, op=MPI.SUM)
 
-            # so the serial output is a function of the serial input and the full distributed
+            # so the duplicated output is a function of the duplicated input and the full distributed
             # input.
             outputs['out_serial'] = Is**2 + 3.0*Is - 5.0 + total_sum[0]
         else:
@@ -1535,7 +1655,7 @@ class Distrib_Derivs_Prod(om.ExplicitComponent):
         Is = inputs['in_serial']
 
         # Our local distributed output is a function of local distributed input and the
-        # serial input.
+        # duplicated input.
         outputs['out_dist'] = Id**2 - 2.0*Id + 4.0 + np.prod(1.5 * Is ** 2)
 
         if self.comm.size > 1:
@@ -1756,14 +1876,14 @@ class TestDistribBugs(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob = self.get_problem(Distrib_DerivsErr)
 
-        msg = "'D1' <class Distrib_DerivsErr>: component has defined partial ('out_serial', 'in_dist') which is a serial output wrt a distributed input. This is only supported using the matrix free API."
+        msg = "'D1' <class Distrib_DerivsErr>: component has defined partial ('out_serial', 'in_dist') which is a duplicated output wrt a distributed input. This is only supported using the matrix free API."
         self.assertEqual(str(cm.exception), msg)
 
     def test_fd_check_err(self):
         with self.assertRaises(RuntimeError) as cm:
             prob = self.get_problem(Distrib_DerivsFD, mode='fwd')
 
-        msg = "'D1' <class Distrib_DerivsFD>: component has defined partial ('out_serial', 'in_dist') which is a serial output wrt a distributed input. This is only supported using the matrix free API."
+        msg = "'D1' <class Distrib_DerivsFD>: component has defined partial ('out_serial', 'in_dist') which is a duplicated output wrt a distributed input. This is only supported using the matrix free API."
         self.assertEqual(str(cm.exception), msg)
 
 

@@ -3597,7 +3597,7 @@ class TestCheckPartialsDistrib(unittest.TestCase):
         # this test passes if it doesn't raise an exception.  The actual partials are not
         # correct because compute_jacvec_product does nothing.
         class DistributedConverter(om.ExplicitComponent):
-            "takes a serial input and converts it to a distributed output that is only on rank 0"
+            "takes a duplicated input and converts it to a distributed output that is only on rank 0"
             def setup(self):
 
                 shape_switch = 1 if self.comm.rank == 0 else 0

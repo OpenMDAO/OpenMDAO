@@ -1412,8 +1412,8 @@ class Component(System):
 
                 if dist_in and not dist_out and not self.matrix_free:
                     raise RuntimeError(f"{self.msginfo}: component has defined partial {rel_key} "
-                                       "which is a serial output wrt a distributed input. This is "
-                                       "only supported using the matrix free API.")
+                                       "which is a duplicated output wrt a distributed input. This"
+                                       " is only supported using the matrix free API.")
 
                 if shape[0] == 0 or shape[1] == 0:
                     msg = "{}: '{}' is an array of size 0"
