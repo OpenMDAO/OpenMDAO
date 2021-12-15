@@ -17,8 +17,7 @@ from openmdao.test_suite.components.sellar import SellarDis2
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_no_warning
 from openmdao.utils.logger_utils import TestLogger
-from openmdao.utils.om_warnings import PromotionWarning, OMDeprecationWarning, \
-    DistributedComponentWarning
+from openmdao.utils.om_warnings import PromotionWarning, OMDeprecationWarning
 from openmdao.utils.name_maps import name2abs_names
 
 try:
