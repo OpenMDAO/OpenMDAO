@@ -171,7 +171,7 @@ class CheckPartialsRev(unittest.TestCase):
         x_dist_init = np.ones(sizes[rank])
         prob.set_val('indep.x_dist', x_dist_init)
 
-        # Set initial values of serial variable.
+        # Set initial values of duplicated variable.
         prob.set_val('indep.x_dup', 10)
 
         prob.run_model()

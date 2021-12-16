@@ -197,7 +197,7 @@ class TestPassSizeDistributed(unittest.TestCase):
     N_PROCS = 3
 
     def test_serial_start(self):
-        """the size information starts in the serial component C"""
+        """the size information starts in the duplicated component C"""
 
         prob = om.Problem()
         prob.model = om.Group()
@@ -224,7 +224,7 @@ class TestPassSizeDistributed(unittest.TestCase):
         self.assertEquals(str(cm.exception), msg)
 
     def test_distributed_start(self):
-        """the size information starts in the distributed comonent C"""
+        """the size information starts in the distributed component C"""
 
         prob = om.Problem()
         prob.model = om.Group()
@@ -716,9 +716,9 @@ class TestDistribDynShapeCombos(unittest.TestCase):
 
     Here is a list of possible connections:
 
-    serial => serial
-    serial => distributed
-    distributed => serial
+    duplicated => duplicated
+    duplicated => distributed
+    distributed => duplicated
     distributed => distributed
     """
 

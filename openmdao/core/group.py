@@ -1667,13 +1667,13 @@ class Group(System):
             # 'always local' transfer (see POEM 46).
             if from_dist and not to_dist:
                 if from_io == 'output':
-                    raise RuntimeError(f"{self.msginfo}: dynamic sizing of serial {to_io} "
+                    raise RuntimeError(f"{self.msginfo}: dynamic sizing of duplicated {to_io} "
                                        f"'{to_var}' from distributed {from_io} '{from_var}' is not "
                                        "supported.")
                 else:  # serial_out <- dist_in
                     # all input rank sizes must be the same
                     if not np.all(distrib_sizes[from_var] == distrib_sizes[from_var][0]):
-                        raise RuntimeError(f"{self.msginfo}: dynamic sizing of serial {to_io} "
+                        raise RuntimeError(f"{self.msginfo}: dynamic sizing of duplicated {to_io} "
                                            f"'{to_var}' from distributed {from_io} '{from_var}' is "
                                            f"not supported because not all {from_var} ranks are "
                                            f"the same size (sizes={distrib_sizes[from_var]}).")
