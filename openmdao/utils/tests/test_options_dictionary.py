@@ -268,8 +268,8 @@ class TestOptionsDict(unittest.TestCase):
         with self.assertRaises(KeyError) as context:
             self.dict['missing']
 
-        expected_msg = "\"Option 'missing' cannot be found\""
-        self.assertEqual(expected_msg, str(context.exception))
+        expected_msg = "Option 'missing' has not been declared."
+        self.assertEqual(expected_msg, context.exception.args[0])
 
     def test_get_default(self):
         obj_def = object()
@@ -337,8 +337,8 @@ class TestOptionsDict(unittest.TestCase):
         with self.assertRaises(KeyError) as context:
             self.dict['test']
 
-        expected_msg = "\"Option 'test' cannot be found\""
-        self.assertEqual(expected_msg, str(context.exception))
+        expected_msg = "Option 'test' has not been declared."
+        self.assertEqual(expected_msg, context.exception.args[0])
 
     def test_deprecated_option(self):
         msg = 'Option "test1" is deprecated.'
@@ -360,6 +360,55 @@ class TestOptionsDict(unittest.TestCase):
         # Should only generate warning first time
         with assert_no_warning(OMDeprecationWarning, msg):
             option = self.dict['test2']
+
+    def test_deprecated_tuple_option(self):
+        msg = 'Option "test1" is deprecated. Use "foo" instead.'
+        self.dict.declare('test1', deprecation=(msg, 'foo'))
+        self.dict.declare('foo')
+
+        # test double set
+        with assert_warning(OMDeprecationWarning, msg):
+            self.dict['test1'] = 'xyz'
+        # Should only generate warning first time
+        with assert_no_warning(OMDeprecationWarning, msg):
+            self.dict['test1'] = 'zzz'
+
+        with assert_no_warning(OMDeprecationWarning, msg):
+            option = self.dict['test1']
+        with assert_no_warning(OMDeprecationWarning):
+            option2 = self.dict['foo']
+        self.assertEqual(option, option2)
+
+        # Also test set and then get
+        msg = 'Option "test2" is deprecated. Use "foo2" instead.'
+        self.dict.declare('test2', deprecation=(msg, 'foo2'))
+        self.dict.declare('foo2')
+
+        with assert_warning(OMDeprecationWarning, msg):
+            self.dict['test2'] = 'abcd'
+        # Should only generate warning first time
+        with assert_no_warning(OMDeprecationWarning, msg):
+            option = self.dict['test2']
+        with assert_no_warning(OMDeprecationWarning):
+            option2 = self.dict['foo2']
+        self.assertEqual(option, option2)
+
+        # test bad alias
+        msg = 'Option "test3" is deprecated. Use "foo3" instead.'
+        self.dict.declare('test3', deprecation=(msg, 'foo3'))
+
+        with self.assertRaises(KeyError) as context:
+            self.dict['test3'] = 'abcd'
+
+        expected_msg = "Can't find aliased option 'foo3' for deprecated option 'test3'."
+        self.assertEqual(context.exception.args[0], expected_msg)
+        
+    def test_bad_option_name(self):
+        opt = OptionsDictionary()
+        msg = "'foo:bar' is not a valid python name and will become an invalid option name in a future release. You can prevent this warning (and future exceptions) by declaring this option using a valid python name."
+
+        with assert_warning(OMDeprecationWarning, msg):
+            opt.declare('foo:bar', 1.0)
 
 
 if __name__ == "__main__":
