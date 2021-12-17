@@ -423,6 +423,35 @@ class Jacobian(object):
                     if match_inds.size > 0:
                         subjac['val'][match_inds] = column[start:end][subjac['rows'][match_inds]]
 
+    def set_dense_jac(self, system, jac):
+        """
+        Assign a dense jacobian to this jacobian.
+
+        This assumes that any column does not attempt to set any nonzero values that are
+        outside of specified sparsity patterns for any of the subjacs.
+
+        Parameters
+        ----------
+        system : System
+            The system that owns this jacobian.
+        jac : ndarray
+            Dense jacobian.
+        """
+        if self._col_varnames is None:
+            self._setup_index_maps(system)
+
+        wrtiter = list(system._jac_wrt_iter())
+        for of, start, end, _, _ in system._jac_of_iter():
+            for wrt, wstart, wend, _, _, _ in wrtiter:
+                key = (of, wrt)
+                if key in self._subjacs_info:
+                    subjac = self._subjacs_info[key]
+                    if subjac['cols'] is None:  # dense
+                        subjac['val'][:, :] = jac[start:end, wstart:wend]
+                    else:  # our COO format
+                        subj = jac[start:end, wstart:wend]
+                        subjac['val'][:] = subj[subjac['rows'], subjac['cols']]
+
     def _restore_approx_sparsity(self):
         """
         Revert all subjacs back to the way they were as declared by the user.

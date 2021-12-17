@@ -967,6 +967,7 @@ class Problem(object):
             'model_ref': weakref.ref(model),  # ref to the model (needed to get out-of-scope
                                               # src data for inputs)
             'using_par_deriv_color': False,  # True if parallel derivative coloring is being used
+            'mode': mode,  # mode (derivative direction) set by the user.  'auto' by default
         }
         model._setup(model_comm, mode, self._metadata)
 

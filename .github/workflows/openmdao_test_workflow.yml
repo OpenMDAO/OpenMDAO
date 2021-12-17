@@ -28,7 +28,8 @@ jobs:
             PYOPTSPARSE: 'v2.1.5'
             SNOPT: 7.7
             OPTIONAL: '[all]'
-            BANDIT: True,
+            JAX: True
+            BANDIT: True
             BUILD_DOCS: True
             PUBLISH_DOCS: True
 
@@ -105,6 +106,16 @@ jobs:
           echo "Install OpenMDAO"
           echo "============================================================="
           pip install .${{ matrix.OPTIONAL }}
+
+      - name: Install jax
+        if: matrix.JAX
+        shell: bash -l {0}
+        run: |
+          echo "============================================================="
+          echo "Install jax"
+          echo "============================================================="
+          pip install jax
+          pip install jaxlib
 
       - name: Install PETSc
         if: matrix.PETSc

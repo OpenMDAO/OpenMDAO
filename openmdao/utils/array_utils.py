@@ -520,3 +520,28 @@ def sparse_subinds(orig, inds):
         newsp[newsp == i] = r
 
     return newsp, mask
+
+
+def identity_column_iter(column):
+    """
+    Yield the given column with a 1 in each position.
+
+    This is useful if you don't want to allocate memory for the full sized identity matrix.
+    Note that this reuses the column array and assumes that the column array has not
+    been modified outside of this function.
+
+    Parameters
+    ----------
+    column : ndarray
+        The array that will contain a column of the 'virtual' identity matrix.
+
+    Yields
+    ------
+    ndarray
+        A column of the identity matrix.
+    """
+    column[:] = 0
+    for i in range(column.size):
+        column[i - 1] = 0
+        column[i] = 1
+        yield column

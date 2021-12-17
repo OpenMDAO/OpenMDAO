@@ -355,30 +355,34 @@ class ExplicitComponent(Component):
                 try:
                     # handle identity subjacs (output_or_resid wrt itself)
                     if isinstance(J, DictionaryJacobian):
-                        rflat = self._vectors['residual']['linear']._abs_get_val
-                        oflat = self._vectors['output']['linear']._abs_get_val
                         d_out_names = self._vectors['output']['linear']._names
 
-                        # 'val' in the code below is a reference to the part of the
-                        # output or residual array corresponding to the variable 'v'
-                        if mode == 'fwd':
-                            for v in self._var_abs2meta['output']:
-                                if v in d_out_names and (v, v) not in self._subjacs_info:
-                                    val = rflat(v)
-                                    val -= oflat(v)
-                        else:  # rev
-                            for v in self._var_abs2meta['output']:
-                                if v in d_out_names and (v, v) not in self._subjacs_info:
-                                    val = oflat(v)
-                                    val -= rflat(v)
+                        if d_out_names:
+                            rflat = self._vectors['residual']['linear']._abs_get_val
+                            oflat = self._vectors['output']['linear']._abs_get_val
 
-                    args = [self._inputs, d_inputs, d_residuals, mode]
-                    if self._discrete_inputs:
-                        args.append(self._discrete_inputs)
+                            # 'val' in the code below is a reference to the part of the
+                            # output or residual array corresponding to the variable 'v'
+                            if mode == 'fwd':
+                                for v in self._var_abs2meta['output']:
+                                    if v in d_out_names and (v, v) not in self._subjacs_info:
+                                        val = rflat(v)
+                                        val -= oflat(v)
+                            else:  # rev
+                                for v in self._var_abs2meta['output']:
+                                    if v in d_out_names and (v, v) not in self._subjacs_info:
+                                        val = oflat(v)
+                                        val -= rflat(v)
 
                     # We used to negate the residual here, and then re-negate after the hook
                     with self._call_user_function('compute_jacvec_product'):
-                        self._compute_jacvec_product_wrapper(*args)
+                        if self._discrete_inputs:
+                            self._compute_jacvec_product_wrapper(self._inputs, d_inputs,
+                                                                 d_residuals, mode,
+                                                                 self._discrete_inputs)
+                        else:
+                            self._compute_jacvec_product_wrapper(self._inputs, d_inputs,
+                                                                 d_residuals, mode)
                 finally:
                     d_inputs.read_only = d_residuals.read_only = False
 
