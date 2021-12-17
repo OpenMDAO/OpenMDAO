@@ -274,9 +274,13 @@ def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6):
             for i in range(3):
                 erel, eabs = val['rel error'][i], val['abs error'][i]
                 if erel is not None and not np.isnan(erel):
-                    assert_near_equal(erel, 0.0, rtol)
+                    if erel > rtol:
+                        raise ValueError(f"rel tolerance of {erel} > allowed rel tolerance "
+                                         f"of {rtol}.")
                 if eabs is not None:
-                    assert_near_equal(eabs, 0.0, atol)
+                    if eabs > atol:
+                        raise ValueError(f"abs tolerance of {eabs} > allowed abs tolerance "
+                                         f"of {atol}.")
         except ValueError as err:
             fails.append((key, val, err))
     if fails:
