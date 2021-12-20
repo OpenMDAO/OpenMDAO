@@ -300,8 +300,8 @@ class MetaModelVisualization(object):
             for name in self.input_names:
                 try:
                     self.training_inputs[name] = {
-                        title for title in metamodel.options['train:' + str(name)]}
-                    tdata = [title for title in metamodel.options['train:' + str(name)]]
+                        title for title in metamodel.options['train_' + str(name)]}
+                    tdata = [title for title in metamodel.options['train_' + str(name)]]
                     self.meta_model.add_input(name, 0., training_data=tdata)
                 except TypeError:
                     msg = "No training data present for one or more parameters"
@@ -311,7 +311,7 @@ class MetaModelVisualization(object):
                 self.meta_model.add_output(
                     name, 0.,
                     training_data=[
-                        title for title in metamodel.options['train:' + str(name)]])
+                        title for title in metamodel.options['train_' + str(name)]])
 
         else:  # semi-struct
             for name in self.input_names:

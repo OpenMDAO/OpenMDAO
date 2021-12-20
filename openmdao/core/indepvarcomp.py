@@ -30,9 +30,10 @@ class IndepVarComp(ExplicitComponent):
         super().__init__(**kwargs)
 
         if 'tags' not in kwargs:
-            kwargs['tags'] = {'indep_var'}
+            kwargs['tags'] = {'indep_var', 'openmdao:allow_desvar'}
         else:
-            kwargs['tags'] = make_set(kwargs['tags'], name='tags') | {'indep_var'}
+            kwargs['tags'] = make_set(kwargs['tags'], name='tags') | {'indep_var',
+                                                                      'openmdao:allow_desvar'}
 
         # A single variable is declared during instantiation
         if isinstance(name, str):
@@ -189,9 +190,9 @@ class IndepVarComp(ExplicitComponent):
             res_ref = ref
 
         if tags is None:
-            tags = {'indep_var'}
+            tags = {'indep_var', 'openmdao:allow_desvar'}
         else:
-            tags = make_set(tags) | {'indep_var'}
+            tags = make_set(tags) | {'indep_var', 'openmdao:allow_desvar'}
 
         kwargs = {'shape': shape, 'units': units, 'res_units': res_units, 'desc': desc,
                   'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
@@ -322,7 +323,7 @@ class _AutoIndepVarComp(IndepVarComp):
             'res_units': None,
             'desc': '',
             'distributed': False,
-            'tags': set(),
+            'tags': set(['openmdao:allow_desvar']),
             'ref': 1.0,
             'ref0': 0.0,
             'res_ref': 1.0,

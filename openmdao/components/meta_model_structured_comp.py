@@ -238,8 +238,12 @@ class MetaModelStructuredComp(ExplicitComponent):
         """
         for out_name, interp in self.interps.items():
             dval = interp._gradient()
-            for i, p in enumerate(self.pnames):
-                partials[out_name, p] = dval[:, i]
+
+            if len(dval.shape) < 2:
+                partials[out_name, self.pnames[0]] = dval
+            else:
+                for i, p in enumerate(self.pnames):
+                    partials[out_name, p] = dval[:, i]
 
             if self.options['training_data_gradients']:
 

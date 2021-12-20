@@ -23,8 +23,8 @@ _allowed_add_input_args = {
 }
 
 _allowed_add_output_args = {
-    'val', 'shape', 'units', 'res_units', 'desc' 'lower', 'upper', 'ref', 'ref0', 'res_ref', 'tags',
-    'shape_by_conn', 'copy_shape', 'distributed', 'resid'
+    'val', 'shape', 'units', 'res_units', 'desc', 'lower', 'upper', 'ref', 'ref0', 'res_ref',
+    'tags', 'shape_by_conn', 'copy_shape', 'distributed', 'resid'
 }
 
 _allowed_declare_options_args = {
@@ -194,6 +194,10 @@ class OMWrappedFunc(object):
         if name in self._inputs:
             if 'resid' in kwargs:
                 self._inputs[name]['resid'] = kwargs['resid']
+                if 'val' in kwargs:
+                    self._inputs[name]['shape'] = np.asarray(kwargs['val']).shape
+                elif 'shape' in kwargs:
+                    self._inputs[name]['shape'] = kwargs['shape']
             else:
                 raise RuntimeError(f"In add_output, '{name}' already registered as an input.")
         if name in self._outputs:
@@ -270,6 +274,8 @@ class OMWrappedFunc(object):
 
         jaxerr = False
         if 'method' in kwargs and kwargs['method'] == 'jax':
+            if jax is None:
+                raise RuntimeError("jax is not installed.  Try 'pip install jax'.")
             if self._declare_partials and not self._use_jax:
                 jaxerr = True
             self._use_jax = True
@@ -288,12 +294,14 @@ class OMWrappedFunc(object):
 
         return self
 
-    def declare_coloring(self, **kwargs):
+    def declare_coloring(self, wrt=('*',), **kwargs):
         r"""
         Collect args to be passed to declare_coloring on an OpenMDAO component.
 
         Parameters
         ----------
+        wrt : str or iter of str
+            Patterns or names matching 'with repect to' variables.
         **kwargs : dict
             Keyword args to store.
         """
@@ -301,6 +309,11 @@ class OMWrappedFunc(object):
             _check_kwargs(kwargs, _allowed_declare_coloring_args, 'declare_coloring')
             _update_from_defaults(kwargs, self._coloring_defaults)
             self._declare_coloring = kwargs.copy()
+            self._declare_coloring['wrt'] = wrt
+            if 'method' in kwargs and kwargs['method'] == 'jax':
+                if jax is None:
+                    raise RuntimeError("jax is not installed. Try 'pip install jax'.")
+                self._use_jax = True
             return self
         raise RuntimeError("declare_coloring has already been called.")
 
@@ -326,7 +339,7 @@ class OMWrappedFunc(object):
         str
             Name of each input variable.
         """
-        yield from inspect.signature(self._f).parameters
+        yield from self._inputs
 
     def get_output_meta(self):
         """
@@ -415,7 +428,7 @@ class OMWrappedFunc(object):
         outlist = []
         try:
             outlist = [(n, {}) for n in self.get_return_names()]
-        except RuntimeError as err:
+        except (RuntimeError, OSError) as err:
             # this could happen if function is compiled or has multiple return lines that are
             # not all consistent
             msg = (f"During AST processing to determine the number and name of return values, the "
@@ -713,6 +726,51 @@ def jax_context(globals):
             globals['np'] = savenp
         if savenumpy is not None:
             globals['numpy'] = savenumpy
+
+
+def jax_decorate(func):
+    """
+    Decorate a function to use jax version of numpy if the function uses normal numpy.
+
+    Parameters
+    ----------
+    func : function
+        The function to be decorated.
+
+    Returns
+    -------
+    function
+        The wrapped function.
+    """
+    g = func.__globals__
+
+    try:
+        src = inspect.getsource(func)
+    except OSError:
+        src = None
+
+    savenp = g['np'] if 'np' in g and g['np'] is np and (src is None or 'np.' in src) else False
+    savenumpy = g['numpy'] if 'numpy' in g and (src is None or 'numpy' in src) else False
+
+    if savenp or savenumpy:
+        def _wrap(*args):
+            if savenp:
+                g['np'] = jnp
+            if savenumpy:
+                g['numpy'] = jnp
+            try:
+                ret = func(*args)
+            finally:
+                if savenp:
+                    g['np'] = savenp
+                if savenumpy:
+                    g['numpy'] = savenumpy
+
+            return ret
+
+        return _wrap
+    else:
+        return func  # no wrapping needed
 
 
 class _FuncRetNameCollector(ast.NodeVisitor):

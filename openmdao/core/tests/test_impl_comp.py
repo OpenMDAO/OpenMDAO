@@ -118,13 +118,21 @@ class ImplCompTestCase(unittest.TestCase):
 
     def test_add_input_output_retval(self):
         # check basic metadata expected in return value
-        expected = {
+        expected_ivp_input = {
             'val': 3,
             'shape': (1,),
             'size': 1,
             'units': 'ft',
             'desc': '',
             'tags': set(),
+        }
+        expected_ivp_output = {
+            'val': 3,
+            'shape': (1,),
+            'size': 1,
+            'units': 'ft',
+            'desc': '',
+            'tags': {'openmdao:allow_desvar'},
         }
         expected_discrete = {
             'val': 3,
@@ -136,7 +144,7 @@ class ImplCompTestCase(unittest.TestCase):
         class ImplComp(om.ImplicitComponent):
             def setup(self):
                 meta = self.add_input('x', val=3.0, units='ft')
-                for key, val in expected.items():
+                for key, val in expected_ivp_input.items():
                     assert meta[key] == val, f'Expected {key}: {val} but got {key}: {meta[key]}'
 
                 meta = self.add_discrete_input('x_disc', val=3)
@@ -144,7 +152,7 @@ class ImplCompTestCase(unittest.TestCase):
                     assert meta[key] == val, f'Expected {key}: {val} but got {key}: {meta[key]}'
 
                 meta = self.add_output('y', val=3.0, units='ft')
-                for key, val in expected.items():
+                for key, val in expected_ivp_output.items():
                     assert meta[key] == val, f'Expected {key}: {val} but got {key}: {meta[key]}'
 
                 meta = self.add_discrete_output('y_disc', val=3)

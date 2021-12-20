@@ -748,19 +748,6 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         p.run_model()
         np.testing.assert_allclose(p.get_val('indeps.x'), p.get_val('comp.x'))
 
-    def test_ser_known_dist_unknown(self):
-        p = om.Problem()
-        indeps = p.model.add_subsystem('indeps', om.IndepVarComp())
-
-        indeps.add_output('x', val=np.random.random(2))
-        p.model.add_subsystem('comp', DistCompUnknownInput())
-        p.model.connect('indeps.x', 'comp.x')
-        msg = "Connection between serial output 'indeps.x' and distributed input 'comp.x' is deprecated and will become an error in a future release."
-        with assert_warning(OMDeprecationWarning, msg):
-            p.setup()
-        p.run_model()
-        np.testing.assert_allclose(p.get_val('indeps.x'), p.get_val('comp.x'))
-
     def test_ser_unknown_dist_known_err(self):
         p = om.Problem()
         indeps = p.model.add_subsystem('indeps', om.IndepVarComp())
@@ -771,18 +758,6 @@ class TestDistribDynShapeCombos(unittest.TestCase):
             p.setup()
         self.assertEquals(cm.exception.args[0],
                           "<model> <class Group>: dynamic sizing of serial output 'indeps.x' from distributed input 'comp.x' is not supported because not all comp.x ranks are the same size (sizes=[3 6 9]).")
-
-    def test_ser_unknown_dist_known(self):
-        p = om.Problem()
-        indeps = p.model.add_subsystem('indeps', om.IndepVarComp())
-        indeps.add_output('x', shape_by_conn=True)
-        p.model.add_subsystem('comp', DistCompKnownInput())
-        p.model.connect('indeps.x', 'comp.x')
-        msg = "Connection between serial output 'indeps.x' and distributed input 'comp.x' is deprecated and will become an error in a future release."
-        with assert_warning(OMDeprecationWarning, msg):
-            p.setup()
-        p.run_model()
-        np.testing.assert_allclose(p.get_val('indeps.x'), p.get_val('comp.x'))
 
     def test_dist_known_ser_unknown(self):
         p = om.Problem()

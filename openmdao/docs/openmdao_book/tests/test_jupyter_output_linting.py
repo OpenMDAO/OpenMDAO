@@ -158,7 +158,7 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
         """
         files = set()
 
-        for file in FILES:
+        for file in _get_files():
             with open(file) as f:
                 json_data = json.load(f)
                 blocks = json_data['cells']

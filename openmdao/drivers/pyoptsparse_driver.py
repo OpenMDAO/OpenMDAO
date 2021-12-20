@@ -213,6 +213,12 @@ class pyOptSparseDriver(Driver):
                              desc='Print pyOpt results if True')
         self.options.declare('gradient method', default='openmdao',
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},
+                             desc='Finite difference implementation to use',
+                             deprecation=(f"'gradient method' is not a valid python name and will "
+                                          "raise an exception in a future release.  Use "
+                                          "'gradient_method' instead.", 'gradient_method'))
+        self.options.declare('gradient_method', default='openmdao',
+                             values={'openmdao', 'pyopt_fd', 'snopt_fd'},
                              desc='Finite difference implementation to use')
         self.options.declare('user_terminate_signal', default=DEFAULT_SIGNAL, allow_none=True,
                              desc='OS signal that triggers a clean user-termination. Only SNOPT'
@@ -231,8 +237,9 @@ class pyOptSparseDriver(Driver):
         self.options.declare('user_teriminate_signal', default=None, allow_none=True,
                              desc='OS signal that triggers a clean user-termination. Only SNOPT'
                              'supports this option.',
-                             deprecation="The option 'user_teriminate_signal' was misspelled and "
-                             "will be deprecated. Please use 'user_terminate_signal' instead.")
+                             deprecation=("The option 'user_teriminate_signal' was misspelled and "
+                                          "will be deprecated. Please use 'user_terminate_signal' "
+                                          "instead.", 'user_terminate_signal'))
 
     def _setup_driver(self, problem):
         """
@@ -444,7 +451,7 @@ class pyOptSparseDriver(Driver):
         try:
 
             # Execute the optimization problem
-            if self.options['gradient method'] == 'pyopt_fd':
+            if self.options['gradient_method'] == 'pyopt_fd':
 
                 # Use pyOpt's internal finite difference
                 # TODO: Need to get this from OpenMDAO
@@ -453,7 +460,7 @@ class pyOptSparseDriver(Driver):
                 sol = opt(opt_prob, sens='FD', sensStep=fd_step, storeHistory=self.hist_file,
                           hotStart=self.hotstart_file)
 
-            elif self.options['gradient method'] == 'snopt_fd':
+            elif self.options['gradient_method'] == 'snopt_fd':
                 if self.options['optimizer'] == 'SNOPT':
 
                     # Use SNOPT's internal finite difference

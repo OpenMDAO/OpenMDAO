@@ -741,7 +741,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
-        prob.driver.options['gradient method'] = 'pyopt_fd'
+        prob.driver.options['gradient_method'] = 'pyopt_fd'
         prob.driver.options['print_results'] = False
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
@@ -781,7 +781,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
-        prob.driver.options['gradient method'] = 'pyopt_fd'
+        prob.driver.options['gradient_method'] = 'pyopt_fd'
         prob.driver.options['print_results'] = False
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
@@ -816,7 +816,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['gradient method'] = 'snopt_fd'
+        prob.driver.options['gradient_method'] = 'snopt_fd'
         prob.driver.options['print_results'] = False
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
@@ -851,7 +851,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['gradient method'] = 'snopt_fd'
+        prob.driver.options['gradient_method'] = 'snopt_fd'
         prob.driver.options['print_results'] = False
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
@@ -2444,7 +2444,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
-        prob.driver.options['gradient method'] = 'snopt_fd'
+        prob.driver.options['gradient_method'] = 'snopt_fd'
         prob.driver.options['print_results'] = False
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
@@ -2484,7 +2484,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
-        prob.driver.options['gradient method'] = 'snopt_fd'
+        prob.driver.options['gradient_method'] = 'snopt_fd'
         prob.driver.options['print_results'] = False
 
         model.add_design_var('x', lower=-50.0, upper=50.0)

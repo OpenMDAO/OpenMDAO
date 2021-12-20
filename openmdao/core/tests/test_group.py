@@ -1343,10 +1343,9 @@ class TestGroup(unittest.TestCase):
         prob.setup()
         prob.model.set_order(['C2', 'C1'])
 
-        msg = "Problem: Cannot call set_order without calling setup after"
-        with self.assertRaises(RuntimeError) as cm:
+        msg = "Problem .*: Cannot call set_order without calling setup after"
+        with self.assertRaisesRegex(RuntimeError, msg):
             prob.run_model()
-        self.assertEqual(str(cm.exception), msg)
 
     def test_set_order_normal(self):
 
@@ -1407,6 +1406,34 @@ class TestGroup(unittest.TestCase):
                "previously set defaults for ['auto', 'prom', 'src_shape', 'val'].")
         with assert_warning(PromotionWarning, msg):
             problem.model.set_input_defaults("b", 4)
+
+    def test_set_input_defaults_promotes_error(self):
+
+        class Foo(om.ExplicitComponent):
+
+            def setup(self):
+                nn = 5
+
+                self.add_input('test_param', val=np.zeros(nn))
+                self.add_output('bar', val=np.ones(nn))
+
+            def compute(self, inputs, outputs):
+                outputs['bar'] = inputs['test_param'] ** 2
+
+
+        p = om.Problem()
+
+        g = p.model.add_subsystem('G', om.Group())
+
+        g.add_subsystem('foo', Foo())
+
+        g.promotes('foo', ['test_param'])
+
+        p.model.set_input_defaults('G.test_param', val=7.0)
+
+        msg = "Input 'G.foo.test_param': could not broadcast input array from shape \(5.*\) into shape \(1.*\)"
+        with self.assertRaisesRegex(ValueError, msg) as cm:
+            p.setup()
 
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestGroupMPISlice(unittest.TestCase):

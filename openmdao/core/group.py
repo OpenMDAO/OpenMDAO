@@ -707,7 +707,7 @@ class Group(System):
             myrank = self.comm.rank
             vars_to_gather = self._vars_to_gather
 
-            for s in self.system_iter(recurse=True):
+            for s in self.system_iter(recurse=True, include_self=True):
                 prefix = s.pathname + '.' if s.pathname else ''
                 for typ in iotypes:
                     # use abs2prom to determine locality since prom2abs is for allprocs
@@ -737,7 +737,7 @@ class Group(System):
                 prom2abs = self.comm.bcast(None, root=0)
         else:  # serial
             prom2abs = {'input': defaultdict(list), 'output': defaultdict(list)}
-            for s in self.system_iter(recurse=True):
+            for s in self.system_iter(recurse=True, include_self=True):
                 prefix = s.pathname + '.' if s.pathname else ''
                 for typ in iotypes:
                     t_prom2abs = prom2abs[typ]
@@ -873,10 +873,6 @@ class Group(System):
                         raise RuntimeError(f"{self.msginfo}: Can't connect distributed output "
                                            f"'{abs_out}' to serial input '{abs_in}' without "
                                            "specifying src_indices.")
-                elif in_dist and not out_dist:
-                    warn_deprecation(f"Connection between serial output '{abs_out}' and distributed"
-                                     f" input '{abs_in}' is deprecated and will become an error "
-                                     "in a future release.")
 
     def _get_group_input_meta(self, prom_in, meta_name):
         if prom_in in self._group_inputs:
@@ -3272,7 +3268,10 @@ class Group(System):
                 if val is None:
                     val = value
                 else:
-                    val[:] = value
+                    try:
+                        val[:] = value
+                    except ValueError as err:
+                        raise ValueError(f"Input '{tgt}': {str(err)}")
 
                 if tgt not in vars_to_gather:
                     found_dup = True

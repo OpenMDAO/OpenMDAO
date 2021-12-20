@@ -56,6 +56,9 @@ from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
 _contains_all = ContainsAll()
 
+# Used for naming Problems when no explicit name is given
+# Also handles sub problems
+_problem_names = []
 
 CITATION = """@article{openmdao_2019,
     Author={Justin S. Gray and John T. Hwang and Joaquim R. R. A.
@@ -123,7 +126,9 @@ class Problem(object):
     _logger : object or None
         Object for logging config checks if _check is True.
     _name : str
-        Problem name.
+        Problem name. If no name given, a default name of the form 'problemN', where N is an
+        integer, will be given to the problem so it can be referenced in command line tools
+        that have an optional problem name argument
     _system_options_recorded : bool
         A flag to indicate whether the system options for all the systems have been recorded
     _metadata : dict
@@ -138,8 +143,30 @@ class Problem(object):
         """
         Initialize attributes.
         """
+        global _problem_names
+
         self.cite = CITATION
-        self._name = name
+
+        # Code to give non-empty names to Problems so that they can be
+        # referenced from command line tools (e.g. check) that accept a Problem argument
+        if name:  # if name hasn't been used yet, use it. Otherwise, error
+            if name not in _problem_names:
+                self._name = name
+            else:
+                raise ValueError(f"The problem name '{name}' already exists")
+        else:  # No name given: look for a name, of the form, 'problemN', that hasn't been used
+            problem_counter = len(_problem_names) + 1
+            _name = f"problem{problem_counter}"
+            if _name in _problem_names:  # need to make it unique so append string of form '.N'
+                i = 1
+                while True:
+                    _name = f"problem{problem_counter}.{i}"
+                    if _name not in _problem_names:
+                        break
+                    i += 1
+            self._name = _name
+        _problem_names.append(self._name)
+
         self._warned = False
 
         if comm is None:
@@ -537,9 +564,13 @@ class Problem(object):
             if model._outputs._contains_abs(abs_name):
                 model._outputs.set_var(abs_name, value, indices)
             elif abs_name in conns:  # input name given. Set value into output
+                src_is_auto_ivc = src.rsplit('.', 1)[0] == '_auto_ivc'
+                # when setting auto_ivc output, error messages should refer
+                # to the promoted name used in the set_val call
+                var_name = name if src_is_auto_ivc else src
                 if model._outputs._contains_abs(src):  # src is local
                     if (model._outputs._abs_get_val(src).size == 0 and
-                            src.rsplit('.', 1)[0] == '_auto_ivc' and
+                            src_is_auto_ivc and
                             all_meta['output'][src]['distributed']):
                         pass  # special case, auto_ivc dist var with 0 local size
                     elif tmeta['has_src_indices']:
@@ -551,7 +582,8 @@ class Problem(object):
                                 src_indices = inds
 
                             if src_indices is None:
-                                model._outputs.set_var(src, value, _full_slice, flat)
+                                model._outputs.set_var(src, value, _full_slice, flat,
+                                                       var_name=var_name)
                             else:
                                 if tmeta['distributed']:
                                     src_indices = src_indices.shaped_array()
@@ -568,10 +600,11 @@ class Problem(object):
                                         src_indices = src_indices - start
                                     src_indices = indexer(src_indices)
                                 if indices is _full_slice:
-                                    model._outputs.set_var(src, value, src_indices, flat)
+                                    model._outputs.set_var(src, value, src_indices, flat,
+                                                           var_name=var_name)
                                 else:
                                     model._outputs.set_var(src, value, src_indices.apply(indices),
-                                                           True)
+                                                           True, var_name=var_name)
                         else:
                             raise RuntimeError(f"{model.msginfo}: Can't set {abs_name}: remote"
                                                " connected inputs with src_indices currently not"
@@ -580,7 +613,7 @@ class Problem(object):
                         value = np.asarray(value)
                         if indices is not _full_slice:
                             indices = indexer(indices)
-                        model._outputs.set_var(src, value, indices)
+                        model._outputs.set_var(src, value, indices, var_name=var_name)
                 elif src in model._discrete_outputs:
                     model._discrete_outputs[src] = value
                 # also set the input
@@ -871,9 +904,8 @@ class Problem(object):
             the direction resulting in the smallest number of linear solves required to
             compute derivatives.
         force_alloc_complex : bool
-            Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
-            detect when you need to do this, but in some cases (e.g., complex step is used
-            after a reconfiguration) you may need to set this to True.
+            If True, sufficient memory will be allocated to allow nonlinear vectors to store
+            complex values while operating under complex step.
         distributed_vector_class : type
             Reference to the <Vector> class or factory function used to instantiate vectors
             and associated transfers involved in interprocess communication.
@@ -934,6 +966,7 @@ class Problem(object):
             'model_ref': weakref.ref(model),  # ref to the model (needed to get out-of-scope
                                               # src data for inputs)
             'using_par_deriv_color': False,  # True if parallel derivative coloring is being used
+            'mode': mode,  # mode (derivative direction) set by the user.  'auto' by default
         }
         model._setup(model_comm, mode, self._metadata)
 
@@ -2085,7 +2118,7 @@ class Problem(object):
                                "`Problem.run_model()`, `Problem.run_driver()`, or "
                                "`Problem.final_setup()`.")
 
-        if active and not self._metadata['force_alloc_complex']:
+        if active and not self.model._outputs._alloc_complex:
             raise RuntimeError(f"{self.msginfo}: To enable complex step, specify "
                                "'force_alloc_complex=True' when calling setup on the problem, "
                                "e.g. 'problem.setup(force_alloc_complex=True)'")

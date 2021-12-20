@@ -1,5 +1,6 @@
 """Define the DictionaryJacobian class."""
 import numpy as np
+import scipy.sparse as sp
 
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.core.constants import INT_DTYPE
@@ -166,6 +167,15 @@ class _CheckingJacobian(DictionaryJacobian):
     def __init__(self, system):
         super().__init__(system)
         self._subjacs_info = self._subjacs_info.copy()
+
+        # Convert any scipy.sparse subjacs to OpenMDAO's interal COO specification.
+        for key, subjac in self._subjacs_info.items():
+            if sp.issparse(subjac['val']):
+                coo_val = subjac['val'].tocoo()
+                self._subjacs_info[key]['rows'] = coo_val.row
+                self._subjacs_info[key]['cols'] = coo_val.col
+                self._subjacs_info[key]['val'] = coo_val.data
+
         self._errors = []
 
     def __iter__(self):

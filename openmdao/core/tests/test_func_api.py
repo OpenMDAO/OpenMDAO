@@ -4,6 +4,11 @@ import numpy as np
 import openmdao.func_api as omf
 from openmdao.utils.assert_utils import assert_warning, assert_no_warning
 
+try:
+    import jax
+except ImportError:
+    jax = None
+
 
 class TestFuncAPI(unittest.TestCase):
     def test_inout_var(self):
@@ -162,7 +167,7 @@ class TestFuncAPI(unittest.TestCase):
             return x
 
         f = (omf.wrap(func)
-                .defaults(units='cm', val=7., method='jax')
+                .defaults(units='cm', val=7., method='cs')
                 .declare_partials(of='x', wrt='a')
                 .declare_coloring(wrt='*'))
 
@@ -179,10 +184,10 @@ class TestFuncAPI(unittest.TestCase):
         self.assertEqual(outvar_meta[0][1]['units'], 'cm')
 
         partials_meta = list(f.get_declare_partials())
-        self.assertEqual(partials_meta[0]['method'], 'jax')
+        self.assertEqual(partials_meta[0]['method'], 'cs')
 
         coloring_meta = f.get_declare_coloring()
-        self.assertEqual(coloring_meta['method'], 'jax')
+        self.assertEqual(coloring_meta['method'], 'cs')
 
     def test_defaults_override(self):
         def func(a=4.):
@@ -236,6 +241,7 @@ class TestFuncAPI(unittest.TestCase):
         self.assertEqual(meta[0], {'of': 'x', 'wrt': ['a', 'b'], 'method': 'cs'})
         self.assertEqual(meta[1], {'of': 'y', 'wrt': ['a', 'b'], 'method': 'fd'})
 
+    @unittest.skipIf(jax is None, "jax is not installed")
     def test_declare_partials_jax_mixed(self):
         def func(a, b):
             x = a * b
@@ -250,6 +256,7 @@ class TestFuncAPI(unittest.TestCase):
         self.assertEqual(cm.exception.args[0],
                          "If multiple calls to declare_partials() are made on the same function object and any set method='jax', then all must set method='jax'.")
 
+    @unittest.skipIf(jax is None, "jax is not installed")
     def test_declare_partials_jax_mixed2(self):
         def func(a, b):
             x = a * b
@@ -285,7 +292,7 @@ class TestFuncAPI(unittest.TestCase):
                          "declare_coloring has already been called.")
 
 
-    @unittest.skipIf(omf.jax is None, "jax is not installed")
+    @unittest.skipIf(jax is None, "jax is not installed")
     def test_jax_out_shape_compute(self):
         def func(a=np.ones((3,3)), b=np.ones((3,3))):
             x = a * b
@@ -300,7 +307,7 @@ class TestFuncAPI(unittest.TestCase):
         self.assertEqual(outvar_meta[1][0], 'y')
         self.assertEqual(outvar_meta[1][1]['shape'], (3,2))
 
-    @unittest.skipIf(omf.jax is None, "jax is not installed")
+    @unittest.skipIf(jax is None, "jax is not installed")
     def test_jax_out_shape_check(self):
         def func(a=np.ones((3,3)), b=np.ones((3,3))):
             x = a * b
@@ -471,12 +478,12 @@ class TestFuncAPI(unittest.TestCase):
 
         self.assertEqual(context.exception.args[0],
                          "Input 'a' value has shape (2,), but shape was specified as (2, 2).")
-        
+
     def test_return_names(self):
         def func(a):
             b = a + 1
             # no return statement
-            
+
         f = omf.wrap(func)
         self.assertEqual(f.get_return_names(), [])
 

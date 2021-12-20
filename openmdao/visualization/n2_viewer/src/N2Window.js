@@ -392,6 +392,38 @@ class N2Window {
         this._enabledModal = enable;
         return this;
     }
+
+    /**
+     * Take ownership of a predefined DOM object, usually a div, by appending
+     * its children to the window body. This allows the definition of more
+     * complex window contents to be located in index.html for example.
+     * @param {String} id HTML id of the object to copy.
+     */
+    absorbBody(id) {
+      const newParent = this.body.node();
+      const oldParent = d3.select(id).node();
+
+        while (oldParent.childNodes.length > 0) {
+            newParent.appendChild(oldParent.childNodes[0]);
+        }
+
+        oldParent.remove();
+    }
+
+    /**
+     * Copy the structure of a predefined DOM object, usually a div, by cloning
+     * its children to the window body. This allows the definition of more
+     * complex window contents to be located in index.html for example.
+     * @param {String} id HTML id of the object to copy.
+     */
+     copyBody(id) {
+        const dstParent = this.body.node();
+        const srcParent = d3.select(id).node();
+  
+          for (const child of srcParent.childNodes) {
+              dstParent.appendChild(child.cloneNode(true));
+          }
+      }
 }
 
 

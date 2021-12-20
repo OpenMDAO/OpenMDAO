@@ -250,15 +250,7 @@ class N2Help extends N2Window {
             .title('Instructions')
             .footerText(`OpenMDAO Version ${version} Model Hierarchy and N2 diagram`);
 
-        // Take ownership of the help div contents defined in index.html
-        const newParent = this.body.node();
-        const oldParent = d3.select('#toolbar-help-container').node();
-
-        while (oldParent.childNodes.length > 0) {
-            newParent.appendChild(oldParent.childNodes[0]);
-        }
-
-        oldParent.remove();
+        this.absorbBody('#toolbar-help-container');
 
         this.helpDiv = this.body.select('div.help-graphic');
         this.helpSvg = this.helpDiv.select('#help-graphic-svg');

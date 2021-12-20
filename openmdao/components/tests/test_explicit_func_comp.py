@@ -13,6 +13,12 @@ import openmdao.func_api as omf
 from openmdao.utils.coloring import compute_total_coloring
 
 
+try:
+    import jax
+    import jax.numpy as jnp
+except ImportError:
+    jax = None
+
 class TestFuncCompNoWrap(unittest.TestCase):
 
     def test_scalar_function(self):
@@ -1034,8 +1040,281 @@ class TestComputePartials(unittest.TestCase):
         assert_check_totals(p.check_totals(of=['comp.foo', 'comp.bar'], wrt=['comp.x', 'comp.y', 'comp.z'], method='cs'))
 
 
-class TestNonDifferentiableArgs(unittest.TestCase):
-    def check_derivs(self, mode, method):
+@unittest.skipIf(jax is None, "jax is not installed")
+class TestJax(unittest.TestCase):
+    def check_derivs(self, mode, shape, use_jit):
+        def func(a, b, c):
+            x = 2. * a * b + 3. * c
+            return x
+
+        f = omf.wrap(func).defaults(shape=shape).declare_partials(of='*', wrt='*', method='jax')
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True, use_jit=use_jit))
+        p.setup(mode=mode)
+        p.run_model()
+        J = p.compute_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'])
+
+        I = np.eye(np.product(shape, dtype=int))
+        assert_near_equal(J['comp.x', 'comp.a'], I * 2.)
+        assert_near_equal(J['comp.x', 'comp.b'], I * 2.)
+        assert_near_equal(J['comp.x', 'comp.c'], I * 3.)
+
+    def test_fwd3x2(self):
+        self.check_derivs('fwd', (3,2), use_jit=False)
+
+    def test_fwd_jit3x2(self):
+        self.check_derivs('fwd', (3,2), use_jit=True)
+
+    def test_rev3x2(self):
+        self.check_derivs('rev', (3,2), use_jit=False)
+
+    def test_rev_jit3x2(self):
+        self.check_derivs('rev', (3,2), use_jit=True)
+
+    def test_fwd(self):
+        self.check_derivs('fwd', (), use_jit=False)
+
+    def test_fwd_jit(self):
+        self.check_derivs('fwd', (), use_jit=True)
+
+    def test_rev(self):
+        self.check_derivs('rev', (), use_jit=False)
+
+    def test_rev_jit(self):
+        self.check_derivs('rev', (), use_jit=True)
+
+
+@unittest.skipIf(jax is None, "jax is not installed")
+class TestJaxMixedShapes1output(unittest.TestCase):
+    def check_derivs(self, mode, m, n, o):
+        def func(a, b, c):
+            x = 2. * a.dot(b) + c
+            return x
+
+        f = omf.wrap(func).declare_partials(of='*', wrt='*', method='jax')
+        ishapes = {'a': (n,m), 'b': (m,o), 'c': (n,o)}
+        oshapes = {'x': (n,o)}
+
+        for name in ['a', 'b', 'c']:
+            f.add_input(name, shape=ishapes[name])
+
+        for name in ['x']:
+            f.add_output(name, shape=oshapes[name])
+
+        rand_inputs = {
+            n: np.random.random(ishapes[n]) for n in ('a', 'b', 'c')
+        }
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True))
+        p.setup(mode=mode)
+
+        for n in ('a', 'b', 'c'):
+            p[f"comp.{n}"] = rand_inputs[n]
+
+        p.run_model()
+        J = p.compute_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'])
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExecComp(['x=2.*a.dot(b)+c'],
+                                                  x={'shape':oshapes['x']},
+                                                  a={'shape':ishapes['a']},
+                                                  b={'shape':ishapes['b']},
+                                                  c={'shape':ishapes['c']},
+                                                  ))
+        p.setup(mode=mode)
+
+        for n in ('a', 'b', 'c'):
+            p[f"comp.{n}"] = rand_inputs[n]
+
+        p.run_model()
+        Jchk = p.compute_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'])
+
+        for inp in ['comp.a', 'comp.b', 'comp.c']:
+            assert_near_equal(J['comp.x', inp], Jchk['comp.x', inp])
+
+    def test1fwd(self):
+        self.check_derivs('fwd', 2, 3, 5)
+
+    def test1rev(self):
+        self.check_derivs('rev', 2, 3, 5)
+
+    def test2fwd(self):
+        self.check_derivs('fwd', 9, 3, 5)
+
+    def test2rev(self):
+        self.check_derivs('rev', 9, 3, 5)
+
+
+@unittest.skipIf(jax is None, "jax is not installed")
+class TestJaxMixedShapes2outputs(unittest.TestCase):
+    def check_derivs(self, mode, m, n, o, p, q):
+        def func(a, b, c):
+            x = 2. * a.dot(b)
+            y = 3. * c
+            return x, y
+
+        f = omf.wrap(func).declare_partials(of='*', wrt='*', method='jax')
+        ishapes = {'a': (n,m), 'b': (m,o), 'c': (p,q)}
+        oshapes = {'x': (n,o), 'y': (p,q)}
+
+        for name in ['a', 'b', 'c']:
+            f.add_input(name, shape=ishapes[name])
+
+        for name in ['x', 'y']:
+            f.add_output(name, shape=oshapes[name])
+
+        rand_inputs = {
+            n: np.random.random(ishapes[n]) for n in ('a', 'b', 'c')
+        }
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True))
+        p.setup(mode=mode)
+
+        for n in ('a', 'b', 'c'):
+            p[f"comp.{n}"] = rand_inputs[n]
+
+        p.run_model()
+        J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExecComp(['x=2.*a.dot(b)', 'y=3.*c'],
+                                                  x={'shape':oshapes['x']},
+                                                  y={'shape':oshapes['y']},
+                                                  a={'shape':ishapes['a']},
+                                                  b={'shape':ishapes['b']},
+                                                  c={'shape':ishapes['c']},
+                                                  ))
+        p.setup(mode=mode)
+
+        for n in ('a', 'b', 'c'):
+            p[f"comp.{n}"] = rand_inputs[n]
+
+        p.run_model()
+        Jchk = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
+
+        for out in ['comp.x', 'comp.y']:
+            for inp in ['comp.a', 'comp.b', 'comp.c']:
+                assert_near_equal(J[out, inp], Jchk[out, inp])
+
+    def test1fwd(self):
+        self.check_derivs('fwd', 2, 3, 5, 7, 1)
+
+    def test1rev(self):
+        self.check_derivs('rev', 2, 3, 5, 7, 1)
+
+    def test2fwd(self):
+        self.check_derivs('fwd', 9, 3, 5, 7, 2)
+
+    def test2rev(self):
+        self.check_derivs('rev', 9, 3, 5, 7, 2)
+
+
+@unittest.skipIf(jax is None, "jax is not installed")
+class TestJaxNumpy(unittest.TestCase):
+    def check_derivs(self, mode, shape, use_jit):
+        def func(a, b, c):
+            x = np.sin(a) * b + 3. * c
+            return x
+
+        f = omf.wrap(func).defaults(shape=shape).declare_partials(of='*', wrt='*', method='jax')
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True, use_jit=use_jit))
+        p.setup(mode=mode)
+        p['comp.a'] = 1.0
+        p['comp.b'] = 2.0
+        p['comp.c'] = 3.0
+        p.run_model()
+
+        assert_check_partials(p.check_partials(includes=['comp'], method='fd', out_stream=None), atol=1e-5)
+
+        J = p.compute_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'])
+
+        I = np.eye(np.product(shape)) if shape else np.eye(1)
+        assert_near_equal(J['comp.x', 'comp.a'], I * p['comp.b'].ravel() * np.cos(p['comp.a']).ravel(), tolerance=1e-7)
+        assert_near_equal(J['comp.x', 'comp.b'], I * np.sin(p['comp.a']).ravel(), tolerance=1e-7)
+        assert_near_equal(J['comp.x', 'comp.c'], I * 3., tolerance=1e-7)
+
+    def test_fwd3x2(self):
+        self.check_derivs('fwd', (3,2), use_jit=False)
+
+    def test_fwd_jit3x2(self):
+        self.check_derivs('fwd', (3,2), use_jit=True)
+
+    def test_rev3x2(self):
+        self.check_derivs('rev', (3,2), use_jit=False)
+
+    def test_rev_jit3x2(self):
+        self.check_derivs('rev', (3,2), use_jit=True)
+
+    def test_fwd(self):
+        self.check_derivs('fwd', (), use_jit=False)
+
+    def test_fwd_jit(self):
+        self.check_derivs('fwd', (), use_jit=True)
+
+    def test_rev(self):
+        self.check_derivs('rev', (), use_jit=False)
+
+    def test_rev_jit(self):
+        self.check_derivs('rev', (), use_jit=True)
+
+
+@unittest.skipIf(jax is None, "jax is not installed")
+class TestJax2retvals(unittest.TestCase):
+    def check_derivs(self, mode, shape, use_jit):
+        def func(a, b, c):
+            x = 2. * a * b + 3. * c
+            y = 5. * a * c - 2.5 * b
+            return x, y
+
+        f = omf.wrap(func).defaults(shape=shape).declare_partials(of='*', wrt='*', method='jax')
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True, use_jit=use_jit))
+        p.setup(mode=mode)
+        p.run_model()
+        J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
+
+        I = np.eye(np.product(shape)) if shape else np.eye(1)
+        assert_near_equal(J['comp.x', 'comp.a'], I * 2.)
+        assert_near_equal(J['comp.x', 'comp.b'], I * 2.)
+        assert_near_equal(J['comp.x', 'comp.c'], I * 3.)
+        assert_near_equal(J['comp.y', 'comp.a'], I * 5.)
+        assert_near_equal(J['comp.y', 'comp.b'], I * -2.5)
+        assert_near_equal(J['comp.y', 'comp.c'], I * 5.)
+
+    def test_fwd3x1(self):
+        self.check_derivs('fwd', (3,1), use_jit=False)
+
+    def test_fwd3x2(self):
+        self.check_derivs('fwd', (3,2), use_jit=False)
+
+    def test_fwd_jit3x2(self):
+        self.check_derivs('fwd', (3,2), use_jit=True)
+
+    def test_rev3x2(self):
+        self.check_derivs('rev', (3,2), use_jit=False)
+
+    def test_rev_jit3x2(self):
+        self.check_derivs('rev', (3,2), use_jit=True)
+
+    def test_fwd(self):
+        self.check_derivs('fwd', (), use_jit=False)
+
+    def test_fwd_jit(self):
+        self.check_derivs('fwd', (), use_jit=True)
+
+    def test_rev(self):
+        self.check_derivs('rev', (), use_jit=False)
+
+    def test_rev_jit(self):
+        self.check_derivs('rev', (), use_jit=True)
+
+
+@unittest.skipIf(jax is None, "jax is not installed")
+class TestJaxNonDifferentiableArgs(unittest.TestCase):
+    def check_derivs(self, mode, use_jit, method):
         def func(a, b, c, ex1, ex2):
             x = 2. * a * b + 3. * c
             y = 5. * a * c - 2.5 * b
@@ -1049,7 +1328,7 @@ class TestNonDifferentiableArgs(unittest.TestCase):
                 )
 
         p = om.Problem()
-        p.model.add_subsystem('comp', om.ExplicitFuncComp(f))
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jit=use_jit))
         p.setup(mode=mode)
         p.run_model()
         J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
@@ -1063,10 +1342,74 @@ class TestNonDifferentiableArgs(unittest.TestCase):
         assert_near_equal(J['comp.y', 'comp.c'], I * 5.)
 
     def test_fwd(self):
-        self.check_derivs('fwd', method='cs')
+        self.check_derivs('fwd', use_jit=False, method='jax')
+
+    def test_fwd_jit(self):
+        self.check_derivs('fwd', use_jit=True, method='jax')
 
     def test_rev(self):
-        self.check_derivs('rev', method='cs')
+        self.check_derivs('rev', use_jit=False, method='jax')
+
+    def test_rev_jit(self):
+        self.check_derivs('rev', use_jit=True, method='jax')
+
+    def test_fwd_cs(self):
+        self.check_derivs('fwd', use_jit=False, method='cs')
+
+    def test_rev_cs(self):
+        self.check_derivs('rev', use_jit=False, method='cs')
+
+
+@unittest.skipIf(jax is None, "jax is not installed")
+class TestJax2retvalsColoring(unittest.TestCase):
+    def check_derivs(self, mode, shape, use_jit):
+        def func(a, b, c):
+            x = 2. * a * b + 3. * c
+            y = 5. * a * c - 2.5 * b
+            return x, y
+
+        f = (omf.wrap(func)
+                .defaults(shape=shape)
+                .declare_partials(of='*', wrt='*', method='jax')
+                .declare_coloring(wrt='*', method='jax')
+        )
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True, use_jit=use_jit))
+        p.setup(mode=mode)
+        p.run_model()
+        J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
+
+        I = np.eye(np.product(shape)) if shape else np.eye(1)
+        assert_near_equal(J['comp.x', 'comp.a'], I * 2.)
+        assert_near_equal(J['comp.x', 'comp.b'], I * 2.)
+        assert_near_equal(J['comp.x', 'comp.c'], I * 3.)
+        assert_near_equal(J['comp.y', 'comp.a'], I * 5.)
+        assert_near_equal(J['comp.y', 'comp.b'], I * -2.5)
+        assert_near_equal(J['comp.y', 'comp.c'], I * 5.)
+
+    def test_fwd3x2(self):
+        self.check_derivs('fwd', (3,2), use_jit=False)
+
+    def test_fwd_jit3x2(self):
+        self.check_derivs('fwd', (3,2), use_jit=True)
+
+    def test_rev3x2(self):
+        self.check_derivs('rev', (3,2), use_jit=False)
+
+    def test_rev_jit3x2(self):
+        self.check_derivs('rev', (3,2), use_jit=True)
+
+    def test_fwd(self):
+        self.check_derivs('fwd', (), use_jit=False)
+
+    def test_fwd_jit(self):
+        self.check_derivs('fwd', (), use_jit=True)
+
+    def test_rev(self):
+        self.check_derivs('rev', (), use_jit=False)
+
+    def test_rev_jit(self):
+        self.check_derivs('rev', (), use_jit=True)
 
 if __name__ == "__main__":
     unittest.main()

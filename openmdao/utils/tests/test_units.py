@@ -392,6 +392,31 @@ class TestModuleFunctions(unittest.TestCase):
             p.setup()
         self.assertEqual(str(cm.exception), msg)
 
+class TestUnitless(unittest.TestCase):
+    def test_percentage(self):
+        p = om.Problem()
+        ivc = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        ivc.add_output('margin_of_safety', val=0.05, units='unitless')
+        p.setup()
+        margin_percent = p.get_val('margin_of_safety', units='percent')[0]
+        assert_near_equal(margin_percent, 5)
+
+    def test_unitless_connection_error(self):
+        p = om.Problem()
+        ivc = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        ivc.add_output('x', val=5.0, units='unitless')
+        p.model.add_subsystem(
+            'exec_comp',om.ExecComp('z = x', z={'units': 'm'}, x={'units': 'm'}),
+            promotes_inputs=['x'])
+
+        msg = ("<model> <class Group>: Output units of 'unitless' for 'indeps.x' are incompatible with input "
+               "units of 'm' for 'exec_comp.x'.")
+
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+        self.assertEqual(str(cm.exception), msg)
+
+
 
 if __name__ == "__main__":
     unittest.main()
