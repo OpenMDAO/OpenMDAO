@@ -11,7 +11,7 @@ from openmdao.core.group import Group
 from openmdao.core.constants import _SetupStatus
 from openmdao.core.indepvarcomp import IndepVarComp
 
-from openmdao.utils.units import is_compatible, _find_unit
+from openmdao.utils.units import _find_unit
 
 # Because ipywidgets has a lot of backend<->frontend comm going on, for large
 #  model hierarchies, a lot of widgets are created and you get buffer overruns. Need to slow it
@@ -26,7 +26,8 @@ _ICON_GROUP = 'envelope-open'
 _ICON_VARIABLE_NOT_SELECTED = 'eye-slash'
 _ICON_VARIABLE_SELECTED = 'eye'
 
-def set_values_gui(prob, vars_to_set=None, initial_depth = None, ivc_only = True,
+
+def set_values_gui(prob, vars_to_set=None, initial_depth=None, ivc_only=True,
                    pause_time=_DEFAULT_PAUSE_TIME, debug=False):
     """
     Create a Jupyter notebook-based GUI to let users set the values of input variables for models.
@@ -58,14 +59,15 @@ def set_values_gui(prob, vars_to_set=None, initial_depth = None, ivc_only = True
         If True, a text box widget is displayed with some debugging info
     """
 
-    ui = SetValuesUI(prob, vars_to_set=vars_to_set, initial_depth = initial_depth,
-                     ivc_only = ivc_only, pause_time=pause_time, debug=debug)
+    ui = SetValuesUI(prob, vars_to_set=vars_to_set, initial_depth=initial_depth,
+                     ivc_only=ivc_only, pause_time=pause_time, debug=debug)
     ui.setup()
     return ui.display()
 
+
 class SetValuesUI(object):
-    def __init__(self, prob, vars_to_set=None, initial_depth = None, ivc_only = True,
-                 pause_time=_DEFAULT_PAUSE_TIME, debug= False):
+    def __init__(self, prob, vars_to_set=None, initial_depth=None, ivc_only=True,
+                 pause_time=_DEFAULT_PAUSE_TIME, debug=False):
         """
         Initialize attributes.
         """
@@ -97,29 +99,35 @@ class SetValuesUI(object):
         """
         Create the GUI widgets and define handlers.
         """
-        if not (self._prob._metadata and self._prob._metadata['setup_status'] > _SetupStatus.PRE_SETUP):
+        if not (self._prob._metadata and
+                self._prob._metadata['setup_status'] > _SetupStatus.PRE_SETUP):
             raise RuntimeError(f"The set values GUI cannot be created before Problem setup.")
 
         # make all the major Boxes and lay them out
         if self._debug:
-            self._tree = Tree(stripes=True, multiple_selection=True, layout={'border': '1px solid black', 'width' :'30%'})
-            self._value_widget_box = VBox([Label("Model Variables") ,], layout={'border': '1px solid black', 'width' :'30%'})
+            self._tree = Tree(stripes=True, multiple_selection=True,
+                              layout={'border': '1px solid black', 'width': '30%'})
+            self._value_widget_box = VBox([Label("Model Variables"), ],
+                                          layout={'border': '1px solid black', 'width': '30%'})
         else:  # more space for the tree and value widgets
-            self._tree = Tree(stripes=True, multiple_selection=True, layout={'border': '1px solid black', 'width' :'40%'})
-            self._value_widget_box = VBox([Label("Model Variables") ,], layout={'border': '1px solid black', 'width' :'50%'})
+            self._tree = Tree(stripes=True, multiple_selection=True,
+                              layout={'border': '1px solid black', 'width': '40%'})
+            self._value_widget_box = VBox([Label("Model Variables"), ],
+                                          layout={'border': '1px solid black', 'width': '50%'})
 
         refresh_button = Button(description="Refresh", layout={'border': '1px solid black',
-                                                        'width' :'80px',
-                                                        'display':'flex',
-                                                        'justify_content':'center'})
+                                                               'width': '80px',
+                                                               'display': 'flex',
+                                                               'justify_content': 'center'})
         if self._debug:
-            self._ui_widget = HBox([self._tree, self._value_widget_box, refresh_button,self._output])
+            self._ui_widget = HBox([self._tree, self._value_widget_box, refresh_button,
+                                    self._output])
         else:
             self._ui_widget = HBox([self._tree, self._value_widget_box, refresh_button])
 
         # populate the tree with model hierarchy and the variables
         self._set_vars_from_model_with_initial_list(self._prob.model, self._tree, 0,
-                                                   vars_to_set=self._vars_to_set )
+                                                    vars_to_set=self._vars_to_set)
 
         # handlers
         self._tree.observe(self._on_selected_change, names='selected_nodes')
@@ -131,13 +139,13 @@ class SetValuesUI(object):
         """
         return self._ui_widget
 
-    def _set_vars_from_model_with_initial_list(self, sys, node, depth, vars_to_set=None):
+    def _set_vars_from_model_with_initial_list(self, system, node, depth, vars_to_set=None):
         """
         Populate the model tree selector widget. This method is called recursively
 
         Parameters
         ----------
-        sys : an OpenMDAO System
+        system : an OpenMDAO System
             The System whose inputs will be added to the GUI hierarchy
 
         node : an ipytree Node object
@@ -151,11 +159,11 @@ class SetValuesUI(object):
             visible. If a list, a list of promoted
         """
 
-        if sys.name == '_auto_ivc': #   _AutoIndepVarComp
+        if system.name == '_auto_ivc':  # AutoIndepVarComp
             return
 
         # make the node for the System, either a Group or Component
-        name = sys.name if sys.name else 'root'
+        name = system.name if system.name else 'root'
         new_node = Node(name)
         node.add_node(new_node)
 
@@ -182,23 +190,23 @@ class SetValuesUI(object):
             new_node.add_node(input_node)
             #  Need to know what component this var is associated. Used inside the handler for
             #  selecting this node
-            input_node._sys = sys
-            time.sleep(self._pause_time)  # To slow down the messages which cause issue with ipwidgets
+            input_node._sys = system
+            time.sleep(self._pause_time)  # Slow down the messages which cause issue with ipwidgets
 
             # make a Model Variables widget, depending on value of vars_to_set
             if vars_to_set is not None:
                 if prom_name in vars_to_set:
-                    self._add_value_widget(sys, input_varname, input_node)
+                    self._add_value_widget(system, input_varname, input_node)
             else:  # if vars_to_set is None, then add Model Variables widgets for all variables
                 self._add_value_widget(sys, input_varname, input_node)
 
         # Set icon of System Node, and recurse if System is Group
-        if isinstance(sys, Component):
+        if isinstance(system, Component):
             new_node.icon = _ICON_COMPONENT
-        elif isinstance(sys, Group):  # must be Group
+        elif isinstance(system, Group):  # must be Group
             new_node.icon = _ICON_GROUP
-            for s in sys._subsystems_myproc:
-                self._set_vars_from_model_with_initial_list(s, new_node, depth + 1, vars_to_set )
+            for s in system._subsystems_myproc:
+                self._set_vars_from_model_with_initial_list(s, new_node, depth + 1, vars_to_set)
 
     def _get_inputs_connected_to_ivc(self):  # returns prom names
         """
@@ -232,14 +240,14 @@ class SetValuesUI(object):
 
         return inputs_connected_to_ivc
 
-    def _add_value_widget(self, sys, prom_name, tree_node):
+    def _add_value_widget(self, system, prom_name, tree_node):
         """
         Add a value widget to the Model Variables section of the GUI so the user
         can set the value and units of the variable
 
         Parameters
         ----------
-        sys : an OpenMDAO System
+        system : an OpenMDAO System
             The System has this variable at its level
 
         prom_name : str
@@ -250,17 +258,17 @@ class SetValuesUI(object):
         """
 
         # check to see if the variable already has entry box
-        prom2abs_list = sys._var_allprocs_prom2abs_list['input']
+        prom2abs_list = system._var_allprocs_prom2abs_list['input']
         abs_name = prom2abs_list[prom_name][0]
         promoted_name_from_top_level = self._abs2prom_inputs[abs_name]
         if promoted_name_from_top_level in self._get_widget_var_names():
-            return # already there
+            return  # already there
 
         # get current value and units
-        val = sys.get_val(prom_name)
+        val = system.get_val(prom_name)
 
-        inputs_metadata = sys.get_io_metadata(('input',), ['units', ],
-                                     get_remote=True, return_rel_names=False)
+        inputs_metadata = system.get_io_metadata(('input',), ['units', ],
+                                                 get_remote=True, return_rel_names=False)
 
         metadata = inputs_metadata[abs_name]
         units = metadata['units']
@@ -269,7 +277,7 @@ class SetValuesUI(object):
 
         if isinstance(val, np.ndarray):
             if val.size > 1:
-                return # skip arrays for now TODO - need to raise warning or error
+                return  # skip arrays for now TODO - need to raise warning or error
             val = val.item()
 
         # Create value widget
@@ -278,13 +286,13 @@ class SetValuesUI(object):
             description=promoted_name_from_top_level,
             disabled=False,
             continuous_update=False,
-            style = {'description_width': 'initial'},
+            style={'description_width': 'initial'},
             step=None,
-            layout = {'border': '1px solid black',
-                      'width': '350px',
-                      'display': 'flex',
-                      'padding': '0px 0px 0px 20px',
-                      }
+            layout={'border': '1px solid black',
+                    'width': '350px',
+                    'display': 'flex',
+                    'padding': '0px 0px 0px 20px',
+                    }
         )
         val_widget.observe(self._update_prob_val, 'value')
 
@@ -293,18 +301,18 @@ class SetValuesUI(object):
                             continuous_update=False,
                             description_tooltip=prom_name,
                             layout={'border': '1px solid black',  # TODO is center doing anything?
-                                                        'width' :'60px',  # TODO dedup style stuff
-                                                        'display':'flex',
-                                                        'justify_content':'center'})
-        units_widget._var_name = promoted_name_from_top_level # need to know which var it belongs to
+                                    'width': '60px',  # TODO dedup style stuff
+                                    'display': 'flex',
+                                    'justify_content': 'center'})
+        units_widget._var_name = promoted_name_from_top_level  # need to know which var belongs to
         units_widget.observe(self._update_prob_unit, 'value')
 
         # create remove button widget
         remove_button = Button(description="X", layout={'border': '1px solid black',
-                                                        'width' :'20px',
-                                                        'display':'flex',
-                                                        'justify_content':'center'})
-        remove_button._var_name = promoted_name_from_top_level # which var it belongs to
+                                                        'width': '20px',
+                                                        'display': 'flex',
+                                                        'justify_content': 'center'})
+        remove_button._var_name = promoted_name_from_top_level  # which var it belongs to
         remove_button.on_click(self._remove_val_widget)
 
         # group all 3 widgets into an HBox
@@ -359,8 +367,8 @@ class SetValuesUI(object):
 
         # Cannot use remove on tuples, which children are so
         # rebuild the children list minus the box to remove
-        self._value_widget_box.children = tuple \
-            (box for box in self._value_widget_box.children if box != box_to_remove)
+        self._value_widget_box.children = tuple(box for box in self._value_widget_box.children
+                                                if box != box_to_remove)
         box_to_remove.close()
         associated_tree_node = box_to_remove._tree_node
         associated_tree_node.icon = _ICON_VARIABLE_NOT_SELECTED
@@ -427,7 +435,7 @@ class SetValuesUI(object):
             A dictionary holding the information about the change
 
         """
-        if self._units_update_due_to_handler: # if handler made the change, no need to do this
+        if self._units_update_due_to_handler:  # if handler made the change, no need to do this
             self._units_update_due_to_handler = False
             return
 
@@ -437,7 +445,7 @@ class SetValuesUI(object):
 
         # Check if units are compatible
         inputs_metadata = self._prob.model.get_io_metadata(('input',), ['units', ],
-                                     get_remote=True, return_rel_names=False)
+                                                           get_remote=True, return_rel_names=False)
 
         prom_name = units_widget._var_name  # promoted name
         # metadata keys are abs names
@@ -446,7 +454,8 @@ class SetValuesUI(object):
         units_default = metadata['units']
 
         if not is_compatible_handles_None(units_default, units):
-            display(HTML(f"<script>alert('Units \"{units}\" is not compatible with units \"{units_old}\"');</script>"))
+            display(HTML(f"<script>alert('Units \"{units}\" is not "
+                         "compatible with units \"{units_old}\"');</script>"))
             self._units_update_due_to_handler = True
             units_widget.value = units_old
             return
@@ -461,21 +470,21 @@ class SetValuesUI(object):
             units = None
         self._prob.set_val(var_name, val, units=units)
 
-    def _get_widget_var_names(self): # TODO - more efficient way?
+    def _get_widget_var_names(self):  # TODO - more efficient way?
         var_names = []
         for box in self._value_widget_box.children[1:]:
             float_text_widget = box.children[0]
             var_names.append(float_text_widget.description)
         return var_names
 
-    def _get_var_names_at_this_level(self, sys):
+    def _get_var_names_at_this_level(self, system):
         """
         Get the list of all the variables that have been promoted to this System, sys, and no
         higher.
 
         Parameters
         ----------
-        sys : OpenMDAO System
+        system : OpenMDAO System
             The OpenMDAO System that the caller wants the promoted variables of
 
         Returns
@@ -486,43 +495,43 @@ class SetValuesUI(object):
         """
         # TODO Should be able to just pass back the abs or prom of the variable
         var_names_at_this_level = []
-        if isinstance(sys, Component):
-            for abs_name, prom_name in sys._var_allprocs_abs2prom['input'].items():
+        if isinstance(system, Component):
+            for abs_name, prom_name in system._var_allprocs_abs2prom['input'].items():
                 current_group_var_promoted_name = prom_name
 
                 if "." not in current_group_var_promoted_name:  # this seems sufficient
-                    if not self._does_parent_sys_have_this_var_promoted( sys, abs_name):
-                            var_names_at_this_level.append((prom_name,abs_name))
-        else: # Group
-            for abs_name, prom_name in sys._var_allprocs_abs2prom['input'].items():
+                    if not self._does_parent_sys_have_this_var_promoted(system, abs_name):
+                        var_names_at_this_level.append((prom_name, abs_name))
+        else:  # Group
+            for abs_name, prom_name in system._var_allprocs_abs2prom['input'].items():
                 current_group_var_promoted_name = prom_name
 
-                if sys.pathname == '':  # root
-                    if not "." in prom_name:
+                if system.pathname == '':  # root
+                    if "." not in prom_name:
                         # don't want dups based on prom_name, which is the first item in the tuple
                         if prom_name not in [a[0] for a in var_names_at_this_level]:
-                            var_names_at_this_level.append((prom_name,abs_name))
+                            var_names_at_this_level.append((prom_name, abs_name))
                 else:
                     if "." not in current_group_var_promoted_name:  # this seems sufficient
                         # What if a group higher up has the same name and the var is promoted to
                         #    that level?
-                        if not self._does_parent_sys_have_this_var_promoted(sys, abs_name):
+                        if not self._does_parent_sys_have_this_var_promoted(system, abs_name):
                             # don't want dups based on prom_name, which is the first item in tuple
                             if prom_name not in [a[0] for a in var_names_at_this_level]:
-                                    var_names_at_this_level.append((prom_name,abs_name))
+                                var_names_at_this_level.append((prom_name, abs_name))
 
         # need to sort them
-        var_names_at_this_level.sort(key = lambda x: x[0].lower())
+        var_names_at_this_level.sort(key=lambda x: x[0].lower())
         return var_names_at_this_level
 
-    def _does_parent_sys_have_this_var_promoted(self, sys, abs_name):
+    def _does_parent_sys_have_this_var_promoted(self, system, abs_name):
         """
         Check to see if the parent System of 'sys' has the variable 'abs_name' promoted to it's
         level.
 
         Parameters
         ----------
-        sys : OpenMDAO System
+        system : OpenMDAO System
             The OpenMDAO System of interest. This method will determine if it's parent has
             the variable 'abs_name' promoted to it's level
 
@@ -535,7 +544,7 @@ class SetValuesUI(object):
             True of the variable 'abs_name' is promoted to the parent of 'sys', or higher.
         """
         #  TODO. It works for when sys is model, but should really handle that explicitly
-        parent_pathname_and_child = sys.pathname.rsplit('.', 1)
+        parent_pathname_and_child = system.pathname.rsplit('.', 1)
         if len(parent_pathname_and_child) > 1:
             parent_pathname = parent_pathname_and_child[0]
         else:
@@ -544,13 +553,15 @@ class SetValuesUI(object):
         parent_vars = parent._var_allprocs_abs2prom['input']
         if abs_name in parent_vars:
             if "." in parent_vars[abs_name]:
-                return False # so it is at this level
+                return False  # so it is at this level
             else:
-                return True  # parent has same var and it's promoted name in that group
-                             # has no period in it so that system has it at that level at least.
-                             # Definitely not at this 'sys' level
+                # parent has same var and it's promoted name in that group
+                # has no period in it so that system has it at that level at least.
+                # Definitely not at this 'system' level
+                return True
         else:
             raise(f"shouldn't happen! {abs_name} not found in var for {parent_pathname}")
+
 
 def is_compatible_handles_None(old_units, new_units):
     old_units = _find_unit(old_units, error=False)
