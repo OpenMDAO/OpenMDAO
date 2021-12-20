@@ -131,10 +131,10 @@ else:
                     if src_indices is None:
                         if meta_out['distributed']:
                             # input in this case is non-distributed (else src_indices would be
-                            # defined by now).  dist output to duplicated input conns w/o
+                            # defined by now).  dist output to non-distributed input conns w/o
                             # src_indices are not allowed.
                             raise RuntimeError(f"{group.msginfo}: Can't connect distributed output "
-                                               f"'{abs_out}' to duplicated input '{abs_in}' "
+                                               f"'{abs_out}' to non-distributed input '{abs_in}' "
                                                "without declaring src_indices.")
                         else:
                             rank = myproc if abs_out in abs2meta_out else owner

@@ -845,7 +845,7 @@ class MPITests2(unittest.TestCase):
         x_dist_init = 3.0 + np.arange(size)[offsets[rank]:offsets[rank] + sizes[rank]]
         prob.set_val('indep.x_dist', x_dist_init)
 
-        # Set initial values of duplicated variable.
+        # Set initial values of non-distributed variable.
         x_dup_init = 1.0 + 2.0*np.arange(size)
         prob.set_val('indep.x_dup', x_dup_init)
 
@@ -1565,7 +1565,7 @@ class Distrib_Derivs(om.ExplicitComponent):
         Is = inputs['in_dup']
 
         # Our local distributed output is a function of the local distributed input and
-        # the duplicated input.
+        # the non-distributed input.
         outputs['out_dist'] = f_out_dist(Id, Is)
 
         if self.comm.size > 1:
@@ -1575,7 +1575,7 @@ class Distrib_Derivs(om.ExplicitComponent):
             total_sum = local_sum.copy()
             self.comm.Allreduce(local_sum, total_sum, op=MPI.SUM)
 
-            # so the duplicated output is a function of the duplicated input and the full distributed
+            # so the non-distributed output is a function of the non-distributed input and the full distributed
             # input.
             outputs['out_dup'] = Is**2 + 3.0*Is - 5.0 + total_sum[0]
         else:
@@ -1616,7 +1616,7 @@ class Distrib_Derivs_Matfree(Distrib_Derivs):
             if 'out_dup' in d_outputs:
                 if 'in_dist' in d_inputs:
                     full = np.zeros(d_outputs['out_dup'].size)
-                    # add up contributions from the duplicated variable that is duplicated over
+                    # add up contributions from the non-distributed variable that is duplicated over
                     # all of the procs.
                     self.comm.Allreduce(d_outputs['out_dup'], full, op=MPI.SUM)
                     d_inputs['in_dist'] += np.tile(dg_dId, size).reshape((size, local_size)).T.dot(full)
@@ -1655,7 +1655,7 @@ class Distrib_Derivs_Prod(om.ExplicitComponent):
         Is = inputs['in_dup']
 
         # Our local distributed output is a function of local distributed input and the
-        # duplicated input.
+        # non-distributed input.
         outputs['out_dist'] = Id**2 - 2.0*Id + 4.0 + np.prod(1.5 * Is ** 2)
 
         if self.comm.size > 1:
@@ -1876,14 +1876,14 @@ class TestDistribBugs(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob = self.get_problem(Distrib_DerivsErr)
 
-        msg = "'D1' <class Distrib_DerivsErr>: component has defined partial ('out_dup', 'in_dist') which is a duplicated output wrt a distributed input. This is only supported using the matrix free API."
+        msg = "'D1' <class Distrib_DerivsErr>: component has defined partial ('out_dup', 'in_dist') which is a non-distributed output wrt a distributed input. This is only supported using the matrix free API."
         self.assertEqual(str(cm.exception), msg)
 
     def test_fd_check_err(self):
         with self.assertRaises(RuntimeError) as cm:
             prob = self.get_problem(Distrib_DerivsFD, mode='fwd')
 
-        msg = "'D1' <class Distrib_DerivsFD>: component has defined partial ('out_dup', 'in_dist') which is a duplicated output wrt a distributed input. This is only supported using the matrix free API."
+        msg = "'D1' <class Distrib_DerivsFD>: component has defined partial ('out_dup', 'in_dist') which is a non-distributed output wrt a distributed input. This is only supported using the matrix free API."
         self.assertEqual(str(cm.exception), msg)
 
 

@@ -18,11 +18,11 @@ class MixedDistrib2(om.ExplicitComponent):
     def setup(self):
         # Distributed Input
         self.add_input('in_dist', shape_by_conn=True, distributed=True)
-        # Duplicated Input
+        # Non-distributed Input
         self.add_input('in_dup', val=1)
         # Distributed Output
         self.add_output('out_dist', copy_shape='in_dist', distributed=True)
-        # Duplicated Output
+        # Non-distributed Output
         self.add_output('out_dup', copy_shape='in_dup')
 
     def compute(self, inputs, outputs):
@@ -171,7 +171,7 @@ class CheckPartialsRev(unittest.TestCase):
         x_dist_init = np.ones(sizes[rank])
         prob.set_val('indep.x_dist', x_dist_init)
 
-        # Set initial values of duplicated variable.
+        # Set initial values of non-distributed variable.
         prob.set_val('indep.x_dup', 10)
 
         prob.run_model()
