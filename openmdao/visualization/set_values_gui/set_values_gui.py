@@ -173,10 +173,9 @@ class SetValuesUI(object):
             new_node.opened = False
 
         # list of prom name at this level and abs name tuples
-        var_names_at_this_level = self._get_var_names_at_this_level(sys)
+        var_names_at_this_level = self._get_var_names_at_this_level(system)
 
         for input_varname, input_abs_name in var_names_at_this_level:
-            # full_varname = f"{sys.pathname}.{input_varname}"   # sort of abs, sort of prom!
             prom_name = self._abs2prom_inputs[input_abs_name]
 
             # If user requested only inputs connected to IVCs, check to see if this var is one
@@ -198,7 +197,7 @@ class SetValuesUI(object):
                 if prom_name in vars_to_set:
                     self._add_value_widget(system, input_varname, input_node)
             else:  # if vars_to_set is None, then add Model Variables widgets for all variables
-                self._add_value_widget(sys, input_varname, input_node)
+                self._add_value_widget(system, input_varname, input_node)
 
         # Set icon of System Node, and recurse if System is Group
         if isinstance(system, Component):
@@ -251,7 +250,7 @@ class SetValuesUI(object):
             The System has this variable at its level
 
         prom_name : str
-            The promoted name of the variable at the level of the System, sys
+            The promoted name of the variable at the level of the System, system
 
         tree_node : ipytree Node
             The node in the ipytree hierarchy that represents this variable
@@ -455,7 +454,7 @@ class SetValuesUI(object):
 
         if not is_compatible_handles_None(units_default, units):
             display(HTML(f"<script>alert('Units \"{units}\" is not "
-                         "compatible with units \"{units_old}\"');</script>"))
+                         f"compatible with units \"{units_old}\"');</script>"))
             self._units_update_due_to_handler = True
             units_widget.value = units_old
             return
@@ -479,7 +478,7 @@ class SetValuesUI(object):
 
     def _get_var_names_at_this_level(self, system):
         """
-        Get the list of all the variables that have been promoted to this System, sys, and no
+        Get the list of all the variables that have been promoted to this System, system, and no
         higher.
 
         Parameters
@@ -490,7 +489,7 @@ class SetValuesUI(object):
         Returns
         -------
         list of tuples
-            List of variables that have been promoted to this System, sys, and no higher.
+            List of variables that have been promoted to this System, system, and no higher.
             Both the promoted and absolute name are put in the list as a tuple
         """
         # TODO Should be able to just pass back the abs or prom of the variable
@@ -526,7 +525,7 @@ class SetValuesUI(object):
 
     def _does_parent_sys_have_this_var_promoted(self, system, abs_name):
         """
-        Check to see if the parent System of 'sys' has the variable 'abs_name' promoted to it's
+        Check to see if the parent System of 'system' has the variable 'abs_name' promoted to it's
         level.
 
         Parameters
@@ -541,9 +540,9 @@ class SetValuesUI(object):
         Returns
         -------
         boot
-            True of the variable 'abs_name' is promoted to the parent of 'sys', or higher.
+            True of the variable 'abs_name' is promoted to the parent of 'system', or higher.
         """
-        #  TODO. It works for when sys is model, but should really handle that explicitly
+        #  TODO. It works for when system is model, but should really handle that explicitly
         parent_pathname_and_child = system.pathname.rsplit('.', 1)
         if len(parent_pathname_and_child) > 1:
             parent_pathname = parent_pathname_and_child[0]
