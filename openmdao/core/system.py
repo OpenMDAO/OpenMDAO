@@ -1568,6 +1568,7 @@ class System(object):
         """
         if self._use_derivatives:
             desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
+            # Check if the constraints are coliding here
             responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
             return self.get_relevant_vars(desvars, responses, mode)
 
@@ -2455,8 +2456,8 @@ class System(object):
         return idxer, size
 
     def add_design_var(self, name, lower=None, upper=None, ref=None, ref0=None, indices=None,
-                       adder=None, scaler=None, units=None,
-                       parallel_deriv_color=None, cache_linear_solution=False, flat_indices=False):
+                       adder=None, scaler=None, units=None, parallel_deriv_color=None,
+                       cache_linear_solution=False, flat_indices=False, alias=None):
         r"""
         Add a design variable to this system.
 
@@ -2502,7 +2503,7 @@ class System(object):
         The argument :code:`ref0` represents the physical value when the scaled value is 0.
         The argument :code:`ref` represents the physical value when the scaled value is 1.
         """
-        if name in self._design_vars or name in self._static_design_vars:
+        if name in self._design_vars or name in self._static_design_vars and alias is None:
             msg = "{}: Design Variable '{}' already exists."
             raise RuntimeError(msg.format(self.msginfo, name))
 
@@ -2519,6 +2520,16 @@ class System(object):
                 units = simplify_unit(units, msginfo=self.msginfo)
             except ValueError as e:
                 raise(ValueError(f"{str(e)[:-1]} for design_var '{name}'."))
+
+        dv = OrderedDict()
+        dv['name'] = name
+
+        # if alias is not None:
+        #     dv['name'] = alias
+        #     dv['path'] = name
+        # else:
+        #     dv['name'] = name
+        #     dv['path'] = None
 
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
@@ -2550,8 +2561,6 @@ class System(object):
         else:
             design_vars = self._design_vars
 
-        dv = OrderedDict()
-
         if isinstance(scaler, np.ndarray):
             if np.all(scaler == 1.0):
                 scaler = None
@@ -2566,7 +2575,7 @@ class System(object):
             adder = None
         dv['adder'] = adder
 
-        dv['name'] = name
+        # dv['name'] = name
         dv['upper'] = upper
         dv['lower'] = lower
         dv['ref'] = ref
@@ -2661,11 +2670,20 @@ class System(object):
             except ValueError as e:
                 raise(ValueError(f"{str(e)[:-1]} for response '{name}'."))
 
+        resp = OrderedDict()
+
         typemap = {'con': 'Constraint', 'obj': 'Objective'}
         if (name in self._responses or name in self._static_responses) and alias is None:
             msg = ("{}: {} '{}' already exists. Use the 'alias' argument to apply a second "
-                   "constraint".format(self.msginfo, typemap[type_], name))
+                "constraint".format(self.msginfo, typemap[type_], name))
             raise RuntimeError(msg.format(name))
+
+        if alias is not None:
+            resp['name'] = alias
+            resp['path'] = name
+        else:
+            resp['name'] = name
+            resp['path'] = None
 
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
@@ -2683,8 +2701,6 @@ class System(object):
             responses = self._static_responses
         else:
             responses = self._responses
-
-        resp = OrderedDict()
 
         if type_ == 'con':
 
@@ -2759,7 +2775,6 @@ class System(object):
             adder = None
         resp['adder'] = adder
 
-        resp['name'] = name
         resp['ref'] = ref
         resp['ref0'] = ref0
         resp['type'] = type_
@@ -2767,9 +2782,8 @@ class System(object):
         resp['cache_linear_solution'] = cache_linear_solution
         resp['parallel_deriv_color'] = parallel_deriv_color
         resp['flat_indices'] = flat_indices
-        resp['alias'] = alias
 
-        responses[name] = resp
+        responses[resp['name']] = resp
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None, units=None,
@@ -2835,7 +2849,7 @@ class System(object):
 
     def add_objective(self, name, ref=None, ref0=None, index=None, units=None,
                       adder=None, scaler=None, parallel_deriv_color=None,
-                      cache_linear_solution=False, flat_indices=False):
+                      cache_linear_solution=False, flat_indices=False, alias=None):
         r"""
         Add a response variable to this system.
 
@@ -2903,7 +2917,7 @@ class System(object):
                           ref=ref, ref0=ref0, index=index, units=units,
                           parallel_deriv_color=parallel_deriv_color,
                           cache_linear_solution=cache_linear_solution,
-                          flat_indices=flat_indices)
+                          flat_indices=flat_indices, alias=alias)
 
     def _check_voi_meta_sizes(self, typename, meta, names):
         """
@@ -3099,7 +3113,10 @@ class System(object):
                     self._problem_meta['using_par_deriv_color'] = True
 
                 if name in prom2abs_out:
-                    abs_name = prom2abs_out[name][0]
+                    if data['path'] is None:
+                        abs_name = prom2abs_out[name][0]
+                    else:
+                        abs_name = data['name']
                     out[abs_name] = data
                     out[abs_name]['ivc_source'] = abs_name
                     out[abs_name]['distributed'] = \
@@ -3108,17 +3125,21 @@ class System(object):
                 else:
                     # A constraint can be on an auto_ivc input, so use connected
                     # output name.
-                    in_abs = prom2abs_in[name][0]
-                    ivc_path = conns[in_abs]
+                    if data['path'] is None:
+                        in_abs = prom2abs_in[name][0]
+                        ivc_path = conns[in_abs]
+                    else:
+                        in_abs = data['name']
+                        ivc_path = data['path']
                     distrib = ivc_path in abs2meta_out and abs2meta_out[ivc_path]['distributed']
                     if use_prom_ivc:
                         out[name] = data
                         out[name]['ivc_source'] = ivc_path
                         out[name]['distributed'] = distrib
                     else:
-                        out[ivc_path] = data
-                        out[ivc_path]['ivc_source'] = ivc_path
-                        out[ivc_path]['distributed'] = distrib
+                        out[in_abs] = data
+                        out[in_abs]['ivc_source'] = ivc_path
+                        out[in_abs]['distributed'] = distrib
 
         except KeyError as err:
             msg = "{}: Output not found for response {}."
@@ -4989,9 +5010,11 @@ class System(object):
                     system = parts[0]
                     graph.add_edge(system, dv)
 
-        for res in responses:
+        for res, meta in responses.items():
             if res not in graph:
                 graph.add_node(res, type_='out')
+                # if meta['path'] is not None:
+                #     res = meta['path']
                 parts = res.rsplit('.', 1)
                 if len(parts) == 1:
                     system = ''  # this happens when a component is the model
@@ -5143,6 +5166,11 @@ class System(object):
                                       total_systems)
                 else:
                     relinp['@all'] = ({'input': set(), 'output': set()}, set())
+
+        # for name in relevant:
+        #     if name in responses and 'path' in responses[name] and responses[name]['path'] is not None:
+        #         path = responses[name]['path']
+        #         relevant[name] = relevant[path]
 
         return relevant
 

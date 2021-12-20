@@ -762,6 +762,9 @@ class Driver(object):
             if ctype == 'ineq' and meta['equals'] is not None:
                 continue
 
+            if 'path' in meta and meta['path']:
+                name = meta['name']
+
             con_dict[name] = self._get_voi_val(name, meta, self._remote_cons,
                                                driver_scaling=driver_scaling)
 

@@ -19,9 +19,10 @@ def test_two_constraints_different_indices():
 
     p.model.add_design_var('exec.a', lower=-1000, upper=1000)
     p.model.add_objective('exec.y', index=50)
-    p.model.add_constraint('exec.z', indices=[-1], upper=25)
-    p.model.add_constraint('exec.z', indices=[1], equals=20, alias="EXEC_COPY")
-
+    p.model.add_constraint('exec.z', indices=[10], equals=21.1111)
+    p.model.add_constraint('exec.z', indices=[-1], equals=20, alias="ALIAS_TEST")
+    # It's still overriding the first exec.z not sure how to either combine them or tie them together
+    # with the alias dict
 
     p.driver = om.pyOptSparseDriver(optimizer='SNOPT')
     p.driver.opt_settings['iSumm'] = 6
@@ -33,7 +34,7 @@ def test_two_constraints_different_indices():
     p.run_driver()
 
     print(p.get_val('exec.z'))
-    assert_near_equal(p.get_val('exec.z')[0], 25)
-    # assert_near_equal(p.get_val('exec.z')[50], -75)
+    assert_near_equal(p.get_val('exec.z')[10], 21.1111)
+    assert_near_equal(p.get_val('exec.z')[50], 20)
 
 test_two_constraints_different_indices()

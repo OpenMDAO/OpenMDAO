@@ -148,7 +148,7 @@ class _TotalJacInfo(object):
         # convert designvar and response dicts to use src names
         # keys will all be absolute names after conversion
         design_vars = _prom2ivc_src_dict(driver._designvars)
-        responses = _prom2ivc_src_dict(driver._responses)
+        self.responses = responses = _prom2ivc_src_dict(driver._responses)
 
         if not model._use_derivatives:
             raise RuntimeError("Derivative support has been turned off but compute_totals "
@@ -228,6 +228,11 @@ class _TotalJacInfo(object):
 
         abs2meta_out = model._var_allprocs_abs2meta['output']
 
+        for name, meta in responses.items():
+            if name not in abs2meta_out and meta['path'] in abs2meta_out and \
+                    meta['path'] is not None:
+                abs2meta_out[name] = abs2meta_out[meta['path']]
+
         constraints = driver._cons
 
         for name in prom_of:
@@ -292,7 +297,6 @@ class _TotalJacInfo(object):
         # return format is 'dict' or 'flat_dict'.
         self.J = J = np.zeros((self.of_size, self.wrt_size))
 
-        abs2meta = model._var_allprocs_abs2meta['output']
         if self.get_remote:
             # if we have distributed 'wrt' variables in fwd mode we have to broadcast the jac
             # columns from the owner of a given range of dist indices to everyone else.
@@ -332,8 +336,8 @@ class _TotalJacInfo(object):
                 self.dist_idx_map[mode] = dist_map = np.zeros(arr.size, dtype=bool)
                 start = end = 0
                 for name in self.output_list[mode]:
-                    end += abs2meta[name]['size']
-                    if abs2meta[name]['distributed']:
+                    end += abs2meta_out[name]['size']
+                    if abs2meta_out[name]['distributed']:
                         dist_map[start:end] = True
                     start = end
 
@@ -796,6 +800,7 @@ class _TotalJacInfo(object):
         slices = model._vectors['output']['linear'].get_slice_dict()
         abs2idx = model._var_allprocs_abs2idx
         jstart = jend = 0
+        temp_path = False
 
         for name in names:
             indices = vois[name]['indices'] if name in vois else None
@@ -809,9 +814,16 @@ class _TotalJacInfo(object):
                 else:
                     sz = meta['size']
 
-            if name in abs2idx and name in slices and name not in self.remote_vois:
-                var_idx = abs2idx[name]
-                slc = slices[name]
+            if name in self.responses and 'path' in self.responses[name] and self.responses[name]['path'] is not None:
+                temp_path = self.responses[name]['path']
+
+            if (name in abs2idx and name in slices and name not in self.remote_vois) or temp_path:
+                if temp_path:
+                    var_idx = abs2idx[temp_path]
+                    slc = slices[temp_path]
+                else:
+                    var_idx = abs2idx[name]
+                    slc = slices[name]
                 if MPI and meta['distributed'] and self.get_remote:
                     if indices is not None:
                         local_idx, sizes_idx, _ = self._dist_driver_vars[name]
@@ -893,6 +905,8 @@ class _TotalJacInfo(object):
                     size = voi['size']
                 indices = vois[name]['indices']
             else:
+                # if 'path' in voi and voi['path'] is not None:
+                #     name = voi['path']
                 size = abs2meta_out[name]['global_size']
                 indices = None
 

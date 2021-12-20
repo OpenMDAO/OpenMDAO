@@ -1037,7 +1037,9 @@ def _prom2ivc_src_item_iter(prom_dict):
         name, metadata
     """
     for name, meta in prom_dict.items():
-        if meta['ivc_source'] is not None:
+        if 'path' in meta and meta['path'] is not None:
+            yield meta['name'], meta
+        elif meta['ivc_source'] is not None:
             yield meta['ivc_source'], meta
         else:
             yield name, meta

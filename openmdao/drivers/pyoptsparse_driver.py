@@ -387,6 +387,7 @@ class pyOptSparseDriver(Driver):
                     jac = {n: resjac[input_meta[n]['ivc_source']] for n in wrt}
                 else:
                     jac = None
+
                 opt_prob.addConGroup(name, size, lower=lower, upper=upper, wrt=wrt, jac=jac)
                 self._quantities.append(name)
 
