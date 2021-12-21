@@ -91,7 +91,7 @@
 #toolbarLoc {
     margin: 0;
     padding: 0;
-    height: 660px;
+    height: 580px;
     width: 65px;
     border-bottom-right-radius: 15px;
     position: relative;
@@ -170,7 +170,6 @@
     opacity: 0;
     min-height: 100%;
     transition: opacity 1s, max-width 1s;
-
 }
 
 .toolbar-group-expandable p {
@@ -237,7 +236,7 @@
     padding: 20px 0 5px 0;
     margin-top: -20px;
     z-index: 34;
-    height: 155px;
+    /* height: 120px; */
 }
 
 .group-4 {
@@ -252,6 +251,8 @@
     padding: 20px 0 7px 0;
     margin-top: -20px;
     z-index: 32;
+    flex-direction: row;
+    align-items: center;
 }
 
 #collapse-expandable {
@@ -270,6 +271,10 @@
     background-color: #42926b;
     display: flex;
     align-items: center;
+}
+
+#info-expandable {
+    background-color: #30684d;
 }
 
 #text-width-expandable p {
@@ -362,7 +367,7 @@
 }
 
 #info-button {
-    font-size: 30px !important;
+    /* font-size: 30px !important; */
     color: white;
     opacity: 1;
     transition: opacity 0.5s, color 0.5s;
@@ -372,13 +377,13 @@
     opacity: 0.7;
 }
 
-#question-button {
-    font-size: 30px !important;
+.icon-question-circle {
+    /* font-size: 25px !important; */
     opacity: 1;
     color: white;
 }
 
-#question-button:hover {
+.icon-question-circle:hover {
     opacity: 0.7;
 }
 

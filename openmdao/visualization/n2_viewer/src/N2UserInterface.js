@@ -717,7 +717,7 @@ class N2UserInterface {
         testThis(this, 'N2UserInterface', 'toggleLegend');
         this.legend.toggle();
 
-        d3.select('#legend-button').attr('class',
+        d3.selectAll('i.icon-key').attr('class',
             this.legend.hidden ? 'fas icon-key' : 'fas icon-key active-tab-icon');
     }
 

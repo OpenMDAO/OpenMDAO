@@ -258,14 +258,14 @@ class N2Toolbar {
 
     /** When an expanded button is clicked, update the 'root' button to the same icon/function. */
     _setRootButton(clickedNode) {
-        let container = d3.select(clickedNode.parentNode.parentNode);
-        let button = d3.select(clickedNode);
-        let rootButton = container.select('i');
+        const container = d3.select(clickedNode.parentNode.parentNode);
+        const button = d3.select(clickedNode);
+        const rootButton = container.select('i:not(.caret)');
 
         rootButton
             .attr('class', button.attr('class'))
             .attr('id', button.attr('id'))
-            .node().onclick = button.node().onclick;
+            .on('click', button.on('click'));
     }
 
     /** Minimal management of buttons which will be described on the help window. */
@@ -411,12 +411,6 @@ class N2Toolbar {
                 self._setRootButton(target);
             }));
 
-        this._addButton(new N2ToolbarButtonToggle('#legend-button', tooltipBox,
-            ["Show legend", "Hide legend"],
-            pred => { return n2ui.legend.hidden; },
-            e => { n2ui.toggleLegend(); }
-        )).setHelpInfo("Toggle legend");
-
         this._addButton(new N2ToolbarButtonToggle('#desvars-button', tooltipBox,
             ["Show optimization variables", "Hide optimization variables"],
             pred => { return n2ui.desVars; },
@@ -445,14 +439,35 @@ class N2Toolbar {
         this._addButton(new N2ToolbarButtonToggle('#info-button', tooltipBox,
             ["Hide detailed node information", "Show detailed node information"],
             pred => { return n2ui.nodeInfoBox.active; },
-            e => {
+            function(target) {
                 n2ui.nodeInfoBox.clear();
                 n2ui.nodeInfoBox.toggle();
+                self._setRootButton(target);
             }
         )).setHelpInfo("Toggle detailed node information");
 
+        this._addButton(new N2ToolbarButtonToggle('#legend-button', tooltipBox,
+            ["Show legend", "Hide legend"],
+            pred => { return n2ui.legend.hidden; },
+            function(target) {
+                n2ui.toggleLegend();
+                self._setRootButton(target);
+            }
+        )).setHelpInfo("Toggle legend");
+
         this._addButton(new N2ToolbarButtonClick('#question-button', tooltipBox,
-            "Show N2 diagram help", e => { self._showHelp() }));
+            "Show N2 diagram help",
+            function(target) {
+                self._showHelp()
+                self._setRootButton(target);
+            }));
+
+        this._addButton(new N2ToolbarButtonClick('#question-button-2', tooltipBox,
+            "Show N2 diagram help",
+            function(target) {
+                self._showHelp()
+                self._setRootButton(target);
+            }));
 
         // Don't add this to the array of tracked buttons because it confuses
         // the help screen generation
