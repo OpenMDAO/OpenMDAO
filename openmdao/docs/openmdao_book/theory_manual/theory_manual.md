@@ -9,6 +9,7 @@ The Theory Manual exists to explain some of the underlying concepts behind OpenM
 - [OpenMDAO Solvers](solver_api.ipynb)
 - [Scaling Variables in OpenMDAO](scaling.ipynb)
 - [Determining How Many Times a System was Executed](iter_count.ipynb)
+- [Using OpenMDAO with MPI](mpi.ipynb)
 
 ## Total Derivatives Theory
 

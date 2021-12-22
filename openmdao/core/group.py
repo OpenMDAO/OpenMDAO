@@ -839,8 +839,8 @@ class Group(System):
                 # run into memory issues if src_indices are large.  Maybe try something like
                 # computing a hash in each rank and comparing those?
                 if out_dist and not in_dist:
-                    # all non-distributed inputs must have src_indices if they connect to a distributed
-                    # output
+                    # all non-distributed inputs must have src_indices if they connect to a
+                    # distributed output.
                     owner = self._owning_rank[abs_in]
                     if abs_in in abs2meta_in:  # input is local
                         src_inds = abs2meta_in[abs_in]['src_indices']
@@ -867,12 +867,12 @@ class Group(System):
                         err = self.comm.bcast(None, root=owner)
                     if err == 1:
                         raise RuntimeError(f"{self.msginfo}: Can't connect distributed output "
-                                           f"'{abs_out}' to non-distributed input '{abs_in}' because "
-                                           "src_indices differ on different ranks.")
+                                           f"'{abs_out}' to non-distributed input '{abs_in}' "
+                                           "because src_indices differ on different ranks.")
                     elif err == -1:
                         raise RuntimeError(f"{self.msginfo}: Can't connect distributed output "
-                                           f"'{abs_out}' to non-distributed input '{abs_in}' without "
-                                           "specifying src_indices.")
+                                           f"'{abs_out}' to non-distributed input '{abs_in}' "
+                                           "without specifying src_indices.")
 
     def _get_group_input_meta(self, prom_in, meta_name):
         if prom_in in self._group_inputs:
@@ -1661,10 +1661,10 @@ class Group(System):
 
             to_dist = nprocs > 1 and all_to_meta['distributed']
 
-            # known dist output to/from non-distributed input.  We don't allow this case because serial
-            # variables must have the same value on all procs and the only way this is possible is
-            # if the src_indices on each proc are identical, but that's not possible if we assume
-            # 'always local' transfer (see POEM 46).
+            # known dist output to/from non-distributed input.  We don't allow this case because
+            # non-distributed variables must have the same value on all procs and the only way
+            # this is possible is if the src_indices on each proc are identical, but that's not
+            # possible if we assume 'always local' transfer (see POEM 46).
             if from_dist and not to_dist:
                 if from_io == 'output':
                     raise RuntimeError(f"{self.msginfo}: dynamic sizing of non-distributed {to_io} "
