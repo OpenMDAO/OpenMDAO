@@ -21,6 +21,8 @@ from openmdao.utils.assert_utils import assert_near_equal
 @unittest.skipUnless(PETScVector is not None, "PETSc is required.")
 class TestPETScKrylov(unittest.TestCase):
 
+    N_PROCS = 1
+
     def test_options(self):
         """Verify that the PETScKrylov specific options are declared."""
 
@@ -382,6 +384,8 @@ class TestPETScKrylov(unittest.TestCase):
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
 class TestPETScKrylovSolverFeature(unittest.TestCase):
+
+    N_PROCS = 1
 
     def test_specify_solver(self):
 

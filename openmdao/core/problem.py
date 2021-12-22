@@ -904,9 +904,8 @@ class Problem(object):
             the direction resulting in the smallest number of linear solves required to
             compute derivatives.
         force_alloc_complex : bool
-            Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
-            detect when you need to do this, but in some cases (e.g., complex step is used
-            after a reconfiguration) you may need to set this to True.
+            If True, sufficient memory will be allocated to allow nonlinear vectors to store
+            complex values while operating under complex step.
         distributed_vector_class : type
             Reference to the <Vector> class or factory function used to instantiate vectors
             and associated transfers involved in interprocess communication.
@@ -967,6 +966,7 @@ class Problem(object):
             'model_ref': weakref.ref(model),  # ref to the model (needed to get out-of-scope
                                               # src data for inputs)
             'using_par_deriv_color': False,  # True if parallel derivative coloring is being used
+            'mode': mode,  # mode (derivative direction) set by the user.  'auto' by default
         }
         model._setup(model_comm, mode, self._metadata)
 
@@ -2115,7 +2115,7 @@ class Problem(object):
                                "`Problem.run_model()`, `Problem.run_driver()`, or "
                                "`Problem.final_setup()`.")
 
-        if active and not self._metadata['force_alloc_complex']:
+        if active and not self.model._outputs._alloc_complex:
             raise RuntimeError(f"{self.msginfo}: To enable complex step, specify "
                                "'force_alloc_complex=True' when calling setup on the problem, "
                                "e.g. 'problem.setup(force_alloc_complex=True)'")
