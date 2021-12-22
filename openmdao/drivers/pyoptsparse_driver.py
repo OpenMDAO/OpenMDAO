@@ -372,7 +372,11 @@ class pyOptSparseDriver(Driver):
             size = meta['global_size'] if meta['distributed'] else meta['size']
             lower = upper = meta['equals']
             if fwd:
-                wrt = [v for v in indep_list if name in relevant[input_meta[v]['ivc_source']]]
+                if 'path' in meta and meta['path'] is not None:
+                    wrt = [v for v in indep_list if meta['path'] in
+                           relevant[input_meta[v]['ivc_source']]]
+                else:
+                    wrt = [v for v in indep_list if name in relevant[input_meta[v]['ivc_source']]]
             else:
                 rels = relevant[name]
                 wrt = [v for v in indep_list if input_meta[v]['ivc_source'] in rels]
@@ -402,7 +406,11 @@ class pyOptSparseDriver(Driver):
             upper = meta['upper']
 
             if fwd:
-                wrt = [v for v in indep_list if name in relevant[input_meta[v]['ivc_source']]]
+                if 'path' in meta and meta['path'] is not None:
+                    wrt = [v for v in indep_list if meta['path'] in
+                           relevant[input_meta[v]['ivc_source']]]
+                else:
+                    wrt = [v for v in indep_list if name in relevant[input_meta[v]['ivc_source']]]
             else:
                 rels = relevant[name]
                 wrt = [v for v in indep_list if input_meta[v]['ivc_source'] in rels]

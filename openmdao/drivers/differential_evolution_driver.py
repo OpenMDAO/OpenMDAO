@@ -226,8 +226,6 @@ class DifferentialEvolutionDriver(Driver):
             upper_bound[i:j] = meta['upper']
             x0[i:j] = desvar_vals[name]
 
-        abs2prom = model._var_abs2prom['output']
-
         # Automatic population size.
         if pop_size == 0:
             pop_size = 20 * count

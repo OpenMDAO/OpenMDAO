@@ -591,6 +591,65 @@ class TestConstrainedDifferentialEvolution(unittest.TestCase):
         self.assertAlmostEqual(prob['radius'], 0.5, 1)  # it is going to the unconstrained optimum
         self.assertAlmostEqual(prob['height'], 0.5, 1)  # it is going to the unconstrained optimum
 
+    def test_multiple_constraints(self):
+
+        p = om.Problem()
+
+        exec = om.ExecComp(['y = x**2',
+                            'z = a + x**2'],
+                            a={'shape': (1,)},
+                            y={'shape': (101,)},
+                            x={'shape': (101,)},
+                            z={'shape': (101,)})
+
+        p.model.add_subsystem('exec', exec)
+
+        p.model.add_design_var('exec.a', lower=-1000, upper=1000)
+        p.model.add_objective('exec.y', index=50)
+        p.model.add_constraint('exec.z', indices=[-1], lower=0)
+        p.model.add_constraint('exec.z', indices=[0], upper=300, alias="ALIAS_TEST")
+
+        p.driver = om.DifferentialEvolutionDriver()
+
+        p.setup()
+
+        p.set_val('exec.x', np.linspace(-10, 10, 101))
+
+        p.run_driver()
+
+        print(p.get_val('exec.z'))
+        assert_near_equal(p.get_val('exec.z')[0], 187.24998293)
+        assert_near_equal(p.get_val('exec.z')[-1], 187.24998293)
+
+    def test_same_cons_and_obj(self):
+
+        p = om.Problem()
+
+        exec = om.ExecComp(['y = x**2',
+                            'z = a + x**2'],
+                            a={'shape': (1,)},
+                            y={'shape': (101,)},
+                            x={'shape': (101,)},
+                            z={'shape': (101,)})
+
+        p.model.add_subsystem('exec', exec)
+
+        p.model.add_design_var('exec.a', lower=-1000, upper=1000)
+        p.model.add_objective('exec.z', index=50)
+        p.model.add_constraint('exec.z', indices=[0], upper=300, alias="ALIAS_TEST")
+
+        p.driver = om.DifferentialEvolutionDriver()
+
+        p.setup()
+
+        p.set_val('exec.x', np.linspace(-10, 10, 101))
+
+        p.run_driver()
+
+        print(p.get_val('exec.z'))
+        assert_near_equal(p.get_val('exec.z')[0], -900)
+        assert_near_equal(p.get_val('exec.z')[50], -1000)
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITestDifferentialEvolution(unittest.TestCase):

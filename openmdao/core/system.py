@@ -1570,6 +1570,10 @@ class System(object):
             desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
             # Check if the constraints are coliding here
             responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
+            for res in responses:
+                if responses[res]['path'] is not None and responses[res]['path'] not in responses:
+                    raise RuntimeError(f"Alias '{res}' is not needed when only "
+                                        "adding one constraint to model")
             return self.get_relevant_vars(desvars, responses, mode)
 
         return {'@all': ({'input': ContainsAll(), 'output': ContainsAll()}, ContainsAll())}
@@ -2457,7 +2461,7 @@ class System(object):
 
     def add_design_var(self, name, lower=None, upper=None, ref=None, ref0=None, indices=None,
                        adder=None, scaler=None, units=None, parallel_deriv_color=None,
-                       cache_linear_solution=False, flat_indices=False, alias=None):
+                       cache_linear_solution=False, flat_indices=False):
         r"""
         Add a design variable to this system.
 
@@ -2523,13 +2527,6 @@ class System(object):
 
         dv = OrderedDict()
         dv['name'] = name
-
-        # if alias is not None:
-        #     dv['name'] = alias
-        #     dv['path'] = name
-        # else:
-        #     dv['name'] = name
-        #     dv['path'] = None
 
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
@@ -2648,6 +2645,8 @@ class System(object):
             solution from the previous linear solve.
         flat_indices : bool
             If True, interpret specified indices as being indices into a flat source array.
+        alias : str
+            Name used when adding multiple responses.
         """
         # Name must be a string
         if not isinstance(name, str):
@@ -2675,7 +2674,7 @@ class System(object):
         typemap = {'con': 'Constraint', 'obj': 'Objective'}
         if (name in self._responses or name in self._static_responses) and alias is None:
             msg = ("{}: {} '{}' already exists. Use the 'alias' argument to apply a second "
-                "constraint".format(self.msginfo, typemap[type_], name))
+                   "constraint".format(self.msginfo, typemap[type_], name))
             raise RuntimeError(msg.format(name))
 
         if alias is not None:
@@ -2831,6 +2830,8 @@ class System(object):
             solution from the previous linear solve.
         flat_indices : bool
             If True, interpret specified indices as being indices into a flat source array.
+        alias : str
+            Name used when adding multiple responses.
 
         Notes
         -----
@@ -2884,6 +2885,8 @@ class System(object):
             solution from the previous linear solve.
         flat_indices : bool
             If True, interpret specified indices as being indices into a flat source array.
+        alias : str
+            Name used when adding multiple responses.
 
         Notes
         -----
@@ -5166,11 +5169,6 @@ class System(object):
                                       total_systems)
                 else:
                     relinp['@all'] = ({'input': set(), 'output': set()}, set())
-
-        # for name in relevant:
-        #     if name in responses and 'path' in responses[name] and responses[name]['path'] is not None:
-        #         path = responses[name]['path']
-        #         relevant[name] = relevant[path]
 
         return relevant
 

@@ -814,7 +814,8 @@ class _TotalJacInfo(object):
                 else:
                     sz = meta['size']
 
-            if name in self.responses and 'path' in self.responses[name] and self.responses[name]['path'] is not None:
+            if name in self.responses and 'path' in self.responses[name] and \
+                    self.responses[name]['path'] is not None:
                 temp_path = self.responses[name]['path']
 
             if (name in abs2idx and name in slices and name not in self.remote_vois) or temp_path:

@@ -441,7 +441,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         model.set_input_defaults('x', val=50.)
         model.set_input_defaults('y', val=50.)
-        
+
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
 
@@ -589,7 +589,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         model.set_input_defaults('x', val=50.)
         model.set_input_defaults('y', val=50.)
-        
+
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
 
@@ -2051,6 +2051,63 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         assert_near_equal(prob.get_val('x'), np.zeros(size), 1e-6)
         assert_near_equal(prob.get_val('f'), 0.0, 1e-6)
+
+    def test_multiple_constraints_scipy():
+
+        p = om.Problem()
+
+        exec = om.ExecComp(['y = x**2',
+                            'z = a + x**2'],
+                            a={'shape': (1,)},
+                            y={'shape': (101,)},
+                            x={'shape': (101,)},
+                            z={'shape': (101,)})
+
+        p.model.add_subsystem('exec', exec)
+
+        p.model.add_design_var('exec.a', lower=-1000, upper=1000)
+        p.model.add_objective('exec.y', index=50)
+        p.model.add_constraint('exec.z', indices=[10], upper=21.1111)
+        p.model.add_constraint('exec.z', indices=[-1], equals=20, alias="ALIAS_TEST")
+
+        p.driver = om.ScipyOptimizeDriver()
+
+        p.setup()
+
+        p.set_val('exec.x', np.linspace(-10, 10, 101))
+
+        p.run_driver()
+
+        assert_near_equal(p.get_val('exec.z')[0], 25)
+        assert_near_equal(p.get_val('exec.z')[50], -75)
+
+    def test_con_and_obj_duplicate():
+
+        p = om.Problem()
+
+        exec = om.ExecComp(['y = x**2',
+                            'z = a + x**2'],
+                            a={'shape': (1,)},
+                            y={'shape': (101,)},
+                            x={'shape': (101,)},
+                            z={'shape': (101,)})
+
+        p.model.add_subsystem('exec', exec)
+
+        p.model.add_design_var('exec.a', lower=-1000, upper=1000)
+        p.model.add_objective('exec.z', index=50)
+        p.model.add_constraint('exec.z', indices=[0], equals=25, alias='ALIAS_TEST')
+
+        p.driver = om.ScipyOptimizeDriver()
+
+        p.setup()
+
+        p.set_val('exec.x', np.linspace(-10, 10, 101))
+
+        p.run_driver()
+
+        assert_near_equal(p.get_val('exec.z')[0], 25)
+        assert_near_equal(p.get_val('exec.z')[50], -75)
 
 
 if __name__ == "__main__":
