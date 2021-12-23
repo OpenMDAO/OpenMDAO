@@ -526,9 +526,7 @@ class ScipyOptimizeDriver(Driver):
         # If an exception was swallowed in one of our callbacks, we want to raise it
         # rather than the cryptic message from scipy.
         except Exception as msg:
-            if self._exc_info is not None:
-                self._reraise()
-            else:
+            if self._exc_info is None:
                 raise
 
         if self._exc_info is not None:
@@ -598,7 +596,7 @@ class ScipyOptimizeDriver(Driver):
             self._con_cache = self.get_constraint_values()
 
         except Exception as msg:
-            self._exc_info = msg
+            self._exc_info = sys.exc_info()
             return 0
 
         # print("Functions calculated")
@@ -712,7 +710,7 @@ class ScipyOptimizeDriver(Driver):
                 self._check_jac = False
 
         except Exception as msg:
-            self._exc_info = msg
+            self._exc_info = sys.exc_info()
             return np.array([[]])
 
         # print("Gradients calculated for objective")
@@ -778,8 +776,7 @@ class ScipyOptimizeDriver(Driver):
         """
         Reraise any exception encountered when scipy calls back into our method.
         """
-        exc = self._exc_info
-        raise exc
+        raise self._exc_info[1].with_traceback(self._exc_info[2])
 
 
 def signature_extender(fcn, extra_args):
