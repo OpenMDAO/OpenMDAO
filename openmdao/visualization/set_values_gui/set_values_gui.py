@@ -1,3 +1,7 @@
+"""
+Code for generating a GUI in notebooks for setting model variable values and units.
+"""
+
 import sys
 import time
 
@@ -39,7 +43,7 @@ def set_values_gui(prob, vars_to_set=None, initial_depth=None, ivc_only=True,
 
     vars_to_set : None or list
         Used to set the initial set of input boxes visible. for If None, then no input boxes
-        visible. If a list, a list of promoted
+        visible. If a list, a list of promoted.
 
     initial_depth : None or int
         Used to set the initial set of depth of the hierarchy displayed. If None, the full
@@ -47,18 +51,22 @@ def set_values_gui(prob, vars_to_set=None, initial_depth=None, ivc_only=True,
 
     ivc_only : bool
         If True, only inputs connected to IVCs are displayed in the hierarchy. If False,
-        all inputs are displayed in the hierarchy
+        all inputs are displayed in the hierarchy.
 
     pause_time : double
         Large hierarchies can cause the ipytree library to generate errors due to some messaging
         buffer overruns. To prevent that, a small pause is needed between ipytree widget
         creations. Usually the default should be fine, but if errors are being generated, the
-        user can try setting this value to a value larger than the default
+        user can try setting this value to a value larger than the default.
 
     debug : bool
-        If True, a text box widget is displayed with some debugging info
-    """
+        If True, a text box widget is displayed with some debugging info.
 
+    Returns
+    -------
+    HBox
+        The widget for the entire GUI.
+    """
     ui = SetValuesUI(prob, vars_to_set=vars_to_set, initial_depth=initial_depth,
                      ivc_only=ivc_only, pause_time=pause_time, debug=debug)
     ui.setup()
@@ -66,6 +74,70 @@ def set_values_gui(prob, vars_to_set=None, initial_depth=None, ivc_only=True,
 
 
 class SetValuesUI(object):
+    """
+    Class used to encapsulate all the data and methods for creating the set var values GUI.
+
+    Parameters
+    ----------
+    prob : Problem
+        The Problem that will be used to populate the GUI.
+    vars_to_set : None or list
+        Used to set the initial set of input boxes visible. for If None, then no input boxes
+        visible. If a list, a list of promoted.
+    initial_depth : None or int
+        Used to set the initial set of depth of the hierarchy displayed. If None, the full
+        hierarchy is displayed. This could be useful for very large hierarchies.
+    ivc_only : bool
+        If True, only inputs connected to IVCs are displayed in the hierarchy. If False,
+        all inputs are displayed in the hierarchy.
+    pause_time : double
+        Large hierarchies can cause the ipytree library to generate errors due to some messaging
+        buffer overruns. To prevent that, a small pause is needed between ipytree widget
+        creations. Usually the default should be fine, but if errors are being generated, the
+        user can try setting this value to a value larger than the default.
+    debug : bool
+        If True, a text box widget is displayed with some debugging info.
+
+    Attributes
+    ----------
+    _prob : Problem
+        The Problem that will be used to populate the GUI.
+    _vars_to_set : None or list
+        Used to set the initial set of input boxes visible. for If None, then no input boxes
+        visible. If a list, a list of promoted.
+    _initial_depth : None or int
+        Used to set the initial set of depth of the hierarchy displayed. If None, the full
+        hierarchy is displayed. This could be useful for very large hierarchies.
+    _ivc_only : bool
+        If True, only inputs connected to IVCs are displayed in the hierarchy. If False,
+        all inputs are displayed in the hierarchy.
+    _pause_time : double
+        Large hierarchies can cause the ipytree library to generate errors due to some messaging
+        buffer overruns. To prevent that, a small pause is needed between ipytree widget
+        creations. Usually the default should be fine, but if errors are being generated, the
+        user can try setting this value to a value larger than the default.
+    _debug : bool
+        If True, a text box widget is displayed with some debugging info.
+    _value_widget_box : VBox widget
+        The widget used to contain all the var values data entry fields.
+    _tree : Tree
+        The ipytree widget which displays the model hierarchy.
+    ui_widget : HBox
+        The HBox contains the entire GUI widget.
+    _refresh_in_progress : bool
+        A flag used to prevent a circular loop of handler calls for the widgets.
+    _units_update_due_to_handler : bool
+        Flag to prevent unneeded update to the units entry widgets.
+    _abs2prom_inputs : dict
+        Convenience var to avoid using the longer equivalent model._var_allprocs_abs2prom['input'].
+    _prom2abs_inputs : dict
+        Convenience var to avoid using the longer equivalent model._var_allprocs_prom2abs['input'].
+    _inputs_connected_to_ivc : list
+        List of all the model's inputs that are connected to IVCs.
+    _output : Output widget
+        Widget used to display debugging messages.
+    """
+
     def __init__(self, prob, vars_to_set=None, initial_depth=None, ivc_only=True,
                  pause_time=_DEFAULT_PAUSE_TIME, debug=False):
         """
@@ -136,12 +208,17 @@ class SetValuesUI(object):
     def display(self):
         """
         Cause the GUI to be displayed in the notebook.
+
+        Returns
+        -------
+        HBox
+            The widget for the entire GUI.
         """
         return self._ui_widget
 
     def _set_vars_from_model_with_initial_list(self, system, node, depth, vars_to_set=None):
         """
-        Populate the model tree selector widget. This method is called recursively
+        Populate the model tree selector widget. This method is called recursively.
 
         Parameters
         ----------
@@ -158,7 +235,6 @@ class SetValuesUI(object):
             Used to set the initial set of input boxes visible. for If None, then no input boxes
             visible. If a list, a list of promoted
         """
-
         if system.name == '_auto_ivc':  # AutoIndepVarComp
             return
 
@@ -241,8 +317,7 @@ class SetValuesUI(object):
 
     def _add_value_widget(self, system, prom_name, tree_node):
         """
-        Add a value widget to the Model Variables section of the GUI so the user
-        can set the value and units of the variable
+        Add value and units widgets to the Model Variables section.
 
         Parameters
         ----------
@@ -255,7 +330,6 @@ class SetValuesUI(object):
         tree_node : ipytree Node
             The node in the ipytree hierarchy that represents this variable
         """
-
         # check to see if the variable already has entry box
         prom2abs_list = system._var_allprocs_prom2abs_list['input']
         abs_name = prom2abs_list[prom_name][0]
@@ -335,14 +409,12 @@ class SetValuesUI(object):
 
     def _on_selected_change(self, change):
         """
-        The handler for variable nodes in the hierarchy. This is called if the node is
-        clicked on
+        Handle changes for variable nodes in the hierarchy. Called if node is clicked on.
 
         Parameters
         ----------
         change : dict
             A dictionary holding the information about the change
-
         """
         tree_node = change['new'][0]
         var_name = tree_node.name
@@ -353,14 +425,12 @@ class SetValuesUI(object):
 
     def _remove_val_widget(self, button):
         """
-        The handler for Button that lets users remove variable entry boxes from the Model
-        Variable section of the GUI
+        Handle Button click that lets users remove variable entry boxes.
 
         Parameters
         ----------
         button : ipywidget Button
-            The remove Button that was clicked on
-
+            The remove Button that was clicked on.
         """
         box_to_remove = button._val_and_units_remove_widget
 
@@ -375,14 +445,12 @@ class SetValuesUI(object):
 
     def _refresh_ui_with_problem_data(self, button):
         """
-        The handler for Button that causes the values in the Model Variables section of the
-        GUI to be updated with the current values of the model
+        Handle Button that syncs the GUI with the current values of the model.
 
         Parameters
         ----------
         button : ipywidget Button
-            The refresh Button that was clicked on
-
+            The refresh Button that was clicked on.
         """
         # A kind of circular loop can happen. This code changes the value of the variable widgets
         #    which causes the handler for those widgets to fire. So use this flag to prevent that
@@ -400,7 +468,7 @@ class SetValuesUI(object):
 
     def _update_prob_val(self, change):
         """
-        The handler for variable value text box. This is called if the value in the box changes
+        Handle for variable value text box. This is called if the value in the box changes.
 
         Parameters
         ----------
@@ -426,7 +494,7 @@ class SetValuesUI(object):
 
     def _update_prob_unit(self, change):
         """
-        The handler for variable units text box. This is called if the value in the box changes
+        Handle for variable units text box. This is called if the value in the box changes.
 
         Parameters
         ----------
@@ -452,7 +520,7 @@ class SetValuesUI(object):
         metadata = inputs_metadata[abs_name]
         units_default = metadata['units']
 
-        if not is_compatible_handles_None(units_default, units):
+        if not _is_compatible_handles_None(units_default, units):
             display(HTML(f"<script>alert('Units \"{units}\" is not "
                          f"compatible with units \"{units_old}\"');</script>"))
             self._units_update_due_to_handler = True
@@ -478,8 +546,7 @@ class SetValuesUI(object):
 
     def _get_var_names_at_this_level(self, system):
         """
-        Get the list of all the variables that have been promoted to this System, system, and no
-        higher.
+        Get list of all variables that have been promoted to this System, system, and no higher.
 
         Parameters
         ----------
@@ -525,8 +592,7 @@ class SetValuesUI(object):
 
     def _does_parent_sys_have_this_var_promoted(self, system, abs_name):
         """
-        Check to see if the parent System of 'system' has the variable 'abs_name' promoted to it's
-        level.
+        Check if the parent System of 'system' has the variable 'abs_name' promoted to it's level.
 
         Parameters
         ----------
@@ -539,7 +605,7 @@ class SetValuesUI(object):
 
         Returns
         -------
-        boot
+        bool
             True of the variable 'abs_name' is promoted to the parent of 'system', or higher.
         """
         #  TODO. It works for when system is model, but should really handle that explicitly
@@ -562,7 +628,23 @@ class SetValuesUI(object):
             raise(f"shouldn't happen! {abs_name} not found in var for {parent_pathname}")
 
 
-def is_compatible_handles_None(old_units, new_units):
+def _is_compatible_handles_None(old_units, new_units):
+    """
+    Check to see if old & new units are compatible. Handles the case when they are None.
+
+    Parameters
+    ----------
+    old_units : str or None
+        Original units as a string or None
+
+    new_units : str or None
+        New units as a string or None
+
+    Returns
+    -------
+    bool
+        True if the units are compatible.
+    """
     old_units = _find_unit(old_units, error=False)
     new_units = _find_unit(new_units, error=False)
 
