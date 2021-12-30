@@ -367,6 +367,8 @@ class System(object):
     _tot_jac : __TotalJacInfo or None
         If a total jacobian is being computed and this is the top level System, this will
         be a reference to the _TotalJacInfo object.
+    _resp_indices_map : dict
+        Dictionary of responses and their indices to warn against overlap
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -519,6 +521,7 @@ class System(object):
         self._coloring_info = _DEFAULT_COLORING_META.copy()
         self._first_call_to_linearize = True   # will check in first call to _linearize
         self._tot_jac = None
+        self._resp_indices_map = {}
 
     @property
     def msginfo(self):
@@ -1573,7 +1576,7 @@ class System(object):
             for res in responses:
                 if responses[res]['path'] is not None and responses[res]['path'] not in responses:
                     raise RuntimeError(f"Alias '{res}' is not needed when only "
-                                        "adding one constraint to model")
+                                       f"adding one constraint to model")
             return self.get_relevant_vars(desvars, responses, mode)
 
         return {'@all': ({'input': ContainsAll(), 'output': ContainsAll()}, ContainsAll())}
@@ -2684,6 +2687,23 @@ class System(object):
             resp['name'] = name
             resp['path'] = None
 
+        if indices is not None:
+            if name in self._resp_indices_map:
+                if resp['path'] is not None:
+                    msg = (f"{self.msginfo}: '{resp['name']}' indices are overlapping its parent "
+                           f"constraint/objective '{resp['path']}'.")
+                    if isinstance(indices, list):
+                        for idx in indices:
+                            if idx in self._resp_indices_map[name]:
+                                raise RuntimeError(msg)
+                    elif isinstance(indices, slice):
+                        if indices.start >= min(self._resp_indices_map[name]) or \
+                                indices.stop <= max(self._resp_indices_map[name]):
+                            raise RuntimeError(msg)
+                self._resp_indices_map[name] = np.append(self._resp_indices_map[name], indices)
+            else:
+                self._resp_indices_map[name] = np.array(indices)
+
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
         ref0 = format_as_float_or_array('ref0', ref0, val_if_none=None, flatten=True)
@@ -3119,6 +3139,8 @@ class System(object):
                     if data['path'] is None:
                         abs_name = prom2abs_out[name][0]
                     else:
+                        if data['path'] in prom2abs_out:
+                            data['path'] = prom2abs_out[data['path']][0]
                         abs_name = data['name']
                     out[abs_name] = data
                     out[abs_name]['ivc_source'] = abs_name
@@ -3133,6 +3155,8 @@ class System(object):
                         ivc_path = conns[in_abs]
                     else:
                         in_abs = data['name']
+                        if data['path'] in prom2abs_out:
+                            data['path'] = prom2abs_out[data['path']][0]
                         ivc_path = data['path']
                     distrib = ivc_path in abs2meta_out and abs2meta_out[ivc_path]['distributed']
                     if use_prom_ivc:

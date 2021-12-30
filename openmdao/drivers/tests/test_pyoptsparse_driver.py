@@ -2360,7 +2360,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         p.model.add_design_var('exec.a', lower=-1000, upper=1000)
         p.model.add_objective('exec.z', index=50)
-        p.model.add_constraint('exec.z', indices=[0], equals=25)
+        p.model.add_constraint('exec.z', indices=[0], equals=25, alias="ALIAS_TEST")
 
         p.driver = om.pyOptSparseDriver(optimizer='SNOPT')
         p.driver.opt_settings['iSumm'] = 6
@@ -2373,6 +2373,69 @@ class TestPyoptSparse(unittest.TestCase):
 
         assert_near_equal(p.get_val('exec.z')[0], 25)
         assert_near_equal(p.get_val('exec.z')[50], -75)
+
+    def test_multi_constraint_promotes(self):
+        p = om.Problem()
+
+        exec = om.ExecComp(['y = x**2',
+                            'z = a + x**2'],
+                            a={'shape': (1,)},
+                            y={'shape': (101,)},
+                            x={'shape': (101,)},
+                            z={'shape': (101,)})
+
+        p.model.add_subsystem('exec', exec, promotes=['*'])
+
+        p.model.add_design_var('a', lower=-1000, upper=1000)
+        p.model.add_objective('y', index=50)
+        p.model.add_constraint('z', indices=[-1], lower=0)
+        p.model.add_constraint('z', indices=[50], equals=-70, alias="ALIAS_TEST")
+
+        p.driver = om.pyOptSparseDriver(optimizer='SNOPT')
+        p.driver.opt_settings['iSumm'] = 6
+
+        p.setup()
+
+        p.set_val('x', np.linspace(-10, 10, 101))
+
+        p.run_driver()
+
+        print(p.get_val('z'))
+        assert_near_equal(p.get_val('z')[-1], 30)
+        assert_near_equal(p.get_val('z')[50], -70)
+
+    def test_overlapping_response_indices(self):
+        p = om.Problem()
+
+        exec = om.ExecComp(['y = x**2',
+                            'z = a + x**2'],
+                            a={'shape': (1,)},
+                            y={'shape': (101,)},
+                            x={'shape': (101,)},
+                            z={'shape': (101,)})
+
+        p.model.add_subsystem('exec', exec)
+
+        p.model.add_design_var('exec.a', lower=-1000, upper=1000)
+        p.model.add_objective('exec.y', index=50)
+        p.model.add_constraint('exec.z', indices=[0, 1], equals=25)
+
+        msg = "<class Group>: 'ALIAS_TEST' indices are overlapping its parent constraint/objective 'exec.z'."
+        with self.assertRaises(RuntimeError) as ctx:
+            p.model.add_constraint('exec.z', indices=om.slicer[1:10], lower=20, alias="ALIAS_TEST")
+
+        print(str(ctx.exception))
+        self.assertEqual(str(ctx.exception), msg)
+
+        with self.assertRaises(RuntimeError) as ctx:
+            p.model.add_constraint('exec.z', indices=[0], lower=20, alias="ALIAS_TEST")
+
+        self.assertEqual(str(ctx.exception), msg)
+
+        with self.assertRaises(RuntimeError) as ctx:
+            p.model.add_constraint('exec.z', indices=[1, 2], lower=20, alias="ALIAS_TEST")
+
+        self.assertEqual(str(ctx.exception), msg)
 
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")

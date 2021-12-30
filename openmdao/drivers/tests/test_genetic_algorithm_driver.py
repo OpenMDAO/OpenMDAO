@@ -807,7 +807,7 @@ class TestConstrainedSimpleGA(unittest.TestCase):
         self.assertAlmostEqual(prob['radius'], 0.5, 1)  # it is going to the unconstrained optimum
         self.assertAlmostEqual(prob['height'], 0.5, 1)  # it is going to the unconstrained optimum
 
-    def test_obj_and_con_same_var_different_indices():
+    def test_obj_and_con_same_var_different_indices(self):
 
         import openmdao.api as om
 
@@ -825,7 +825,7 @@ class TestConstrainedSimpleGA(unittest.TestCase):
         p.model.add_design_var('exec.a', lower=-1000, upper=1000)
         p.model.add_objective('exec.y', index=50)
         p.model.add_constraint('exec.z', indices=[-1], lower=0)
-        p.model.add_constraint('exec.z', indices=[50], equals=-70, alias="ALIAS_TEST")
+        p.model.add_constraint('exec.z', indices=[50], equals=30, alias="ALIAS_TEST")
 
         p.driver = om.SimpleGADriver()
 
@@ -836,10 +836,10 @@ class TestConstrainedSimpleGA(unittest.TestCase):
         p.run_driver()
 
         print(p.get_val('exec.z'))
-        assert_near_equal(p.get_val('exec.z')[-1], 30)
-        assert_near_equal(p.get_val('exec.z')[50], -75)
+        assert_near_equal(p.get_val('exec.z')[-1], 130)
+        assert_near_equal(p.get_val('exec.z')[50], 30)
 
-    def test_multiple_con_and_obj():
+    def test_multiple_con_and_obj(self):
 
         p = om.Problem()
 
@@ -854,7 +854,7 @@ class TestConstrainedSimpleGA(unittest.TestCase):
 
         p.model.add_design_var('exec.a', lower=-1000, upper=1000)
         p.model.add_objective('exec.z', index=50)
-        p.model.add_constraint('exec.z', indices=[0], lower=-200, alias="ALIAS_TEST")
+        p.model.add_constraint('exec.z', indices=[0], equals=-300, alias="ALIAS_TEST")
 
         p.driver = om.SimpleGADriver()
 
@@ -864,9 +864,8 @@ class TestConstrainedSimpleGA(unittest.TestCase):
 
         p.run_driver()
 
-        print(p.get_val('exec.z'))
-        assert_near_equal(p.get_val('exec.z')[0], -200)
-        assert_near_equal(p.get_val('exec.z')[50], -300)
+        assert_near_equal(p.get_val('exec.z')[0], -300)
+        assert_near_equal(p.get_val('exec.z')[50], -400)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
