@@ -1,5 +1,49 @@
 ***********************************
-# Release Notes for OpenMDAO 3.14.0
+# Release Notes for OpenMDAO 3.16.0
+
+January 06, 2022
+
+OpenMDAO 3.16.0 fixes the definition of the "Kelvin as energy" unit, improves documentation and exception handling, adds verification that options names are valid python names, and adds improvements to the N2 visualization.
+
+
+We've also adjusted our nomenclature with respect to parallel processing.
+Instead of inputs and outputs either being "distributed" or "serial", we now refer to them as "distributed" or "non-distributed."
+
+## New Deprecations
+
+- Added deprecation if options names are not valid python names. [#2378](https://github.com/OpenMDAO/OpenMDAO/pull/2378)
+
+## Backwards Incompatible API Changes
+
+- None
+
+## Backwards Incompatible Non-API Changes
+
+- None
+
+## New Features
+
+- If no explicit name given to a Problem, assign one automatically. [#2368](https://github.com/OpenMDAO/OpenMDAO/pull/2368)
+- Added fwd/rev coloring support for function comps (using jax). [#2370](https://github.com/OpenMDAO/OpenMDAO/pull/2370)
+- Added deprecation if options names are not valid python names. [#2378](https://github.com/OpenMDAO/OpenMDAO/pull/2378)
+- Added traceback information in a few places where OpenMDAO handles then re-raises exceptions. [#2384](https://github.com/OpenMDAO/OpenMDAO/pull/2384)
+
+## Bug Fixes
+
+- Replaced np.bool with bool to silence numpy deprecation. [#2375](https://github.com/OpenMDAO/OpenMDAO/pull/2375)
+- Fixed 'Ken' (kelvin-as-energy-unit) definition based on 2018 standard. [#2386](https://github.com/OpenMDAO/OpenMDAO/pull/2386)
+
+## Miscellaneous
+
+- Added a search box to the N2 variable selection dialog. [#2361](https://github.com/OpenMDAO/OpenMDAO/pull/2361)
+- Removed Deprecation Warning For Serial to Distributed IO Connections. [#2363](https://github.com/OpenMDAO/OpenMDAO/pull/2363)
+- Added a complex step summary notebook. [#2376](https://github.com/OpenMDAO/OpenMDAO/pull/2376)
+- Removed old 'experimental docs' directory. [#2382](https://github.com/OpenMDAO/OpenMDAO/pull/2382)
+- Updated ISSUE_TEMPLATE to remove redundant summary section.  [#2388](https://github.com/OpenMDAO/OpenMDAO/pull/2388)
+- Overhaul documentation for matrix-free derivatives on components with distributed variables. [#2390](https://github.com/OpenMDAO/OpenMDAO/pull/2390)
+
+***********************************
+# Release Notes for OpenMDAO 3.15.0
 
 November 24, 2021
 
