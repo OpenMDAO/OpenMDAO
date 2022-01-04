@@ -2529,7 +2529,6 @@ class System(object):
                 raise(ValueError(f"{str(e)[:-1]} for design_var '{name}'."))
 
         dv = OrderedDict()
-        dv['name'] = name
 
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
@@ -2575,7 +2574,7 @@ class System(object):
             adder = None
         dv['adder'] = adder
 
-        # dv['name'] = name
+        dv['name'] = name
         dv['upper'] = upper
         dv['lower'] = lower
         dv['ref'] = ref
@@ -2763,9 +2762,6 @@ class System(object):
             resp['equals'] = equals
             resp['linear'] = linear
             if indices is not None:
-                # if (name in self._responses or name in self._static_responses):
-                #     if (indices != int(self._static_responses[name]['indices']())):
-                #         indices.append(int(self._static_responses[name]['indices']()))
                 indices, size = self._create_indexer(indices, resp_types[type_], name,
                                                      flat_src=flat_indices)
                 if size is not None:
@@ -4752,6 +4748,9 @@ class System(object):
                                 vdict[ivc_path] = discrete_vec[ivc_path[offset:]]['val']
                 else:
                     for name in variables:
+                        if name in self._responses and 'path' in self._responses[name] and \
+                                self._responses[name]['path'] is not None:
+                            name = self._responses[name]['path']
                         if vec._contains_abs(name):
                             vdict[name] = get(name, False)
                         else:
@@ -4762,6 +4761,9 @@ class System(object):
                 vdict = {}
                 if discrete_vec:
                     for name in variables:
+                        if name in self._responses and 'path' in self._responses[name] and \
+                                self._responses[name]['path'] is not None:
+                            name = self._responses[name]['path']
                         if vec._contains_abs(name):
                             vdict[name] = get(name, get_remote=True, rank=0,
                                               vec_name=vec_name, kind=kind)
@@ -5037,11 +5039,9 @@ class System(object):
                     system = parts[0]
                     graph.add_edge(system, dv)
 
-        for res, meta in responses.items():
+        for res in responses:
             if res not in graph:
                 graph.add_node(res, type_='out')
-                # if meta['path'] is not None:
-                #     res = meta['path']
                 parts = res.rsplit('.', 1)
                 if len(parts) == 1:
                     system = ''  # this happens when a component is the model

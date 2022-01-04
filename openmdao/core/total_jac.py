@@ -906,8 +906,6 @@ class _TotalJacInfo(object):
                     size = voi['size']
                 indices = vois[name]['indices']
             else:
-                # if 'path' in voi and voi['path'] is not None:
-                #     name = voi['path']
                 size = abs2meta_out[name]['global_size']
                 indices = None
 
