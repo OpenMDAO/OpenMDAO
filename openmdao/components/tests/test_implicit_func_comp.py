@@ -7,55 +7,13 @@ from scipy.optimize import newton
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
 import openmdao.func_api as omf
+from openmdao.core.tests.test_partial_color import _check_partial_matrix
 
-from openmdao.core.tests.test_fd_color import _check_partial_matrix
-
-
-def _partials_implicit_2in2out(mode, method, use_jit):
-
-    def apply_nl(x1, x2, y1, y2):
-        mat = np.array([[0.11534105, 0.9799784 , 0.        , 0.86227559, 0.        ],
-                        [0.        , 0.20731316, 0.89688114, 0.96884353, 0.        ],
-                        [0.        , 0.        , 0.97299632, 0.68203646, 0.75099805],
-                        [0.42413042, 0.7716147 , 0.        , 0.        , 0.        ],
-                        [0.        , 0.        , 0.51819104, 0.        , 0.43046408]])
-        vec = np.hstack((x1 - y1, x2 - y2))
-        result = mat.dot(vec)
-        return result[:3], result[3:]
-
-    f = (omf.wrap(apply_nl)
-            .add_input('x1', shape=3)
-            .add_input('x2', shape=2)
-            .add_output('y1', resid='R_y1', shape=3)
-            .add_output('y2', resid='R_y2', shape=2)
-            .declare_partials(of='*', wrt='*', method=method)
-        )
-
-    prob = om.Problem()
-    model = prob.model
-
-    comp = model.add_subsystem('comp', om.ImplicitFuncComp(f, use_jit=use_jit))
-    comp.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, iprint=0)
-    comp.linear_solver = om.DirectSolver()
-
-    prob.setup(check=False, mode=mode)
-
-    prob['comp.y1'] = -3.
-    prob['comp.y2'] = 3
-    prob.set_solver_print(level=0)
-    prob.run_model()
-
-    jac = comp._jacobian._subjacs_info
-    # redefining the same mat as used above here because mat above needs to be
-    # internal to the func in order to be contained in a jax_context (which converts
-    # np to jnp and numpy to jnp to make jax happy but allowing user to define the function
-    # using normal numpy)
-    check = np.array([[0.11534105, 0.9799784 , 0.        , 0.86227559, 0.        ],
-                        [0.        , 0.20731316, 0.89688114, 0.96884353, 0.        ],
-                        [0.        , 0.        , 0.97299632, 0.68203646, 0.75099805],
-                        [0.42413042, 0.7716147 , 0.        , 0.        , 0.        ],
-                        [0.        , 0.        , 0.51819104, 0.        , 0.43046408]])
-    _check_partial_matrix(comp, jac, check, method)
+try:
+    import jax
+    import jax.numpy as jnp
+except ImportError:
+    jax = None
 
 
 class TestImplicitFuncComp(unittest.TestCase):
@@ -102,10 +60,12 @@ class TestImplicitFuncComp(unittest.TestCase):
             val = model.lingrp.lin._residuals['x']
             assert_near_equal(val, np.zeros((3, )), tolerance=1e-8)
 
-    def test_apply_nonlinear_linsys_coloring(self):
+    def setup_apply_nonlinear_linsys_coloring(self, method, mode):
 
-        x_=np.array([1, 2, -3])
+        x_=np.array([[1], [2], [-3]])
         A = np.array([[5.0, 0., 2.0], [1.0, 7.0, 0.], [1.0, 0.0, 0.]])
+        if mode == 'rev':
+            A = A.T
         b = A.dot(x_)
 
         def resid_func(A, b, x):
@@ -116,7 +76,7 @@ class TestImplicitFuncComp(unittest.TestCase):
                 .add_input('A', shape=A.shape)
                 .add_input('b', shape=b.shape)
                 .add_output('x', resid='rx', val=x_)
-                .declare_coloring(wrt='*', method='cs')
+                .declare_coloring(wrt='*', method=method)
                 )
 
         prob = om.Problem()
@@ -133,12 +93,30 @@ class TestImplicitFuncComp(unittest.TestCase):
         model.connect('p1.A', 'comp.A')
         model.connect('p2.b', 'comp.b')
 
-        prob.setup()
+        prob.setup(mode=mode)
 
         prob.set_solver_print(level=0)
         prob.run_model()
+        return prob
 
-        assert_check_partials(prob.check_partials(includes=['comp'], out_stream=None), atol=1e-5)
+    def test_apply_nonlinear_linsys_coloring_cs(self):
+        prob = self.setup_apply_nonlinear_linsys_coloring('cs', 'fwd')
+        partials = prob.check_partials(includes=['comp'], out_stream=None)
+        assert_check_partials(partials, atol=1e-5)
+        assert_check_totals(prob.check_totals(of=['comp.x'], wrt=['comp.A', 'comp.b'], out_stream=None), atol=3e-5, rtol=3e-5)
+
+    @unittest.skipIf(jax is None, "jax is not installed")
+    def test_apply_nonlinear_linsys_coloring_jax_fwd(self):
+        prob = self.setup_apply_nonlinear_linsys_coloring('jax', 'fwd')
+        partials = prob.check_partials(includes=['comp'], out_stream=None)
+        assert_check_partials(partials, atol=1e-5)
+        assert_check_totals(prob.check_totals(of=['comp.x'], wrt=['comp.A', 'comp.b'], out_stream=None), atol=3e-5, rtol=3e-5)
+
+    @unittest.skipIf(jax is None, "jax is not installed")
+    def test_apply_nonlinear_linsys_coloring_jax_rev(self):
+        prob = self.setup_apply_nonlinear_linsys_coloring('jax', 'rev')
+        partials = prob.check_partials(includes=['comp'], out_stream=None)
+        assert_check_partials(partials, atol=1e-5)
         assert_check_totals(prob.check_totals(of=['comp.x'], wrt=['comp.A', 'comp.b'], out_stream=None), atol=3e-5, rtol=3e-5)
 
     def test_component_model_w_linearize(self):
@@ -184,7 +162,7 @@ class TestImplicitFuncComp(unittest.TestCase):
 
         p_opt = om.Problem()
 
-        p_opt.model = om.ImplicitFuncComp(f, linearize=linearize)
+        p_opt.model = om.ImplicitFuncComp(f, linearize=linearize,)
 
         p_opt.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, iprint=0)
         p_opt.model.linear_solver = om.DirectSolver(assemble_jac=True)
@@ -424,9 +402,141 @@ class TestImplicitFuncComp(unittest.TestCase):
         assert_check_partials(p.check_partials(includes=['comp'], out_stream=None), atol=1e-5)
         assert_check_totals(p.check_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'], out_stream=None))
 
-    def test_partials_implicit_2in2out_fwd_cs_nojit(self):
-        _partials_implicit_2in2out(mode='fwd', method='cs', use_jit=False)
 
+@unittest.skipIf(jax is None, "jax is not installed")
+class TestJax(unittest.TestCase):
+    def check_derivs(self, mode, use_jit, nondiff):
+        if nondiff:
+            def apply_nl(a, b, c, x, ex1, ex2):
+                R_x = a * x ** 2 + b * x + c
+                return R_x
+
+            def solve_nl(a, b, c, x, ex1, ex2):
+                x = (-b + (b ** 2 - 4 * a * c) ** 0.5) / (2 * a)
+                return x
+
+            f = (omf.wrap(apply_nl)
+                    .add_output('x', resid='R_x', val=0.0)
+                    .declare_option('ex1', default='foo')
+                    .declare_option('ex2', default='bar')
+                    .declare_partials(of='*', wrt='*', method='jax')
+                    )
+        else:
+            def apply_nl(a, b, c, x):
+                R_x = a * x ** 2 + b * x + c
+                return R_x
+
+            def solve_nl(a, b, c, x):
+                x = (-b + (b ** 2 - 4 * a * c) ** 0.5) / (2 * a)
+                return x
+
+            f = (omf.wrap(apply_nl)
+                    .add_output('x', resid='R_x', val=0.0)
+                    .declare_partials(of='*', wrt='*', method='jax')
+                    )
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ImplicitFuncComp(f, solve_nonlinear=solve_nl, use_jit=use_jit))
+
+        # need this since comp is implicit and doesn't have a solve_linear
+        p.model.comp.linear_solver = om.DirectSolver()
+
+        p.setup(check=True, mode=mode)
+
+        p.set_val('comp.a', 1.)
+        p.set_val('comp.b', -4.)
+        p.set_val('comp.c', 3.)
+        p.run_model()
+
+        J = p.compute_totals(wrt=['comp.a', 'comp.b', 'comp.c'], of=['comp.x', 'comp.x'])
+        assert_near_equal(J['comp.x', 'comp.a'], [[-4.5]])
+        assert_near_equal(J['comp.x', 'comp.b'], [[-1.5]])
+        assert_near_equal(J['comp.x', 'comp.c'], [[-0.5]])
+
+    def test_fwd(self):
+        self.check_derivs('fwd', use_jit=False, nondiff=False)
+
+    def test_fwd_jit(self):
+        self.check_derivs('fwd', use_jit=True, nondiff=False)
+
+    def test_rev(self):
+        self.check_derivs('rev', use_jit=False, nondiff=False)
+
+    def test_rev_jit(self):
+        self.check_derivs('rev', use_jit=True, nondiff=False)
+
+    def test_fwd_nondiff(self):
+        self.check_derivs('fwd', use_jit=False, nondiff=True)
+
+    def test_fwd_jit_nondiff(self):
+        self.check_derivs('fwd', use_jit=True, nondiff=True)
+
+    def test_rev_nondiff(self):
+        self.check_derivs('rev', use_jit=False, nondiff=True)
+
+    def test_rev_jit_nondiff(self):
+        self.check_derivs('rev', use_jit=True, nondiff=True)
+
+    def _partials_implicit_2in2out(self, mode, method, use_jit):
+
+        def apply_nl(x1, x2, y1, y2):
+            mat = np.array([[0.11534105, 0.9799784 , 0.        , 0.86227559, 0.        ],
+                            [0.        , 0.20731316, 0.89688114, 0.96884353, 0.        ],
+                            [0.        , 0.        , 0.97299632, 0.68203646, 0.75099805],
+                            [0.42413042, 0.7716147 , 0.        , 0.        , 0.        ],
+                            [0.        , 0.        , 0.51819104, 0.        , 0.43046408]])
+            vec = np.hstack((x1 - y1, x2 - y2))
+            result = mat.dot(vec)
+            return result[:3], result[3:]
+
+        f = (omf.wrap(apply_nl)
+             .add_input('x1', shape=3)
+             .add_input('x2', shape=2)
+             .add_output('y1', resid='R_y1', shape=3)
+             .add_output('y2', resid='R_y2', shape=2)
+             .declare_partials(of='*', wrt='*', method=method)
+            )
+
+        prob = om.Problem()
+        model = prob.model
+
+        comp = model.add_subsystem('comp', om.ImplicitFuncComp(f, use_jit=use_jit))
+        comp.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, iprint=0)
+        comp.linear_solver = om.DirectSolver()
+
+        prob.setup(check=False, mode=mode)
+
+        prob['comp.y1'] = -3.
+        prob['comp.y2'] = 3
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        jac = comp._jacobian._subjacs_info
+        # redefining the same mat as used above here because mat above needs to be
+        # internal to the func in order to be contained in a jax_context (which converts
+        # np to jnp and numpy to jnp to make jax happy but allowing user to define the function
+        # using normal numpy)
+        check = np.array([[0.11534105, 0.9799784 , 0.        , 0.86227559, 0.        ],
+                            [0.        , 0.20731316, 0.89688114, 0.96884353, 0.        ],
+                            [0.        , 0.        , 0.97299632, 0.68203646, 0.75099805],
+                            [0.42413042, 0.7716147 , 0.        , 0.        , 0.        ],
+                            [0.        , 0.        , 0.51819104, 0.        , 0.43046408]])
+        _check_partial_matrix(comp, jac, check, method)
+
+    def test_partials_implicit_2in2out_fwd_jax_nojit(self):
+        self._partials_implicit_2in2out(mode='fwd', method='jax', use_jit=False)
+
+    def test_partials_implicit_2in2out_fwd_jax_jit(self):
+        self._partials_implicit_2in2out(mode='fwd', method='jax', use_jit=True)
+
+    def test_partials_implicit_2in2out_rev_jax_nojit(self):
+        self._partials_implicit_2in2out(mode='rev', method='jax', use_jit=False)
+
+    def test_partials_implicit_2in2out_rev_jax_jit(self):
+        self._partials_implicit_2in2out(mode='rev', method='jax', use_jit=True)
+
+    def test_partials_implicit_2in2out_fwd_cs_nojit(self):
+        self._partials_implicit_2in2out(mode='fwd', method='cs', use_jit=False)
 
 if __name__ == "__main__":
     unittest.main()

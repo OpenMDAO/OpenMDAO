@@ -12,11 +12,11 @@ from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 
 
 class MetaModelUnStructuredComp(ExplicitComponent):
-    """
+    r"""
     Class that creates a reduced order model for outputs from inputs.
 
     Each output may have its own surrogate model.
-    Training inputs and outputs are automatically created with 'train:' prepended to the
+    Training inputs and outputs are automatically created with 'train\_' prepended to the
     corresponding input/output name.
 
     For a Float variable, the training data is an array of length m,
@@ -149,10 +149,15 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             self._input_size += input_size
         surrogate_input_names.append((name, input_size))
 
-        train_name = 'train:%s' % name
-        self.options.declare(train_name, default=None, desc='Training data for %s' % name)
+        train_name = f'train:{name}'
+        good_name = f'train_{name}'
+        self.options.declare(train_name, default=None, desc='Training data for %s' % name,
+                             deprecation=(f"The option '{train_name}' has been deprecated because "
+                                          f"it's not a valid python name.  Use '{good_name}' "
+                                          "instead.", good_name))
+        self.options.declare(good_name, default=None, desc='Training data for %s' % name)
         if training_data is not None:
-            self.options[train_name] = training_data
+            self.options[good_name] = training_data
 
         return metadata
 
@@ -209,10 +214,16 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         else:
             metadata['default_surrogate'] = True
 
-        train_name = 'train:%s' % name
-        self.options.declare(train_name, default=None, desc='Training data for %s' % name)
+        train_name = f'train:{name}'
+        good_name = f'train_{name}'
+        self.options.declare(train_name, default=None, desc='Training data for %s' % name,
+                             deprecation=(f"The option '{train_name}' has been deprecated because "
+                                          f"it's not a valid python name.  Use '{good_name}' "
+                                          "instead.", good_name))
+        self.options.declare(good_name, default=None, desc='Training data for %s' % name)
+
         if training_data is not None:
-            self.options[train_name] = training_data
+            self.options[good_name] = training_data
 
         return metadata
 
@@ -558,7 +569,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         missing_training_data = []
         num_sample = None
         for name, _ in chain(self._surrogate_input_names, self._surrogate_output_names):
-            train_name = 'train:' + name
+            train_name = f'train_{name}'
             val = self.options[train_name]
             if val is None:
                 missing_training_data.append(train_name)
@@ -581,7 +592,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         # Assemble input data.
         idx = 0
         for name, sz in self._surrogate_input_names:
-            val = self.options['train:' + name]
+            val = self.options[f'train_{name}']
             if isinstance(val[0], float):
                 inputs[:, idx] = val
                 idx += 1
@@ -598,7 +609,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             outputs = np.zeros((num_sample, output_size))
             self._training_output[name] = outputs
 
-            val = self.options['train:' + name]
+            val = self.options[f'train_{name}']
 
             if isinstance(val[0], float):
                 outputs[:, 0] = val

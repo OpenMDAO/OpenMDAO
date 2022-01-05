@@ -197,7 +197,7 @@ def ensure_compatible(name, value, shape=None, indices=None):
     else:
         # shape is determined, if value is scalar assign it to array of shape
         # otherwise make sure value is an array of the determined shape
-        if np.isscalar(value) or value.shape == (1,):
+        if np.isscalar(value) or value.shape == () or value.shape == (1,):
             value = np.ones(shape) * value
         else:
             value = np.atleast_1d(value).astype(np.float64)
