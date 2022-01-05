@@ -37,12 +37,10 @@ optional_dependencies = {
         'pydocstyle==2.0.0',
         'testflo>=1.3.6'
         'websockets>8',
-        'aiounittest'
+        'aiounittest',
+        'playwright<1.15'
     ]
 }
-
-if sys.version_info >= (3, 7):
-    optional_dependencies['test'].append('playwright<1.15')
 
 # Add an optional dependency that concatenates all others
 optional_dependencies['all'] = sorted([
@@ -70,7 +68,6 @@ setup(
         'Operating System :: Microsoft :: Windows',
         'Topic :: Scientific/Engineering',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: Implementation :: CPython',
@@ -164,7 +161,7 @@ setup(
         ],
         'openmdao': ['*/tests/*.py', '*/*/tests/*.py', '*/*/*/tests/*.py']
     },
-    python_requires=">=3.6",
+    python_requires=">=3.7",
     install_requires=[
         'networkx>=2.0',
         'numpy',
