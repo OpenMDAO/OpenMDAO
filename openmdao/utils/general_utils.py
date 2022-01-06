@@ -967,38 +967,6 @@ def _is_slicer_op(indices):
     return isinstance(indices, slice)
 
 
-def _slice_indices(slicer, arr_size, arr_shape):
-    """
-    Return an index array based on a slice or slice tuple and the array size and shape.
-
-    Parameters
-    ----------
-    slicer : slice or tuple containing slices
-        Slice object to slice array
-    arr_size : int
-        Size of output array
-    arr_shape : tuple
-        Tuple of output array shape
-
-    Returns
-    -------
-    array
-        Returns the sliced indices.
-    """
-    if isinstance(slicer, slice):
-        # for a simple slice we can use less memory
-        start, stop, step = slicer.start, slicer.stop, slicer.step
-        if start is None:
-            start = 0
-        if stop is None:
-            stop = arr_size
-        if step is None:
-            step = 1
-        return np.arange(start, stop, step, dtype=INT_DTYPE).reshape(arr_shape)
-    else:
-        return np.arange(arr_size, dtype=INT_DTYPE).reshape(arr_shape)[slicer]
-
-
 def _prom2ivc_src_name_iter(prom_dict):
     """
     Yield keys from prom_dict with promoted input names converted to ivc source names.
