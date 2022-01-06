@@ -227,7 +227,6 @@
     padding: 20px 0 5px 0;
     margin-top: -20px;
     z-index: 35;
-    flex-direction: row;
     align-items: center;
 }
 
@@ -335,6 +334,10 @@
 	font-size: 13px !important;
 }
 
+.icon-collapse-target {
+    font-size: 30px !important;
+}
+
 .toolbar .fas {
     margin: 7px 0;
     color: white;
@@ -385,6 +388,14 @@
 
 .icon-question-circle:hover {
     opacity: 0.7;
+}
+
+.collapse-mode-cursor {
+    cursor: crosshair;
+}
+
+.filter-mode-cursor {
+    cursor: zoom-in;
 }
 
 /* Slider */

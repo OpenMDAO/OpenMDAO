@@ -472,17 +472,14 @@ class NodeInfo extends N2Window {
     activate() {
         this.active = true;
         this.hidden = false;
-        d3.selectAll('i.icon-info-circle').classed('active-tab-icon', true);
-        d3.select('#all_pt_n2_content_div').classed('node-data-cursor', true);
         return this;
     }
 
     /** Make the info box hidden if it's visible */
     deactivate() {
+        this.clear();
         this.active = false;
         this.hidden = true;
-        d3.selectAll('i.icon-info-circle').classed('active-tab-icon', false);
-        d3.select('#all_pt_n2_content_div').classed('node-data-cursor', false);
         return this;
     }
 

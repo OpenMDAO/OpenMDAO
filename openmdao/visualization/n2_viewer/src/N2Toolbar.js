@@ -381,6 +381,26 @@ class N2Toolbar {
                 self._setRootButton(target);
             }));
 
+        this._addButton(new N2ToolbarButtonClick('#collapse-target', tooltipBox,
+            "Select tree navigation mode",
+            function (target) {
+                n2ui.click.toggle('collapse');
+            }));
+
+        this._addButton(new N2ToolbarButtonClick('#collapse-target-2', tooltipBox,
+            "Enter collapse/expand mode",
+            function (target) {
+                n2ui.click.toggle('collapse');
+                self._setRootButton(target);
+            }));
+
+        this._addButton(new N2ToolbarButtonClick('#filter-target', tooltipBox,
+            "Enter variable filtering mode",
+            function (target) {
+                n2ui.click.toggle('filter');
+                self._setRootButton(target);
+            }));
+
         this._addButton(new N2ToolbarButtonClick('#linear-solver-button', tooltipBox,
             "Control solver tree display",
             function (target) {
@@ -440,8 +460,7 @@ class N2Toolbar {
             ["Hide detailed node information", "Show detailed node information"],
             pred => { return n2ui.nodeInfoBox.active; },
             function(target) {
-                n2ui.nodeInfoBox.clear();
-                n2ui.nodeInfoBox.toggle();
+                n2ui.click.toggle('nodeinfo');
                 self._setRootButton(target);
             }
         )).setHelpInfo("Toggle detailed node information");

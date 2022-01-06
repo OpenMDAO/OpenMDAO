@@ -1,4 +1,94 @@
 /**
+ * Manage the cursor state and process click events based on it.
+ * @typedef N2Click
+ */
+class N2Click {
+    static ClickEffect = {
+        Normal: 0,
+        NodeInfo: 1,
+        Collapse: 2,
+        Filter: 3
+    };
+
+    constructor(nodeInfoBox) {
+        this.clickEffect = N2Click.ClickEffect.Normal;
+
+        this.modeData = {
+            nodeinfo: {
+                val: N2Click.ClickEffect.NodeInfo,
+                icon: 'i.icon-info-circle',
+                cursor: 'node-data-cursor',
+                obj: nodeInfoBox
+            },
+            collapse: {
+                val: N2Click.ClickEffect.Collapse,
+                icon: 'i.icon-collapse-target',
+                cursor: 'collapse-mode-cursor',
+                obj: null
+            },
+            filter: {
+                val: N2Click.ClickEffect.Filter,
+                icon: 'i.icon-filter-target',
+                cursor: 'filter-mode-cursor',
+                obj: null
+            }
+        };
+    }
+
+    get isNormal() { return this.clickEffect == N2Click.ClickEffect.Normal; }
+    get isNodeInfo() { return this.clickEffect == N2Click.ClickEffect.NodeInfo; }
+    get isCollapse() { return this.clickEffect == N2Click.ClickEffect.Collapse; }
+    get isFilter() { return this.clickEffect == N2Click.ClickEffect.Filter; }
+
+    _validateMode(modeName, funcName) {
+        if (! modeName in this.modeData)
+            throw(`Unknown mode name '${modeName}' passed to N2Click.${funcName}().`)
+    }
+
+    activate(modeName) {
+        this._validateMode(modeName, 'activate');
+
+        const m = this.modeData[modeName];
+        d3.selectAll(m.icon).classed('active-tab-icon', true);
+        d3.select('#all_pt_n2_content_div').classed(m.cursor, true);
+        this.clickEffect = m.val;
+        if (m.obj) { m.obj.activate(); }
+
+        return this;
+    }
+
+    deactivate(modeName) {
+        this._validateMode(modeName, 'deactivate');
+
+        const m = this.modeData[modeName];
+        d3.selectAll(m.icon).classed('active-tab-icon', false);
+        d3.select('#all_pt_n2_content_div').classed(m.cursor, false);
+        this.clickEffect = N2Click.ClickEffect.Normal;
+        if (m.obj) { m.obj.deactivate(); }
+
+        return this;
+    }
+
+    deactivateAll() {
+        for (const modeName in this.modeData) {
+            this.deactivate(modeName);
+        }
+
+        return this;
+    }
+
+    toggle(modeName) {
+        this._validateMode(modeName, 'toggle');
+        
+        if (this.clickEffect == this.modeData[modeName].val) { return this.deactivate(modeName); }
+
+        if (this.clickEffect != N2Click.ClickEffect.Normal) { this.deactivateAll(); }
+        
+        return this.activate(modeName);
+    }
+}
+
+/**
  * Handle input events for the matrix and toolbar.
  * @typedef N2UserInterface
  * @property {N2Diagram} n2Diag Reference to the main diagram.
@@ -39,6 +129,7 @@ class N2UserInterface {
 
         this.legend = new N2Legend(this.n2Diag.modelData);
         this.nodeInfoBox = new NodeInfo(this);
+        this.click = new N2Click(this.nodeInfoBox);
         this.toolbar = new N2Toolbar(this);
 
         // Add listener for reading in a saved view.
