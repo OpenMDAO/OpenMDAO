@@ -5,9 +5,11 @@ January 06, 2022
 
 OpenMDAO 3.16.0 fixes the definition of the "Kelvin as energy" unit, improves documentation and exception handling, adds verification that options names are valid python names, and adds improvements to the N2 visualization.
 
-
 We've also adjusted our nomenclature with respect to parallel processing.
 Instead of inputs and outputs either being "distributed" or "serial", we now refer to them as "distributed" or "non-distributed."
+
+Finally, the minimum supported version of Python is now 3.7, since 3.6 has reached the end of its life.  While OpenMDAO may still work with prior versions of Python, we recommend users upgrade to supported versions.
+
 
 ## New Deprecations
 
@@ -41,6 +43,9 @@ Instead of inputs and outputs either being "distributed" or "serial", we now ref
 - Removed old 'experimental docs' directory. [#2382](https://github.com/OpenMDAO/OpenMDAO/pull/2382)
 - Updated ISSUE_TEMPLATE to remove redundant summary section.  [#2388](https://github.com/OpenMDAO/OpenMDAO/pull/2388)
 - Overhaul documentation for matrix-free derivatives on components with distributed variables. [#2390](https://github.com/OpenMDAO/OpenMDAO/pull/2390)
+- Made a few changes to improve coverage. [#2394](https://github.com/OpenMDAO/OpenMDAO/pull/2394)
+- Changed minimum Python version to 3.7 since 3.6 has reached end-of-life. [#2395](https://github.com/OpenMDAO/OpenMDAO/pull/2395)
+- Made a small fix to make distributed example more complex-safe. [#2398](https://github.com/OpenMDAO/OpenMDAO/pull/2398)
 
 ***********************************
 # Release Notes for OpenMDAO 3.15.0
