@@ -400,10 +400,15 @@ class SqliteRecorder(CaseRecorder):
                         name = var_set[name]['ivc_source']
 
                     if name not in self._abs2meta:
-                        try:
+                        if name in real_meta_out:
                             self._abs2meta[name] = real_meta_out[name].copy()
-                        except KeyError:
+                        elif name in disc_meta_out:
                             self._abs2meta[name] = disc_meta_out[name].copy()
+                        elif name in system._responses:
+                            for io in self._prom2abs:
+                                if name in self._prom2abs[io]:
+                                    prom_name = self._prom2abs[io][name][0]
+                                    self._abs2meta[name] = real_meta_in[prom_name].copy()
                         self._abs2meta[name]['type'] = []
                         self._abs2meta[name]['explicit'] = name not in states
 

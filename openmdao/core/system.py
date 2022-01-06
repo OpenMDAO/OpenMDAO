@@ -369,6 +369,8 @@ class System(object):
         be a reference to the _TotalJacInfo object.
     _resp_indices_map : dict
         Dictionary of responses and their indices to warn against overlap
+    _multi_constraint : dict
+        Dictionary to flag when a constraint is a duplicate
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -522,6 +524,7 @@ class System(object):
         self._first_call_to_linearize = True   # will check in first call to _linearize
         self._tot_jac = None
         self._resp_indices_map = {}
+        self._multi_constraint = {}
 
     @property
     def msginfo(self):
@@ -1571,11 +1574,13 @@ class System(object):
         """
         if self._use_derivatives:
             desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
-            # Check if the constraints are coliding here
             responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
-            for res in responses:
-                if responses[res]['path'] is not None and responses[res]['path'] not in responses:
-                    raise RuntimeError(f"Alias '{res}' is not needed when only "
+            for name in responses:
+                if responses[name]['path'] is not None:
+                    name = responses[name]['path']
+
+                if name not in responses and not self._multi_constraint[name]:
+                    raise RuntimeError(f"Alias '{name}' is not needed when only "
                                        f"adding one constraint to model")
             return self.get_relevant_vars(desvars, responses, mode)
 
@@ -2686,6 +2691,8 @@ class System(object):
             resp['name'] = name
             resp['path'] = None
 
+        self._multi_constraint[name] = False
+
         if indices is not None:
             if name in self._resp_indices_map:
                 if resp['path'] is not None:
@@ -2699,6 +2706,7 @@ class System(object):
                         if indices.start >= min(self._resp_indices_map[name]) or \
                                 indices.stop <= max(self._resp_indices_map[name]):
                             raise RuntimeError(msg)
+                self._multi_constraint[name] = True
                 self._resp_indices_map[name] = np.append(self._resp_indices_map[name], indices)
             else:
                 self._resp_indices_map[name] = np.array(indices)

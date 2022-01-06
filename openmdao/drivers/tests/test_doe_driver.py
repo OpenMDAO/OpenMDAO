@@ -1379,6 +1379,31 @@ class TestDOEDriver(unittest.TestCase):
         for name in ('x', 'y', 'z'):
             assert_near_equal(outputs[name], prob[name])
 
+    def test_multi_constraint_doe(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', om.ExecComp('y=x**2 + b',
+                                                x=np.array([1., 2., 3.]),
+                                                b=np.array([1., 2., 3.]),
+                                                y=np.zeros(3)), promotes=['*'])
+
+        prob.model.add_design_var('x', lower=7.0, upper=11.0, indices=[0])
+        prob.model.add_constraint('b', lower=7., indices=[0])
+        prob.model.add_constraint('b', upper=11., indices=[-1], alias='TEST')
+        prob.model.add_objective('y', index=0)
+
+        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.setup()
+        prob.run_driver()
+
+        cr = om.CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
+
+        for case in cases:
+            outputs = cr.get_case(case).outputs
+            assert_near_equal(outputs['b'], np.array([1., 2, 3]))
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 @use_tempdirs
