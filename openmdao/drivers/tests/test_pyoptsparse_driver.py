@@ -2400,7 +2400,6 @@ class TestPyoptSparse(unittest.TestCase):
 
         p.run_driver()
 
-        print(p.get_val('z'))
         assert_near_equal(p.get_val('z')[-1], 30)
         assert_near_equal(p.get_val('z')[50], -70)
 
