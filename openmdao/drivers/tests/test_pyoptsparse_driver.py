@@ -2287,7 +2287,8 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_constraint('exec.z', indices=[0], equals=25)
         p.model.add_constraint('exec.z', indices=[-1], lower=20, alias="ALIAS_TEST")
 
-        p.driver = om.pyOptSparseDriver(optimizer='SNOPT')
+        p.driver = om.pyOptSparseDriver()
+        p.driver.options['optimizer'] = OPTIMIZER
         p.driver.opt_settings['iSumm'] = 6
 
         p.setup()
@@ -2335,7 +2336,8 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_objective('exec.y', index=50)
         p.model.add_constraint('exec.z', indices=[-1], lower=20, alias="ALIAS_TEST")
 
-        p.driver = om.pyOptSparseDriver(optimizer='SNOPT')
+        p.driver = om.pyOptSparseDriver()
+        p.driver.options['optimizer'] = OPTIMIZER
         p.driver.opt_settings['iSumm'] = 6
 
         msg = "Alias 'ALIAS_TEST' is not needed when only adding one constraint to model"
@@ -2362,7 +2364,8 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_objective('exec.z', index=50)
         p.model.add_constraint('exec.z', indices=[0], equals=25, alias="ALIAS_TEST")
 
-        p.driver = om.pyOptSparseDriver(optimizer='SNOPT')
+        p.driver = om.pyOptSparseDriver()
+        p.driver.options['optimizer'] = OPTIMIZER
         p.driver.opt_settings['iSumm'] = 6
 
         p.setup()
@@ -2391,7 +2394,8 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_constraint('z', indices=[-1], lower=0)
         p.model.add_constraint('z', indices=[50], equals=-70, alias="ALIAS_TEST")
 
-        p.driver = om.pyOptSparseDriver(optimizer='SNOPT')
+        p.driver = om.pyOptSparseDriver()
+        p.driver.options['optimizer'] = OPTIMIZER
         p.driver.opt_settings['iSumm'] = 6
 
         p.setup()
