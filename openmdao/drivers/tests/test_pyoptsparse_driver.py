@@ -2289,7 +2289,6 @@ class TestPyoptSparse(unittest.TestCase):
 
         p.driver = om.pyOptSparseDriver()
         p.driver.options['optimizer'] = OPTIMIZER
-        p.driver.opt_settings['iSumm'] = 6
 
         p.setup()
 
@@ -2338,7 +2337,6 @@ class TestPyoptSparse(unittest.TestCase):
 
         p.driver = om.pyOptSparseDriver()
         p.driver.options['optimizer'] = OPTIMIZER
-        p.driver.opt_settings['iSumm'] = 6
 
         msg = "Alias 'ALIAS_TEST' is not needed when only adding one constraint to model"
         with self.assertRaises(RuntimeError) as msg:
@@ -2366,7 +2364,6 @@ class TestPyoptSparse(unittest.TestCase):
 
         p.driver = om.pyOptSparseDriver()
         p.driver.options['optimizer'] = OPTIMIZER
-        p.driver.opt_settings['iSumm'] = 6
 
         p.setup()
 
@@ -2396,7 +2393,6 @@ class TestPyoptSparse(unittest.TestCase):
 
         p.driver = om.pyOptSparseDriver()
         p.driver.options['optimizer'] = OPTIMIZER
-        p.driver.opt_settings['iSumm'] = 6
 
         p.setup()
 
