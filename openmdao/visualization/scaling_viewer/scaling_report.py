@@ -520,9 +520,6 @@ def _scaling_cmd(options, user_args):
                 _scaling(problem)
 
     def _scaling(problem):
-        hooks._unregister_hook('final_setup', 'Problem')  # avoid recursive loop
-        hooks._unregister_hook('run_driver', 'Problem')
-        hooks._unregister_hook('run_model', 'Problem')
         driver = problem.driver
         if options.title:
             title = options.title
@@ -537,10 +534,10 @@ def _scaling_cmd(options, user_args):
                          post=_scaling_check)
 
     hooks._register_hook('run_model', class_name='Problem', inst_id=options.problem,
-                         pre=_set_run_model_start, post=_set_run_model_done)
+                         pre=_set_run_model_start, post=_set_run_model_done, ncalls=1)
 
     hooks._register_hook('run_driver', class_name='Problem', inst_id=options.problem,
-                         pre=_set_run_driver_flag)
+                         pre=_set_run_driver_flag, ncalls=1)
 
     # register an atexit function to check if scaling report was triggered during the script
     import atexit

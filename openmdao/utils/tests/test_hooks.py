@@ -13,6 +13,7 @@ def make_hook(name):
 
 
 def hooks_active(f):
+    # turn hooks on and off around a hooks test
     def _wrapper(*args, **kwargs):
         hooks.use_hooks = True
         try:
@@ -24,13 +25,7 @@ def hooks_active(f):
 
 
 class HooksTestCase(unittest.TestCase):
-    @hooks_active
-    def test_multiwrap(self):
-        pre_final = make_hook('pre_final')
-        post_final = make_hook('post_final')
-        hooks._register_hook('final_setup', 'Problem', pre=pre_final, post=post_final)
-        hooks._register_hook('final_setup', 'Problem', pre=make_hook('pre_final2'), post=make_hook('post_final2'))
-
+    def build_model(self):
         prob = om.Problem()
         prob.calls = []
         model = prob.model
@@ -41,8 +36,47 @@ class HooksTestCase(unittest.TestCase):
 
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
-
         prob.setup()
+        return prob
+
+    @hooks_active
+    def test_ncalls(self):
+        hooks._register_hook('final_setup', 'Problem', pre=make_hook('pre_final'), post=make_hook('post_final'), ncalls=2)
+        hooks._register_hook('final_setup', 'Problem', pre=make_hook('pre_final2'), post=make_hook('post_final2'))
+
+        prob = self.build_model()
+        prob.run_model()
+        prob.run_model()
+        prob.run_model()
+
+        self.assertEqual(prob.calls, ['pre_final', 'pre_final2', 'post_final', 'post_final2',
+                                      'pre_final', 'pre_final2', 'post_final', 'post_final2',
+                                      'pre_final2', 'post_final2',
+                                     ])
+
+    @hooks_active
+    def test_exit(self):
+        hooks._register_hook('final_setup', 'Problem', pre=make_hook('pre_final'), post=make_hook('post_final'))
+        hooks._register_hook('final_setup', 'Problem', pre=make_hook('pre_final2'), post=make_hook('post_final2'), exit=True)
+
+        prob = self.build_model()
+        try:
+            prob.run_model()
+            prob.run_model()
+            prob.run_model()
+        except SystemExit:
+            self.assertEqual(prob.calls, ['pre_final', 'pre_final2', 'post_final', 'post_final2'])
+        else:
+            self.fail("sys.exit() was not called")
+
+    @hooks_active
+    def test_multiwrap(self):
+        pre_final = make_hook('pre_final')
+        post_final = make_hook('post_final')
+        hooks._register_hook('final_setup', 'Problem', pre=pre_final, post=post_final)
+        hooks._register_hook('final_setup', 'Problem', pre=make_hook('pre_final2'), post=make_hook('post_final2'))
+
+        prob = self.build_model()
         prob.run_model()
         prob.run_model()
         prob.run_model()
@@ -64,24 +98,26 @@ class HooksTestCase(unittest.TestCase):
                                       'pre_final2', 'post_final', 'post_final2',
                                      ])
 
+        hooks._unregister_hook('final_setup', 'Problem', pre=True, post=False)
+        prob.calls = []
+
+        prob.run_model()
+        prob.run_model()
+        prob.run_model()
+
+        self.assertEqual(prob.calls, ['post_final', 'post_final2',
+                                      'post_final', 'post_final2',
+                                      'post_final', 'post_final2',
+                                     ])
+
     @hooks_active
     def test_problem_hooks(self):
         hooks._register_hook('setup', 'Problem', pre=make_hook('pre_setup'), post=make_hook('post_setup'))
         hooks._register_hook('final_setup', 'Problem', pre=make_hook('pre_final'), post=make_hook('post_final'))
         hooks._register_hook('run_model', 'Problem', pre=make_hook('pre_run_model'), post=make_hook('post_run_model'))
 
-        prob = om.Problem()
-        prob.calls = []
-        model = prob.model
+        prob = self.build_model()
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
-        model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
-        model.add_subsystem('comp', om.ExecComp("f_xy=2.0*x+3.0*y"))
-
-        model.connect('p1.x', 'comp.x')
-        model.connect('p2.y', 'comp.y')
-
-        prob.setup()
         prob.run_model()
         prob.run_model()
         prob.run_model()

@@ -711,10 +711,9 @@ def _check_config_cmd(options, user_args):
 
             prob.check_config(logger, options.checks)
 
-        exit()
-
     # register the hook
-    _register_hook('final_setup', class_name='Problem', inst_id=options.problem, post=_check_config)
+    _register_hook('final_setup', class_name='Problem', inst_id=options.problem, post=_check_config,
+                   exit=True)
 
     ignore_errors(True)
     _load_and_exec(options.file[0], user_args)

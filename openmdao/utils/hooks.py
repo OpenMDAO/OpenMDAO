@@ -6,6 +6,7 @@ from collections import defaultdict
 from functools import wraps
 import inspect
 import warnings
+import sys
 
 
 # global dict of hooks
@@ -75,6 +76,27 @@ def _setup_hooks(obj):
                     setattr(obj, funcname, _hook_decorator(method, obj, instmeta[funcname]))
 
 
+def _run_hooks(hooks, inst):
+    """
+    Run the given list of hooks.
+
+    Parameters
+    ----------
+    hooks : list
+        List of hook data.
+    inst : object
+        Object instance to pass to hook functions.
+    """
+    for i, (hook, ncalls, ex) in enumerate(hooks):
+        if ncalls is None or ncalls > 0:
+            hook(inst)
+            if ex:
+                sys.exit()
+            if ncalls is not None:
+                ncalls -= 1
+                hooks[i] = (hook, ncalls, ex)
+
+
 def _hook_decorator(f, inst, hookmeta):
     """
     Wrap a method with pre and/or post hook checks.
@@ -88,16 +110,11 @@ def _hook_decorator(f, inst, hookmeta):
     hookmeta : dict
         A dict with information about the hooks.
     """
+    pre_hooks, post_hooks = hookmeta
     def execute_hooks(*args, **kwargs):
-        pre_hooks, post_hooks = hookmeta
-        for hook in pre_hooks:
-            hook(inst)
-
+        _run_hooks(pre_hooks, inst)
         ret = f(*args, **kwargs)
-
-        for hook in post_hooks:
-            hook(inst)
-
+        _run_hooks(post_hooks, inst)
         return ret
 
     execute_hooks._hook_ = True  # to prevent multiple decoration of same function
@@ -133,7 +150,7 @@ def _get_hook_lists(class_name, inst_id, fname):
     return imeta[fname]
 
 
-def _register_hook(fname, class_name, inst_id=None, pre=None, post=None):
+def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=None, exit=False):
     """
     Register a hook function.
 
@@ -151,15 +168,54 @@ def _register_hook(fname, class_name, inst_id=None, pre=None, post=None):
         If not None, this hook will run before the named function runs.
     post : function (None)
         If not None, this hook will run after the named function runs.
+    ncalls : int or None
+        Auto-remove the hook function after this many calls.  If None, never auto-remove.
+        If both pre and post are registered, this will affect both.
+    exit : bool
+        If True, run sys.exit() after calling the hook function.  If post is registered, this
+        affects only post, else it will affect pre.
     """
     if pre is None and post is None:
         raise RuntimeError("In _register_hook you must specify pre or post.")
 
     pre_hooks, post_hooks = _get_hook_lists(class_name, inst_id, fname)
-    if pre is not None:
-        pre_hooks.append(pre)
-    if post is not None:
-        post_hooks.append(post)
+    if pre is not None and (ncalls is None or ncalls > 0):
+        pre_hooks.append((pre, ncalls, exit and post is None))
+    if post is not None and (ncalls is None or ncalls > 0):
+        post_hooks.append((post, ncalls, exit))
+
+
+def _remove_hook(to_remove, hooks, class_name, fname, hook_loc):
+    """
+    Remove a hook function.
+
+    Parameters
+    ----------
+    to_remove : bool or function
+        If True, all hook functions in 'hooks' will be removed.  If a function, any function
+        in 'hooks' that matches will be removed.
+    hooks : list
+        List of (hook_func, ncalls, exit) tuples.
+    class_name : str
+        The name of the class owning the method where the hook will be removed.
+    fname : str
+        The name of the function where the hooks are located.
+    hook_loc : str
+        Either 'pre' or 'post', indicating the hooks run before or after respectively the
+        function specified by fname.
+    """
+    if to_remove and hooks:
+        if to_remove is True:
+            hooks[:] = []
+        else:
+            for hook in hooks:
+                p, _, _ = hook
+                if p is to_remove:
+                    hooks.remove(hook)
+                    break
+            else:
+                raise RuntimeError(f"Couldn't find the given '{hook_loc}' function in the "
+                                   f"{hook_loc} hooks for {class_name}.{fname}.")
 
 
 def _unregister_hook(fname, class_name, inst_id=None, pre=True, post=True):
@@ -194,28 +250,8 @@ def _unregister_hook(fname, class_name, inst_id=None, pre=True, post=True):
 
     if fname in hookdict:
         pre_hooks, post_hooks = hookdict[fname]
-        if pre and pre_hooks:
-            if pre is True:
-                pre_hooks[:] = []
-            else:
-                for p in pre_hooks:
-                    if p is pre:
-                        pre_hooks.remove(pre)
-                        break
-                else:
-                    raise RuntimeError("Couldn't find the given 'pre' function in the pre hooks "
-                                       f"for {class_name}.{fname}.")
-        if post and post_hooks:
-            if post is True:
-                post_hooks[:] = []
-            else:
-                for p in post_hooks:
-                    if p is post:
-                        post_hooks.remove(post)
-                        break
-                else:
-                    raise RuntimeError("Couldn't find the given 'post' function in the post hooks "
-                                       f"for {class_name}.{fname}.")
+        _remove_hook(pre, pre_hooks, class_name, fname, 'pre')
+        _remove_hook(post, post_hooks, class_name, fname, 'post')
 
         if not (pre_hooks or post_hooks):
             del hookdict[fname]
