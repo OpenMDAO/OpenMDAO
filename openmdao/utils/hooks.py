@@ -111,6 +111,7 @@ def _hook_decorator(f, inst, hookmeta):
         A dict with information about the hooks.
     """
     pre_hooks, post_hooks = hookmeta
+
     def execute_hooks(*args, **kwargs):
         _run_hooks(pre_hooks, inst)
         ret = f(*args, **kwargs)
