@@ -10,7 +10,12 @@ class N2Click {
         Filter: 3
     };
 
+    /**
+     * Set up the initial mode and define parameters for the other modes. 
+     * @param {NodeInfo} nodeInfoBox Reference to the NodeInfo window to activate/deactivate it.
+     */
     constructor(nodeInfoBox) {
+        // This tracks the current mode:
         this.clickEffect = N2Click.ClickEffect.Normal;
 
         this.modeData = {
@@ -40,11 +45,17 @@ class N2Click {
     get isCollapse() { return this.clickEffect == N2Click.ClickEffect.Collapse; }
     get isFilter() { return this.clickEffect == N2Click.ClickEffect.Filter; }
 
+    /** Make sure the string used as a mode name is recognized */
     _validateMode(modeName, funcName) {
         if (! modeName in this.modeData)
             throw(`Unknown mode name '${modeName}' passed to N2Click.${funcName}().`)
     }
 
+    /**
+     * Color the active icon, change the mouse pointer, and update the mode state.
+     * @param {String} modeName The name of the mode to activate.
+     * @returns Reference to this N2Click object.
+     */
     activate(modeName) {
         this._validateMode(modeName, 'activate');
 
@@ -57,6 +68,11 @@ class N2Click {
         return this;
     }
 
+    /**
+     * Return the icon, mouse pointer, and mode state to the default.
+     * @param {String} modeName The name of the mode to deactivate.
+     * @returns Reference to this N2Click object.
+     */
     deactivate(modeName) {
         this._validateMode(modeName, 'deactivate');
 
@@ -69,6 +85,10 @@ class N2Click {
         return this;
     }
 
+    /**
+     * Iterate over all modes and run deactivate() on each.
+     * @returns Reference to this N2Click object.
+     */
     deactivateAll() {
         for (const modeName in this.modeData) {
             this.deactivate(modeName);
@@ -77,6 +97,12 @@ class N2Click {
         return this;
     }
 
+    /**
+     * If the specified mode is not active, activate it; if another non-default mode
+     * is active, deactivate it first. If the specified mode is active, deactivate it.
+     * @param {String} modeName Name of the mode to toggle.
+     * @returns Reference to this N2Click object.
+     */
     toggle(modeName) {
         this._validateMode(modeName, 'toggle');
         
