@@ -12,7 +12,7 @@ def make_hook(name):
     return hook_func
 
 
-def hook_tester(f):
+def hooks_active(f):
     def _wrapper(*args, **kwargs):
         hooks.use_hooks = True
         try:
@@ -24,7 +24,7 @@ def hook_tester(f):
 
 
 class HooksTestCase(unittest.TestCase):
-    @hook_tester
+    @hooks_active
     def test_multiwrap(self):
         pre_final = make_hook('pre_final')
         post_final = make_hook('post_final')
@@ -64,7 +64,7 @@ class HooksTestCase(unittest.TestCase):
                                       'pre_final2', 'post_final', 'post_final2',
                                      ])
 
-    @hook_tester
+    @hooks_active
     def test_problem_hooks(self):
         hooks._register_hook('setup', 'Problem', pre=make_hook('pre_setup'), post=make_hook('post_setup'))
         hooks._register_hook('final_setup', 'Problem', pre=make_hook('pre_final'), post=make_hook('post_final'))
