@@ -91,7 +91,7 @@
 #toolbarLoc {
     margin: 0;
     padding: 0;
-    height: 580px;
+    height: 605px;
     width: 65px;
     border-bottom-right-radius: 15px;
     position: relative;
@@ -258,6 +258,10 @@
     background-color: #7dcda6;
 }
 
+#target-expandable {
+    background-color: #7dcda6;
+}
+
 #connections-expandable {
     background-color: #66b48e;
 }
@@ -335,7 +339,11 @@
 }
 
 .icon-collapse-target {
-    font-size: 30px !important;
+    font-size: 20px !important;
+}
+
+.icon-filter-target {
+    font-size: 20px !important;
 }
 
 .toolbar .fas {
@@ -347,7 +355,8 @@
 }
 
 .active-tab-icon {
-    color: #00ff00 !important;
+    color: #06f !important;
+    filter: drop-shadow(0 0 5px white);
 }
 
 .toolbar .fas:hover {

@@ -259,6 +259,8 @@ class N2Toolbar {
     /** When an expanded button is clicked, update the 'root' button to the same icon/function. */
     _setRootButton(clickedNode) {
         const container = d3.select(clickedNode.parentNode.parentNode);
+        if (!container.classed('expandable')) return;
+        
         const button = d3.select(clickedNode);
         const rootButton = container.select('i:not(.caret)');
 
