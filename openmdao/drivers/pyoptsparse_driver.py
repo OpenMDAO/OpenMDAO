@@ -6,6 +6,7 @@ formulating and solving nonlinear constrained optimization problems, with
 additional MPI capability.
 """
 
+import sys
 from collections import OrderedDict
 import json
 import signal
@@ -137,8 +138,9 @@ class pyOptSparseDriver(Driver):
         Pyopt_sparse solution object.
     _check_jac : bool
         Used internally to control when to perform singular checks on computed total derivs.
-    _exc_info : None or <Exception>
-        Cached exception that was raised in the _objfunc or _gradfunc callbacks.
+    _exc_info : 3 item tuple
+        Storage for exception and traceback information for exception that was raised in the
+        _objfunc or _gradfunc callbacks.
     _in_user_function :bool
         This is set to True at the start of a pyoptsparse callback to _objfunc and _gradfunc, and
         restored to False at the finish of each callback.
@@ -472,7 +474,7 @@ class pyOptSparseDriver(Driver):
 
                 else:
                     msg = "SNOPT's internal finite difference can only be used with SNOPT"
-                    self._exc_info = Exception(msg)
+                    self._exc_info = (Exception, Exception(msg), None)
             else:
 
                 # Use OpenMDAO's differentiator for the gradient
@@ -481,10 +483,12 @@ class pyOptSparseDriver(Driver):
 
         except Exception as _:
             if not self._exc_info:
-                raise()
+                raise
 
         if self._exc_info:
-            raise self._exc_info
+            if self._exc_info[2] is None:
+                raise self._exc_info[1]
+            raise self._exc_info[1].with_traceback(self._exc_info[2])
 
         # Print results
         if self.options['print_results']:
@@ -601,8 +605,8 @@ class pyOptSparseDriver(Driver):
                 rec.abs = 0.0
                 rec.rel = 0.0
 
-        except Exception as raised:
-            self._exc_info = raised
+        except Exception:
+            self._exc_info = sys.exc_info()
             fail = 1
             func_dict = {}
 
@@ -701,8 +705,8 @@ class pyOptSparseDriver(Driver):
                         isize = len(ival)
                         sens_dict[okey][ikey] = np.zeros((osize, isize))
 
-        except Exception as raised:
-            self._exc_info = raised
+        except Exception:
+            self._exc_info = sys.exc_info()
             fail = 1
             sens_dict = {}
 

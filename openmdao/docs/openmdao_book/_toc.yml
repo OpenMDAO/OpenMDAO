@@ -41,6 +41,7 @@ parts:
     - file: theory_manual/total_derivs_theory
     - file: theory_manual/setup_linear_solvers
     - file: theory_manual/advanced_linear_solvers_special_cases/advanced_linear_solvers_special_cases
+    - file: theory_manual/mpi
   - file: features/features
     sections:
     - file: features/core_features/main.md

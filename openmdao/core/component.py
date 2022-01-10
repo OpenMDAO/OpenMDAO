@@ -876,7 +876,7 @@ class Component(System):
 
     def _update_dist_src_indices(self, abs_in2out, all_abs2meta, all_abs2idx, all_sizes):
         """
-        Set default src_indices on distributed components for any inputs where they aren't set.
+        Set default src_indices for any distributed inputs where they aren't set.
 
         Parameters
         ----------
@@ -1412,24 +1412,24 @@ class Component(System):
 
                 if dist_in and not dist_out and not self.matrix_free:
                     raise RuntimeError(f"{self.msginfo}: component has defined partial {rel_key} "
-                                       "which is a serial output wrt a distributed input. This is "
-                                       "only supported using the matrix free API.")
+                                       "which is a non-distributed output wrt a distributed input."
+                                       " This is only supported using the matrix free API.")
 
                 if shape[0] == 0 or shape[1] == 0:
                     msg = "{}: '{}' is an array of size 0"
                     if shape[0] == 0:
                         if dist_out:
-                            # distributed comp are allowed to have zero size inputs on some procs
+                            # distributed vars are allowed to have zero size inputs on some procs
                             rows_max = -1
                         else:
-                            # non-distributed components are not allowed to have zero size inputs
+                            # non-distributed vars are not allowed to have zero size inputs
                             raise ValueError(msg.format(self.msginfo, of))
                     if shape[1] == 0:
                         if not dist_in:
-                            # non-distributed components are not allowed to have zero size outputs
+                            # non-distributed vars are not allowed to have zero size outputs
                             raise ValueError(msg.format(self.msginfo, wrt))
                         else:
-                            # distributed comp are allowed to have zero size outputs on some procs
+                            # distributed vars are allowed to have zero size outputs on some procs
                             cols_max = -1
 
                 if val is None:

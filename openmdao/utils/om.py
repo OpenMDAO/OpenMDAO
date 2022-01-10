@@ -8,6 +8,18 @@ import argparse
 from openmdao import __version__ as version
 
 try:
+    import coverage
+except ImportError:
+    pass
+else:
+    # the following allows us to do coverage on our command line tools.  It will do nothing
+    # unless COVERAGE_PROCESS_START is set in the environment.
+    try:
+        coverage.process_startup()
+    except Exception:
+        pass  # in case they're using an old version of coverage
+
+try:
     import pkg_resources
 except ImportError:
     pkg_resources = None

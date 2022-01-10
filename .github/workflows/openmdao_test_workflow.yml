@@ -53,7 +53,7 @@ jobs:
 
           # oldest supported versions
           - NAME: Oldest
-            PY: 3.6
+            PY: 3.7
             NUMPY: 1.17
             SCIPY: 1.2
             PETSc: 3.10.2
