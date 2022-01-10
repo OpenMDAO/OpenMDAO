@@ -260,7 +260,7 @@ class N2Toolbar {
     _setRootButton(clickedNode) {
         const container = d3.select(clickedNode.parentNode.parentNode);
         if (!container.classed('expandable')) return;
-        
+
         const button = d3.select(clickedNode);
         const rootButton = container.select('i:not(.caret)');
 
@@ -362,11 +362,41 @@ class N2Toolbar {
                 self._setRootButton(target);
             }));
 
+        this._addButton(new N2ToolbarButtonToggle('#info-button', tooltipBox,
+            ["Hide detailed node information", "Show detailed node information"],
+            pred => { return n2ui.nodeInfoBox.active; },
+            function(target) {
+                n2ui.click.toggle('nodeinfo');
+            }));
+
+        this._addButton(new N2ToolbarButtonToggle('#info-button-2', tooltipBox,
+            ["Hide detailed node information", "Show detailed node information"],
+            pred => { return n2ui.nodeInfoBox.active; },
+            function(target) {
+                n2ui.click.toggle('nodeinfo');
+                self._setRootButton(target);
+            }));
+
+        this._addButton(new N2ToolbarButtonToggle('#collapse-target', tooltipBox,
+            ["Exit collapse/expand mode", "Enter collapse/expand mode"],
+            pred => { return n2ui.click.clickEffect == N2Click.ClickEffect.Collapse; },
+            function (target) {
+                n2ui.click.toggle('collapse');
+                self._setRootButton(target);
+            }));
+
+        this._addButton(new N2ToolbarButtonToggle('#filter-target', tooltipBox,
+            ["Exit variable filtering mode", "Enter variable filtering mode"],
+            pred => { return n2ui.click.clickEffect == N2Click.ClickEffect.Filter; },
+            function (target) {
+                n2ui.click.toggle('filter');
+                self._setRootButton(target);
+            }));
+
         this._addButton(new N2ToolbarButtonClick('#hide-connections', tooltipBox,
             "Set connections visibility",
-            function (target) {
+            function () {
                 n2ui.n2Diag.clearArrows();
-                self._setRootButton(target);
             }));
 
         this._addButton(new N2ToolbarButtonClick('#hide-connections-2', tooltipBox,
@@ -380,26 +410,6 @@ class N2Toolbar {
             "Show all connections in view",
             function (target) {
                 n2ui.n2Diag.showAllArrows();
-                self._setRootButton(target);
-            }));
-
-        this._addButton(new N2ToolbarButtonClick('#collapse-target', tooltipBox,
-            "Select tree navigation mode",
-            function (target) {
-                n2ui.click.toggle('collapse');
-            }));
-
-        this._addButton(new N2ToolbarButtonClick('#collapse-target-2', tooltipBox,
-            "Enter collapse/expand mode",
-            function (target) {
-                n2ui.click.toggle('collapse');
-                self._setRootButton(target);
-            }));
-
-        this._addButton(new N2ToolbarButtonClick('#filter-target', tooltipBox,
-            "Enter variable filtering mode",
-            function (target) {
-                n2ui.click.toggle('filter');
                 self._setRootButton(target);
             }));
 
@@ -457,15 +467,6 @@ class N2Toolbar {
 
         this._addButton(new N2ToolbarButtonClick('#load-state-button', tooltipBox,
             "Load View", e => { n2ui.loadState() }));
-
-        this._addButton(new N2ToolbarButtonToggle('#info-button', tooltipBox,
-            ["Hide detailed node information", "Show detailed node information"],
-            pred => { return n2ui.nodeInfoBox.active; },
-            function(target) {
-                n2ui.click.toggle('nodeinfo');
-                self._setRootButton(target);
-            }
-        )).setHelpInfo("Toggle detailed node information");
 
         this._addButton(new N2ToolbarButtonToggle('#legend-button', tooltipBox,
             ["Show legend", "Hide legend"],

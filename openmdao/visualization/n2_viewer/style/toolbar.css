@@ -385,20 +385,21 @@
     transition: opacity 0.5s, color 0.5s;
 }
 
+/*
 #info-button:hover {
     opacity: 0.7;
 }
-
+*/
 .icon-question-circle {
     /* font-size: 25px !important; */
     opacity: 1;
     color: white;
 }
-
+/*
 .icon-question-circle:hover {
     opacity: 0.7;
 }
-
+*/
 .collapse-mode-cursor {
     cursor: crosshair;
 }
