@@ -299,7 +299,7 @@ class N2Toolbar {
         const tooltipBox = d3.select(".tool-tip");
 
         this._addButton(new N2ToolbarButtonClick('#searchButtonId', tooltipBox,
-            "Collapse model to only variables that match search term",
+            "Collapse model to variables matching search term",
             e => {
                 if (self.searchBar.node().value == '') {
                     self.searchCount.html('0 matches');
@@ -367,7 +367,7 @@ class N2Toolbar {
             pred => { return n2ui.nodeInfoBox.active; },
             function(target) {
                 n2ui.click.toggle('nodeinfo');
-            }));
+            })).setHelpInfo("Select left-click action");
 
         this._addButton(new N2ToolbarButtonToggle('#info-button-2', tooltipBox,
             ["Hide detailed node information", "Show detailed node information"],
@@ -375,7 +375,7 @@ class N2Toolbar {
             function(target) {
                 n2ui.click.toggle('nodeinfo');
                 self._setRootButton(target);
-            }));
+            })).setHelpInfo("Toggle detailed node info mode");
 
         this._addButton(new N2ToolbarButtonToggle('#collapse-target', tooltipBox,
             ["Exit collapse/expand mode", "Enter collapse/expand mode"],
@@ -383,7 +383,7 @@ class N2Toolbar {
             function (target) {
                 n2ui.click.toggle('collapse');
                 self._setRootButton(target);
-            }));
+            })).setHelpInfo("Toggle collapse/expand mode");
 
         this._addButton(new N2ToolbarButtonToggle('#filter-target', tooltipBox,
             ["Exit variable filtering mode", "Enter variable filtering mode"],
@@ -391,7 +391,7 @@ class N2Toolbar {
             function (target) {
                 n2ui.click.toggle('filter');
                 self._setRootButton(target);
-            }));
+            })).setHelpInfo("Toggle variable filtering mode");
 
         this._addButton(new N2ToolbarButtonClick('#hide-connections', tooltipBox,
             "Set connections visibility",
