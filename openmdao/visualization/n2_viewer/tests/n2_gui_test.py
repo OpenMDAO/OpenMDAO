@@ -626,6 +626,11 @@ n2_gui_test_scripts = {
             "button": "left"
         },
         {
+            "desc": "Expand help group",
+            "test": "hover",
+            "selector": "#question-button"
+        },
+        {
             "desc": "Display Legend",
             "test": "click",
             "selector": "#legend-button",
