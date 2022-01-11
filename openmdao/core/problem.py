@@ -945,6 +945,7 @@ class Problem(object):
 
         # this metadata will be shared by all Systems/Solvers in the system tree
         self._metadata = {
+            'name': self._name,  # the name of this Problem
             'coloring_dir': self.options['coloring_dir'],  # directory for coloring files
             'recording_iter': _RecIteration(),  # manager of recorder iterations
             'local_vector_class': local_vector_class,
