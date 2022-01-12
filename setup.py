@@ -24,10 +24,12 @@ optional_dependencies = {
     'notebooks': [
         'notebook',
         'tabulate',
-        'ipython'
+        'ipython',
+        'ipywidgets'
     ],
     'visualization': [
         'bokeh>=1.3.4',
+        'matplotlib',
         'colorama'
     ],
     'test': [
