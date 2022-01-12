@@ -198,10 +198,7 @@ class Driver(object):
     def _get_inst_id(self):
         if self._problem is None:
             return None
-        probid = self._problem()._get_inst_id()
-        if probid is None:
-            return "driver"
-        return f"{probid}.driver"
+        return f"{self._problem()._get_inst_id()}.driver"
 
     @property
     def msginfo(self):
