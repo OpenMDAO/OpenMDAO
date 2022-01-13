@@ -1129,6 +1129,17 @@ class Driver(object):
             Data used to create html file.
         """
         from openmdao.visualization.scaling_viewer.scaling_report import view_driver_scaling
+
+        # Run the model if it hasn't been run yet.
+        try:
+            prob = self._problem()
+        except TypeError:
+            raise RuntimeError("Either 'run_model' or 'final_setup' must be called before the "
+                               "scaling report can be generated.")
+
+        if prob._run_counter < 0:
+            prob.run_model()
+
         return view_driver_scaling(self, outfile=outfile, show_browser=show_browser, jac=jac,
                                    title=title)
 
