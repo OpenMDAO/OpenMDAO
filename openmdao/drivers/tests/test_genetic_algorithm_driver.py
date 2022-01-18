@@ -807,7 +807,7 @@ class TestConstrainedSimpleGA(unittest.TestCase):
         self.assertAlmostEqual(prob['radius'], 0.5, 1)  # it is going to the unconstrained optimum
         self.assertAlmostEqual(prob['height'], 0.5, 1)  # it is going to the unconstrained optimum
 
-    def test_obj_and_con_same_var_different_indices(self):
+    def test_two_constraints(self):
 
         import openmdao.api as om
 
@@ -839,7 +839,7 @@ class TestConstrainedSimpleGA(unittest.TestCase):
         assert_near_equal(p.get_val('exec.z')[-1], 130)
         assert_near_equal(p.get_val('exec.z')[50], 30)
 
-    def test_multiple_con_and_obj(self):
+    def test_con_and_obj_same_var_name(self):
 
         p = om.Problem()
 

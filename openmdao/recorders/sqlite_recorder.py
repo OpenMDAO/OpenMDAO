@@ -409,6 +409,7 @@ class SqliteRecorder(CaseRecorder):
                                 if name in self._prom2abs[io]:
                                     prom_name = self._prom2abs[io][name][0]
                                     self._abs2meta[name] = real_meta_in[prom_name].copy()
+                                    break
                         self._abs2meta[name]['type'] = []
                         self._abs2meta[name]['explicit'] = name not in states
 

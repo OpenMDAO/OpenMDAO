@@ -15,6 +15,7 @@ except ImportError:
     load_npz = None
 
 import openmdao.api as om
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.coloring import _compute_coloring, array_viz, compute_total_coloring
 from openmdao.utils.mpi import MPI

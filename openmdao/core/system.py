@@ -23,6 +23,8 @@ from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE, 
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import _full_slice
+from openmdao.utils.indexer import _index_sort
+from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
@@ -369,8 +371,6 @@ class System(object):
         be a reference to the _TotalJacInfo object.
     _resp_indices_map : dict
         Dictionary of responses and their indices to warn against overlap
-    _multi_constraint : dict
-        Dictionary to flag when a constraint is a duplicate
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -524,7 +524,6 @@ class System(object):
         self._first_call_to_linearize = True   # will check in first call to _linearize
         self._tot_jac = None
         self._resp_indices_map = {}
-        self._multi_constraint = {}
 
     @property
     def msginfo(self):
@@ -1556,6 +1555,19 @@ class System(object):
         """
         pass
 
+    def _indices_check(self, indices, abs_meta_idx_arr, msg):
+        """
+        Check for overlapping indices and throw error if there is
+        """
+        if isinstance(indices, (list, np.ndarray)):
+            for idx in indices:
+                if abs_meta_idx_arr[idx]:
+                    raise RuntimeError(msg)
+
+        elif isinstance(indices, slice):
+            if any(abs_meta_idx_arr[indices.start:indices.stop + 1]):
+                raise RuntimeError(msg)
+
     def _init_relevance(self, mode):
         """
         Create the relevance dictionary.
@@ -1575,13 +1587,71 @@ class System(object):
         if self._use_derivatives:
             desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
             responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
+            abs_meta = {}
+            prom2abs_names = {}
+            _discrete = False
+            if self._var_allprocs_discrete['input'] and \
+                    self._var_allprocs_discrete['output']:
+                _discrete = True
+
+            for data in self._var_allprocs_abs2meta.values():
+                for name, val in data.items():
+                    if name in responses and responses[name]['flat_indices']:
+                        abs_meta[name] = np.zeros(val['shape'], dtype='bool').flatten()
+
+                    else:
+                        abs_meta[name] = np.zeros(val['shape'], dtype='bool')
+
+            for data in self._var_allprocs_prom2abs_list.values():
+                for name, val in data.items():
+                    prom2abs_names[name] = val
+
             for name in responses:
                 if responses[name]['path'] is not None:
-                    name = responses[name]['path']
+                    path_name = responses[name]['path']
+                else:
+                    path_name = None
 
-                if name not in responses and not self._multi_constraint[name]:
+                if name not in responses or \
+                        (path_name is not None and path_name not in responses and
+                         prom2abs_names[path_name][0] not in responses):
                     raise RuntimeError(f"Alias '{name}' is not needed when only "
                                        f"adding one constraint to model")
+
+                path = responses[name]['path']
+                indices = responses[name]['indices']
+                msg = (f"{self.msginfo}: '{name}' indices are overlapping "
+                       f"constraint/objective '{path}'.")
+
+                if not _discrete:
+                    if self.comm.size > 1:
+                        distrib_idx_arr = self.comm.allgather(abs_meta)
+                        abs_meta = distrib_idx_arr[0]
+                        if len(distrib_idx_arr) > 1:
+                            for idx in distrib_idx_arr:
+                                for key in idx:
+                                    if key in abs_meta:
+                                        abs_meta[key] = np.concatenate((abs_meta[key].flatten(),
+                                                                        idx[key].flatten()))
+                                    else:
+                                        abs_meta[key] = idx[key]
+
+                    if path is not None:
+                        name = path
+
+                    try:
+                        abs_meta_idx_arr = abs_meta[name]
+                    except KeyError:
+                        prom_name = prom2abs_names[name][0]
+                        abs_meta_idx_arr = abs_meta[prom_name]
+
+                    if indices is not None:
+                        indices = _index_sort(indices)
+                        if path is not None:
+                            self._indices_check(indices, abs_meta_idx_arr, msg)
+                        for idx in indices:
+                            abs_meta_idx_arr[idx] = True
+
             return self.get_relevant_vars(desvars, responses, mode)
 
         return {'@all': ({'input': ContainsAll(), 'output': ContainsAll()}, ContainsAll())}
@@ -2515,7 +2585,7 @@ class System(object):
         The argument :code:`ref0` represents the physical value when the scaled value is 0.
         The argument :code:`ref` represents the physical value when the scaled value is 1.
         """
-        if name in self._design_vars or name in self._static_design_vars and alias is None:
+        if name in self._design_vars or name in self._static_design_vars:
             msg = "{}: Design Variable '{}' already exists."
             raise RuntimeError(msg.format(self.msginfo, name))
 
@@ -2690,26 +2760,6 @@ class System(object):
         else:
             resp['name'] = name
             resp['path'] = None
-
-        self._multi_constraint[name] = False
-
-        if indices is not None:
-            if name in self._resp_indices_map:
-                if resp['path'] is not None:
-                    msg = (f"{self.msginfo}: '{resp['name']}' indices are overlapping its parent "
-                           f"constraint/objective '{resp['path']}'.")
-                    if isinstance(indices, list):
-                        for idx in indices:
-                            if idx in self._resp_indices_map[name]:
-                                raise RuntimeError(msg)
-                    elif isinstance(indices, slice):
-                        if indices.start >= min(self._resp_indices_map[name]) or \
-                                indices.stop <= max(self._resp_indices_map[name]):
-                            raise RuntimeError(msg)
-                self._multi_constraint[name] = True
-                self._resp_indices_map[name] = np.append(self._resp_indices_map[name], indices)
-            else:
-                self._resp_indices_map[name] = np.array(indices)
 
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)

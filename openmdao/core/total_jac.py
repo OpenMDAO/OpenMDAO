@@ -228,11 +228,6 @@ class _TotalJacInfo(object):
 
         abs2meta_out = model._var_allprocs_abs2meta['output']
 
-        for name, meta in responses.items():
-            if name not in abs2meta_out and meta['path'] in abs2meta_out and \
-                    meta['path'] is not None:
-                abs2meta_out[name] = abs2meta_out[meta['path']]
-
         constraints = driver._cons
 
         for name in prom_of:
@@ -520,6 +515,9 @@ class _TotalJacInfo(object):
                 if out in self.remote_vois:
                     continue
                 J_dict[prom_of[i]] = outer = OrderedDict()
+                if out in self.responses and 'path' in self.responses[out] and \
+                        self.responses[out]['path'] is not None:
+                    out = self.responses[out]['path']
                 out_slice = of_meta[out][0]
                 for j, inp in enumerate(wrt):
                     if inp not in self.remote_vois:
@@ -804,6 +802,8 @@ class _TotalJacInfo(object):
 
         for name in names:
             indices = vois[name]['indices'] if name in vois else None
+            if name in vois and 'path' in vois[name] and vois[name]['path'] is not None:
+                name = vois[name]['path']
             meta = allprocs_abs2meta_out[name]
 
             if indices is not None:
@@ -905,6 +905,8 @@ class _TotalJacInfo(object):
                 else:
                     size = voi['size']
                 indices = vois[name]['indices']
+                if 'path' in voi and voi['path'] is not None:
+                    name = voi['path']
             else:
                 size = abs2meta_out[name]['global_size']
                 indices = None

@@ -2344,9 +2344,6 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_obj_and_con_same_var_different_indices(self):
 
-        import openmdao.api as om
-        from openmdao.utils.assert_utils import assert_near_equal
-
         p = om.Problem()
 
         exec = om.ExecComp(['y = x**2',
@@ -2419,21 +2416,34 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_objective('exec.y', index=50)
         p.model.add_constraint('exec.z', indices=[0, 1], equals=25)
 
-        msg = "<class Group>: 'ALIAS_TEST' indices are overlapping its parent constraint/objective 'exec.z'."
+        # Need to fix up this test to run right
+        msg = "<model> <class Group>: 'ALIAS_TEST' indices are overlapping constraint/objective 'exec.z'."
         with self.assertRaises(RuntimeError) as ctx:
             p.model.add_constraint('exec.z', indices=om.slicer[1:10], lower=20, alias="ALIAS_TEST")
+            p.setup()
 
         print(str(ctx.exception))
         self.assertEqual(str(ctx.exception), msg)
 
         with self.assertRaises(RuntimeError) as ctx:
             p.model.add_constraint('exec.z', indices=[0], lower=20, alias="ALIAS_TEST")
+            p.setup()
 
+        print(str(ctx.exception))
         self.assertEqual(str(ctx.exception), msg)
 
         with self.assertRaises(RuntimeError) as ctx:
             p.model.add_constraint('exec.z', indices=[1, 2], lower=20, alias="ALIAS_TEST")
+            p.setup()
 
+        print(str(ctx.exception))
+        self.assertEqual(str(ctx.exception), msg)
+
+        with self.assertRaises(RuntimeError) as ctx:
+            p.model.add_constraint('exec.z', indices=[-1], lower=20, alias="ALIAS_TEST")
+            p.setup()
+
+        print(str(ctx.exception))
         self.assertEqual(str(ctx.exception), msg)
 
 
