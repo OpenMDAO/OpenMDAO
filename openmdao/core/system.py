@@ -24,7 +24,6 @@ from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import _full_slice
 from openmdao.utils.indexer import _index_sort
-from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
@@ -1557,7 +1556,7 @@ class System(object):
 
     def _indices_check(self, indices, abs_meta_idx_arr, msg):
         """
-        Check for overlapping indices and throw error if there is
+        Check for overlapping indices and throw error if there is.
         """
         if isinstance(indices, (list, np.ndarray)):
             for idx in indices:
