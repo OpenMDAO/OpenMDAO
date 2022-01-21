@@ -929,20 +929,25 @@ class N2Diagram {
      * @param {N2TreeNode} node The current node to operate on.
      */
     findAllHidden(hiddenList, reveal = false, node = this.model.root) {
-        if (!node.isVisible() || node.draw.manuallyExpanded) {
+        // Filtered nodes are handled by their true parents
+        if (node.isFilter()) return;
+
+        if (!node.isVisible() || node.draw.minimized || node.draw.manuallyExpanded) {
             hiddenList.push({
                 'node': node,
                 'draw': {
                     'minimized': node.draw.minimized,
                     'hidden': node.draw.hidden,
+                    'filtered': node.draw.filtered,
                     'manuallyExpanded': node.draw.manuallyExpanded
                 }
             })
 
             if (reveal) {
-                node.draw.minimized = false;
-                node.draw.hidden = false;
+                node.expand();
+                node.show();
                 node.draw.manuallyExpanded = false;
+                node.removeSelfFromFilter();
             }
         }
 
@@ -959,23 +964,27 @@ class N2Diagram {
      * @param {N2TreeNode} node The current node to operate on.
     */
     resetAllHidden(hiddenList, node = this.model.root) {
-        if (!hiddenList) return;
+        // Filtered nodes are handled by their true parents
+        if (!hiddenList || node.isFilter()) return;
 
         const foundEntry = hiddenList.find(item => item.node === node);
 
         // If variables were selectively hidden, force the variable selection
         // dialog to rebuild the hiddenVars array.
-        if ('filter' in node) { node.filter.inputs.wipe(); node.filter.outputs.wipe(); }
+        if (node.hasFilters()) { node.filter.inputs.wipe(); node.filter.outputs.wipe(); }
 
         if (!foundEntry) { // Not found, reset values to default
-            node.draw.minimized = false;
-            node.draw.hidden = false;
+            node.expand();
+            node.show();
             node.draw.manuallyExpanded = false;
+            node.removeSelfFromFilter();
         }
         else { // Found, restore values
             node.draw.minimized = foundEntry.draw.minimized;
             node.draw.hidden = foundEntry.draw.hidden;
             node.draw.manuallyExpanded = foundEntry.draw.manuallyExpanded;
+            if (foundEntry.draw.filtered) { node.addSelfToFilter(); }
+            else { node.removeSelfFromFilter(); }
         }
 
         if (node.hasChildren()) {

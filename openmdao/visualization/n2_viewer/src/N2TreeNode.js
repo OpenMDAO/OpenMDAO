@@ -58,8 +58,8 @@ class N2TreeNode {
     show() { this.draw.hidden = false; return this; }
 
     // Accessor functions for this.draw.filtered - whether a variable is shown in collapsed form
-    filter() { this.draw.filtered = true; }
-    unfilter() { this.draw.filtered = false; }
+    doFilter(filterNode) { this.draw.filtered = true; this.draw.filterParent = filterNode; }
+    undoFilter() { this.draw.filtered = false; this.draw.filterParent = null; }
 
     /**
      * Create a backup of our position and other info.
@@ -122,7 +122,7 @@ class N2TreeNode {
     /** True if it's a subsystem and this.subsystem_type is 'component' */
     isComponent() { return (this.isSubsystem() && this.subsystem_type == 'component'); }
 
-    /** True if this is a "fake" node that managed filtered children. */
+    /** True if this is a "fake" node that manages filtered children. */
     isFilter() { return (this.type == 'filter'); }
 
     /** Not connectable if this is an input group or parents are minimized. */
@@ -133,7 +133,7 @@ class N2TreeNode {
         return this.draw.minimized;
     }
 
-    /** Return false if the node is minimized or hidden */
+    /** Return false if the node is hidden, or filtered */
     isVisible() {
         return !(this.draw.hidden || this.draw.filtered);
     }
@@ -306,7 +306,18 @@ class N2TreeNode {
         }
     }
 
+    addSelfToFilter() {
+        if (this.isInput()) { this.parent.filter.inputs.add(this); }
+        else if (this.isOutput()) { this.parent.filter.outputs.add(this); }
+    }
+
+    removeSelfFromFilter() {
+        if (this.isInput()) { this.parent.filter.inputs.del(this); }
+        else if (this.isOutput()) { this.parent.filter.outputs.del(this); }
+    }
+
     isFilter() { return false; }
+    hasFilters() { return ('filter' in this); }
     isInputFilter() { return false; }
     isOutputFilter() { return false; }
 }
@@ -331,17 +342,15 @@ class N2FilterNode extends N2TreeNode {
         this.children.push(node);
         this.childNames.add(node.absPathName);
         this.numDescendants += 1;
-        node.draw.filtered = true;
-        node.draw.filterParent = this;
+        node.doFilter(this);
         this.show();
     }
     
     del(node) {
+        node.undoFilter(); // Reset state regardless of being found
         if (this.hasChildren()) {
             const idx = this.children.indexOf(node);
             if (idx >= 0) {
-                node.draw.filtered = false;
-                node.draw.filterParent = null;
                 this.children.splice(idx);
                 this.childNames.delete(node);
                 this.numDescendants -= 1;
@@ -349,16 +358,15 @@ class N2FilterNode extends N2TreeNode {
                     this.children = null;
                     this.hide();
                 }
+                return true;
             }
         }
+        return false;
     }
 
     wipe() {
         if (this.hasChildren()) {
-            for (const child of this.children) {
-                child.draw.filtered = false;
-                child.draw.filterParent = null;
-            }
+            for (const child of this.children) { child.undoFilter(); }
             this.children = null;
 
             this.numDescendants = 0;
@@ -384,6 +392,7 @@ class N2FilterNode extends N2TreeNode {
     }
 
     isFilter() { return true; }
+    hasFilters() { return false; }
     isInputFilter() { return this.suffix == 'inputs'; }
     isOutputFilter() { return this.suffix == 'outputs'; }
 

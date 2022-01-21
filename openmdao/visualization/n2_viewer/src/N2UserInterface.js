@@ -567,25 +567,25 @@ class N2UserInterface {
             this.backButtonHistory.length + " items in history");
 
         const history = this.backButtonHistory.pop();
-        const node = history.node;
+        const oldZoomedElement = history.node;
 
         this.toolbar.setSearchState(history.search);
         this.setCollapseDepthSlider({ 'val': history.collapseDepth });
 
         // Check to see if the node is a collapsed node or not
-        if (node.collapsable) {
-            this.leftClickedNode = node;
-            this.addForwardButtonHistory(node);
+        if (oldZoomedElement.collapsable) {
+            this.leftClickedNode = oldZoomedElement;
+            this.addForwardButtonHistory(oldZoomedElement);
             this.collapse();
         }
         else {
-            for (let obj = node; obj != null; obj = obj.parent) {
+            for (let obj = oldZoomedElement; obj != null; obj = obj.parent) {
                 //make sure history item is not minimized
                 if (obj.draw.minimized) return;
             }
 
             this.addForwardButtonHistory(this.n2Diag.zoomedElement);
-            this._setupLeftClick(node);
+            this._setupLeftClick(oldZoomedElement);
         }
 
         this.n2Diag.resetAllHidden(history.hidden);
