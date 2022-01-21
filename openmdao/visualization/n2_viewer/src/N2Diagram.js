@@ -162,7 +162,6 @@ class N2Diagram {
         node.draw.minimized = dataList.pop();
         node.draw.manuallyExpanded = dataList.pop();
         node.draw.hidden = dataList.pop();
-        //console.log(node.draw.minimized, node.draw.manuallyExpanded);
 
         if (node.hasChildren()) {
             for (const child of node.children) {
@@ -400,10 +399,6 @@ class N2Diagram {
                     self.prevScales.model.y(d.draw.prevDims.y) + ")";
             })
             .on("click", function (d) {
-                /*
-                if (self.ui.nodeInfoBox.hidden) { self.ui.leftClick(d); } // Zoom if not in info panel mode
-                else { self.ui.nodeInfoBox.pin(); } // Create a persistent panel
-                self.ui.click.left(self.ui.leftClick.bind(self.ui), d); */
                 self.leftClickSelector(this, d);
             })
             .on("contextmenu", function (d) {
@@ -552,11 +547,6 @@ class N2Diagram {
                     self.prevScales.solver.y(d.draw.prevSolverDims.y) + ")";
             })
             .on("click", function (d) {
-                /*
-                if (self.ui.nodeInfoBox.hidden) { self.ui.leftClick(d); } // Zoom if not in info panel mode
-                else { self.ui.nodeInfoBox.pin(); } // Create a persistent panel
-                
-                self.ui.click.left(self.ui.leftClick.bind(self.ui), d); */
                 self.leftClickSelector(this, d);
             })
             .on("contextmenu", function (d) {
@@ -893,7 +883,6 @@ class N2Diagram {
      * @param {N2MatrixCell} cell The cell the event occured on.
      */
     mouseClick(cell) {
-        // this.ui.click.left(this.arrowMgr.togglePin.bind(this.arrowMgr), cell.id);
         if (this.ui.click.isNormal) { // If not in info-panel mode, pin/unpin arrows
             this.arrowMgr.togglePin(cell.id);
         }

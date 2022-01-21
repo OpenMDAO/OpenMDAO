@@ -146,6 +146,7 @@ class N2TreeNode {
         return this.draw.minimized; // Collapsed non-variable
     }
 
+    /** True if this is a variable and will be displayed as partially collapsed. */
     isFilteredVariable() {
         return (this.isInputOrOutput() && this.draw.filtered);
     }
@@ -292,6 +293,7 @@ class N2TreeNode {
         this.children.splice(idx + 1, 0, newChild);
     }
 
+    /** If this is a component, add special children that can hold filtered variables */
     addFilterChildIfComponent() {
         if (this.isComponent() && this.hasChildren()) {
 
@@ -306,23 +308,34 @@ class N2TreeNode {
         }
     }
 
+    /** Add ourselves to the corrent parental filter */
     addSelfToFilter() {
         if (this.isInput()) { this.parent.filter.inputs.add(this); }
         else if (this.isOutput()) { this.parent.filter.outputs.add(this); }
     }
 
+    /** Remove ourselves from the corrent parental filter */
     removeSelfFromFilter() {
         if (this.isInput()) { this.parent.filter.inputs.del(this); }
         else if (this.isOutput()) { this.parent.filter.outputs.del(this); }
     }
 
-    isFilter() { return false; }
-    hasFilters() { return ('filter' in this); }
-    isInputFilter() { return false; }
-    isOutputFilter() { return false; }
+    isFilter() { return false; } // Always false in base class
+    hasFilters() { return ('filter' in this); } // True if we contain filters
+    isInputFilter() { return false; } // Always false in base class
+    isOutputFilter() { return false; } // Always false in base class
 }
 
+/**
+ * Special N2TreeNode subclass whose children are filtered variables of the parent component.
+ * @typedef N2FilterNode
+ */
 class N2FilterNode extends N2TreeNode {
+    /**
+     * Give ourselves a special name and the "filter" type.
+     * @param {N2TreeNode} parentComponent The component that we are filtering variables for.
+     * @param {String} suffix Either "inputs" or "outputs".
+     */
     constructor(parentComponent, suffix) {
         super(
             {
@@ -337,6 +350,10 @@ class N2FilterNode extends N2TreeNode {
         this.suffix = suffix;
     }
 
+    /**
+     * Add a node to our filtered children, update its state, and make ourselves visible.
+     * @param {N2TreeNode} node Reference to the node to filter.
+     */
     add(node) {
         if (!this.hasChildren()) { this.children = []; }
         this.children.push(node);
@@ -346,6 +363,12 @@ class N2FilterNode extends N2TreeNode {
         this.show();
     }
     
+    /**
+     * Update the node's state and remove it from our children. If nothing is left in
+     * the children array, delete it and hide ourselves.
+     * @param {N2TreeNode} node Reference to the node to unfilter.
+     * @returns {Boolean} True if the node was found in children, otherwise false.
+     */
     del(node) {
         node.undoFilter(); // Reset state regardless of being found
         if (this.hasChildren()) {
@@ -364,6 +387,7 @@ class N2FilterNode extends N2TreeNode {
         return false;
     }
 
+    /** Set the state of all children to unfiltered and delete the array */
     wipe() {
         if (this.hasChildren()) {
             for (const child of this.children) { child.undoFilter(); }
@@ -376,10 +400,16 @@ class N2FilterNode extends N2TreeNode {
         }
     }
 
+    /**
+     * Determine if the referenced node is in our array of children.
+     * @param {N2TreeNode} child The node to find.
+     * @returns {Boolean} True if the child was found, false otherwise.
+     */
     hasChild(child) {
         return (this.hasChildren()? this.children.indexOf(child) >= 0 : false);
     }
 
+    /** Return the length of the children array or 0 if it doesn't exist. */
     get count() { return (this.hasChildren()? this.children.length : 0); }
     
     /** Don't expand, always stay minimized. */
@@ -391,11 +421,18 @@ class N2FilterNode extends N2TreeNode {
         return this;
     }
 
-    isFilter() { return true; }
-    hasFilters() { return false; }
-    isInputFilter() { return this.suffix == 'inputs'; }
-    isOutputFilter() { return this.suffix == 'outputs'; }
+    isFilter() { return true; } // Always true for the N2TreeNode class
+    hasFilters() { return false; } // Only components contains filters
+    isInputFilter() { return this.suffix == 'inputs'; } // True if this manages input filters
+    isOutputFilter() { return this.suffix == 'outputs'; } // True if this manages output filters
 
+    /**
+     * For normal nodes, targetParentSet and sourceParentSet are built when the model
+     * is initialized. Since filters are created after that, _genParentSet() generates a
+     * set dynamically based on the specified parent sets of its children.
+     * @param {String} setName Either "source" or "target"
+     * @returns {Set} The merged contents of the parent sets of all children.
+     */
     _genParentSet(setName) {
         const tmpSet = new Set();
         const setPropName = `${setName}ParentSet`;

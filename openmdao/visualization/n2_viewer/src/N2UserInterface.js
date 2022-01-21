@@ -815,19 +815,14 @@ class N2UserInterface {
      * is currently shown, and vice-versa.
      */
     showSolvers() {
-        // d3.select('#solver_tree').style('display','block');
         n2Diag.showSolvers = true;
         this.n2Diag.update();
         d3.select('#n2-resizer-handle').attr('class', 'inactive-resizer-handle')
     }
     hideSolvers() {
-        // d3.select('#solver_tree').style('display','none');
-        // d3.select('#solver_tree').attr('width',0);
         n2Diag.showSolvers = false;
         this.n2Diag.update();
-        // const handle = d3.select('#n2-resizer-handle');
         d3.select('#n2-resizer-handle').attr('class', 'inactive-resizer-handle-without-solvers')
-        // n2-resizer-handle
     }
 
     /** React to the toggle legend button, and show or hide the legend below the N2. */
