@@ -139,6 +139,12 @@ class N2Style {
             '.horiz_line, .vert_line': {
                 'stroke': N2Style.color.gridline,
             },
+            "g.partition_group > rect[id$='_N2_FILTER_inputs'] + text": {
+                'font-style': 'italic'
+            },
+            "g.partition_group > rect[id$='_N2_FILTER_outputs'] + text": {
+                'font-style': 'italic'
+            }
         };
 
         for (let solverName in this.solvers) {
@@ -187,7 +193,7 @@ class N2Style {
        * @return {string} The name of an existing CSS class.
        */
     getNodeClass(element) {
-        if (element.isMinimized) return 'minimized';
+        if (element.draw.minimized) return 'minimized';
 
         switch (element.type) {
             case 'input':
@@ -200,6 +206,9 @@ class N2Style {
 
             case 'autoivc_input':
                 return 'autoivc_input';
+
+            case 'filter':
+                return 'filter';
 
             case 'output':
                 if (Array.isPopulatedArray(element.children)) return 'output_group';
@@ -214,7 +223,7 @@ class N2Style {
                 return 'subsystem';
 
             default:
-                throw 'CSS class not found for element ' + element;
+                throw `CSS class not found for element type: ${element.type}`
         }
     }
 }
@@ -236,6 +245,7 @@ N2Style.color = {
     'component': '#02BFFF',
     'collapsed': '#555555',
     'collapsedText': 'white',
+    'filter': '#555555',
     'unconnectedInput': '#F42F0D',
     'inputArrow': 'salmon',
     'outputArrow': 'seagreen',

@@ -420,10 +420,10 @@ class N2UserInterface {
         d3.event.preventDefault();
         d3.event.stopPropagation();
 
-        if (node.isMinimized) {
+        if (node.draw.minimized) {
             this.rightClickedNode = node;
             this.addBackButtonHistory();
-            node.manuallyExpanded = true;
+            node.draw.manuallyExpanded = true;
             this._uncollapse(node);
             this.n2Diag.update();
         }
@@ -432,7 +432,7 @@ class N2UserInterface {
             node.collapsable = true;
 
             this.addBackButtonHistory();
-            node.manuallyExpanded = false;
+            node.draw.manuallyExpanded = false;
             this.collapse();
         }
     }
@@ -489,7 +489,7 @@ class N2UserInterface {
         if (d3.event.button != 0) return;
         this.addBackButtonHistory();
         node.expand();
-        node.manuallyExpanded = true;
+        node.draw.manuallyExpanded = true;
         this._setupLeftClick(node);
 
         this.n2Diag.update();
@@ -581,7 +581,7 @@ class N2UserInterface {
         else {
             for (let obj = node; obj != null; obj = obj.parent) {
                 //make sure history item is not minimized
-                if (obj.isMinimized) return;
+                if (obj.draw.minimized) return;
             }
 
             this.addForwardButtonHistory(this.n2Diag.zoomedElement);
@@ -620,7 +620,7 @@ class N2UserInterface {
 
         for (let obj = node; obj != null; obj = obj.parent) {
             // make sure history item is not minimized
-            if (obj.isMinimized) return;
+            if (obj.draw.minimized) return;
         }
 
         this.addBackButtonHistory(false);
@@ -688,7 +688,7 @@ class N2UserInterface {
      */
     _collapseOutputs(node) {
         if (node.subsystem_type && node.subsystem_type == 'component') {
-            node.isMinimized = true;
+            node.minimize();
         }
         if (node.hasChildren()) {
             for (let child of node.children) {
@@ -717,15 +717,16 @@ class N2UserInterface {
      * @param {N2TreeNode} node The node to operate on.
      */
     _uncollapse(node) {
-        node.expand();
-        node.varIsHidden = false;
+        node.expand().show();
+        if (node.isFilteredVariable()) node.draw.filtered = false;
 
         if (node.hasChildren()) {
             for (const child of node.children) {
-                if ('hiddenVars' in node && node.hiddenVars.indexOf(child) == -1)
                 this._uncollapse(child);
             }
         }
+
+        if (node.isFilter()) { node.wipe(); } // Clear the contents if it's a filter node
     }
 
     /**
@@ -740,7 +741,7 @@ class N2UserInterface {
         N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
         this._uncollapse(startNode);
-        startNode.manuallyExpanded = true;
+        startNode.draw.manuallyExpanded = true;
         this.n2Diag.update();
     }
 
@@ -1132,13 +1133,16 @@ class ChildSelectDialog extends N2WindowDraggable {
 
     /** Reset the array of hidden vars from the node's array if it exists. */
     _initHiddenVars() {
-        if ('hiddenVars' in this.node) {
-            this.hiddenVars = this.node.hiddenVars;
-            this.existingHiddenVars = true;
-        }
-        else {
-            this.hiddenVars = [];
-            this.existingHiddenVars = false;
+        this.hiddenVars = [];
+        this.existingHiddenVars = false;
+
+        for (const iotype of ['inputs', 'outputs']) {
+            if (this.node.filter[iotype].count > 0) {
+                for (const child of this.node.filter[iotype].children) {
+                    this.hiddenVars.push(child);
+                };
+                this.existingHiddenVars = true;
+            }
         }
     }
 
@@ -1177,13 +1181,13 @@ class ChildSelectDialog extends N2WindowDraggable {
 
             row.append('td').attr('class', 'varname').text(varName);
             const checkId = `${child.toId()}-visible-check`;
-            if (child.varIsHidden && ! this.existingHiddenVars) { this.hiddenVars.push(child); }
+            if (child.isFilteredVariable() && ! this.existingHiddenVars) { this.hiddenVars.push(child); }
 
             // Add a checkbox. When checked, the variable will be displayed.
             row.append('td').attr('class', 'varvis')
                 .append('input')
                 .attr('type', 'checkbox')
-                .property('checked', !child.varIsHidden)
+                .property('checked', !child.isFilteredVariable())
                 .attr('id', checkId)
                 .on('change', e => {
                     const isVisible = d3.select(`#${checkId}`).property('checked');
@@ -1191,7 +1195,7 @@ class ChildSelectDialog extends N2WindowDraggable {
                     else { 
                         const idx = this.hiddenVars.indexOf(child);
                         if (idx > -1 ) { this.hiddenVars.splice(idx, 1); }
-                        else { console.warning("Could not find child in hiddenVars array."); }
+                        else { console.warn('Could not find child in hiddenVars array.', child); }
                     }
                 })
         }
@@ -1219,24 +1223,25 @@ class ChildSelectDialog extends N2WindowDraggable {
     apply() {
         if (this.hiddenVars.length == this.node.children.length || this.varCount == 0) {
             // If every variable was hidden, just collapse the node if it's expanded
-            if (! this.node.isMinimized) { n2Diag.ui.rightClick(this.node); }
+            if (! this.node.draw.minimized) { n2Diag.ui.rightClick(this.node); }
         }
         else {
             n2Diag.ui.rightClickedNode = this.node;
             n2Diag.ui.addBackButtonHistory();
 
             this.node.searchTerm = this.searchTerm;
-            this.node.hiddenVars = this.hiddenVars;
-            
-            if (this.node.isMinimized) {
-                // If node itself is collapsed, expand it
-                this.node.manuallyExpanded = true;
-                this.node.expand();
-                this.node.varIsHidden = false;
+            this.node.filter.inputs.wipe();
+            this.node.filter.outputs.wipe();
+
+            for (const child of this.hiddenVars) {
+                if (child.isInput()) { this.node.filter.inputs.add(child); }
+                else { this.node.filter.outputs.add(child); }
             }
-            for (const child of this.node.children) {
-                // Need to check every child because some may be newly visible
-                child.varIsHidden = (this.hiddenVars.indexOf(child) >= 0);
+            
+            if (this.node.draw.minimized) {
+                // If node itself is collapsed, expand it
+                this.node.draw.manuallyExpanded = true;
+                this.node.expand();
             }
             n2Diag.update();
         }
@@ -1255,6 +1260,7 @@ class ChildSelectDialog extends N2WindowDraggable {
         if (this.foundSearchVars.length > 0) {
             // Select variables not found by search
             for (const child of this.node.children) {
+                if (child.isFilter()) continue;
                 if (this.foundSearchVars.indexOf(child) < 0) {
                     this.hiddenVars.push(child);
                 }
@@ -1269,6 +1275,7 @@ class ChildSelectDialog extends N2WindowDraggable {
         this.hiddenVars = [];
 
         for (const child of this.node.children) {
+            if (child.isFilter()) continue;
             this.hiddenVars.push(child);
         }
 

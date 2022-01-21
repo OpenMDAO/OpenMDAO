@@ -144,9 +144,9 @@ class N2Diagram {
      * Recurse and pull state info from model for saving.
      */
     getSubState(dataList, node = this.model.root) {
-        dataList.push(node.isMinimized);
-        dataList.push(node.manuallyExpanded);
-        dataList.push(node.varIsHidden);
+        dataList.push(node.draw.minimized);
+        dataList.push(node.draw.manuallyExpanded);
+        dataList.push(node.draw.hidden);
 
         if (node.hasChildren()) {
             for (const child of node.children) {
@@ -159,10 +159,10 @@ class N2Diagram {
      * Recurse and set state info into model.
      */
     setSubState(dataList, node = this.model.root) {
-        node.isMinimized = dataList.pop();
-        node.manuallyExpanded = dataList.pop();
-        node.varIsHidden = dataList.pop();
-        //console.log(node.isMinimized, node.manuallyExpanded);
+        node.draw.minimized = dataList.pop();
+        node.draw.manuallyExpanded = dataList.pop();
+        node.draw.hidden = dataList.pop();
+        //console.log(node.draw.minimized, node.draw.manuallyExpanded);
 
         if (node.hasChildren()) {
             for (const child of node.children) {
@@ -266,37 +266,37 @@ class N2Diagram {
     _updateScale() {
         if (!this.scales.firstRun) this._preservePreviousScale();
 
-        this.transitCoords.model.x = (this.zoomedElement.dims.x ?
+        this.transitCoords.model.x = (this.zoomedElement.draw.dims.x ?
             this.layout.size.partitionTree.width - this.layout.size.parentNodeWidth :
-            this.layout.size.partitionTree.width) / (1 - this.zoomedElement.dims.x);
+            this.layout.size.partitionTree.width) / (1 - this.zoomedElement.draw.dims.x);
         this.transitCoords.model.y = this.layout.size.partitionTree.height /
-            this.zoomedElement.dims.height;
+            this.zoomedElement.draw.dims.height;
 
         this.scales.model.x
-            .domain([this.zoomedElement.dims.x, 1])
-            .range([this.zoomedElement.dims.x ? this.layout.size.parentNodeWidth : 0,
+            .domain([this.zoomedElement.draw.dims.x, 1])
+            .range([this.zoomedElement.draw.dims.x ? this.layout.size.parentNodeWidth : 0,
             this.layout.size.partitionTree.width
             ]);
         this.scales.model.y
-            .domain([this.zoomedElement.dims.y, this.zoomedElement.dims.y +
-                this.zoomedElement.dims.height
+            .domain([this.zoomedElement.draw.dims.y, this.zoomedElement.draw.dims.y +
+                this.zoomedElement.draw.dims.height
             ])
             .range([0, this.layout.size.partitionTree.height]);
 
-        this.transitCoords.solver.x = (this.zoomedElement.solverDims.x ?
+        this.transitCoords.solver.x = (this.zoomedElement.draw.solverDims.x ?
             this.layout.size.solverTree.width - this.layout.size.parentNodeWidth :
-            this.layout.size.solverTree.width) / (1 - this.zoomedElement.solverDims.x);
+            this.layout.size.solverTree.width) / (1 - this.zoomedElement.draw.solverDims.x);
         this.transitCoords.solver.y = this.layout.size.solverTree.height /
-            this.zoomedElement.solverDims.height;
+            this.zoomedElement.draw.solverDims.height;
 
         this.scales.solver.x
-            .domain([this.zoomedElement.solverDims.x, 1])
-            .range([this.zoomedElement.solverDims.x ? this.layout.size.parentNodeWidth :
+            .domain([this.zoomedElement.draw.solverDims.x, 1])
+            .range([this.zoomedElement.draw.solverDims.x ? this.layout.size.parentNodeWidth :
                 0, this.layout.size.solverTree.width
             ]);
         this.scales.solver.y
-            .domain([this.zoomedElement.solverDims.y,
-            this.zoomedElement.solverDims.y + this.zoomedElement.solverDims.height
+            .domain([this.zoomedElement.draw.solverDims.y,
+            this.zoomedElement.draw.solverDims.y + this.zoomedElement.draw.solverDims.height
             ])
             .range([0, this.layout.size.solverTree.height]);
 
@@ -396,8 +396,8 @@ class N2Diagram {
             })
             .attr("transform", function (d) {
                 return "translate(" +
-                    self.prevScales.model.x(d.prevDims.x) + " " +
-                    self.prevScales.model.y(d.prevDims.y) + ")";
+                    self.prevScales.model.x(d.draw.prevDims.x) + " " +
+                    self.prevScales.model.y(d.draw.prevDims.y) + ")";
             })
             .on("click", function (d) {
                 /*
@@ -427,10 +427,10 @@ class N2Diagram {
 
         nodeEnter.append("rect")
             .attr("width", function (d) {
-                return d.prevDims.width * self.prevTransitCoords.model.x;
+                return d.draw.prevDims.width * self.prevTransitCoords.model.x;
             })
             .attr("height", function (d) {
-                return d.prevDims.height * self.prevTransitCoords.model.y;
+                return d.draw.prevDims.height * self.prevTransitCoords.model.y;
             })
             .attr("id", function (d) {
                 return N2TreeNode.absPathToId(d.absPathName);
@@ -441,10 +441,10 @@ class N2Diagram {
         nodeEnter.append("text")
             .attr("dy", ".35em")
             .attr("transform", function (d) {
-                let anchorX = d.prevDims.width * self.prevTransitCoords.model.x -
+                let anchorX = d.draw.prevDims.width * self.prevTransitCoords.model.x -
                     self.layout.size.rightTextMargin;
                 return "translate(" + anchorX + " " +
-                    (d.prevDims.height * self.prevTransitCoords.model.y / 2) + ")";
+                    (d.draw.prevDims.height * self.prevTransitCoords.model.y / 2) + ")";
             })
             .style("opacity", function (d) {
                 if (d.depth < self.zoomedElement.depth) return 0;
@@ -471,25 +471,25 @@ class N2Diagram {
                 return "partition_group " + self.style.getNodeClass(d);
             })
             .attr("transform", function (d) {
-                return "translate(" + self.scales.model.x(d.dims.x) + " " +
-                    self.scales.model.y(d.dims.y) + ")";
+                return "translate(" + self.scales.model.x(d.draw.dims.x) + " " +
+                    self.scales.model.y(d.draw.dims.y) + ")";
             });
 
         nodeUpdate.select("rect")
             .attr("width", function (d) {
-                return d.dims.width * self.transitCoords.model.x;
+                return d.draw.dims.width * self.transitCoords.model.x;
             })
             .attr("height", function (d) {
-                return d.dims.height * self.transitCoords.model.y;
+                return d.draw.dims.height * self.transitCoords.model.y;
             })
             .attr('rx', 12)
             .attr('ry', 12);
 
         nodeUpdate.select("text")
             .attr("transform", function (d) {
-                let anchorX = d.dims.width * self.transitCoords.model.x -
+                let anchorX = d.draw.dims.width * self.transitCoords.model.x -
                     self.layout.size.rightTextMargin;
-                return "translate(" + anchorX + " " + (d.dims.height *
+                return "translate(" + anchorX + " " + (d.draw.dims.height *
                     self.transitCoords.model.y / 2) + ")";
             })
             .style("opacity", function (d) {
@@ -505,24 +505,24 @@ class N2Diagram {
         // Transition exiting nodes to the parent's new position.
         let nodeExit = selection.exit().transition(sharedTransition)
             .attr("transform", function (d) {
-                return "translate(" + self.scales.model.x(d.dims.x) + "," +
-                    self.scales.model.y(d.dims.y) + ")";
+                return "translate(" + self.scales.model.x(d.draw.dims.x) + "," +
+                    self.scales.model.y(d.draw.dims.y) + ")";
             })
             .remove();
 
         nodeExit.select("rect")
             .attr("width", function (d) {
-                return d.dims.width * self.transitCoords.model.x;
+                return d.draw.dims.width * self.transitCoords.model.x;
             })
             .attr("height", function (d) {
-                return d.dims.height * self.transitCoords.model.y;
+                return d.draw.dims.height * self.transitCoords.model.y;
             });
 
         nodeExit.select("text")
             .attr("transform", function (d) {
-                let anchorX = d.dims.width * self.transitCoords.model.x -
+                let anchorX = d.draw.dims.width * self.transitCoords.model.x -
                     self.layout.size.rightTextMargin;
-                return "translate(" + anchorX + "," + (d.dims.height *
+                return "translate(" + anchorX + "," + (d.draw.dims.height *
                     self.transitCoords.model.y / 2) + ")";
             })
             .style("opacity", 0);
@@ -545,11 +545,11 @@ class N2Diagram {
                 return solver_class + " solver_group " + self.style.getNodeClass(d);
             })
             .attr("transform", function (d) {
-                let x = 1.0 - d.prevSolverDims.x - d.prevSolverDims.width;
+                let x = 1.0 - d.draw.prevSolverDims.x - d.draw.prevSolverDims.width;
                 // The magic for reversing the blocks on the right side
                 // The solver tree goes from the root on the right and expands to the left
                 return "translate(" + self.prevScales.solver.x(x) + "," +
-                    self.prevScales.solver.y(d.prevSolverDims.y) + ")";
+                    self.prevScales.solver.y(d.draw.prevSolverDims.y) + ")";
             })
             .on("click", function (d) {
                 /*
@@ -594,10 +594,10 @@ class N2Diagram {
 
         nodeEnter.append("svg:rect")
             .attr("width", function (d) {
-                return d.prevSolverDims.width * self.prevTransitCoords.solver.x;
+                return d.draw.prevSolverDims.width * self.prevTransitCoords.solver.x;
             })
             .attr("height", function (d) {
-                return d.prevSolverDims.height * self.prevTransitCoords.solver.y;
+                return d.draw.prevSolverDims.height * self.prevTransitCoords.solver.y;
             })
             .attr("id", function (d) {
                 return d.absPathName.replace(/\./g, '_');
@@ -606,9 +606,9 @@ class N2Diagram {
         nodeEnter.append("svg:text")
             .attr("dy", ".35em")
             .attr("transform", function (d) {
-                let anchorX = d.prevSolverDims.width * self.prevTransitCoords.solver.x -
+                let anchorX = d.draw.prevSolverDims.width * self.prevTransitCoords.solver.x -
                     self.layout.size.rightTextMargin;
-                return "translate(" + anchorX + "," + d.prevSolverDims.height *
+                return "translate(" + anchorX + "," + d.draw.prevSolverDims.height *
                     self.prevTransitCoords.solver.y / 2 + ")";
             })
             .style("opacity", function (d) {
@@ -640,28 +640,28 @@ class N2Diagram {
                 return solver_class + " solver_group " + self.style.getNodeClass(d);
             })
             .attr("transform", function (d) {
-                let x = 1.0 - d.solverDims.x - d.solverDims.width;
+                let x = 1.0 - d.draw.solverDims.x - d.draw.solverDims.width;
                 // The magic for reversing the blocks on the right side
 
                 return "translate(" + self.scales.solver.x(x) + "," +
-                    self.scales.solver.y(d.solverDims.y) + ")";
+                    self.scales.solver.y(d.draw.solverDims.y) + ")";
             });
 
         nodeUpdate.select("rect")
             .attr("width", function (d) {
-                return d.solverDims.width * self.transitCoords.solver.x;
+                return d.draw.solverDims.width * self.transitCoords.solver.x;
             })
             .attr("height", function (d) {
-                return d.solverDims.height * self.transitCoords.solver.y;
+                return d.draw.solverDims.height * self.transitCoords.solver.y;
             })
             .attr('rx', 12)
             .attr('ry', 12);
 
         nodeUpdate.select("text")
             .attr("transform", function (d) {
-                let anchorX = d.solverDims.width * self.transitCoords.solver.x -
+                let anchorX = d.draw.solverDims.width * self.transitCoords.solver.x -
                     self.layout.size.rightTextMargin;
-                return "translate(" + anchorX + "," + d.solverDims.height *
+                return "translate(" + anchorX + "," + d.draw.solverDims.height *
                     self.transitCoords.solver.y / 2 + ")";
             })
             .style("opacity", function (d) {
@@ -678,24 +678,24 @@ class N2Diagram {
         let nodeExit = selection.exit()
             .transition(sharedTransition)
             .attr("transform", function (d) {
-                return "translate(" + self.scales.solver.x(d.solverDims.x) + "," +
-                    self.scales.solver.y(d.solverDims.y) + ")";
+                return "translate(" + self.scales.solver.x(d.draw.solverDims.x) + "," +
+                    self.scales.solver.y(d.draw.solverDims.y) + ")";
             })
             .remove();
 
         nodeExit.select("rect")
             .attr("width", function (d) {
-                return d.solverDims.width * self.transitCoords.solver.x;
+                return d.draw.solverDims.width * self.transitCoords.solver.x;
             })
             .attr("height", function (d) {
-                return d.solverDims.height * self.transitCoords.solver.y;
+                return d.draw.solverDims.height * self.transitCoords.solver.y;
             });
 
         nodeExit.select("text")
             .attr("transform", function (d) {
-                let anchorX = d.solverDims.width * self.transitCoords.solver.x -
+                let anchorX = d.draw.solverDims.width * self.transitCoords.solver.x -
                     self.layout.size.rightTextMargin;
-                return "translate(" + anchorX + "," + d.solverDims.height *
+                return "translate(" + anchorX + "," + d.draw.solverDims.height *
                     self.transitCoords.solver.y / 2 + ")";
             })
             .style("opacity", 0);
@@ -929,18 +929,20 @@ class N2Diagram {
      * @param {N2TreeNode} node The current node to operate on.
      */
     findAllHidden(hiddenList, reveal = false, node = this.model.root) {
-        if (!node.isVisible() || node.manuallyExpanded) {
+        if (!node.isVisible() || node.draw.manuallyExpanded) {
             hiddenList.push({
                 'node': node,
-                'isMinimized': node.isMinimized,
-                'varIsHidden': node.varIsHidden,
-                'manuallyExpanded': node.manuallyExpanded
+                'draw': {
+                    'minimized': node.draw.minimized,
+                    'hidden': node.draw.hidden,
+                    'manuallyExpanded': node.draw.manuallyExpanded
+                }
             })
 
             if (reveal) {
-                node.isMinimized = false;
-                node.varIsHidden = false;
-                node.manuallyExpanded = false;
+                node.draw.minimized = false;
+                node.draw.hidden = false;
+                node.draw.manuallyExpanded = false;
             }
         }
 
@@ -963,17 +965,17 @@ class N2Diagram {
 
         // If variables were selectively hidden, force the variable selection
         // dialog to rebuild the hiddenVars array.
-        if ('hiddenVars' in node) { delete node.hiddenVars; }
+        if ('filter' in node) { node.filter.inputs.wipe(); node.filter.outputs.wipe(); }
 
         if (!foundEntry) { // Not found, reset values to default
-            node.isMinimized = false;
-            node.varIsHidden = false;
-            node.manuallyExpanded = false;
+            node.draw.minimized = false;
+            node.draw.hidden = false;
+            node.draw.manuallyExpanded = false;
         }
         else { // Found, restore values
-            node.isMinimized = foundEntry.isMinimized;
-            node.varIsHidden = foundEntry.varIsHidden;
-            node.manuallyExpanded = foundEntry.manuallyExpanded;
+            node.draw.minimized = foundEntry.draw.minimized;
+            node.draw.hidden = foundEntry.draw.hidden;
+            node.draw.manuallyExpanded = foundEntry.draw.manuallyExpanded;
         }
 
         if (node.hasChildren()) {
@@ -997,11 +999,11 @@ class N2Diagram {
      * @param {N2TreeNode} startNode The node to begin from.
      */
     manuallyExpandAll(startNode) {
-        startNode.isMinimized = false;
-        startNode.manuallyExpanded = true;
+        startnode.draw.minimized = false;
+        startnode.draw.manuallyExpanded = true;
 
         if (startNode.hasChildren()) {
-            for (let child of startNode.children) {
+            for (const child of startNode.children) {
                 this.manuallyExpandAll(child);
             }
         }
@@ -1014,12 +1016,12 @@ class N2Diagram {
      */
     minimizeAll(startNode, initialNode = true) {
         if (!initialNode) {
-            startNode.isMinimized = true;
-            startNode.manuallyExpanded = false;
+            startnode.draw.minimized = true;
+            startnode.draw.manuallyExpanded = false;
         }
 
         if (startNode.hasChildren()) {
-            for (let child of startNode.children) {
+            for (const child of startNode.children) {
                 this.minimizeAll(child, false);
             }
         }
@@ -1035,12 +1037,12 @@ class N2Diagram {
         }
 
         if (node.depth < this.chosenCollapseDepth) {
-            node.isMinimized = false;
-            node.manuallyExpanded = true;
+            node.draw.minimized = false;
+            node.draw.manuallyExpanded = true;
         }
         else {
-            node.isMinimized = true;
-            node.manuallyExpanded = false;
+            node.draw.minimized = true;
+            node.draw.manuallyExpanded = false;
         }
 
         if (node.hasChildren()) {

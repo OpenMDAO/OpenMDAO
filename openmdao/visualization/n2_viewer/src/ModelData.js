@@ -94,6 +94,8 @@ class ModelData {
             }
         }
 
+        newNode.addFilterChildIfComponent();
+
         return newNode;
     }
 
@@ -320,16 +322,16 @@ class ModelData {
         let sysPathnames = this.sysPathnamesList;
         let throwLbl = 'ModelData._computeConnections: ';
 
-        for (let conn of this.conns) {
+        for (const conn of this.conns) {
             // Process sources
-            let srcObj = this.nodePaths[conn.src];
+            const srcObj = this.nodePaths[conn.src];
 
             if (!srcObj) {
                 console.warn(throwLbl + "Cannot find connection source " + conn.src);
                 continue;
             }
 
-            let srcObjParents = [srcObj];
+            const srcObjParents = [srcObj];
             if (!srcObj.isOutput()) { // source obj must be output
                 console.warn(throwLbl + "Found a source that is not an output.");
                 continue;
@@ -345,7 +347,7 @@ class ModelData {
             }
 
             // Process targets
-            let tgtObj = this.nodePaths[conn.tgt];
+            const tgtObj = this.nodePaths[conn.tgt];
 
             if (!tgtObj) {
                 console.warn(throwLbl + "Cannot find connection target " + conn.tgt);
@@ -367,13 +369,13 @@ class ModelData {
                 continue;
             }
 
-            let tgtObjParents = [tgtObj];
+            const tgtObjParents = [tgtObj];
             for (let parentObj = tgtObj.parent; parentObj != null; parentObj = parentObj.parent) {
                 tgtObjParents.push(parentObj);
             }
 
-            for (let srcParent of srcObjParents) {
-                for (let tgtParent of tgtObjParents) {
+            for (const srcParent of srcObjParents) {
+                for (const tgtParent of tgtObjParents) {
                     if (tgtParent.absPathName != "")
                         srcParent.targetParentSet.add(tgtParent);
 
