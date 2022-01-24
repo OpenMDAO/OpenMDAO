@@ -258,14 +258,16 @@ class N2Toolbar {
 
     /** When an expanded button is clicked, update the 'root' button to the same icon/function. */
     _setRootButton(clickedNode) {
-        let container = d3.select(clickedNode.parentNode.parentNode);
-        let button = d3.select(clickedNode);
-        let rootButton = container.select('i');
+        const container = d3.select(clickedNode.parentNode.parentNode);
+        if (!container.classed('expandable')) return;
+
+        const button = d3.select(clickedNode);
+        const rootButton = container.select('i:not(.caret)');
 
         rootButton
             .attr('class', button.attr('class'))
             .attr('id', button.attr('id'))
-            .node().onclick = button.node().onclick;
+            .on('click', button.on('click'));
     }
 
     /** Minimal management of buttons which will be described on the help window. */
@@ -297,7 +299,7 @@ class N2Toolbar {
         const tooltipBox = d3.select(".tool-tip");
 
         this._addButton(new N2ToolbarButtonClick('#searchButtonId', tooltipBox,
-            "Collapse model to only variables that match search term",
+            "Collapse model to variables matching search term",
             e => {
                 if (self.searchBar.node().value == '') {
                     self.searchCount.html('0 matches');
@@ -360,11 +362,41 @@ class N2Toolbar {
                 self._setRootButton(target);
             }));
 
+        this._addButton(new N2ToolbarButtonToggle('#info-button', tooltipBox,
+            ["Hide detailed node information", "Show detailed node information"],
+            pred => { return n2ui.nodeInfoBox.active; },
+            function(target) {
+                n2ui.click.toggle('nodeinfo');
+            })).setHelpInfo("Select left-click action");
+
+        this._addButton(new N2ToolbarButtonToggle('#info-button-2', tooltipBox,
+            ["Hide detailed node information", "Show detailed node information"],
+            pred => { return n2ui.nodeInfoBox.active; },
+            function(target) {
+                n2ui.click.toggle('nodeinfo');
+                self._setRootButton(target);
+            })).setHelpInfo("Toggle detailed node info mode");
+
+        this._addButton(new N2ToolbarButtonToggle('#collapse-target', tooltipBox,
+            ["Exit collapse/expand mode", "Enter collapse/expand mode"],
+            pred => { return n2ui.click.clickEffect == N2Click.ClickEffect.Collapse; },
+            function (target) {
+                n2ui.click.toggle('collapse');
+                self._setRootButton(target);
+            })).setHelpInfo("Toggle collapse/expand mode");
+
+        this._addButton(new N2ToolbarButtonToggle('#filter-target', tooltipBox,
+            ["Exit variable filtering mode", "Enter variable filtering mode"],
+            pred => { return n2ui.click.clickEffect == N2Click.ClickEffect.Filter; },
+            function (target) {
+                n2ui.click.toggle('filter');
+                self._setRootButton(target);
+            })).setHelpInfo("Toggle variable filtering mode");
+
         this._addButton(new N2ToolbarButtonClick('#hide-connections', tooltipBox,
             "Set connections visibility",
-            function (target) {
+            function () {
                 n2ui.n2Diag.clearArrows();
-                self._setRootButton(target);
             }));
 
         this._addButton(new N2ToolbarButtonClick('#hide-connections-2', tooltipBox,
@@ -411,12 +443,6 @@ class N2Toolbar {
                 self._setRootButton(target);
             }));
 
-        this._addButton(new N2ToolbarButtonToggle('#legend-button', tooltipBox,
-            ["Show legend", "Hide legend"],
-            pred => { return n2ui.legend.hidden; },
-            e => { n2ui.toggleLegend(); }
-        )).setHelpInfo("Toggle legend");
-
         this._addButton(new N2ToolbarButtonToggle('#desvars-button', tooltipBox,
             ["Show optimization variables", "Hide optimization variables"],
             pred => { return n2ui.desVars; },
@@ -442,17 +468,28 @@ class N2Toolbar {
         this._addButton(new N2ToolbarButtonClick('#load-state-button', tooltipBox,
             "Load View", e => { n2ui.loadState() }));
 
-        this._addButton(new N2ToolbarButtonToggle('#info-button', tooltipBox,
-            ["Hide detailed node information", "Show detailed node information"],
-            pred => { return n2ui.nodeInfoBox.active; },
-            e => {
-                n2ui.nodeInfoBox.clear();
-                n2ui.nodeInfoBox.toggle();
+        this._addButton(new N2ToolbarButtonToggle('#legend-button', tooltipBox,
+            ["Show legend", "Hide legend"],
+            pred => { return n2ui.legend.hidden; },
+            function(target) {
+                n2ui.toggleLegend();
+                self._setRootButton(target);
             }
-        )).setHelpInfo("Toggle detailed node information");
+        )).setHelpInfo("Toggle legend");
 
         this._addButton(new N2ToolbarButtonClick('#question-button', tooltipBox,
-            "Show N2 diagram help", e => { self._showHelp() }));
+            "Show N2 diagram help",
+            function(target) {
+                self._showHelp()
+                self._setRootButton(target);
+            }));
+
+        this._addButton(new N2ToolbarButtonClick('#question-button-2', tooltipBox,
+            "Show N2 diagram help",
+            function(target) {
+                self._showHelp()
+                self._setRootButton(target);
+            }));
 
         // Don't add this to the array of tracked buttons because it confuses
         // the help screen generation

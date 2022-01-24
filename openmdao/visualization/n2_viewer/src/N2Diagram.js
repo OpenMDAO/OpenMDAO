@@ -364,6 +364,23 @@ class N2Diagram {
         }
     }
 
+    leftClickSelector(obj, node) {
+        switch (this.ui.click.clickEffect) {
+            case N2Click.ClickEffect.NodeInfo:
+                this.ui.nodeInfoBox.pin();
+                break;
+            case N2Click.ClickEffect.Collapse:
+                this.ui.rightClick(node, obj);
+                break;
+            case N2Click.ClickEffect.Filter:
+                const color = d3.select(obj).select('rect').style('fill');
+                this.ui.altRightClick(node, color);
+                break;
+            default:
+                this.ui.leftClick(node);
+        }
+    }
+
     _createPartitionCells() {
         const self = this; // For callbacks that change "this". Alternative to using .bind().
 
@@ -383,8 +400,11 @@ class N2Diagram {
                     self.prevScales.model.y(d.prevDims.y) + ")";
             })
             .on("click", function (d) {
+                /*
                 if (self.ui.nodeInfoBox.hidden) { self.ui.leftClick(d); } // Zoom if not in info panel mode
                 else { self.ui.nodeInfoBox.pin(); } // Create a persistent panel
+                self.ui.click.left(self.ui.leftClick.bind(self.ui), d); */
+                self.leftClickSelector(this, d);
             })
             .on("contextmenu", function (d) {
                 if (d3.event.altKey) {
@@ -509,7 +529,7 @@ class N2Diagram {
     }
 
     _createSolverCells() {
-        let self = this; // For callbacks that change "this". Alternative to using .bind().
+        const self = this; // For callbacks that change "this". Alternative to using .bind().
 
         let selection = self.dom.pSolverTreeGroup.selectAll(".solver_group")
             .data(self.layout.zoomedSolverNodes, function (d) {
@@ -532,8 +552,12 @@ class N2Diagram {
                     self.prevScales.solver.y(d.prevSolverDims.y) + ")";
             })
             .on("click", function (d) {
+                /*
                 if (self.ui.nodeInfoBox.hidden) { self.ui.leftClick(d); } // Zoom if not in info panel mode
                 else { self.ui.nodeInfoBox.pin(); } // Create a persistent panel
+                
+                self.ui.click.left(self.ui.leftClick.bind(self.ui), d); */
+                self.leftClickSelector(this, d);
             })
             .on("contextmenu", function (d) {
                 self.ui.rightClick(d, this);
@@ -869,7 +893,8 @@ class N2Diagram {
      * @param {N2MatrixCell} cell The cell the event occured on.
      */
     mouseClick(cell) {
-        if (this.ui.nodeInfoBox.hidden) { // If not in info-panel mode, pin/unpin arrows
+        // this.ui.click.left(this.arrowMgr.togglePin.bind(this.arrowMgr), cell.id);
+        if (this.ui.click.isNormal) { // If not in info-panel mode, pin/unpin arrows
             this.arrowMgr.togglePin(cell.id);
         }
         else { // Make a persistent info panel
@@ -882,9 +907,9 @@ class N2Diagram {
      * @returns {Object} Object containing each of the functions.
      */
     getMouseFuncs() {
-        let self = this;
+        const self = this;
 
-        let mf = {
+        const mf = {
             'overOffDiag': self.mouseOverOffDiagonal.bind(self),
             'overOnDiag': self.mouseOverOnDiagonal.bind(self),
             'moveOnDiag': self.mouseMoveOnDiagonal.bind(self),
