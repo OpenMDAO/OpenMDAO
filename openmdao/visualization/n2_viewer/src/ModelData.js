@@ -248,7 +248,7 @@ class ModelData {
     getAutoIvcTgt(elementPath) {
         if (!elementPath.match(/^_auto_ivc.*$/)) return undefined;
 
-        for (let conn of this.conns) {
+        for (const conn of this.conns) {
             if (conn.src == elementPath) {
                 return conn.tgt;
             }
@@ -432,15 +432,19 @@ class ModelData {
     }
 
     /**
-     *
+     * If the Auto-IVC component exists, rename its child variables to their
+     * promoted names so they can be easily recognized instead of as v0, v1, etc.
      */
     _updateAutoIvcNames() {
         const aivc = this.nodePaths['_auto_ivc'];
         if (aivc !== undefined && aivc.hasChildren()) {
             for (const ivc of aivc.children) {
-                const tgtPath = this.getAutoIvcTgt(ivc.absPathName);
-                if (tgtPath !== undefined) {
-                    ivc.promotedName = this.nodePaths[tgtPath].promotedName;
+                if (!ivc.isFilter()) {
+                    const tgtPath = this.getAutoIvcTgt(ivc.absPathName);
+
+                    if (tgtPath !== undefined) {
+                        ivc.promotedName = this.nodePaths[tgtPath].promotedName;
+                    }
                 }
             }
         }

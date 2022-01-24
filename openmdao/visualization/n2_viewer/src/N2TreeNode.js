@@ -212,7 +212,7 @@ class N2TreeNode {
      * @returns {Array} The array containing all the found nodes with cycleArrows.
      */
     getNodesWithCycleArrows() {
-        let arr = [];
+        const arr = [];
 
         // Check parents first.
         for (let obj = this.parent; obj != null; obj = obj.parent) {
@@ -320,10 +320,47 @@ class N2TreeNode {
         else if (this.isOutput()) { this.parent.filter.outputs.del(this); }
     }
 
+    /**
+     * Filter ourselves based on the supplied filter state.
+     * @param {Boolean} filtered Whether to filter or not.
+     * @return {Boolean} The newly set state.
+     */
+    filterSelf(filtered) {
+        if (filtered) { this.addSelfToFilter(); }
+        else { this.removeSelfFromFilter(); }
+
+        return this.draw.filtered;
+    }
+
     isFilter() { return false; } // Always false in base class
     hasFilters() { return ('filter' in this); } // True if we contain filters
     isInputFilter() { return false; } // Always false in base class
     isOutputFilter() { return false; } // Always false in base class
+
+
+    /**
+     * Create a simple object that can be used to save state to a file.
+     * @returns {Object} Reference to required info.
+     */
+    getStateForSave() {
+        return {
+            'minimized': this.draw.minimized,
+            'manuallyExpanded': this.draw.manuallyExpanded,
+            'hidden': this.draw.hidden,
+            'filtered': this.draw.filtered
+        };
+    }
+
+    /**
+     * Provided with loaded state information, update our settings.
+     * @param {Object} state The state loaded from file.
+     */
+    setStateFromLoad(state) {
+        this.draw.minimized = state.minimized;
+        this.draw.manuallyExpanded = state.manuallyExpanded;
+        this.draw.hidden = state.hidden;
+        this.filterSelf(state.filtered);
+    }
 }
 
 /**
@@ -453,5 +490,4 @@ class N2FilterNode extends N2TreeNode {
 
     get targetParentSet() { return this._genParentSet('target'); }
     set targetParentSet(val) { return val; }
-
 }

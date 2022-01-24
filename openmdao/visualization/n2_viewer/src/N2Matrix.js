@@ -247,9 +247,11 @@ class N2Matrix {
     }
 
     /**
-     * Set up N2MatrixCell arrays resembling a two-dimensional grid as the
-     * matrix, but not an actual two dimensional array because most of
-     * it would be unused.
+     * Set up N2MatrixCell arrays resembling a two-dimensional grid as the matrix, but not
+     * an actual two dimensional array because most of it would be unused. Each node
+     * appearing on the diagonal is first added to the matrix. It's then checked for connections
+     * to see if a connecting cell needs to be added or if the connection is going offscreen.
+     * Additional processing tests collapsed and filtered nodes for connections.
      */
     _buildGrid() {
         this.visibleCells = [];
@@ -267,14 +269,11 @@ class N2Matrix {
             const newDiagCell = new N2MatrixCell(srcIdx, srcIdx, diagNode, diagNode, this.model);
             this._addCell(srcIdx, srcIdx, newDiagCell);
             this._findUnseenCycleSources(newDiagCell);
-            // if (diagNode.isFilter()) console.log("diagNode filter", diagNode, diagNode.targetParentSet, diagNode.sourceParentSet)
 
-            // console.log(diagNode.name, diagNode.targetParentSet, diagNode.sourceParentSet)
             for (const tgt of diagNode.targetParentSet) {
                 const tgtNode = tgt.draw.filtered? tgt.draw.filterParent : tgt;
                 const tgtIdx = indexFor(this.diagNodes, tgtNode);
 
-                // if (tgtNode.isFilter()) { console.log("targetting filter ", tgtNode, diagNode)}
                 if (tgtIdx != -1 && srcIdx != tgtIdx) {
                     const newCell = new N2MatrixCell(srcIdx, tgtIdx, diagNode, tgtNode, this.model);
                     this._addCell(srcIdx, tgtIdx, newCell);
@@ -323,7 +322,7 @@ class N2Matrix {
     }
 
     /**
-     * Determine the size of the boxes that will border the variables of each component.
+     * Determine the size of the boxes that will enclose the variables of each component.
      */
     _setupComponentBoxesAndGridLines() {
         let currentBox = {

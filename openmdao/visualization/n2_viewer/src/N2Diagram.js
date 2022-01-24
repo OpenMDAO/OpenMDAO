@@ -140,13 +140,15 @@ class N2Diagram {
         document.body.removeChild(downloadLink);
     }
 
-    /*
+    /**
      * Recurse and pull state info from model for saving.
+     * @param {Array} dataList Array of objects with state info for each node.
+     * @param {N2TreeNode} node The current node being examined.
      */
     getSubState(dataList, node = this.model.root) {
-        dataList.push(node.draw.minimized);
-        dataList.push(node.draw.manuallyExpanded);
-        dataList.push(node.draw.hidden);
+        if (node.isFilter()) return; // Ignore state for N2FilterNodes
+
+        dataList.push(node.getStateForSave());
 
         if (node.hasChildren()) {
             for (const child of node.children) {
@@ -155,13 +157,22 @@ class N2Diagram {
         }
     }
 
-    /*
+    /**
      * Recurse and set state info into model.
+     * @param {Array} dataList Array of objects with state info for each node. 
+     * @param {N2TreeNode} node The node currently being restored.
      */
     setSubState(dataList, node = this.model.root) {
-        node.draw.minimized = dataList.pop();
-        node.draw.manuallyExpanded = dataList.pop();
-        node.draw.hidden = dataList.pop();
+        if (node.isFilter()) return; // Ignore state for N2FilterNodes
+
+        node.setStateFromLoad(dataList.pop());
+
+        // Get rid of any existing filters before processing children, as they'll
+        // be populated while processing the state of each child node.
+        if (node.hasFilters()) {
+            node.filter.inputs.wipe();
+            node.filter.outputs.wipe();
+        }
 
         if (node.hasChildren()) {
             for (const child of node.children) {
@@ -1059,5 +1070,37 @@ class N2Diagram {
 
         if (this.chosenCollapseDepth > this.zoomedElement.depth)
             this._minimizeToDepth(this.model.root);
+    }
+
+    /**
+     * Using an object populated by loading and validating a JSON file, set the model
+     * to the saved view.
+     * @param {Object} oldState The model view to restore.
+     */
+    restoreSavedState(oldState) {
+        // Solver toggle state.
+        this.showLinearSolverNames = oldState.showLinearSolverNames;
+        this.ui.setSolvers(oldState.showLinearSolverNames);
+        this.showSolvers = oldState.showSolvers;
+
+        // Zoomed node (subsystem).
+        this.zoomedElement = this.findNodeById(oldState.zoomedElement);
+
+        // Expand/Collapse state of all nodes (subsystems) in model.
+        this.setSubState(oldState.expandCollapse.reverse());
+
+        // Force an immediate display update.
+        // Needed to do this so that the arrows don't slip in before the element zoom.
+        this.layout = new N2Layout(this.model, this.zoomedElement,
+            this.showLinearSolverNames, this.showSolvers, this.dims);
+        this.ui.updateClickedIndices();
+        this.matrix = new N2Matrix(this.model, this.layout,
+            this.dom.n2Groups, this.arrowMgr, this.ui.lastClickWasLeft,
+            this.ui.findRootOfChangeFunction, this.matrix.nodeSize);
+        this._updateScale();
+        this.layout.updateTransitionInfo(this.dom, this.transitionStartDelay, this.manuallyResized);
+
+        // Arrow State
+        this.arrowMgr.loadPinnedArrows(oldState.arrowState);
     }
 }
