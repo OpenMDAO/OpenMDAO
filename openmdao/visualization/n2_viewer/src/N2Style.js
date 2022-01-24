@@ -190,18 +190,19 @@ class N2Style {
     /**
        * Based on the element's type and conditionally other info, determine
        * what CSS style is associated.
+       * @param {N2TreeNode} node The item to check.
        * @return {string} The name of an existing CSS class.
        */
-    getNodeClass(element) {
-        if (element.draw.minimized) return 'minimized';
+    getNodeClass(node) {
+        if (node.draw.minimized) return 'minimized';
 
-        switch (element.type) {
+        switch (node.type) {
             case 'input':
-                if (Array.isPopulatedArray(element.children)) return 'input_group';
+                if (Array.isPopulatedArray(node.children)) return 'input_group';
                 return 'input';
 
             case 'unconnected_input':
-                if (Array.isPopulatedArray(element.children)) return 'input_group';
+                if (Array.isPopulatedArray(node.children)) return 'input_group';
                 return 'unconnected_input';
 
             case 'autoivc_input':
@@ -211,19 +212,19 @@ class N2Style {
                 return 'filter';
 
             case 'output':
-                if (Array.isPopulatedArray(element.children)) return 'output_group';
-                if (element.implicit) return 'output_implicit';
+                if (Array.isPopulatedArray(node.children)) return 'output_group';
+                if (node.implicit) return 'output_implicit';
                 return 'output';
 
             case 'root':
                 return 'subsystem';
 
             case 'subsystem':
-                if (element.subsystem_type == 'component') return 'component';
+                if (node.subsystem_type == 'component') return 'component';
                 return 'subsystem';
 
             default:
-                throw `CSS class not found for element type: ${element.type}`
+                throw `CSS class not found for node type: ${node.type}`
         }
     }
 }

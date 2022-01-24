@@ -144,7 +144,7 @@ class N2BentArrow extends N2Arrow {
     }
 
     /** Use SVG to draw the line segments and an arrow at the end-point. */
-    draw() {
+    draw() {       
         if (this.doTransition) {
             // Arrow already exists, size and/or shape needs updated
             this.path = this.group.select('path').transition(sharedTransition);

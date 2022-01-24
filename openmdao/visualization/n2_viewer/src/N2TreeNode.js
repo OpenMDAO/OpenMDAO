@@ -140,7 +140,7 @@ class N2TreeNode {
 
     /** True if node is not hidden and has no visible children */
     isVisibleLeaf() {
-        if (this.draw.hidden) return false; // Any explicitly hidden node
+        if (this.draw.hidden || this.draw.filtered) return false; // Any explicitly hidden node
         if (this.isInputOrOutput()) return !this.draw.filtered; // Variable
         if (!this.hasChildren()) return true; // Group or component w/out children
         return this.draw.minimized; // Collapsed non-variable

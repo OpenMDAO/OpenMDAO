@@ -238,7 +238,7 @@ class N2Diagram {
             }
         };
 
-        let n2Groups = {};
+        const n2Groups = {};
         this.dom.n2InnerGroup.selectAll('g').each(function () {
             const d3elem = d3.select(this);
             const name = new String(d3elem.attr('id')).replace(/n2/, '');
@@ -246,7 +246,7 @@ class N2Diagram {
         })
         this.dom.n2Groups = n2Groups;
 
-        let offgrid = {};
+        const offgrid = {};
         this.dom.n2OuterGroup.selectAll('g.offgridLabel').each(function () {
             const d3elem = d3.select(this);
             const name = new String(d3elem.attr('id')).replace(/n2/, '');
@@ -402,7 +402,7 @@ class N2Diagram {
         // Create a new SVG group for each node in zoomedNodes
         let nodeEnter = selection.enter().append("g")
             .attr("class", function (d) {
-                return "partition_group " + self.style.getNodeClass(d);
+                return `partition_group ${self.style.getNodeClass(d)}`;
             })
             .attr("transform", function (d) {
                 return "translate(" +
@@ -474,7 +474,7 @@ class N2Diagram {
         let nodeUpdate = d3Refs.nodeEnter.merge(d3Refs.selection)
             .transition(sharedTransition)
             .attr("class", function (d) {
-                return "partition_group " + self.style.getNodeClass(d);
+                return `partition_group ${self.style.getNodeClass(d)}`;
             })
             .attr("transform", function (d) {
                 return "translate(" + self.scales.model.x(d.draw.dims.x) + " " +
@@ -544,11 +544,11 @@ class N2Diagram {
 
         let nodeEnter = selection.enter().append("svg:g")
             .attr("class", function (d) {
-                let solver_class = self.style.getSolverClass(self.showLinearSolverNames, {
+                const solver_class = self.style.getSolverClass(self.showLinearSolverNames, {
                     'linear': d.linear_solver,
                     'nonLinear': d.nonlinear_solver
                 });
-                return solver_class + " solver_group " + self.style.getNodeClass(d);
+                return `${solver_class} solver_group ${self.style.getNodeClass(d)}`;
             })
             .attr("transform", function (d) {
                 let x = 1.0 - d.draw.prevSolverDims.x - d.draw.prevSolverDims.width;

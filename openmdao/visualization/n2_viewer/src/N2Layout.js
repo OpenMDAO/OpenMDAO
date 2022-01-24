@@ -38,46 +38,29 @@ class N2Layout {
         this.size = dims.size;
         this.svg = d3.select("#svgId");
 
-        startTimer('N2Layout._computeLeaves');
         this._computeLeaves();
-        stopTimer('N2Layout._computeLeaves');
 
         this._setupTextRenderer();
-        startTimer('N2Layout._updateTextWidths');
         this._updateTextWidths();
-        stopTimer('N2Layout._updateTextWidths');
-
         delete (this.textRenderer);
 
-        startTimer('N2Layout._computeColumnWidths');
         this._computeColumnWidths();
-        stopTimer('N2Layout._computeColumnWidths');
 
-        if (this.showSolvers) {
-            startTimer('N2Layout._computeSolverColumnWidths');
-            this._computeSolverColumnWidths();
-            stopTimer('N2Layout._computeSolverColumnWidths');
-        }
+        if (this.showSolvers) { this._computeSolverColumnWidths(); }
 
-        startTimer('N2Layout._setColumnLocations');
         this._setColumnLocations();
-        stopTimer('N2Layout._setColumnLocations');
-
-        startTimer('N2Layout._computeNormalizedPositions');
         this._computeNormalizedPositions(this.model.root, 0, false, null);
-        stopTimer('N2Layout._computeNormalizedPositions');
         if (this.zoomedElement.parent)
             this.zoomedNodes.push(this.zoomedElement.parent);
 
         if (this.showSolvers) {
-            startTimer('N2Layout._computeSolverNormalizedPositions');
             this._computeSolverNormalizedPositions(this.model.root, 0, false, null);
-            stopTimer('N2Layout._computeSolverNormalizedPositions');
-            if (this.zoomedElement.parent)
+            if (this.zoomedElement.parent) {
                 this.zoomedSolverNodes.push(this.zoomedElement.parent);
+            }
         }
-        this.setTransitionPermission();
 
+        this.setTransitionPermission();
     }
 
     /**
@@ -228,7 +211,7 @@ class N2Layout {
     _computeLeaves(node = this.model.root) {
         node.draw.numLeaves = 0;
 
-        if (!node.draw.hidden) {
+        if (!(node.draw.hidden || node.draw.filtered)) {
             if (node.name == '_auto_ivc' && !node.draw.manuallyExpanded) {
                 node.minimize();
             }
@@ -241,9 +224,6 @@ class N2Layout {
                     this._computeLeaves(child);
                     node.draw.numLeaves += child.draw.numLeaves;
                 }
-            }
-            else if (node.draw.filtered) {
-                node.draw.numLeaves = 0; // Filtered variable
             }
             else {
                 node.draw.numLeaves = 1; // Leaf node
@@ -381,32 +361,34 @@ class N2Layout {
         }
 
         if (earliestMinimizedParent == null && isChildOfZoomed) {
-            if (!node.draw.hidden) this.zoomedNodes.push(node);
-            // if (!node.hasChildren() || (!node.isInputOrOutput() && node.draw.minimized)) { // at a "leaf" node
-            if (node.isVisibleLeaf()) {
-                if (!node.draw.hidden) this.visibleNodes.push(node);
-                earliestMinimizedParent = node;
+            if (node.isVisible()) {
+                this.zoomedNodes.push(node)
+                if (node.isVisibleLeaf()) {
+                    if (!node.draw.hidden) this.visibleNodes.push(node);
+                    earliestMinimizedParent = node;
+                }
             }
         }
 
         const workNode = (earliestMinimizedParent) ? earliestMinimizedParent : node;
         node.preserveDims(false, leafCounter);
 
-        node.draw.dims.x = this.cols[workNode.depth].location / this.size.partitionTree.width;
-        node.draw.dims.y = leafCounter / this.model.root.draw.numLeaves;
-        node.draw.dims.width = (node.hasChildren() && !node.draw.minimized) ?
-            (this.cols[workNode.depth].width / this.size.partitionTree.width) : 1 - workNode.draw.dims.x;
-        node.draw.dims.height = workNode.draw.numLeaves / this.model.root.draw.numLeaves;
-
-        if (node.draw.hidden) { // input or hidden leaf leaving
+        if (! node.isVisible()) { // input or hidden leaf leaving
             node.draw.dims.x = this.cols[node.parentComponent.depth + 1].location / this.size.partitionTree.width;
             node.draw.dims.y = node.parentComponent.draw.dims.y;
             node.draw.dims.width = node.draw.dims.height = 1e-6;
         }
+        else {
+            node.draw.dims.x = this.cols[workNode.depth].location / this.size.partitionTree.width;
+            node.draw.dims.y = leafCounter / this.model.root.draw.numLeaves;
+            node.draw.dims.width = (node.hasChildren() && !node.draw.minimized && !node.draw.filtered) ?
+                (this.cols[workNode.depth].width / this.size.partitionTree.width) : 1 - workNode.draw.dims.x;
+            node.draw.dims.height = workNode.draw.numLeaves / this.model.root.draw.numLeaves;
+        }
 
         if (node.hasChildren()) {
             for (const child of node.children) {
-                if (node.isFilter() || !child.isInputOrOutput() || !child.isMinmized) {
+                if (!child.isInputOrOutput() || !child.draw.minimized) {
                     this._computeNormalizedPositions(child, leafCounter,
                         isChildOfZoomed, earliestMinimizedParent);
                     if (earliestMinimizedParent == null) { //numleaves is only valid passed nonminimized nodes
@@ -436,39 +418,45 @@ class N2Layout {
             if (node.type.match(/^(subsystem|root)$/)) {
                 this.zoomedSolverNodes.push(node);
             }
-            // if (!node.hasChildren() || node.draw.minimized) { //at a "leaf" workNode
             if (node.isVisibleLeaf()) { //at a "leaf" workNode
-                if (!node.isInput() && !node.draw.hidden) {
+                if (!node.isInput()) {
                     this.visibleSolverNodes.push(node);
                 }
                 earliestMinimizedParent = node;
+            }
+            else if (node.draw.filtered) {
+                earliestMinimizedParent = node.draw.filterParent;
             }
         }
 
         const workNode = (earliestMinimizedParent) ? earliestMinimizedParent : node;
         node.preserveDims(true, leafCounter);
 
-        node.draw.solverDims.x = this.solverCols[workNode.depth].location / this.size.solverTree.width;
-        node.draw.solverDims.y = leafCounter / this.model.root.draw.numLeaves;
-        node.draw.solverDims.width = (node.subsystem_children && !node.draw.minimized) ?
-            (this.solverCols[workNode.depth].width / this.size.solverTree.width) :
-            1 - workNode.draw.solverDims.x;
-
-        node.draw.solverDims.height = workNode.draw.numLeaves / this.model.root.draw.numLeaves;
-
-        if (node.draw.hidden) { //input or hidden leaf leaving
+        if (! node.isVisible()) { //input or hidden leaf leaving
             node.draw.solverDims.x = this.cols[node.parentComponent.depth + 1].location /
                 this.size.partitionTree.width;
             node.draw.solverDims.y = node.parentComponent.draw.dims.y;
             node.draw.solverDims.width = node.draw.solverDims.height = 1e-6;
         }
+        else {
+            node.draw.solverDims.x = this.solverCols[workNode.depth].location / this.size.solverTree.width;
+            node.draw.solverDims.y = leafCounter / this.model.root.draw.numLeaves;
+            node.draw.solverDims.width = (node.subsystem_children && !node.draw.minimized) ?
+                (this.solverCols[workNode.depth].width / this.size.solverTree.width) :
+                1 - workNode.draw.solverDims.x;
+    
+            node.draw.solverDims.height = workNode.draw.numLeaves / this.model.root.draw.numLeaves;
+        }
 
         if (node.hasChildren()) {
             for (const child of node.children) {
-                this._computeSolverNormalizedPositions(child,
-                    leafCounter, isChildOfZoomed, earliestMinimizedParent);
-                if (earliestMinimizedParent == null) { //numleaves is only valid passed nonminimized nodes
-                    leafCounter += child.draw.numLeaves;
+                if (!child.isInputOrOutput() || !child.draw.minimized) {
+                    this._computeSolverNormalizedPositions(child,
+                        leafCounter, isChildOfZoomed,
+                        child.draw.filterParent? child.draw.filterParent : earliestMinimizedParent);
+                    if (earliestMinimizedParent == null) { //numleaves is only valid passed nonminimized nodes
+                        leafCounter += child.draw.numLeaves;
+                    }
                 }
             }
         }
