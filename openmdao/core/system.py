@@ -3341,7 +3341,6 @@ class System(object):
         loc2meta = self._var_abs2meta
         all2meta = self._var_allprocs_abs2meta
 
-        dynset = set(('shape', 'size', 'val'))
         gather_keys = {'val', 'src_indices'}
         need_gather = get_remote and self.comm.size > 1
         if metadata_keys is not None:
@@ -3358,7 +3357,6 @@ class System(object):
                 raise RuntimeError(f"{self.msginfo}: {sorted(diff)} are not valid metadata entry "
                                    "names.")
         need_local_meta = metadata_keys is not None and len(gather_keys.intersection(keyset)) > 0
-        nodyn = metadata_keys is None or keyset.intersection(dynset)
 
         if need_local_meta:
             metadict = loc2meta
@@ -3388,12 +3386,6 @@ class System(object):
                 if abs_name in all2meta[iotype]:  # continuous
                     meta = cont2meta[abs_name] if abs_name in cont2meta else None
                     distrib = all2meta[iotype][abs_name]['distributed']
-                    if nodyn:
-                        a2m = all2meta[iotype][abs_name]
-                        if a2m['shape'] is None and (a2m['shape_by_conn'] or a2m['copy_shape']):
-                            raise RuntimeError(f"{self.msginfo}: Can't retrieve shape, size, or "
-                                               f"value for dynamically sized variable '{prom}' "
-                                               "because they aren't known yet.")
                 else:  # discrete
                     if need_local_meta:  # use relative name for discretes
                         meta = disc2meta[rel_name] if rel_name in disc2meta else None
