@@ -579,7 +579,8 @@ def printoptions(*args, **kwds):
 
     See Also
     --------
-        set_printoptions, get_printoptions
+        set_printoptions : Set printing options.
+        get_printoptions : Get printing options.
     """
     opts = np.get_printoptions()
 
