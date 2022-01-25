@@ -3819,6 +3819,30 @@ class TestFeatureConfigure(unittest.TestCase):
         assert_near_equal(p.get_val('totalforcecomp.total_force', units='kN'),
                          np.array([[100, 200, 300], [0, -1, -2]]).T)
 
+    def test_configure_dyn_shape(self):
+
+        class MyComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', shape_by_conn=True, copy_shape='y')
+                self.add_output('y', shape_by_conn=True, copy_shape='x')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 3*inputs['x']
+
+        class MyGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp', MyComp())
+
+            def configure(self):
+                meta = self.comp.get_io_metadata('output', includes='y')
+
+        p = om.Problem()
+        p.model.add_subsystem("G", MyGroup())
+        p.model.add_subsystem("sink", om.ExecComp('y=5*x'))
+        p.model.connect('G.comp.y', 'sink.x')
+        # this used to raise an exception
+        p.setup()
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestConfigureMPI(unittest.TestCase):

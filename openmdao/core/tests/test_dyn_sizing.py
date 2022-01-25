@@ -302,12 +302,11 @@ class DistribDynShapeComp(om.ExplicitComponent):
 class DynShapeGroupSeries(om.Group):
     # strings together some number of components in series.
     # component type is determined by comp_class
-    def __init__(self, n_comps, n_inputs, comp_class, call_get_io_meta=False):
+    def __init__(self, n_comps, n_inputs, comp_class):
         super().__init__()
         self.n_comps = n_comps
         self.n_inputs = n_inputs
         self.comp_class = comp_class
-        self.call_get_io_meta = call_get_io_meta
 
         for icmp in range(1, self.n_comps + 1):
             self.add_subsystem(f"C{icmp}", self.comp_class(n_inputs=self.n_inputs))
@@ -315,12 +314,6 @@ class DynShapeGroupSeries(om.Group):
         for icmp in range(1, self.n_comps):
             for i in range(1, self.n_inputs + 1):
                 self.connect(f"C{icmp}.y{i}", f"C{icmp+1}.x{i}")
-
-    def configure(self):
-        if self.call_get_io_meta:
-            for icmp in range(1, self.n_comps + 1):
-                sub = self._get_subsystem(f"C{icmp}")
-                sub_meta = sub.get_io_metadata(iotypes=('input', 'output'))
 
 
 class DynShapeGroupConnectedInputs(om.Group):
@@ -344,26 +337,6 @@ class TestDynShapes(unittest.TestCase):
         indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
         indep.add_output('x2', val=np.ones((4,2)))
         p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3, 2, DynShapeComp))
-        p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
-                                                  x1={'shape_by_conn': True, 'copy_shape': 'y1'},
-                                                  x2={'shape_by_conn': True, 'copy_shape': 'y2'},
-                                                  y1={'shape_by_conn': True, 'copy_shape': 'x1'},
-                                                  y2={'shape_by_conn': True, 'copy_shape': 'x2'}))
-        p.model.connect('Gdyn.C3.y1', 'sink.x1')
-        p.model.connect('Gdyn.C3.y2', 'sink.x2')
-        p.model.connect('indep.x1', 'Gdyn.C1.x1')
-        p.model.connect('indep.x2', 'Gdyn.C1.x2')
-        p.setup()
-        p.run_model()
-        np.testing.assert_allclose(p['sink.y1'], np.ones((2,3))*16)
-        np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*16)
-
-    def test_series_config_get_io_metadata(self):
-        # this test used to raise an exception when the DynShapeGroupSeries called get_io_metadata from config
-        p = om.Problem()
-        indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
-        indep.add_output('x2', val=np.ones((4,2)))
-        p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3, 2, DynShapeComp, call_get_io_meta=True))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
                                                   x1={'shape_by_conn': True, 'copy_shape': 'y1'},
                                                   x2={'shape_by_conn': True, 'copy_shape': 'y2'},
