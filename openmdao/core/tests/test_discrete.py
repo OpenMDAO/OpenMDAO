@@ -672,9 +672,9 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(TypeError) as cm:
             p.run_model()
 
-        msg = ("'g0.g1.broken' <class BrokenComp>: Error calling compute(), "
-               "compute() takes 3 positional arguments but 5 were given")
-        self.assertEqual(str(cm.exception), msg)
+        msg = str(cm.exception)
+        self.assertTrue(msg.startswith("'g0.g1.broken' <class BrokenComp>: Error calling compute()"))
+        self.assertTrue(msg.endswith("compute() takes 3 positional arguments but 5 were given"))
 
     def test_discrete_input_dataframe(self):
         class OMDataFrame:

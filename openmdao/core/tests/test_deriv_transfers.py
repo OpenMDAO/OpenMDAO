@@ -2,11 +2,7 @@
 import unittest
 import itertools
 
-# note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
-try:
-    from collections.abc import Iterable
-except ImportError:
-    from collections import Iterable
+from collections.abc import Iterable
 
 import numpy as np
 
@@ -377,4 +373,3 @@ class TestParallelGroups(unittest.TestCase):
         np.testing.assert_allclose(J['C6.y', 'ivc.x'][0][0], 141.2)
         np.testing.assert_allclose(prob.get_val('C6.y', get_remote=True),
                                    141.2)
-
