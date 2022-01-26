@@ -276,7 +276,14 @@ class CaseViewer(object):
             data = data.T
             case_array = case_array.T
             self._tooltip_management()
+            print(data, case_array)
             return data, case_array
+
+        elif self.case_iter_select.value == "Min/Max":
+            data = np.array([max(arr) for arr in data])
+            case_array = case_array.T[0].reshape(1, len(data))
+            self._tooltip_management()
+            return data.reshape(1, len(data)), case_array
 
         elif (set(case_array.flatten()) == {0.} or set(data.flatten()) == {0.}) and \
                 not (_num_case_check_x and _num_case_check_y):
@@ -294,6 +301,7 @@ class CaseViewer(object):
         """
         if new == self._case_iter_str or self.io_select_x.value == self._case_iter_str:
             self.case_iter_select.options = self.case_iter_options
+            self.case_iter_select.value = self.case_iter_options[0]
         else:
             self.case_iter_select.options = ["N/A"]
 
@@ -377,22 +385,22 @@ class CaseViewer(object):
                     self.warning_box.text = ("NOTE: Cannot compare Number of Points to Case "
                                              "Iterations")
                 elif num_points_y or self._case_iter_y:
-                    if isinstance(x_io[self.io_select_x.value], (np.ndarray, list, float)):
-                        x_variable = x_io[self.io_select_x.value].flatten()
+                    if isinstance(self.case[self.io_select_x.value], (np.ndarray, list, float)):
+                        x_variable = self.case[self.io_select_x.value].flatten()
                     else:
                         x_variable = np.zeros(1)
                         print(f"X is a non compatible type")
                     y_variable = np.arange(len(x_variable))
                 elif num_points_x or self._case_iter_x:
-                    if isinstance(y_io[self.io_select_y.value], (np.ndarray, list, float)):
-                        y_variable = y_io[self.io_select_y.value].flatten()
+                    if isinstance(self.case[self.io_select_y.value], (np.ndarray, list, float)):
+                        y_variable = self.case[self.io_select_y.value].flatten()
                     else:
                         y_variable = np.zeros(1)
                         print(f"Y is a non compatible type")
                     x_variable = np.arange(len(y_variable))
                 else:
-                    x_variable = x_io[self.io_select_x.value].flatten()
-                    y_variable = y_io[self.io_select_y.value].flatten()
+                    x_variable = self.case[self.io_select_x.value].flatten()
+                    y_variable = self.case[self.io_select_y.value].flatten()
 
                 if not isinstance(new_data['x_vals'], np.ndarray):
                     new_data['x_vals'] = np.empty((0, len(x_variable)), float)
