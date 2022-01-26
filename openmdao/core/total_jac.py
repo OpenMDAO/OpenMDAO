@@ -597,6 +597,9 @@ class _TotalJacInfo(object):
             non_rel_outs = False
 
         for name in input_list:
+            # if name in model._responses and model._responses[name]['path'] is not None:
+            #     name = model._responses[name]['path']
+
             if name not in abs2meta_out:
                 # could be promoted input name
                 abs_in = model._var_allprocs_prom2abs_list['input'][name][0]
