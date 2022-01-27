@@ -379,8 +379,9 @@ class pyOptSparseDriver(Driver):
                     wrt = [v for v in indep_list if name in relevant[input_meta[v]['ivc_source']]]
             else:
                 if 'path' in meta and meta['path'] is not None:
-                    name = meta['path']
-                rels = relevant[name]
+                    rels = relevant[meta['path']]
+                else:
+                    rels = relevant[name]
                 wrt = [v for v in indep_list if input_meta[v]['ivc_source'] in rels]
 
             if meta['linear']:
@@ -415,8 +416,9 @@ class pyOptSparseDriver(Driver):
                     wrt = [v for v in indep_list if name in relevant[input_meta[v]['ivc_source']]]
             else:
                 if 'path' in meta and meta['path'] is not None:
-                    name = meta['path']
-                rels = relevant[name]
+                    rels = relevant[meta['path']]
+                else:
+                    rels = relevant[name]
                 wrt = [v for v in indep_list if input_meta[v]['ivc_source'] in rels]
 
             if meta['linear']:

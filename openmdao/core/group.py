@@ -2921,6 +2921,9 @@ class Group(System):
             # we're computing totals/semi-totals (vars may not be local)
             start = end = 0
             for of in self._owns_approx_of:
+                if of in self._responses and 'path' in self._responses[of] and \
+                        self._responses[of]['path'] is not None:
+                    of = self._responses[of]['path']
                 meta = abs2meta[of]
                 if meta['distributed']:
                     dist_sizes = sizes[:, abs2idx[of]]
@@ -3074,12 +3077,25 @@ class Group(System):
 
         approx_keys = self._get_approx_subjac_keys()
         for key in approx_keys:
+            left, right = key[0], key[1]
+            if left in self._responses and 'path' in self._responses[left] and \
+                    self._responses[left]['path'] is not None:
+                left = self._responses[left]['path']
+            if right in self._responses and 'path' in self._responses[right] and \
+                    self._responses[right]['path'] is not None:
+                right = self._responses[right]['path']
+
             if key in self._subjacs_info:
                 meta = self._subjacs_info[key]
             else:
                 meta = SUBJAC_META_DEFAULTS.copy()
-                if key[0] == key[1]:
-                    size = abs2meta['output'][key[0]]['size']
+
+                if left == right:
+                    # if left in self._responses and 'path' in self._responses[left] and \
+                    #         self._responses[right]['path'] is not None:
+                    #     left = self._responses[left]['path']
+
+                    size = abs2meta['output'][left]['size']
                     meta['rows'] = meta['cols'] = np.arange(size)
                     # All group approximations are treated as explicit components, so we
                     # have a -1 on the diagonal.
@@ -3090,15 +3106,15 @@ class Group(System):
 
             meta.update(self._owns_approx_jac_meta)
 
-            if wrt_matches is None or key[1] in wrt_matches:
+            if wrt_matches is None or right in wrt_matches:
                 self._update_approx_coloring_meta(meta)
 
             if meta['val'] is None:
-                if key[1] in abs2meta['input']:
-                    sz = abs2meta['input'][key[1]]['size']
+                if right in abs2meta['input']:
+                    sz = abs2meta['input'][right]['size']
                 else:
-                    sz = abs2meta['output'][key[1]]['size']
-                shape = (abs2meta['output'][key[0]]['size'], sz)
+                    sz = abs2meta['output'][right]['size']
+                shape = (abs2meta['output'][left]['size'], sz)
                 meta['shape'] = shape
                 if meta['rows'] is not None:  # subjac is sparse
                     meta['val'] = np.zeros(len(meta['rows']))
