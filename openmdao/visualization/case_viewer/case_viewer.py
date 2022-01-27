@@ -484,5 +484,4 @@ class CaseViewer(object):
                 self.warning_box.text = "NOTE: Cannot compare more than 256 cases"
                 colors = list(Turbo256)
 
-        print(colors)
         return colors
