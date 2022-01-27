@@ -221,23 +221,23 @@ class CaseViewer(object):
         self.doc.add_root(self.layout)
 
     def _checkbox_group_update(self, attr, old, new):
-        io_dict = copy.deepcopy(self.io_options_x)
+        options_dict = copy.deepcopy(self.io_options_x)
         if 0 in new and 1 in new:
-            if 'inputs' in io_dict:
-                del io_dict['inputs']
-            if 'residuals' in io_dict:
-                del io_dict['residuals']
-            self.io_select_x.options = io_dict
+            if 'inputs' in options_dict:
+                del options_dict['inputs']
+            if 'residuals' in options_dict:
+                del options_dict['residuals']
+            self.io_select_x.options = self.io_select_y.options = options_dict
         elif 0 in new:
-            if 'inputs' in io_dict:
-                del io_dict['inputs']
-            self.io_select_x.options = io_dict
+            if 'inputs' in options_dict:
+                del options_dict['inputs']
+            self.io_select_x.options = self.io_select_y.options = options_dict
         elif 1 in new:
-            if 'residuals' in io_dict:
-                del io_dict['residuals']
-            self.io_select_x.options = io_dict
+            if 'residuals' in options_dict:
+                del options_dict['residuals']
+            self.io_select_x.options = self.io_select_y.options = options_dict
         else:
-            self.io_select_x.options = io_dict
+            self.io_select_x.options = self.io_select_y.options = options_dict
 
     def _source_update(self, attr, old, new):
         """
