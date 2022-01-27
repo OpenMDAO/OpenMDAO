@@ -200,16 +200,11 @@ class CaseViewer(object):
 
         self.warning_box = Paragraph(text="""""", width=350, height=100)
 
-        LABELS = ["Hide Inputs", "Hide Residuals"]
-        self.checkbox_group = CheckboxGroup(labels=LABELS, active=[])
-        self.checkbox_group.on_change('active', self._checkbox_group_update)
-
         self.layout = row(self.variables_plot, column(self.source_select,
                                                       self.case_select,
                                                       self.io_select_x,
                                                       self.io_select_y,
                                                       self.case_iter_select,
-                                                      self.checkbox_group,
                                                       self.warning_box
                                                       ))
 
@@ -219,25 +214,6 @@ class CaseViewer(object):
                                                                  self.io_select_x.value)
 
         self.doc.add_root(self.layout)
-
-    def _checkbox_group_update(self, attr, old, new):
-        options_dict = copy.deepcopy(self.io_options_x)
-        if 0 in new and 1 in new:
-            if 'inputs' in options_dict:
-                del options_dict['inputs']
-            if 'residuals' in options_dict:
-                del options_dict['residuals']
-            self.io_select_x.options = self.io_select_y.options = options_dict
-        elif 0 in new:
-            if 'inputs' in options_dict:
-                del options_dict['inputs']
-            self.io_select_x.options = self.io_select_y.options = options_dict
-        elif 1 in new:
-            if 'residuals' in options_dict:
-                del options_dict['residuals']
-            self.io_select_x.options = self.io_select_y.options = options_dict
-        else:
-            self.io_select_x.options = self.io_select_y.options = options_dict
 
     def _source_update(self, attr, old, new):
         """
@@ -298,10 +274,11 @@ class CaseViewer(object):
         elif self.case_iter_select.value == "Vector Lines":
             data = data.T
             case_array = case_array.T
-            self._tooltip_management()
+            self._tooltip_management(False)
             return data, case_array
 
         elif self.case_iter_select.value == "Min/Max":
+            self._tooltip_management()
             return data, case_array
 
         elif (set(case_array.flatten()) == {0.} or set(data.flatten()) == {0.}) and \
@@ -451,7 +428,7 @@ class CaseViewer(object):
 
                 if self.case_iter_select.value == "Vector Lines":
                     new_data['cases'] = new_data['cases'][0:len(new_data['x_vals'])]
-                    new_data['color'] = self._line_color_list(new_data['x_vals'], True)
+                    new_data['color'] = self._line_color_list(new_data['x_vals'])
 
                 new_data['x_vals'] = new_data['x_vals'].tolist()
                 new_data['y_vals'] = new_data['y_vals'].tolist()
@@ -470,7 +447,7 @@ class CaseViewer(object):
 
                 if self.case_iter_select.value == "Vector Lines":
                     new_data['cases'] = new_data['cases'][0:len(new_data['x_vals'])]
-                    new_data['color'] = self._line_color_list(new_data['x_vals'], True)
+                    new_data['color'] = self._line_color_list(new_data['x_vals'])
 
                 new_data['x_vals'] = new_data['x_vals'].flatten().tolist()
                 new_data['y_vals'] = new_data['y_vals'].flatten().tolist()
@@ -478,7 +455,7 @@ class CaseViewer(object):
                 self.circle_data.data = new_data
                 self.multi_line_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}
 
-    def _line_color_list(self, x_var_vals, vector_lines=False):
+    def _line_color_list(self, x_var_vals):
         """
         Create list of colors for multi line plots.
 
@@ -494,9 +471,6 @@ class CaseViewer(object):
         """
         var_length = len(x_var_vals)
 
-        if vector_lines:
-            return ["#000000" for i in range(0, var_length)]
-
         if var_length <= 3:
             colors = list(Category20[3])
             while len(colors) > var_length:
@@ -510,4 +484,5 @@ class CaseViewer(object):
                 self.warning_box.text = "NOTE: Cannot compare more than 256 cases"
                 colors = list(Turbo256)
 
+        print(colors)
         return colors
