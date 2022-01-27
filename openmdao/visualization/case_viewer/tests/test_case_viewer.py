@@ -131,14 +131,14 @@ class TestCaseViewer(unittest.TestCase):
         cv.source_select.value = 'driver'
 
         self.assertEqual(cv.io_select_y.options, ['paraboloid.f', 'paraboloid.x', 'paraboloid.y',
-                                                  'Number of Points', 'Case Iterations'])
+                                                  'Variable Array Index', 'Case Iterations'])
 
         cv = om.CaseViewer(self.filename)
-        cv.io_select_x.value = "Number of Points"
+        cv.io_select_x.value = "Variable Array Index"
         cv.source_select.value = 'driver'
 
         self.assertEqual(cv.io_select_y.options['outputs'], ['paraboloid.f', 'paraboloid.x', 'paraboloid.y'])
-        self.assertEqual(cv.io_select_y.options['Other'], ['Number of Points', 'Case Iterations'])
+        self.assertEqual(cv.io_select_y.options['Other'], ['Variable Array Index', 'Case Iterations'])
 
     def test_vectorized_case_data(self):
 
@@ -182,7 +182,7 @@ class TestCaseViewer(unittest.TestCase):
         cv = om.CaseViewer(self.filename)
 
         cv.io_select_x.value = 'v'
-        cv.io_select_y.value = 'Number of Points'
+        cv.io_select_y.value = 'Variable Array Index'
         cv.case_select.value = ['0', '1', '2']
 
         multi_line_data = cv.multi_line_data.data
@@ -203,7 +203,7 @@ class TestCaseViewer(unittest.TestCase):
         cv = om.CaseViewer(self.filename)
 
         cv.io_select_y.value = 'v'
-        cv.io_select_x.value = 'Number of Points'
+        cv.io_select_x.value = 'Variable Array Index'
         cv.case_select.value = ['0', '1', '2']
 
         multi_line_data = cv.multi_line_data.data
@@ -367,13 +367,13 @@ class TestCaseViewer(unittest.TestCase):
                          "Select a different case or variable")
 
         # Test x and y value changes, case iterations and case iteration with min/max option
-        cv.io_select_x.value = 'Number of Points'
+        cv.io_select_x.value = 'Variable Array Index'
         cv.io_select_y.value = 'Case Iterations'
-        self.assertEqual(cv.warning_box.text, "NOTE: Cannot compare Number of Points to Case "
+        self.assertEqual(cv.warning_box.text, "NOTE: Cannot compare Variable Array Index to Case "
                          "Iterations")
 
         cv = om.CaseViewer(self.filename)
-        cv.io_select_x.value = 'Number of Points'
+        cv.io_select_x.value = 'Variable Array Index'
         cv.io_select_y.value = 'Case Iterations'
 
     def test_zero_array_warning(self):

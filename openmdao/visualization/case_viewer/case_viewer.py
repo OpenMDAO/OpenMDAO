@@ -299,14 +299,10 @@ class CaseViewer(object):
             data = data.T
             case_array = case_array.T
             self._tooltip_management()
-            print(data, case_array)
             return data, case_array
 
         elif self.case_iter_select.value == "Min/Max":
-            data = np.array([max(arr) for arr in data])
-            case_array = case_array.T[0].reshape(1, len(data))
-            self._tooltip_management()
-            return data.reshape(1, len(data)), case_array
+            return data, case_array
 
         elif (set(case_array.flatten()) == {0.} or set(data.flatten()) == {0.}) and \
                 not (_num_case_check_x and _num_case_check_y):
