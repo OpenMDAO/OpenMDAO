@@ -2,11 +2,9 @@
 
 import warnings
 
-from openmdao.utils.om_warnings import issue_warning
-
 try:
     from bokeh.io import show, output_notebook, curdoc
-    from bokeh.models import Select, HoverTool, MultiSelect, Paragraph
+    from bokeh.models import Select, HoverTool, MultiSelect, Paragraph, CheckboxGroup
     from bokeh.layouts import row, column
     from bokeh.plotting import figure, ColumnDataSource
     from bokeh.palettes import Category20, Turbo256
@@ -19,6 +17,7 @@ from openmdao.recorders.case_reader import CaseReader
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
 
 import numpy as np
+import copy
 
 
 class CaseViewer(object):
@@ -62,7 +61,7 @@ class CaseViewer(object):
             self.cr = data
 
         self._case_iter_str = "Case Iterations"
-        self._num_points_str = "Number of Points"
+        self._num_points_str = "Variable Array Index"
 
         if notebook:
             output_notebook()
@@ -201,11 +200,16 @@ class CaseViewer(object):
 
         self.warning_box = Paragraph(text="""""", width=350, height=100)
 
+        LABELS = ["Hide Inputs", "Hide Residuals"]
+        self.checkbox_group = CheckboxGroup(labels=LABELS, active=[])
+        self.checkbox_group.on_change('active', self._checkbox_group_update)
+
         self.layout = row(self.variables_plot, column(self.source_select,
                                                       self.case_select,
                                                       self.io_select_x,
                                                       self.io_select_y,
                                                       self.case_iter_select,
+                                                      self.checkbox_group,
                                                       self.warning_box
                                                       ))
 
@@ -215,6 +219,25 @@ class CaseViewer(object):
                                                                  self.io_select_x.value)
 
         self.doc.add_root(self.layout)
+
+    def _checkbox_group_update(self, attr, old, new):
+        io_dict = copy.deepcopy(self.io_options_x)
+        if 0 in new and 1 in new:
+            if 'inputs' in io_dict:
+                del io_dict['inputs']
+            if 'residuals' in io_dict:
+                del io_dict['residuals']
+            self.io_select_x.options = io_dict
+        elif 0 in new:
+            if 'inputs' in io_dict:
+                del io_dict['inputs']
+            self.io_select_x.options = io_dict
+        elif 1 in new:
+            if 'residuals' in io_dict:
+                del io_dict['residuals']
+            self.io_select_x.options = io_dict
+        else:
+            self.io_select_x.options = io_dict
 
     def _source_update(self, attr, old, new):
         """
@@ -382,7 +405,7 @@ class CaseViewer(object):
                 elif (num_points_x and self._case_iter_y) or (num_points_y and self._case_iter_x):
                     x_variable = np.zeros(1)
                     y_variable = np.zeros(1)
-                    self.warning_box.text = ("NOTE: Cannot compare Number of Points to Case "
+                    self.warning_box.text = ("NOTE: Cannot compare Variable Array Index to Case "
                                              "Iterations")
                 elif num_points_y or self._case_iter_y:
                     if isinstance(self.case[self.io_select_x.value], (np.ndarray, list, float)):
