@@ -746,8 +746,6 @@ class pyOptSparseDriver(Driver):
         nl_order = list(self._objs)
         neq_order = []
         for n, meta in self._cons.items():
-            # if 'path' in self._responses[n] and self._responses[n]['path'] is not None:
-            #     n = self._responses[n]['path']
             if 'linear' not in meta or not meta['linear']:
                 if meta['equals'] is not None:
                     nl_order.append(n)

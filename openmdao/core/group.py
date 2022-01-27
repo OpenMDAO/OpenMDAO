@@ -3091,10 +3091,6 @@ class Group(System):
                 meta = SUBJAC_META_DEFAULTS.copy()
 
                 if left == right:
-                    # if left in self._responses and 'path' in self._responses[left] and \
-                    #         self._responses[right]['path'] is not None:
-                    #     left = self._responses[left]['path']
-
                     size = abs2meta['output'][left]['size']
                     meta['rows'] = meta['cols'] = np.arange(size)
                     # All group approximations are treated as explicit components, so we
