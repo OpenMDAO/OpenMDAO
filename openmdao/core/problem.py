@@ -2,10 +2,11 @@
 
 import sys
 import pprint
-import os
 import logging
 import weakref
 import time
+import pathlib
+import os
 
 from collections import defaultdict, namedtuple, OrderedDict
 from fnmatch import fnmatchcase
@@ -42,10 +43,12 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.logger_utils import get_logger, TestLogger
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.hooks import _setup_hooks
+from openmdao.utils.hooks import _setup_hooks, _register_hook
 from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
+from openmdao.utils.coloring import compute_total_coloring
+from openmdao.visualization.scaling_viewer.scaling_report import view_driver_scaling
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -139,7 +142,8 @@ class Problem(object):
         Bool to check if `value` deprecation warning has occured yet
     """
 
-    def __init__(self, model=None, driver=None, comm=None, name=None, **options):
+    def __init__(self, model=None, driver=None, comm=None, name=None, reports=True,
+                 reports_dir=None, **options):
         """
         Initialize attributes.
         """
@@ -209,9 +213,14 @@ class Problem(object):
 
         # General options
         self.options = OptionsDictionary(parent_name=type(self).__name__)
+        import os
         self.options.declare('coloring_dir', types=str,
                              default=os.path.join(os.getcwd(), 'coloring_files'),
                              desc='Directory containing coloring files (if any) for this Problem.')
+        self.options.declare('reports', types=bool, default=True,
+                                       desc='Set to True to have reports automatically generated')
+        self.options.declare('reports_dir', types=str, default=None,
+                             desc='Directory where the reports will be placed.')
         self.options.update(options)
 
         # Case recording options
@@ -253,7 +262,178 @@ class Problem(object):
                                        desc='Patterns for vars to exclude in recording '
                                             '(processed post-includes). Uses fnmatch wildcards')
 
+        if reports:
+
+            def scriptinfo():
+                '''
+                Returns a dictionary with information about the running top level Python
+                script:
+                ---------------------------------------------------------------------------
+                dir:    directory containing script or compiled executable
+                name:   name of script or executable
+                source: name of source code file
+                ---------------------------------------------------------------------------
+                "name" and "source" are identical if and only if running interpreted code.
+                When running code compiled by py2exe or cx_freeze, "source" contains
+                the name of the originating Python script.
+                If compiled by PyInstaller, "source" contains no meaningful information.
+                '''
+
+                import os, sys, inspect
+                # ---------------------------------------------------------------------------
+                # scan through call stack for caller information
+                # ---------------------------------------------------------------------------
+                for teil in inspect.stack():
+                    # skip system calls
+                    if teil[1].startswith("<"):
+                        continue
+                    if teil[1].upper().startswith(sys.exec_prefix.upper()):
+                        continue
+                    trc = teil[1]
+
+                # trc contains highest level calling script name
+                # check if we have been compiled
+                if getattr(sys, 'frozen', False):
+                    scriptdir, scriptname = os.path.split(sys.executable)
+                    return {"dir": scriptdir,
+                            "name": scriptname,
+                            "source": trc}
+
+                # from here on, we are in the interpreted case
+                scriptdir, trc = os.path.split(trc)
+                # if trc did not contain directory information,
+                # the current working directory is what we need
+                if not scriptdir:
+                    scriptdir = os.getcwd()
+
+                scr_dict = {"name": trc,
+                            "source": trc,
+                            "dir": scriptdir}
+                return scr_dict
+
+
+            import __main__
+
+
+            # appName = __main__
+            # print(f"__main__: {appName}")
+            # appName = __file__
+            # print(f"__file__: {appName}")
+            # appName = os.path.basename(__main__.__file__).strip(".py")
+            # print(f"os.path.basename(__main__.__file__).strip: {appName}")
+            # appName = os.path.basename(__main__.__file__).split(".")[0]
+            # print(f"os.path.basename(__main__.__file__).split: {appName}")
+            #
+            # appName = inspect.stack()[-1][1]
+            # print(f"inspect.stack: {appName}")
+            #
+            # whoami = scriptinfo()
+            # print(f"scriptinfo: {whoami}")
+
+            if reports_dir is None:
+                import pprint
+                pprint.pprint(sys.argv, stream=sys.stdout)
+                import inspect
+                script_path = inspect.stack()[-1][1]
+                script_name = pathlib.Path(script_path).stem
+                reports_dir = f'{script_name}_reports'
+            if not os.path.isdir(reports_dir):
+                os.mkdir(reports_dir)
+
+            from openmdao.visualization.n2_viewer.n2_viewer import n2
+
+            n2_filename = f'{self._name}_N2.html'
+
+            scaling_filename = f'{self._name}_driver_scaling.html'
+            coloring_filename = f'{self._name}_jacobian_to_compute_coloring.png'
+            # def _n2(prob):
+            #     # pathlib.Path(dirname).joinpath("README")
+            #     n2(prob, outfile=str(pathlib.Path(reports_dir).joinpath(n2_filename)))
+            #     # n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
+            #     #    title=options.title, embeddable=options.embeddable)
+
+
+            def _reporting(prob):
+                n2_filepath = str(pathlib.Path(reports_dir).joinpath(n2_filename))
+                n2(prob, show_browser=False, outfile=n2_filepath)
+                scaling_filepath = str(pathlib.Path(reports_dir).joinpath(scaling_filename))
+                view_driver_scaling(self.driver, show_browser=False, outfile=scaling_filepath)
+                coloring_filepath = str(pathlib.Path(reports_dir).joinpath(coloring_filename))
+
+                # def compute_total_coloring(problem, mode=None, of=None, wrt=None,
+                #                            num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
+                #                            tol=_DEF_COMP_SPARSITY_ARGS['tol'],
+                #                            orders=_DEF_COMP_SPARSITY_ARGS['orders'],
+                #                            setup=False, run_model=False, fname=None,
+                #                            use_abs_names=False):
+
+                coloring = compute_total_coloring(prob,
+                                                  # num_full_jacs=options.num_jacs,
+                                                  # tol=options.tolerance,
+                                                  # orders=options.orders,
+                                                  # setup=False,
+                                                  # run_model=True,
+                                                  # fname=outfile,
+                                                  use_abs_names=True
+                                                  )
+
+                coloring.display(show=False, fname=coloring_filepath)
+
+            # def _scaling(problem):
+            #     hooks._unregister_hook('final_setup', 'Problem')  # avoid recursive loop
+            #     hooks._unregister_hook('run_driver', 'Problem')
+            #     hooks._unregister_hook('run_model', 'Problem')
+            #     driver = problem.driver
+            #     if options.title:
+            #         title = options.title
+            #     else:
+            #         title = "Driver scaling for %s" % os.path.basename(options.file[0])
+            #
+            #     from openmdao.visualization.scaling_viewer.scaling_report import view_driver_scaling
+            #     view_driver_scaling(self.driver, outfile=scaling_filename)
+            #     # view_driver_scaling(driver, outfile=options.outfile,
+            #     #                     show_browser=not options.no_browser,
+            #     #                     title=title, jac=not options.nojac)
+            #
+            # def _scaling_check(problem):
+            #     if _run_driver_called:
+            #         # If run_driver has been called, we know no more user changes are coming.
+            #         if not _run_model_start:
+            #             problem.run_model()
+            #         if _run_model_done:
+            #             _scaling(problem)
+
+            # def _scaling_check(problem):
+            #     from openmdao.visualization.scaling_viewer.scaling_report import view_driver_scaling
+            #     view_driver_scaling(self.driver, outfile=str(pathlib.Path(reports_dir).joinpath(scaling_filename)))
+
+            import openmdao.utils.hooks as hooks
+
+            hooks.use_hooks = True
+            # _register_hook('final_setup', 'Problem', post=_n2) # Need to do this before calling setup hooks
+            _register_hook('final_setup', 'Problem', post=_reporting) # Need to do this before calling setup hooks
+
+            # _register_hook('final_setup', class_name='Problem', inst_id=self._get_inst_id(),
+            #                      post=_scaling_check)
+
         _setup_hooks(self)
+
+        if reports:
+            pass
+            # n2(filename, outfile=options.outfile, title=options.title,
+            #    show_browser=not options.no_browser, embeddable=options.embeddable)
+
+            # avoid circular import
+            # from openmdao.visualization.n2_viewer.n2_viewer import n2
+            #
+            #
+            # _register_hook('final_setup', 'Problem', post=n2)
+
+
+
+            # _register_hook('setup', class_name='Problem')
+            # _register_hook('final_setup', class_name='Problem', inst_id=options.problem,
+            #                      post=_scaling_check)
 
     def _get_var_abs_name(self, name):
         if name in self.model._var_allprocs_abs2meta:
