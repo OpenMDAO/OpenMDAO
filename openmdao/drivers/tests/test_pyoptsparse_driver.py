@@ -2476,8 +2476,8 @@ class TestPyoptSparse(unittest.TestCase):
         p.run_driver()
 
         assert_check_totals(p.check_totals())
-        assert_near_equal(p.get_val('exec.z')[0], 25)
-        assert_near_equal(p.get_val('exec.z')[50], -75)
+        assert_near_equal(p.get_val('exec.z')[0], 25, 1e-13)
+        assert_near_equal(p.get_val('exec.z')[50], -75, 1e-13)
 
         # REV
         p.setup(mode='rev')
@@ -2487,8 +2487,8 @@ class TestPyoptSparse(unittest.TestCase):
         p.run_driver()
 
         assert_check_totals(p.check_totals())
-        assert_near_equal(p.get_val('exec.z')[0], 25)
-        assert_near_equal(p.get_val('exec.z')[50], -75)
+        assert_near_equal(p.get_val('exec.z')[0], 25, 1e-13)
+        assert_near_equal(p.get_val('exec.z')[50], -75, 1e-13)
 
         # Test inequality constraint
         p = om.Problem()
@@ -2518,8 +2518,8 @@ class TestPyoptSparse(unittest.TestCase):
         p.run_driver()
 
         assert_check_totals(p.check_totals())
-        assert_near_equal(p.get_val('exec.z')[0], 30)
-        assert_near_equal(p.get_val('exec.z')[50], -70)
+        assert_near_equal(p.get_val('exec.z')[0], 30, 1e-13)
+        assert_near_equal(p.get_val('exec.z')[50], -70, 1e-13)
 
         # REV
         p.setup(mode='rev')
@@ -2550,7 +2550,7 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_constraint('exec.z', indices=[-1], lower=20, alias="ALIAS_TEST")
 
         p.driver = om.pyOptSparseDriver()
-        p.driver.options['optimizer'] = "SNOPT"
+        p.driver.options['optimizer'] = OPTIMIZER
 
         # FWD
         p.setup(mode='fwd')
@@ -2561,8 +2561,8 @@ class TestPyoptSparse(unittest.TestCase):
         print(p.check_totals())
 
         print(p.get_val('exec.z'))
-        assert_near_equal(p.get_val('exec.z')[0], 25)
-        assert_near_equal(p.get_val('exec.z')[50], -75)
+        assert_near_equal(p.get_val('exec.z')[0], 25, 1e-13)
+        assert_near_equal(p.get_val('exec.z')[50], -75, 1e-13)
 
         # REV
         p.setup(mode='rev')
@@ -2573,8 +2573,8 @@ class TestPyoptSparse(unittest.TestCase):
         print(p.check_totals())
 
         print(p.get_val('exec.z'))
-        assert_near_equal(p.get_val('exec.z')[0], 25)
-        assert_near_equal(p.get_val('exec.z')[50], -75)
+        assert_near_equal(p.get_val('exec.z')[0], 25, 1e-13)
+        assert_near_equal(p.get_val('exec.z')[50], -75, 1e-13)
 
     def test_fwd_rev_compute_totals_check(self):
         p = om.Problem()
@@ -2594,7 +2594,7 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_constraint('exec.z', indices=[-1], lower=20, alias="ALIAS_TEST")
 
         p.driver = om.pyOptSparseDriver()
-        p.driver.options['optimizer'] = "SNOPT"
+        p.driver.options['optimizer'] = OPTIMIZER
 
         # FWD
         p.setup(mode='fwd')
