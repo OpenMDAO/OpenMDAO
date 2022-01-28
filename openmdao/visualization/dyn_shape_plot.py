@@ -44,7 +44,6 @@ def _view_dyn_shapes_cmd(options, user_args):
     def _view_shape_graph(model):
         view_dyn_shapes(model, outfile=options.outfile, show=not options.no_display,
                         title=options.title)
-        exit()
 
     def _set_dyn_hook(prob):
         # we can't wait until the end of Problem.setup because we'll die in _setup_sizes
@@ -52,11 +51,11 @@ def _view_dyn_shapes_cmd(options, user_args):
         # _setup_dynamic_shapes.  inst_id is None here because no system's pathname will
         # have been set at the time this hook is triggered.
         hooks._register_hook('_setup_dynamic_shapes', class_name='Group', inst_id=None,
-                             post=_view_shape_graph)
+                             post=_view_shape_graph, exit=True)
         hooks._setup_hooks(prob.model)
 
     # register the hooks
-    hooks._register_hook('setup', 'Problem', pre=_set_dyn_hook)
+    hooks._register_hook('setup', 'Problem', pre=_set_dyn_hook, ncalls=1)
 
     ignore_errors(True)
     _load_and_exec(options.file[0], user_args)

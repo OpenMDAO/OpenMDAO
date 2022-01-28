@@ -366,6 +366,8 @@ class DistribParaboloid(om.ExplicitComponent):
 @unittest.skipUnless(MPI, "MPI is required.")
 class DistributedIO(unittest.TestCase):
 
+    N_PROCS = 2
+
     def test_driver_metadata(self):
         self.comm = MPI.COMM_WORLD
 

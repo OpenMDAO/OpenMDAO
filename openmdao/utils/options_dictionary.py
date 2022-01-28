@@ -7,7 +7,7 @@ from openmdao.core.constants import _UNDEFINED
 
 
 # regex to check for valid names.
-namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
+namecheck_rgx = re.compile('[a-zA-Z_][_a-zA-Z0-9]*')
 
 
 #

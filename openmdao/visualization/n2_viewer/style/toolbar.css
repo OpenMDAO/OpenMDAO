@@ -51,7 +51,6 @@
     border-top-right-radius: 25px;
     border-bottom-right-radius: 25px;
     padding: 8px 8px;
-    /* transition-delay: 0.5s; */
     transition: border-color 0.5s, width 0.5s, margin-left 0.5s, visibility 0.5s;
 }
 
@@ -91,7 +90,7 @@
 #toolbarLoc {
     margin: 0;
     padding: 0;
-    height: 660px;
+    height: 605px;
     width: 65px;
     border-bottom-right-radius: 15px;
     position: relative;
@@ -170,7 +169,6 @@
     opacity: 0;
     min-height: 100%;
     transition: opacity 1s, max-width 1s;
-
 }
 
 .toolbar-group-expandable p {
@@ -228,7 +226,6 @@
     padding: 20px 0 5px 0;
     margin-top: -20px;
     z-index: 35;
-    flex-direction: row;
     align-items: center;
 }
 
@@ -237,7 +234,6 @@
     padding: 20px 0 5px 0;
     margin-top: -20px;
     z-index: 34;
-    height: 155px;
 }
 
 .group-4 {
@@ -252,9 +248,15 @@
     padding: 20px 0 7px 0;
     margin-top: -20px;
     z-index: 32;
+    flex-direction: row;
+    align-items: center;
 }
 
 #collapse-expandable {
+    background-color: #7dcda6;
+}
+
+#target-expandable {
     background-color: #7dcda6;
 }
 
@@ -270,6 +272,10 @@
     background-color: #42926b;
     display: flex;
     align-items: center;
+}
+
+#info-expandable {
+    background-color: #30684d;
 }
 
 #text-width-expandable p {
@@ -330,6 +336,14 @@
 	font-size: 13px !important;
 }
 
+.icon-collapse-target {
+    font-size: 20px !important;
+}
+
+.icon-filter-target {
+    font-size: 20px !important;
+}
+
 .toolbar .fas {
     margin: 7px 0;
     color: white;
@@ -339,7 +353,8 @@
 }
 
 .active-tab-icon {
-    color: #00ff00 !important;
+    color: #06f !important;
+    filter: drop-shadow(0 0 5px white);
 }
 
 .toolbar .fas:hover {
@@ -362,24 +377,22 @@
 }
 
 #info-button {
-    font-size: 30px !important;
     color: white;
     opacity: 1;
     transition: opacity 0.5s, color 0.5s;
 }
 
-#info-button:hover {
-    opacity: 0.7;
-}
-
-#question-button {
-    font-size: 30px !important;
+.icon-question-circle {
     opacity: 1;
     color: white;
 }
 
-#question-button:hover {
-    opacity: 0.7;
+.collapse-mode-cursor {
+    cursor: crosshair;
+}
+
+.filter-mode-cursor {
+    cursor: zoom-in;
 }
 
 /* Slider */

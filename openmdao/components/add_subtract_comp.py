@@ -1,7 +1,7 @@
 """
 Definition of the Add/Subtract Component.
 """
-import collections
+from collections.abc import Iterable
 
 import numpy as np
 from scipy import sparse as sp
@@ -81,7 +81,7 @@ class AddSubtractComp(ExplicitComponent):
         if isinstance(output_name, str):
             self.add_equation(output_name, input_names, vec_size, length, val,
                               scaling_factors=scaling_factors, **kwargs)
-        elif isinstance(output_name, collections.Iterable):
+        elif isinstance(output_name, Iterable):
             raise NotImplementedError(self.msginfo + ': Declaring multiple addition systems '
                                       'on initiation is not implemented.'
                                       'Use a string to name a single addition relationship or use '

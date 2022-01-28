@@ -2061,9 +2061,8 @@ def _total_coloring_cmd(options, user_args):
                 coloring.summary()
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
-        exit()
 
-    hooks._register_hook('final_setup', 'Problem', post=_total_coloring)
+    hooks._register_hook('final_setup', 'Problem', post=_total_coloring, exit=True)
 
     _load_and_exec(options.file[0], user_args)
 
@@ -2233,9 +2232,8 @@ def _partial_coloring_cmd(options, user_args):
                                 _show(s, options, c)
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
-        exit()
 
-    hooks._register_hook('final_setup', 'Problem', post=_partial_coloring)
+    hooks._register_hook('final_setup', 'Problem', post=_partial_coloring, exit=True)
 
     _load_and_exec(options.file[0], user_args)
 

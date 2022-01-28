@@ -116,6 +116,8 @@ class DistribStateImplicit(om.ImplicitComponent):
 @unittest.skipUnless(PETScVector is not None, "PETSc is required.")
 class TestUserDefinedSolver(unittest.TestCase):
 
+    N_PROCS = 1
+
     def test_method(self):
         p = om.Problem()
 
