@@ -707,7 +707,7 @@ class Group(System):
             myrank = self.comm.rank
             vars_to_gather = self._vars_to_gather
 
-            for s in self.system_iter(recurse=True):
+            for s in self.system_iter(recurse=True, include_self=True):
                 prefix = s.pathname + '.' if s.pathname else ''
                 for typ in iotypes:
                     # use abs2prom to determine locality since prom2abs is for allprocs
@@ -737,7 +737,7 @@ class Group(System):
                 prom2abs = self.comm.bcast(None, root=0)
         else:  # serial
             prom2abs = {'input': defaultdict(list), 'output': defaultdict(list)}
-            for s in self.system_iter(recurse=True):
+            for s in self.system_iter(recurse=True, include_self=True):
                 prefix = s.pathname + '.' if s.pathname else ''
                 for typ in iotypes:
                     t_prom2abs = prom2abs[typ]
@@ -839,8 +839,8 @@ class Group(System):
                 # run into memory issues if src_indices are large.  Maybe try something like
                 # computing a hash in each rank and comparing those?
                 if out_dist and not in_dist:
-                    # all serial inputs must have src_indices if they connect to a distributed
-                    # output
+                    # all non-distributed inputs must have src_indices if they connect to a
+                    # distributed output.
                     owner = self._owning_rank[abs_in]
                     if abs_in in abs2meta_in:  # input is local
                         src_inds = abs2meta_in[abs_in]['src_indices']
@@ -867,16 +867,12 @@ class Group(System):
                         err = self.comm.bcast(None, root=owner)
                     if err == 1:
                         raise RuntimeError(f"{self.msginfo}: Can't connect distributed output "
-                                           f"'{abs_out}' to serial input '{abs_in}' because "
-                                           "src_indices differ on different ranks.")
+                                           f"'{abs_out}' to non-distributed input '{abs_in}' "
+                                           "because src_indices differ on different ranks.")
                     elif err == -1:
                         raise RuntimeError(f"{self.msginfo}: Can't connect distributed output "
-                                           f"'{abs_out}' to serial input '{abs_in}' without "
-                                           "specifying src_indices.")
-                elif in_dist and not out_dist:
-                    warn_deprecation(f"Connection between serial output '{abs_out}' and distributed"
-                                     f" input '{abs_in}' is deprecated and will become an error "
-                                     "in a future release.")
+                                           f"'{abs_out}' to non-distributed input '{abs_in}' "
+                                           "without specifying src_indices.")
 
     def _get_group_input_meta(self, prom_in, meta_name):
         if prom_in in self._group_inputs:
@@ -1665,22 +1661,23 @@ class Group(System):
 
             to_dist = nprocs > 1 and all_to_meta['distributed']
 
-            # known dist output to/from serial input.  We don't allow this case because serial
-            # variables must have the same value on all procs and the only way this is possible is
-            # if the src_indices on each proc are identical, but that's not possible if we assume
-            # 'always local' transfer (see POEM 46).
+            # known dist output to/from non-distributed input.  We don't allow this case because
+            # non-distributed variables must have the same value on all procs and the only way
+            # this is possible is if the src_indices on each proc are identical, but that's not
+            # possible if we assume 'always local' transfer (see POEM 46).
             if from_dist and not to_dist:
                 if from_io == 'output':
-                    raise RuntimeError(f"{self.msginfo}: dynamic sizing of serial {to_io} "
+                    raise RuntimeError(f"{self.msginfo}: dynamic sizing of non-distributed {to_io} "
                                        f"'{to_var}' from distributed {from_io} '{from_var}' is not "
                                        "supported.")
                 else:  # serial_out <- dist_in
                     # all input rank sizes must be the same
                     if not np.all(distrib_sizes[from_var] == distrib_sizes[from_var][0]):
-                        raise RuntimeError(f"{self.msginfo}: dynamic sizing of serial {to_io} "
-                                           f"'{to_var}' from distributed {from_io} '{from_var}' is "
-                                           f"not supported because not all {from_var} ranks are "
-                                           f"the same size (sizes={distrib_sizes[from_var]}).")
+                        raise RuntimeError(f"{self.msginfo}: dynamic sizing of non-distributed "
+                                           f"{to_io} '{to_var}' from distributed {from_io} "
+                                           f"'{from_var}' is not supported because not all "
+                                           f"{from_var} ranks are the same size "
+                                           f"(sizes={distrib_sizes[from_var]}).")
 
             all_to_meta['shape'] = from_shape
             all_to_meta['size'] = from_size

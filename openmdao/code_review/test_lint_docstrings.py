@@ -4,7 +4,7 @@ import os.path
 import importlib
 import inspect
 import textwrap
-import collections
+from collections.abc import Iterable
 import re
 
 try:
@@ -109,7 +109,7 @@ class ReturnFinder(ast.NodeVisitor):
             if node.value is not None:
                 self.has_return = True
 
-        if hasattr(node, 'body') and isinstance(node.body, collections.Iterable):
+        if hasattr(node, 'body') and isinstance(node.body, Iterable):
             # If the top level function does nothing but pass, note it.
             if is_func_def and self._depth == 2 and len(node.body) <= 2 \
                      and isinstance(node.body[-1], ast.Pass):

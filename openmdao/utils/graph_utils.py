@@ -23,31 +23,3 @@ def get_sccs_topo(graph):
     sccs = list(nx.strongly_connected_components(graph))
     sccs.reverse()
     return sccs
-
-
-def all_connected_nodes(graph, start):
-    """
-    Yield all downstream nodes starting at the given node.
-
-    Parameters
-    ----------
-    graph : network.DiGraph
-        Graph being traversed.
-    start : hashable object
-        Identifier of the starting node.
-
-    Yields
-    ------
-    str
-        Each node found when traversal starts at start.
-    """
-    stack = [start]
-    visited = set(stack)
-    yield start
-    while stack:
-        src = stack.pop()
-        for tgt in graph[src]:
-            yield tgt
-            if tgt not in visited:
-                visited.add(tgt)
-                stack.append(tgt)

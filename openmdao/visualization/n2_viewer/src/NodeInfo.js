@@ -460,7 +460,6 @@ class NodeInfo extends N2Window {
         this.ui = ui;
         this.table = this.body.append('table').attr('class', 'node-info-table');
         this.tbody = this.table.append('tbody');
-        this.toolbarButton = d3.select('#info-button');
         this.dataDiv = this.main.append('div').attr('class', 'node-info-data');
         this.theme('node-info');
         this.hideCloseButton();
@@ -473,17 +472,14 @@ class NodeInfo extends N2Window {
     activate() {
         this.active = true;
         this.hidden = false;
-        this.toolbarButton.classed('active-tab-icon', true);
-        d3.select('#all_pt_n2_content_div').classed('node-data-cursor', true);
         return this;
     }
 
     /** Make the info box hidden if it's visible */
     deactivate() {
+        this.clear();
         this.active = false;
         this.hidden = true;
-        this.toolbarButton.classed('active-tab-icon', false);
-        d3.select('#all_pt_n2_content_div').classed('node-data-cursor', false);
         return this;
     }
 

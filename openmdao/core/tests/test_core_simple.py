@@ -97,6 +97,8 @@ class Test(unittest.TestCase):
 @unittest.skipUnless(PETScVector, "PETSc is required.")
 class TestPETScVec(Test):
 
+    N_PROCS = 1
+
     def setUp(self):
         group = GroupG()
         group.add_subsystems()

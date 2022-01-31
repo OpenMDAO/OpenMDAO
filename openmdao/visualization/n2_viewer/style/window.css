@@ -657,10 +657,17 @@ div.help-graphic {
 div.help-graphic > p {
     position: absolute;
     font: Helvetica;
-    font-size: 15pt;
-    padding: 2px 0 2px 5px;
-    margin: 0;
+    font-size: 10pt;
+    padding: 0px 0 0px 5px;
+    height: 30px;
+    max-height: 30px;
+    max-width: 165px;
+    margin: -1px 0 0 0;
     z-index: 2;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-left: 2px solid black;
 }
 
 div.help-button-group {
@@ -671,23 +678,42 @@ div.help-button-group {
     border-left-width: 0;
     border-color: green;
     border-style: solid;
-    left: 640px;
+    left: 500px;
     border-radius: 0px 10px 10px 0px;
     background-color: #e0e0e0;
+    max-height: 100px;
+    width: 380px;
+    padding: 5px;
+    
+    display: flex;
+    flex-flow: row wrap;
+    justify-content: flex-start;
 }
 
 div.help-button-group > p {
     font: Helvetica;
-    font-size: 15pt;
     padding: 0;
-    margin: 12px 10px 14px 10px;
+    margin: 3px;
+    flex: 1 1 auto;
+}
+
+p.help-text {
+    display: flex;
+    flex-direction: row;
+    max-width: 180px;
 }
 
 i.help-text-icon {
     color: white;
     background-color: #42926b;
     padding: 5px;
-    margin-right: 5px;
+    margin: 0 5px 0 0;
+    height: 22px;
+    font-size: 20px;
+}
+
+p.help-text > span {
+    font-size: 10pt;
 }
 
 #help-graphic-svg {

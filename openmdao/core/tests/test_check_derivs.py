@@ -1986,17 +1986,17 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
             prob.setup(force_alloc_complex=force_alloc_complex)
             return prob, parab
 
-        expected_check_partials_error = f"Problem: Checking partials with respect " \
+        expected_check_partials_error = f"Problem .*: Checking partials with respect " \
               "to variable '{var}' in component " \
               "'{comp.pathname}' using the same " \
               "method and options as are used to compute the " \
               "component's derivatives " \
               "will not provide any relevant information on the " \
-              "accuracy.\n" \
+              "accuracy\.\n" \
               "To correct this, change the options to do the \n" \
               "check_partials using either:\n" \
-              "     - arguments to Problem.check_partials. \n" \
-              "     - arguments to Component.set_check_partial_options"
+              "     - arguments to Problem\.check_partials. \n" \
+              "     - arguments to Component\.set_check_partial_options"
 
         # Scenario 1:
         #    Compute partials: exact
@@ -2011,10 +2011,9 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         #    Expected result: Error
         prob, parab = create_problem()
         parab.declare_partials(of='*', wrt='*', method='fd')
-        with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as err:
-            prob.check_partials(method='fd')
         expected_error_msg = expected_check_partials_error.format(var='x', comp=self.parab)
-        self.assertEqual(expected_error_msg, str(err.exception))
+        with self.assertRaisesRegex(OMInvalidCheckDerivativesOptionsWarning, expected_error_msg):
+            prob.check_partials(method='fd')
 
         # Scenario 3:
         #    Compute partials: fd, with default options
@@ -2056,10 +2055,9 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         #    Expected result: Error since using fd to check fd. All options the same
         prob, parab = create_problem()
         parab.declare_partials(of='*', wrt='*', method='fd')
-        with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as err:
-            prob.check_partials(method='cs')
         expected_error_msg = expected_check_partials_error.format(var='x', comp=parab)
-        self.assertEqual(expected_error_msg, str(err.exception)[:len(expected_error_msg)])
+        with self.assertRaisesRegex(OMInvalidCheckDerivativesOptionsWarning, expected_error_msg):
+            prob.check_partials(method='cs')
 
         # Scenario 7:
         #    Compute partials: fd, with default options
@@ -2079,10 +2077,9 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         prob, parab = create_problem()
         parab.declare_partials(of='*', wrt='*', method='fd')
         parab.set_check_partial_options('*')
-        with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as err:
-            prob.check_partials()
         expected_error_msg = expected_check_partials_error.format(var='x', comp=parab)
-        self.assertEqual(expected_error_msg, str(err.exception)[:len(expected_error_msg)])
+        with self.assertRaisesRegex(OMInvalidCheckDerivativesOptionsWarning, expected_error_msg):
+            prob.check_partials()
 
         # Scenario 9:
         #    Compute partials: fd, with default options
@@ -2138,10 +2135,9 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         prob, parab = create_problem(force_alloc_complex=True)
         parab.declare_partials(of='*', wrt='*', method='cs')
         parab.set_check_partial_options('*', method='cs')
-        with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as err:
-            prob.check_partials()
         expected_error_msg = expected_check_partials_error.format(var='x', comp=parab)
-        self.assertEqual(expected_error_msg, str(err.exception)[:len(expected_error_msg)])
+        with self.assertRaisesRegex(OMInvalidCheckDerivativesOptionsWarning, expected_error_msg):
+            prob.check_partials()
 
         # Scenario 15:
         #    Compute partials: cs, with default options
@@ -2155,12 +2151,12 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         prob.check_partials()
 
         # Now do similar checks for check_totals when approximations are used
-        expected_check_totals_error_msg = "Problem: Checking totals using the same " \
+        expected_check_totals_error_msg = "Problem .*: Checking totals using the same " \
               "method and options as are used to compute the " \
               "totals will not provide any relevant information on the " \
-              "accuracy.\n" \
+              "accuracy\.\n" \
               "To correct this, change the options to do the " \
-              "check_totals or on the call to approx_totals for the model."
+              "check_totals or on the call to approx_totals for the model\."
 
         # Scenario 16:
         #    Compute totals: no approx on totals
@@ -2179,9 +2175,9 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         prob.model.approx_totals()
         prob.setup()
         prob.run_model()
-        with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as err:
+        with self.assertRaisesRegex(OMInvalidCheckDerivativesOptionsWarning,
+                                        expected_check_totals_error_msg) :
             prob.check_totals()
-        self.assertEqual(expected_check_totals_error_msg, str(err.exception))
 
         # Scenario 18:
         #    Compute totals: approx on totals using defaults
@@ -2222,9 +2218,9 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         prob.model.approx_totals(method='cs')
         prob.setup()
         prob.run_model()
-        with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as err:
+        with self.assertRaisesRegex(OMInvalidCheckDerivativesOptionsWarning,
+                               expected_check_totals_error_msg):
             prob.check_totals(method='cs')
-        self.assertEqual(expected_check_totals_error_msg, str(err.exception))
 
         # Scenario 22:
         #    Compute totals: fd, the default
@@ -3484,12 +3480,10 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        with self.assertRaises(RuntimeError) as cm:
+        msg = "\nProblem .*: To enable complex step, specify 'force_alloc_complex=True' when calling " + \
+                "setup on the problem, e\.g\. 'problem\.setup\(force_alloc_complex=True\)'"
+        with self.assertRaisesRegex(RuntimeError, msg):
             prob.check_totals(method='cs')
-
-        msg = "\nProblem: To enable complex step, specify 'force_alloc_complex=True' when calling " + \
-                "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
-        self.assertEqual(str(cm.exception), msg)
 
     def test_fd_zero_check(self):
 
@@ -3603,7 +3597,7 @@ class TestCheckPartialsDistrib(unittest.TestCase):
         # this test passes if it doesn't raise an exception.  The actual partials are not
         # correct because compute_jacvec_product does nothing.
         class DistributedConverter(om.ExplicitComponent):
-            "takes a serial input and converts it to a distributed output that is only on rank 0"
+            "takes a non-distributed input and converts it to a distributed output that is only on rank 0"
             def setup(self):
 
                 shape_switch = 1 if self.comm.rank == 0 else 0

@@ -75,7 +75,7 @@ class DenseMatrix(COOMatrix):
                 # Mask need to be applied to ext_mtx so that we can ignore multiplication
                 # by certain columns.
                 mat_T = mat.T
-                arrmask = np.zeros(mat_T.shape, dtype=np.bool)
+                arrmask = np.zeros(mat_T.shape, dtype=bool)
                 arrmask[mask, :] = True
                 masked_mtx = np.ma.array(mat_T, mask=arrmask, fill_value=0.0)
 
@@ -101,7 +101,7 @@ class DenseMatrix(COOMatrix):
         """
         if d_inputs._in_matvec_context():
             sub = d_inputs._names
-            mask = np.ones(len(d_inputs), dtype=np.bool)
+            mask = np.ones(len(d_inputs), dtype=bool)
             for key, val in self._metadata.items():
                 if key[1] in sub:
                     mask[val[1]] = False

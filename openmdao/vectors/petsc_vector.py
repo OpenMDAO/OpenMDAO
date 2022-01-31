@@ -89,12 +89,12 @@ else:
 
         def _get_dup_inds(self):
             """
-            Compute the indices into the data vector corresponding to duplicated variables.
+            Compute the indices into the data vector corresponding to non-distributed variables.
 
             Returns
             -------
             ndarray of int
-                Index array corresponding to duplicated variables.
+                Index array corresponding to non-distributed variables.
             """
             if self._dup_inds is None:
                 system = self._system()

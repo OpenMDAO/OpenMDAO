@@ -87,7 +87,7 @@ def array_to_blob(array):
 
     Returns
     -------
-    blob :
+    blob
         The blob created from the array.
     """
     out = BytesIO()
@@ -109,7 +109,7 @@ def blob_to_array(blob):
 
     Returns
     -------
-    array :
+    array
         The array created from the blob.
     """
     out = BytesIO(blob)

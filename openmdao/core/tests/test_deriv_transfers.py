@@ -2,11 +2,7 @@
 import unittest
 import itertools
 
-# note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
-try:
-    from collections.abc import Iterable
-except ImportError:
-    from collections import Iterable
+from collections.abc import Iterable
 
 import numpy as np
 
@@ -52,7 +48,7 @@ class TestParallelGroups(unittest.TestCase):
     @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]),
                           name_func=_test_func_name)
     def test_dup_dup(self, mode, auto):
-        # duplicated vars on both ends
+        # non-distributed vars on both ends
         prob = om.Problem()
         model = prob.model
 
@@ -83,7 +79,7 @@ class TestParallelGroups(unittest.TestCase):
     @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]),
                           name_func=_test_func_name)
     def test_dup_par(self, mode, auto):
-        # duplicated output, parallel input
+        # non-distributed output, parallel input
         prob = om.Problem()
         model = prob.model
 
@@ -153,7 +149,7 @@ class TestParallelGroups(unittest.TestCase):
         assert_near_equal(prob.get_val('dup.y', get_remote=True), 1.5, 1e-6)
 
     def test_dup_par_par_derivs(self):
-        # duplicated output, parallel input
+        # non-distributed output, parallel input
         prob = om.Problem()
         model = prob.model
 
@@ -189,7 +185,7 @@ class TestParallelGroups(unittest.TestCase):
     def test_dup_dist(self, mode, auto):
         # Note: Auto-ivc not supported for distributed inputs.
 
-        # duplicated output, parallel input
+        # non-distributed output, parallel input
         prob = om.Problem()
         model = prob.model
         size = 3
@@ -225,7 +221,7 @@ class TestParallelGroups(unittest.TestCase):
     @parameterized.expand(itertools.product(['fwd', 'rev']),
                           name_func=_test_func_name)
     def test_par_dup(self, mode):
-        # duplicated output, parallel input
+        # non-distributed output, parallel input
         prob = om.Problem()
         model = prob.model
 
@@ -256,7 +252,7 @@ class TestParallelGroups(unittest.TestCase):
     @parameterized.expand(itertools.product(['fwd', 'rev'], [False]),
                           name_func=_test_func_name)
     def test_dist_dup(self, mode, auto):
-        # duplicated output, parallel input
+        # non-distributed output, parallel input
         # Note: Auto-ivc not supported for distributed inputs.
         prob = om.Problem()
         model = prob.model
@@ -293,7 +289,7 @@ class TestParallelGroups(unittest.TestCase):
     @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]),
                           name_func=_test_func_name)
     def test_par_dist(self, mode, auto):
-        # duplicated output, parallel input
+        # non-distributed output, parallel input
         prob = om.Problem()
         model = prob.model
         size = 3
@@ -377,4 +373,3 @@ class TestParallelGroups(unittest.TestCase):
         np.testing.assert_allclose(J['C6.y', 'ivc.x'][0][0], 141.2)
         np.testing.assert_allclose(prob.get_val('C6.y', get_remote=True),
                                    141.2)
-

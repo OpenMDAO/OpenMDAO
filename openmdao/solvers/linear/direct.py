@@ -9,6 +9,7 @@ from scipy.sparse import csc_matrix
 
 from openmdao.solvers.solver import LinearSolver
 from openmdao.matrices.dense_matrix import DenseMatrix
+from openmdao.utils.array_utils import identity_column_iter
 
 
 def index_to_varname(system, loc):
@@ -148,7 +149,7 @@ def format_nan_error(system, matrix):
     # need to associate each index with a variable.
     varsizes = np.sum(system._owned_sizes, axis=0)
 
-    nanrows = np.zeros(matrix.shape[0], dtype=np.bool)
+    nanrows = np.zeros(matrix.shape[0], dtype=bool)
     nanrows[np.where(np.isnan(matrix))[0]] = True
 
     varnames = []
@@ -242,10 +243,8 @@ class DirectSolver(LinearSolver):
         scope_out, scope_in = system._get_scope()
 
         # Assemble the Jacobian by running the identity matrix through apply_linear
-        for i in range(nmtx):
+        for i, seed in enumerate(identity_column_iter(seed)):
             # set value of x vector to provided value
-            seed[i - 1] = 0.
-            seed[i] = 1.
             xvec.set_val(seed)
 
             # apply linear

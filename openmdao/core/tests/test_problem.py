@@ -827,20 +827,17 @@ class TestProblem(unittest.TestCase):
         prob.model.add_subsystem('comp', Paraboloid())
         prob.setup()
         prob.run_model()
-        with self.assertRaises(RuntimeError) as cm:
+        msg = "Problem .*: To enable complex step, specify 'force_alloc_complex=True' when calling " + \
+            "setup on the problem, e\.g\. 'problem\.setup\(force_alloc_complex=True\)'"
+        with self.assertRaisesRegex(RuntimeError, msg):
             prob.set_complex_step_mode(True)
-
-        msg = "Problem: To enable complex step, specify 'force_alloc_complex=True' when calling " + \
-            "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
-        self.assertEqual(cm.exception.args[0], msg)
 
         prob = om.Problem()
         prob.model.add_subsystem('comp', Paraboloid())
-        with self.assertRaises(RuntimeError) as cm:
+        msg = "Problem .*: set_complex_step_mode cannot be called before `Problem\.run_model\(\)`, " + \
+            "`Problem\.run_driver\(\)`, or `Problem\.final_setup\(\)`."
+        with self.assertRaisesRegex(RuntimeError, msg) :
             prob.set_complex_step_mode(True)
-        msg = "Problem: set_complex_step_mode cannot be called before `Problem.run_model()`, " + \
-            "`Problem.run_driver()`, or `Problem.final_setup()`."
-        self.assertEqual(cm.exception.args[0], msg)
 
     def test_feature_run_driver(self):
 
@@ -1385,44 +1382,26 @@ class TestProblem(unittest.TestCase):
 
         prob = om.Problem()
 
-        try:
+        msg = "Problem .*: The `setup` method must be called before `run_model`."
+        with self.assertRaisesRegex(RuntimeError, msg):
             prob.run_model()
-        except RuntimeError as err:
-            msg = "Problem: The `setup` method must be called before `run_model`."
-            self.assertEqual(str(err), msg)
-        else:
-            self.fail('Expecting RuntimeError')
 
-        try:
+        msg = "Problem .*: The `setup` method must be called before `run_driver`."
+        with self.assertRaisesRegex(RuntimeError, msg):
             prob.run_driver()
-        except RuntimeError as err:
-            msg = "Problem: The `setup` method must be called before `run_driver`."
-            self.assertEqual(str(err), msg)
-        else:
-            self.fail('Expecting RuntimeError')
 
     def test_run_with_invalid_prefix(self):
         # Test error message when running with invalid prefix.
 
-        msg = "Problem: The 'case_prefix' argument should be a string."
-
         prob = om.Problem()
 
-        try:
+        msg = "Problem .*: The 'case_prefix' argument should be a string."
+        with self.assertRaisesRegex(TypeError, msg):
             prob.setup()
             prob.run_model(case_prefix=1234)
-        except TypeError as err:
-            self.assertEqual(str(err), msg)
-        else:
-            self.fail('Expecting TypeError')
-
-        try:
+        with self.assertRaisesRegex(TypeError, msg):
             prob.setup()
             prob.run_driver(case_prefix=12.34)
-        except TypeError as err:
-            self.assertEqual(str(err), msg)
-        else:
-            self.fail('Expecting TypeError')
 
     def test_args(self):
         # defaults
@@ -1446,18 +1425,14 @@ class TestProblem(unittest.TestCase):
         self.assertTrue(isinstance(prob.driver, om.ScipyOptimizeDriver))
 
         # invalid model
-        with self.assertRaises(TypeError) as cm:
+        msg = "Problem .*: The value provided for 'model' is not a valid System."
+        with self.assertRaisesRegex(TypeError, msg) :
             prob = om.Problem(om.ScipyOptimizeDriver())
 
-        self.assertEqual(str(cm.exception),
-                         "Problem: The value provided for 'model' is not a valid System.")
-
         # invalid driver
-        with self.assertRaises(TypeError) as cm:
+        msg = "Problem .*: The value provided for 'driver' is not a valid Driver."
+        with self.assertRaisesRegex(TypeError, msg) :
             prob = om.Problem(driver=SellarDerivatives())
-
-        self.assertEqual(str(cm.exception),
-                         "Problem: The value provided for 'driver' is not a valid Driver.")
 
     def test_relevance(self):
         p = om.Problem()
@@ -2104,9 +2079,70 @@ class TestProblem(unittest.TestCase):
         model = prob.model
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
-        with self.assertRaises(RuntimeError) as cm:
+        msg = "Problem .*: 'x' Cannot call set_val before setup."
+        with self.assertRaisesRegex(RuntimeError, msg):
             prob.set_val('x', 0.)
-        self.assertEqual(str(cm.exception), "Problem: 'x' Cannot call set_val before setup.")
+
+    def test_design_var_connected_to_output_as_input_err(self):
+        prob = om.Problem()
+        root = prob.model
+
+        prob.driver = om.ScipyOptimizeDriver()
+
+        root.add_subsystem('initial_comp', om.ExecComp(['x = 10']), promotes_outputs=['x'])
+
+        outer_group = root.add_subsystem('outer_group', om.Group(), promotes_inputs=['x'])
+        inner_group = outer_group.add_subsystem('inner_group', om.Group(), promotes_inputs=['x'])
+
+        c1 = inner_group.add_subsystem('c1', om.ExecComp(['y = x * 2.0',  'z = x ** 2']),
+                                       promotes_inputs=['x'])
+
+        c1.add_design_var('x', lower=0, upper=5)
+
+        msg = "Design variable 'initial_comp.x' is not an IndepVarComp or ImplicitComp output."
+        with self.assertRaises(RuntimeError) as cm:
+            prob.setup()
+        self.assertEqual(str(cm.exception), msg)
+
+    def test_design_var_connected_to_output(self):
+        prob = om.Problem()
+        root = prob.model
+
+        prob.driver = om.ScipyOptimizeDriver()
+
+        root.add_subsystem('ivc', om.IndepVarComp('x', val=10.))
+
+        outer_group = root.add_subsystem('outer_group', om.Group(), promotes_inputs=['x'])
+        inner_group = outer_group.add_subsystem('inner_group', om.Group(), promotes_inputs=['x'])
+
+        c1 = inner_group.add_subsystem('c1', om.ExecComp(['y = x * 2.0',  'z = x ** 2']),
+                                       promotes_inputs=['x'])
+
+        c1.add_design_var('x', lower=0, upper=5)
+
+        try:
+            prob.setup()
+        except RuntimeError:
+            self.fail("'setup raised RuntimeError unexpectedly")
+
+        prob = om.Problem()
+        root = prob.model
+
+        root.add_subsystem('ivc', om.IndepVarComp('x', val=10.))
+
+        outer_group = root.add_subsystem('outer_group', om.Group(), promotes_inputs=['x'])
+        inner_group = outer_group.add_subsystem('inner_group', om.Group(), promotes_inputs=['x'])
+
+        c1 = inner_group.add_subsystem('c1', om.ExecComp(['y = x * 2.0',  'z = x ** 2']),
+                                       promotes_inputs=['x'])
+
+        c1.add_design_var('x', lower=0, upper=5)
+        root.connect('ivc.x', 'x')
+
+        try:
+            prob.setup()
+        except RuntimeError:
+            self.fail("'setup raised RuntimeError unexpectedly")
 
 
 class NestedProblemTestCase(unittest.TestCase):
@@ -2196,6 +2232,71 @@ class NestedProblemTestCase(unittest.TestCase):
         totals = prob.check_totals(of='f_xy', wrt=['x', 'y'], method='cs', out_stream=None)
         for key, val in totals.items():
             assert_near_equal(val['rel error'][0], 0.0, 1e-12)
+
+    def test_nested_prob_default_naming(self):
+        import openmdao.core.problem
+        class _ProblemSolver(om.NonlinearRunOnce):
+
+            def __init__(self, prob_name=None):
+                super(_ProblemSolver, self).__init__()
+                self.prob_name = prob_name
+                self._problem = None
+
+            def solve(self):
+                # create a simple subproblem and run it to test for global solver_info bug
+                p = om.Problem(name=self.prob_name)
+                self._problem = p
+                p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
+                p.model.add_subsystem('comp', om.ExecComp('y=2*x'))
+                p.model.connect('indep.x', 'comp.x')
+                p.setup()
+                p.run_model()
+
+                print(p.msginfo)
+
+                return super().solve()
+
+        # Initially use the default names
+        openmdao.core.problem._problem_names = []  # need to reset these to simulate separate runs
+        p = om.Problem()
+        p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
+        G = p.model.add_subsystem('G', om.Group())
+        G.add_subsystem('comp', om.ExecComp('y=2*x'))
+        G.nonlinear_solver = _ProblemSolver()
+        p.model.connect('indep.x', 'G.comp.x')
+        p.setup()
+        p.run_model()  # need to do run_model in this test so sub problem is created
+
+        self.assertEqual(p._get_inst_id(), 'problem1')
+        self.assertEqual(G.nonlinear_solver._problem._get_inst_id(), 'problem2')
+
+        # If the second Problem uses the default name of the first
+        openmdao.core.problem._problem_names = []  # need to reset these to simulate separate runs
+        p = om.Problem()
+        p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
+        G = p.model.add_subsystem('G', om.Group())
+        G.add_subsystem('comp', om.ExecComp('y=2*x'))
+        G.nonlinear_solver = _ProblemSolver(prob_name='problem1')
+        p.model.connect('indep.x', 'G.comp.x')
+        p.setup()
+
+        with self.assertRaises(Exception) as context:
+            p.run_model()
+        self.assertEqual(str(context.exception), "The problem name 'problem1' already exists")
+
+        # If the first Problem uses the default name of 'problem2'
+        openmdao.core.problem._problem_names = []  # need to reset these to simulate separate runs
+        p = om.Problem(name='problem2')
+        p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
+        G = p.model.add_subsystem('G', om.Group())
+        G.add_subsystem('comp', om.ExecComp('y=2*x'))
+        G.nonlinear_solver = _ProblemSolver()
+        p.model.connect('indep.x', 'G.comp.x')
+        p.setup()
+        p.run_model()
+
+        self.assertEqual(p._get_inst_id(), 'problem2')
+        self.assertEqual(G.nonlinear_solver._problem._get_inst_id(), 'problem2.1')
 
 
 class SystemInTwoProblemsTestCase(unittest.TestCase):

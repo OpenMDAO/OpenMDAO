@@ -1509,5 +1509,51 @@ class TestDriverScalingReport(unittest.TestCase):
         # just make sure this doesn't raise an exception
         prob.driver.scaling_report(show_browser=False)
 
+    def test_setup_message(self):
+        x_train = np.arange(0., 10.)
+        y_train = np.arange(10., 20.)
+        z_train = x_train ** 2 + y_train ** 2
+
+        p = om.Problem()
+        p.model = model = om.Group()
+
+        params = om.IndepVarComp()
+        params.add_output('x', val=0.)
+        params.add_output('y', val=0.)
+
+        model.add_subsystem('params', params, promotes=['*'])
+
+        sm = om.MetaModelUnStructuredComp(default_surrogate=om.ResponseSurface())
+        sm.add_input('x', val=0.)
+        sm.add_input('y', val=0.)
+        sm.add_output('z', val=0.)
+
+        sm.options['train_x'] = x_train
+        sm.options['train_y'] = y_train
+        sm.options['train_z'] = z_train
+
+        # With or without the line below does not matter
+        # Only when method is set to fd, then RuntimeWarning disappears
+        sm.declare_partials('*', '*', method='exact')
+
+        model.add_subsystem('sm', sm, promotes=['*'])
+
+        model.add_design_var('x', lower=0., upper=10.)
+        model.add_design_var('y', lower=0., upper=10.)
+        model.add_objective('z')
+
+        p.setup()
+
+        with self.assertRaises(RuntimeError) as cm:
+            p.driver.scaling_report()
+
+        msg = "Either 'run_model' or 'final_setup' must be called before the scaling report can be generated."
+        self.assertEqual(str(cm.exception), msg)
+
+        # Now, make sure it runs run_model automatically as long as we final_setup.
+        p.final_setup()
+        p.driver.scaling_report(show_browser=False)
+
+
 if __name__ == '__main__':
     unittest.main()

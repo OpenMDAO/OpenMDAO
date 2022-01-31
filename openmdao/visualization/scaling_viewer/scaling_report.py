@@ -1,10 +1,8 @@
 
 """Define a function to view driver scaling."""
 import os
-import sys
 import json
-from itertools import chain
-from collections import defaultdict
+import functools
 
 import numpy as np
 
@@ -15,18 +13,8 @@ import openmdao.utils.hooks as hooks
 from openmdao.utils.units import convert_units
 from openmdao.utils.mpi import MPI
 from openmdao.utils.webview import webview
-from openmdao.utils.general_utils import printoptions, ignore_errors, default_noraise
-from openmdao.utils.file_utils import _load_and_exec, _to_filename
-
-
-def _val2str(val):
-    if isinstance(val, np.ndarray):
-        if val.size > 5:
-            return 'array %s' % str(val.shape)
-        else:
-            return np.array2string(val)
-
-    return str(val)
+from openmdao.utils.general_utils import ignore_errors, default_noraise
+from openmdao.utils.file_utils import _load_and_exec
 
 
 def _unscale(val, scaler, adder, default=''):
@@ -36,16 +24,6 @@ def _unscale(val, scaler, adder, default=''):
         val = val * (1.0 / scaler)
     if adder is not None:
         val = val - adder
-    return val
-
-
-def _scale(val, scaler, adder, unset=''):
-    if val is None:
-        return unset
-    if adder is not None:
-        val = val + adder
-    if scaler is not None:
-        val = val * scaler
     return val
 
 
@@ -493,15 +471,22 @@ def _scaling_setup_parser(parser):
                         help="Don't show jacobian info")
 
 
-_run_driver_called = False
-_run_model_start = False
-_run_model_done = False
+_run_driver_called = set()
+_run_model_start = set()
+_run_model_done = set()
 
 
-def _exitfunc():
-    if not _run_driver_called:
-        print("\n\nNo driver scaling report was generated because run_driver() was not called "
-              "on the required Problem.\n")
+def _exitfunc(probname):
+    global _run_driver_called
+    from openmdao.core.problem import _problem_names
+    if probname is None:
+        probnames = _problem_names
+    else:
+        probnames = [probname]
+    missing = [p for p in probnames if p not in _run_driver_called]
+    if missing:
+        print(f"\n\nMissing call(s) to run_driver() for Problem(s) {sorted(missing)} "
+              "so couldn't generate corresponding driver scaling report.\n")
 
 
 def _scaling_cmd(options, user_args):
@@ -517,28 +502,25 @@ def _scaling_cmd(options, user_args):
     """
     def _set_run_driver_flag(problem):
         global _run_driver_called
-        _run_driver_called = True
+        _run_driver_called.add(problem._name)
 
     def _set_run_model_start(problem):
         global _run_model_start
-        _run_model_start = True
+        _run_model_start.add(problem._name)
 
     def _set_run_model_done(problem):
         global _run_model_done
-        _run_model_done = True
+        _run_model_done.add(problem._name)
 
     def _scaling_check(problem):
-        if _run_driver_called:
+        if problem._name in _run_driver_called:
             # If run_driver has been called, we know no more user changes are coming.
-            if not _run_model_start:
+            if problem._name not in _run_model_start:
                 problem.run_model()
-            if _run_model_done:
+            if problem._name in _run_model_done:
                 _scaling(problem)
 
     def _scaling(problem):
-        hooks._unregister_hook('final_setup', 'Problem')  # avoid recursive loop
-        hooks._unregister_hook('run_driver', 'Problem')
-        hooks._unregister_hook('run_model', 'Problem')
         driver = problem.driver
         if options.title:
             title = options.title
@@ -553,14 +535,14 @@ def _scaling_cmd(options, user_args):
                          post=_scaling_check)
 
     hooks._register_hook('run_model', class_name='Problem', inst_id=options.problem,
-                         pre=_set_run_model_start, post=_set_run_model_done)
+                         pre=_set_run_model_start, post=_set_run_model_done, ncalls=1)
 
     hooks._register_hook('run_driver', class_name='Problem', inst_id=options.problem,
-                         pre=_set_run_driver_flag)
+                         pre=_set_run_driver_flag, ncalls=1)
 
     # register an atexit function to check if scaling report was triggered during the script
     import atexit
-    atexit.register(_exitfunc)
+    atexit.register(functools.partial(_exitfunc, options.problem))
 
     ignore_errors(True)
     _load_and_exec(options.file[0], user_args)

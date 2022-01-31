@@ -17,7 +17,7 @@ class TestIndepVarComp(unittest.TestCase):
             'size': 1,
             'units': 'ft',
             'desc': '',
-            'tags': {'indep_var'},
+            'tags': {'indep_var', 'openmdao:allow_desvar'},
         }
         expected_discrete = {
             'val': 3,

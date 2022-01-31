@@ -55,7 +55,8 @@ _asm_jac_types = {
 _supported_methods = {
     'fd': FiniteDifference,
     'cs': ComplexStep,
-    'exact': None
+    'exact': None,
+    'jax': None
 }
 
 _DEFAULT_COLORING_META = {
@@ -800,11 +801,12 @@ class System(object):
 
         if name in prom2abs['input']:
             name = prom2abs['input'][name][0]
+
         model = self._problem_meta['model_ref']()
         if name in model._conn_global_abs_in2out:
             return model._conn_global_abs_in2out[name]
 
-        return name
+        raise KeyError(f"{self.msginfo}: source for '{name}' not found.")
 
     def _setup(self, comm, mode, prob_meta):
         """
@@ -863,8 +865,27 @@ class System(object):
         self._setup_connections()
 
     def _top_level_post_connections(self, mode):
-        # this runs after all connections are known
-        pass
+        # this runs after all connections are known, and only if this is the top level system
+        self._problem_meta['prom2abs'] = self._get_all_promotes()
+
+    def _get_all_promotes(self):
+        """
+        Create the top level mapping of all promoted names to absolute names for all local systems.
+
+        Note that this will only be called on a component that is the top level model.
+
+        Returns
+        -------
+        dict
+            Mapping of all promoted names to absolute names.
+        """
+        prom2abs = {}
+        for typ in ('input', 'output'):
+            t_prom2abs = prom2abs[typ] = defaultdict(list)
+            for prom, abslist in self._var_allprocs_prom2abs_list[typ].items():
+                t_prom2abs[prom] = abslist
+
+        return prom2abs
 
     def _top_level_post_sizes(self):
         # this runs after the variable sizes are known
@@ -1015,15 +1036,18 @@ class System(object):
         show_sparsity : bool
             If True, display sparsity with coloring info after generating coloring.
         """
-        if method not in ('fd', 'cs'):
-            raise RuntimeError("{}: method must be one of ['fd', 'cs'].".format(self.msginfo))
+        if method not in ('fd', 'cs', 'jax'):
+            raise RuntimeError(
+                "{}: method must be one of ['fd', 'cs', 'jax'].".format(self.msginfo))
 
         self._has_approx = True
-        approx = self._get_approx_scheme(method)
 
         # start with defaults
         options = _DEFAULT_COLORING_META.copy()
-        options.update(approx.DEFAULT_OPTIONS)
+
+        if method != 'jax':
+            approx = self._get_approx_scheme(method)
+            options.update(approx.DEFAULT_OPTIONS)
 
         if self._coloring_info['static'] is None:
             options['dynamic'] = True
@@ -1049,12 +1073,11 @@ class System(object):
 
         self._coloring_info = options
 
-    def _compute_approx_coloring(self, recurse=False, **overrides):
+    def _compute_coloring(self, recurse=False, **overrides):
         """
-        Compute a coloring of the approximated derivatives.
+        Compute a coloring of the partial jacobian.
 
-        This assumes that the current System is in a proper state for computing approximated
-        derivatives.
+        This assumes that the current System is in a proper state for computing derivatives.
 
         Parameters
         ----------
@@ -1079,15 +1102,22 @@ class System(object):
             for s in self.system_iter(include_self=True, recurse=True):
                 if my_coloring is None or s in grad_systems:
                     if s._coloring_info['coloring'] is not None:
-                        coloring = s._compute_approx_coloring(recurse=False, **overrides)[0]
+                        coloring = s._compute_coloring(recurse=False, **overrides)[0]
                         colorings.append(coloring)
                         if coloring is not None:
                             coloring._meta['pathname'] = s.pathname
                             coloring._meta['class'] = type(s).__name__
             return [c for c in colorings if c is not None] or [None]
 
-        # don't override metadata if it's already declared
         info = self._coloring_info
+
+        use_jax = False
+        try:
+            if self.options['use_jax']:
+                info['method'] = 'jax'
+                use_jax = True
+        except KeyError:
+            pass
 
         info.update(**overrides)
         if isinstance(info['wrt_patterns'], str):
@@ -1097,14 +1127,14 @@ class System(object):
             info['method'] = list(self._approx_schemes)[0]
 
         if info['coloring'] is None:
-            # check to see if any approx derivs have been declared
+            # check to see if any approx or jax derivs have been declared
             for meta in self._subjacs_info.values():
                 if 'method' in meta and meta['method']:
                     break
             else:  # no approx derivs found
                 if not (self._owns_approx_of or self._owns_approx_wrt):
-                    issue_warning("No approx partials found but coloring was requested.  "
-                                  "Declaring ALL partials as dense and approx "
+                    issue_warning("No partials found but coloring was requested.  "
+                                  "Declaring ALL partials as dense "
                                   "(method='{}')".format(info['method']),
                                   prefix=self.msginfo, category=DerivativesWarning)
                     try:
@@ -1118,12 +1148,13 @@ class System(object):
                                 s.declare_partials('*', '*', method=info['method'])
                     self._setup_partials()
 
-        approx_scheme = self._get_approx_scheme(info['method'])
+        if not use_jax:
+            approx_scheme = self._get_approx_scheme(info['method'])
 
         if info['coloring'] is None and info['static'] is None:
             info['dynamic'] = True
 
-        coloring_fname = self.get_approx_coloring_fname()
+        coloring_fname = self.get_coloring_fname()
 
         # if we find a previously computed class coloring for our class, just use that
         # instead of regenerating a coloring.
@@ -1138,11 +1169,9 @@ class System(object):
                                                                         type(self).__name__))
                 info.update(coloring._meta)
                 # force regen of approx groups during next compute_approximations
-                approx_scheme._reset()
+                if not use_jax:
+                    approx_scheme._reset()
             return [coloring]
-
-        from openmdao.core.group import Group
-        is_total = isinstance(self, Group)
 
         # compute perturbations
         starting_inputs = self._inputs.asarray(copy=True)
@@ -1157,16 +1186,17 @@ class System(object):
 
         starting_resids = self._residuals.asarray(copy=True)
 
-        # for groups, this does some setup of approximations
-        self._setup_approx_coloring()
-
         save_first_call = self._first_call_to_linearize
         self._first_call_to_linearize = False
         sparsity_start_time = time.time()
 
+        # for groups, this does some setup of approximations
+        self._setup_approx_coloring()
+
         # tell approx scheme to limit itself to only colored columns
-        approx_scheme._reset()
-        approx_scheme._during_sparsity_comp = True
+        if not use_jax:
+            approx_scheme._reset()
+            approx_scheme._during_sparsity_comp = True
 
         self._update_wrt_matches(info)
 
@@ -1174,6 +1204,9 @@ class System(object):
 
         # use special sparse jacobian to collect sparsity info
         self._jacobian = _ColSparsityJac(self, info)
+
+        from openmdao.core.group import Group
+        is_total = isinstance(self, Group)
 
         for i in range(info['num_full_jacs']):
             # randomize inputs (and outputs if implicit)
@@ -1187,19 +1220,24 @@ class System(object):
                 else:
                     self._apply_nonlinear()
 
-                for scheme in self._approx_schemes.values():
-                    scheme._reset()  # force a re-initialization of approx
-                    scheme._during_sparsity_comp = True
+                if not use_jax:
+                    for scheme in self._approx_schemes.values():
+                        scheme._reset()  # force a re-initialization of approx
+                        scheme._during_sparsity_comp = True
 
-            self.run_linearize(sub_do_ln=False)
+            if use_jax:
+                self._jax_linearize()
+            else:
+                self.run_linearize(sub_do_ln=False)
 
-        sparsity, sp_info = self._jacobian.get_sparsity()
+        sparsity, sp_info = self._jacobian.get_sparsity(self)
 
         self._jacobian = save_jac
 
-        # revert uncolored approx back to normal
-        for scheme in self._approx_schemes.values():
-            scheme._reset()
+        if not use_jax:
+            # revert uncolored approx back to normal
+            for scheme in self._approx_schemes.values():
+                scheme._reset()
 
         sparsity_time = time.time() - sparsity_start_time
 
@@ -1215,7 +1253,11 @@ class System(object):
             ordered_of_info = self._jac_var_info_abs2prom(ordered_of_info)
             ordered_wrt_info = self._jac_var_info_abs2prom(ordered_wrt_info)
 
-        coloring = _compute_coloring(sparsity, 'fwd')
+        if use_jax:
+            direction = self._mode
+        else:
+            direction = 'fwd'
+        coloring = _compute_coloring(sparsity, direction)
 
         # if the improvement wasn't large enough, don't use coloring
         pct = coloring._solves_info()[-1]
@@ -1244,12 +1286,13 @@ class System(object):
 
         info['coloring'] = coloring
 
-        approx = self._get_approx_scheme(coloring._meta['method'])
-        # force regen of approx groups during next compute_approximations
-        approx._reset()
+        if not use_jax:
+            approx = self._get_approx_scheme(coloring._meta['method'])
+            # force regen of approx groups during next compute_approximations
+            approx._reset()
 
         if info['show_sparsity'] or info['show_summary']:
-            print("\nApprox coloring for '%s' (class %s)" % (self.pathname, type(self).__name__))
+            print("\nColoring for '%s' (class %s)" % (self.pathname, type(self).__name__))
 
         if info['show_sparsity']:
             coloring.display_txt()
@@ -1274,7 +1317,7 @@ class System(object):
     def _setup_approx_coloring(self):
         pass
 
-    def get_approx_coloring_fname(self):
+    def get_coloring_fname(self):
         """
         Return the full pathname to a coloring file.
 
@@ -1310,7 +1353,7 @@ class System(object):
         # under MPI, only save on proc 0
         if ((self._full_comm is not None and self._full_comm.rank == 0) or
                 (self._full_comm is None and self.comm.rank == 0)):
-            coloring.save(self.get_approx_coloring_fname())
+            coloring.save(self.get_coloring_fname())
 
     def _get_static_coloring(self):
         """
@@ -1331,7 +1374,7 @@ class System(object):
         static = info['static']
         if static is _STD_COLORING_FNAME or isinstance(static, str):
             if static is _STD_COLORING_FNAME:
-                fname = self.get_approx_coloring_fname()
+                fname = self.get_coloring_fname()
             else:
                 fname = static
             print("%s: loading coloring from file %s" % (self.msginfo, fname))
@@ -1368,7 +1411,7 @@ class System(object):
         """
         coloring = self._get_static_coloring()
         if coloring is None and self._coloring_info['dynamic']:
-            self._coloring_info['coloring'] = coloring = self._compute_approx_coloring()[0]
+            self._coloring_info['coloring'] = coloring = self._compute_coloring()[0]
             if coloring is not None:
                 self._coloring_info.update(coloring._meta)
 
@@ -2239,9 +2282,10 @@ class System(object):
         except Exception:
             err_type, err, trace = sys.exc_info()
             if str(err).startswith(self.msginfo):
-                raise err
+                raise
             else:
-                raise err_type(f"{self.msginfo}: Error calling {fname}(), {err}")
+                raise err_type(
+                    f"{self.msginfo}: Error calling {fname}(), {err}").with_traceback(trace)
         finally:
             self._inputs.read_only = False
             self._outputs.read_only = False
@@ -3150,6 +3194,13 @@ class System(object):
                             else:
                                 out[name] = meta
 
+        if out and self is model:
+            for var in out:
+                if var in abs2meta_out:
+                    if "openmdao:allow_desvar" not in abs2meta_out[var]['tags']:
+                        raise RuntimeError(f"Design variable '{var}' is not an IndepVarComp or "
+                                           f"ImplicitComp output.")
+
         return out
 
     def get_responses(self, recurse=True, get_sizes=True, use_prom_ivc=False):
@@ -3396,7 +3447,6 @@ class System(object):
         loc2meta = self._var_abs2meta
         all2meta = self._var_allprocs_abs2meta
 
-        dynset = set(('shape', 'size', 'val'))
         gather_keys = {'val', 'src_indices'}
         need_gather = get_remote and self.comm.size > 1
         if metadata_keys is not None:
@@ -3413,7 +3463,6 @@ class System(object):
                 raise RuntimeError(f"{self.msginfo}: {sorted(diff)} are not valid metadata entry "
                                    "names.")
         need_local_meta = metadata_keys is not None and len(gather_keys.intersection(keyset)) > 0
-        nodyn = metadata_keys is None or keyset.intersection(dynset)
 
         if need_local_meta:
             metadict = loc2meta
@@ -3443,12 +3492,6 @@ class System(object):
                 if abs_name in all2meta[iotype]:  # continuous
                     meta = cont2meta[abs_name] if abs_name in cont2meta else None
                     distrib = all2meta[iotype][abs_name]['distributed']
-                    if nodyn:
-                        a2m = all2meta[iotype][abs_name]
-                        if a2m['shape'] is None and (a2m['shape_by_conn'] or a2m['copy_shape']):
-                            raise RuntimeError(f"{self.msginfo}: Can't retrieve shape, size, or "
-                                               f"value for dynamically sized variable '{prom}' "
-                                               "because they aren't known yet.")
                 else:  # discrete
                     if need_local_meta:  # use relative name for discretes
                         meta = disc2meta[rel_name] if rel_name in disc2meta else None

@@ -2,6 +2,7 @@
 import os
 import sys
 import itertools
+import pickle
 
 import unittest
 import numpy as np
@@ -17,7 +18,8 @@ except ImportError:
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.utils.coloring import _compute_coloring, array_viz, compute_total_coloring
+from openmdao.utils.array_utils import array_viz
+from openmdao.utils.coloring import _compute_coloring, compute_total_coloring, Coloring
 from openmdao.utils.mpi import MPI
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder
@@ -1292,6 +1294,24 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
             p.run_driver()
 
         self.assertEqual(str(ctx.exception), "'comp' <class DumbComp>: Current coloring configuration does not match the configuration of the current model.\n   The following variables have changed sizes: ['y', 'y_in'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
+
+    def test_bad_format(self):
+        with open('_bad_format_', 'w') as f:
+            f.write('asdfas asdfasdf;lkjasdflkjas df sadf;jasdf;lkja')
+        with self.assertRaises(RuntimeError) as ctx:
+            c = Coloring.load('_bad_format_')
+
+        self.assertEqual(ctx.exception.args[0], "File '_bad_format_' is not a valid coloring file.")
+
+    def test_wrong_pickle(self):
+        s = 'asdfas asdfasdf;lkjasdflkjas df sadf;jasdf;lkja'
+        with open('_bad_pickle_', 'wb') as f:
+            pickle.dump(s, f)
+
+        with self.assertRaises(RuntimeError) as ctx:
+            c = Coloring.load('_bad_pickle_')
+
+        self.assertEqual(ctx.exception.args[0], "File '_bad_pickle_' is not a valid coloring file.")
 
 
 if __name__ == '__main__':

@@ -8,6 +8,18 @@ import argparse
 from openmdao import __version__ as version
 
 try:
+    import coverage
+except ImportError:
+    pass
+else:
+    # the following allows us to do coverage on our command line tools.  It will do nothing
+    # unless COVERAGE_PROCESS_START is set in the environment.
+    try:
+        coverage.process_startup()
+    except Exception:
+        pass  # in case they're using an old version of coverage
+
+try:
     import pkg_resources
 except ImportError:
     pkg_resources = None
@@ -102,10 +114,9 @@ def _n2_cmd(options, user_args):
         def _viewmod(prob):
             n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
                 title=options.title, embeddable=options.embeddable)
-            exit()  # could make this command line selectable later
 
-        hooks._register_hook('setup', 'Problem', pre=_noraise)
-        hooks._register_hook('final_setup', 'Problem', post=_viewmod)
+        hooks._register_hook('setup', 'Problem', pre=_noraise, ncalls=1)
+        hooks._register_hook('final_setup', 'Problem', post=_viewmod, exit=True)
 
         ignore_errors(True)
         _load_and_exec(options.file[0], user_args)
@@ -154,14 +165,14 @@ def _view_connections_cmd(options, user_args):
             title = "Connections for %s" % os.path.basename(options.file[0])
         view_connections(prob, outfile=options.outfile, show_browser=not options.no_browser,
                          show_values=options.show_values, title=title)
-        exit()
 
     # register the hook
     if options.show_values:
         funcname = 'final_setup'
     else:
         funcname = 'setup'
-    hooks._register_hook(funcname, class_name='Problem', inst_id=options.problem, post=_viewconns)
+    hooks._register_hook(funcname, class_name='Problem', inst_id=options.problem, post=_viewconns,
+                         exit=True)
 
     ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
@@ -259,9 +270,8 @@ def _meta_model_cmd(options, user_args):
                 else:
                     print("\n'{}' is not a Metamodel. Try the following:\n".format(pathname))
                 _mm_list(mm_names, options)
-        exit()
 
-    hooks._register_hook('final_setup', 'Problem', post=_view_metamodel)
+    hooks._register_hook('final_setup', 'Problem', post=_view_metamodel, exit=True)
 
     _load_and_exec(options.file[0], user_args)
 
@@ -289,11 +299,7 @@ def _config_summary_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    def summary(prob):
-        config_summary(prob)
-        sys.exit(0)
-
-    hooks._register_hook('final_setup', 'Problem', post=summary)
+    hooks._register_hook('final_setup', 'Problem', post=config_summary, exit=True)
 
     ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
@@ -397,14 +403,14 @@ def _tree_cmd(options, user_args):
         tree(prob, show_colors=options.show_colors, show_sizes=options.show_sizes,
              show_approx=options.show_approx, filter=filt, max_depth=options.depth,
              rank=options.rank, stream=out)
-        exit()
 
     # register the hook
     if options.vecvars or options.show_sizes or options.show_approx:
         funcname = 'final_setup'
     else:
         funcname = 'setup'
-    hooks._register_hook(funcname, class_name='Problem', inst_id=options.problem, post=_tree)
+    hooks._register_hook(funcname, class_name='Problem', inst_id=options.problem, post=_tree,
+                         exit=True)
 
     ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
@@ -448,9 +454,8 @@ def _cite_cmd(options, user_args):
     def _cite(prob):
         if not MPI or MPI.COMM_WORLD.rank == 0:
             print_citations(prob, classes=options.classes, out_stream=out)
-        exit()
 
-    hooks._register_hook('setup', 'Problem', post=_cite)
+    hooks._register_hook('setup', 'Problem', post=_cite, exit=True)
 
     ignore_errors(True)
     _load_and_exec(options.file[0], user_args)

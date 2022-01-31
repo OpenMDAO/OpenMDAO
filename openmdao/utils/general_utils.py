@@ -9,11 +9,7 @@ from fnmatch import fnmatchcase
 from io import StringIO
 from numbers import Number
 
-# note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
-try:
-    from collections.abc import Iterable
-except ImportError:
-    from collections import Iterable
+from collections.abc import Iterable
 
 import numbers
 
@@ -197,7 +193,7 @@ def ensure_compatible(name, value, shape=None, indices=None):
     else:
         # shape is determined, if value is scalar assign it to array of shape
         # otherwise make sure value is an array of the determined shape
-        if np.isscalar(value) or value.shape == (1,):
+        if np.isscalar(value) or value.shape == () or value.shape == (1,):
             value = np.ones(shape) * value
         else:
             value = np.atleast_1d(value).astype(np.float64)
@@ -579,7 +575,8 @@ def printoptions(*args, **kwds):
 
     See Also
     --------
-        set_printoptions, get_printoptions
+        set_printoptions : Set printing options.
+        get_printoptions : Get printing options.
     """
     opts = np.get_printoptions()
 
@@ -965,38 +962,6 @@ def _is_slicer_op(indices):
         return any(isinstance(i, slice) or i is ... for i in indices)
 
     return isinstance(indices, slice)
-
-
-def _slice_indices(slicer, arr_size, arr_shape):
-    """
-    Return an index array based on a slice or slice tuple and the array size and shape.
-
-    Parameters
-    ----------
-    slicer : slice or tuple containing slices
-        Slice object to slice array
-    arr_size : int
-        Size of output array
-    arr_shape : tuple
-        Tuple of output array shape
-
-    Returns
-    -------
-    array
-        Returns the sliced indices.
-    """
-    if isinstance(slicer, slice):
-        # for a simple slice we can use less memory
-        start, stop, step = slicer.start, slicer.stop, slicer.step
-        if start is None:
-            start = 0
-        if stop is None:
-            stop = arr_size
-        if step is None:
-            step = 1
-        return np.arange(start, stop, step, dtype=INT_DTYPE).reshape(arr_shape)
-    else:
-        return np.arange(arr_size, dtype=INT_DTYPE).reshape(arr_shape)[slicer]
 
 
 def _prom2ivc_src_name_iter(prom_dict):
