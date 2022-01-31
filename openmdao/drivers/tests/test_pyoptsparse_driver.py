@@ -2659,7 +2659,60 @@ class TestPyoptSparse(unittest.TestCase):
 
 
     def test_mimic_multi_constraints_and_verify_dynamic_coloring(self):
+        p = om.Problem()
 
+        exec = om.ExecComp(['y = x**2',
+                            'z = a + x**2'],
+                            a={'shape': (1,)},
+                            y={'shape': (101,)},
+                            x={'shape': (101,)},
+                            z={'shape': (101,)})
+
+        p.model.add_subsystem('exec', exec)
+
+        p.model.add_design_var('exec.a', lower=-1000, upper=1000)
+        p.model.add_objective('exec.y', index=50)
+        p.model.add_constraint('exec.z', indices=[0,1,2,3], equals=25)
+
+        p.driver = om.pyOptSparseDriver()
+        p.driver.options['optimizer'] = OPTIMIZER
+
+        p.driver.declare_coloring()
+
+        p.setup(mode='rev')
+
+        p.set_val('exec.x', np.linspace(-10, 10, 101))
+
+        p.run_driver()
+
+        assert_near_equal(p.get_val('exec.z')[0:4], np.array([32.84, 28.88, 25.0, 21.20]))
+        self.assertEqual(len(p.driver._coloring_info['coloring']._nzrows), 4)
+        self.assertEqual(len(p.driver._coloring_info['coloring']._nzcols), 4)
+
+
+        p = om.Problem()
+
+        p.model.add_subsystem('exec', exec)
+
+        p.model.add_design_var('exec.a', lower=-1000, upper=1000)
+        p.model.add_objective('exec.y', index=50)
+        p.model.add_constraint('exec.z', indices=[0,1], equals=25)
+        p.model.add_constraint('exec.z', indices=[2,3], equals=25, alias="ALIAS_TEST")
+
+        p.driver = om.pyOptSparseDriver()
+        p.driver.options['optimizer'] = OPTIMIZER
+
+        p.driver.declare_coloring()
+
+        p.setup(mode='rev')
+
+        p.set_val('exec.x', np.linspace(-10, 10, 101))
+
+        p.run_driver()
+
+        assert_near_equal(p.get_val('exec.z')[0:4], np.array([32.84, 28.88, 25.0, 21.20]))
+        self.assertEqual(len(p.driver._coloring_info['coloring']._nzrows), 4)
+        self.assertEqual(len(p.driver._coloring_info['coloring']._nzcols), 4)
 
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")

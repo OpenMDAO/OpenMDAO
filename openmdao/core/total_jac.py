@@ -601,7 +601,10 @@ class _TotalJacInfo(object):
 
         for name in input_list:
             if name in model._responses and model._responses[name]['path'] is not None:
+                alias = name
                 name = model._responses[name]['path']
+            else:
+                alias = None
 
             if name not in abs2meta_out:
                 # could be promoted input name
@@ -718,7 +721,10 @@ class _TotalJacInfo(object):
             elif not simul_coloring:  # plain old single index iteration
                 imeta = defaultdict(bool)
                 imeta['idx_list'] = range(start, end)
-                idx_iter_dict[name] = (imeta, self.single_index_iter)
+                if alias is not None:
+                    idx_iter_dict[alias] = (imeta, self.single_index_iter)
+                else:
+                    idx_iter_dict[name] = (imeta, self.single_index_iter)
 
             if name in relevant and not non_rel_outs:
                 tup = (ndups, relevant[name]['@all'][1], cache_lin_sol)
@@ -1502,6 +1508,9 @@ class _TotalJacInfo(object):
         """
         inds = tup[1]  # these must be indices into the flattened var
         shname = 'shape' if self.get_remote else 'global_shape'
+        if name in self.model._responses and 'path' in self.model._responses[name] and \
+                self.model._responses[name]['path'] is not None:
+            name = self.model._responses[name]['path']
         shape = self.model._var_allprocs_abs2meta['output'][name][shname]
         vslice = jac_arr[tup[0]]
 
