@@ -12,7 +12,8 @@ from openmdao.components.interp_util.interp_cubic import InterpCubic
 from openmdao.components.interp_util.interp_lagrange2 import InterpLagrange2, Interp3DLagrange2
 from openmdao.components.interp_util.interp_lagrange3 import InterpLagrange3, Interp3DLagrange3
 from openmdao.components.interp_util.interp_scipy import InterpScipy
-from openmdao.components.interp_util.interp_slinear import InterpLinear, Interp3DSlinear
+from openmdao.components.interp_util.interp_slinear import InterpLinear, Interp3DSlinear, \
+     Interp1DSlinear, Interp2DSlinear
 
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 from openmdao.utils.om_warnings import warn_deprecation
@@ -28,6 +29,8 @@ INTERP_METHODS = {
     'scipy_slinear': InterpScipy,
     'scipy_quintic': InterpScipy,
     'bsplines': InterpBSplines,
+    '1D-slinear': Interp1DSlinear,
+    '2D-slinear': Interp2DSlinear,
     '3D-slinear': Interp3DSlinear,
     '3D-lagrange2': Interp3DLagrange2,
     '3D-lagrange3': Interp3DLagrange3,
@@ -38,8 +41,10 @@ INTERP_METHODS = {
 
 TABLE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima',
                  'scipy_cubic', 'scipy_slinear', 'scipy_quintic',
-                 'trilinear', 'akima1D',  # all Deprecated
-                 '3D-slinear', '1D-akima', '3D-lagrange2', '3D-lagrange3']
+                 'trilinear', 'akima1D',  # These two are Deprecated
+                 '3D-slinear', '2D-slinear', '1D-slinear',
+                 '1D-akima',
+                 '3D-lagrange2', '3D-lagrange3']
 SPLINE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima', 'bsplines',
                   'scipy_cubic', 'scipy_slinear', 'scipy_quintic']
 

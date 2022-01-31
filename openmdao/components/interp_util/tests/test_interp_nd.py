@@ -160,7 +160,7 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
             if method.startswith('scipy'):
                 continue
 
-            if method in ['1D-akima', 'akima1D']:
+            if '1D' in method or '2D' in method:
                 # These methods are for fixed grids other than 3d.
                 continue
 
@@ -891,6 +891,77 @@ class TestInterpNDFixedPython(unittest.TestCase):
             assert_near_equal(f, f_base[j], 1e-11)
             assert_near_equal(df_dx[0], df_dx_base[j, :], 1e-11)
 
+    def test_3Dslinear(self):
+        # Test fixed 3D-slinear vs general equivalent.
+
+        p1 = np.linspace(0, 100, 25)
+        p2 = np.linspace(-10, 10, 15)
+        p3 = np.linspace(0, 1, 12)
+
+        # can use meshgrid to create a 3D array of test data
+        P1, P2, P3 = np.meshgrid(p1, p2, p3, indexing='ij')
+        f_p = np.sqrt(P1) + P2 * P3
+
+        x1 = np.linspace(-2, 101, 5)
+        x2 = np.linspace(-10.5, 11, 5)
+        x3 = np.linspace(-0.2, 1.1, 5)
+        X1, X2, X3 = np.meshgrid(x1, x2, x3, indexing='ij')
+        x = np.zeros((125, 3))
+        x[:, 0] = X1.ravel()
+        x[:, 1] = X2.ravel()
+        x[:, 2] = X3.ravel()
+
+        interp = InterpND(points=(p1, p2, p3), values=f_p, method='3D-slinear', extrapolate=True)
+        f, df_dx = interp.interpolate(x, compute_derivative=True)
+
+        interp_base = InterpND(points=(p1, p2, p3), values=f_p, method='slinear', extrapolate=True)
+        f_base, df_dx_base = interp_base.interpolate(x, compute_derivative=True)
+
+        assert_near_equal(f, f_base, 1e-11)
+        assert_near_equal(df_dx, df_dx_base, 1e-11)
+
+        # Test non-vectorized.
+        for j, x_i in enumerate(x):
+            interp = InterpND(points=(p1, p2, p3), values=f_p, method='3D-slinear', extrapolate=True)
+            f, df_dx = interp.interpolate(x_i, compute_derivative=True)
+
+            assert_near_equal(f, f_base[j], 1e-11)
+            assert_near_equal(df_dx[0], df_dx_base[j, :], 1e-11)
+
+    def test_2Dslinear(self):
+        # Test fixed 3D-slinear vs general equivalent.
+
+        p1 = np.linspace(0, 100, 25)
+        p2 = np.linspace(-10, 10, 15)
+
+        # can use meshgrid to create a 3D array of test data
+        P1, P2 = np.meshgrid(p1, p2, indexing='ij')
+        f_p = np.sqrt(P1) + (0.1 * P2) ** 2
+
+        x1 = np.linspace(-2, 101, 5)
+        x2 = np.linspace(-10.5, 11, 5)
+        X1, X2 = np.meshgrid(x1, x2, indexing='ij')
+        x = np.zeros((25, 2))
+        x[:, 0] = X1.ravel()
+        x[:, 1] = X2.ravel()
+
+        interp = InterpND(points=(p1, p2), values=f_p, method='2D-slinear', extrapolate=True)
+        f, df_dx = interp.interpolate(x, compute_derivative=True)
+
+        interp_base = InterpND(points=(p1, p2), values=f_p, method='slinear', extrapolate=True)
+        f_base, df_dx_base = interp_base.interpolate(x, compute_derivative=True)
+
+        assert_near_equal(f, f_base, 1e-11)
+        assert_near_equal(df_dx, df_dx_base, 1e-11)
+
+        # Test non-vectorized.
+        for j, x_i in enumerate(x):
+            interp = InterpND(points=(p1, p2), values=f_p, method='2D-slinear', extrapolate=True)
+            f, df_dx = interp.interpolate(x_i, compute_derivative=True)
+
+            assert_near_equal(f, f_base[j], 1e-11)
+            assert_near_equal(df_dx[0], df_dx_base[j, :], 1e-11)
+
     def test_1Dakima(self):
         # Test 1D-akima vs general equivalent.
 
@@ -910,6 +981,33 @@ class TestInterpNDFixedPython(unittest.TestCase):
         # Test non-vectorized.
         for j, x_i in enumerate(x):
             interp = InterpND(points=p, values=f_p, method='1D-akima', extrapolate=True)
+            f, df_dx = interp.interpolate(x_i, compute_derivative=True)
+
+            assert_near_equal(f, f_base[j], 1e-13)
+
+            # Compare abs error since deriv is near zero in some spots.
+            abs_err = np.abs(df_dx[0] -  df_dx_base[j])
+            assert_near_equal(abs_err, 0.0, 1e-13)
+
+    def test_1Dslinear(self):
+        # Test 1D-akima vs general equivalent.
+
+        p = np.linspace(0, 100, 25)
+        f_p = np.cos(p * np.pi * 0.5)
+        x = np.linspace(-1, 101, 33) + 0.01
+
+        interp = InterpND(points=p, values=f_p, method='1D-slinear', extrapolate=True)
+        f, df_dx = interp.interpolate(x, compute_derivative=True)
+
+        interp_base = InterpND(points=p, values=f_p, method='slinear', extrapolate=True)
+        f_base, df_dx_base = interp_base.interpolate(x, compute_derivative=True)
+
+        assert_near_equal(f, f_base, 1e-13)
+        assert_near_equal(df_dx, df_dx_base, 1e-13)
+
+        # Test non-vectorized.
+        for j, x_i in enumerate(x):
+            interp = InterpND(points=p, values=f_p, method='1D-slinear', extrapolate=True)
             f, df_dx = interp.interpolate(x_i, compute_derivative=True)
 
             assert_near_equal(f, f_base[j], 1e-13)
