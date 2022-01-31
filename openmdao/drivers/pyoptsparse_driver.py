@@ -487,7 +487,7 @@ class pyOptSparseDriver(Driver):
                 sol = opt(opt_prob, sens=WeakMethodWrapper(self, '_gradfunc'),
                           storeHistory=self.hist_file, hotStart=self.hotstart_file)
 
-        except Exception as _:
+        except Exception as c:
             if not self._exc_info:
                 raise()
 
@@ -783,6 +783,9 @@ class pyOptSparseDriver(Driver):
             return
 
         for res, resdict in total_sparsity.items():
+            if res in self._responses and 'path' in self._responses[res] and \
+                    self._responses[res]['path'] is not None:
+                res = self._responses[res]['path']
             if res in self._objs:  # skip objectives
                 continue
             self._res_jacs[res] = {}

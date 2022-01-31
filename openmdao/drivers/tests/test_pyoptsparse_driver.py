@@ -2476,8 +2476,8 @@ class TestPyoptSparse(unittest.TestCase):
         p.run_driver()
 
         assert_check_totals(p.check_totals())
-        assert_near_equal(p.get_val('exec.z')[0], 25, 1e-13)
-        assert_near_equal(p.get_val('exec.z')[50], -75, 1e-13)
+        assert_near_equal(p.get_val('exec.z')[0], 25)
+        assert_near_equal(p.get_val('exec.z')[50], -75)
 
         # REV
         p.setup(mode='rev')
@@ -2487,8 +2487,8 @@ class TestPyoptSparse(unittest.TestCase):
         p.run_driver()
 
         assert_check_totals(p.check_totals())
-        assert_near_equal(p.get_val('exec.z')[0], 25, 1e-13)
-        assert_near_equal(p.get_val('exec.z')[50], -75, 1e-13)
+        assert_near_equal(p.get_val('exec.z')[0], 25)
+        assert_near_equal(p.get_val('exec.z')[50], -75)
 
         # Test inequality constraint
         p = om.Problem()
@@ -2504,7 +2504,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         p.model.add_design_var('exec.a', lower=-1000, upper=1000)
         p.model.add_objective('exec.z', index=50)
-        p.model.add_constraint('exec.z', indices=[-1], lower=30, alias="ALIAS_TEST")
+        p.model.add_constraint('exec.z', indices=[-1], lower=30., alias="ALIAS_TEST")
 
 
         p.driver = om.pyOptSparseDriver()
@@ -2518,8 +2518,8 @@ class TestPyoptSparse(unittest.TestCase):
         p.run_driver()
 
         assert_check_totals(p.check_totals())
-        assert_near_equal(p.get_val('exec.z')[0], 30, 1e-13)
-        assert_near_equal(p.get_val('exec.z')[50], -70, 1e-13)
+        assert_near_equal(p.get_val('exec.z')[0], 30.)
+        assert_near_equal(p.get_val('exec.z')[50], -70)
 
         # REV
         p.setup(mode='rev')
@@ -2529,7 +2529,7 @@ class TestPyoptSparse(unittest.TestCase):
         p.run_driver()
 
         assert_check_totals(p.check_totals())
-        assert_near_equal(p.get_val('exec.z')[0], 30)
+        assert_near_equal(p.get_val('exec.z')[0], 30.)
         assert_near_equal(p.get_val('exec.z')[50], -70)
 
     def test_fwd_rev_multi_constraint(self):
@@ -2558,11 +2558,10 @@ class TestPyoptSparse(unittest.TestCase):
         p.set_val('exec.x', np.linspace(-10, 10, 101))
 
         p.run_driver()
-        print(p.check_totals())
 
-        print(p.get_val('exec.z'))
-        assert_near_equal(p.get_val('exec.z')[0], 25, 1e-13)
-        assert_near_equal(p.get_val('exec.z')[50], -75, 1e-13)
+        assert_check_totals(p.check_totals())
+        assert_near_equal(p.get_val('exec.z')[0], 25)
+        assert_near_equal(p.get_val('exec.z')[50], -75)
 
         # REV
         p.setup(mode='rev')
@@ -2570,11 +2569,10 @@ class TestPyoptSparse(unittest.TestCase):
         p.set_val('exec.x', np.linspace(-10, 10, 101))
 
         p.run_driver()
-        print(p.check_totals())
 
-        print(p.get_val('exec.z'))
-        assert_near_equal(p.get_val('exec.z')[0], 25, 1e-13)
-        assert_near_equal(p.get_val('exec.z')[50], -75, 1e-13)
+        assert_check_totals(p.check_totals())
+        assert_near_equal(p.get_val('exec.z')[0], 25)
+        assert_near_equal(p.get_val('exec.z')[50], -75)
 
     def test_fwd_rev_compute_totals_check(self):
         p = om.Problem()
@@ -2601,6 +2599,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         p.set_val('exec.x', np.linspace(-10, 10, 101))
 
+        p.run_model()
         p.run_driver()
 
         J = p.compute_totals()
@@ -2613,12 +2612,54 @@ class TestPyoptSparse(unittest.TestCase):
 
         p.set_val('exec.x', np.linspace(-10, 10, 101))
 
+        p.run_model()
         p.run_driver()
 
         J = p.compute_totals()
         assert_near_equal(J[('exec.y', 'exec.a')].flatten(), np.array([-0]))
         assert_near_equal(J[('exec.z', 'exec.a')].flatten(), np.array([1.]))
         assert_near_equal(J[('ALIAS_TEST', 'exec.a')].flatten(), np.array([1.]))
+
+    def test_dynamic_coloring_w_multi_constraints(self):
+        p = om.Problem()
+
+        exec = om.ExecComp(['y = x**2',
+                            'z = a + x**2'],
+                            a={'shape': (1,)},
+                            y={'shape': (101,)},
+                            x={'shape': (101,)},
+                            z={'shape': (101,)})
+
+        p.model.add_subsystem('exec', exec)
+
+        p.model.add_design_var('exec.a', lower=-1000, upper=1000)
+        p.model.add_objective('exec.y', index=50)
+        p.model.add_constraint('exec.z', indices=[0], equals=25)
+        p.model.add_constraint('exec.z', indices=[-1], lower=20, alias="ALIAS_TEST")
+
+        p.driver = om.pyOptSparseDriver()
+        p.driver.options['optimizer'] = "SNOPT"
+
+        p.driver.declare_coloring()
+
+        p.setup(mode='rev')
+
+        p.set_val('exec.x', np.linspace(-10, 10, 101))
+
+        p.run_model()
+        p.run_driver()
+
+        J = p.compute_totals()
+
+        assert_near_equal(J[('exec.y', 'exec.a')].flatten(), np.array([-0]))
+        assert_near_equal(J[('exec.z', 'exec.a')].flatten(), np.array([1.]))
+        assert_near_equal(J[('ALIAS_TEST', 'exec.a')].flatten(), np.array([1.]))
+        assert_near_equal(p.get_val('exec.z')[0], 25)
+        assert_near_equal(p.get_val('exec.z')[50], -75)
+
+
+    def test_mimic_multi_constraints_and_verify_dynamic_coloring(self):
+
 
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
