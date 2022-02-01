@@ -21,6 +21,7 @@ from openmdao.utils.array_utils import sizes2offsets, convert_neg
 from openmdao.vectors.vector import _full_slice
 from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation
+from openmdao.utils.hooks import _setup_hooks
 
 
 def _check_debug_print_opts_valid(name, opts):
@@ -194,6 +195,10 @@ class Driver(object):
 
         self._declare_options()
         self.options.update(kwargs)
+
+        # Want to allow the setting of hooks on Drivers
+        _setup_hooks(self)
+
 
     def _get_inst_id(self):
         if self._problem is None:
