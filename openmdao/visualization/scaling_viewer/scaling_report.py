@@ -167,7 +167,7 @@ def _compute_jac_view_info(totals, data, dv_vals, response_vals, coloring):
 
 
 def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_browser=True,
-                        title=None, jac=True):
+                        title=None, jac=True, run_compute_totals=True):
     """
     Generate a self-contained html file containing a table of scaling data.
 
@@ -363,8 +363,11 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         data['wrtlabels'] = list(dv_vals)
 
         try:
-            totals = driver._compute_totals(of=data['oflabels'], wrt=data['wrtlabels'],
-                                            return_format='array')
+            if run_compute_totals:
+                totals = driver._compute_totals(of=data['oflabels'], wrt=data['wrtlabels'],
+                                                return_format='array')
+            else:
+                totals = save.J   # Or is it J_final ?
         finally:
             driver._total_jac = save
 

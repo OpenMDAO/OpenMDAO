@@ -330,28 +330,147 @@ class Problem(object):
             # whoami = scriptinfo()
             # print(f"scriptinfo: {whoami}")
 
-            if reports_dir is None:
-                import pprint
-                pprint.pprint(sys.argv, stream=sys.stdout)
-                import inspect
-                script_path = inspect.stack()[-1][1]
-                script_name = pathlib.Path(script_path).stem
-                reports_dir = f'{script_name}_reports'
-            if not os.path.isdir(reports_dir):
-                os.mkdir(reports_dir)
+            # if reports_dir is None:
+            #     import pprint
+            #     pprint.pprint(sys.argv, stream=sys.stdout)
+            #     import inspect
+            #     script_path = inspect.stack()[-1][1]
+            #     script_name = pathlib.Path(script_path).stem
+            #     reports_dir = f'{script_name}_reports'
+            # if not os.path.isdir(reports_dir):
+            #     os.mkdir(reports_dir)
 
             from openmdao.visualization.n2_viewer.n2_viewer import n2
 
-            n2_filename = f'{self._name}_N2.html'
+            # n2_filename = f'{self._name}_N2.html'
+            #
+            # scaling_filename = f'{self._name}_driver_scaling.html'
+            # coloring_filename = f'{self._name}_jacobian_to_compute_coloring.png'
+            #
 
-            scaling_filename = f'{self._name}_driver_scaling.html'
-            coloring_filename = f'{self._name}_jacobian_to_compute_coloring.png'
+            # TODO should really get these values from where they are set in these reports??
+
+            n2_filename = f'N2.html'
+
+            scaling_filename = f'driver_scaling.html'
+            coloring_filename = f'jacobian_to_compute_coloring.png'
+
+            # If MPI, only save reports on rank 0
+            on_rank0 = True
+            if MPI:
+                rank = self.comm.rank
+                if rank != 0:
+                    on_rank0 = False
+
             # def _n2(prob):
             #     # pathlib.Path(dirname).joinpath("README")
             #     n2(prob, outfile=str(pathlib.Path(reports_dir).joinpath(n2_filename)))
             #     # n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
             #     #    title=options.title, embeddable=options.embeddable)
 
+            from openmdao.utils.reports_system import get_reports_dir
+            def _n2_reporting(prob):
+                if 'OPENMDAO_REPORTS' in os.environ and os.environ['OPENMDAO_REPORTS'] in ['0',
+                                                                                           'false',
+                                                                                           'off']:
+                    return
+
+                problem_reports_dirpath = get_reports_dir(prob)
+
+                if on_rank0:
+                    # if not os.path.isdir(problem_reports_dirpath):
+                    #     os.mkdir(problem_reports_dirpath)
+                    #
+                    pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
+
+                current_cwd = pathlib.Path.cwd()
+                os.chdir(problem_reports_dirpath)
+
+                # n2_filepath = str(pathlib.Path(reports_dir).joinpath(n2_filename))
+                # n2(prob, show_browser=False, outfile=n2_filepath)
+                # n2_filepath = str(pathlib.Path(reports_dir).joinpath(n2_filename))
+
+                try:
+                    n2(prob, show_browser=False, outfile=n2_filename)
+                # Need to handle the coloring and scaling reports which can fail in this way
+                #   because total Jacobian can't be computed
+                except RuntimeError as err:
+                    if str(err) != "Can't compute total derivatives unless " \
+                                   "both 'of' or 'wrt' variables have been specified.":
+                        raise err
+                finally:
+                    os.chdir(current_cwd)
+
+
+            # def _scaling_reporting(prob):
+            def _scaling_reporting(driver):
+                if 'OPENMDAO_REPORTS' in os.environ and os.environ['OPENMDAO_REPORTS'] in ['0',
+                                                                                           'false',
+                                                                                           'off']:
+                    return
+
+                prob = driver._problem()
+                problem_reports_dirpath = get_reports_dir(prob)
+                scaling_filepath = str(pathlib.Path(problem_reports_dirpath).joinpath(scaling_filename))
+                # prob = driver._problem() # obtain the referent since this is a weakref
+
+                # problem_reports_dirpath = get_reports_dir(prob)
+                if on_rank0:
+                    # if not os.path.isdir(problem_reports_dirpath):
+                    #     os.mkdir(problem_reports_dirpath)
+                    #
+                    pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
+
+                # current_cwd = pathlib.Path.cwd()
+                # os.chdir(problem_reports_dirpath)
+
+                try:
+                    view_driver_scaling(prob.driver, show_browser=False, outfile=scaling_filepath,
+                                        run_compute_totals=True)
+                # Need to handle the coloring and scaling reports which can fail in this way
+                #   because total Jacobian can't be computed
+                except RuntimeError as err:
+                    if str(err) != "Can't compute total derivatives unless " \
+                                   "both 'of' or 'wrt' variables have been specified.":
+                        raise err
+                # finally:
+                #     os.chdir(current_cwd)
+
+                a = 1 + 2
+
+            def _coloring_reporting(driver):
+                if 'OPENMDAO_REPORTS' in os.environ and os.environ['OPENMDAO_REPORTS'] in ['0',
+                                                                                           'false',
+                                                                                           'off']:
+                    return
+
+                prob = driver._problem()  # obtain the referent since this is a weakref
+
+                problem_reports_dirpath = get_reports_dir(prob)
+                if on_rank0:
+                    # if not os.path.isdir(problem_reports_dirpath):
+                    #     os.mkdir(problem_reports_dirpath)
+                    #
+                    pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
+
+                # current_cwd = pathlib.Path.cwd()
+                # os.chdir(problem_reports_dirpath)
+
+                # reports_dir = get_reports_dir(prob)
+                coloring_filepath = str(pathlib.Path(problem_reports_dirpath).joinpath(coloring_filename))
+                coloring = compute_total_coloring(prob,
+                                                  # num_full_jacs=options.num_jacs,
+                                                  # tol=options.tolerance,
+                                                  # orders=options.orders,
+                                                  # setup=False,
+                                                  # run_model=True,
+                                                  # fname=outfile,
+                                                  use_abs_names=True
+                                                  )
+                if coloring:
+                    coloring.display(show=False, fname=coloring_filepath)
+
+                # os.chdir(current_cwd)
 
             def _reporting(prob):
                 n2_filepath = str(pathlib.Path(reports_dir).joinpath(n2_filename))
@@ -411,7 +530,18 @@ class Problem(object):
 
             hooks.use_hooks = True
             # _register_hook('final_setup', 'Problem', post=_n2) # Need to do this before calling setup hooks
-            _register_hook('final_setup', 'Problem', post=_reporting) # Need to do this before calling setup hooks
+            # _register_hook('final_setup', 'Problem', post=_reporting) # Need to do this before calling setup hooks
+
+            # new hook strategy as of 1/27/2022
+            # Need to do this before calling setup hooks
+            if 'TESTFLO_RUNNING' not in os.environ:
+
+                _register_hook('final_setup', 'Problem', post=_n2_reporting, ncalls=1)
+                # _register_hook('compute_totals', 'Problem', post=_scaling_reporting, ncalls=1)
+                _register_hook('_compute_totals', 'Driver', post=_scaling_reporting, ncalls=1)
+                _register_hook('_compute_totals', 'Driver', post=_coloring_reporting, ncalls=1)
+
+
 
             # _register_hook('final_setup', class_name='Problem', inst_id=self._get_inst_id(),
             #                      post=_scaling_check)
