@@ -274,7 +274,7 @@ class N2Help extends N2Window {
      * @param {Object} helpInfo Data structure containing N2Toolbar button info.
      */
     _addButtonHelpText(helpInfo) {
-        let topPx = 40;
+        let topPx = 20;
         for (const btnId in helpInfo.buttons) {
             const btn = helpInfo.buttons[btnId];
 
@@ -305,12 +305,12 @@ class N2Help extends N2Window {
                                 break;
                             }
                         }
-                        topPx += 38;
                         grp.append('p').attr('class', 'help-text')
-                            .html(`<i class="fas ${memClass} help-text-icon"></i>${helpInfo.buttons[memId].desc}`)
+                            .html(`<i class="fas ${memClass} help-text-icon"></i><span>${helpInfo.buttons[memId].desc}</span>`)
                     }
 
-                    topPx += 30;
+                    const grpBbox = grp.node().getBoundingClientRect();
+                    topPx += grpBbox.height + 25;
 
                     this._drawGroupLines(btnText, grp)
                 }
@@ -327,10 +327,12 @@ class N2Help extends N2Window {
             textBRect = btnText.node().getBoundingClientRect(),
             grpBRect = grp.node().getBoundingClientRect();
 
+        const vertOffset = 7;
+
         const coords = {
-            ul: { x: textBRect.right - winBRect.left + 5, y: textBRect.top - winBRect.top },
+            ul: { x: textBRect.right - winBRect.left + 5, y: textBRect.top - winBRect.top + vertOffset },
             ur: { x: grpBRect.left - winBRect.left, y: grpBRect.top - winBRect.top + 0.5 },
-            bl: { x: textBRect.right - winBRect.left + 5, y: textBRect.bottom - winBRect.top },
+            bl: { x: textBRect.right - winBRect.left + 5, y: textBRect.bottom - winBRect.top - vertOffset },
             br: { x: grpBRect.left - winBRect.left, y: grpBRect.bottom - winBRect.top - 0.5 }
         }
 

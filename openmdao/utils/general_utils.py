@@ -9,11 +9,7 @@ from fnmatch import fnmatchcase
 from io import StringIO
 from numbers import Number
 
-# note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
-try:
-    from collections.abc import Iterable
-except ImportError:
-    from collections import Iterable
+from collections.abc import Iterable
 
 import numbers
 
@@ -579,7 +575,8 @@ def printoptions(*args, **kwds):
 
     See Also
     --------
-        set_printoptions, get_printoptions
+        set_printoptions : Set printing options.
+        get_printoptions : Get printing options.
     """
     opts = np.get_printoptions()
 

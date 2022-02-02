@@ -789,8 +789,8 @@ class TestObjectiveOnModel(unittest.TestCase):
             prob.model.add_objective('con1', lower=-100, upper=100, ref=1.0,
                                       scaler=0.5)
 
-        self.assertEqual(str(context.exception),
-                         "add_objective() got an unexpected keyword argument 'lower'")
+        self.assertTrue(str(context.exception).endswith(
+                        "add_objective() got an unexpected keyword argument 'lower'"))
 
         with self.assertRaises(ValueError) as context:
             prob.model.add_objective('con1', ref=0.0, scaler=0.5)
@@ -846,7 +846,7 @@ class TestObjectiveOnModel(unittest.TestCase):
         self.assertAlmostEqual( obj_scaler*(obj_ref + obj_adder), 1.0,
                                 places=12)
 
-    @parameterized.expand(['lower', 'upper', 'adder', 'scaler', 'ref', 'ref0'], 
+    @parameterized.expand(['lower', 'upper', 'adder', 'scaler', 'ref', 'ref0'],
                           name_func=lambda f, n, p: 'test_desvar_size_err_' + '_'.join(a for a in p.args))
     def test_desvar_size_err(self, name):
 
@@ -864,7 +864,7 @@ class TestObjectiveOnModel(unittest.TestCase):
         self.assertEqual(str(context.exception),
                          f"<model> <class SellarDerivatives>: When adding design var 'z', {name} should have size 1 but instead has size 2.")
 
-    @parameterized.expand(['lower', 'upper', 'equals', 'adder', 'scaler', 'ref', 'ref0'], 
+    @parameterized.expand(['lower', 'upper', 'equals', 'adder', 'scaler', 'ref', 'ref0'],
                           name_func=lambda f, n, p: 'test_constraint_size_err_' + '_'.join(a for a in p.args))
     def test_constraint_size_err(self, name):
 
@@ -882,7 +882,7 @@ class TestObjectiveOnModel(unittest.TestCase):
         self.assertEqual(str(context.exception),
                          f"<model> <class SellarDerivatives>: When adding constraint 'z', {name} should have size 1 but instead has size 2.")
 
-    @parameterized.expand(['adder', 'scaler', 'ref', 'ref0'], 
+    @parameterized.expand(['adder', 'scaler', 'ref', 'ref0'],
                           name_func=lambda f, n, p: 'test_objective_size_err_' + '_'.join(a for a in p.args))
     def test_objective_size_err(self, name):
 
