@@ -339,6 +339,8 @@ jobs:
         run: |
           conda install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
 
+          pip install --upgrade pip
+
           echo "============================================================="
           echo "Install OpenMDAO"
           echo "============================================================="
