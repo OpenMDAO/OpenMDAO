@@ -2659,7 +2659,7 @@ class TestPyoptSparse(unittest.TestCase):
 
 
     def test_mimic_multi_constraints_and_verify_dynamic_coloring(self):
-
+        raise RuntimeError('Put a new test here.')
 
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
