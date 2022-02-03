@@ -626,6 +626,11 @@ n2_gui_test_scripts = {
             "button": "left"
         },
         {
+            "desc": "Expand help group",
+            "test": "hover",
+            "selector": "#question-button"
+        },
+        {
             "desc": "Display Legend",
             "test": "click",
             "selector": "#legend-button",
@@ -642,7 +647,77 @@ n2_gui_test_scripts = {
             "test": "click",
             "selector": "#n2win-legend span.window-close-button",
             "button": "left"
-        }
+        },
+        {
+            "desc": "Expand target click group",
+            "test": "hover",
+            "selector": "#info-button"
+        },
+        {
+            "desc": "Toggle expand/collapse mode on",
+            "test": "click",
+            "selector": "#collapse-target",
+            "button": "left"
+        },
+        {
+            "desc": "Collapse the lingrp group",
+            "test": "click",
+            "selector": "g#tree rect#lingrp",
+            "button": "left"
+        },
+        {
+            "desc": "Verify size of model tree",
+            "test": "count",
+            "selector": "g#tree > g.partition_group",
+            "count": 6
+        },
+        {
+            "desc": "Expand the lingrp group",
+            "test": "click",
+            "selector": "g#tree rect#lingrp",
+            "button": "left"
+        },
+        {
+            "desc": "Verify size of model tree",
+            "test": "count",
+            "selector": "g#tree > g.partition_group",
+            "count": 10
+        },
+        {
+            "desc": "Toggle expand/collapse mode off",
+            "test": "click",
+            "selector": "#collapse-target",
+            "button": "left"
+        },
+        {
+            "desc": "Expand target click group",
+            "test": "hover",
+            "selector": "#collapse-target"
+        },
+        {
+            "desc": "Toggle filter mode on",
+            "test": "click",
+            "selector": "#filter-target",
+            "button": "left"
+        },
+        {
+            "desc": "Click the lin component, open variable dialog",
+            "test": "click",
+            "selector": "rect#lingrp_lin",
+            "button": "left"
+        },
+        {
+            "desc": "Close the lin variable dialog",
+            "test": "click",
+            "selector": "#childSelect-lingrp_lin span.window-close-button",
+            "button": "left"
+        },
+        {
+            "desc": "Toggle filter mode off",
+            "test": "click",
+            "selector": "#filter-target",
+            "button": "left"
+        },   
     ]
 }
 
