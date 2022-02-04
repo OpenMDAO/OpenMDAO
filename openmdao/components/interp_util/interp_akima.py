@@ -154,7 +154,7 @@ class InterpAkima(InterpAlgorithm):
         nx = len(x)
 
         # Complex Step
-        if self.values.dtype == complex or self.grid.dtype == complex or x.dtype == complex:
+        if self.values.dtype == complex:
             dtype = complex
         else:
             dtype = x.dtype
