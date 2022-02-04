@@ -332,7 +332,7 @@ class Interp1DSlinear(InterpAlgorithmFixed):
         idx : int
             List of interval indices for x.
         dtype : object
-            dtype for vector allocation; used for complex step.
+            The dtype for vector allocation; used for complex step.
 
         Returns
         -------
@@ -426,7 +426,7 @@ class Interp1DSlinear(InterpAlgorithmFixed):
         idx : int
             List of interval indices for x.
         dtype : object
-            dtype for vector allocation; used for complex step.
+            The dtype for vector allocation; used for complex step.
 
         Returns
         -------
@@ -558,7 +558,7 @@ class Interp2DSlinear(InterpAlgorithmFixed):
         idx : int
             List of interval indices for x.
         dtype : object
-            dtype for vector allocation; used for complex step.
+            The dtype for vector allocation; used for complex step.
 
         Returns
         -------
@@ -682,7 +682,7 @@ class Interp2DSlinear(InterpAlgorithmFixed):
         idx : int
             List of interval indices for x.
         dtype : object
-            dtype for vector allocation; used for complex step.
+            The dtype for vector allocation; used for complex step.
 
         Returns
         -------
@@ -830,7 +830,7 @@ class Interp3DSlinear(InterpAlgorithmFixed):
         idx : int
             List of interval indices for x.
         dtype : object
-            dtype for vector allocation; used for complex step.
+            The dtype for vector allocation; used for complex step.
 
         Returns
         -------
@@ -1027,7 +1027,7 @@ class Interp3DSlinear(InterpAlgorithmFixed):
         idx : int
             List of interval indices for x.
         dtype : object
-            dtype for vector allocation; used for complex step.
+            The dtype for vector allocation; used for complex step.
 
         Returns
         -------

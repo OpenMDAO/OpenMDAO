@@ -449,7 +449,7 @@ class Interp3DLagrange2(InterpAlgorithmFixed):
         idx : int
             List of interval indices for x.
         dtype : object
-            dtype for vector allocation; used for complex step.
+            The dtype for vector allocation; used for complex step.
 
         Returns
         -------
@@ -652,7 +652,7 @@ class Interp3DLagrange2(InterpAlgorithmFixed):
         idx : int
             List of interval indices for x.
         dtype : object
-            dtype for vector allocation; used for complex step.
+            The dtype for vector allocation; used for complex step.
 
         Returns
         -------
