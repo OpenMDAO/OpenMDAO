@@ -539,7 +539,6 @@ class Interp2DSlinear(InterpAlgorithmFixed):
 
         val = a[0] + (a[1] + a[3] * y) * x + a[2] * y
 
-
         d_x = np.empty((2, ), dtype=dtype)
         d_x[0] = a[1] + y * a[3]
         d_x[1] = a[2] + x * a[3]

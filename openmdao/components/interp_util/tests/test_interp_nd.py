@@ -6,10 +6,13 @@ import unittest
 
 import numpy as np
 
+# Only import openmdao to test using standalone interp in a component with complex step.
+import openmdao.api as om
+
 from openmdao.components.interp_util.interp import InterpND, SPLINE_METHODS, TABLE_METHODS
 from openmdao.components.interp_util.interp_semi import InterpNDSemi
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
-from openmdao.utils.assert_utils import assert_near_equal, assert_equal_arrays, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_equal_arrays, assert_warning, assert_check_partials
 from openmdao.utils.om_warnings import OMDeprecationWarning
 
 def rel_error(actual, computed):
@@ -782,9 +785,9 @@ class TestInterpNDPython(unittest.TestCase):
 
         badvalues = np.array(values, dtype=complex)
         with self.assertRaises(ValueError) as cm:
-            interp = InterpND(method='slinear', points=badpoints, values=badvalues.tolist())
+            interp = InterpND(method='scipy_slinear', points=badpoints, values=badvalues.tolist())
 
-        msg = ("Interpolation method 'slinear' does not support complex values.")
+        msg = ("Interpolation method 'scipy_slinear' does not support complex points or values.")
         self.assertEqual(str(cm.exception), msg)
 
         interp = InterpND(method='slinear', points=points, values=values.tolist())
@@ -833,6 +836,74 @@ class TestInterpNDPython(unittest.TestCase):
 
         assert_near_equal(dval3 - dval1, np.array([[0.0]]))
         assert_near_equal(dval5 - dval1, np.array([[0.0]]))
+
+    def test_cs_across_interpND(self):
+        p1 = np.linspace(0, 100, 5)
+        p2 = np.linspace(-10, 10, 5)
+
+        # can use meshgrid to create a 2D array of test data
+        P1, P2 = np.meshgrid(p1, p2, indexing='ij')
+        f_p = np.sqrt(P1) + P2
+
+        nn = 3
+
+        x1 = np.linspace(-2, 101, nn)
+        x2 = np.linspace(-10.5, 11, nn)
+        X1, X2 = np.meshgrid(x1, x2, indexing='ij')
+        x = np.zeros((nn**2, 2))
+        x[:, 0] = X1.ravel()
+        x[:, 1] = X2.ravel()
+
+        class CompUsesInterp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('interp', None)
+
+            def setup(self):
+                method = self.options['interp']
+
+                self.add_input('p1', p1)
+                self.add_input('p2', p2)
+                self.add_input('f_p', f_p)
+                self.add_input('x', x)
+
+                self.add_output('f', np.ones((nn**2, )))
+                self.add_output('df', np.ones((nn**2, 2)))
+
+            def setup_partials(self):
+                self.declare_partials('*', '*', method='cs')
+
+            def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
+                method = self.options['interp']
+
+                p1 = inputs['p1']
+                p2 = inputs['p2']
+                f_p = inputs['f_p']
+                x = inputs['x']
+
+                interp = InterpND(points=(p1, p2), values=f_p, method=method, extrapolate=True)
+                f, df_dx = interp.interpolate(x, compute_derivative=True)
+
+                outputs['f'] = f
+                outputs['df'] = df_dx
+
+
+        for method in self.interp_methods:
+
+            if method.startswith('scipy') or method == 'akima':
+                # These aren't supported (yet)
+                continue
+
+            prob = om.Problem()
+            model = prob.model
+
+            model.add_subsystem('interp', CompUsesInterp(interp=method))
+
+            prob.setup(force_alloc_complex=True)
+            prob.run_model()
+
+            derivs = prob.check_partials(method='fd', out_stream=None)
+            assert_check_partials(derivs, atol=1e-3, rtol=1e-4)
 
 
 class TestInterpNDFixedPython(unittest.TestCase):

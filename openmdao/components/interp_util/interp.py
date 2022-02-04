@@ -13,7 +13,7 @@ from openmdao.components.interp_util.interp_lagrange2 import InterpLagrange2, In
 from openmdao.components.interp_util.interp_lagrange3 import InterpLagrange3, Interp3DLagrange3
 from openmdao.components.interp_util.interp_scipy import InterpScipy
 from openmdao.components.interp_util.interp_slinear import InterpLinear, Interp3DSlinear, \
-     Interp1DSlinear, Interp2DSlinear
+    Interp1DSlinear, Interp2DSlinear
 
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 from openmdao.utils.om_warnings import warn_deprecation
@@ -190,8 +190,9 @@ class InterpND(object):
                 raise ValueError("There are %d point arrays, but values has %d "
                                  "dimensions" % (len(points), values.ndim))
 
-            if np.iscomplexobj(values[:]):
-                msg = "Interpolation method '%s' does not support complex values." % method
+            if (method.startswith('scipy') or method == 'akima') and \
+               (np.iscomplexobj(values[:]) or np.any(np.iscomplex(points[0]))):
+                msg = f"Interpolation method '{method}' does not support complex points or values."
                 raise ValueError(msg)
 
             for i, p in enumerate(points):
