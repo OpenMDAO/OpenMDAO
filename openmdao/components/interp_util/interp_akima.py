@@ -155,7 +155,7 @@ class InterpAkima(InterpAlgorithm):
 
         # Complex Step
         if self.values.dtype == complex:
-            dtype = complex
+            dtype = self.values.dtype
         else:
             dtype = x.dtype
 
