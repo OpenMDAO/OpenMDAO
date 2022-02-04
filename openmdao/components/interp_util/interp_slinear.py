@@ -314,7 +314,7 @@ class Interp1DSlinear(InterpAlgorithmFixed):
             idx = 0
 
         if idx_key not in self.coeffs:
-            self.coeffs[idx_key] = self.compute_coeffs(idx)
+            self.coeffs[idx_key] = self.compute_coeffs(idx, dtype)
         a = self.coeffs[idx_key]
 
         val = a[0] + a[1] * (x - grid[idx])
@@ -323,7 +323,7 @@ class Interp1DSlinear(InterpAlgorithmFixed):
 
         return val, d_x, None, None
 
-    def compute_coeffs(self, idx):
+    def compute_coeffs(self, idx, dtype):
         """
         Compute the interpolation coefficients for this block.
 
@@ -331,6 +331,8 @@ class Interp1DSlinear(InterpAlgorithmFixed):
         ----------
         idx : int
             List of interval indices for x.
+        dtype : object
+            dtype for vector allocation; used for complex step.
 
         Returns
         -------
@@ -339,7 +341,7 @@ class Interp1DSlinear(InterpAlgorithmFixed):
         """
         grid = self.grid[0]
         values = self.values
-        a = np.empty(2)
+        a = np.empty(2, dtype=dtype)
 
         i_x = idx
 
@@ -396,14 +398,14 @@ class Interp1DSlinear(InterpAlgorithmFixed):
 
         if self.vec_coeff is None:
             self.coeffs = set()
-            self.vec_coeff = np.empty((nx, 2))
+            self.vec_coeff = np.empty((nx, 2), dtype=dtype)
 
         needed = set([item for item in i_x])
         uncached = needed.difference(self.coeffs)
         if len(uncached) > 0:
             unc = np.array(list(uncached))
             uncached_idx = (unc, )
-            a = self.compute_coeffs_vectorized(uncached_idx)
+            a = self.compute_coeffs_vectorized(uncached_idx, dtype)
             self.vec_coeff[unc, ...] = a
             self.coeffs = self.coeffs.union(uncached)
         a = self.vec_coeff[i_x, :]
@@ -415,7 +417,7 @@ class Interp1DSlinear(InterpAlgorithmFixed):
 
         return val, d_x, None, None
 
-    def compute_coeffs_vectorized(self, idx):
+    def compute_coeffs_vectorized(self, idx, dtype):
         """
         Compute the interpolation coefficients for this block.
 
@@ -423,6 +425,8 @@ class Interp1DSlinear(InterpAlgorithmFixed):
         ----------
         idx : int
             List of interval indices for x.
+        dtype : object
+            dtype for vector allocation; used for complex step.
 
         Returns
         -------
@@ -534,7 +538,7 @@ class Interp2DSlinear(InterpAlgorithmFixed):
             dtype = x.dtype
 
         if idx_key not in self.coeffs:
-            self.coeffs[idx_key] = self.compute_coeffs(idx)
+            self.coeffs[idx_key] = self.compute_coeffs(idx, dtype)
         a = self.coeffs[idx_key]
 
         val = a[0] + (a[1] + a[3] * y) * x + a[2] * y
@@ -545,7 +549,7 @@ class Interp2DSlinear(InterpAlgorithmFixed):
 
         return val, d_x, None, None
 
-    def compute_coeffs(self, idx):
+    def compute_coeffs(self, idx, dtype):
         """
         Compute the interpolation coefficients for this block.
 
@@ -553,6 +557,8 @@ class Interp2DSlinear(InterpAlgorithmFixed):
         ----------
         idx : int
             List of interval indices for x.
+        dtype : object
+            dtype for vector allocation; used for complex step.
 
         Returns
         -------
@@ -561,7 +567,7 @@ class Interp2DSlinear(InterpAlgorithmFixed):
         """
         grid = self.grid
         values = self.values
-        a = np.empty(4)
+        a = np.empty(4, dtype=dtype)
 
         i_x, i_y = idx
 
@@ -647,14 +653,14 @@ class Interp2DSlinear(InterpAlgorithmFixed):
 
         if self.vec_coeff is None:
             self.coeffs = set()
-            self.vec_coeff = np.empty((nx, ny, 4))
+            self.vec_coeff = np.empty((nx, ny, 4), dtype=dtype)
 
         needed = set([item for item in zip(i_x, i_y)])
         uncached = needed.difference(self.coeffs)
         if len(uncached) > 0:
             unc = np.array(list(uncached))
             uncached_idx = (unc[:, 0], unc[:, 1])
-            a = self.compute_coeffs_vectorized(uncached_idx)
+            a = self.compute_coeffs_vectorized(uncached_idx, dtype)
             self.vec_coeff[unc[:, 0], unc[:, 1], ...] = a
             self.coeffs = self.coeffs.union(uncached)
         a = self.vec_coeff[i_x, i_y, :]
@@ -667,7 +673,7 @@ class Interp2DSlinear(InterpAlgorithmFixed):
 
         return val, d_x, None, None
 
-    def compute_coeffs_vectorized(self, idx):
+    def compute_coeffs_vectorized(self, idx, dtype):
         """
         Compute the interpolation coefficients for this block.
 
@@ -675,6 +681,8 @@ class Interp2DSlinear(InterpAlgorithmFixed):
         ----------
         idx : int
             List of interval indices for x.
+        dtype : object
+            dtype for vector allocation; used for complex step.
 
         Returns
         -------
@@ -686,7 +694,7 @@ class Interp2DSlinear(InterpAlgorithmFixed):
 
         i_x, i_y = idx
         vec_size = len(i_y)
-        a = np.empty((vec_size, 4))
+        a = np.empty((vec_size, 4), dtype=dtype)
 
         x0 = grid[0][i_x]
         x1 = grid[0][i_x + 1]
@@ -798,7 +806,7 @@ class Interp3DSlinear(InterpAlgorithmFixed):
             dtype = x.dtype
 
         if idx_key not in self.coeffs:
-            self.coeffs[idx_key] = self.compute_coeffs(idx)
+            self.coeffs[idx_key] = self.compute_coeffs(idx, dtype)
         a = self.coeffs[idx_key]
 
         val = a[0] + \
@@ -813,7 +821,7 @@ class Interp3DSlinear(InterpAlgorithmFixed):
 
         return val, d_x, None, None
 
-    def compute_coeffs(self, idx):
+    def compute_coeffs(self, idx, dtype):
         """
         Compute the interpolation coefficients for this block.
 
@@ -821,6 +829,8 @@ class Interp3DSlinear(InterpAlgorithmFixed):
         ----------
         idx : int
             List of interval indices for x.
+        dtype : object
+            dtype for vector allocation; used for complex step.
 
         Returns
         -------
@@ -829,7 +839,7 @@ class Interp3DSlinear(InterpAlgorithmFixed):
         """
         grid = self.grid
         values = self.values
-        a = np.empty(8)
+        a = np.empty(8, dtype=dtype)
 
         i_x, i_y, i_z = idx
 
@@ -984,14 +994,14 @@ class Interp3DSlinear(InterpAlgorithmFixed):
 
         if self.vec_coeff is None:
             self.coeffs = set()
-            self.vec_coeff = np.empty((nx, ny, nz, 8))
+            self.vec_coeff = np.empty((nx, ny, nz, 8), dtype=dtype)
 
         needed = set([item for item in zip(i_x, i_y, i_z)])
         uncached = needed.difference(self.coeffs)
         if len(uncached) > 0:
             unc = np.array(list(uncached))
             uncached_idx = (unc[:, 0], unc[:, 1], unc[:, 2])
-            a = self.compute_coeffs_vectorized(uncached_idx)
+            a = self.compute_coeffs_vectorized(uncached_idx, dtype)
             self.vec_coeff[unc[:, 0], unc[:, 1], unc[:, 2], ...] = a
             self.coeffs = self.coeffs.union(uncached)
         a = self.vec_coeff[i_x, i_y, i_z, :]
@@ -1008,7 +1018,7 @@ class Interp3DSlinear(InterpAlgorithmFixed):
 
         return val, d_x, None, None
 
-    def compute_coeffs_vectorized(self, idx):
+    def compute_coeffs_vectorized(self, idx, dtype):
         """
         Compute the interpolation coefficients for this block.
 
@@ -1016,6 +1026,8 @@ class Interp3DSlinear(InterpAlgorithmFixed):
         ----------
         idx : int
             List of interval indices for x.
+        dtype : object
+            dtype for vector allocation; used for complex step.
 
         Returns
         -------
@@ -1027,7 +1039,7 @@ class Interp3DSlinear(InterpAlgorithmFixed):
 
         i_x, i_y, i_z = idx
         vec_size = len(i_y)
-        a = np.empty((vec_size, 8))
+        a = np.empty((vec_size, 8), dtype=dtype)
 
         x0 = grid[0][i_x]
         x1 = grid[0][i_x + 1]
