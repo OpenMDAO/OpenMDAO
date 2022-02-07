@@ -275,7 +275,7 @@ class SqliteRecorder(CaseRecorder):
                               "solver_options BLOB, solver_class TEXT)")
 
         self._database_initialized = True
-        if MPI is not None:
+        if MPI and self._parallel:
             MPI.COMM_WORLD.barrier()
 
     def _cleanup_abs2meta(self):
