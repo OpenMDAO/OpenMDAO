@@ -404,11 +404,11 @@ class DistributedRecorderTest(unittest.TestCase):
             ])
 
             my_responses = [cr.get_case(case_id)['f_xy'] for case_id in my_cases]
-            self.assertEqual(my_responses, [22., 17., 23.75, 31., 27] if rank == 0 else
+            self.assertEqual(my_responses, [22., 17., 23.75, 31., 27.] if rank == 0 else
                                            [19.25, 26.25, 21.75, 28.75])
 
-        # Run only by proc 0
-        if rank == 0:
+        # Run model on a single processor
+        if rank == 1:
             run_sequential()
 
         # Synchronize as generated doe will be used by all procs
