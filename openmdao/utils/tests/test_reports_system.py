@@ -7,11 +7,11 @@ from io import StringIO
 
 import openmdao.api as om
 from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.test_suite.components.sellar_feature import SellarMDA
 import openmdao.core.problem
-# from openmdao.utils.reports_system import setup_default_reports, clear_reports, set_reports_dir, \
-#     register_report, list_reports, _reports_dir, clear_reports_run
-from openmdao.utils.reports_system import set_reports_dir, _reports_dir, register_report, get_reports_dir
-from openmdao.visualization.n2_viewer.n2_viewer import n2
+from openmdao.utils.general_utils import set_pyoptsparse_opt
+from openmdao.utils.reports_system import set_reports_dir, _reports_dir, register_report, \
+    get_reports_dir, list_reports, clear_reports, run_n2_report, setup_default_reports
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
 from openmdao.utils.tests.test_hooks import hooks_active
@@ -19,6 +19,15 @@ try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
     PETScVector = None
+
+OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
+
+if OPTIMIZER:
+    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
+
+
+
+
 
 # import openmdao.utils.hooks as hooks
 #
@@ -32,15 +41,17 @@ except ImportError:
 #             hooks._reset_all_hooks()
 #     return _wrapper
 
-
+from openmdao.utils.coloring import _default_coloring_imagefile
+from openmdao.visualization.n2_viewer.n2_viewer import _default_n2_filename
+from openmdao.visualization.scaling_viewer.scaling_report import _default_scaling_filename
 
 @use_tempdirs
-class TestReportGeneration(unittest.TestCase):
+class TestReportsSystem(unittest.TestCase):
 
     def setUp(self):
-        self.n2_filename = 'n2.html'
-        self.scaling_filename = 'driver_scaling.html'
-        self.coloring_filename = 'jacobian_to_compute_coloring.png'
+        self.n2_filename = _default_n2_filename
+        self.scaling_filename = _default_scaling_filename
+        self.coloring_filename = _default_coloring_imagefile
 
         # set things to a known initial state for all the test runs
         openmdao.core.problem._problem_names = []  # need to reset these to simulate separate runs
@@ -51,17 +62,19 @@ class TestReportGeneration(unittest.TestCase):
         #   checks to see if TESTFLO_RUNNING is set and will not do anything if it is set
         # But we need to remember whether it was set so we can restore it
         self.testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
-        # clear_reports()
+        clear_reports()
         # clear_reports_run()
         set_reports_dir('.')
-        # setup_default_reports()
+        setup_default_reports()
+
+        self.count = 0
 
     def tearDown(self):
         # restore what was there before running the test
         if self.testflo_running is not None:
             os.environ['TESTFLO_RUNNING'] = self.testflo_running
 
-    def setup_and_run_simple_problem(self):
+    def setup_and_run_simple_problem(self, driver=None):
         prob = om.Problem()
         model = prob.model
 
@@ -73,7 +86,11 @@ class TestReportGeneration(unittest.TestCase):
         model.add_design_var('y', lower=0.0, upper=1.0)
         model.add_objective('f_xy')
 
-        prob.driver = om.ScipyOptimizeDriver()
+        if driver:
+            prob.driver = driver
+
+        else:
+            prob.driver = om.ScipyOptimizeDriver()
 
         prob.setup()
         prob.run_driver()
@@ -124,12 +141,64 @@ class TestReportGeneration(unittest.TestCase):
         self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
-        path = pathlib.Path(problem_reports_dir).joinpath(self.coloring_filename)
-        self.assertTrue(path.is_file(), f'The coloring report file, {str(path)}, was not found')
+        # path = pathlib.Path(problem_reports_dir).joinpath(self.coloring_filename)
+        # self.assertTrue(path.is_file(), f'The coloring report file, {str(path)}, was not found')
+
+    @hooks_active
+    def test_report_generation_basic_pyoptsparse(self):
+        # Just to try a different driver
+        prob = self.setup_and_run_simple_problem(driver=pyOptSparseDriver(optimizer='SLSQP'))
+
+        # get the path to the problem subdirectory
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{prob._name}_reports')
+
+        path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
+        self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
+        self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
+        # path = pathlib.Path(problem_reports_dir).joinpath(self.coloring_filename)
+        # self.assertTrue(path.is_file(), f'The coloring report file, {str(path)}, was not found')
+
+    @hooks_active
+    def test_report_generation_basic_doedriver(self):
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        model.add_design_var('x', lower=0.0, upper=1.0)
+        model.add_design_var('y', lower=0.0, upper=1.0)
+        model.add_objective('f_xy')
+
+        prob.driver = om.DOEDriver(om.PlackettBurmanGenerator())
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{prob._name}_reports')
+
+        path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
+        self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
+
+        # DOEDriver won't cause the creation of a scaling report
+
+
+        # path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
+        # self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
+
+
+
+
+
+
+
 
     @hooks_active
     def test_report_generation_list_reports(self):
-        self.setup_and_run_simple_problem()
 
         stdout = sys.stdout
         strout = StringIO()
@@ -144,7 +213,7 @@ class TestReportGeneration(unittest.TestCase):
 
         self.assertTrue('N2 diagram' in output, '"N2 diagram" expected in list_reports output but was not found')
         self.assertTrue('Driver scaling report' in output, '"Driver scaling report" expected in list_reports output but was not found')
-        self.assertTrue('Coloring report' in output, '"Coloring report" expected in list_reports output but was not found')
+        # self.assertTrue('Coloring report' in output, '"Coloring report" expected in list_reports output but was not found')
 
     @hooks_active
     def test_report_generation_no_reports(self):
@@ -180,8 +249,8 @@ class TestReportGeneration(unittest.TestCase):
         self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
-        path = pathlib.Path(problem_reports_dir).joinpath(self.coloring_filename)
-        self.assertTrue(path.is_file(), f'The coloring report file, {str(path)}, was not found')
+        # path = pathlib.Path(problem_reports_dir).joinpath(self.coloring_filename)
+        # self.assertTrue(path.is_file(), f'The coloring report file, {str(path)}, was not found')
 
     @hooks_active
     def test_report_generation_user_defined_report(self):
@@ -210,7 +279,9 @@ class TestReportGeneration(unittest.TestCase):
 
         # register_report(user_defined_report, 'user defined report', 'setup', 'pre')
 
-        register_report(user_defined_report, 'setup', 'pre', 'Problem')
+        # register_report(user_defined_report, 'setup', 'pre', 'Problem')
+
+        register_report("User defined report", user_defined_report, "user defined report", 'Problem', 'setup', 'pre')
 
         prob = self.setup_and_run_simple_problem()
 
@@ -224,27 +295,48 @@ class TestReportGeneration(unittest.TestCase):
         # the reports can be generated pre and post for setup, final_setup, and run_driver
         # check those all work
 
-        def user_defined_report(problem, filename):
-            with open(filename, "w") as f:
-                f.write(f"Do some reporting on the Problem, {problem._name}\n")
+        # def user_defined_report(problem, filename):
+        #     with open(filename, "w") as f:
+        #         f.write(f"Do some reporting on the Problem, {problem._name}\n")
+        self.count = 0
+        def user_defined_report(prob):
+            problem_reports_dirpath = get_reports_dir(prob)
+            pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
+
+            user_defined_report_filepath = str(pathlib.Path(problem_reports_dirpath).joinpath(f"user_defined_{self.count}.txt"))
+
+            with open(user_defined_report_filepath, "w") as f:
+                f.write(f"Do some reporting on the Problem, {prob._name}\n")
+            self.count += 1
 
         for method in ['setup', 'final_setup', 'run_driver']:
             for pre_or_post in ['pre', 'post']:
                 user_report_filename = f'{pre_or_post}_{method}.txt'
                 # register_report(user_defined_report, f'user defined report {pre_or_post} {method}',
                 #                 method, pre_or_post, filename=user_report_filename)
-                register_report(user_defined_report, method, pre_or_post, 'Problem')
+                # register_report(user_defined_report, method, pre_or_post, 'Problem')
+                register_report(f"User defined report {method} {pre_or_post}", user_defined_report, "user defined report",
+                                'Problem', method, pre_or_post)
 
         prob = self.setup_and_run_simple_problem()
 
         problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{prob._name}_reports')
+        #
+        # for method in ['setup', 'final_setup', 'run_driver']:
+        #     for pre_or_post in ['pre', 'post']:
+        #         user_report_filename = f'{pre_or_post}_{method}.txt'
+        #         path = pathlib.Path(problem_reports_dir).joinpath(user_report_filename)
+        #         self.assertTrue(path.is_file(),
+        #                         f'The user defined report file, {str(path)} was not found')
 
+        self.count = 0
         for method in ['setup', 'final_setup', 'run_driver']:
             for pre_or_post in ['pre', 'post']:
-                user_report_filename = f'{pre_or_post}_{method}.txt'
+                user_report_filename = f"user_defined_{self.count}.txt"
                 path = pathlib.Path(problem_reports_dir).joinpath(user_report_filename)
                 self.assertTrue(path.is_file(),
                                 f'The user defined report file, {str(path)} was not found')
+                self.count += 1
 
     @hooks_active
     def test_report_generation_multiple_problems(self):
@@ -258,9 +350,9 @@ class TestReportGeneration(unittest.TestCase):
             path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
             self.assertFalse(path.is_file(),
                              f'Scaling report file, {str(path)}, was found but should not have')
-            path = pathlib.Path(problem_reports_dir).joinpath(self.coloring_filename)
-            self.assertFalse(path.is_file(),
-                             f'Coloring report file, {str(path)}, was found but should not have')
+            # path = pathlib.Path(problem_reports_dir).joinpath(self.coloring_filename)
+            # self.assertFalse(path.is_file(),
+            #                  f'Coloring report file, {str(path)}, was found but should not have')
 
     @hooks_active
     def test_report_generation_multiple_problems_report_specific_problem(self):
@@ -268,9 +360,12 @@ class TestReportGeneration(unittest.TestCase):
         #   than have the report run for all Problems
 
         # to simplify things, just do n2.
-        # clear_reports()
-        register_report(n2, 'create n2', 'final_setup', 'post', probname='problem2',
-                        show_browser=False)
+        clear_reports()
+        # register_report(n2, 'create n2', 'final_setup', 'post', probname='problem2',
+        #                 show_browser=False)
+
+        register_report("n2_report", run_n2_report, 'N2 diagram', 'Problem', 'final_setup', 'post',
+                        inst_id='problem2')
 
         probname, subprobname = self.setup_and_run_model_with_subproblem()
 
@@ -288,6 +383,10 @@ class TestReportGeneration(unittest.TestCase):
     @hooks_active
     def test_report_generation_test_TESTFLO_RUNNING(self):
         os.environ['TESTFLO_RUNNING'] = 'true'
+        # need to do this here again even though it is done in setup, because otherwise
+        # setup_default_reports won't see environment variable, TESTFLO_RUNNING, we set in this test
+        clear_reports()
+        setup_default_reports()
 
         prob = self.setup_and_run_simple_problem()
 
@@ -303,11 +402,75 @@ class TestReportGeneration(unittest.TestCase):
         self.assertFalse(path.is_file(),
                          f'The coloring report file, {str(path)}, was found but should not have')
 
+# TODO try different drivers?
 
-    # @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-    # def test_reports_system_under_mpi(self):
-    #
-    #     # TODO Need an MPI test!
+@use_tempdirs
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestReportsSystemMPI(unittest.TestCase):
+    N_PROCS = 2
+
+    def setUp(self):
+        self.n2_filename = _default_n2_filename
+        self.scaling_filename = _default_scaling_filename
+        self.coloring_filename = _default_coloring_imagefile
+
+        # set things to a known initial state for all the test runs
+        openmdao.core.problem._problem_names = []  # need to reset these to simulate separate runs
+
+        os.environ.pop('OPENMDAO_REPORTS', None)
+        os.environ.pop('OPENMDAO_REPORTS_DIR', None)
+        # We need to remove this for these tests to run. The reports code
+        #   checks to see if TESTFLO_RUNNING is set and will not do anything if it is set
+        # But we need to remember whether it was set so we can restore it
+        self.testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
+        clear_reports()
+        # clear_reports_run()
+        set_reports_dir('.')
+        setup_default_reports()
+
+        self.count = 0
+
+    def tearDown(self):
+        # restore what was there before running the test
+        if self.testflo_running is not None:
+            os.environ['TESTFLO_RUNNING'] = self.testflo_running
+
+    @hooks_active
+    def test_reports_system_mpi_basic(self): #  example taken from TestScipyOptimizeDriverMPI
+        import openmdao.utils.hooks as hooks
+
+        print("test_reports_system_mpi_basic start")
+        prob = om.Problem()
+        prob.model = SellarMDA()
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-8)
+
+        prob.model.add_design_var('x', lower=0, upper=10)
+        prob.model.add_design_var('z', lower=0, upper=10)
+        prob.model.add_objective('obj')
+        prob.model.add_constraint('con1', upper=0)
+        prob.model.add_constraint('con2', upper=0)
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+
+        prob.run_driver()
+
+        list_reports()
+
+
+        print(f"hooks._hooks = f{hooks._hooks}")
+
+        # get the path to the problem subdirectory
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{prob._name}_reports')
+
+        path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
+        self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
+        self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
+        print("test_reports_system_mpi_basic end")
+        # path = pathlib.Path(problem_reports_dir).joinpath(self.coloring_filename)
+        # self.assertTrue(path.is_file(), f'The coloring report file, {str(path)}, was not found')
+
 
 
 
