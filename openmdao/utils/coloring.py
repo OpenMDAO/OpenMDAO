@@ -60,6 +60,7 @@ _force_dyn_coloring = False
 # path or system pathname
 _STD_COLORING_FNAME = object()
 
+_default_coloring_imagefile = 'jacobian_to_compute_coloring.png'
 
 # default values related to the computation of a sparsity matrix
 _DEF_COMP_SPARSITY_ARGS = {
@@ -686,7 +687,7 @@ class Coloring(object):
             raise RuntimeError("Internal coloring bug: jacobian has entries where fwd and rev "
                                "colorings overlap!")
 
-    def display(self,show=True,fname='jacobian_to_compute_coloring.png'):
+    def display(self,show=True,fname=_default_coloring_imagefile):
         """
         Display a plot of the sparsity pattern, showing grouping by color.
 
