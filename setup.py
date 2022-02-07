@@ -24,7 +24,8 @@ optional_dependencies = {
     'notebooks': [
         'notebook',
         'tabulate',
-        'ipython'
+        'ipython',
+        'ipywidgets>=7.6.5'
     ],
     'visualization': [
         'bokeh>=1.3.4',
