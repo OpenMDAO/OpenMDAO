@@ -407,7 +407,7 @@ class Interp1DSlinear(InterpAlgorithmFixed):
             uncached_idx = (unc, )
             a = self.compute_coeffs_vectorized(uncached_idx, dtype)
             self.vec_coeff[unc, ...] = a
-            self.coeffs = self.coeffs.union(uncached)
+            self.coeffs.update(uncached)
         a = self.vec_coeff[i_x, :]
 
         val = a[:, 0] + a[:, 1] * (x - grid[i_x])
@@ -662,7 +662,7 @@ class Interp2DSlinear(InterpAlgorithmFixed):
             uncached_idx = (unc[:, 0], unc[:, 1])
             a = self.compute_coeffs_vectorized(uncached_idx, dtype)
             self.vec_coeff[unc[:, 0], unc[:, 1], ...] = a
-            self.coeffs = self.coeffs.union(uncached)
+            self.coeffs.update(uncached)
         a = self.vec_coeff[i_x, i_y, :]
 
         val = a[:, 0] + (a[:, 1] + a[:, 3] * y) * x + a[:, 2] * y
@@ -1003,7 +1003,7 @@ class Interp3DSlinear(InterpAlgorithmFixed):
             uncached_idx = (unc[:, 0], unc[:, 1], unc[:, 2])
             a = self.compute_coeffs_vectorized(uncached_idx, dtype)
             self.vec_coeff[unc[:, 0], unc[:, 1], unc[:, 2], ...] = a
-            self.coeffs = self.coeffs.union(uncached)
+            self.coeffs.update(uncached)
         a = self.vec_coeff[i_x, i_y, i_z, :]
 
         val = a[:, 0] + \

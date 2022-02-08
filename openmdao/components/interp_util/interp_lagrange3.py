@@ -696,7 +696,7 @@ class Interp3DLagrange3(InterpAlgorithmFixed):
             uncached_idx = (unc[:, 0], unc[:, 1], unc[:, 2])
             a = self.compute_coeffs_vectorized(uncached_idx, dtype)
             self.vec_coeff[unc[:, 0], unc[:, 1], unc[:, 2], ...] = a
-            self.coeffs = self.coeffs.union(uncached)
+            self.coeffs.update(uncached)
         a = self.vec_coeff[i_x, i_y, i_z, :]
 
         # Taking powers of the "deltas" instead of the actual table inputs eliminates numerical
