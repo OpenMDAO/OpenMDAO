@@ -475,7 +475,7 @@ class Interp3DLagrange3(InterpAlgorithmFixed):
             dtype = x.dtype
 
         if idx not in self.coeffs:
-            self.coeffs[idx] = self.compute_coeffs(idx)
+            self.coeffs[idx] = self.compute_coeffs(idx, dtype)
         a = self.coeffs[idx]
 
         x, y, z = x
@@ -506,7 +506,7 @@ class Interp3DLagrange3(InterpAlgorithmFixed):
 
         return val, d_x, None, None
 
-    def compute_coeffs(self, idx):
+    def compute_coeffs(self, idx, dtype):
         """
         Compute the tri-lagrange3 interpolation coefficients for this block.
 
@@ -514,6 +514,8 @@ class Interp3DLagrange3(InterpAlgorithmFixed):
         ----------
         idx : int
             List of interval indices for x.
+        dtype : object
+            The dtype for vector allocation; used for complex step.
 
         Returns
         -------
@@ -581,7 +583,7 @@ class Interp3DLagrange3(InterpAlgorithmFixed):
                           [1.0 / (cx12 * cx13 * cx14),
                            -1.0 / (cx12 * cx23 * cx24),
                            1.0 / (cx13 * cx23 * cx34),
-                           -1.0 / (cx14 * cx24 * cx34)]])
+                           -1.0 / (cx14 * cx24 * cx34)]], dtype=dtype)
 
         termy = np.array([[y2 * y3 * y4,
                            0.0,
@@ -598,7 +600,7 @@ class Interp3DLagrange3(InterpAlgorithmFixed):
                           [1.0 / (cy12 * cy13 * cy14),
                            -1.0 / (cy12 * cy23 * cy24),
                            1.0 / (cy13 * cy23 * cy34),
-                           -1.0 / (cy14 * cy24 * cy34)]])
+                           -1.0 / (cy14 * cy24 * cy34)]], dtype=dtype)
 
         termz = np.array([[z2 * z3 * z4,
                            0.0,
@@ -615,7 +617,7 @@ class Interp3DLagrange3(InterpAlgorithmFixed):
                           [1.0 / (cz12 * cz13 * cz14),
                            -1.0 / (cz12 * cz23 * cz24),
                            1.0 / (cz13 * cz23 * cz34),
-                           -1.0 / (cz14 * cz24 * cz34)]])
+                           -1.0 / (cz14 * cz24 * cz34)]], dtype=dtype)
 
         termx[2, :] *= -termx[3, :]
         termy[2, :] *= -termy[3, :]
@@ -676,19 +678,25 @@ class Interp3DLagrange3(InterpAlgorithmFixed):
         i_y[i_y > ny - 3] = ny - 3
         i_z[i_z > nz - 3] = nz - 3
 
+        # Complex Step
+        if self.values.dtype == complex:
+            dtype = self.values.dtype
+        else:
+            dtype = x_vec.dtype
+
         if self.vec_coeff is None:
             self.coeffs = set()
             grid = self.grid
-            self.vec_coeff = np.empty((nx, ny, nz, 4, 4, 4))
+            self.vec_coeff = np.empty((nx, ny, nz, 4, 4, 4), dtype=dtype)
 
         needed = set(zip(i_x, i_y, i_z))
         uncached = needed.difference(self.coeffs)
         if len(uncached) > 0:
             unc = np.array(list(uncached))
             uncached_idx = (unc[:, 0], unc[:, 1], unc[:, 2])
-            a = self.compute_coeffs_vectorized(uncached_idx)
+            a = self.compute_coeffs_vectorized(uncached_idx, dtype)
             self.vec_coeff[unc[:, 0], unc[:, 1], unc[:, 2], ...] = a
-            self.coeffs = self.coeffs.union(uncached)
+            self.coeffs.update(uncached)
         a = self.vec_coeff[i_x, i_y, i_z, :]
 
         # Taking powers of the "deltas" instead of the actual table inputs eliminates numerical
@@ -696,12 +704,6 @@ class Interp3DLagrange3(InterpAlgorithmFixed):
         x = x_vec[:, 0] - grid[0][i_x - 1]
         y = x_vec[:, 1] - grid[1][i_y - 1]
         z = x_vec[:, 2] - grid[2][i_z - 1]
-
-        # Complex Step
-        if self.values.dtype == complex:
-            dtype = self.values.dtype
-        else:
-            dtype = x.dtype
 
         # Compute interpolated value using the 64 coefficients.
 
@@ -750,7 +752,7 @@ class Interp3DLagrange3(InterpAlgorithmFixed):
 
         return val, d_x, None, None
 
-    def compute_coeffs_vectorized(self, idx):
+    def compute_coeffs_vectorized(self, idx, dtype):
         """
         Compute the tri-lagrange3 interpolation coefficients for this block.
 
@@ -758,6 +760,8 @@ class Interp3DLagrange3(InterpAlgorithmFixed):
         ----------
         idx : int
             List of interval indices for x.
+        dtype : object
+            The dtype for vector allocation; used for complex step.
 
         Returns
         -------
@@ -766,7 +770,7 @@ class Interp3DLagrange3(InterpAlgorithmFixed):
         """
         grid = self.grid
         values = self.values
-        a = np.zeros((4, 4, 4))
+        a = np.zeros((4, 4, 4), dtype=dtype)
 
         i_x, i_y, i_z = idx
         vec_size = len(i_x)
@@ -822,7 +826,7 @@ class Interp3DLagrange3(InterpAlgorithmFixed):
         z3 -= z1
         z4 -= z1
 
-        termx = np.empty((vec_size, 4, 4))
+        termx = np.empty((vec_size, 4, 4), dtype=dtype)
         termx[:, 0, 0] = x2 * x3 * x4
         termx[:, 0, 1] = 0.0
         termx[:, 0, 2] = 0.0
@@ -840,7 +844,7 @@ class Interp3DLagrange3(InterpAlgorithmFixed):
         termx[:, 3, 2] = 1.0 / (cx13 * cx23 * cx34)
         termx[:, 3, 3] = -1.0 / (cx14 * cx24 * cx34)
 
-        termy = np.empty((vec_size, 4, 4))
+        termy = np.empty((vec_size, 4, 4), dtype=dtype)
         termy[:, 0, 0] = y2 * y3 * y4
         termy[:, 0, 1] = 0.0
         termy[:, 0, 2] = 0.0
@@ -858,7 +862,7 @@ class Interp3DLagrange3(InterpAlgorithmFixed):
         termy[:, 3, 2] = 1.0 / (cy13 * cy23 * cy34)
         termy[:, 3, 3] = -1.0 / (cy14 * cy24 * cy34)
 
-        termz = np.empty((vec_size, 4, 4))
+        termz = np.empty((vec_size, 4, 4), dtype=dtype)
         termz[:, 0, 0] = z2 * z3 * z4
         termz[:, 0, 1] = 0.0
         termz[:, 0, 2] = 0.0
@@ -888,7 +892,7 @@ class Interp3DLagrange3(InterpAlgorithmFixed):
         termy[:, 0, :] *= -termy[:, 3, :]
         termz[:, 0, :] *= -termz[:, 3, :]
 
-        all_val = np.empty((vec_size, 4, 4, 4))
+        all_val = np.empty((vec_size, 4, 4, 4), dtype=dtype)
         # The only loop in this algorithm, but it doesn't seem to have much impact on time.
         # Broadcasting out the index slices would be a bit complicated.
         for j in range(vec_size):
