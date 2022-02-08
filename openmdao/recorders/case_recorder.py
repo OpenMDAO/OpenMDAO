@@ -8,6 +8,7 @@ from openmdao.core.problem import Problem
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import check_path
+from openmdao.utils.om_warnings import warn_deprecation
 
 
 # default pickle protocol version for serialization
@@ -48,6 +49,11 @@ class CaseRecorder(object):
     def __init__(self, record_viewer_data=True):
         """
         Initialize.
+
+        Parameters
+        ----------
+        record_viewer_data : bool, optional
+            If True, record data needed for visualization.
         """
         self._record_viewer_data = record_viewer_data
 
@@ -70,7 +76,7 @@ class CaseRecorder(object):
         # unnecessary gathering.
         self._parallel = False
 
-    def startup(self, recording_requester):
+    def startup(self, recording_requester, comm=None):
         """
         Prepare for a new run and calculate inclusion lists.
 
@@ -78,6 +84,8 @@ class CaseRecorder(object):
         ----------
         recording_requester : object
             Object to which this recorder is attached.
+        comm : MPI.Comm or <FakeComm> or None
+            The communicator for the recorder (should be the comm for the Problem).
         """
         self._counter = 0
 
@@ -164,25 +172,22 @@ class CaseRecorder(object):
         **kwargs : keyword args
             Some implementations of record_iteration need additional args.
         """
-        if not self._parallel:
-            if MPI and MPI.COMM_WORLD.rank > 0:
-                raise RuntimeError("Non-parallel recorders should not be recording on ranks > 0")
+        if self._record_on_proc:
+            self._counter += 1
 
-        self._counter += 1
+            self._iteration_coordinate = \
+                recording_requester._recording_iter.get_formatted_iteration_coordinate()
 
-        self._iteration_coordinate = \
-            recording_requester._recording_iter.get_formatted_iteration_coordinate()
-
-        if isinstance(recording_requester, Driver):
-            self.record_iteration_driver(recording_requester, data, metadata)
-        elif isinstance(recording_requester, System):
-            self.record_iteration_system(recording_requester, data, metadata)
-        elif isinstance(recording_requester, Solver):
-            self.record_iteration_solver(recording_requester, data, metadata)
-        elif isinstance(recording_requester, Problem):
-            self.record_iteration_problem(recording_requester, data, metadata)
-        else:
-            raise ValueError("Recorders must be attached to Drivers, Systems, or Solvers.")
+            if isinstance(recording_requester, Driver):
+                self.record_iteration_driver(recording_requester, data, metadata)
+            elif isinstance(recording_requester, System):
+                self.record_iteration_system(recording_requester, data, metadata)
+            elif isinstance(recording_requester, Solver):
+                self.record_iteration_solver(recording_requester, data, metadata)
+            elif isinstance(recording_requester, Problem):
+                self.record_iteration_problem(recording_requester, data, metadata)
+            else:
+                raise ValueError("Recorders must be attached to Drivers, Systems, or Solvers.")
 
     def record_iteration_driver(self, recording_requester, data, metadata):
         """

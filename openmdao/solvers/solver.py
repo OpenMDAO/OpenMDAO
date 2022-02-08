@@ -297,7 +297,8 @@ class Solver(object):
         if isinstance(self, LinearSolver) and not system._use_derivatives:
             return
 
-        self._rec_mgr.startup(self)
+        # NOTE: can't currently add a recorder to a solver under MPI, so comm=None
+        self._rec_mgr.startup(self, comm=None)
 
         myoutputs = myresiduals = myinputs = []
         incl = self.recording_options['includes']

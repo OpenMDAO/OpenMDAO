@@ -929,7 +929,8 @@ class System(object):
         if self._use_derivatives:
             self._setup_jacobians()
 
-        self._setup_recording()
+        # recorders will use the problem comm
+        self._setup_recording(comm)
 
         self.set_initial_values()
 
@@ -1450,7 +1451,15 @@ class System(object):
 
         return comm
 
-    def _setup_recording(self):
+    def _setup_recording(self, comm):
+        """
+        Set up case recording.
+
+        Parameters
+        ----------
+        comm : MPI.Comm or <FakeComm> or None
+            The communicator for recorders (should be the comm for the Problem).
+        """
         if self._rec_mgr._recorders:
             myinputs = myoutputs = myresiduals = []
 
@@ -1489,10 +1498,10 @@ class System(object):
                 'residual': myresiduals
             }
 
-            self._rec_mgr.startup(self)
+            self._rec_mgr.startup(self, comm)
 
         for subsys in self._subsystems_myproc:
-            subsys._setup_recording()
+            subsys._setup_recording(comm)
 
     def _setup_procs(self, pathname, comm, mode, prob_meta):
         """

@@ -482,13 +482,17 @@ class Driver(object):
 
         return vars2record
 
-    def _setup_recording(self):
+    def _setup_recording(self, comm):
         """
         Set up case recording.
+
+        Parameters
+        ----------
+        comm : MPI.Comm or <FakeComm> or None
+            The communicator for recorders (should be the comm for the Problem).
         """
         self._filtered_vars_to_record = self._get_vars_to_record(self.recording_options)
-
-        self._rec_mgr.startup(self)
+        self._rec_mgr.startup(self, comm)
 
     def _get_voi_val(self, name, meta, remote_vois, driver_scaling=True,
                      get_remote=True, rank=None):

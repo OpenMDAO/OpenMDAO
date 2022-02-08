@@ -76,7 +76,7 @@ class RecordingManager(object):
         """
         self._recorders.append(recorder)
 
-    def startup(self, recording_requester):
+    def startup(self, recording_requester, comm=None):
         """
         Run startup on each recorder in the manager.
 
@@ -84,12 +84,14 @@ class RecordingManager(object):
         ----------
         recording_requester : object
             The object that needs an iteration of itself recorded.
+        comm : MPI.Comm or <FakeComm> or None
+            The communicator for recorders (should be the comm for the Problem).
         """
         # Will only add parallel code for Drivers. Use the old method for System and Solver
         from openmdao.core.driver import Driver
         if not isinstance(recording_requester, Driver):
             for recorder in self._recorders:
-                recorder.startup(recording_requester)
+                recorder.startup(recording_requester, comm)
             return
 
         # The remaining code only works for recording of Drivers
@@ -102,9 +104,8 @@ class RecordingManager(object):
                                    "running in parallel on an inactive System")
 
         for recorder in self._recorders:
-            # Each of the recorders determines its self._filtered_* list of vars
-            #   to record
-            recorder.startup(recording_requester)
+            # Each of the recorders determines its self._filtered_* list of vars to record
+            recorder.startup(recording_requester, comm)
 
             if not recorder._parallel:
                 self._has_serial_recorders = True
@@ -137,8 +138,7 @@ class RecordingManager(object):
             metadata['timestamp'] = time.time()
 
         for recorder in self._recorders:
-            if recorder._parallel or MPI is None or self.rank == 0:
-                recorder.record_iteration(recording_requester, data, metadata)
+            recorder.record_iteration(recording_requester, data, metadata)
 
     def record_metadata(self, recording_requester):
         """

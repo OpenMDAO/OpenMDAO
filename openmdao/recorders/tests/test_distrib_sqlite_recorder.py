@@ -364,7 +364,7 @@ class DistributedRecorderTest(unittest.TestCase):
         my_comm = MPI.COMM_WORLD.Split(rank)
 
         def run_sequential():
-            # problem will run in the single proc comm
+            # problem will run in the single proc comm for this rank
             prob = om.Problem(comm=my_comm)
 
             prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])

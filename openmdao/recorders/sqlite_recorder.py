@@ -186,18 +186,23 @@ class SqliteRecorder(CaseRecorder):
 
         super().__init__(record_viewer_data)
 
-    def _initialize_database(self):
+    def _initialize_database(self, comm=None):
         """
         Initialize the database.
+
+        Parameters
+        ----------
+        comm : MPI.Comm or <FakeComm> or None
+            The communicator for the recorder (should be the comm for the Problem).
         """
-        if MPI:
-            rank = MPI.COMM_WORLD.rank
+        if MPI and comm:
             if self._parallel and self._record_on_proc:
-                filepath = '%s_%d' % (self._filepath, rank)
+                rank = comm.rank
+                filepath = f"{self._filepath}_{rank}"
                 print("Note: SqliteRecorder is running on multiple processors. "
-                      "Cases from rank %d are being written to %s." %
-                      (rank, filepath))
-                if rank == 0:
+                      f"Cases from rank {rank} are being written to {filepath}.")
+                ranks = comm.allgather(rank)
+                if rank == min(ranks):
                     metadata_filepath = f'{self._filepath}_meta'
                     print(f"Note: Metadata is being recorded separately as {metadata_filepath}.")
                     try:
@@ -210,7 +215,7 @@ class SqliteRecorder(CaseRecorder):
                     self.metadata_connection = sqlite3.connect(metadata_filepath)
                 else:
                     self._record_metadata = False
-            elif rank == 0:
+            elif self._record_on_proc:
                 filepath = self._filepath
             else:
                 filepath = None
@@ -276,7 +281,7 @@ class SqliteRecorder(CaseRecorder):
 
         self._database_initialized = True
         if MPI and self._parallel:
-            MPI.COMM_WORLD.barrier()
+            comm.barrier()
 
     def _cleanup_abs2meta(self):
         """
@@ -307,7 +312,7 @@ class SqliteRecorder(CaseRecorder):
                 var_settings[name][prop] = make_serializable(var_settings[name][prop])
         return var_settings
 
-    def startup(self, recording_requester):
+    def startup(self, recording_requester, comm=None):
         """
         Prepare for a new run and create/update the abs2prom and prom2abs variables.
 
@@ -315,15 +320,17 @@ class SqliteRecorder(CaseRecorder):
         ----------
         recording_requester : object
             Object to which this recorder is attached.
+        comm : MPI.Comm or <FakeComm> or None
+            The communicator for the recorder (should be the comm for the Problem).
         """
         # we only want to set up recording once for each recording_requester
         if recording_requester in self._started:
             return
 
-        super().startup(recording_requester)
+        super().startup(recording_requester, comm)
 
         if not self._database_initialized:
-            self._initialize_database()
+            self._initialize_database(comm)
 
         # grab the system and driver
         if isinstance(recording_requester, Driver):
