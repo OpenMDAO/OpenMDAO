@@ -2918,20 +2918,25 @@ class Group(System):
             # we're computing totals/semi-totals (vars may not be local)
             start = end = 0
             for of in self._owns_approx_of:
+
+                # Support for constraint aliases.
                 if of in self._responses and 'path' in self._responses[of] and \
                         self._responses[of]['path'] is not None:
-                    of = self._responses[of]['path']
-                meta = abs2meta[of]
+                    path = self._responses[of]['path']
+                else:
+                    path = of
+
+                meta = abs2meta[path]
                 if meta['distributed']:
-                    dist_sizes = sizes[:, abs2idx[of]]
+                    dist_sizes = sizes[:, abs2idx[path]]
                 else:
                     dist_sizes = None
                 if of in approx_of_idx:
                     end += approx_of_idx[of].indexed_src_size
-                    yield of, start, end, approx_of_idx[of].shaped_array().ravel(), dist_sizes
+                    yield path, start, end, approx_of_idx[of].shaped_array().ravel(), dist_sizes
                 else:
-                    end += abs2meta[of][szname]
-                    yield of, start, end, _full_slice, dist_sizes
+                    end += abs2meta[path][szname]
+                    yield path, start, end, _full_slice, dist_sizes
 
                 start = end
         else:

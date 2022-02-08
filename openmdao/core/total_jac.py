@@ -515,9 +515,6 @@ class _TotalJacInfo(object):
                 if out in self.remote_vois:
                     continue
                 J_dict[prom_of[i]] = outer = OrderedDict()
-                if out in self.responses and 'path' in self.responses[out] and \
-                        self.responses[out]['path'] is not None:
-                    out = self.responses[out]['path']
                 out_slice = of_meta[out][0]
                 for j, inp in enumerate(wrt):
                     if inp not in self.remote_vois:
@@ -526,9 +523,6 @@ class _TotalJacInfo(object):
             for i, out in enumerate(of):
                 if out in self.remote_vois:
                     continue
-                if out in self.responses and 'path' in self.responses[out] and \
-                        self.responses[out]['path'] is not None:
-                    out = self.responses[out]['path']
                 out_slice = of_meta[out][0]
                 for j, inp in enumerate(wrt):
                     if inp not in self.remote_vois:
@@ -901,6 +895,8 @@ class _TotalJacInfo(object):
         has_dist = False
 
         for name in names:
+            path = name
+
             if name in self.remote_vois:
                 continue
             if name in vois:
@@ -911,17 +907,20 @@ class _TotalJacInfo(object):
                 else:
                     size = voi['size']
                 indices = vois[name]['indices']
+
+                # Support for constraint aliases.
                 if 'path' in voi and voi['path'] is not None:
-                    name = voi['path']
+                    path = voi['path']
+
             else:
-                size = abs2meta_out[name]['global_size']
+                size = abs2meta_out[path]['global_size']
                 indices = None
 
-            has_dist |= abs2meta_out[name]['distributed']
+            has_dist |= abs2meta_out[path]['distributed']
 
             end += size
 
-            idx_map[name] = (slice(start, end), indices, abs2meta_out[name]['distributed'])
+            idx_map[name] = (slice(start, end), indices, abs2meta_out[path]['distributed'])
             start = end
 
         return idx_map, end, has_dist  # after the loop, end is the total size
