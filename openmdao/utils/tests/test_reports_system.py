@@ -26,23 +26,6 @@ OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
-
-
-
-
-# import openmdao.utils.hooks as hooks
-#
-# def hook_tester(f):
-#     def _wrapper(*args, **kwargs):
-#         hooks.use_hooks = True
-#         try:
-#             f(*args, **kwargs)
-#         finally:
-#             hooks.use_hooks = False
-#             hooks._reset_all_hooks()
-#     return _wrapper
-
-from openmdao.utils.coloring import _default_coloring_imagefile
 from openmdao.visualization.n2_viewer.n2_viewer import _default_n2_filename
 from openmdao.visualization.scaling_viewer.scaling_report import _default_scaling_filename
 
@@ -52,7 +35,6 @@ class TestReportsSystem(unittest.TestCase):
     def setUp(self):
         self.n2_filename = _default_n2_filename
         self.scaling_filename = _default_scaling_filename
-        self.coloring_filename = _default_coloring_imagefile
 
         # set things to a known initial state for all the test runs
         openmdao.core.problem._problem_names = []  # need to reset these to simulate separate runs
@@ -142,8 +124,6 @@ class TestReportsSystem(unittest.TestCase):
         self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
-        # path = pathlib.Path(problem_reports_dir).joinpath(self.coloring_filename)
-        # self.assertTrue(path.is_file(), f'The coloring report file, {str(path)}, was not found')
 
     @hooks_active
     def test_report_generation_basic_pyoptsparse(self):
@@ -157,8 +137,6 @@ class TestReportsSystem(unittest.TestCase):
         self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
-        # path = pathlib.Path(problem_reports_dir).joinpath(self.coloring_filename)
-        # self.assertTrue(path.is_file(), f'The coloring report file, {str(path)}, was not found')
 
     @hooks_active
     def test_report_generation_basic_doedriver(self):
@@ -214,7 +192,6 @@ class TestReportsSystem(unittest.TestCase):
 
         self.assertTrue('N2 diagram' in output, '"N2 diagram" expected in list_reports output but was not found')
         self.assertTrue('Driver scaling report' in output, '"Driver scaling report" expected in list_reports output but was not found')
-        # self.assertTrue('Coloring report' in output, '"Coloring report" expected in list_reports output but was not found')
 
     @hooks_active
     def test_report_generation_no_reports(self):
@@ -231,9 +208,6 @@ class TestReportsSystem(unittest.TestCase):
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertFalse(path.is_file(),
                          f'The scaling report file, {str(path)}, was found but should not have')
-        path = pathlib.Path(problem_reports_dir).joinpath(self.coloring_filename)
-        self.assertFalse(path.is_file(),
-                         f'The coloring report file, {str(path)}, was found but should not have')
 
     @hooks_active
     def test_report_generation_set_reports_dir(self):
@@ -250,8 +224,6 @@ class TestReportsSystem(unittest.TestCase):
         self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
-        # path = pathlib.Path(problem_reports_dir).joinpath(self.coloring_filename)
-        # self.assertTrue(path.is_file(), f'The coloring report file, {str(path)}, was not found')
 
     @hooks_active
     def test_report_generation_user_defined_report(self):
@@ -351,9 +323,6 @@ class TestReportsSystem(unittest.TestCase):
             path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
             self.assertFalse(path.is_file(),
                              f'Scaling report file, {str(path)}, was found but should not have')
-            # path = pathlib.Path(problem_reports_dir).joinpath(self.coloring_filename)
-            # self.assertFalse(path.is_file(),
-            #                  f'Coloring report file, {str(path)}, was found but should not have')
 
     @hooks_active
     def test_report_generation_multiple_problems_report_specific_problem(self):
@@ -399,9 +368,6 @@ class TestReportsSystem(unittest.TestCase):
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertFalse(path.is_file(),
                          f'The scaling report file, {str(path)}, was found but should not have')
-        path = pathlib.Path(problem_reports_dir).joinpath(self.coloring_filename)
-        self.assertFalse(path.is_file(),
-                         f'The coloring report file, {str(path)}, was found but should not have')
 
 # TODO try different drivers?
 
@@ -413,7 +379,6 @@ class TestReportsSystemMPI(unittest.TestCase):
     def setUp(self):
         self.n2_filename = _default_n2_filename
         self.scaling_filename = _default_scaling_filename
-        self.coloring_filename = _default_coloring_imagefile
 
         # set things to a known initial state for all the test runs
         openmdao.core.problem._problem_names = []  # need to reset these to simulate separate runs
@@ -438,7 +403,6 @@ class TestReportsSystemMPI(unittest.TestCase):
 
     @hooks_active
     def test_reports_system_mpi_basic(self): #  example taken from TestScipyOptimizeDriverMPI
-        import openmdao.utils.hooks as hooks
 
         print("test_reports_system_mpi_basic start")
         prob = om.Problem()
@@ -454,30 +418,18 @@ class TestReportsSystemMPI(unittest.TestCase):
         prob.setup()
         prob.set_solver_print(level=0)
 
-
         msg = "ScipyOptimizeDriver: The scaling report currently is not supported when running under MPI."
-
         with assert_warning(om.MPIWarning, msg):
             prob.run_driver()
-
-        list_reports()
-
-
-        print(f"hooks._hooks = f{hooks._hooks}")
 
         # get the path to the problem subdirectory
         problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{prob._name}_reports')
 
         path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
         self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
-        # path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
-        # self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
-        # print("test_reports_system_mpi_basic end")
-        # path = pathlib.Path(problem_reports_dir).joinpath(self.coloring_filename)
-        # self.assertTrue(path.is_file(), f'The coloring report file, {str(path)}, was not found')
-
-
-
+        path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
+        self.assertFalse(path.is_file(),
+                         f'The scaling report file, {str(path)}, was found but should not have')
 
 
 if __name__ == '__main__':
