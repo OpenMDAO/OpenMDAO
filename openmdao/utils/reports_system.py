@@ -177,8 +177,9 @@ def run_scaling_report_enclosing():
         print("run_scaling_report_inner prob.driver.scaling_report")
 
         try:
-            prob.driver.scaling_report(outfile=scaling_filepath, show_browser=False,
-                                       run_compute_totals=False)
+            # prob.driver.scaling_report(outfile=scaling_filepath, show_browser=False,
+            #                            run_compute_totals=False)
+            prob.driver.scaling_report(outfile=scaling_filepath, show_browser=False)
 
         # Need to handle the coloring and scaling reports which can fail in this way
         #   because total Jacobian can't be computed
@@ -310,8 +311,8 @@ def setup_default_reports():
 
     # def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=None, **kwargs):
 
-    # register_report("n2_report", run_n2_report, 'N2 diagram', 'Problem', 'final_setup', 'post', inst_id=None)
-    # register_report("scaling_report", run_scaling_report, 'Driver scaling report', 'Driver', '_compute_totals', 'post', inst_id=None)
+    register_report("n2_report", run_n2_report, 'N2 diagram', 'Problem', 'final_setup', 'post', inst_id=None)
+    register_report("scaling_report", run_scaling_report, 'Driver scaling report', 'Driver', '_compute_totals', 'post', inst_id=None)
     # register_report("coloring report", run_coloring_report, 'Coloring report', 'Driver', '_compute_totals', 'post', inst_id=None)
     # register_report("coloring report", run_coloring_report, 'Coloring report', 'Problem', 'final_setup', 'post', inst_id=None)
     #
