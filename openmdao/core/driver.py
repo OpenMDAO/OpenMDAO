@@ -20,7 +20,7 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import sizes2offsets, convert_neg
 from openmdao.vectors.vector import _full_slice
 from openmdao.utils.indexer import indexer
-from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, MPIWarning, warn_deprecation
 from openmdao.utils.hooks import _setup_hooks
 
 
@@ -1132,6 +1132,11 @@ class Driver(object):
         dict
             Data used to create html file.
         """
+        if MPI:
+            issue_warning("The scaling report currently is not supported when running under MPI.",
+                          prefix=self.msginfo, category=MPIWarning)
+            return
+
         from openmdao.visualization.scaling_viewer.scaling_report import view_driver_scaling
 
         # Run the model if it hasn't been run yet.
