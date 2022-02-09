@@ -1608,7 +1608,7 @@ class Interp1DAkima(InterpAlgorithmFixed):
             self.vec_coeff[uncached, 1] = b
             self.vec_coeff[uncached, 2] = c
             self.vec_coeff[uncached, 3] = d
-            self.coeffs = self.coeffs.union(uncached)
+            self.coeffs.update(uncached)
         a = self.vec_coeff[idx_coeffs, 0]
         b = self.vec_coeff[idx_coeffs, 1]
         c = self.vec_coeff[idx_coeffs, 2]
