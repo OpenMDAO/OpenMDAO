@@ -16,6 +16,9 @@ from openmdao.utils.reports_system import set_reports_dir, _reports_dir, registe
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
 from openmdao.utils.tests.test_hooks import hooks_active
+from openmdao.visualization.n2_viewer.n2_viewer import _default_n2_filename
+from openmdao.visualization.scaling_viewer.scaling_report import _default_scaling_filename
+
 try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
@@ -26,8 +29,6 @@ OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
-from openmdao.visualization.n2_viewer.n2_viewer import _default_n2_filename
-from openmdao.visualization.scaling_viewer.scaling_report import _default_scaling_filename
 
 @use_tempdirs
 class TestReportsSystem(unittest.TestCase):
@@ -38,15 +39,13 @@ class TestReportsSystem(unittest.TestCase):
 
         # set things to a known initial state for all the test runs
         openmdao.core.problem._problem_names = []  # need to reset these to simulate separate runs
-
         os.environ.pop('OPENMDAO_REPORTS', None)
         os.environ.pop('OPENMDAO_REPORTS_DIR', None)
-        # We need to remove this for these tests to run. The reports code
+        # We need to remove the TESTFLO_RUNNING environment variable for these tests to run. The reports code
         #   checks to see if TESTFLO_RUNNING is set and will not do anything if it is set
         # But we need to remember whether it was set so we can restore it
         self.testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
         clear_reports()
-        # clear_reports_run()
         set_reports_dir('.')
         setup_default_reports()
 
@@ -162,19 +161,10 @@ class TestReportsSystem(unittest.TestCase):
 
         path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
         self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
-
         # DOEDriver won't cause the creation of a scaling report
-
-
-        # path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
-        # self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
-
-
-
-
-
-
-
+        path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
+        self.assertFalse(path.is_file(),
+                         f'The scaling report file, {str(path)}, was found but should not have')
 
     @hooks_active
     def test_report_generation_list_reports(self):
@@ -268,9 +258,6 @@ class TestReportsSystem(unittest.TestCase):
         # the reports can be generated pre and post for setup, final_setup, and run_driver
         # check those all work
 
-        # def user_defined_report(problem, filename):
-        #     with open(filename, "w") as f:
-        #         f.write(f"Do some reporting on the Problem, {problem._name}\n")
         self.count = 0
         def user_defined_report(prob):
             problem_reports_dirpath = get_reports_dir(prob)
@@ -385,16 +372,15 @@ class TestReportsSystemMPI(unittest.TestCase):
 
         os.environ.pop('OPENMDAO_REPORTS', None)
         os.environ.pop('OPENMDAO_REPORTS_DIR', None)
-        # We need to remove this for these tests to run. The reports code
+        # We need to remove the TESTFLO_RUNNING environment variable for these tests to run. The reports code
         #   checks to see if TESTFLO_RUNNING is set and will not do anything if it is set
         # But we need to remember whether it was set so we can restore it
         self.testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
         clear_reports()
-        # clear_reports_run()
         set_reports_dir('.')
         setup_default_reports()
 
-        self.count = 0
+        self.count = 0  # used to keep a count of reports generated
 
     def tearDown(self):
         # restore what was there before running the test
@@ -404,7 +390,6 @@ class TestReportsSystemMPI(unittest.TestCase):
     @hooks_active
     def test_reports_system_mpi_basic(self): #  example taken from TestScipyOptimizeDriverMPI
 
-        print("test_reports_system_mpi_basic start")
         prob = om.Problem()
         prob.model = SellarMDA()
         prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-8)
