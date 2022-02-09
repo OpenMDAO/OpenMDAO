@@ -9,6 +9,7 @@ import openmdao.api as om
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar_feature import SellarMDA
 import openmdao.core.problem
+from openmdao.utils.assert_utils import assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.reports_system import set_reports_dir, _reports_dir, register_report, \
     get_reports_dir, list_reports, clear_reports, run_n2_report, setup_default_reports
@@ -453,7 +454,11 @@ class TestReportsSystemMPI(unittest.TestCase):
         prob.setup()
         prob.set_solver_print(level=0)
 
-        prob.run_driver()
+
+        msg = "ScipyOptimizeDriver: The scaling report currently is not supported when running under MPI."
+
+        with assert_warning(om.MPIWarning, msg):
+            prob.run_driver()
 
         list_reports()
 
@@ -465,9 +470,9 @@ class TestReportsSystemMPI(unittest.TestCase):
 
         path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
         self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
-        path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
-        self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
-        print("test_reports_system_mpi_basic end")
+        # path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
+        # self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
+        # print("test_reports_system_mpi_basic end")
         # path = pathlib.Path(problem_reports_dir).joinpath(self.coloring_filename)
         # self.assertTrue(path.is_file(), f'The coloring report file, {str(path)}, was not found')
 
