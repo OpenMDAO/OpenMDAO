@@ -140,65 +140,6 @@ def run_scaling_report_enclosing():
 
 run_scaling_report = run_scaling_report_enclosing()
 
-def run_coloring_report_enclosing():
-    def run_coloring_report_inner(driver):
-        run_coloring_report_inner.calls[driver] += 1
-        if run_coloring_report_inner.calls[driver] > 1:
-            return
-
-        if 'OPENMDAO_REPORTS' in os.environ and os.environ['OPENMDAO_REPORTS'] in ['0', 'false', 'off']:
-            return
-
-
-        prob = driver._problem()
-        # prob = driver
-
-        problem_reports_dirpath = get_reports_dir(prob)
-
-        coloring_filepath = str(pathlib.Path(problem_reports_dirpath).joinpath(_default_coloring_imagefile))
-        if _is_rank_0(prob):
-            pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
-
-        coloring = compute_total_coloring(prob)
-        if coloring:
-            coloring.display(show=False, fname=coloring_filepath)
-
-    run_coloring_report_inner.calls = defaultdict(int)
-    return run_coloring_report_inner
-
-
-run_coloring_report = run_coloring_report_enclosing()
-
-
-def run_coloring_report_func(driver, **kwargs):
-    """
-    Run the coloring report.
-
-    Created for the reporting system, which expects the reporting functions to have Problem as
-    their first argument.
-
-    Parameters
-    ----------
-    prob : Problem
-        The problem used for the coloring report.
-    **kwargs : dict
-        Optional args for the coloring report function.
-    """
-    if 'OPENMDAO_REPORTS' in os.environ and os.environ['OPENMDAO_REPORTS'] in ['0', 'false', 'off']:
-        return
-
-    prob = driver._problem()
-    problem_reports_dirpath = get_reports_dir(prob)
-
-    coloring_filepath = str(pathlib.Path(problem_reports_dirpath).joinpath(_default_coloring_imagefile))
-    if _is_rank_0(prob):
-        pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
-
-    coloring = compute_total_coloring(prob, **kwargs)
-    if coloring:
-        coloring.display(show=False, fname=coloring_filepath)
-
-
 def setup_default_reports():
     """
     Set up the default reports for all OpenMDAO runs.
