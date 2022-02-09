@@ -2,10 +2,10 @@
 
 import sys
 import pprint
+import os
 import logging
 import weakref
 import time
-import os
 
 from collections import defaultdict, namedtuple, OrderedDict
 from fnmatch import fnmatchcase
