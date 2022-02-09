@@ -1,49 +1,40 @@
 """
 Utility functions related to the reporting system which generates reports by default for all runs.
 """
-from mpi4py import MPI
 
 from collections import namedtuple
 import pathlib
 import sys
 import os
+from collections import defaultdict
 
-from openmdao.utils.coloring import compute_total_coloring
+from mpi4py import MPI
+
+from openmdao.utils.coloring import compute_total_coloring, _default_coloring_imagefile
 from openmdao.utils.mpi import MPI
-from openmdao.utils.hooks import _register_hook, _hooks, _unregister_hook
-
-from openmdao.utils.coloring import _default_coloring_imagefile
+from openmdao.utils.hooks import _register_hook, _unregister_hook
 from openmdao.visualization.n2_viewer.n2_viewer import _default_n2_filename
 from openmdao.visualization.scaling_viewer.scaling_report import _default_scaling_filename
+from openmdao.visualization.n2_viewer.n2_viewer import n2
 
-
+# Keeping track of the registered reports
 _Report = namedtuple('Report', 'func desc class_name inst_id method pre_or_post kwargs')
-
 _reports_registry = {}
+
 _reports_dir = '.'  # the default location for the reports
 
-# _Reports_Run = namedtuple('_Reports_Run', 'probname method pre_or_post' )
-# _reports_run = []
-
-_reports_run = {}
-
-def is_rank_0(prob):
-    # If MPI, only save reports on rank 0
+def _is_rank_0(prob):
+    # Utility function to determine if MPI and on rank0 or not on MPI at all
     on_rank0 = True
     if MPI:
         rank = prob.comm.rank
         if rank != 0:
             on_rank0 = False
-
-
-    print(f"on_rank0 = {on_rank0}")
-
     return on_rank0
 
 def unregister_report(name):
     if name not in _reports_registry:
         raise ValueError(f"Cannot unregister report because report with name '{name}' does not exist")
-
 
 def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=None, **kwargs):
     """
@@ -75,10 +66,8 @@ def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=N
     _reports_registry[name] = report
 
     if pre_or_post == 'pre':
-        # _register_hook(method, class_name, pre=func, inst_id=inst_id, ncalls=1)
         _register_hook(method, class_name, pre=func, inst_id=inst_id)
     elif pre_or_post == 'post':
-        # _register_hook(method, class_name, post=func, inst_id=inst_id, ncalls=1)
         _register_hook(method, class_name, post=func, inst_id=inst_id)
     else:
         raise ValueError(
@@ -87,25 +76,20 @@ def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=N
 
     return
 
-
-from openmdao.visualization.n2_viewer.n2_viewer import n2
-from collections import defaultdict
-
-
+#########      N2 report definition     #########
+# Need to create these closures so that functions can keep track of how many times they have
+#    been called per Problem (or Driver). In the case of the n2, it is Problem
 def run_n2_report_enclosing():
     def run_n2_report_inner(prob):
         run_n2_report_inner.calls[prob] += 1
-        if run_n2_report_inner.calls[prob] > 1:
+        if run_n2_report_inner.calls[prob] > 1: # Only do the report once per Problem
             return
 
         if 'OPENMDAO_REPORTS' in os.environ and os.environ['OPENMDAO_REPORTS'] in ['0', 'false', 'off']:
             return
 
-        print("run_n2_report")
-
-
         problem_reports_dirpath = get_reports_dir(prob)
-        if is_rank_0(prob):
+        if _is_rank_0(prob):
             pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
 
         n2_filepath = str(pathlib.Path(problem_reports_dirpath).joinpath(_default_n2_filename))
@@ -121,64 +105,27 @@ def run_n2_report_enclosing():
 
 run_n2_report = run_n2_report_enclosing()
 
-
-
-
-def run_n2_report_func(prob):
-    if 'OPENMDAO_REPORTS' in os.environ and os.environ['OPENMDAO_REPORTS'] in ['0', 'false', 'off']:
-        return
-
-    print("run_n2_report")
-
-
-    problem_reports_dirpath = get_reports_dir(prob)
-    if is_rank_0(prob):
-        pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
-
-    n2_filepath = str(pathlib.Path(problem_reports_dirpath).joinpath(_default_n2_filename))
-    try:
-        n2(prob, show_browser=False, outfile=n2_filepath, display_in_notebook=False)
-    except RuntimeError as err:
-        if str(err) != "Can't compute total derivatives unless " \
-                       "both 'of' or 'wrt' variables have been specified.":
-            raise err
-
-
-
+#########      scaling report definition     #########
 def run_scaling_report_enclosing():
     def run_scaling_report_inner(driver):
-
-
-        print("run_scaling_report_inner starting")
 
         run_scaling_report_inner.calls[driver] += 1
         if run_scaling_report_inner.calls[driver] > 1:
             return
 
-
         if 'OPENMDAO_REPORTS' in os.environ and os.environ['OPENMDAO_REPORTS'] in ['0', 'false',
                                                                                    'off']:
             return
 
-        print("run_scaling_report_inner driver._problem")
         prob = driver._problem()
         problem_reports_dirpath = get_reports_dir(prob)
-        print("run_scaling_report_inner scaling_filepath = str")
-
-
-
 
         scaling_filepath = str(
             pathlib.Path(problem_reports_dirpath).joinpath(_default_scaling_filename))
-        if is_rank_0(prob):
+        if _is_rank_0(prob):
             pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
 
-
-        print("run_scaling_report_inner prob.driver.scaling_report")
-
         try:
-            # prob.driver.scaling_report(outfile=scaling_filepath, show_browser=False,
-            #                            run_compute_totals=False)
             prob.driver.scaling_report(outfile=scaling_filepath, show_browser=False)
 
         # Need to handle the coloring and scaling reports which can fail in this way
@@ -192,53 +139,6 @@ def run_scaling_report_enclosing():
     return run_scaling_report_inner
 
 run_scaling_report = run_scaling_report_enclosing()
-
-
-
-
-
-def run_scaling_report_func(driver, **kwargs):
-    """
-    Run the scaling report.
-
-    Created for the reporting system, which expects the reporting functions to have Problem as
-    their first argument.
-
-    Parameters
-    ----------
-    prob : Problem
-        The problem used for the scaling report.
-    **kwargs : dict
-        Optional args for the scaling report function.
-    """
-    if 'OPENMDAO_REPORTS' in os.environ and os.environ['OPENMDAO_REPORTS'] in ['0', 'false', 'off']:
-        return
-
-    # Keep track of what was run so we don't do it again. Prevents issues with recursion
-    # report_run = _Reports_Run(prob._name, method, pre_or_post)
-    # if report_run in _reports_run:
-    #     return
-    # _reports_run.append(report_run)
-
-    prob = driver._problem()
-    problem_reports_dirpath = get_reports_dir(prob)
-
-    scaling_filepath = str(pathlib.Path(problem_reports_dirpath).joinpath(_default_scaling_filename))
-    if is_rank_0(prob):
-        pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
-
-    try:
-        prob.driver.scaling_report(outfile=scaling_filepath, show_browser=False, run_compute_totals=False)
-
-    # Need to handle the coloring and scaling reports which can fail in this way
-    #   because total Jacobian can't be computed
-    except RuntimeError as err:
-        if str(err) != "Can't compute total derivatives unless " \
-                       "both 'of' or 'wrt' variables have been specified.":
-            raise err
-
-
-
 
 def run_coloring_report_enclosing():
     def run_coloring_report_inner(driver):
@@ -256,7 +156,7 @@ def run_coloring_report_enclosing():
         problem_reports_dirpath = get_reports_dir(prob)
 
         coloring_filepath = str(pathlib.Path(problem_reports_dirpath).joinpath(_default_coloring_imagefile))
-        if is_rank_0(prob):
+        if _is_rank_0(prob):
             pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
 
         coloring = compute_total_coloring(prob)
@@ -291,7 +191,7 @@ def run_coloring_report_func(driver, **kwargs):
     problem_reports_dirpath = get_reports_dir(prob)
 
     coloring_filepath = str(pathlib.Path(problem_reports_dirpath).joinpath(_default_coloring_imagefile))
-    if is_rank_0(prob):
+    if _is_rank_0(prob):
         pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
 
     coloring = compute_total_coloring(prob, **kwargs)
@@ -423,84 +323,6 @@ def list_reports(out_stream=None):
 
     out_stream.write('\n')
 
-#
-# def run_reports(prob, method, pre_or_post):
-#     """
-#     Run all the registered reports.
-#
-#     It takes into account the specifics of when and if
-#     they should be run at this point. This function is called from various methods of
-#     Problem.
-#
-#     Parameters
-#     ----------
-#     prob : Problem
-#         OpenMDAO Problem instance.
-#     method : str
-#         Name of the method in Problem that this is called from.
-#     pre_or_post : str
-#         Where in the Problem method that this was called from. Only valid values are 'pre' and
-#         'post'.
-#     """
-#     global _reports_dir
-#     global _reports_registry
-#
-#     # If MPI, only save reports on rank 0
-#     on_rank0 = True
-#     if MPI:
-#         rank = prob.comm.rank
-#         if rank != 0:
-#             on_rank0 = False
-#
-#     # Keep track of what was run so we don't do it again. Prevents issues with recursion
-#     report_run = _Reports_Run(prob._name, method, pre_or_post)
-#     if report_run in _reports_run:
-#         return
-#     _reports_run.append(report_run)
-#
-#     # No running of reports when running under testflo
-#     if 'TESTFLO_RUNNING' in os.environ:
-#         return
-#
-#     # The user can define OPENMDAO_REPORTS to turn off reporting
-#     if 'OPENMDAO_REPORTS' in os.environ and os.environ['OPENMDAO_REPORTS'] in ['0', 'false', 'off']:
-#         return
-#
-#     # The user can define where to put the reports using an environment variables
-#     reports_dir = os.environ.get('OPENMDAO_REPORTS_DIR', _reports_dir)
-#
-#     # loop through reports registry looking for matches
-#     for report in _reports_registry:
-#         if report.probname and report.probname != prob._name:
-#             continue
-#         if report.method != method:
-#             continue
-#         if report.pre_or_post == pre_or_post:
-#             # make the problem reports dir
-#             problem_reports_dirname = f'{prob._name}_reports'
-#             problem_reports_dirpath = pathlib.Path(reports_dir).joinpath(problem_reports_dirname)
-#
-#             if on_rank0:
-#                 # if not os.path.isdir(problem_reports_dirpath):
-#                 #     os.mkdir(problem_reports_dirpath)
-#                 #
-#                 pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
-#
-#             current_cwd = pathlib.Path.cwd()
-#             os.chdir(problem_reports_dirpath)
-#
-#             try:
-#                 report.func(prob, **report.kwargs)
-#             # Need to handle the coloring and scaling reports which can fail in this way
-#             #   because total Jacobian can't be computed
-#             except RuntimeError as err:
-#                 if str(err) != "Can't compute total derivatives unless " \
-#                                    "both 'of' or 'wrt' variables have been specified.":
-#                     raise err
-#             finally:
-#                 os.chdir(current_cwd)
-
-
 def clear_reports():
     """
     Clear all of the reports from the registry.
@@ -509,29 +331,12 @@ def clear_reports():
 
     # need to remove the hooks
     for name, report in _reports_registry.items():
-        #                 val = getattr(report, column_name)
-        #    List of (hook_func, ncalls, exit) tuples
-
         if getattr(report, 'pre_or_post') == "pre":
             _unregister_hook(getattr(report, 'method'), getattr(report, 'class_name'), inst_id=getattr(report, 'inst_id'), pre=getattr(report, 'func'))
         else:
             _unregister_hook(getattr(report, 'method'), getattr(report, 'class_name'), inst_id=getattr(report, 'inst_id'), post=getattr(report, 'func'))
-
-        # _remove_hook(getattr(report, 'func'),
-        #              [(getattr(report, 'func'), 1, False)],
-        #              getattr(report, 'class_name'),
-        #              getattr(report, 'method'),
-        #              getattr(report, 'pre_or_post'),
-        #              )
     _reports_registry = {}
 
 
-def clear_reports_run():
-    global _reports_run
-    _reports_run = []
-
-
-# if 'TESTFLO_RUNNING' not in os.environ:
-#     setup_default_reports()
 setup_default_reports()
 
