@@ -196,13 +196,14 @@ class SqliteRecorder(CaseRecorder):
             The communicator for the recorder (should be the comm for the Problem).
         """
         if MPI and comm:
-            if self._parallel and self._record_on_proc:
-                rank = comm.rank
+            rank = comm.rank
+            ranks = comm.allgather((rank, self._record_on_proc))
+            recording_ranks = [rnk for rnk, rec in ranks if rec]
+            if len(recording_ranks) > 1 and rank in recording_ranks:
                 filepath = f"{self._filepath}_{rank}"
                 print("Note: SqliteRecorder is running on multiple processors. "
                       f"Cases from rank {rank} are being written to {filepath}.")
-                ranks = comm.allgather(rank)
-                if rank == min(ranks):
+                if rank == min(recording_ranks):
                     metadata_filepath = f'{self._filepath}_meta'
                     print(f"Note: Metadata is being recorded separately as {metadata_filepath}.")
                     try:
