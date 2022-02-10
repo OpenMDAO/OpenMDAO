@@ -43,7 +43,7 @@ class CaseRecorder(object):
         Solver abs_error value, to be used by a derived recorder.
     _iteration_coordinate : str
         The unique iteration coordinate of where an iteration originates.
-    _parallel : bool
+    parallel : bool
         Designates if the current recorder is parallel-recording-capable.
     record_on_proc : bool or _UNDEFINED
         Flag indicating if this recorder will record on the current process.
@@ -77,7 +77,7 @@ class CaseRecorder(object):
         # By default, this is False, but it should be set to True
         # if the recorder will record data on multiple processes to avoid
         # unnecessary gathering.
-        self._parallel = False
+        self.parallel = False
 
         # Flag indicating if recording will be performed on the current process
         # Defaults to undefined indicating the default behavior, which is normally
@@ -272,7 +272,7 @@ class CaseRecorder(object):
         **kwargs : keyword args
             Some implementations of record_derivatives need additional args.
         """
-        if not self._parallel:
+        if not self.parallel:
             if MPI and MPI.COMM_WORLD.rank > 0:
                 raise RuntimeError("Non-parallel recorders should not be recording on ranks > 0")
 

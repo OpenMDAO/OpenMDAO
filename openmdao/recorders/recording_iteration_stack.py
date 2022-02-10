@@ -19,22 +19,22 @@ class _RecIteration(object):
         A list that holds the stack of iteration coordinates.
     prefix : str or None
         Prefix to prepend to iteration coordinates.
-    comm : MPI.Comm or <FakeComm> or None
-        The communicator to use when generating iteration coordinates.
+    rank : int
+        The MPI rank to use when constructing iteration coordinates.
     """
 
-    def __init__(self, comm=None):
+    def __init__(self, rank=0):
         """
         Initialize.
 
         Parameters
         ----------
-        comm : MPI.Comm or <FakeComm> or None
-            The communicator to use when generating iteration coordinates.
+        rank : int
+            The MPI rank to use when constructing iteration coordinates.
         """
         self.stack = []
         self.prefix = None
-        self.comm = comm
+        self.rank = 0
         self._norec_refcount = 0
 
     def print_recording_iteration_stack(self):
@@ -67,10 +67,7 @@ class _RecIteration(object):
         else:
             prefix = ''
 
-        if self.comm:
-            prefix += f'rank{self.comm.rank}:'
-        else:
-            prefix += 'rank0:'
+        prefix += f'rank{self.rank}:'
 
         # iteration hierarchy
         coord_list = []

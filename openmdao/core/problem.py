@@ -948,7 +948,7 @@ class Problem(object):
             'name': self._name,  # the name of this Problem
             'comm': comm,
             'coloring_dir': self.options['coloring_dir'],  # directory for coloring files
-            'recording_iter': _RecIteration(comm),  # manager of recorder iterations
+            'recording_iter': _RecIteration(comm.rank),  # manager of recorder iterations
             'local_vector_class': local_vector_class,
             'distributed_vector_class': distributed_vector_class,
             'solver_info': SolverInfo(),
@@ -994,7 +994,6 @@ class Problem(object):
         started, and the rest of the framework is prepared for execution.
         """
         driver = self.driver
-        comm = self.comm
 
         response_size, desvar_size = driver._update_voi_meta(self.model)
 
@@ -1006,7 +1005,7 @@ class Problem(object):
             mode = self._orig_mode
 
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-            self.model._final_setup(comm)
+            self.model._final_setup(self.comm)
 
         driver._setup_driver(self)
 

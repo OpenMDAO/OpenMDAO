@@ -107,7 +107,7 @@ class RecordingManager(object):
             # Each of the recorders determines its self._filtered_* list of vars to record
             recorder.startup(recording_requester, comm)
 
-            if not recorder._parallel:
+            if not recorder.parallel:
                 self._has_serial_recorders = True
 
     def shutdown(self):
@@ -172,7 +172,7 @@ class RecordingManager(object):
             metadata['timestamp'] = time.time()
 
         for recorder in self._recorders:
-            if recorder._parallel or MPI is None or self.rank == 0:
+            if recorder.parallel or MPI is None or self.rank == 0:
                 recorder.record_derivatives(recording_requester, data, metadata)
 
     def has_recorders(self):
@@ -187,7 +187,7 @@ class RecordingManager(object):
         return True if self._recorders else False
 
     def _check_parallel(self):
-        pset = {bool(r._parallel) for r in self._recorders}
+        pset = {bool(r.parallel) for r in self._recorders}
 
         # check to make sure we don't have mixed parallel/non-parallel, because that
         # currently won't work properly.
