@@ -207,7 +207,6 @@ class SqliteRecorder(CaseRecorder):
                     filepath = f"{self._filepath}_{rank}"
                     print("Note: SqliteRecorder is running on multiple processors. "
                           f"Cases from rank {rank} are being written to {filepath}.")
-                    print(f"{rank=} {recording_ranks=}")
                     if rank == min(recording_ranks):
                         metadata_filepath = f'{self._filepath}_meta'
                         print("Note: Metadata is being recorded separately as "
