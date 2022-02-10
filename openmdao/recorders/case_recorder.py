@@ -180,7 +180,7 @@ class CaseRecorder(object):
         **kwargs : keyword args
             Some implementations of record_iteration need additional args.
         """
-        if self._record_on_proc:
+        if self.record_on_proc:
             self._counter += 1
 
             self._iteration_coordinate = \
@@ -272,10 +272,6 @@ class CaseRecorder(object):
         **kwargs : keyword args
             Some implementations of record_derivatives need additional args.
         """
-        if not self.parallel:
-            if MPI and MPI.COMM_WORLD.rank > 0:
-                raise RuntimeError("Non-parallel recorders should not be recording on ranks > 0")
-
         self._iteration_coordinate = \
             recording_requester._recording_iter.get_formatted_iteration_coordinate()
 

@@ -197,7 +197,7 @@ class SqliteRecorder(CaseRecorder):
         """
         filepath = None
 
-        if MPI and comm:
+        if MPI and comm and comm.size > 1:
             rank = comm.rank
             record_on_ranks = comm.allgather(self.record_on_proc)
             if True in record_on_ranks:
@@ -285,7 +285,7 @@ class SqliteRecorder(CaseRecorder):
                               "solver_options BLOB, solver_class TEXT)")
 
         self._database_initialized = True
-        if MPI and self.parallel:
+        if MPI and comm and comm.size > 1:
             comm.barrier()
 
     def _cleanup_abs2meta(self):

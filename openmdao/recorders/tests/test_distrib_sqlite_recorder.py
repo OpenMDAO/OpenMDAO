@@ -300,7 +300,9 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.run_model()
         prob.record('final')
 
-    def test_regression_bug_fix_issue_2062_sql_meta_file_running_parallel(self):
+    def test_sql_meta_file_exists(self):
+        # Check that an existing sql_meta file will be deleted/overwritten
+        # if it already exists before a run. (see Issue #2062)
         prob = om.Problem()
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
@@ -318,8 +320,7 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        # Run this again. Because of the bug fix for issue 2062, this code should NOT
-        #   throw an exception
+        # Run this again. It should NOT throw an exception.
         prob = om.Problem()
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])

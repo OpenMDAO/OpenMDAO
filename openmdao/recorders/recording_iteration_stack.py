@@ -30,7 +30,7 @@ class _RecIteration(object):
         Parameters
         ----------
         rank : int
-            The MPI rank to use when constructing iteration coordinates.
+            The rank to use when constructing iteration coordinates.
         """
         self.stack = []
         self.prefix = None
