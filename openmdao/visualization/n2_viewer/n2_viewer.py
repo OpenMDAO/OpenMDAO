@@ -36,6 +36,7 @@ _MAX_ARRAY_SIZE_FOR_REPR_VAL = 1000  # If var has more elements than this do not
 
 _default_n2_filename = 'n2.html'
 
+
 def _convert_nans_in_nested_list(val_as_list):
     """
     Given a list, possibly nested, replace any numpy.nan values with the string "nan".

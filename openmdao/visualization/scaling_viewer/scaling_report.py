@@ -18,6 +18,7 @@ from openmdao.utils.file_utils import _load_and_exec
 
 _default_scaling_filename = 'driver_scaling_report.html'
 
+
 def _unscale(val, scaler, adder, default=''):
     if val is None:
         return default

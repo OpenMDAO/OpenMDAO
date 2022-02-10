@@ -20,7 +20,8 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import sizes2offsets, convert_neg
 from openmdao.vectors.vector import _full_slice
 from openmdao.utils.indexer import indexer
-from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, MPIWarning, warn_deprecation
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, MPIWarning, \
+    warn_deprecation
 from openmdao.utils.hooks import _setup_hooks
 
 

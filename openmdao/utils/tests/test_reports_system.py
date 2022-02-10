@@ -46,7 +46,7 @@ class TestReportsSystem(unittest.TestCase):
         # But we need to remember whether it was set so we can restore it
         self.testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
         clear_reports()
-        set_reports_dir('.')
+        set_reports_dir(_reports_dir)
         setup_default_reports()
 
         self.count = 0
@@ -168,10 +168,8 @@ class TestReportsSystem(unittest.TestCase):
 
     @hooks_active
     def test_report_generation_list_reports(self):
-
         stdout = sys.stdout
         strout = StringIO()
-
         sys.stdout = strout
         try:
             list_reports()
@@ -179,12 +177,12 @@ class TestReportsSystem(unittest.TestCase):
             sys.stdout = stdout
 
         output = strout.getvalue()
-
         self.assertTrue('N2 diagram' in output, '"N2 diagram" expected in list_reports output but was not found')
         self.assertTrue('Driver scaling report' in output, '"Driver scaling report" expected in list_reports output but was not found')
 
     @hooks_active
     def test_report_generation_no_reports(self):
+        # test use of the OPENMDAO_REPORTS variable to turn off reporting
         os.environ['OPENMDAO_REPORTS'] = 'false'
 
         prob = self.setup_and_run_simple_problem()
@@ -201,6 +199,7 @@ class TestReportsSystem(unittest.TestCase):
 
     @hooks_active
     def test_report_generation_set_reports_dir(self):
+        # test use of setting a custom reports directory other than the default of "."
         custom_dir = 'custom_reports_dir'
         os.environ['OPENMDAO_REPORTS_DIR'] = custom_dir
 
@@ -224,27 +223,13 @@ class TestReportsSystem(unittest.TestCase):
             user_report_filepath = str(
                 pathlib.Path(problem_reports_dirpath).joinpath(user_report_filename))
 
-            on_rank0 = True
-            if MPI:
-                rank = prob.comm.rank
-                if rank != 0:
-                    on_rank0 = False
-
-
-            if on_rank0:
-                # if not os.path.isdir(problem_reports_dirpath):
-                #     os.mkdir(problem_reports_dirpath)
-                #
-                pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
+            pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
 
             with open(user_report_filepath, "w") as f:
                 f.write(f"Do some reporting on the Problem, {prob._name}\n")
 
-        # register_report(user_defined_report, 'user defined report', 'setup', 'pre')
-
-        # register_report(user_defined_report, 'setup', 'pre', 'Problem')
-
-        register_report("User defined report", user_defined_report, "user defined report", 'Problem', 'setup', 'pre')
+        register_report("User defined report", user_defined_report, "user defined report",
+                        'Problem', 'setup', 'pre')
 
         prob = self.setup_and_run_simple_problem()
 
@@ -259,10 +244,15 @@ class TestReportsSystem(unittest.TestCase):
         # check those all work
 
         self.count = 0
+
+        # A simple report
         def user_defined_report(prob):
             problem_reports_dirpath = get_reports_dir(prob)
             pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
 
+            # Use the self.count value to give the reports a unique name
+            # Ideally we would be able to pass a filename in when registering a report
+            #   but report registration does not support kwargs yet
             user_defined_report_filepath = str(pathlib.Path(problem_reports_dirpath).joinpath(f"user_defined_{self.count}.txt"))
 
             with open(user_defined_report_filepath, "w") as f:
@@ -271,23 +261,12 @@ class TestReportsSystem(unittest.TestCase):
 
         for method in ['setup', 'final_setup', 'run_driver']:
             for pre_or_post in ['pre', 'post']:
-                user_report_filename = f'{pre_or_post}_{method}.txt'
-                # register_report(user_defined_report, f'user defined report {pre_or_post} {method}',
-                #                 method, pre_or_post, filename=user_report_filename)
-                # register_report(user_defined_report, method, pre_or_post, 'Problem')
                 register_report(f"User defined report {method} {pre_or_post}", user_defined_report, "user defined report",
                                 'Problem', method, pre_or_post)
 
         prob = self.setup_and_run_simple_problem()
 
         problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{prob._name}_reports')
-        #
-        # for method in ['setup', 'final_setup', 'run_driver']:
-        #     for pre_or_post in ['pre', 'post']:
-        #         user_report_filename = f'{pre_or_post}_{method}.txt'
-        #         path = pathlib.Path(problem_reports_dir).joinpath(user_report_filename)
-        #         self.assertTrue(path.is_file(),
-        #                         f'The user defined report file, {str(path)} was not found')
 
         self.count = 0
         for method in ['setup', 'final_setup', 'run_driver']:
@@ -305,9 +284,8 @@ class TestReportsSystem(unittest.TestCase):
         for problem_name in [probname, subprobname]:
             problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{problem_name}_reports')
             path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
-            self.assertTrue(path.is_file(),
-                            f'N2 report file, {str(path)} was not found')
-            path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
+            self.assertTrue(path.is_file(), f'N2 report file, {str(path)} was not found')
+            path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
             self.assertFalse(path.is_file(),
                              f'Scaling report file, {str(path)}, was found but should not have')
 
@@ -318,30 +296,27 @@ class TestReportsSystem(unittest.TestCase):
 
         # to simplify things, just do n2.
         clear_reports()
-        # register_report(n2, 'create n2', 'final_setup', 'post', probname='problem2',
-        #                 show_browser=False)
-
         register_report("n2_report", run_n2_report, 'N2 diagram', 'Problem', 'final_setup', 'post',
                         inst_id='problem2')
 
         probname, subprobname = self.setup_and_run_model_with_subproblem()
 
         problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{subprobname}_reports')
-
-        path = pathlib.Path(problem_reports_dir).joinpath('n2.html')
-        # for the subproblem Problem named problem2, there should be a report but not for problem1
+        path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
+        # for the subproblem named problem2, there should be a report but not for problem1 since
+        #    we specifically asked for just the instance of problem2
         self.assertTrue(path.is_file(), f'The n2 report file, {str(path)} was not found')
 
         problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{probname}_reports')
-        path = pathlib.Path(problem_reports_dir).joinpath('n2.html')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
         self.assertFalse(path.is_file(),
                          f'The N2 report file, {str(path)} was found but should not have')
 
     @hooks_active
     def test_report_generation_test_TESTFLO_RUNNING(self):
-        os.environ['TESTFLO_RUNNING'] = 'true'
         # need to do this here again even though it is done in setup, because otherwise
-        # setup_default_reports won't see environment variable, TESTFLO_RUNNING, we set in this test
+        # setup_default_reports won't see environment variable, TESTFLO_RUNNING
+        os.environ['TESTFLO_RUNNING'] = 'true'
         clear_reports()
         setup_default_reports()
 
@@ -355,8 +330,6 @@ class TestReportsSystem(unittest.TestCase):
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertFalse(path.is_file(),
                          f'The scaling report file, {str(path)}, was found but should not have')
-
-# TODO try different drivers?
 
 @use_tempdirs
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -377,7 +350,7 @@ class TestReportsSystemMPI(unittest.TestCase):
         # But we need to remember whether it was set so we can restore it
         self.testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
         clear_reports()
-        set_reports_dir('.')
+        set_reports_dir(_reports_dir)
         setup_default_reports()
 
         self.count = 0  # used to keep a count of reports generated

@@ -10,7 +10,6 @@ from collections import defaultdict
 
 from mpi4py import MPI
 
-from openmdao.utils.coloring import compute_total_coloring, _default_coloring_imagefile
 from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook, _unregister_hook
 from openmdao.visualization.n2_viewer.n2_viewer import _default_n2_filename
@@ -23,6 +22,7 @@ _reports_registry = {}
 
 _reports_dir = '.'  # the default location for the reports
 
+
 def _is_rank_0(prob):
     # Utility function to determine if MPI and on rank0 or not on MPI at all
     on_rank0 = True
@@ -32,9 +32,20 @@ def _is_rank_0(prob):
             on_rank0 = False
     return on_rank0
 
+
 def unregister_report(name):
+    """
+    Unregister a report from the reports system.
+
+    Parameters
+    ----------
+    name : str
+        Name of the report to remove from the reports system.
+    """
     if name not in _reports_registry:
-        raise ValueError(f"Cannot unregister report because report with name '{name}' does not exist")
+        raise ValueError(f"Cannot unregister report because report with name '{name}' does "
+                         "not exist")
+
 
 def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=None, **kwargs):
     """
@@ -48,13 +59,15 @@ def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=N
         A function to do the reporting. Expects the first argument to be a Problem instance.
     desc : str
         A description of the report.
+    class_name : str
+        The name of the class owning the method where the report will be run.
     method : str
         In which method of the Problem should this be run.
     pre_or_post : str
         Valid values are 'pre' and 'post'. Indicates when to run the report in the method.
-    probname : str or None
-        Either the name of a Problem or None. If None, then this report will be run for all
-        Problems.
+    inst_id : str or None
+        Either the instance ID of an OpenMDAO object (e.g. Problem, Driver) or None.
+        If None, then this report will be run for all objects of type class_name.
     **kwargs : dict
         Optional args for the reporting function.
     """
@@ -76,16 +89,18 @@ def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=N
 
     return
 
-#########      N2 report definition     #########
+
+# N2 report definition
 # Need to create these closures so that functions can keep track of how many times they have
 #    been called per Problem (or Driver). In the case of the n2, it is Problem
-def run_n2_report_enclosing():
+def _run_n2_report_enclosing():
     def run_n2_report_inner(prob):
         run_n2_report_inner.calls[prob] += 1
-        if run_n2_report_inner.calls[prob] > 1: # Only do the report once per Problem
+        if run_n2_report_inner.calls[prob] > 1:  # Only do the report once per Problem
             return
 
-        if 'OPENMDAO_REPORTS' in os.environ and os.environ['OPENMDAO_REPORTS'] in ['0', 'false', 'off']:
+        if 'OPENMDAO_REPORTS' in os.environ and os.environ['OPENMDAO_REPORTS'] in ['0', 'false',
+                                                                                   'off']:
             return
 
         problem_reports_dirpath = get_reports_dir(prob)
@@ -103,10 +118,12 @@ def run_n2_report_enclosing():
     run_n2_report_inner.calls = defaultdict(int)
     return run_n2_report_inner
 
-run_n2_report = run_n2_report_enclosing()
 
-#########      scaling report definition     #########
-def run_scaling_report_enclosing():
+run_n2_report = _run_n2_report_enclosing()
+
+
+# scaling report definition
+def _run_scaling_report_enclosing():
     def run_scaling_report_inner(driver):
 
         run_scaling_report_inner.calls[driver] += 1
@@ -138,34 +155,22 @@ def run_scaling_report_enclosing():
     run_scaling_report_inner.calls = defaultdict(int)
     return run_scaling_report_inner
 
-run_scaling_report = run_scaling_report_enclosing()
+
+run_scaling_report = _run_scaling_report_enclosing()
+
 
 def setup_default_reports():
     """
     Set up the default reports for all OpenMDAO runs.
     """
-    # with open(f"rank_{MPI.COMM_WORLD.rank}.log", "a") as f:
-    #     f.write("setup_default_reports\n")
-    from openmdao.visualization.n2_viewer.n2_viewer import n2
     if 'TESTFLO_RUNNING' in os.environ:
         return
 
-    # def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=None, **kwargs):
+    register_report("n2_report", run_n2_report, 'N2 diagram', 'Problem',
+                    'final_setup', 'post', inst_id=None)
+    register_report("scaling_report", run_scaling_report, 'Driver scaling report', 'Driver',
+                    '_compute_totals', 'post', inst_id=None)
 
-    register_report("n2_report", run_n2_report, 'N2 diagram', 'Problem', 'final_setup', 'post', inst_id=None)
-    register_report("scaling_report", run_scaling_report, 'Driver scaling report', 'Driver', '_compute_totals', 'post', inst_id=None)
-    # register_report("coloring report", run_coloring_report, 'Coloring report', 'Driver', '_compute_totals', 'post', inst_id=None)
-    # register_report("coloring report", run_coloring_report, 'Coloring report', 'Problem', 'final_setup', 'post', inst_id=None)
-    #
-
-    # register_report(n2, 'N2 diagram', 'final_setup', 'post', probname=None, show_browser=False, display_in_notebook=False)
-    # register_report(run_scaling_report, 'Driver scaling report', 'final_setup', 'post',
-    #                 probname=None, show_browser=False)
-    # register_report(run_coloring_report, 'Coloring report', 'final_setup', 'post', probname=None)
-    pass
-
-
-_reports_dir = '.'  # the default location for the reports
 
 def set_reports_dir(reports_dir_path):
     """
@@ -179,19 +184,27 @@ def set_reports_dir(reports_dir_path):
     global _reports_dir
     _reports_dir = reports_dir_path
 
+
 def get_reports_dir(prob):
+    """
+    Get the path to the directory where the reports files should go.
+
+    Parameters
+    ----------
+    prob : OpenMDAO Problem object
+        The report will be run on this Problem.
+
+    Returns
+    -------
+    str
+        The path to the directory where reports should be written.
+    """
     reports_dir = os.environ.get('OPENMDAO_REPORTS_DIR', _reports_dir)
 
     problem_reports_dirname = f'{prob._name}_reports'
     problem_reports_dirpath = pathlib.Path(reports_dir).joinpath(problem_reports_dirname)
 
     return problem_reports_dirpath
-
-
-
-
-
-
 
 
 def list_reports(out_stream=None):
@@ -264,6 +277,7 @@ def list_reports(out_stream=None):
 
     out_stream.write('\n')
 
+
 def clear_reports():
     """
     Clear all of the reports from the registry.
@@ -273,11 +287,12 @@ def clear_reports():
     # need to remove the hooks
     for name, report in _reports_registry.items():
         if getattr(report, 'pre_or_post') == "pre":
-            _unregister_hook(getattr(report, 'method'), getattr(report, 'class_name'), inst_id=getattr(report, 'inst_id'), pre=getattr(report, 'func'))
+            _unregister_hook(getattr(report, 'method'), getattr(report, 'class_name'),
+                             inst_id=getattr(report, 'inst_id'), pre=getattr(report, 'func'))
         else:
-            _unregister_hook(getattr(report, 'method'), getattr(report, 'class_name'), inst_id=getattr(report, 'inst_id'), post=getattr(report, 'func'))
+            _unregister_hook(getattr(report, 'method'), getattr(report, 'class_name'),
+                             inst_id=getattr(report, 'inst_id'), post=getattr(report, 'func'))
     _reports_registry = {}
 
 
 setup_default_reports()
-
