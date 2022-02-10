@@ -595,13 +595,15 @@ class _TotalJacInfo(object):
 
         for name in input_list:
             if name in model._responses and model._responses[name]['path'] is not None:
-                name = model._responses[name]['path']
+                path = model._responses[name]['path']
+            else:
+                path = name
 
-            if name not in abs2meta_out:
+            if path not in abs2meta_out:
                 # could be promoted input name
-                abs_in = model._var_allprocs_prom2abs_list['input'][name][0]
-                name = model._conn_global_abs_in2out[abs_in]
-            in_var_meta = abs2meta_out[name]
+                abs_in = model._var_allprocs_prom2abs_list['input'][path][0]
+                path = model._conn_global_abs_in2out[abs_in]
+            in_var_meta = abs2meta_out[path]
 
             if name in vois:
                 # if name is in vois, then it has been declared as either a design var or
@@ -641,7 +643,7 @@ class _TotalJacInfo(object):
                 in_idxs = parallel_deriv_color = None
                 cache_lin_sol = False
 
-            in_var_idx = abs2idx[name]
+            in_var_idx = abs2idx[path]
             sizes = var_sizes['output']
             offsets = var_offsets['output']
             gstart = np.sum(sizes[:iproc, in_var_idx])
@@ -714,8 +716,8 @@ class _TotalJacInfo(object):
                 imeta['idx_list'] = range(start, end)
                 idx_iter_dict[name] = (imeta, self.single_index_iter)
 
-            if name in relevant and not non_rel_outs:
-                tup = (ndups, relevant[name]['@all'][1], cache_lin_sol)
+            if path in relevant and not non_rel_outs:
+                tup = (ndups, relevant[path]['@all'][1], cache_lin_sol)
             else:
                 tup = (ndups, _contains_all, cache_lin_sol)
 
@@ -798,7 +800,6 @@ class _TotalJacInfo(object):
         slices = model._vectors['output']['linear'].get_slice_dict()
         abs2idx = model._var_allprocs_abs2idx
         jstart = jend = 0
-        temp_path = False
 
         for name in names:
             indices = vois[name]['indices'] if name in vois else None
@@ -814,17 +815,17 @@ class _TotalJacInfo(object):
                 else:
                     sz = meta['size']
 
+            # Support for constraint aliases.
             if name in self.responses and 'path' in self.responses[name] and \
                     self.responses[name]['path'] is not None:
-                temp_path = self.responses[name]['path']
+                path = self.responses[name]['path']
+            else:
+                path = name
 
-            if (name in abs2idx and name in slices and name not in self.remote_vois) or temp_path:
-                if temp_path:
-                    var_idx = abs2idx[temp_path]
-                    slc = slices[temp_path]
-                else:
-                    var_idx = abs2idx[name]
-                    slc = slices[name]
+            if (path in abs2idx and path in slices and path not in self.remote_vois):
+                var_idx = abs2idx[path]
+                slc = slices[path]
+
                 if MPI and meta['distributed'] and self.get_remote:
                     if indices is not None:
                         local_idx, sizes_idx, _ = self._dist_driver_vars[name]
@@ -851,7 +852,7 @@ class _TotalJacInfo(object):
                     if fwd or not self.get_remote:
                         name2jinds[name] = jac_inds[-1]
 
-            if name not in self.remote_vois:
+            if path not in self.remote_vois:
                 jend += sz
                 jstart = jend
 
@@ -1391,7 +1392,7 @@ class _TotalJacInfo(object):
                 model.comm.Bcast(contig, root=rank)
                 self.J[:, start:stop] = contig
 
-        if debug_print:
+        if True or debug_print:
             # Debug outputs scaled derivatives.
             self._print_derivatives()
 
@@ -1539,6 +1540,12 @@ class _TotalJacInfo(object):
         if np.any(col):  # there's at least 1 row that's zero across all columns
             zero_rows = []
             for name, tup in self.of_meta.items():
+
+                # Support for constraint aliases.
+                if name in self.responses and 'path' in self.responses[name] and \
+                        self.responses[name]['path'] is not None:
+                    name = self.responses[name]['path']
+
                 zero_idxs = self._get_zero_inds(name, tup, col)
 
                 if zero_idxs[0].size > 0:
@@ -1564,6 +1571,12 @@ class _TotalJacInfo(object):
         if np.any(row):  # there's at least 1 col that's zero across all rows
             zero_cols = []
             for name, tup in self.wrt_meta.items():
+
+                # Support for constraint aliases.
+                if name in self.responses and 'path' in self.responses[name] and \
+                        self.responses[name]['path'] is not None:
+                    name = self.responses[name]['path']
+
                 zero_idxs = self._get_zero_inds(name, tup, row)
 
                 if zero_idxs[0].size > 0:
