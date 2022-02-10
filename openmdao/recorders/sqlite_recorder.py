@@ -186,7 +186,7 @@ class SqliteRecorder(CaseRecorder):
 
         super().__init__(record_viewer_data)
 
-    def _initialize_database(self, comm=None):
+    def _initialize_database(self, comm):
         """
         Initialize the database.
 
@@ -195,31 +195,36 @@ class SqliteRecorder(CaseRecorder):
         comm : MPI.Comm or <FakeComm> or None
             The communicator for the recorder (should be the comm for the Problem).
         """
+        filepath = None
+
         if MPI and comm:
             rank = comm.rank
-            ranks = comm.allgather((rank, self._record_on_proc))
-            recording_ranks = [rnk for rnk, rec in ranks if rec]
-            if len(recording_ranks) > 1 and rank in recording_ranks:
-                filepath = f"{self._filepath}_{rank}"
-                print("Note: SqliteRecorder is running on multiple processors. "
-                      f"Cases from rank {rank} are being written to {filepath}.")
-                if rank == min(recording_ranks):
-                    metadata_filepath = f'{self._filepath}_meta'
-                    print(f"Note: Metadata is being recorded separately as {metadata_filepath}.")
-                    try:
-                        os.remove(metadata_filepath)
-                        issue_warning('The existing case recorder metadata file, '
-                                      f'{metadata_filepath}, is being overwritten.',
-                                      category=UserWarning)
-                    except OSError:
-                        pass
-                    self.metadata_connection = sqlite3.connect(metadata_filepath)
-                else:
-                    self._record_metadata = False
-            elif self._record_on_proc:
+            record_on_ranks = comm.allgather(self.record_on_proc)
+            if True in record_on_ranks:
+                # recording ranks have been specified
+                recording_ranks = [rnk for rnk, rec in enumerate(record_on_ranks) if rec is True]
+                if len(recording_ranks) > 1 and rank in recording_ranks:
+                    filepath = f"{self._filepath}_{rank}"
+                    print("Note: SqliteRecorder is running on multiple processors. "
+                          f"Cases from rank {rank} are being written to {filepath}.")
+                    print(f"{rank=} {recording_ranks=}")
+                    if rank == min(recording_ranks):
+                        metadata_filepath = f'{self._filepath}_meta'
+                        print("Note: Metadata is being recorded separately as "
+                              f"{metadata_filepath}.")
+                        try:
+                            os.remove(metadata_filepath)
+                            issue_warning('The existing case recorder metadata file, '
+                                          f'{metadata_filepath}, is being overwritten.',
+                                          category=UserWarning)
+                        except OSError:
+                            pass
+                        self.metadata_connection = sqlite3.connect(metadata_filepath)
+                    else:
+                        self._record_metadata = False
+            elif rank == 0:
+                # recording ranks have not been specified, default to recording only on rank 0
                 filepath = self._filepath
-            else:
-                filepath = None
         else:
             filepath = self._filepath
 
@@ -313,7 +318,7 @@ class SqliteRecorder(CaseRecorder):
                 var_settings[name][prop] = make_serializable(var_settings[name][prop])
         return var_settings
 
-    def startup(self, recording_requester, comm=None):
+    def startup(self, recording_requester, comm):
         """
         Prepare for a new run and create/update the abs2prom and prom2abs variables.
 

@@ -256,17 +256,17 @@ class DOEDriver(Driver):
                     # of parallel DOEs (i.e. on the root procs for the cases)
                     if isinstance(recorder, SqliteRecorder):
                         if procs_per_model == 1:
-                            recorder._record_on_proc = True
+                            recorder.record_on_proc = True
                         else:
                             size = self._problem_comm.size // procs_per_model
                             if self._problem_comm.rank < size:
-                                recorder._record_on_proc = True
+                                recorder.record_on_proc = True
                             else:
-                                recorder._record_on_proc = False
+                                recorder.record_on_proc = False
 
                 elif comm.rank > 0:
                     # if not running cases in parallel, then just record on proc 0
-                    recorder._record_on_proc = False
+                    recorder.record_on_proc = False
 
         super()._setup_recording(comm)
 

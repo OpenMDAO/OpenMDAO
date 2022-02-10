@@ -5,6 +5,7 @@ from openmdao.core.system import System
 from openmdao.core.driver import Driver
 from openmdao.solvers.solver import Solver
 from openmdao.core.problem import Problem
+from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import check_path
@@ -44,6 +45,8 @@ class CaseRecorder(object):
         The unique iteration coordinate of where an iteration originates.
     _parallel : bool
         Designates if the current recorder is parallel-recording-capable.
+    record_on_proc : bool or _UNDEFINED
+        Flag indicating if this recorder will record on the current process.
     """
 
     def __init__(self, record_viewer_data=True):
@@ -72,11 +75,16 @@ class CaseRecorder(object):
         self._iteration_coordinate = None
 
         # By default, this is False, but it should be set to True
-        # if the recorder will record data on each process to avoid
+        # if the recorder will record data on multiple processes to avoid
         # unnecessary gathering.
         self._parallel = False
 
-    def startup(self, recording_requester, comm=None):
+        # Flag indicating if recording will be performed on the current process
+        # Defaults to undefined indicating the default behavior, which is normally
+        # that recording should only be performed on rank 0.
+        self.record_on_proc = _UNDEFINED
+
+    def startup(self, recording_requester, comm):
         """
         Prepare for a new run and calculate inclusion lists.
 
