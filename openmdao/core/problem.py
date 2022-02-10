@@ -793,17 +793,12 @@ class Problem(object):
             # may need to convert some lnames to auto_ivc names
             return {n: lvec[conns[n] if n in conns else n].copy() for n in lnames}
 
-    def _setup_recording(self, comm):
+    def _setup_recording(self):
         """
         Set up case recording.
-
-        Parameters
-        ----------
-        comm : MPI.Comm or <FakeComm> or None
-            The communicator for recorders (should be the comm for the Problem).
         """
         self._filtered_vars_to_record = self.driver._get_vars_to_record(self.recording_options)
-        self._rec_mgr.startup(self, comm)
+        self._rec_mgr.startup(self, self.comm)
 
     def add_recorder(self, recorder):
         """
@@ -951,6 +946,7 @@ class Problem(object):
         # this metadata will be shared by all Systems/Solvers in the system tree
         self._metadata = {
             'name': self._name,  # the name of this Problem
+            'comm': comm,
             'coloring_dir': self.options['coloring_dir'],  # directory for coloring files
             'recording_iter': _RecIteration(comm),  # manager of recorder iterations
             'local_vector_class': local_vector_class,
@@ -1043,8 +1039,8 @@ class Problem(object):
 
         # set up recording, including any new recorders since last setup
         if self._metadata['setup_status'] >= _SetupStatus.POST_SETUP:
-            driver._setup_recording(comm)
-            self._setup_recording(comm)
+            driver._setup_recording()
+            self._setup_recording()
             record_viewer_data(self)
 
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:

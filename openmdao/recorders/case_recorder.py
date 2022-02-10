@@ -93,7 +93,7 @@ class CaseRecorder(object):
         recording_requester : object
             Object to which this recorder is attached.
         comm : MPI.Comm or <FakeComm> or None
-            The communicator for the recorder (should be the comm for the Problem).
+            The MPI communicator for the recorder (should be the comm for the Problem).
         """
         self._counter = 0
 

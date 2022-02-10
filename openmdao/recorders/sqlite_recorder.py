@@ -326,7 +326,7 @@ class SqliteRecorder(CaseRecorder):
         recording_requester : object
             Object to which this recorder is attached.
         comm : MPI.Comm or <FakeComm> or None
-            The communicator for the recorder (should be the comm for the Problem).
+            The MPI communicator for the recorder (should be the comm for the Problem).
         """
         # we only want to set up recording once for each recording_requester
         if recording_requester in self._started:

@@ -235,14 +235,9 @@ class DOEDriver(Driver):
             if i % size == color:
                 yield case
 
-    def _setup_recording(self, comm):
+    def _setup_recording(self):
         """
         Set up case recording.
-
-        Parameters
-        ----------
-        comm : MPI.Comm or <FakeComm> or None
-            The communicator for recorders (should be the comm for the Problem).
         """
         if MPI:
             run_parallel = self.options['run_parallel']
@@ -264,11 +259,11 @@ class DOEDriver(Driver):
                             else:
                                 recorder.record_on_proc = False
 
-                elif comm.rank > 0:
+                elif self._problem_comm.rank > 0:
                     # if not running cases in parallel, then just record on proc 0
                     recorder.record_on_proc = False
 
-        super()._setup_recording(comm)
+        super()._setup_recording()
 
     def _get_recorder_metadata(self, case_name):
         """
