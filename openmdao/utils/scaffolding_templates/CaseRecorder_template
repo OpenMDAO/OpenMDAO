@@ -21,7 +21,7 @@ class {class_name}(CaseRecorder):
 
         # initialize attributes here...
 
-    def startup(self, recording_requester, comm):
+    def startup(self, recording_requester, comm=None):
         """
         Prepare for a new run and calculate inclusion lists.
 

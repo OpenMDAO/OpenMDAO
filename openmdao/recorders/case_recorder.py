@@ -84,7 +84,7 @@ class CaseRecorder(object):
         # that recording should only be performed on rank 0.
         self.record_on_proc = _UNDEFINED
 
-    def startup(self, recording_requester, comm):
+    def startup(self, recording_requester, comm=None):
         """
         Prepare for a new run and calculate inclusion lists.
 

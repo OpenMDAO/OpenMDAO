@@ -313,7 +313,7 @@ class SqliteRecorder(CaseRecorder):
                 var_settings[name][prop] = make_serializable(var_settings[name][prop])
         return var_settings
 
-    def startup(self, recording_requester, comm):
+    def startup(self, recording_requester, comm=None):
         """
         Prepare for a new run and create/update the abs2prom and prom2abs variables.
 
