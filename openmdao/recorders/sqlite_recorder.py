@@ -157,8 +157,6 @@ class SqliteRecorder(CaseRecorder):
         Flag indicating whether or not the database has been initialized.
     _started : set
         set of recording requesters for which this recorder has been started.
-    _record_on_proc : bool
-        Flag indicating whether to record on this processor when running in parallel.
     """
 
     def __init__(self, filepath, append=False, pickle_version=PICKLE_VER, record_viewer_data=True):
@@ -181,9 +179,6 @@ class SqliteRecorder(CaseRecorder):
         self._database_initialized = False
         self._started = set()
 
-        # default to record on all procs when running in parallel
-        self._record_on_proc = True
-
         super().__init__(record_viewer_data)
 
     def _initialize_database(self, comm):
@@ -203,7 +198,8 @@ class SqliteRecorder(CaseRecorder):
             if True in record_on_ranks:
                 # recording ranks have been specified
                 recording_ranks = [rnk for rnk, rec in enumerate(record_on_ranks) if rec is True]
-                if len(recording_ranks) > 1 and rank in recording_ranks:
+                parallel = self._parallel = len(recording_ranks) > 1
+                if parallel and rank in recording_ranks:
                     filepath = f"{self._filepath}_{rank}"
                     print("Note: SqliteRecorder is running on multiple processors. "
                           f"Cases from rank {rank} are being written to {filepath}.")

@@ -43,8 +43,8 @@ class CaseRecorder(object):
         Solver abs_error value, to be used by a derived recorder.
     _iteration_coordinate : str
         The unique iteration coordinate of where an iteration originates.
-    parallel : bool
-        Designates if the current recorder is parallel-recording-capable.
+    _parallel : bool
+        Flag indicating if this recorder will record on multiple processes.
     record_on_proc : bool or _UNDEFINED
         Flag indicating if this recorder will record on the current process.
     """
@@ -77,7 +77,7 @@ class CaseRecorder(object):
         # By default, this is False, but it should be set to True
         # if the recorder will record data on multiple processes to avoid
         # unnecessary gathering.
-        self.parallel = False
+        self._parallel = False
 
         # Flag indicating if recording will be performed on the current process
         # Defaults to undefined indicating the default behavior, which is normally
@@ -96,6 +96,13 @@ class CaseRecorder(object):
             The MPI communicator for the recorder (should be the comm for the Problem).
         """
         self._counter = 0
+
+    @property
+    def parallel(self):
+        """
+        Return True if this recorder is recording on multiple processes.
+        """
+        return self._parallel
 
     def record_metadata(self, recording_requester):
         """

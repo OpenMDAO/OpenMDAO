@@ -245,8 +245,6 @@ class DOEDriver(Driver):
 
             for recorder in self._rec_mgr:
                 if run_parallel:
-                    recorder.parallel = True
-
                     # write cases only on procs up to the number of parallel DOEs
                     # (i.e. on the root procs for the cases)
                     if procs_per_model == 1:
