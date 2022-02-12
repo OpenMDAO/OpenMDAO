@@ -405,16 +405,17 @@ class Problem(object):
         object
             The value of the requested output/input variable.
         """
+        scope = self.model
         if self._metadata['setup_status'] == _SetupStatus.POST_SETUP:
             val = self._get_cached_val(name, get_remote=get_remote)
             if val is not _UNDEFINED:
                 if indices is not None:
                     val = val[indices]
                 if units is not None:
-                    val = self.model.convert2units(name, val, simplify_unit(units))
+                    val = scope.convert2units(name, val, simplify_unit(units))
         else:
-            val = self.model.get_val(name, units=units, indices=indices, get_remote=get_remote,
-                                     from_src=True)
+            val = scope.get_val(name, units=units, indices=indices, get_remote=get_remote,
+                                from_src=True)
 
         if val is _UNDEFINED:
             if get_remote:
@@ -576,10 +577,13 @@ class Problem(object):
                     elif tmeta['has_src_indices']:
                         if tlocmeta:  # target is local
                             flat = False
-                            src_indices = tlocmeta['src_indices']
                             if name in model._var_prom2inds:
                                 sshape, inds, flat = model._var_prom2inds[name]
                                 src_indices = inds
+                            elif tlocmeta.get('manual_connection'):
+                                src_indices = tlocmeta['src_indices']
+                            else:
+                                src_indices = None
 
                             if src_indices is None:
                                 model._outputs.set_var(src, value, _full_slice, flat,
@@ -968,6 +972,14 @@ class Problem(object):
                                               # src data for inputs)
             'using_par_deriv_color': False,  # True if parallel derivative coloring is being used
             'mode': mode,  # mode (derivative direction) set by the user.  'auto' by default
+            'abs_in2prom_info': {},  # map of abs input name to list of length = sys tree height
+                                     # down to var location, to allow quick resolution of local
+                                     # src_shape/src_indices due to promotes.  For example,
+                                     # for abs_in of a.b.c.d, dict entry would be
+                                     # [None, None, None], corresponding to levels
+                                     # a, a.b, and a.b.c, with one of the Nones replaced
+                                     # by promotes info.  Dict entries are only created if a
+                                     # promotion exists that specifies src_indices.
         }
         model._setup(model_comm, mode, self._metadata)
 

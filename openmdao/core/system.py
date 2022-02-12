@@ -5,7 +5,7 @@ import hashlib
 import time
 
 from contextlib import contextmanager
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict, defaultdict, deque
 from itertools import chain
 from enum import IntEnum
 
@@ -1877,8 +1877,6 @@ class System(object):
             to (promoted name, promotion_info) tuple.
         """
         from openmdao.core.group import Group
-        prom_names = self._var_allprocs_prom2abs_list
-        gname = self.name + '.' if self.name else ''
 
         def split_list(lst):
             """
@@ -1912,7 +1910,7 @@ class System(object):
                     raise TypeError(f"when adding subsystem '{self.pathname}', entry '{key}'"
                                     " is not a string or tuple of size 2.")
 
-        def _dup(io, matches, match_type, name, tup):
+        def _check_dup(io, matches, match_type, name, tup):
             """
             Report error or warning when attempting to promote a variable twice.
 
@@ -1988,7 +1986,8 @@ class System(object):
                             nmatch = len(pmap)
                             for n in proms[io]:
                                 if fnmatchcase(n, key):
-                                    if not (n in pmap and _dup(io, matches, match_type, n, tup)):
+                                    if not (n in pmap and _check_dup(io, matches, match_type, n,
+                                                                     tup)):
                                         pmap[n] = (n, key, pinfo, match_type)
                             if len(pmap) > nmatch:
                                 found.add(key)
@@ -1999,7 +1998,7 @@ class System(object):
                         pmap = matches[io]
                         if key in proms[io]:
                             if key in pmap:
-                                _dup(io, matches, match_type, key, tup)
+                                _check_dup(io, matches, match_type, key, tup)
                             pmap[key] = (s, key, pinfo, match_type)
                             if match_type == _MatchType.NAME:
                                 found.add(key)
@@ -2022,16 +2021,17 @@ class System(object):
                 raise RuntimeError(f"{self.msginfo}: '{call}' failed to find any matches for the "
                                    f"following names or patterns: {not_found}.{empty_group_msg}")
 
+        prom2abs_list = self._var_allprocs_prom2abs_list
         maps = {'input': {}, 'output': {}}
 
         if self._var_promotes['input'] or self._var_promotes['output']:
             if self._var_promotes['any']:
                 raise RuntimeError("%s: 'promotes' cannot be used at the same time as "
                                    "'promotes_inputs' or 'promotes_outputs'." % self.msginfo)
-            resolve(self._var_promotes['input'], ('input',), maps, prom_names)
-            resolve(self._var_promotes['output'], ('output',), maps, prom_names)
+            resolve(self._var_promotes['input'], ('input',), maps, prom2abs_list)
+            resolve(self._var_promotes['output'], ('output',), maps, prom2abs_list)
         else:
-            resolve(self._var_promotes['any'], ('input', 'output'), maps, prom_names)
+            resolve(self._var_promotes['any'], ('input', 'output'), maps, prom2abs_list)
 
         return maps
 
@@ -2455,6 +2455,38 @@ class System(object):
             if recurse:
                 for sub in s.system_iter(recurse=True, typ=typ):
                     yield sub
+
+    def bfs_system_iter(self, include_self=False, typ=None):
+        """
+        Yield a generator of local subsystems of this system.
+
+        Systems are yielded in breadth first order.
+
+        Parameters
+        ----------
+        include_self : bool
+            If True, include this system in the iteration.
+        typ : type
+            If not None, only yield Systems that match that are instances of the
+            given type.
+
+        Yields
+        ------
+        type or None
+        """
+        if include_self and (typ is None or isinstance(self, typ)):
+            yield self
+
+        deq = deque([self.system_iter(recurse=False, typ=typ)])
+        while deq:
+            it = deq.popleft()
+            while True:
+                try:
+                    s = next(it)
+                except StopIteration:
+                    break
+                yield s
+                deq.append(s.system_iter(recurse=False, typ=typ))
 
     def _create_indexer(self, indices, typename, vname, flat_src=False):
         """
@@ -4549,9 +4581,13 @@ class System(object):
             return self._abs_get_val(src, get_remote, rank, vec_name, 'output', flat,
                                      from_root=True)
 
+        is_prom = len(abs_ins) > 1 or name != abs_ins[0]
+        
         if scope_sys is None:
             scope_sys = self
 
+        abs2meta_all_ins = self._var_allprocs_abs2meta['input']
+        
         # if we have multiple promoted inputs that are explicitly connected to an output and units
         # have not been specified, look for group input to disambiguate
         if units is None and len(abs_ins) > 1:
@@ -4560,39 +4596,53 @@ class System(object):
                 try:
                     units = scope_sys._group_inputs[name][0]['units']
                 except (KeyError, IndexError):
-                    unit0 = self._var_allprocs_abs2meta['input'][abs_ins[0]]['units']
+                    unit0 = abs2meta_all_ins[abs_ins[0]]['units']
                     for n in abs_ins[1:]:
-                        if unit0 != self._var_allprocs_abs2meta['input'][n]['units']:
+                        if unit0 != abs2meta_all_ins[n]['units']:
                             self._show_ambiguity_msg(name, ('units',), abs_ins)
                             break
 
-        if abs_name in self._var_abs2meta['input']:  # input is local
+        is_local = abs_name in self._var_abs2meta['input']
+        src_indices = vshape = None
+        if is_local:  # input is local
             vmeta = self._var_abs2meta['input'][abs_name]
-            src_indices = vmeta['src_indices']
+            if vmeta.get('manual_connection'):
+                src_indices = vmeta['src_indices']
+                vshape = vmeta['shape']
         else:
-            vmeta = self._var_allprocs_abs2meta['input'][abs_name]
-            src_indices = None  # FIXME: remote var could have src_indices
+            vmeta = abs2meta_all_ins[abs_name]
 
         distrib = vmeta['distributed']
-        vshape = vmeta['shape']
         vdynshape = vmeta['shape_by_conn']
-        has_src_indices = any(self._var_allprocs_abs2meta['input'][n]['has_src_indices']
-                              for n in abs_ins)
+        for n in abs_ins:
+            if abs2meta_all_ins[n]['has_src_indices']:
+                has_src_indices = True
+                break
+        else:
+            has_src_indices = False
 
         # see if we have any 'intermediate' level src_indices when using a promoted name
-        if name in scope_sys._var_prom2inds:
-            src_shape, inds, _ = scope_sys._var_prom2inds[name]
-            if inds is None:
-                if len(abs_ins) > 1 or name != abs_ins[0]:  # using a promoted lookup
-                    src_indices = None
-                    vshape = None
-                    has_src_indices = False
-            else:
-                shp = inds.indexed_src_shape
-                src_indices = inds
-                has_src_indices = True
-                if len(abs_ins) > 1 or name != abs_name:
-                    vshape = shp
+        n = name
+        scope = scope_sys
+        while n:
+            if n in scope._var_prom2inds:
+                src_shape, inds, _ = scope._var_prom2inds[n]
+                if inds is None:
+                    if is_prom:  # using a promoted lookup
+                        src_indices = None
+                        vshape = None
+                        has_src_indices = False
+                else:
+                    shp = inds.indexed_src_shape
+                    src_indices = inds
+                    has_src_indices = True
+                    if is_prom:
+                        vshape = shp
+                break
+            parts = n.split('.', 1)
+            n = n[len(parts[0]) + 1:]
+            if len(parts) > 1:
+                scope = scope._get_subsystem(parts[0])
 
         if self.comm.size > 1 and get_remote:
             if self.comm.rank == self._owning_rank[abs_name]:
@@ -4622,8 +4672,11 @@ class System(object):
         val = self._abs_get_val(src, get_remote, rank, vec_name, 'output', flat, from_root=True)
 
         if has_src_indices:
-            if src_indices is None:  # input is remote
+            if not is_local:
                 val = np.zeros(0)
+            elif src_indices is None:
+                if vshape is not None:
+                    val = val.reshape(vshape)
             else:
                 if distrib and (sdistrib or dynshape or not slocal) and not get_remote:
                     var_idx = self._var_allprocs_abs2idx[src]
@@ -4648,6 +4701,10 @@ class System(object):
                 else:
                     if src_indices._flat_src:
                         val = val.ravel()[src_indices.flat()]
+                        # if we're at component level, just keep shape of the target and don't flatten
+                        if not flat and not is_prom:
+                            shp = vmeta['global_shape'] if get_remote else vmeta['shape']
+                            val.shape = shp
                     else:
                         val = val[src_indices()]
 
@@ -4671,8 +4728,8 @@ class System(object):
                         val = self.comm.bcast(None, root=self._owning_rank[abs_name])
 
             if distrib and get_remote:
-                val.shape = self._var_allprocs_abs2meta['input'][abs_name]['global_shape']
-            elif not flat and val.size > 0:
+                val.shape = abs2meta_all_ins[abs_name]['global_shape']
+            elif not flat and val.size > 0 and vshape is not None:
                 val.shape = vshape
         elif vshape is not None:
             val = val.reshape(vshape)

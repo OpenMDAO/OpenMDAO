@@ -1559,44 +1559,45 @@ class Component(System):
                     self._update_subjac_sparsity(coloring.get_subjac_sparsity())
                 self._jacobian._restore_approx_sparsity()
 
-    def _resolve_src_inds(self, my_tdict, top):
-        abs2meta_in = self._var_abs2meta['input']
+    def _resolve_src_inds(self):
+        abs2prom = self._var_abs2prom['input']
+        tree_level = len(self.pathname.split('.')) if self.pathname else 0
+        abs_in2prom_info = self._problem_meta['abs_in2prom_info']
         all_abs2meta_in = self._var_allprocs_abs2meta['input']
-        abs2prom = self._var_allprocs_abs2prom['input']
+        abs2meta_in = self._var_abs2meta['input']
 
-        for tgt, (pinfo, parent_src_shape, oldprom, oldpath) in my_tdict.items():
-            src_inds, flat_src_inds, src_shape = pinfo
+        for tgt in self._var_abs2meta['input']:
+            if tgt in abs_in2prom_info:
+                plist = abs_in2prom_info[tgt]
+                pinfo, shape, _ = plist[tree_level]
+                if pinfo is not None:
+                    inds, flat, shape = pinfo
+                    if inds is not None:
+                        self._var_prom2inds[abs2prom[tgt]] = [shape, inds, flat]
+                        # print(f"{self.pathname}: adding var_prom2inds[{abs2prom[tgt]}] of [{shape}, {inds}, {flat}]")
 
-            # update the input metadata with the final
-            # src_indices, flat_src_indices and src_shape
-            if src_inds is None:
-                prom = abs2prom[tgt]
-                if prom in self._var_prom2inds:
-                    del self._var_prom2inds[prom]
-            else:
-                all_abs2meta_in[tgt]['has_src_indices'] = True
-                meta = abs2meta_in[tgt]
-                shape = pinfo.root_shape if pinfo.root_shape is not None else parent_src_shape
-                if src_shape is None and shape is not None:
-                    try:
-                        src_inds.set_src_shape(shape)
-                    except Exception as err:
-                        raise RuntimeError(f"{self.msginfo}: When promoting '{tgt}' with "
-                                           f"src_indices {src_inds} and source shape "
-                                           f"{shape}: {err}")
-                meta['src_shape'] = src_shape
-                if meta.get('add_input_src_indices'):
-                    src_inds = convert_src_inds(src_inds, src_shape,
-                                                meta['src_indices'], src_shape)
-                elif src_inds._flat_src:
-                    meta['flat_src_indices'] = True
-                elif meta['flat_src_indices'] is None:
-                    meta['flat_src_indices'] = flat_src_inds
+                        all_abs2meta_in[tgt]['has_src_indices'] = True
+                        meta = abs2meta_in[tgt]
+                        shape = pinfo.root_shape
+                        # if src_shape is None and shape is not None:
+                        #     try:
+                        #         src_inds.set_src_shape(shape)
+                        #     except Exception as err:
+                        #         raise RuntimeError(f"{self.msginfo}: When promoting '{tgt}' with "
+                        #                         f"src_indices {src_inds} and source shape "
+                        #                         f"{shape}: {err}")
+                        meta['src_shape'] = shape
+                        if meta.get('add_input_src_indices'):
+                            inds = convert_src_inds(inds, shape, meta['src_indices'], shape)
+                        elif inds._flat_src:
+                            meta['flat_src_indices'] = True
+                        elif meta['flat_src_indices'] is None:
+                            meta['flat_src_indices'] = flat
 
-                if not isinstance(src_inds, Indexer):
-                    meta['src_indices'] = indexer(src_inds, flat_src=flat_src_inds)
-                else:
-                    meta['src_indices'] = src_inds.copy()
+                        if not isinstance(inds, Indexer):
+                            meta['src_indices'] = indexer(inds, flat_src=flat)
+                        else:
+                            meta['src_indices'] = inds # .copy()
 
 
 class _DictValues(object):

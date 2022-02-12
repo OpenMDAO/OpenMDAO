@@ -189,33 +189,32 @@ class SrcIndicesTestCase(unittest.TestCase):
         class Burn1(om.Group):
             def setup(self):
                 self.add_subsystem('comp1', om.ExecComp(['y1=x*2'], y1=np.ones(4), x=np.ones(4)),
-                                promotes_outputs=['*'])
+                                   promotes_outputs=['*'])
 
                 self.add_subsystem('comp2', om.ExecComp(['y2=x*3'], y2=np.ones(4), x=np.ones(4)),
-                                promotes_outputs=['*'])
+                                   promotes_outputs=['*'])
 
             def configure(self):
                 self.promotes('comp1', inputs=[('x', 'design:x')],
-                            src_indices=[0, 0, 0, 0], flat_src_indices=True)
+                              src_indices=[0, 0, 0, 0], flat_src_indices=True)
 
                 self.set_input_defaults('design:x', 75.3)
 
 
         class Traj(om.Group):
             def setup(self):
-                self.add_subsystem('burn1', Burn1(),
-                                promotes_outputs=['*'])
+                self.add_subsystem('burn1', Burn1(), promotes_outputs=['*'])
 
             def configure(self):
                 self.promotes('burn1', inputs=['design:x'],
-                            src_indices=[0, 0, 0, 0], flat_src_indices=True)
+                              src_indices=[0, 0, 0, 0], flat_src_indices=True)
 
         prob = om.Problem(model=Traj())
 
         prob.setup()
         prob.run_model()
 
-        assert_near_equal(prob['design:x'], [75.3]*4)
+        assert_near_equal(prob['design:x'], [75.3])
         assert_near_equal(prob['y1'], [75.3*2]*4)
         assert_near_equal(prob['y2'], [1*3]*4)
 
@@ -344,12 +343,12 @@ class SrcIndicesTestCase(unittest.TestCase):
                             flat_src_indices=flat_src_indices)
         p.model.set_input_defaults('x', src_shape=src_shape)
 
-        with self.assertRaises(RuntimeError) as cm:
+        with self.assertRaises(IndexError) as cm:
             p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "'C1' <class MyComp>: When promoting 'C1.x' with src_indices [4 5 7 9] and "
-                         "source shape (3, 3): index 9 is out of bounds for source dimension of size 9.")
+                         "When promoting 'x' from system 'C1' with src_indices [4 5 7 9] and src_shape (3, 3): "
+                         "index 9 is out of bounds for source dimension of size 9.")
 
 
 class SrcIndicesFeatureTestCase(unittest.TestCase):
@@ -358,15 +357,15 @@ class SrcIndicesFeatureTestCase(unittest.TestCase):
         p = om.Problem()
         G = p.model.add_subsystem('G', om.Group())
 
-        # At the top level, we assume that the source has a shape of (3,3), and after we
-        # slice it with [:,:-1], lower levels will see their source having a shape of (3,2)
+        # At the top level, we assume that the source, and our input 'x', has a shape of (3,3), 
+        # and after we slice it with [:,:-1], lower levels will see their source having a shape of (3,2)
         p.model.promotes('G', inputs=['x'], src_indices=om.slicer[:,:-1], src_shape=(3,3))
 
         # This specifies that G.x assumes a source shape of (3,2)
         G.set_input_defaults('x', src_shape=(3,2))
 
         g1 = G.add_subsystem('g1', om.Group(), promotes_inputs=['x'])
-        g1.add_subsystem('C1', om.ExecComp('y = 3*x', shape=3))
+        g1.add_subsystem('C1', om.ExecComp('y = 3*x', x=np.random.random(3), y=np.random.random(3)))
 
         # C1.x has a shape of 3, so we apply a slice of [:, 1] to our source which has a shape
         # of (3,2) to give us our final shape of 3.
@@ -383,10 +382,12 @@ class SrcIndicesFeatureTestCase(unittest.TestCase):
 
         inp = np.arange(9).reshape((3,3)) + 1.
 
-        p.set_val('x', inp[:, :-1])
+        # 'x' at the top level has a shape of (3,3) because no src_indices have been applied yet
+        p.set_val('x', inp)
         p.run_model()
 
-        assert_near_equal(p['x'], inp[:, :-1])
+        assert_near_equal(p['x'], inp)
+        assert_near_equal(p['G.x'], inp[:, :-1])
         assert_near_equal(p['G.g1.C1.y'], inp[:, :-1][:, 1]*3.)
         assert_near_equal(p['G.g2.C2.y'], inp[:, :-1].flatten()[[1,5]]*2.)
 
@@ -423,7 +424,7 @@ class SrcIndicesMPITestCase(unittest.TestCase):
 
         reduced_inp = inp[:, :-1]
 
-        p.set_val('x', reduced_inp)
+        p.set_val('x', inp)
         p.run_model()
 
         if commsize == 1 or p.comm.rank == 0:
