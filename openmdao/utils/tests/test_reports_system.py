@@ -41,8 +41,8 @@ class TestReportsSystem(unittest.TestCase):
         openmdao.core.problem._problem_names = []  # need to reset these to simulate separate runs
         os.environ.pop('OPENMDAO_REPORTS', None)
         os.environ.pop('OPENMDAO_REPORTS_DIR', None)
-        # We need to remove the TESTFLO_RUNNING environment variable for these tests to run. The reports code
-        #   checks to see if TESTFLO_RUNNING is set and will not do anything if it is set
+        # We need to remove the TESTFLO_RUNNING environment variable for these tests to run.
+        # The reports code checks to see if TESTFLO_RUNNING is set and will not do anything if set
         # But we need to remember whether it was set so we can restore it
         self.testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
         clear_reports()
@@ -184,6 +184,8 @@ class TestReportsSystem(unittest.TestCase):
     def test_report_generation_no_reports(self):
         # test use of the OPENMDAO_REPORTS variable to turn off reporting
         os.environ['OPENMDAO_REPORTS'] = 'false'
+        clear_reports()
+        setup_default_reports()  # So it sees the OPENMDAO_REPORTS var
 
         prob = self.setup_and_run_simple_problem()
 
@@ -193,6 +195,24 @@ class TestReportsSystem(unittest.TestCase):
         path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
         self.assertFalse(path.is_file(),
                          f'The N2 report file, {str(path)} was found but should not have')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
+        self.assertFalse(path.is_file(),
+                         f'The scaling report file, {str(path)}, was found but should not have')
+
+    @hooks_active
+    def test_report_generation_selected_reports(self):
+        # test use of the OPENMDAO_REPORTS variable to turn off selected reports
+        os.environ['OPENMDAO_REPORTS'] = 'n2'
+        clear_reports()
+        setup_default_reports()  # So it sees the OPENMDAO_REPORTS var
+
+        prob = self.setup_and_run_simple_problem()
+
+        # See if the report files exist and if they have the right names
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{prob._name}_reports')
+
+        path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
+        self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertFalse(path.is_file(),
                          f'The scaling report file, {str(path)}, was found but should not have')
@@ -261,8 +281,8 @@ class TestReportsSystem(unittest.TestCase):
 
         for method in ['setup', 'final_setup', 'run_driver']:
             for pre_or_post in ['pre', 'post']:
-                register_report(f"User defined report {method} {pre_or_post}", user_defined_report, "user defined report",
-                                'Problem', method, pre_or_post)
+                register_report(f"User defined report {method} {pre_or_post}", user_defined_report,
+                                "user defined report", 'Problem', method, pre_or_post)
 
         prob = self.setup_and_run_simple_problem()
 
@@ -281,13 +301,11 @@ class TestReportsSystem(unittest.TestCase):
     def test_report_generation_multiple_problems(self):
         probname, subprobname = self.setup_and_run_model_with_subproblem()
 
+        # The multiple problem code only runs model so no scaling reports to look for
         for problem_name in [probname, subprobname]:
             problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{problem_name}_reports')
             path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
             self.assertTrue(path.is_file(), f'N2 report file, {str(path)} was not found')
-            path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
-            self.assertFalse(path.is_file(),
-                             f'Scaling report file, {str(path)}, was found but should not have')
 
     @hooks_active
     def test_report_generation_multiple_problems_report_specific_problem(self):
@@ -301,6 +319,7 @@ class TestReportsSystem(unittest.TestCase):
 
         probname, subprobname = self.setup_and_run_model_with_subproblem()
 
+        # The multiple problem code only runs model so no scaling reports to look for
         problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{subprobname}_reports')
         path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
         # for the subproblem named problem2, there should be a report but not for problem1 since
