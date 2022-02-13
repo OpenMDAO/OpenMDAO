@@ -21,8 +21,8 @@ _hooks = {}
 # classes found here are known to contain no hooks within themselves or their ancestors
 _hook_skip_classes = set()
 
-# global switch that turns hook machinery on/off
-use_hooks = False
+# global switch that turns hook machinery on/off. But need it on for reporting system
+use_hooks = True
 
 
 def _reset_all_hooks():
