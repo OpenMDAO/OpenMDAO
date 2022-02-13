@@ -2,11 +2,10 @@
 Utility functions related to the reporting system which generates reports by default for all runs.
 """
 
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 import pathlib
 import sys
 import os
-from collections import defaultdict
 
 from mpi4py import MPI
 
@@ -86,21 +85,16 @@ def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=N
         raise ValueError(
             f"The argument 'pre_or_post' can only have values of 'pre' or 'post', but {pre_or_post}"
             " was given")
-
     return
 
 
 # N2 report definition
 # Need to create these closures so that functions can keep track of how many times they have
-#    been called per Problem (or Driver). In the case of the n2, it is Problem
+# been called per Problem (or Driver). In the case of the n2, it is Problem
 def _run_n2_report_enclosing():
     def run_n2_report_inner(prob):
         run_n2_report_inner.calls[prob] += 1
         if run_n2_report_inner.calls[prob] > 1:  # Only do the report once per Problem
-            return
-
-        if 'OPENMDAO_REPORTS' in os.environ and os.environ['OPENMDAO_REPORTS'] in ['0', 'false',
-                                                                                   'off']:
             return
 
         problem_reports_dirpath = get_reports_dir(prob)
@@ -111,6 +105,7 @@ def _run_n2_report_enclosing():
         try:
             n2(prob, show_browser=False, outfile=n2_filepath, display_in_notebook=False)
         except RuntimeError as err:
+            # We ignore this error
             if str(err) != "Can't compute total derivatives unless " \
                            "both 'of' or 'wrt' variables have been specified.":
                 raise err
@@ -128,10 +123,6 @@ def _run_scaling_report_enclosing():
 
         run_scaling_report_inner.calls[driver] += 1
         if run_scaling_report_inner.calls[driver] > 1:
-            return
-
-        if 'OPENMDAO_REPORTS' in os.environ and os.environ['OPENMDAO_REPORTS'] in ['0', 'false',
-                                                                                   'off']:
             return
 
         prob = driver._problem()
@@ -158,6 +149,12 @@ def _run_scaling_report_enclosing():
 
 run_scaling_report = _run_scaling_report_enclosing()
 
+_default_reports = {
+    'n2': (run_n2_report, 'N2 diagram', 'Problem', 'final_setup', 'post', None),
+    'scaling': (run_scaling_report, 'Driver scaling report', 'Driver', '_compute_totals', 'post',
+                None)
+}
+
 
 def setup_default_reports():
     """
@@ -166,10 +163,20 @@ def setup_default_reports():
     if 'TESTFLO_RUNNING' in os.environ:
         return
 
-    register_report("n2_report", run_n2_report, 'N2 diagram', 'Problem',
-                    'final_setup', 'post', inst_id=None)
-    register_report("scaling_report", run_scaling_report, 'Driver scaling report', 'Driver',
-                    '_compute_totals', 'post', inst_id=None)
+    if 'OPENMDAO_REPORTS' in os.environ:
+        if os.environ['OPENMDAO_REPORTS'] in ['0', 'false', 'off', "none"]:
+            return
+
+        if os.environ['OPENMDAO_REPORTS'] in ['1', 'true', 'on', "all"]:
+            reports_on = _default_reports.keys()
+        else:
+            reports_on = os.environ['OPENMDAO_REPORTS'].split('.')
+    else:  # if no env set, all reports are on
+        reports_on = _default_reports.keys()
+
+    for report_name, report_info in _default_reports.items():
+        if report_name in reports_on:
+            register_report(report_name, *report_info)
 
 
 def set_reports_dir(reports_dir_path):
