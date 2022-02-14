@@ -1629,7 +1629,10 @@ class System(object):
         if self._use_derivatives:
             desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
             responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
-            abs_meta = {}
+
+            # If you have response aliases, check for overlapping indices.
+
+            used_indices = {}
             prom2abs_names = {}
             _discrete = False
             if self._var_allprocs_discrete['input'] and \
@@ -1639,16 +1642,19 @@ class System(object):
             for data in self._var_allprocs_abs2meta.values():
                 for name, val in data.items():
                     if name in responses and responses[name]['flat_indices']:
-                        abs_meta[name] = np.zeros(val['shape'], dtype='bool').flatten()
-
+                        used_indices[name] = np.zeros(val['shape'], dtype='bool').ravel()
                     else:
-                        abs_meta[name] = np.zeros(val['shape'], dtype='bool')
+                        used_indices[name] = np.zeros(val['shape'], dtype='bool')
 
             for data in self._var_allprocs_prom2abs_list.values():
                 for name, val in data.items():
                     prom2abs_names[name] = val
 
             for name in responses:
+
+                if _discrete:
+                    continue
+
                 if responses[name]['path'] is not None:
                     path_name = responses[name]['path']
                 else:
@@ -1665,34 +1671,33 @@ class System(object):
                 msg = (f"{self.msginfo}: '{name}' indices are overlapping "
                        f"constraint/objective '{path}'.")
 
-                if not _discrete:
-                    if self.comm.size > 1:
-                        distrib_idx_arr = self.comm.allgather(abs_meta)
-                        abs_meta = distrib_idx_arr[0]
-                        if len(distrib_idx_arr) > 1:
-                            for idx in distrib_idx_arr:
-                                for key in idx:
-                                    if key in abs_meta:
-                                        abs_meta[key] = np.concatenate((abs_meta[key].flatten(),
-                                                                        idx[key].flatten()))
-                                    else:
-                                        abs_meta[key] = idx[key]
+                if self.comm.size > 1:
+                    distrib_idx_arr = self.comm.allgather(used_indices)
+                    used_indices = distrib_idx_arr[0]
+                    if len(distrib_idx_arr) > 1:
+                        for idx in distrib_idx_arr:
+                            for key in idx:
+                                if key in used_indices:
+                                    used_indices[key] = np.concatenate((used_indices[key].ravel(),
+                                                                        idx[key].ravel()))
+                                else:
+                                    used_indices[key] = idx[key]
 
+                if path is not None:
+                    name = path
+
+                try:
+                    abs_meta_idx_arr = used_indices[name]
+                except KeyError:
+                    prom_name = prom2abs_names[name][0]
+                    abs_meta_idx_arr = used_indices[prom_name]
+
+                if indices is not None:
+                    indices = _index_sort(indices)
                     if path is not None:
-                        name = path
-
-                    try:
-                        abs_meta_idx_arr = abs_meta[name]
-                    except KeyError:
-                        prom_name = prom2abs_names[name][0]
-                        abs_meta_idx_arr = abs_meta[prom_name]
-
-                    if indices is not None:
-                        indices = _index_sort(indices)
-                        if path is not None:
-                            self._indices_check(indices, abs_meta_idx_arr, msg)
-                        for idx in indices:
-                            abs_meta_idx_arr[idx] = True
+                        self._indices_check(indices, abs_meta_idx_arr, msg)
+                    for idx in indices:
+                        abs_meta_idx_arr[idx] = True
 
             return self.get_relevant_vars(desvars, responses, mode)
 

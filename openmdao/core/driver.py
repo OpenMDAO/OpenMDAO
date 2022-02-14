@@ -759,6 +759,7 @@ class Driver(object):
             if ctype == 'ineq' and meta['equals'] is not None:
                 continue
 
+            # Support for constraint aliases.
             if 'path' in meta and meta['path']:
                 name = meta['name']
 

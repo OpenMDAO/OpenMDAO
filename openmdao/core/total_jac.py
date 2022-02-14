@@ -1392,7 +1392,7 @@ class _TotalJacInfo(object):
                 model.comm.Bcast(contig, root=rank)
                 self.J[:, start:stop] = contig
 
-        if True or debug_print:
+        if debug_print:
             # Debug outputs scaled derivatives.
             self._print_derivatives()
 

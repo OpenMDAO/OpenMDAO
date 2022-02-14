@@ -2315,7 +2315,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.run_model()
 
         data = prob.check_partials(out_stream=None, compact_print=True)
-        print(data)
 
     def test_set_step_on_comp(self):
 
@@ -3589,7 +3588,6 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.setup(mode='fwd')
 
         failed = prob.run_driver()
-        print(failed)
 
         totals = prob.check_totals(out_stream=None)
 

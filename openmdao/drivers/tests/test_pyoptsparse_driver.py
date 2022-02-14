@@ -1,7 +1,6 @@
 """ Unit tests for the Pyoptsparse Driver."""
 
 import copy
-from lib2to3.pgen2.token import OP
 import unittest
 
 from distutils.version import LooseVersion
