@@ -71,7 +71,6 @@ class RecordingManager(object):
         comm : MPI.Comm or <FakeComm> or None
             The communicator for recorders (should be the comm for the Problem).
         """
-        # Each of the recorders determines its self._filtered_* list of vars to record
         for recorder in self._recorders:
             recorder.startup(recording_requester, comm)
 
