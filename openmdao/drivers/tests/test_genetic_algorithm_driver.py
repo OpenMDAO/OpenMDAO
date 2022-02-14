@@ -1197,10 +1197,10 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
         model.add_objective('obj')
 
         driver = prob.driver = om.SimpleGADriver()
-        prob.driver.options['pop_size'] = 4
-        prob.driver.options['max_gen'] = 3
-        prob.driver.options['run_parallel'] = True
-        prob.driver.options['procs_per_model'] = 2
+        driver.options['pop_size'] = 4
+        driver.options['max_gen'] = 3
+        driver.options['run_parallel'] = True
+        driver.options['procs_per_model'] = 2
 
         # also check that parallel recording works
         driver.add_recorder(om.SqliteRecorder("cases.sql"))
