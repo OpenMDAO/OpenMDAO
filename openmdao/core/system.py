@@ -1634,10 +1634,7 @@ class System(object):
 
             used_indices = {}
             prom2abs_names = {}
-            _discrete = False
-            if self._var_allprocs_discrete['input'] and \
-                    self._var_allprocs_discrete['output']:
-                _discrete = True
+            discrete = self._var_allprocs_discrete
 
             for data in self._var_allprocs_abs2meta.values():
                 for name, val in data.items():
@@ -1652,7 +1649,7 @@ class System(object):
 
             for name in responses:
 
-                if _discrete:
+                if name in discrete['input'] or name in discrete['output']:
                     continue
 
                 if responses[name]['path'] is not None:
