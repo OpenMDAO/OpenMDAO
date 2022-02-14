@@ -2658,10 +2658,6 @@ class TestPyoptSparse(unittest.TestCase):
         assert_near_equal(p.get_val('exec.z')[50], -75)
 
 
-    def test_mimic_multi_constraints_and_verify_dynamic_coloring(self):
-        raise RuntimeError('Put a new test here.')
-
-
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 @use_tempdirs
 class TestPyoptSparseFeature(unittest.TestCase):

@@ -178,6 +178,10 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
         if con_alias:
 
             class MuxComp(om.ExplicitComponent):
+                """
+                This component muxes all of the constraints in the model into a single wide vector.
+                This includes a variety of sizes.
+                """
 
                 def setup(self):
                     self.add_input('r_con_g', val=np.ones(10))
