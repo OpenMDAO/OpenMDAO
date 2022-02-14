@@ -35,7 +35,7 @@ def _index_sort(indices):
                 end = -2
             else:
                 end = indices.stop
-            return np.array(range(start, end + 1))
+            return np.array(range(start, end))
         elif isinstance(indices, int):
             return np.array([indices])
         else:
