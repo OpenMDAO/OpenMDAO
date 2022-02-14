@@ -32,20 +32,6 @@ def _is_rank_0(prob):
     return on_rank0
 
 
-def unregister_report(name):
-    """
-    Unregister a report from the reports system.
-
-    Parameters
-    ----------
-    name : str
-        Name of the report to remove from the reports system.
-    """
-    if name not in _reports_registry:
-        raise ValueError(f"Cannot unregister report because report with name '{name}' does "
-                         "not exist")
-
-
 def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=None, **kwargs):
     """
     Register a report with the reporting system.
@@ -86,6 +72,143 @@ def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=N
             f"The argument 'pre_or_post' can only have values of 'pre' or 'post', but {pre_or_post}"
             " was given")
     return
+
+
+def unregister_report(name):
+    """
+    Unregister a report from the reports system.
+
+    Parameters
+    ----------
+    name : str
+        Name of the report to remove from the reports system.
+    """
+    if name not in _reports_registry:
+        raise ValueError(f"Cannot unregister report because report with name '{name}' does "
+                         "not exist")
+
+
+def list_reports(out_stream=None):
+    """
+    Write table of information about reports currently registered in the reporting system.
+
+    Parameters
+    ----------
+    out_stream : file-like object
+        Where to send report info.
+    """
+    global _reports_registry
+
+    if not out_stream:
+        out_stream = sys.stdout
+
+    column_names = ['name', 'desc', 'class_name', 'inst_id', 'method', 'pre_or_post', 'func']
+    column_widths = {}
+    # Determine the column widths of the data fields by finding the max width for all rows
+    # First for the headers
+    for column_name in column_names:
+        column_widths[column_name] = len(column_name)
+
+    # Now for the values
+    for name, report in _reports_registry.items():
+        for column_name in column_names:
+            if column_name == 'name':
+                val = name
+            else:
+                val = getattr(report, column_name)
+                if column_name == 'func':
+                    val = val.__name__
+                else:
+                    val = str(val)
+            column_widths[column_name] = max(column_widths[column_name], len(val))
+
+    out_stream.write("\nHere are the reports registered to run:\n\n")
+
+    column_header = ''
+    column_dashes = ''
+    column_spacing = 2
+    for i, column_name in enumerate(column_names):
+        column_header += '{:{width}}'.format(column_name, width=column_widths[column_name])
+        column_dashes += column_widths[column_name] * '-'
+        if i < len(column_names) - 1:
+            column_header += column_spacing * ' '
+            column_dashes += column_spacing * ' '
+
+    out_stream.write('\n')
+    out_stream.write(column_header + '\n')
+    out_stream.write(column_dashes + '\n')
+
+    for name, report in _reports_registry.items():
+        report_info = ''
+        for i, column_name in enumerate(column_names):
+            if column_name == 'name':
+                val = name
+            else:
+                val = getattr(report, column_name)
+                if column_name == 'func':
+                    val = val.__name__
+                else:
+                    val = str(val)
+            val_formatted = f"{val:<{column_widths[column_name]}}"
+            report_info += val_formatted
+            if i < len(column_names) - 1:
+                report_info += column_spacing * ' '
+
+        out_stream.write(report_info + '\n')
+
+    out_stream.write('\n')
+
+
+def set_reports_dir(reports_dir_path):
+    """
+    Set the path to where the reports should go. Normally, they go into the current directory.
+
+    Parameters
+    ----------
+    reports_dir_path : str
+        Path to where the report directories should go.
+    """
+    global _reports_dir
+    _reports_dir = reports_dir_path
+
+
+def get_reports_dir(prob):
+    """
+    Get the path to the directory where the reports files should go.
+
+    Parameters
+    ----------
+    prob : OpenMDAO Problem object
+        The report will be run on this Problem.
+
+    Returns
+    -------
+    str
+        The path to the directory where reports should be written.
+    """
+    reports_dir = os.environ.get('OPENMDAO_REPORTS_DIR', _reports_dir)
+
+    problem_reports_dirname = f'{prob._name}_reports'
+    problem_reports_dirpath = pathlib.Path(reports_dir).joinpath(problem_reports_dirname)
+
+    return problem_reports_dirpath
+
+
+def clear_reports():
+    """
+    Clear all of the reports from the registry.
+    """
+    global _reports_registry
+
+    # need to remove the hooks
+    for name, report in _reports_registry.items():
+        if getattr(report, 'pre_or_post') == "pre":
+            _unregister_hook(getattr(report, 'method'), getattr(report, 'class_name'),
+                             inst_id=getattr(report, 'inst_id'), pre=getattr(report, 'func'))
+        else:
+            _unregister_hook(getattr(report, 'method'), getattr(report, 'class_name'),
+                             inst_id=getattr(report, 'inst_id'), post=getattr(report, 'func'))
+    _reports_registry = {}
 
 
 # N2 report definition
@@ -155,6 +278,8 @@ _default_reports = {
                 None)
 }
 
+# _default_reports = {}#TODO delete this
+
 
 def setup_default_reports():
     """
@@ -163,6 +288,8 @@ def setup_default_reports():
     if 'TESTFLO_RUNNING' in os.environ:
         return
 
+    print("TESTFLO_RUNNING not in env")
+    print(os.environ)
     if 'OPENMDAO_REPORTS' in os.environ:
         if os.environ['OPENMDAO_REPORTS'] in ['0', 'false', 'off', "none"]:
             return
@@ -177,129 +304,6 @@ def setup_default_reports():
     for report_name, report_info in _default_reports.items():
         if report_name in reports_on:
             register_report(report_name, *report_info)
-
-
-def set_reports_dir(reports_dir_path):
-    """
-    Set the path to where the reports should go. Normally, they go into the current directory.
-
-    Parameters
-    ----------
-    reports_dir_path : str
-        Path to where the report directories should go.
-    """
-    global _reports_dir
-    _reports_dir = reports_dir_path
-
-
-def get_reports_dir(prob):
-    """
-    Get the path to the directory where the reports files should go.
-
-    Parameters
-    ----------
-    prob : OpenMDAO Problem object
-        The report will be run on this Problem.
-
-    Returns
-    -------
-    str
-        The path to the directory where reports should be written.
-    """
-    reports_dir = os.environ.get('OPENMDAO_REPORTS_DIR', _reports_dir)
-
-    problem_reports_dirname = f'{prob._name}_reports'
-    problem_reports_dirpath = pathlib.Path(reports_dir).joinpath(problem_reports_dirname)
-
-    return problem_reports_dirpath
-
-
-def list_reports(out_stream=None):
-    """
-    Write table of information about reports currently registered in the reporting system.
-
-    Parameters
-    ----------
-    out_stream : file-like object
-        Where to send report info.
-    """
-    global _reports_registry
-
-    if not out_stream:
-        out_stream = sys.stdout
-
-    column_names = ['name', 'desc', 'class_name', 'inst_id', 'method', 'pre_or_post', 'func']
-    column_widths = {}
-    # Determine the column widths of the data fields by finding the max width for all rows
-    # First for the headers
-    for column_name in column_names:
-        column_widths[column_name] = len(column_name)
-
-    # Now for the values
-    for name, report in _reports_registry.items():
-        for column_name in column_names:
-            if column_name == 'name':
-                val = name
-            else:
-                val = getattr(report, column_name)
-                if column_name == 'func':
-                    val = val.__name__
-                else:
-                    val = str(val)
-            column_widths[column_name] = max(column_widths[column_name], len(val))
-
-    out_stream.write("Here are the reports registered to run:\n\n")
-
-    column_header = ''
-    column_dashes = ''
-    column_spacing = 2
-    for i, column_name in enumerate(column_names):
-        column_header += '{:{width}}'.format(column_name, width=column_widths[column_name])
-        column_dashes += column_widths[column_name] * '-'
-        if i < len(column_names) - 1:
-            column_header += column_spacing * ' '
-            column_dashes += column_spacing * ' '
-
-    out_stream.write('\n')
-    out_stream.write(column_header + '\n')
-    out_stream.write(column_dashes + '\n')
-
-    for name, report in _reports_registry.items():
-        report_info = ''
-        for i, column_name in enumerate(column_names):
-            if column_name == 'name':
-                val = name
-            else:
-                val = getattr(report, column_name)
-                if column_name == 'func':
-                    val = val.__name__
-                else:
-                    val = str(val)
-            val_formatted = f"{val:<{column_widths[column_name]}}"
-            report_info += val_formatted
-            if i < len(column_names) - 1:
-                report_info += column_spacing * ' '
-
-        out_stream.write(report_info + '\n')
-
-    out_stream.write('\n')
-
-
-def clear_reports():
-    """
-    Clear all of the reports from the registry.
-    """
-    global _reports_registry
-
-    # need to remove the hooks
-    for name, report in _reports_registry.items():
-        if getattr(report, 'pre_or_post') == "pre":
-            _unregister_hook(getattr(report, 'method'), getattr(report, 'class_name'),
-                             inst_id=getattr(report, 'inst_id'), pre=getattr(report, 'func'))
-        else:
-            _unregister_hook(getattr(report, 'method'), getattr(report, 'class_name'),
-                             inst_id=getattr(report, 'inst_id'), post=getattr(report, 'func'))
-    _reports_registry = {}
 
 
 setup_default_reports()
