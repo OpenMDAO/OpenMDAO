@@ -2423,28 +2423,24 @@ class TestPyoptSparse(unittest.TestCase):
             p.model.add_constraint('exec.z', indices=om.slicer[1:10], lower=20, alias="ALIAS_TEST")
             p.setup()
 
-        print(str(ctx.exception))
         self.assertEqual(str(ctx.exception), msg)
 
         with self.assertRaises(RuntimeError) as ctx:
             p.model.add_constraint('exec.z', indices=[0], lower=20, alias="ALIAS_TEST")
             p.setup()
 
-        print(str(ctx.exception))
         self.assertEqual(str(ctx.exception), msg)
 
         with self.assertRaises(RuntimeError) as ctx:
             p.model.add_constraint('exec.z', indices=[1, 2], lower=20, alias="ALIAS_TEST")
             p.setup()
 
-        print(str(ctx.exception))
         self.assertEqual(str(ctx.exception), msg)
 
         with self.assertRaises(RuntimeError) as ctx:
             p.model.add_constraint('exec.z', indices=[-1], lower=20, alias="ALIAS_TEST")
             p.setup()
 
-        print(str(ctx.exception))
         self.assertEqual(str(ctx.exception), msg)
 
     def test_fwd_rev_obj_constraint(self):
