@@ -835,7 +835,6 @@ class TestConstrainedSimpleGA(unittest.TestCase):
 
         p.run_driver()
 
-        print(p.get_val('exec.z'))
         assert_near_equal(p.get_val('exec.z')[-1], 130)
         assert_near_equal(p.get_val('exec.z')[50], 30)
 

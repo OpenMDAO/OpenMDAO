@@ -617,7 +617,6 @@ class TestConstrainedDifferentialEvolution(unittest.TestCase):
 
         p.run_driver()
 
-        print(p.get_val('exec.z'))
         assert_near_equal(p.get_val('exec.z')[0], 187.24998293, tolerance=1e-6)
         assert_near_equal(p.get_val('exec.z')[-1], 187.24998293, tolerance=1e-6)
 
@@ -646,7 +645,6 @@ class TestConstrainedDifferentialEvolution(unittest.TestCase):
 
         p.run_driver()
 
-        print(p.get_val('exec.z'))
         assert_near_equal(p.get_val('exec.z')[0], -900)
         assert_near_equal(p.get_val('exec.z')[50], -1000)
 
