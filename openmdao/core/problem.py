@@ -980,6 +980,8 @@ class Problem(object):
                                      # a, a.b, and a.b.c, with one of the Nones replaced
                                      # by promotes info.  Dict entries are only created if a
                                      # promotion exists that specifies src_indices.
+            'raise_connection_errors': True,  # If False, connection related errors in setup will
+                                              # be converted to warnings.
         }
         model._setup(model_comm, mode, self._metadata)
 

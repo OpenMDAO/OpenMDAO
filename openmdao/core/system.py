@@ -368,6 +368,8 @@ class System(object):
     _tot_jac : __TotalJacInfo or None
         If a total jacobian is being computed and this is the top level System, this will
         be a reference to the _TotalJacInfo object.
+    _raise_connection_errors : bool
+        Flag indicating whether connection related errors are raised as an Exception.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -520,6 +522,7 @@ class System(object):
         self._coloring_info = _DEFAULT_COLORING_META.copy()
         self._first_call_to_linearize = True   # will check in first call to _linearize
         self._tot_jac = None
+        self._raise_connection_errors = True
 
     @property
     def msginfo(self):
@@ -4582,12 +4585,12 @@ class System(object):
                                      from_root=True)
 
         is_prom = len(abs_ins) > 1 or name != abs_ins[0]
-        
+
         if scope_sys is None:
             scope_sys = self
 
         abs2meta_all_ins = self._var_allprocs_abs2meta['input']
-        
+
         # if we have multiple promoted inputs that are explicitly connected to an output and units
         # have not been specified, look for group input to disambiguate
         if units is None and len(abs_ins) > 1:
@@ -4709,7 +4712,9 @@ class System(object):
                             val.shape = shp
                     else:
                         val = val[src_indices()]
-                        if vmeta and val.shape != vmeta['shape']:
+                        if vshape is not None and val.shape != vshape:
+                            val.shape = vshape
+                        elif not is_prom and vmeta is not None and val.shape != vmeta['shape']:
                             val.shape = vmeta['shape']
 
             if get_remote and self.comm.size > 1:

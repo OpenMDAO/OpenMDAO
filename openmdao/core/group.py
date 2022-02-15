@@ -197,8 +197,6 @@ class Group(System):
     _contains_parallel_group : bool
         If True, this Group contains a ParallelGroup. Only used to determine if a parallel
         group or distributed component is below a DirectSolver so that we can raise an exception.
-    _raise_connection_errors : bool
-        Flag indicating whether connection errors are raised as an Exception.
     _order_set : bool
         Flag to check if set_order has been called.
     _auto_ivc_warnings : list
@@ -230,7 +228,6 @@ class Group(System):
         self._discrete_transfers = {}
         self._setup_procs_finished = False
         self._contains_parallel_group = False
-        self._raise_connection_errors = True
         self._order_set = False
         self._shapes_graph = None
         self._shape_knowns = None
@@ -853,7 +850,12 @@ class Group(System):
                     if abs_in in abs2meta_in:  # input is local
                         src_inds = abs2meta_in[abs_in]['src_indices']
                         if src_inds is not None:
-                            src_inds = src_inds.shaped_instance()
+                            shaped = src_inds.shaped_instance()
+                            if shaped is None:
+                                raise RuntimeError(f"For connection from '{abs_out}' to '{abs_in}', "
+                                                   f"src_indices {src_inds} have no source shape.")
+                            else:
+                                src_inds = shaped
                     else:
                         src_inds = None
                     if self.comm.rank == owner:
@@ -923,36 +925,56 @@ class Group(System):
             # input 'abc.def.ghi.x' would look like [tup0, tup1, tup2, tup3] corresponding to
             # the ['', 'abc', 'abc.def', 'abc.def.ghi'] levels in the tree.
 
+            # After this routine runs, all pinfo entries will have src_indices wrt the root
+            # shape.
+
             # use a _PromotesInfo for the top level even though there really isn't a promote there
             # TODO: do this in a less hacky way
-            current_pinfo = _PromotesInfo(src_shape=src_shape)
-            current_shape = src_shape
+            current_pinfo = _PromotesInfo(src_shape=src_shape,
+                                          prom=self._var_allprocs_abs2prom['input'][tgt])
+            root_shape = src_shape
             for lst in plist:
                 pinfo, shape, _ = lst
                 if shape is None:
-                    lst[1] = current_shape
+                    lst[1] = root_shape
                 if pinfo is None:
                     pass
                 elif current_pinfo.src_indices is None:
-                    if pinfo.src_indices is not None:
-                        if current_shape != pinfo.src_shape:
-                            if pinfo.src_shape is None:
-                                pinfo.src_shape = current_shape
-                            else:
-                                prom = self._var_allprocs_abs2prom['input'][tgt]
-                                raise RuntimeError(f"{self.msginfo}: Promoted src_shape of "
-                                                   f"{pinfo.src_shape} for '{pinfo.prom}' in "
-                                                   f"'{pinfo.promoted_from}' differs from src_shape "
-                                                   f"{current_shape} for '{prom}'.")
+                    try:
+                        if pinfo.src_shape is None:
+                            pinfo.set_src_shape(root_shape)
+                        elif pinfo.src_indices is not None and root_shape != pinfo.src_shape:
+                            raise RuntimeError(f"Promoted src_shape of {pinfo.src_shape} for "
+                                               f"'{pinfo.prom_path()}' differs from src_shape "
+                                               f"{root_shape} for '{current_pinfo.prom_path()}'.")
+                    except Exception:
+                        exc = sys.exc_info()
+                        conditional_error(f"In connection from '{conns[tgt]}' to "
+                                          f"'{pinfo.prom_path()}', error was: {exc[1]}", exc=exc,
+                                          category=SetupWarning, err=self._raise_connection_errors)
                     current_pinfo = pinfo
                     continue
                 elif pinfo.src_indices is None:
                     pinfo = pinfo.copy()  # TODO: make sure we really need this copy here
                     pinfo.src_indices = current_pinfo.src_indices
+                    if pinfo.src_shape is None:
+                        pinfo.set_src_shape(current_pinfo.src_shape)
                     current_pinfo = pinfo
                 else:  # both have src_indices
-                    sinds = convert_src_inds(current_pinfo.src_indices, current_pinfo.src_shape,
-                                             pinfo.src_indices, pinfo.src_shape)
+                    try:
+                        if pinfo.src_shape is None:
+                            pinfo.set_src_shape(current_pinfo.src_indices.indexed_src_shape)
+                        sinds = convert_src_inds(current_pinfo.src_indices, current_pinfo.src_shape,
+                                                 pinfo.src_indices, pinfo.src_shape)
+                    except Exception:
+                        exc = sys.exc_info()
+                        raise exc[0](f"In connection from '{conns[tgt]}' to '{pinfo.prom_path()}', "
+                                     f"input '{current_pinfo.prom_path()}' src_indices are "
+                                     f"{current_pinfo.src_indices} and indexing into those failed "
+                                     f"using src_indices {pinfo.src_indices} from input "
+                                     f"'{pinfo.prom_path()}'. Error was: "
+                                     f"{exc[1]}").with_traceback(exc[2])
+
                     # final src_indices are wrt original full sized source and are flat,
                     # so use val.shape and flat_src=True
                     # It would be nice if we didn't have to convert these and could just keep
@@ -965,7 +987,7 @@ class Group(System):
                     lst[1] = src_indices.indexed_src_shape
                 lst[0] = current_pinfo
 
-            _PromotesInfo.dump_plist(plist, tgt)
+            # _PromotesInfo.dump_plist(plist, tgt)
 
         with multi_proc_exception_check(self.comm):
             self._resolve_src_inds()
@@ -991,7 +1013,6 @@ class Group(System):
                     inds, flat, shape = pinfo
                     if inds is not None:
                         self._var_prom2inds[prom] = [shape, inds, flat]
-                print('*'*10, self.name, prom, gshape, pinfo.src_shape if pinfo else None)
 
         for s in self._subsystems_myproc:
             s._resolve_src_inds()
@@ -1418,10 +1439,6 @@ class Group(System):
         allprocs_discrete_in = self._var_allprocs_discrete['input']
         allprocs_discrete_out = self._var_allprocs_discrete['output']
 
-        all_abs2meta_in = self._var_allprocs_abs2meta['input']
-        all_abs2meta_out = self._var_allprocs_abs2meta['output']
-        abs2meta_in = self._var_abs2meta['input']
-        abs2meta_out = self._var_abs2meta['output']
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
 
         pathname = self.pathname
@@ -1818,8 +1835,6 @@ class Group(System):
         allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
         abs2meta_in = self._var_abs2meta['input']
         abs2meta_out = self._var_abs2meta['output']
-        sizes_out = self._var_sizes['output']
-        out_idxs = self._var_allprocs_abs2idx
 
         nproc = self.comm.size
 
@@ -2038,8 +2053,8 @@ class Group(System):
             will issue a warning and the offending connection will be ignored.
         """
         for sub, _ in self._subsystems_allprocs.values():
+            sub._raise_connection_errors = val
             if isinstance(sub, Group):
-                sub._raise_connection_errors = val
                 sub._set_subsys_connection_errors(val)
 
     def _transfer(self, vec_name, mode, sub=None):
@@ -3202,6 +3217,7 @@ class Group(System):
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
 
         val = None
+        val_shape = None
 
         # first, find the auto_ivc output shape
         for tgt in tgts:
@@ -3211,17 +3227,18 @@ class Group(System):
                     for pinfo, src_shape, _ in abs_in2prom_info[tgt]:
                         if pinfo is not None and pinfo.src_shape is not None:
                             val = np.ones(pinfo.src_shape)
+                            val_shape = pinfo.src_shape
                             break
                         if src_shape is not None:
                             val = np.ones(src_shape)
+                            val_shape = src_shape
                             break
                 else:  # no src_indices - full connection
-                    val = abs2meta_in[tgt]['val']
+                    #val = abs2meta_in[tgt]['val']
+                    val_shape = abs2meta_in[tgt]['shape']
                     if tgt not in vars_to_gather:
                         found_dup = True
-
-            if val is not None:
-                break
+                    break
 
         for tgt in tgts:
             if tgt in vars_to_gather and self.comm.rank != vars_to_gather[tgt]:
@@ -3233,14 +3250,13 @@ class Group(System):
             meta = abs2meta_in[tgt]
             # prom = abs2prom[tgt]
             size = meta['size']
-
             value = meta['val']
             src_indices = None
             if tgt in abs_in2prom_info:
                 # traverse down the promotes list, (abs_in2prom_info[tgt]), to get the
                 # final src_indices down at the component level so we can set the value of
                 # that component input into the appropriate place(s) in the auto_ivc output.
-                newshape = val.shape
+                newshape = val_shape
                 for pinfo, _, _ in abs_in2prom_info[tgt]:
                     if pinfo is None:
                         continue
@@ -3263,8 +3279,8 @@ class Group(System):
                         else:
                             sinds = convert_src_inds(src_indices, newshape, inds, shape)
                             # final src_indices are wrt original full sized source and are flat,
-                            # so use val.shape and flat_src=True
-                            src_indices = indexer(sinds, src_shape=val.shape, flat_src=True)
+                            # so use val_shape and flat_src=True
+                            src_indices = indexer(sinds, src_shape=val_shape, flat_src=True)
                         newshape = src_indices.indexed_src_shape
 
             if src_indices is None:
@@ -3291,11 +3307,8 @@ class Group(System):
             else:
                 if val is None:
                     val = value
-                elif val is not value:
-                    try:
-                        val[:] = value
-                    except ValueError as err:
-                        raise ValueError(f"Input '{tgt}': {str(err)}")
+                elif val.shape != value.shape:
+                    raise ValueError(f"Shape of input '{tgt}', {value.shape}, doesn't match shape {val.shape}.")
 
                 if tgt not in vars_to_gather:
                     found_dup = True

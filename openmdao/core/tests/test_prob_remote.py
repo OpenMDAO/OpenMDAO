@@ -153,6 +153,8 @@ class ProbRemoteTestCase(unittest.TestCase):
                 self.par.add_subsystem('c1', om.ExecComp(['y=2.0*x']), promotes_inputs=['*'])
                 self.par.add_subsystem('c2', om.ExecComp(['y=5.0*x']), promotes_inputs=['*'])
 
+        om.wing_dbg()
+        
         prob = om.Problem(model=MyModel())
         prob.setup(mode='fwd')
 

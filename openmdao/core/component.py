@@ -1,5 +1,6 @@
 """Define the Component class."""
 
+import sys
 from collections import defaultdict
 from collections.abc import Iterable
 from itertools import product
@@ -18,11 +19,11 @@ from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    find_matches, make_set, convert_src_inds
+    find_matches, make_set, convert_src_inds, conditional_error
 from openmdao.utils.indexer import Indexer, indexer
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
-    DerivativesWarning, warn_deprecation
+    DerivativesWarning, SetupWarning, warn_deprecation
 
 _forbidden_chars = ['.', '*', '?', '!', '[', ']']
 _whitespace = {' ', '\t', '\r', '\n'}
@@ -924,7 +925,7 @@ class Component(System):
                                            "supplied manually.")
 
                 inds = np.arange(offset, end, dtype=INT_DTYPE)
-                meta_in['src_indices'] = indexer(inds, flat_src=True)
+                meta_in['src_indices'] = indexer(inds, flat_src=True, src_shape=all_abs2meta_out[src]['global_shape'])
                 meta_in['flat_src_indices'] = True
                 added_src_inds.append(iname)
 
@@ -1561,32 +1562,23 @@ class Component(System):
 
     def _resolve_src_inds(self):
         abs2prom = self._var_abs2prom['input']
-        tree_level = len(self.pathname.split('.')) if self.pathname else 0
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
         all_abs2meta_in = self._var_allprocs_abs2meta['input']
         abs2meta_in = self._var_abs2meta['input']
+        conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
+        all_abs2meta_out = self._problem_meta['model_ref']()._var_allprocs_abs2meta['output']
 
-        for tgt in self._var_abs2meta['input']:
-            meta = abs2meta_in[tgt]
+        for tgt, meta in abs2meta_in.items():
             if tgt in abs_in2prom_info:
                 plist = abs_in2prom_info[tgt]
-                pinfo, shape, _ = plist[tree_level]
+                pinfo, shape, _ = plist[-1]  # component always last in the plist
                 if pinfo is not None:
                     inds, flat, shape = pinfo
                     if inds is not None:
                         self._var_prom2inds[abs2prom[tgt]] = [shape, inds, flat]
-                        # print(f"{self.pathname}: adding var_prom2inds[{abs2prom[tgt]}] of [{shape}, {inds}, {flat}]")
 
                         all_abs2meta_in[tgt]['has_src_indices'] = True
-                        shape = pinfo.root_shape
-                        # if src_shape is None and shape is not None:
-                        #     try:
-                        #         src_inds.set_src_shape(shape)
-                        #     except Exception as err:
-                        #         raise RuntimeError(f"{self.msginfo}: When promoting '{tgt}' with "
-                        #                         f"src_indices {src_inds} and source shape "
-                        #                         f"{shape}: {err}")
-                        meta['src_shape'] = shape
+                        meta['src_shape'] = shape = all_abs2meta_out[conns[tgt]]['global_shape']
                         if meta.get('add_input_src_indices'):
                             inds = convert_src_inds(inds, shape, meta['src_indices'], shape)
                         elif inds._flat_src:
@@ -1594,10 +1586,20 @@ class Component(System):
                         elif meta['flat_src_indices'] is None:
                             meta['flat_src_indices'] = flat
 
-                        if not isinstance(inds, Indexer):
-                            meta['src_indices'] = indexer(inds, flat_src=flat)
-                        else:
-                            meta['src_indices'] = inds # .copy()
+                        try:
+                            if not isinstance(inds, Indexer):
+                                meta['src_indices'] = indexer(inds, flat_src=flat, src_shape=shape)
+                            else:
+                                meta['src_indices'] = inds = inds.copy()
+                                inds.set_src_shape(shape)
+                        except Exception:
+                            exc = sys.exc_info()
+                            conditional_error(f"When promoting '{pinfo.prom}' from system "
+                                              f"'{pinfo.promoted_from}' with src_indices {inds}"
+                                              f" and src_shape {shape}: "
+                                              f"{exc[1]}", exc=exc, category=SetupWarning,
+                                              err=self._raise_connection_errors)
+
             elif meta.get('add_input_src_indices'):
                 self._var_prom2inds[abs2prom[tgt]] = [meta['shape'], meta['src_indices'], meta['src_indices']._flat_src]
 

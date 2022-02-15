@@ -2068,7 +2068,7 @@ class TestGroupPromotes(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(cm.exception),
-            "In connection from 'ind.a' to 'sub.comp.a', input 'sub.a' src_indices are [0 1 2] and indexing into those failed using src_indices [0 2 4] from input 'sub.comp.a'. Error was: index 4 is out of bounds for axis 0 with size 3.")
+            "In connection from 'ind.a' to 'sub.comp.a', input 'sub.a' src_indices are [0 1 2] and indexing into those failed using src_indices [0 2 4] from input 'sub.comp.a'. Error was: index 4 is out of bounds for source dimension of size 3.")
 
     def test_promotes_list_order(self):
         # This test verifies that the order we promote in the arguments to add_subsystem doesn't
@@ -2447,7 +2447,7 @@ class TestConnect(unittest.TestCase):
         self.sub.connect('src.x', 'arr.x', src_indices=[[2,2],[-1,2],[2,2]],
                          flat_src_indices=False)
 
-        msg = "'sub' <class Group>: When connecting 'src.x' to 'arr.x': Can't set source shape to (5, 3) because indexer ([2, 2], [-1, 2], [2, 2]) expects 3 dimensions."
+        msg = "<model> <class Group>: When connecting 'sub.src.x' to 'sub.arr.x': Can't set source shape to (5, 3) because indexer ([2, 2], [-1, 2], [2, 2]) expects 3 dimensions."
         try:
             self.prob.setup()
         except ValueError as err:
@@ -2456,6 +2456,7 @@ class TestConnect(unittest.TestCase):
             self.fail('Exception expected.')
 
         self.prob.model._raise_connection_errors = False
+        self.prob.model._set_subsys_connection_errors(False)
 
         with assert_warning(UserWarning, msg):
             self.prob.setup()
@@ -2465,7 +2466,7 @@ class TestConnect(unittest.TestCase):
         self.sub.connect('src.x', 'arr.x', src_indices=[[2, 4],[-1, 4]],
                          flat_src_indices=False)
 
-        msg = "'sub' <class Group>: When connecting 'src.x' to 'arr.x': index 4 is out of bounds for source dimension of size 3."
+        msg = "<model> <class Group>: When connecting 'sub.src.x' to 'sub.arr.x': index 4 is out of bounds for source dimension of size 3."
 
         try:
             self.prob.setup()
@@ -2665,8 +2666,8 @@ class TestGroupAddInput(unittest.TestCase):
         par.add_subsystem('C1', om.ExecComp('y = 3. * x', x=1.0), promotes_inputs=['x'])
         par.add_subsystem('C2', om.ExecComp('y = 5. * x', x=1.1), promotes_inputs=['x'])
 
-        #with self.assertRaises(Exception) as cm:
-        p.setup()
+        with self.assertRaises(Exception) as cm:
+            p.setup()
 
         self.assertEqual(cm.exception.args[0],
                          "<model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['val'] differ. Call <group>.set_input_defaults('x', val=?), where <group> is the Group named 'par' to remove the ambiguity.")
@@ -3016,6 +3017,7 @@ class Test3Deep(unittest.TestCase):
     sub_par = False
 
     def build_model(self):
+        om.wing_dbg()
         p = om.Problem(model=ConfigGroup())
 
         minprocs = 3 if self.cfg_par else 1
@@ -3158,6 +3160,7 @@ class Test3Deep(unittest.TestCase):
     def test_add_output_to_child(self):
         p = self.build_model()
         p.model.cfg.sub.add_var_output('C3.ovar0', 3.0, units='ft')
+                
         p.setup()
 
         names = self.get_matching_var_setup_counts(p, 1)

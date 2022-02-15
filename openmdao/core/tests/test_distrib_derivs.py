@@ -312,6 +312,7 @@ class MPITests2(unittest.TestCase):
     def test_distrib_voi_dense(self):
         size = 7
 
+        om.wing_dbg()
         prob = om.Problem()
         model = prob.model
 

@@ -317,7 +317,7 @@ class SrcIndicesTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "<model> <class Group>: Promoted src_shape of (3, 3) for 'x' in 'G.g1.C1' differs from src_shape (3, 2) for 'x'.")
+        self.assertEqual(cm.exception.args[0], "In connection from '_auto_ivc.v0' to 'G.g1.C1.x', error was: Promoted src_shape of (3, 3) for 'G.g1.C1.x' differs from src_shape (3, 2) for 'x'.")
 
     def test_src_indices_on_promotes(self):
         src_shape = (3, 3)
