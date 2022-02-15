@@ -47,7 +47,6 @@ class TestReportsSystem(unittest.TestCase):
         self.testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
         clear_reports()
         set_reports_dir(_reports_dir)
-        setup_default_reports()
 
         self.count = 0
 
@@ -57,6 +56,7 @@ class TestReportsSystem(unittest.TestCase):
             os.environ['TESTFLO_RUNNING'] = self.testflo_running
 
     def setup_and_run_simple_problem(self, driver=None):
+        from openmdao.utils.hooks import _hooks, _hook_skip_classes, use_hooks
         prob = om.Problem()
         model = prob.model
 
@@ -114,6 +114,7 @@ class TestReportsSystem(unittest.TestCase):
 
     @hooks_active
     def test_report_generation_basic(self):
+        setup_default_reports()
         prob = self.setup_and_run_simple_problem()
 
         # get the path to the problem subdirectory
@@ -127,6 +128,7 @@ class TestReportsSystem(unittest.TestCase):
     @hooks_active
     def test_report_generation_basic_pyoptsparse(self):
         # Just to try a different driver
+        setup_default_reports()
         prob = self.setup_and_run_simple_problem(driver=pyOptSparseDriver(optimizer='SLSQP'))
 
         # get the path to the problem subdirectory
@@ -139,6 +141,7 @@ class TestReportsSystem(unittest.TestCase):
 
     @hooks_active
     def test_report_generation_basic_doedriver(self):
+        setup_default_reports()
 
         prob = om.Problem()
         model = prob.model
@@ -168,6 +171,7 @@ class TestReportsSystem(unittest.TestCase):
 
     @hooks_active
     def test_report_generation_list_reports(self):
+        setup_default_reports()  # So it sees the OPENMDAO_REPORTS var
         stdout = sys.stdout
         strout = StringIO()
         sys.stdout = strout
@@ -219,6 +223,7 @@ class TestReportsSystem(unittest.TestCase):
 
     @hooks_active
     def test_report_generation_set_reports_dir(self):
+        setup_default_reports()  # So it sees the OPENMDAO_REPORTS var
         # test use of setting a custom reports directory other than the default of "."
         custom_dir = 'custom_reports_dir'
         os.environ['OPENMDAO_REPORTS_DIR'] = custom_dir
@@ -236,6 +241,7 @@ class TestReportsSystem(unittest.TestCase):
 
     @hooks_active
     def test_report_generation_user_defined_report(self):
+        setup_default_reports()  # So it sees the OPENMDAO_REPORTS var
         user_report_filename = 'user_report.txt'
 
         def user_defined_report(prob):
@@ -262,6 +268,7 @@ class TestReportsSystem(unittest.TestCase):
     def test_report_generation_various_locations(self):
         # the reports can be generated pre and post for setup, final_setup, and run_driver
         # check those all work
+        setup_default_reports()  # So it sees the OPENMDAO_REPORTS var
 
         self.count = 0
 
@@ -299,6 +306,7 @@ class TestReportsSystem(unittest.TestCase):
 
     @hooks_active
     def test_report_generation_multiple_problems(self):
+        setup_default_reports()  # So it sees the OPENMDAO_REPORTS var
         probname, subprobname = self.setup_and_run_model_with_subproblem()
 
         # The multiple problem code only runs model so no scaling reports to look for
@@ -370,7 +378,6 @@ class TestReportsSystemMPI(unittest.TestCase):
         self.testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
         clear_reports()
         set_reports_dir(_reports_dir)
-        setup_default_reports()
 
         self.count = 0  # used to keep a count of reports generated
 
@@ -381,6 +388,7 @@ class TestReportsSystemMPI(unittest.TestCase):
 
     @hooks_active
     def test_reports_system_mpi_basic(self): #  example taken from TestScipyOptimizeDriverMPI
+        setup_default_reports()
 
         prob = om.Problem()
         prob.model = SellarMDA()
