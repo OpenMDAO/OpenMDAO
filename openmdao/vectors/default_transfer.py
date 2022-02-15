@@ -98,6 +98,7 @@ class DefaultTransfer(Transfer):
                 src_indices = meta_in['src_indices']
                 if src_indices is not None:
                     src_indices = src_indices.shaped_array()
+                    # src_indices = src_indices.shaped_array(flat=meta_in['flat_src_indices'])
 
                 # 1. Compute the output indices
                 offset = offsets_out[idx_out]
