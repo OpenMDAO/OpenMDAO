@@ -2513,8 +2513,8 @@ class TestPyoptSparse(unittest.TestCase):
         p.run_driver()
 
         assert_check_totals(p.check_totals())
-        assert_near_equal(p.get_val('exec.z')[0], 30.)
-        assert_near_equal(p.get_val('exec.z')[50], -70)
+        assert_near_equal(p.get_val('exec.z')[0], 30., tolerance=1e-13)
+        assert_near_equal(p.get_val('exec.z')[50], -70, tolerance=1e-13)
 
         # REV
         p.setup(mode='rev')
@@ -2524,8 +2524,8 @@ class TestPyoptSparse(unittest.TestCase):
         p.run_driver()
 
         assert_check_totals(p.check_totals())
-        assert_near_equal(p.get_val('exec.z')[0], 30.)
-        assert_near_equal(p.get_val('exec.z')[50], -70)
+        assert_near_equal(p.get_val('exec.z')[0], 30., tolerance=1e-13)
+        assert_near_equal(p.get_val('exec.z')[50], -70, tolerance=1e-13)
 
     def test_fwd_rev_multi_constraint(self):
         p = om.Problem()
@@ -2616,6 +2616,9 @@ class TestPyoptSparse(unittest.TestCase):
         assert_near_equal(J[('ALIAS_TEST', 'exec.a')].flatten(), np.array([1.]))
 
     def test_dynamic_coloring_w_multi_constraints(self):
+
+        OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT', fallback=False)
+
         p = om.Problem()
 
         exec = om.ExecComp(['y = x**2',
