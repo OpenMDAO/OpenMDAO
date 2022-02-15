@@ -193,34 +193,33 @@ class SqliteRecorder(CaseRecorder):
         filepath = None
 
         if MPI and comm and comm.size > 1:
-            rank = comm.rank
-            record_on_ranks = comm.allgather(self.record_on_proc)
-            if True in record_on_ranks:
-                # recording ranks have been specified
-                recording_ranks = [rnk for rnk, rec in enumerate(record_on_ranks) if rec is True]
-                parallel = self._parallel = len(recording_ranks) > 1
-                if parallel and rank in recording_ranks:
+            if self._record_on_proc:
+                if not self._parallel:
+                    # recording only on this proc
+                    filepath = self._filepath
+                else:
+                    # recording on multiple procs, so a separate file for each recording proc
+                    # plus a file for the common metadata, written by the lowest recording rank
+                    rank = comm.rank
                     filepath = f"{self._filepath}_{rank}"
                     print("Note: SqliteRecorder is running on multiple processors. "
                           f"Cases from rank {rank} are being written to {filepath}.")
-                    if rank == min(recording_ranks):
+                    if rank == min(self._recording_ranks):
                         metadata_filepath = f'{self._filepath}_meta'
                         print("Note: Metadata is being recorded separately as "
                               f"{metadata_filepath}.")
                         try:
-                            os.remove(metadata_filepath)
-                            issue_warning('The existing case recorder metadata file, '
-                                          f'{metadata_filepath}, is being overwritten.',
+                            rc = os.remove(metadata_filepath)
+                            issue_warning("The existing case recorder metadata file, "
+                                          f"{metadata_filepath}, is being overwritten.",
                                           category=UserWarning)
                         except OSError:
                             pass
                         self.metadata_connection = sqlite3.connect(metadata_filepath)
                     else:
                         self._record_metadata = False
-            elif rank == 0:
-                # recording ranks have not been specified, default to recording only on rank 0
-                filepath = self._filepath
         else:
+            # no MPI or comm size == 1
             filepath = self._filepath
 
         if filepath:

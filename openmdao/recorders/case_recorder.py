@@ -5,7 +5,6 @@ from openmdao.core.system import System
 from openmdao.core.driver import Driver
 from openmdao.solvers.solver import Solver
 from openmdao.core.problem import Problem
-from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import check_path
@@ -45,8 +44,10 @@ class CaseRecorder(object):
         The unique iteration coordinate of where an iteration originates.
     _parallel : bool
         Flag indicating if this recorder will record on multiple processes.
-    record_on_proc : bool or _UNDEFINED
-        Flag indicating if this recorder will record on the current process.
+    _record_on_proc : bool or None
+        Flag indicating if this recorder will record on the current process (None if unspecified).
+    _record_on_ranks : list
+        list of _record_on_proc flags for all ranks (gathered at startup)
     """
 
     def __init__(self, record_viewer_data=True):
@@ -74,19 +75,50 @@ class CaseRecorder(object):
         # For Drivers, Systems, and Solvers
         self._iteration_coordinate = None
 
-        # By default, this is False, but it should be set to True
-        # if the recorder will record data on multiple processes to avoid
-        # unnecessary gathering.
+        # By default, this is False, but it will be set to True if the recorder
+        # will record data on multiple processes
         self._parallel = False
 
-        # Flag indicating if recording will be performed on the current process
-        # Defaults to undefined indicating the default behavior, which is normally
-        # that recording should only be performed on rank 0.
-        self.record_on_proc = _UNDEFINED
+        # Flag indicating if recording will be performed on the current process.
+        # If the value is not set to True on any process (the default), then
+        # recording will be performed only on rank 0.
+        # If the value is set to True on any process, then the _parallel flag
+        # will be set and recording will occur on all processes for which the
+        # value is True.
+        self._record_on_proc = None
+
+        # list of _record_on_proc flags for all ranks (gathered at startup)
+        self._record_on_ranks = None
+
+    @property
+    def record_on_process(self):
+        """
+        Determine if recording should be performed on this process.
+        """
+        return self._record_on_proc
+
+    @record_on_process.setter
+    def record_on_process(self, record):
+        """
+        Specify that recording should be performed on this process.
+
+        Parameters
+        ----------
+        record : bool
+            If True, then recording should be performed on this process.
+        """
+        self._record_on_proc = record
+
+    @property
+    def parallel(self):
+        """
+        Return True if this recorder is recording on multiple processes.
+        """
+        return self._parallel
 
     def startup(self, recording_requester, comm=None):
         """
-        Prepare for a new run and calculate inclusion lists.
+        Prepare for a new run.
 
         Parameters
         ----------
@@ -97,12 +129,17 @@ class CaseRecorder(object):
         """
         self._counter = 0
 
-    @property
-    def parallel(self):
-        """
-        Return True if this recorder is recording on multiple processes.
-        """
-        return self._parallel
+        if MPI and comm and comm.size > 1:
+            record_on_ranks = comm.allgather(self._record_on_proc)
+            recording_ranks = [rnk for rnk, rec in enumerate(record_on_ranks) if rec is True]
+            if recording_ranks:
+                # recording ranks have been specified
+                self._recording_ranks = recording_ranks
+                self._parallel = len(recording_ranks) > 1
+            else:
+                # default to just record on rank 0
+                self._record_on_proc = comm.rank == 0
+                self._recording_ranks = [0]
 
     def record_metadata(self, recording_requester):
         """
@@ -117,6 +154,21 @@ class CaseRecorder(object):
                          "All system and solver options are recorded automatically.")
 
     def _get_metadata_system(self, system):
+        """
+        Get system metadata.
+
+        Parameters
+        ----------
+        system : System
+            The System for which to record metadata.
+
+        Returns
+        -------
+        dict
+            dictionary of scaling vectors
+        OptionsDictionary
+            dictionary with recordable options for system
+        """
         # Cannot handle PETScVector yet
         from openmdao.api import PETScVector
         if PETScVector and isinstance(system._outputs, PETScVector):
@@ -187,7 +239,7 @@ class CaseRecorder(object):
         **kwargs : keyword args
             Some implementations of record_iteration need additional args.
         """
-        if self.record_on_proc:
+        if not self._parallel or self._record_on_proc is True:
             self._counter += 1
 
             self._iteration_coordinate = \
