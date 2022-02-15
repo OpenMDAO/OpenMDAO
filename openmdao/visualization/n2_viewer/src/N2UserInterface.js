@@ -425,7 +425,8 @@ class N2UserInterface {
         window.getSelection().empty();
 
         // Make sure node is collapsible and window doesn't exist yet.
-        if (this.isCollapsible(node) && d3.select('#childSelect-' + node.toId()).empty()) {
+        if (this.isCollapsible(node) && !node.isFilter() && 
+            d3.select('#childSelect-' + node.toId()).empty()) {
             new ChildSelectDialog(node, color); // Create the modal dialog
         }
     }
