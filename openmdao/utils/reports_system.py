@@ -16,7 +16,7 @@ from openmdao.visualization.scaling_viewer.scaling_report import _default_scalin
 from openmdao.visualization.n2_viewer.n2_viewer import n2
 
 # Keeping track of the registered reports
-_Report = namedtuple('Report', 'func desc class_name inst_id method pre_or_post kwargs')
+_Report = namedtuple('Report', 'func desc class_name inst_id method pre_or_post')
 _reports_registry = {}
 
 _reports_dir = '.'  # the default location for the reports
@@ -32,7 +32,7 @@ def _is_rank_0(prob):
     return on_rank0
 
 
-def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=None, **kwargs):
+def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=None):
     """
     Register a report with the reporting system.
 
@@ -53,12 +53,10 @@ def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=N
     inst_id : str or None
         Either the instance ID of an OpenMDAO object (e.g. Problem, Driver) or None.
         If None, then this report will be run for all objects of type class_name.
-    **kwargs : dict
-        Optional args for the reporting function.
     """
     global _reports_registry
 
-    report = _Report(func, desc, class_name, inst_id, method, pre_or_post, kwargs)
+    report = _Report(func, desc, class_name, inst_id, method, pre_or_post)
     if name in _reports_registry:
         raise ValueError(f"A report with the name {name} already exists")
     _reports_registry[name] = report
@@ -278,8 +276,6 @@ _default_reports = {
                 None)
 }
 
-# _default_reports = {}#TODO delete this
-
 
 def setup_default_reports():
     """
@@ -288,8 +284,6 @@ def setup_default_reports():
     if 'TESTFLO_RUNNING' in os.environ:
         return
 
-    print("TESTFLO_RUNNING not in env")
-    print(os.environ)
     if 'OPENMDAO_REPORTS' in os.environ:
         if os.environ['OPENMDAO_REPORTS'] in ['0', 'false', 'off', "none"]:
             return
