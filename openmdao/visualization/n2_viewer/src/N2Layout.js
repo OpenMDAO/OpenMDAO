@@ -153,8 +153,8 @@ class N2Layout {
             retVal = 'Auto-IVC';
         }
         else if (node.isFilter()) {
-            if (node.name.match(/.*_N2_FILTER_inputs$/)) retVal = 'Inputs';
-            else retVal = 'Outputs';
+            if (node.name.match(/.*_N2_FILTER_inputs$/)) retVal = 'Filtered Inputs';
+            else retVal = 'Filtered Outputs';
         }
         else if (node.absPathName.match(/^_auto_ivc.*/) && node.promotedName !== undefined) {
             retVal = node.promotedName;
