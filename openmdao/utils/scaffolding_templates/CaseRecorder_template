@@ -23,7 +23,7 @@ class {class_name}(CaseRecorder):
 
     def startup(self, recording_requester, comm=None):
         """
-        Prepare for a new run and calculate inclusion lists.
+        Prepare for a new run.
 
         Parameters
         ----------
