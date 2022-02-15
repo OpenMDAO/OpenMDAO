@@ -98,7 +98,9 @@ class DOEDriver(Driver):
         """
         self._problem_comm = comm
 
-        if MPI:
+        if not MPI:
+            return comm
+        else:
             procs_per_model = self.options['procs_per_model']
 
             full_size = comm.size
@@ -109,12 +111,9 @@ class DOEDriver(Driver):
                                    "number of processors that is a multiple of %d, or "
                                    "specify a number of processors per model that divides "
                                    "into %d." % (procs_per_model, full_size))
-            color = self._color = comm.rank % size
-            model_comm = comm.Split(color)
-        else:
-            model_comm = comm
 
-        return model_comm
+            color = self._color = comm.rank % size
+            return comm.Split(color)
 
     def _set_name(self):
         """
@@ -241,22 +240,28 @@ class DOEDriver(Driver):
         Set up case recording.
         """
         if MPI:
+            run_parallel = self.options['run_parallel']
             procs_per_model = self.options['procs_per_model']
 
             for recorder in self._rec_mgr:
-                recorder._parallel = True
+                if run_parallel:
+                    recorder._parallel = True
 
-                # if SqliteRecorder, write cases only on procs up to the number
-                # of parallel DOEs (i.e. on the root procs for the cases)
-                if isinstance(recorder, SqliteRecorder):
-                    if procs_per_model == 1:
-                        recorder._record_on_proc = True
-                    else:
-                        size = self._problem_comm.size // procs_per_model
-                        if self._problem_comm.rank < size:
+                    # if SqliteRecorder, write cases only on procs up to the number
+                    # of parallel DOEs (i.e. on the root procs for the cases)
+                    if isinstance(recorder, SqliteRecorder):
+                        if procs_per_model == 1:
                             recorder._record_on_proc = True
                         else:
-                            recorder._record_on_proc = False
+                            size = self._problem_comm.size // procs_per_model
+                            if self._problem_comm.rank < size:
+                                recorder._record_on_proc = True
+                            else:
+                                recorder._record_on_proc = False
+
+                elif self._problem_comm.rank > 0:
+                    # if not running cases in parallel, then just record on proc 0
+                    recorder._record_on_proc = False
 
         super()._setup_recording()
 

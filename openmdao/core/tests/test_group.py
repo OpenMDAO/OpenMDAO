@@ -3819,7 +3819,7 @@ class TestFeatureConfigure(unittest.TestCase):
         assert_near_equal(p.get_val('totalforcecomp.total_force', units='kN'),
                          np.array([[100, 200, 300], [0, -1, -2]]).T)
 
-    def test_configure_dyn_shape_err(self):
+    def test_configure_dyn_shape(self):
 
         class MyComp(om.ExplicitComponent):
             def setup(self):
@@ -3840,11 +3840,8 @@ class TestFeatureConfigure(unittest.TestCase):
         p.model.add_subsystem("G", MyGroup())
         p.model.add_subsystem("sink", om.ExecComp('y=5*x'))
         p.model.connect('G.comp.y', 'sink.x')
-        with self.assertRaises(RuntimeError) as cm:
-            p.setup()
-
-        msg="'G.comp' <class MyComp>: Can't retrieve shape, size, or value for dynamically sized variable 'y' because they aren't known yet."
-        self.assertEqual(str(cm.exception), msg)
+        # this used to raise an exception
+        p.setup()
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

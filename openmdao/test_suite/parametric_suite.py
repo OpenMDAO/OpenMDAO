@@ -1,5 +1,5 @@
 import itertools
-import collections
+from collections.abc import Iterable
 
 try:
     from parameterized import parameterized
@@ -63,7 +63,7 @@ def _test_suite(*args, **kwargs):
                     if arg_value == '*':
                         opts[arg] = default_val
                     elif isinstance(arg_value, str) \
-                            or not isinstance(arg_value, collections.Iterable):
+                            or not isinstance(arg_value, Iterable):
                         # itertools.product expects iterables, so make 1-item tuple
                         opts[arg] = (arg_value,)
                     else:

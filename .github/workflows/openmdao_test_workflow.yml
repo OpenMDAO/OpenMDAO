@@ -35,7 +35,7 @@ jobs:
 
           # latest versions
           - NAME: Latest
-            PY: <3.9
+            PY: 3
             NUMPY: 1
             SCIPY: 1
             PETSc: 3
@@ -45,7 +45,7 @@ jobs:
 
           # minimal install
           - NAME: Minimal
-            PY: <3.9
+            PY: 3
             NUMPY: 1
             SCIPY: 1
             PYOPTSPARSE: 'conda-forge'
@@ -101,6 +101,8 @@ jobs:
         shell: bash -l {0}
         run: |
           conda install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
+
+          pip install --upgrade pip
 
           echo "============================================================="
           echo "Install OpenMDAO"
@@ -336,6 +338,8 @@ jobs:
         shell: pwsh
         run: |
           conda install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
+
+          pip install --upgrade pip
 
           echo "============================================================="
           echo "Install OpenMDAO"
