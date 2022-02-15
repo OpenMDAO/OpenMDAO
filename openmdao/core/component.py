@@ -1567,6 +1567,7 @@ class Component(System):
         abs2meta_in = self._var_abs2meta['input']
 
         for tgt in self._var_abs2meta['input']:
+            meta = abs2meta_in[tgt]
             if tgt in abs_in2prom_info:
                 plist = abs_in2prom_info[tgt]
                 pinfo, shape, _ = plist[tree_level]
@@ -1577,7 +1578,6 @@ class Component(System):
                         # print(f"{self.pathname}: adding var_prom2inds[{abs2prom[tgt]}] of [{shape}, {inds}, {flat}]")
 
                         all_abs2meta_in[tgt]['has_src_indices'] = True
-                        meta = abs2meta_in[tgt]
                         shape = pinfo.root_shape
                         # if src_shape is None and shape is not None:
                         #     try:
@@ -1598,6 +1598,8 @@ class Component(System):
                             meta['src_indices'] = indexer(inds, flat_src=flat)
                         else:
                             meta['src_indices'] = inds # .copy()
+            elif meta.get('add_input_src_indices'):
+                self._var_prom2inds[abs2prom[tgt]] = [meta['shape'], meta['src_indices'], meta['src_indices']._flat_src]
 
 
 class _DictValues(object):

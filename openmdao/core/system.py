@@ -4642,7 +4642,9 @@ class System(object):
             parts = n.split('.', 1)
             n = n[len(parts[0]) + 1:]
             if len(parts) > 1:
-                scope = scope._get_subsystem(parts[0])
+                s = scope._get_subsystem(parts[0])
+                if s is not None:
+                    scope = s
 
         if self.comm.size > 1 and get_remote:
             if self.comm.rank == self._owning_rank[abs_name]:
@@ -4707,6 +4709,8 @@ class System(object):
                             val.shape = shp
                     else:
                         val = val[src_indices()]
+                        if vmeta and val.shape != vmeta['shape']:
+                            val.shape = vmeta['shape']
 
             if get_remote and self.comm.size > 1:
                 if distrib:

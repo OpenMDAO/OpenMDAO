@@ -1431,9 +1431,12 @@ class TestGroup(unittest.TestCase):
 
         p.model.set_input_defaults('G.test_param', val=7.0)
 
-        msg = "Input 'G.foo.test_param': could not broadcast input array from shape \(5.*\) into shape \(1.*\)"
-        with self.assertRaisesRegex(ValueError, msg) as cm:
+        msg = "<model> <class Group>: The source and target shapes do not match or are ambiguous for the connection '_auto_ivc.v0' to 'G.foo.test_param'. The source shape is (1,) but the target shape is (5,)."
+        with self.assertRaises(ValueError) as cm:
             p.setup()
+
+        self.assertEqual(cm.exception.args[0], msg)
+
 
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestGroupMPISlice(unittest.TestCase):
@@ -2662,8 +2665,8 @@ class TestGroupAddInput(unittest.TestCase):
         par.add_subsystem('C1', om.ExecComp('y = 3. * x', x=1.0), promotes_inputs=['x'])
         par.add_subsystem('C2', om.ExecComp('y = 5. * x', x=1.1), promotes_inputs=['x'])
 
-        with self.assertRaises(Exception) as cm:
-           p.setup()
+        #with self.assertRaises(Exception) as cm:
+        p.setup()
 
         self.assertEqual(cm.exception.args[0],
                          "<model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['val'] differ. Call <group>.set_input_defaults('x', val=?), where <group> is the Group named 'par' to remove the ambiguity.")

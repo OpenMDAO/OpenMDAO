@@ -922,38 +922,50 @@ class Group(System):
             # system tree corresponding to an absolute input name, e.g., a plist for the
             # input 'abc.def.ghi.x' would look like [tup0, tup1, tup2, tup3] corresponding to
             # the ['', 'abc', 'abc.def', 'abc.def.ghi'] levels in the tree.
-            # prom = abs2prom[tgt]
-            # current_pinfo = _PromotesInfo(src_inds, flat_src_inds, src_shape, prom=prom)
-            current_pinfo = None
-            for lst in plist:
-                if current_pinfo is None:
-                    current_pinfo = _PromotesInfo(src_shape=src_shape)
 
+            # use a _PromotesInfo for the top level even though there really isn't a promote there
+            # TODO: do this in a less hacky way
+            current_pinfo = _PromotesInfo(src_shape=src_shape)
+            current_shape = src_shape
+            for lst in plist:
                 pinfo, shape, _ = lst
-                print(tgt, "shape:", shape, "current_pinfo.shape", current_pinfo.src_shape,
-                      "pinfo.shape", pinfo.src_shape if pinfo is not None else None)
+                if shape is None:
+                    lst[1] = current_shape
                 if pinfo is None:
                     pass
                 elif current_pinfo.src_indices is None:
+                    if pinfo.src_indices is not None:
+                        if current_shape != pinfo.src_shape:
+                            if pinfo.src_shape is None:
+                                pinfo.src_shape = current_shape
+                            else:
+                                prom = self._var_allprocs_abs2prom['input'][tgt]
+                                raise RuntimeError(f"{self.msginfo}: Promoted src_shape of "
+                                                   f"{pinfo.src_shape} for '{pinfo.prom}' in "
+                                                   f"'{pinfo.promoted_from}' differs from src_shape "
+                                                   f"{current_shape} for '{prom}'.")
                     current_pinfo = pinfo
                     continue
                 elif pinfo.src_indices is None:
-                    pinfo = pinfo.copy()
+                    pinfo = pinfo.copy()  # TODO: make sure we really need this copy here
                     pinfo.src_indices = current_pinfo.src_indices
                     current_pinfo = pinfo
                 else:  # both have src_indices
-                    # current_pinfo = pinfo.convert_from(current_pinfo)
                     sinds = convert_src_inds(current_pinfo.src_indices, current_pinfo.src_shape,
                                              pinfo.src_indices, pinfo.src_shape)
                     # final src_indices are wrt original full sized source and are flat,
                     # so use val.shape and flat_src=True
+                    # It would be nice if we didn't have to convert these and could just keep
+                    # them in their original form and stack them to get the final result. We can
+                    # do this when doing a get_val, but it doesn't work when doing a set_val.
                     src_indices = indexer(sinds, src_shape=src_shape, flat_src=True)
                     current_pinfo = _PromotesInfo(src_indices=src_indices, src_shape=src_shape,
                                                   flat=True, promoted_from=pinfo.promoted_from,
                                                   prom=pinfo.prom)
+                    lst[1] = src_indices.indexed_src_shape
                 lst[0] = current_pinfo
 
-            # _PromotesInfo.dump_plist(plist, tgt)
+            _PromotesInfo.dump_plist(plist, tgt)
 
         with multi_proc_exception_check(self.comm):
             self._resolve_src_inds()
@@ -971,6 +983,9 @@ class Group(System):
                 if prom in promseen:
                     continue
                 promseen.add(prom)
+
+                #gsrc_shape = self._group_inputs[prom][0].get('src_shape') \
+                    #if prom in self._group_inputs else None
                 pinfo, gshape, _ = plist[tree_level]
                 if pinfo is not None:
                     inds, flat, shape = pinfo
@@ -2195,9 +2210,11 @@ class Group(System):
             promoted = inputs if inputs else any
             try:
                 src_indices = indexer(src_indices, flat_src=flat_src_indices)
-            except Exception as err:
-                raise err.__class__(f"{self.msginfo}: When promoting {promoted} from "
-                                    f"'{subsys_name}': {err}")
+            except Exception:
+                exc = sys.exc_info()
+                conditional_error(f"{self.msginfo}: When promoting {promoted} from '{subsys_name}':"
+                                  f" {exc[1]}", exc=exc, category=SetupWarning,
+                                  err=self._raise_connection_errors)
 
             if outputs:
                 raise RuntimeError(f"{self.msginfo}: Trying to promote outputs {outputs} while "
@@ -2390,9 +2407,11 @@ class Group(System):
         if src_indices is not None:
             try:
                 src_indices = indexer(src_indices, flat_src=flat_src_indices)
-            except Exception as err:
-                raise err.__class__(f"{self.msginfo}: When connecting from '{src_name}' to "
-                                    f"'{tgt_name}': {err}")
+            except Exception:
+                exc = sys.exc_info()
+                conditional_error(f"{self.msginfo}: When connecting from '{src_name}' to "
+                                  f"'{tgt_name}': {exc[1]}", exc=exc, category=SetupWarning,
+                                  err=self._raise_connection_errors)
 
         # target should not already be connected
         for manual_connections in [self._manual_connections, self._static_manual_connections]:
@@ -3499,7 +3518,13 @@ class Group(System):
             if tgt in abs_in2prom_info and abs_in2prom_info[tgt][0][0] is not None:
                 # abs_in2prom_info[tgt][0][0] is the top level _PromotesInfo object
                 if src in all_abs2meta_out:
-                    abs_in2prom_info[tgt][0][0].set_src_shape(all_abs2meta_out[src]['global_shape'])
+                    try:
+                        abs_in2prom_info[tgt][0][0].set_src_shape(all_abs2meta_out[src]['global_shape'])
+                    except Exception:
+                        exc = sys.exc_info()
+                        conditional_error(f"{self.msginfo}: When connecting '{src}' to '{tgt}': "
+                                          f"{exc[1]}", exc=exc, category=SetupWarning,
+                                          err=self._raise_connection_errors)
 
             if src.startswith('_auto_ivc.'):
                 if src in srcconns:

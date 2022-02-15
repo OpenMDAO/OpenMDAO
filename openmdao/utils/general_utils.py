@@ -72,18 +72,26 @@ def conditional_error(msg, exc=RuntimeError, category=UserWarning, err=None):
     ----------
     msg : str
         The error/warning message.
-    exc : Exception class
-        This exception class is used to create the exception to be raised.
+    exc : Exception class or exception info tuple (exception class, exception instance, traceback)
+        This exception class is used to create the exception to be raised, or an exception info
+        tuple from a previously raised exception that is to be re-raised, contingent on the value
+        of 'err'.
     category : warning class
         This category is the class of warning to be issued.
     err : bool
         If None, use ignore_errors(), otherwise use value of err to determine whether to
         raise an exception (err=True) or issue a warning (err=False).
+    exc_info : tuple of (exception class, exception instance, traceback) or None
+        If not None and an exception is to be raised, re-raise using a previous exceptions's
+        traceback.
     """
     if (err is None and ignore_errors()) or err is False:
         issue_warning(msg, category=category)
     else:
-        raise exc(msg)
+        if isinstance(exc, tuple):
+            raise exc[0](msg).with_traceback(exc[2])
+        else:
+            raise exc(msg)
 
 
 @contextmanager
