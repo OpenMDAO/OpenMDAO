@@ -371,23 +371,6 @@ class SrcIndicesTestCase(unittest.TestCase):
         assert_near_equal(p.get_val('exec.B').ravel(), p.get_val('ivc.M')[:1].ravel())
         assert_near_equal(p.get_val('exec.A').ravel(), p.get_val('ivc.M')[:1].ravel())
 
-        print('M')
-        print(p.get_val('ivc.M'))
-
-        print()
-        print('p.get_val("exec.A")')
-        print(p.get_val('exec.A'))
-        print('p.get_val("exec.B")')
-        print(p.get_val('exec.B'))
-        print('p.model.exec.get_val("B")')
-        print(p.model.exec.get_val('B'))
-        print()
-        print('numpy M[:1]')
-        print(p.get_val('ivc.M')[:1])
-
-        p.model.list_inputs(print_arrays=True)
-
-
     def test_promote_slice_src_indices_not_full_size(self):
         p = om.Problem()
 
@@ -408,22 +391,6 @@ class SrcIndicesTestCase(unittest.TestCase):
 
         assert_near_equal(p.get_val('exec.B').ravel(), p.get_val('ivc.M')[:1].ravel())
         assert_near_equal(p.get_val('exec.A').ravel(), p.get_val('ivc.M')[:1].ravel())
-
-        print('M')
-        print(p.get_val('ivc.M'))
-
-        print()
-        print('p.get_val("exec.A")')
-        print(p.get_val('exec.A'))
-        print('p.get_val("exec.B")')
-        print(p.get_val('exec.B'))
-        print('p.model.exec.get_val("B")')
-        print(p.model.exec.get_val('B'))
-        print()
-        print('numpy M[:1]')
-        print(p.get_val('ivc.M')[:1])
-
-        p.model.list_inputs(print_arrays=True)
 
 class SrcIndicesFeatureTestCase(unittest.TestCase):
     def test_multi_promotes(self):
