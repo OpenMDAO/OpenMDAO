@@ -550,15 +550,16 @@ class ShapedSliceIndexer(Indexer):
             # use maxsize here since a shaped slice always has positive int start and stop
             return np.arange(*self._slice.indices(sys.maxsize), dtype=int)
         else:
+            src_size = np.prod(self._src_shape, dtype=int)
+            arr = np.arange(src_size, dtype=int).reshape(self._src_shape)[self._slice]
             if flat:
                 # Case 2: Requested flattened indices of multidimensional array
                 # Return indices into a flattened src.
-                src_size = np.prod(self._src_shape, dtype=int)
-                return np.arange(src_size, dtype=int).reshape(self._src_shape)[self._slice].ravel()
+                return arr.ravel()
             else:
                 # Case 3: Requested non-flat indices of multidimensional array
-                grid = np.mgrid[{tuple: self._slice, slice: (self._slice,)}[type(self._slice)]]
-                return tuple(grid[i].ravel() for i in range(grid.shape[0]))
+                # This is never called within OpenMDAO
+                raise NotImplementedError('ShapedSliceIndexer.as_array only returns flat arrays.')
 
     def flat(self, copy=False):
         """
