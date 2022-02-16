@@ -46,8 +46,6 @@ class CaseRecorder(object):
         Flag indicating if this recorder will record on multiple processes.
     _record_on_proc : bool or None
         Flag indicating if this recorder will record on the current process (None if unspecified).
-    _record_on_ranks : list
-        list of _record_on_proc flags for all ranks (gathered at startup)
     """
 
     def __init__(self, record_viewer_data=True):
@@ -86,9 +84,6 @@ class CaseRecorder(object):
         # will be set and recording will occur on all processes for which the
         # value is True.
         self._record_on_proc = None
-
-        # list of _record_on_proc flags for all ranks (gathered at startup)
-        self._record_on_ranks = None
 
     @property
     def record_on_process(self):
