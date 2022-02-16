@@ -46,6 +46,8 @@ class CaseRecorder(object):
         Flag indicating if this recorder will record on multiple processes.
     _record_on_proc : bool or None
         Flag indicating if this recorder will record on the current process (None if unspecified).
+    _recording_ranks : list
+        List of ranks on which this recorder will record if running under MPI.
     """
 
     def __init__(self, record_viewer_data=True):
@@ -84,6 +86,10 @@ class CaseRecorder(object):
         # will be set and recording will occur on all processes for which the
         # value is True.
         self._record_on_proc = None
+
+        # List of ranks on which this recorder will record if running under MPI.
+        # Only used when running under MPI with communicator size greater than one.
+        self._recording_ranks = None
 
     @property
     def record_on_process(self):
