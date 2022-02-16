@@ -15,6 +15,7 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 import openmdao.utils.hooks as hooks
 from openmdao.utils.units import convert_units
 from openmdao.utils.om_warnings import DerivativesWarning
+from openmdao.utils.tests.test_hooks import hooks_active
 
 try:
     from parameterized import parameterized
@@ -1826,11 +1827,11 @@ class TestProblem(unittest.TestCase):
         self.assertTrue(isinstance(top.model.sub.nonlinear_solver, om.NewtonSolver))
         self.assertTrue(isinstance(top.model.sub.linear_solver, om.ScipyKrylov))
 
+    @hooks_active
     def test_post_final_setup_hook(self):
         def hook_func(prob):
             prob['p2.y'] = 5.0
 
-        hooks.use_hooks = True
         hooks._register_hook('final_setup', class_name='Problem', post=hook_func)
         try:
             prob = om.Problem()
