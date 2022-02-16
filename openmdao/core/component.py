@@ -242,6 +242,7 @@ class Component(System):
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
         abs2prom = self._var_allprocs_abs2prom = self._var_abs2prom
+        abs_in2prom_info = self._problem_meta['abs_in2prom_info']
 
         # Compute the prefix for turning rel/prom names into abs names
         prefix = self.pathname + '.' if self.pathname else ''
@@ -251,7 +252,7 @@ class Component(System):
             allprocs_abs2meta = self._var_allprocs_abs2meta[io]
 
             is_input = io == 'input'
-            for i, prom_name in enumerate(self._var_rel_names[io]):
+            for prom_name in self._var_rel_names[io]:
                 abs_name = prefix + prom_name
                 abs2meta[abs_name] = metadata = self._var_rel2meta[prom_name]
 
@@ -266,6 +267,11 @@ class Component(System):
                 if is_input and 'src_indices' in metadata:
                     allprocs_abs2meta[abs_name]['has_src_indices'] = \
                         metadata['src_indices'] is not None
+                    if metadata['add_input_src_indices'] and abs_name not in abs_in2prom_info:
+                        # need a level for each system including '', so we don't
+                        # subtract 1 from abs_in.split('.') which includes the var name
+                        abs_in2prom_info[abs_name] = [[None, None, None] for s in
+                                                      abs_name.split('.')]
 
             for prom_name, val in self._var_discrete[io].items():
                 abs_name = prefix + prom_name
@@ -925,7 +931,8 @@ class Component(System):
                                            "supplied manually.")
 
                 inds = np.arange(offset, end, dtype=INT_DTYPE)
-                meta_in['src_indices'] = indexer(inds, flat_src=True, src_shape=all_abs2meta_out[src]['global_shape'])
+                meta_in['src_indices'] = indexer(inds, flat_src=True,
+                                                 src_shape=all_abs2meta_out[src]['global_shape'])
                 meta_in['flat_src_indices'] = True
                 added_src_inds.append(iname)
 
@@ -1574,34 +1581,40 @@ class Component(System):
                 pinfo, shape, _ = plist[-1]  # component always last in the plist
                 if pinfo is not None:
                     inds, flat, shape = pinfo
-                    if inds is not None:
-                        self._var_prom2inds[abs2prom[tgt]] = [shape, inds, flat]
-
+                    if inds is None:
+                        if meta['add_input_src_indices']:
+                            meta['src_shape'] = shape = all_abs2meta_out[conns[tgt]]['global_shape']
+                            inds = meta['src_indices']
+                    else:
                         all_abs2meta_in[tgt]['has_src_indices'] = True
                         meta['src_shape'] = shape = all_abs2meta_out[conns[tgt]]['global_shape']
-                        if meta.get('add_input_src_indices'):
+                        if meta['add_input_src_indices']:
                             inds = convert_src_inds(inds, shape, meta['src_indices'], shape)
                         elif inds._flat_src:
                             meta['flat_src_indices'] = True
                         elif meta['flat_src_indices'] is None:
                             meta['flat_src_indices'] = flat
 
+                    if inds is not None:
                         try:
                             if not isinstance(inds, Indexer):
-                                meta['src_indices'] = indexer(inds, flat_src=flat, src_shape=shape)
+                                meta['src_indices'] = inds = indexer(inds, flat_src=flat,
+                                                                     src_shape=shape)
                             else:
                                 meta['src_indices'] = inds = inds.copy()
                                 inds.set_src_shape(shape)
+                                self._var_prom2inds[abs2prom[tgt]] = [shape, inds, flat]
                         except Exception:
                             exc = sys.exc_info()
-                            conditional_error(f"When promoting '{pinfo.prom}' from system "
-                                              f"'{pinfo.promoted_from}' with src_indices {inds}"
-                                              f" and src_shape {shape}: "
-                                              f"{exc[1]}", exc=exc, category=SetupWarning,
+                            conditional_error(f"When accessing '{conns[tgt]}' with src_shape "
+                                              f"{shape} from '{pinfo.prom_path()}' using "
+                                              f"src_indices {inds}: {exc[1]}",
+                                              exc=exc, category=SetupWarning,
                                               err=self._raise_connection_errors)
 
-            elif meta.get('add_input_src_indices'):
-                self._var_prom2inds[abs2prom[tgt]] = [meta['shape'], meta['src_indices'], meta['src_indices']._flat_src]
+            elif meta['add_input_src_indices']:
+                self._var_prom2inds[abs2prom[tgt]] = [meta['shape'], meta['src_indices'],
+                                                      meta['src_indices']._flat_src]
 
 
 class _DictValues(object):

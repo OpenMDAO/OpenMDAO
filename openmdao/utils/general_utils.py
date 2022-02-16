@@ -81,9 +81,6 @@ def conditional_error(msg, exc=RuntimeError, category=UserWarning, err=None):
     err : bool
         If None, use ignore_errors(), otherwise use value of err to determine whether to
         raise an exception (err=True) or issue a warning (err=False).
-    exc_info : tuple of (exception class, exception instance, traceback) or None
-        If not None and an exception is to be raised, re-raise using a previous exceptions's
-        traceback.
     """
     if (err is None and ignore_errors()) or err is False:
         issue_warning(msg, category=category)
@@ -1101,7 +1098,7 @@ def get_connection_owner(system, tgt):
     Returns
     -------
     tuple
-        (wning group, promoted source name, promoted target name).
+        (owning group, promoted source name, promoted target name).
     """
     from openmdao.core.group import Group
 
@@ -1116,9 +1113,9 @@ def get_connection_owner(system, tgt):
                 if g._manual_connections:
                     tprom = g._var_allprocs_abs2prom['input'][tgt]
                     if tprom in g._manual_connections:
-                        return g.pathname, g._var_allprocs_abs2prom['output'][src], tprom
+                        return g, g._var_allprocs_abs2prom['output'][src], tprom
 
-    return None, None, None
+    return system, src, tgt
 
 
 def wing_dbg():

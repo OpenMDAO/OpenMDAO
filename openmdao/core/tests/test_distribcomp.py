@@ -1028,6 +1028,8 @@ class MPIFeatureTests(unittest.TestCase):
 
         model = om.Group()
 
+        om.wing_dbg()
+
         # Distributed component "C2" requires an IndepVarComp to supply inputs.
         model.add_subsystem("indep", om.IndepVarComp('x', np.zeros(size)))
         model.add_subsystem("C2", DistribComp(size=size))

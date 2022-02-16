@@ -517,8 +517,8 @@ class TestMultiConns(unittest.TestCase):
                 self.options.declare('src_idx', [0, 1])
 
             def setup(self):
-                src = self.options['src_idx']
-                self.add_input('x', shape=2, src_indices=src, val=-2038.0)
+                src_inds = self.options['src_idx']
+                self.add_input('x', shape=2, src_indices=src_inds, val=-2038.0)
                 self.add_output('y', shape=2)
                 self.declare_partials('y', 'x')
 

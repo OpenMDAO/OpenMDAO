@@ -2496,8 +2496,7 @@ class TestSrcIndices(unittest.TestCase):
             prob.model.connect('indeps.x', 'C1.x', src_indices=src_indices,
                                flat_src_indices=flat_src_indices)
 
-        if not raise_connection_errors:
-            prob.model._raise_connection_errors = False
+        prob.model._raise_connection_errors = raise_connection_errors
 
         prob.setup()
 
@@ -2525,7 +2524,7 @@ class TestSrcIndices(unittest.TestCase):
                                 raise_connection_errors=False)
 
     def test_src_indices_shape_bad_idx_flat_promotes(self):
-        msg = "<model> <class Group>: When connecting 'indeps.x' to 'C1.x': index 9 is out of bounds for source dimension of size 9."
+        msg = "When accessing 'indeps.x' with src_shape (3, 3) from 'x' using src_indices [4 5 7 9]: index 9 is out of bounds for source dimension of size 9."
         try:
             self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
                                 src_indices=[4, 5, 7, 9],
@@ -2535,6 +2534,7 @@ class TestSrcIndices(unittest.TestCase):
         else:
             self.fail("Exception expected.")
 
+        msg = "When accessing 'indeps.x' with src_shape (3, 3) from 'C1.x' using src_indices [4 5 7 9]: index 9 is out of bounds for source dimension of size 9."
         with assert_warning(UserWarning, msg):
             self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
                                 src_indices=[4, 5, 7, 9],

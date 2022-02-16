@@ -580,7 +580,7 @@ class Problem(object):
                             if name in model._var_prom2inds:
                                 sshape, inds, flat = model._var_prom2inds[name]
                                 src_indices = inds
-                            elif tlocmeta.get('manual_connection'):
+                            elif tlocmeta.get('manual_connection') or model._inputs._contains_abs(name):
                                 src_indices = tlocmeta['src_indices']
                             else:
                                 src_indices = None

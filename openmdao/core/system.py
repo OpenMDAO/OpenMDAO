@@ -4609,7 +4609,7 @@ class System(object):
         src_indices = vshape = None
         if is_local:  # input is local
             vmeta = self._var_abs2meta['input'][abs_name]
-            if vmeta.get('manual_connection'):
+            if vmeta.get('manual_connection') or not is_prom:
                 src_indices = vmeta['src_indices']
                 vshape = vmeta['shape']
         else:
@@ -4624,30 +4624,31 @@ class System(object):
         else:
             has_src_indices = False
 
-        # see if we have any 'intermediate' level src_indices when using a promoted name
-        n = name
-        scope = scope_sys
-        while n:
-            if n in scope._var_prom2inds:
-                src_shape, inds, _ = scope._var_prom2inds[n]
-                if inds is None:
-                    if is_prom:  # using a promoted lookup
-                        src_indices = None
-                        vshape = None
-                        has_src_indices = False
-                else:
-                    shp = inds.indexed_src_shape
-                    src_indices = inds
-                    has_src_indices = True
-                    if is_prom:
-                        vshape = shp
-                break
-            parts = n.split('.', 1)
-            n = n[len(parts[0]) + 1:]
-            if len(parts) > 1:
-                s = scope._get_subsystem(parts[0])
-                if s is not None:
-                    scope = s
+        if is_prom:
+            # see if we have any 'intermediate' level src_indices when using a promoted name
+            n = name
+            scope = scope_sys
+            while n:
+                if n in scope._var_prom2inds:
+                    src_shape, inds, _ = scope._var_prom2inds[n]
+                    if inds is None:
+                        if is_prom:  # using a promoted lookup
+                            src_indices = None
+                            vshape = None
+                            has_src_indices = False
+                    else:
+                        shp = inds.indexed_src_shape
+                        src_indices = inds
+                        has_src_indices = True
+                        if is_prom:
+                            vshape = shp
+                    break
+                parts = n.split('.', 1)
+                n = n[len(parts[0]) + 1:]
+                if len(parts) > 1:
+                    s = scope._get_subsystem(parts[0])
+                    if s is not None:
+                        scope = s
 
         if self.comm.size > 1 and get_remote:
             if self.comm.rank == self._owning_rank[abs_name]:
@@ -4706,9 +4707,9 @@ class System(object):
                 else:
                     if src_indices._flat_src:
                         val = val.ravel()[src_indices.flat()]
-                        # if we're at component level, just keep shape of the target and don't flatten
+                        # if at component level, just keep shape of the target and don't flatten
                         if not flat and not is_prom:
-                            shp = vmeta['global_shape'] if get_remote else vmeta['shape']
+                            shp = vmeta['shape']
                             val.shape = shp
                     else:
                         val = val[src_indices()]
