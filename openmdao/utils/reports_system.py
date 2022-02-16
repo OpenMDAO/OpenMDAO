@@ -11,9 +11,8 @@ from mpi4py import MPI
 
 from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook, _unregister_hook
-from openmdao.visualization.n2_viewer.n2_viewer import _default_n2_filename
+from openmdao.visualization.n2_viewer.n2_viewer import n2, _default_n2_filename
 from openmdao.visualization.scaling_viewer.scaling_report import _default_scaling_filename
-from openmdao.visualization.n2_viewer.n2_viewer import n2
 
 # Keeping track of the registered reports
 _Report = namedtuple('Report', 'func desc class_name inst_id method pre_or_post')
@@ -41,13 +40,13 @@ def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=N
     name : str
         Name of report. Report names must be unique across all reports.
     func : function
-        A function to do the reporting. Expects the first argument to be a Problem instance.
+        A function to do the reporting. Expects the first argument to be an instance of class_name.
     desc : str
         A description of the report.
     class_name : str
         The name of the class owning the method where the report will be run.
     method : str
-        In which method of the Problem should this be run.
+        In which method of class_name should this be run.
     pre_or_post : str
         Valid values are 'pre' and 'post'. Indicates when to run the report in the method.
     inst_id : str or None
@@ -70,20 +69,6 @@ def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=N
             f"The argument 'pre_or_post' can only have values of 'pre' or 'post', but {pre_or_post}"
             " was given")
     return
-
-
-def unregister_report(name):
-    """
-    Unregister a report from the reports system.
-
-    Parameters
-    ----------
-    name : str
-        Name of the report to remove from the reports system.
-    """
-    if name not in _reports_registry:
-        raise ValueError(f"Cannot unregister report because report with name '{name}' does "
-                         "not exist")
 
 
 def list_reports(out_stream=None):
@@ -159,7 +144,7 @@ def list_reports(out_stream=None):
 
 def set_reports_dir(reports_dir_path):
     """
-    Set the path to where the reports should go. Normally, they go into the current directory.
+    Set the path to where the reports should go. By default, they go into the current directory.
 
     Parameters
     ----------
@@ -172,7 +157,7 @@ def set_reports_dir(reports_dir_path):
 
 def get_reports_dir(prob):
     """
-    Get the path to the directory where the reports files should go.
+    Get the path to the directory where the report files should go.
 
     Parameters
     ----------
@@ -286,7 +271,7 @@ def setup_default_reports():
 
     if 'OPENMDAO_REPORTS' in os.environ:
         if os.environ['OPENMDAO_REPORTS'] in ['0', 'false', 'off', "none"]:
-            return
+            return  # do not do any reports
 
         if os.environ['OPENMDAO_REPORTS'] in ['1', 'true', 'on', "all"]:
             reports_on = _default_reports.keys()
