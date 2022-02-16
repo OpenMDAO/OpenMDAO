@@ -15,12 +15,12 @@ def make_hook(name):
 def hooks_active(f):
     # turn hooks on and off around a hooks test
     def _wrapper(*args, **kwargs):
+        hooks._reset_all_hooks()
         hooks.use_hooks = True
         try:
             f(*args, **kwargs)
         finally:
             hooks.use_hooks = False
-            hooks._reset_all_hooks()
     return _wrapper
 
 
