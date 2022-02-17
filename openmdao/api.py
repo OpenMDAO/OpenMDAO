@@ -109,6 +109,7 @@ from openmdao.utils.om_warnings import issue_warning, reset_warnings, OpenMDAOWa
 
 
 from openmdao.utils.general_utils import wing_dbg
+wing_dbg()
 
 # set up tracing or memory profiling if env vars are set.
 import os

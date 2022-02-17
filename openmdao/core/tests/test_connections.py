@@ -570,7 +570,7 @@ class TestConnectionsDistrib(unittest.TestCase):
         model.add_subsystem('c3', TestComp())
         model.connect("p1.x", "c3.x")
 
-        expected = f"Exception raised on rank 0: <model> <class Group>: When connecting 'p1.x' to 'c3.x': index 2 is out of bounds for source dimension of size 2."
+        expected = f"Exception raised on rank 0: When accessing 'p1.x' with src_shape (2,) from 'c3.x' using src_indices [1 2]: index 2 is out of bounds for source dimension of size 2."
         try:
             prob.setup()
         except Exception as err:
@@ -599,7 +599,7 @@ class TestConnectionsDistrib(unittest.TestCase):
         model.add_subsystem('c3', TestComp())
         model.connect("p1.x", "c3.x")
 
-        expected = f"Exception raised on rank 0: <model> <class Group>: When connecting 'p1.x' to 'c3.x': index 2 is out of bounds for source dimension of size 2."
+        expected = f"Exception raised on rank 0: When accessing 'p1.x' with src_shape (2,) from 'c3.x' using src_indices [1 2]: index 2 is out of bounds for source dimension of size 2."
 
         try:
             prob.setup()
@@ -656,7 +656,7 @@ class TestConnectionsError(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup(check=False, mode='fwd')
         self.assertEqual(str(context.exception),
-                         "Exception raised on rank 0: <model> <class Group>: When connecting 'p1.x' to 'c3.x': index 2 is out of bounds for source dimension of size 2.")
+                         "Exception raised on rank 0: When accessing 'p1.x' with src_shape (2,) from 'c3.x' using src_indices [1 2]: index 2 is out of bounds for source dimension of size 2.")
 
 
 @unittest.skipUnless(MPI, "MPI is required.")
