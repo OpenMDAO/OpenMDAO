@@ -544,14 +544,22 @@ class ShapedSliceIndexer(Indexer):
         ndarray
             The index array.
         """
-        # use maxsize here since a shaped slice always has positive int start and stop
-        arr = np.arange(*self._slice.indices(sys.maxsize), dtype=int)
-        if flat:
-            return arr
-
-        if self._orig_shape is None:
-            return arr
-        return arr.reshape(self._orig_shape)
+        if self._src_shape is None or len(self._src_shape) == 1:
+            # Case 1: Requested flat or nonflat indices but src_shape is None or flat
+            # return a flattened arange
+            # use maxsize here since a shaped slice always has positive int start and stop
+            return np.arange(*self._slice.indices(sys.maxsize), dtype=int)
+        else:
+            src_size = np.prod(self._src_shape, dtype=int)
+            arr = np.arange(src_size, dtype=int).reshape(self._src_shape)[self._slice].ravel()
+            if flat:
+                # Case 2: Requested flattened indices of multidimensional array
+                # Return indices into a flattened src.
+                return arr
+            else:
+                # Case 3: Requested non-flat indices of multidimensional array
+                # This is never called within OpenMDAO
+                return np.unravel_index(arr, shape=self._src_shape)
 
     def flat(self, copy=False):
         """
