@@ -126,6 +126,7 @@ class TestReportsSystem(unittest.TestCase):
         self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
 
     @hooks_active
+    @unittest.skipUnless(OPTIMIZER, "This test requires pyOptSparseDriver.")
     def test_report_generation_basic_pyoptsparse(self):
         # Just to try a different driver
         setup_default_reports()
