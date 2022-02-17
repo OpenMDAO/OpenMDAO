@@ -7,8 +7,6 @@ import pathlib
 import sys
 import os
 
-from mpi4py import MPI
-
 from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook, _unregister_hook
 from openmdao.visualization.n2_viewer.n2_viewer import n2, _default_n2_filename
