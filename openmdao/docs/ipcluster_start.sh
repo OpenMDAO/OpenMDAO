@@ -17,4 +17,4 @@ else
   echo "c.IPClusterStart.controller_launcher_class = 'MPIControllerLauncher'" >> $CFG_FILE
 fi
 
-ipcluster start -n 4 --profile=mpi &
+ipcluster start -n 4 --profile=mpi --engines='ipyparallel.cluster.launcher.MPIEngineSetLauncher' &
