@@ -5363,10 +5363,19 @@ class System(object):
         tuple
             The distributed shape for the given variable.
         """
-        io = 'output' if abs_name in self._var_allprocs_abs2meta['output'] else 'input'
-        meta = self._var_allprocs_abs2meta[io][abs_name]
-        var_idx = self._var_allprocs_abs2idx[abs_name]
-        global_size = np.sum(self._var_sizes[io][:, var_idx])
+        if abs_name in self._var_allprocs_abs2meta['output']:
+            io = 'output'
+            scope = self
+        elif abs_name in self._problem_meta['model_ref']()._var_allprocs_abs2meta['output']:
+            io = 'output'
+            scope = self._problem_meta['model_ref']()
+        else:
+            io = 'input'
+            scope = self
+        # io = 'output' if abs_name in self._var_allprocs_abs2meta['output'] else 'input'
+        meta = scope._var_allprocs_abs2meta[io][abs_name]
+        var_idx = scope._var_allprocs_abs2idx[abs_name]
+        global_size = np.sum(scope._var_sizes[io][:, var_idx])
 
         # assume that all but the first dimension of the shape of a
         # distributed variable is the same on all procs

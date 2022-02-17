@@ -930,9 +930,12 @@ class Component(System):
                                            f"automatically for input '{iname}'. They must be "
                                            "supplied manually.")
 
+                if not all_abs2meta_out[src]['distributed'] and meta_in['distributed']:
+                    src_shape = self._get_full_dist_shape(src, all_abs2meta_out[src]['shape'])
+                else:
+                    src_shape = all_abs2meta_out[src]['global_shape']
                 inds = np.arange(offset, end, dtype=INT_DTYPE)
-                meta_in['src_indices'] = indexer(inds, flat_src=True,
-                                                 src_shape=all_abs2meta_out[src]['global_shape'])
+                meta_in['src_indices'] = indexer(inds, flat_src=True, src_shape=src_shape)
                 meta_in['flat_src_indices'] = True
                 added_src_inds.append(iname)
 
@@ -1583,7 +1586,9 @@ class Component(System):
                     inds, flat, shape = pinfo
                     if inds is None:
                         if meta['add_input_src_indices']:
-                            meta['src_shape'] = shape = all_abs2meta_out[conns[tgt]]['global_shape']
+                            if shape is None:
+                                shape = all_abs2meta_out[conns[tgt]]['global_shape']
+                            meta['src_shape'] = shape
                             inds = meta['src_indices']
                     else:
                         all_abs2meta_in[tgt]['has_src_indices'] = True

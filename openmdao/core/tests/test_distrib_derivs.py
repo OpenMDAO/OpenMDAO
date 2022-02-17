@@ -1291,6 +1291,8 @@ class MPITestsBug(unittest.TestCase):
 
         phase.add_objective('rhs_disc.x0dot', index=-1)
 
+        om.wing_dbg()
+        
         p.setup(mode='rev')
         p.final_setup()
         p.run_model()

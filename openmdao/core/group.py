@@ -915,11 +915,18 @@ class Group(System):
         This is called only at the top level of the system tree.
         """
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
+        all_abs2meta_in = self._var_allprocs_abs2meta['input']
         conns = self._conn_global_abs_in2out
 
         for tgt, plist in self._problem_meta['abs_in2prom_info'].items():
             src = conns[tgt]
-            src_shape = all_abs2meta_out[src]['global_shape']
+            smeta = all_abs2meta_out[src]
+            tmeta = all_abs2meta_in[tgt]
+
+            if not smeta['distributed'] and tmeta['distributed']:
+                src_shape = self._get_full_dist_shape(src, smeta['shape'])
+            else:
+                src_shape = smeta['global_shape']
 
             # plist is a list of (pinfo, shape, use_tgt) tuples, one for each level in the
             # system tree corresponding to an absolute input name, e.g., a plist for the
