@@ -1,4 +1,5 @@
 #!/bin/bash
+echo "NOTE: if 'Bad config' error occurs during ipcluster startup, try deleting the $HOME/.ipython/profile_mpi directory"
 rm -rf openmdao_book/_srcdocs openmdao_book/_build
 export OLD_OPENMDAO_REPORTS=${OPENMDAO_REPORTS}
 export OPENMDAO_REPORTS=0
