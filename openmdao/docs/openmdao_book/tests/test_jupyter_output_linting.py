@@ -141,7 +141,7 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
                     if tags:
 
                         # Don't check hidden cells
-                        if 'remove-input' in tags and 'remove-output' in tags:
+                        if ('remove-input' in tags and 'remove-output' in tags) or 'remove-cell' in tags:
                             continue
 
                         # We allow an assert in a cell if you tag it.
