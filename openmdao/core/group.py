@@ -924,9 +924,9 @@ class Group(System):
             tmeta = all_abs2meta_in[tgt]
 
             if not smeta['distributed'] and tmeta['distributed']:
-                src_shape = self._get_full_dist_shape(src, smeta['shape'])
+                root_shape = self._get_full_dist_shape(src, smeta['shape'])
             else:
-                src_shape = smeta['global_shape']
+                root_shape = smeta['global_shape']
 
             # plist is a list of (pinfo, shape, use_tgt) tuples, one for each level in the
             # system tree corresponding to an absolute input name, e.g., a plist for the
@@ -938,9 +938,8 @@ class Group(System):
 
             # use a _PromotesInfo for the top level even though there really isn't a promote there
             # TODO: do this in a less hacky way
-            current_pinfo = _PromotesInfo(src_shape=src_shape,
+            current_pinfo = _PromotesInfo(src_shape=root_shape,
                                           prom=self._var_allprocs_abs2prom['input'][tgt])
-            root_shape = src_shape
             for lst in plist:
                 pinfo, shape, _ = lst
                 if shape is None:
@@ -988,8 +987,8 @@ class Group(System):
                     # It would be nice if we didn't have to convert these and could just keep
                     # them in their original form and stack them to get the final result. We can
                     # do this when doing a get_val, but it doesn't work when doing a set_val.
-                    src_indices = indexer(sinds, src_shape=src_shape, flat_src=True)
-                    current_pinfo = _PromotesInfo(src_indices=src_indices, src_shape=src_shape,
+                    src_indices = indexer(sinds, src_shape=root_shape, flat_src=True)
+                    current_pinfo = _PromotesInfo(src_indices=src_indices, src_shape=root_shape,
                                                   flat=True, promoted_from=pinfo.promoted_from,
                                                   prom=pinfo.prom)
                     lst[1] = src_indices.indexed_src_shape

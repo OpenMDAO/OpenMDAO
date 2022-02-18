@@ -107,12 +107,12 @@ from openmdao.utils.om_warnings import issue_warning, reset_warnings, OpenMDAOWa
     MPIWarning, UnitsWarning, SolverWarning, OMDeprecationWarning, \
     OMInvalidCheckDerivativesOptionsWarning
 
+import os
 
 from openmdao.utils.general_utils import wing_dbg
 wing_dbg()
 
 # set up tracing or memory profiling if env vars are set.
-import os
 if os.environ.get('OPENMDAO_TRACE'):
     from openmdao.devtools.itrace import setup, start
     setup(os.environ['OPENMDAO_TRACE'])

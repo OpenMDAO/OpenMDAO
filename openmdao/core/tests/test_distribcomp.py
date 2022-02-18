@@ -437,9 +437,13 @@ class MPITests(unittest.TestCase):
         model = p.model
         model.add_subsystem('indep', om.IndepVarComp('x', np.ones(size*2)))
         model.add_subsystem("Cdist", DistribInputDistribOutputComp(arr_size=size*2))
+        if p.comm.rank == 0:
+            inds = [0,1,2]
+        else:
+            inds = [3,4]
         model.add_subsystem("Cdist2", DistribInputDistribOutputComp(arr_size=size))
         model.connect('indep.x', 'Cdist.invec')
-        model.connect('Cdist.outvec', 'Cdist2.invec')
+        model.connect('Cdist.outvec', 'Cdist2.invec', src_indices=inds)
 
         p.setup()
         p.run_model()

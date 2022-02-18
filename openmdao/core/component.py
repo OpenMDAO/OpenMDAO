@@ -911,33 +911,56 @@ class Component(System):
         added_src_inds = []
         # loop over continuous inputs
         for i, (iname, meta_in) in enumerate(abs2meta_in.items()):
-            src = abs_in2out[iname]
-            if meta_in['src_indices'] is None and (
-                    meta_in['distributed'] or all_abs2meta_out[src]['distributed']):
-                nzs = np.nonzero(sizes_out[:, all_abs2idx[src]])[0]
-                if (all_abs2meta_out[src]['global_size'] ==
-                        all_abs2meta_in[iname]['global_size'] or nzs.size == self.comm.size):
-                    # This offset assumes a 'full' distributed output
-                    offset = np.sum(sizes_in[:iproc, i])
-                    end = offset + sizes_in[iproc, i]
-                else:  # distributed output (may have some zero size entries)
-                    if nzs.size == 1:
-                        offset = 0
-                        end = sizes_out[nzs[0], all_abs2idx[src]]
-                    else:
-                        # total sizes differ and output is distributed, so can't determine mapping
+            if meta_in['src_indices'] is None:
+                src = abs_in2out[iname]
+                dist_in = meta_in['distributed']
+                dist_out = all_abs2meta_out[src]['distributed']
+                if dist_in or dist_out:
+                    gsize_out = all_abs2meta_out[src]['global_size']
+                    gsize_in = all_abs2meta_in[iname]['global_size']
+                    vout_sizes = sizes_out[:, all_abs2idx[src]]
+
+                    offset = None
+                    if gsize_out == gsize_in or (not dist_out and np.sum(vout_sizes)
+                                                 == gsize_in):
+                        # This assumes one of:
+                        # 1) a distributed output with total size matching the total size of a
+                        #    distributed input
+                        # 2) a non-distributed output with local size matching the total size of a
+                        #    distributed input
+                        # 3) a non-distributed output with total size matching the total size of a
+                        #    distributed input
+                        if dist_in:
+                            offset = np.sum(sizes_in[:iproc, i])
+                            end = offset + sizes_in[iproc, i]
+                        else:
+                            if src.startswith('_auto_ivc.'):
+                                nzs = np.nonzero(vout_sizes)[0]
+                                if nzs.size == 1:
+                                    # special case where we have a 'distributed' auto_ivc output
+                                    # that has a nonzero value in only one proc, so we can treat
+                                    # it like a non-distributed output. This happens in cases
+                                    # where an auto_ivc output connects to a variable that is
+                                    # remote on at least one proc.
+                                    offset = 0
+                                    end = vout_sizes[nzs[0]]
+
+                    # total sizes differ and output is distributed, so can't determine mapping
+                    if offset is None:
                         raise RuntimeError(f"{self.msginfo}: Can't determine src_indices "
                                            f"automatically for input '{iname}'. They must be "
                                            "supplied manually.")
 
-                if not all_abs2meta_out[src]['distributed'] and meta_in['distributed']:
-                    src_shape = self._get_full_dist_shape(src, all_abs2meta_out[src]['shape'])
-                else:
-                    src_shape = all_abs2meta_out[src]['global_shape']
-                inds = np.arange(offset, end, dtype=INT_DTYPE)
-                meta_in['src_indices'] = indexer(inds, flat_src=True, src_shape=src_shape)
-                meta_in['flat_src_indices'] = True
-                added_src_inds.append(iname)
+                    if dist_in and not dist_out:
+                        src_shape = self._get_full_dist_shape(src, all_abs2meta_out[src]['shape'])
+                    else:
+                        src_shape = all_abs2meta_out[src]['global_shape']
+
+                    # inds = np.arange(offset, end, dtype=INT_DTYPE)
+                    meta_in['src_indices'] = indexer(slice(offset, end), flat_src=True,
+                                                     src_shape=src_shape)
+                    meta_in['flat_src_indices'] = True
+                    added_src_inds.append(iname)
 
         return added_src_inds
 
