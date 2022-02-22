@@ -937,7 +937,6 @@ class Group(System):
             # shape.
 
             # use a _PromotesInfo for the top level even though there really isn't a promote there
-            # TODO: do this in a less hacky way
             current_pinfo = _PromotesInfo(src_shape=root_shape,
                                           prom=self._var_allprocs_abs2prom['input'][tgt])
             for lst in plist:
@@ -3252,6 +3251,7 @@ class Group(System):
             if tgt in vars_to_gather and self.comm.rank != vars_to_gather[tgt]:
                 if info is None or 0 > max_size:
                     info = (tgt, np.zeros(0), True)
+                    max_size = 0
                 continue
 
             # if we get here, tgt is local
@@ -3263,6 +3263,8 @@ class Group(System):
                 # traverse down the promotes list, (abs_in2prom_info[tgt]), to get the
                 # final src_indices down at the component level so we can set the value of
                 # that component input into the appropriate place(s) in the auto_ivc output.
+                # If a tgt has no src_indices anywhere, it will not be found in
+                # abs_in2prom_info.
                 newshape = val_shape
                 for pinfo, _, _ in abs_in2prom_info[tgt]:
                     if pinfo is None:

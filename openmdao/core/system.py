@@ -130,17 +130,23 @@ class _MetadataDict(dict):
     """
 
     def __getitem__(self, key):
-        if key == 'value':
-            warn_deprecation(value_deprecated_msg)
-            key = 'val'
-        val = dict.__getitem__(self, key)
-        return val
+        try:
+            return dict.__getitem__(self, key)
+        except KeyError:
+            if key == 'value':
+                warn_deprecation(value_deprecated_msg)
+                return dict.__getitem__(self, 'val')
+            raise
 
     def __setitem__(self, key, val):
-        if key == 'value':
-            warn_deprecation(value_deprecated_msg)
-            key = 'val'
-        dict.__setitem__(self, key, val)
+        try:
+            dict.__setitem__(self, key, val)
+        except KeyError:
+            if key == 'value':
+                dict.__setitem__(self, 'val', val)
+                warn_deprecation(value_deprecated_msg)
+            else:
+                raise
 
 
 class System(object):
@@ -3373,28 +3379,25 @@ class System(object):
         if isinstance(excludes, str):
             excludes = (excludes,)
 
-        loc2meta = self._var_abs2meta
-        all2meta = self._var_allprocs_abs2meta
-
         gather_keys = {'val', 'src_indices'}
         need_gather = get_remote and self.comm.size > 1
         if metadata_keys is not None:
             keyset = set(metadata_keys)
-            try:
-                # DEPRECATION: if 'value' in keyset, replace with 'val'
+            # DEPRECATION: if 'value' in keyset, replace with 'val'
+            if 'value' in keyset:
                 keyset.remove('value')
                 keyset.add('val')
                 warn_deprecation(value_deprecated_msg)
-            except KeyError:
-                pass
+
             diff = keyset - allowed_meta_names
             if diff:
                 raise RuntimeError(f"{self.msginfo}: {sorted(diff)} are not valid metadata entry "
                                    "names.")
         need_local_meta = metadata_keys is not None and len(gather_keys.intersection(keyset)) > 0
 
+        all2meta = self._var_allprocs_abs2meta
         if need_local_meta:
-            metadict = loc2meta
+            metadict = self._var_abs2meta
             disc_metadict = self._var_discrete
         else:
             metadict = all2meta
@@ -3417,7 +3420,6 @@ class System(object):
                     continue
 
                 rel_name = abs_name[rel_idx:]
-
                 if abs_name in all2meta[iotype]:  # continuous
                     meta = cont2meta[abs_name] if abs_name in cont2meta else None
                     distrib = all2meta[iotype][abs_name]['distributed']
@@ -3435,7 +3437,7 @@ class System(object):
                         ret_meta = _MetadataDict(meta)
                     else:
                         ret_meta = _MetadataDict()
-                        for key in metadata_keys:
+                        for key in keyset:
                             try:
                                 ret_meta[key] = meta[key]
                             except KeyError:
@@ -3452,7 +3454,7 @@ class System(object):
                             if not ret_meta:
                                 ret_meta = _MetadataDict()
                             if distrib:
-                                if 'val' in metadata_keys:
+                                if 'val' in keyset:
                                     # assemble the full distributed value
                                     dist_vals = [m['val'] for m in allproc_metas
                                                  if m is not None and m['val'].size > 0]
@@ -3460,7 +3462,7 @@ class System(object):
                                         ret_meta['val'] = np.concatenate(dist_vals)
                                     else:
                                         ret_meta['val'] = np.zeros(0)
-                                if 'src_indices' in metadata_keys:
+                                if 'src_indices' in keyset:
                                     # assemble full src_indices
                                     dist_src_inds = [m['src_indices'] for m in allproc_metas
                                                      if m is not None and m['src_indices'].size > 0]
@@ -3478,15 +3480,16 @@ class System(object):
                             ret_meta = None
 
                 if ret_meta is not None:
-                    ret_meta['prom_name'] = prom
-                    ret_meta['discrete'] = abs_name not in all2meta
-
-                    vname = rel_name if return_rel_names else abs_name
-
                     if tags and not tagset & ret_meta['tags']:
                         continue
 
-                    result[vname] = ret_meta
+                    ret_meta['prom_name'] = prom
+                    ret_meta['discrete'] = abs_name not in all2meta
+
+                    if return_rel_names:
+                        result[rel_name] = ret_meta
+                    else:
+                        result[abs_name] = ret_meta
 
         return result
 
