@@ -318,6 +318,28 @@ class IndexerMultiDimTestCase(unittest.TestCase):
         assert_equal(ind.indexed_src_shape, (3,3,3))
         assert_equal(ind.min_src_dim, 3)
 
+    def test_flat_slice_into_nd_source(self):
+        ind = indexer[1:]
+        src = np.arange(27).reshape((3,3,3))
+        ind.set_src_shape(src.shape)
+
+        assert_equal(ind(), slice(1, None, None))
+
+        expected = np.stack([np.arange(9, 18).reshape((3, 3)), np.arange(18, 27).reshape((3, 3))])
+
+        assert_equal(expected, src[1:])
+        assert_equal(src[ind()], expected)
+
+        shaped_ind = ind.shaped_instance()
+
+        assert_equal(shaped_ind.as_array(flat=True), expected.ravel())
+
+        expected_nonflat = (np.array([1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2]),
+                            np.array([0, 0, 0, 1, 1, 1, 2, 2, 2, 0, 0, 0, 1, 1, 1, 2, 2, 2]),
+                            np.array([0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2]))
+
+        assert_equal(shaped_ind.as_array(flat=False), expected_nonflat)
+
     def test_slice_neg(self):
         ind = indexer[:-1,:,:2]
         src = np.arange(27).reshape((3,3,3))

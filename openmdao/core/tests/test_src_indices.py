@@ -351,6 +351,46 @@ class SrcIndicesTestCase(unittest.TestCase):
                          "'C1' <class MyComp>: When promoting 'C1.x' with src_indices [4 5 7 9] and "
                          "source shape (3, 3): index 9 is out of bounds for source dimension of size 9.")
 
+    def test_connect_slice_src_indices_not_full_size(self):
+        p = om.Problem()
+
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp())
+        M_np = np.arange(9)[::-1].reshape((3, 3))
+        ivc.add_output('M', val=M_np)
+
+        exec = p.model.add_subsystem('exec', om.ExecComp())
+
+        exec.add_expr('A = B', A={'shape': (3,)}, B={'shape': (3,)})
+
+        p.model.connect('ivc.M', 'exec.B', src_indices=om.slicer[:1])
+
+        p.setup()
+
+        p.run_model()
+
+        assert_near_equal(p.get_val('exec.B').ravel(), p.get_val('ivc.M')[:1].ravel())
+        assert_near_equal(p.get_val('exec.A').ravel(), p.get_val('ivc.M')[:1].ravel())
+
+    def test_promote_slice_src_indices_not_full_size(self):
+        p = om.Problem()
+
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp())
+        M_np = np.arange(9)[::-1].reshape((3, 3))
+        ivc.add_output('M', val=M_np)
+
+        exec = p.model.add_subsystem('exec', om.ExecComp())
+
+        exec.add_expr('A = B', A={'shape': (3,)}, B={'shape': (3,)})
+
+        p.model.promotes('ivc', outputs=['M'])
+        p.model.promotes('exec', inputs=[('B', 'M')], src_indices=om.slicer[:1], src_shape=(3, 3))
+
+        p.setup()
+
+        p.run_model()
+
+        assert_near_equal(p.get_val('exec.B').ravel(), p.get_val('ivc.M')[:1].ravel())
+        assert_near_equal(p.get_val('exec.A').ravel(), p.get_val('ivc.M')[:1].ravel())
 
 class SrcIndicesFeatureTestCase(unittest.TestCase):
     def test_multi_promotes(self):
