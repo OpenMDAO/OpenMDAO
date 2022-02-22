@@ -424,6 +424,12 @@ class N2GroupGroupCell extends N2GroupBase {
     }
 }
 
+class N2FilterCell extends N2VectorBase {
+    constructor(color, id) {
+        super(color, id);
+    }
+}
+
 // TODO: Consider moving color management into CSS styles
 
 /**
@@ -524,7 +530,7 @@ class N2MatrixCell {
             this.symbolType.declaredPartial) return N2Style.color.declaredPartial;
 
         if (this.onDiagonal()) {
-            if (this.obj.isMinimized) return N2Style.color.collapsed;
+            if (this.obj.draw.minimized) return N2Style.color.collapsed;
             if (this.obj.isAutoIvcInput()) return N2Style.color.autoivcInput;
             if (this.obj.isConnectedInput()) return N2Style.color.input;
             if (this.obj.isUnconnectedInput()) return N2Style.color.unconnectedInput;
@@ -614,6 +620,8 @@ class N2MatrixCell {
                 return new N2GroupVectorCell(color, this.id);
             case "groupGroup":
                 return new N2GroupGroupCell(color, this.id);
+            case "filter":
+                return new N2FilterCell(color, this.id);
         }
     }
 
@@ -628,7 +636,8 @@ class N2MatrixCell {
      */
     highlight(varType = 'self', direction = 'self') {
 
-        const obj = (varType == 'target') ? this.tgtObj : this.srcObj;
+        let obj = (varType == 'target') ? this.tgtObj : this.srcObj;
+        if (obj.draw.filtered) { obj = obj.draw.filterParent; }
         const treeId = N2TreeNode.absPathToId(obj.absPathName);
         const treeNode = d3.select('rect#' + treeId);
 

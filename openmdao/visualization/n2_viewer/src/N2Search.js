@@ -115,7 +115,7 @@ class N2Search {
     _doSearch(node, regexMatch, undoList) {
         let didMatch = false;
 
-        if (node.hasChildren() && !node.isMinimized) {
+        if (node.hasChildren() && !node.draw.minimized) {
             // depth first, dont go into minimized children
             for (let child of node.children) {
                 if (this._doSearch(child, regexMatch, undoList)) didMatch = true;
@@ -132,14 +132,14 @@ class N2Search {
             }
             else if (undoList) {
                 // did not match and undo list is not null
-                node.varIsHidden = true;
+                node.draw.hidden = true;
                 undoList.push(node);
             }
         }
 
-        if (!didMatch && node.hasChildren() && !node.isMinimized && undoList) {
+        if (!didMatch && node.hasChildren() && !node.draw.minimized && undoList) {
             // minimizeable and undoList not null
-            node.isMinimized = true;
+            node.draw.minimized = true;
             undoList.push(node);
         }
 
@@ -161,8 +161,8 @@ class N2Search {
     performSearch() {
         for (let node of this.searchCollapsedUndo) {
             //auto undo on successive searches
-            if (!node.hasChildren() && node.isInputOrOutput()) node.varIsHidden = false;
-            else node.isMinimized = false;
+            if (!node.hasChildren() && node.isInputOrOutput()) node.draw.hidden = false;
+            else node.draw.minimized = false;
         }
 
         this.numMatches = 0;
@@ -252,7 +252,7 @@ class N2Search {
     findRootOfChangeForSearch(node) {
         let earliestObj = node;
         for (let obj = node; obj != null; obj = obj.parent) {
-            if (obj.isMinimized) earliestObj = obj;
+            if (obj.draw.minimized) earliestObj = obj;
         }
         return earliestObj;
     }
@@ -263,7 +263,7 @@ class N2Search {
      * @param {N2TreeNode} node The node to search from.
      */
     _populateAutoCompleteList(node) {
-        if (node.hasChildren() && !node.isMinimized) {
+        if (node.hasChildren() && !node.draw.minimized) {
             // Depth first, dont go into minimized children
             for (let child of node.children) {
                 this._populateAutoCompleteList(child);
