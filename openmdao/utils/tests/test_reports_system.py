@@ -9,6 +9,7 @@ import openmdao.api as om
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar_feature import SellarMDA
 import openmdao.core.problem
+from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.assert_utils import assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.reports_system import set_reports_dir, _reports_dir, register_report, \
@@ -55,9 +56,8 @@ class TestReportsSystem(unittest.TestCase):
         if self.testflo_running is not None:
             os.environ['TESTFLO_RUNNING'] = self.testflo_running
 
-    def setup_and_run_simple_problem(self, driver=None):
-        from openmdao.utils.hooks import _hooks, _hook_skip_classes, use_hooks
-        prob = om.Problem()
+    def setup_and_run_simple_problem(self, driver=None, reports=_UNDEFINED):
+        prob = om.Problem(reports=reports)
         model = prob.model
 
         model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
@@ -80,16 +80,18 @@ class TestReportsSystem(unittest.TestCase):
 
         return prob
 
-    def setup_and_run_model_with_subproblem(self):
+    def setup_and_run_model_with_subproblem(self, prob1_reports=_UNDEFINED,
+                                            prob2_reports=_UNDEFINED):
         class _ProblemSolver(om.NonlinearRunOnce):
 
-            def __init__(self, prob_name=None):
+            def __init__(self, prob_name=None, reports=_UNDEFINED):
                 super(_ProblemSolver, self).__init__()
                 self.prob_name = prob_name
+                self.reports = reports
                 self._problem = None
 
             def solve(self):
-                subprob = om.Problem(name=self.prob_name)
+                subprob = om.Problem(name=self.prob_name,reports=self.reports)
                 self._problem = subprob
                 subprob.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
                 subprob.model.add_subsystem('comp', om.ExecComp('y=2*x'))
@@ -99,11 +101,11 @@ class TestReportsSystem(unittest.TestCase):
 
                 return super().solve()
 
-        prob = om.Problem()
+        prob = om.Problem(reports=prob1_reports)
         prob.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
         G = prob.model.add_subsystem('G', om.Group())
         G.add_subsystem('comp', om.ExecComp('y=2*x'))
-        G.nonlinear_solver = _ProblemSolver()
+        G.nonlinear_solver = _ProblemSolver(reports=prob2_reports)
         prob.model.connect('indep.x', 'G.comp.x')
         prob.setup()
         prob.run_model()  # need to do run_model in this test so sub problem is created
@@ -118,7 +120,7 @@ class TestReportsSystem(unittest.TestCase):
         prob = self.setup_and_run_simple_problem()
 
         # get the path to the problem subdirectory
-        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{prob._name}_reports')
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
 
         path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
         self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
@@ -133,7 +135,7 @@ class TestReportsSystem(unittest.TestCase):
         prob = self.setup_and_run_simple_problem(driver=pyOptSparseDriver(optimizer='SLSQP'))
 
         # get the path to the problem subdirectory
-        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{prob._name}_reports')
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
 
         path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
         self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
@@ -142,26 +144,12 @@ class TestReportsSystem(unittest.TestCase):
 
     @hooks_active
     def test_report_generation_basic_doedriver(self):
+        # Test a driver that does not generate scaling report
         setup_default_reports()
+        prob = self.setup_and_run_simple_problem(driver=om.DOEDriver(om.PlackettBurmanGenerator()))
 
-        prob = om.Problem()
-        model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
-
-        model.add_design_var('x', lower=0.0, upper=1.0)
-        model.add_design_var('y', lower=0.0, upper=1.0)
-        model.add_objective('f_xy')
-
-        prob.driver = om.DOEDriver(om.PlackettBurmanGenerator())
-
-        prob.setup()
-        prob.run_driver()
-        prob.cleanup()
-
-        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{prob._name}_reports')
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
 
         path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
         self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
@@ -186,7 +174,7 @@ class TestReportsSystem(unittest.TestCase):
         self.assertTrue('Driver scaling report' in output, '"Driver scaling report" expected in list_reports output but was not found')
 
     @hooks_active
-    def test_report_generation_no_reports(self):
+    def test_report_generation_no_reports_using_env_var(self):
         # test use of the OPENMDAO_REPORTS variable to turn off reporting
         os.environ['OPENMDAO_REPORTS'] = 'false'
         clear_reports()
@@ -195,7 +183,7 @@ class TestReportsSystem(unittest.TestCase):
         prob = self.setup_and_run_simple_problem()
 
         # See if the report files exist and if they have the right names
-        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{prob._name}_reports')
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
 
         path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
         self.assertFalse(path.is_file(),
@@ -205,7 +193,7 @@ class TestReportsSystem(unittest.TestCase):
                          f'The scaling report file, {str(path)}, was found but should not have')
 
     @hooks_active
-    def test_report_generation_selected_reports(self):
+    def test_report_generation_selected_reports_using_env_var(self):
         # test use of the OPENMDAO_REPORTS variable to turn off selected reports
         os.environ['OPENMDAO_REPORTS'] = 'n2'
         clear_reports()
@@ -214,7 +202,7 @@ class TestReportsSystem(unittest.TestCase):
         prob = self.setup_and_run_simple_problem()
 
         # See if the report files exist and if they have the right names
-        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{prob._name}_reports')
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
 
         path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
         self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
@@ -223,7 +211,7 @@ class TestReportsSystem(unittest.TestCase):
                          f'The scaling report file, {str(path)}, was found but should not have')
 
     @hooks_active
-    def test_report_generation_set_reports_dir(self):
+    def test_report_generation_set_reports_dir_using_env_var(self):
         setup_default_reports()  # So it sees the OPENMDAO_REPORTS var
         # test use of setting a custom reports directory other than the default of "."
         custom_dir = 'custom_reports_dir'
@@ -233,7 +221,7 @@ class TestReportsSystem(unittest.TestCase):
 
         # See if the report files exist and if they have the right names
         reports_dir = custom_dir
-        problem_reports_dir = pathlib.Path(reports_dir).joinpath(f'{prob._name}_reports')
+        problem_reports_dir = pathlib.Path(reports_dir).joinpath(prob._name)
 
         path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
         self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
@@ -260,7 +248,7 @@ class TestReportsSystem(unittest.TestCase):
 
         prob = self.setup_and_run_simple_problem()
 
-        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{prob._name}_reports')
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
 
         path = pathlib.Path(problem_reports_dir).joinpath(user_report_filename)
         self.assertTrue(path.is_file(), f'The user defined report file, {str(path)} was not found')
@@ -294,7 +282,7 @@ class TestReportsSystem(unittest.TestCase):
 
         prob = self.setup_and_run_simple_problem()
 
-        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{prob._name}_reports')
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
 
         self.count = 0
         for method in ['setup', 'final_setup', 'run_driver']:
@@ -312,7 +300,7 @@ class TestReportsSystem(unittest.TestCase):
 
         # The multiple problem code only runs model so no scaling reports to look for
         for problem_name in [probname, subprobname]:
-            problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{problem_name}_reports')
+            problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{problem_name}')
             path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
             self.assertTrue(path.is_file(), f'N2 report file, {str(path)} was not found')
 
@@ -329,13 +317,13 @@ class TestReportsSystem(unittest.TestCase):
         probname, subprobname = self.setup_and_run_model_with_subproblem()
 
         # The multiple problem code only runs model so no scaling reports to look for
-        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{subprobname}_reports')
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{subprobname}')
         path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
         # for the subproblem named problem2, there should be a report but not for problem1 since
         #    we specifically asked for just the instance of problem2
         self.assertTrue(path.is_file(), f'The n2 report file, {str(path)} was not found')
 
-        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{probname}_reports')
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{probname}')
         path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
         self.assertFalse(path.is_file(),
                          f'The N2 report file, {str(path)} was found but should not have')
@@ -350,7 +338,7 @@ class TestReportsSystem(unittest.TestCase):
 
         prob = self.setup_and_run_simple_problem()
 
-        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{prob._name}_reports')
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
 
         path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
         self.assertFalse(path.is_file(),
@@ -358,6 +346,86 @@ class TestReportsSystem(unittest.TestCase):
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertFalse(path.is_file(),
                          f'The scaling report file, {str(path)}, was found but should not have')
+
+    @hooks_active
+    def test_report_generation_basic_problem_reports_argument_false(self):
+        setup_default_reports()
+
+        prob = self.setup_and_run_simple_problem(reports=False)
+
+        # get the path to the problem subdirectory
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
+        path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
+        self.assertFalse(path.is_file(),
+                         f'The N2 report file, {str(path)} was found but should not have')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
+        self.assertFalse(path.is_file(),
+                         f'The scaling report file, {str(path)}, was found but should not have')
+
+    @hooks_active
+    def test_report_generation_basic_problem_reports_argument_none(self):
+        setup_default_reports()
+
+        prob = self.setup_and_run_simple_problem(reports=None)
+
+        # get the path to the problem subdirectory
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
+
+        path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
+        self.assertFalse(path.is_file(),
+                         f'The N2 report file, {str(path)} was found but should not have')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
+        self.assertFalse(path.is_file(),
+                         f'The scaling report file, {str(path)}, was found but should not have')
+
+
+    @hooks_active
+    def test_report_generation_basic_problem_reports_argument_n2_only(self):
+        setup_default_reports()
+        prob = self.setup_and_run_simple_problem(reports='n2')
+
+        # get the path to the problem subdirectory
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
+
+        path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
+        self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
+        self.assertFalse(path.is_file(),
+                         f'The scaling report file, {str(path)}, was found but should not have')
+
+    @hooks_active
+    def test_report_generation_basic_problem_reports_argument_n2_and_scaling(self):
+        setup_default_reports()
+        prob = self.setup_and_run_simple_problem(reports='n2,scaling')
+
+        # get the path to the problem subdirectory
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
+
+        path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
+        self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
+        self.assertTrue(path.is_file(), f'The scaling report file, {str(path)} was not found')
+
+    @hooks_active
+    def test_report_generation_problem_reports_argument_multiple_problems(self):
+        setup_default_reports()
+        _, _ = self.setup_and_run_model_with_subproblem(prob2_reports=None)
+
+        # Only problem1 reports should have been generated
+
+        # The multiple problem code only runs model so no scaling reports to look for
+        problem_name = 'problem1'
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{problem_name}')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
+        self.assertTrue(path.is_file(), f'The problem1 N2 report file, {str(path)} was not found')
+
+        problem_name = 'problem2'
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{problem_name}')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
+        self.assertFalse(path.is_file(),
+                         f'The problem2 n2 report file, {str(path)}, was found but should not have')
+
+
 
 @use_tempdirs
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -409,7 +477,7 @@ class TestReportsSystemMPI(unittest.TestCase):
             prob.run_driver()
 
         # get the path to the problem subdirectory
-        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{prob._name}_reports')
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
 
         path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
         self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')

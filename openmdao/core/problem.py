@@ -88,6 +88,12 @@ class Problem(object):
     name : str
         Problem name. Can be used to specify a Problem instance when multiple Problems
         exist.
+    reports : str, bool, None
+        If _UNDEFINED, the OPENMDAO_REPORTS variable is used. Defaults to _UNDEFINED.
+        If given, reports should override OPENMDAO_REPORTS. If boolean, enable/disable all reports.
+        Since none is acceptable in the environment variable, a value of reports=None
+        is equivalent to reports=False. Otherwise, reports may be a sequence of
+        strings giving the names of the reports to run.
     **options : named args
         All remaining named args are converted to options.
 
@@ -137,9 +143,15 @@ class Problem(object):
         The number of times run_driver or run_model has been called.
     _warned : bool
         Bool to check if `value` deprecation warning has occured yet
+    _reports : str, bool, None
+        If _UNDEFINED, the OPENMDAO_REPORTS variable is used. Defaults to _UNDEFINED.
+        If given, reports should override OPENMDAO_REPORTS. If boolean, enable/disable all reports.
+        Since none is acceptable in the environment variable, a value of reports=None
+        is equivalent to reports=False. Otherwise, reports may be a sequence of
+        strings giving the names of the reports to run.
     """
 
-    def __init__(self, model=None, driver=None, comm=None, name=None, **options):
+    def __init__(self, model=None, driver=None, comm=None, name=None, reports=_UNDEFINED, **options):
         """
         Initialize attributes.
         """
@@ -206,6 +218,8 @@ class Problem(object):
         self._run_counter = -1
         self._system_options_recorded = False
         self._rec_mgr = RecordingManager()
+
+        self._reports = reports
 
         # General options
         self.options = OptionsDictionary(parent_name=type(self).__name__)

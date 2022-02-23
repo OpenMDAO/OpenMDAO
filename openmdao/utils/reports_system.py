@@ -169,7 +169,8 @@ def get_reports_dir(prob):
     """
     reports_dir = os.environ.get('OPENMDAO_REPORTS_DIR', _reports_dir)
 
-    problem_reports_dirname = f'{prob._name}_reports'
+    # problem_reports_dirname = f'{prob._name}_reports'
+    problem_reports_dirname = f'{prob._name}'
     problem_reports_dirpath = pathlib.Path(reports_dir).joinpath(problem_reports_dirname)
 
     return problem_reports_dirpath
@@ -191,12 +192,31 @@ def clear_reports():
                              inst_id=getattr(report, 'inst_id'), post=getattr(report, 'func'))
     _reports_registry = {}
 
+def _should_report_run(reports, report_name):
+    # Utility function that checks the _reports attribute on Problem
+    #   to determine whether the report named "report_name" should be run
+    if isinstance(reports, str):
+        reports_on = reports.split(',')
+        if report_name not in reports_on:
+            return False
+    elif isinstance(reports, bool):
+        if not reports:
+            return False
+    elif reports is None:
+        return False
+
+    return True
+
 
 # N2 report definition
 # Need to create these closures so that functions can keep track of how many times they have
 # been called per Problem (or Driver). In the case of the n2, it is Problem
 def _run_n2_report_enclosing():
     def run_n2_report_inner(prob):
+
+        if not _should_report_run(prob._reports, 'n2'):
+            return
+
         run_n2_report_inner.calls[prob] += 1
         if run_n2_report_inner.calls[prob] > 1:  # Only do the report once per Problem
             return
@@ -225,11 +245,15 @@ run_n2_report = _run_n2_report_enclosing()
 def _run_scaling_report_enclosing():
     def run_scaling_report_inner(driver):
 
+        prob = driver._problem()
+
+        if not _should_report_run(prob._reports, 'scaling'):
+            return
+
         run_scaling_report_inner.calls[driver] += 1
         if run_scaling_report_inner.calls[driver] > 1:
             return
 
-        prob = driver._problem()
         problem_reports_dirpath = get_reports_dir(prob)
 
         scaling_filepath = str(
@@ -274,7 +298,7 @@ def setup_default_reports():
         if os.environ['OPENMDAO_REPORTS'] in ['1', 'true', 'on', "all"]:
             reports_on = _default_reports.keys()
         else:
-            reports_on = os.environ['OPENMDAO_REPORTS'].split('.')
+            reports_on = os.environ['OPENMDAO_REPORTS'].split(',')
     else:  # if no env set, all reports are on
         reports_on = _default_reports.keys()
 
