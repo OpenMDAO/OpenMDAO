@@ -905,13 +905,14 @@ class Component(System):
         abs2meta_in = self._var_abs2meta['input']
         all_abs2meta_in = all_abs2meta['input']
         all_abs2meta_out = all_abs2meta['output']
+        abs_in2prom_info = self._problem_meta['abs_in2prom_info']
 
         sizes_in = self._var_sizes['input']
         sizes_out = all_sizes['output']
         added_src_inds = []
         # loop over continuous inputs
         for i, (iname, meta_in) in enumerate(abs2meta_in.items()):
-            if meta_in['src_indices'] is None:
+            if meta_in['src_indices'] is None and iname not in abs_in2prom_info:
                 src = abs_in2out[iname]
                 dist_in = meta_in['distributed']
                 dist_out = all_abs2meta_out[src]['distributed']

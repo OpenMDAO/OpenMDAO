@@ -835,10 +835,9 @@ class Group(System):
             for abs_in, abs_out in sorted(conns.items()):
                 if abs_out not in allprocs_abs2meta_out:
                     continue  # discrete var
-                all_meta_out = allprocs_abs2meta_out[abs_out]
-                all_meta_in = allprocs_abs2meta_in[abs_in]
-                in_dist = all_meta_in['distributed']
-                out_dist = all_meta_out['distributed']
+
+                in_dist = allprocs_abs2meta_in[abs_in]['distributed']
+                out_dist = allprocs_abs2meta_out[abs_out]['distributed']
 
                 # check that src_indices match for dist->serial connection
                 # FIXME: this transfers src_indices from all ranks to the owning rank so we could
