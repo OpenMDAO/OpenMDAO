@@ -16,7 +16,7 @@ from openmdao.visualization.scaling_viewer.scaling_report import _default_scalin
 _Report = namedtuple('Report', 'func desc class_name inst_id method pre_or_post')
 _reports_registry = {}
 
-_reports_dir = '.'  # the default location for the reports
+_reports_dir = './reports'  # the default location for the reports
 
 
 def _is_rank_0(prob):
