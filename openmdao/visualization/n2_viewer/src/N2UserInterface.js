@@ -159,11 +159,10 @@ class N2UserInterface {
         this.toolbar = new N2Toolbar(this);
 
         // Add listener for reading in a saved view.
-        let self = this;
-        let n2diag = this.n2Diag;
+        const self = this;
         document.getElementById('state-file-input').addEventListener('change', function () {
+            const fr = new FileReader();
 
-            var fr = new FileReader();
             fr.onload = function () {
                 let dataDict = false;
 
@@ -181,37 +180,13 @@ class N2UserInterface {
                 }
 
                 // Make sure model didn't change.
-                if (dataDict.md5_hash != n2diag.model.md5_hash) {
+                if (dataDict.md5_hash != n2Diag.model.md5_hash) {
                     alert("Cannot load view. Current model structure is different than in saved view.")
                     return;
                 }
 
                 self.addBackButtonHistory();
-
-                // Solver toggle state.
-                n2diag.showLinearSolverNames = dataDict.showLinearSolverNames;
-                n2diag.ui.setSolvers(dataDict.showLinearSolverNames);
-                n2diag.showSolvers = dataDict.showSolvers;
-
-                // Zoomed node (subsystem).
-                n2diag.zoomedElement = n2diag.findNodeById(dataDict.zoomedElement);
-
-                // Expand/Collapse state of all nodes (subsystems) in model.
-                n2diag.setSubState(dataDict.expandCollapse.reverse());
-
-                // Force an immediate display update.
-                // Needed to do this so that the arrows don't slip in before the element zoom.
-                n2diag.layout = new N2Layout(n2diag.model, n2diag.zoomedElement,
-                    n2diag.showLinearSolverNames, n2diag.showSolvers, n2diag.dims);
-                n2diag.ui.updateClickedIndices();
-                n2diag.matrix = new N2Matrix(n2diag.model, n2diag.layout,
-                    n2diag.dom.n2Groups, n2diag.arrowMgr, n2diag.ui.lastClickWasLeft,
-                    n2diag.ui.findRootOfChangeFunction, n2diag.matrix.nodeSize);
-                n2diag._updateScale();
-                n2diag.layout.updateTransitionInfo(n2diag.dom, n2diag.transitionStartDelay, n2diag.manuallyResized);
-
-                // Arrow State
-                n2diag.arrowMgr.loadPinnedArrows(dataDict.arrowState);
+                self.n2Diag.restoreSavedState(dataDict);
             }
             fr.readAsText(this.files[0]);
         })
@@ -420,10 +395,10 @@ class N2UserInterface {
         d3.event.preventDefault();
         d3.event.stopPropagation();
 
-        if (node.isMinimized) {
+        if (node.draw.minimized) {
             this.rightClickedNode = node;
             this.addBackButtonHistory();
-            node.manuallyExpanded = true;
+            node.draw.manuallyExpanded = true;
             this._uncollapse(node);
             this.n2Diag.update();
         }
@@ -432,7 +407,7 @@ class N2UserInterface {
             node.collapsable = true;
 
             this.addBackButtonHistory();
-            node.manuallyExpanded = false;
+            node.draw.manuallyExpanded = false;
             this.collapse();
         }
     }
@@ -450,7 +425,8 @@ class N2UserInterface {
         window.getSelection().empty();
 
         // Make sure node is collapsible and window doesn't exist yet.
-        if (this.isCollapsible(node) && d3.select('#childSelect-' + node.toId()).empty()) {
+        if (this.isCollapsible(node) && !node.isFilter() && 
+            d3.select('#childSelect-' + node.toId()).empty()) {
             new ChildSelectDialog(node, color); // Create the modal dialog
         }
     }
@@ -489,7 +465,7 @@ class N2UserInterface {
         if (d3.event.button != 0) return;
         this.addBackButtonHistory();
         node.expand();
-        node.manuallyExpanded = true;
+        node.draw.manuallyExpanded = true;
         this._setupLeftClick(node);
 
         this.n2Diag.update();
@@ -567,25 +543,25 @@ class N2UserInterface {
             this.backButtonHistory.length + " items in history");
 
         const history = this.backButtonHistory.pop();
-        const node = history.node;
+        const oldZoomedElement = history.node;
 
         this.toolbar.setSearchState(history.search);
         this.setCollapseDepthSlider({ 'val': history.collapseDepth });
 
         // Check to see if the node is a collapsed node or not
-        if (node.collapsable) {
-            this.leftClickedNode = node;
-            this.addForwardButtonHistory(node);
+        if (oldZoomedElement.collapsable) {
+            this.leftClickedNode = oldZoomedElement;
+            this.addForwardButtonHistory(oldZoomedElement);
             this.collapse();
         }
         else {
-            for (let obj = node; obj != null; obj = obj.parent) {
+            for (let obj = oldZoomedElement; obj != null; obj = obj.parent) {
                 //make sure history item is not minimized
-                if (obj.isMinimized) return;
+                if (obj.draw.minimized) return;
             }
 
             this.addForwardButtonHistory(this.n2Diag.zoomedElement);
-            this._setupLeftClick(node);
+            this._setupLeftClick(oldZoomedElement);
         }
 
         this.n2Diag.resetAllHidden(history.hidden);
@@ -620,7 +596,7 @@ class N2UserInterface {
 
         for (let obj = node; obj != null; obj = obj.parent) {
             // make sure history item is not minimized
-            if (obj.isMinimized) return;
+            if (obj.draw.minimized) return;
         }
 
         this.addBackButtonHistory(false);
@@ -688,7 +664,7 @@ class N2UserInterface {
      */
     _collapseOutputs(node) {
         if (node.subsystem_type && node.subsystem_type == 'component') {
-            node.isMinimized = true;
+            node.minimize();
         }
         if (node.hasChildren()) {
             for (let child of node.children) {
@@ -717,15 +693,16 @@ class N2UserInterface {
      * @param {N2TreeNode} node The node to operate on.
      */
     _uncollapse(node) {
-        node.expand();
-        node.varIsHidden = false;
+        node.expand().show();
+        if (node.isFilteredVariable()) node.draw.filtered = false;
 
         if (node.hasChildren()) {
             for (const child of node.children) {
-                if ('hiddenVars' in node && node.hiddenVars.indexOf(child) == -1)
                 this._uncollapse(child);
             }
         }
+
+        if (node.isFilter()) { node.wipe(); } // Clear the contents if it's a filter node
     }
 
     /**
@@ -740,7 +717,7 @@ class N2UserInterface {
         N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
         this._uncollapse(startNode);
-        startNode.manuallyExpanded = true;
+        startNode.draw.manuallyExpanded = true;
         this.n2Diag.update();
     }
 
@@ -814,19 +791,14 @@ class N2UserInterface {
      * is currently shown, and vice-versa.
      */
     showSolvers() {
-        // d3.select('#solver_tree').style('display','block');
         n2Diag.showSolvers = true;
         this.n2Diag.update();
         d3.select('#n2-resizer-handle').attr('class', 'inactive-resizer-handle')
     }
     hideSolvers() {
-        // d3.select('#solver_tree').style('display','none');
-        // d3.select('#solver_tree').attr('width',0);
         n2Diag.showSolvers = false;
         this.n2Diag.update();
-        // const handle = d3.select('#n2-resizer-handle');
         d3.select('#n2-resizer-handle').attr('class', 'inactive-resizer-handle-without-solvers')
-        // n2-resizer-handle
     }
 
     /** React to the toggle legend button, and show or hide the legend below the N2. */
@@ -950,20 +922,20 @@ class N2UserInterface {
         const stateFileName = prompt("Filename to save view state as", 'saved.n2view');
 
         // Solver toggle state.
-        let showLinearSolverNames = this.n2Diag.showLinearSolverNames;
-        let showSolvers = this.n2Diag.showSolvers;
+        const showLinearSolverNames = this.n2Diag.showLinearSolverNames;
+        const showSolvers = this.n2Diag.showSolvers;
 
         // Zoomed node (subsystem).
-        let zoomedElement = this.n2Diag.zoomedElement.id;
+        const zoomedElement = this.n2Diag.zoomedElement.id;
 
         // Expand/Collapse state of all nodes (subsystems) in model.
-        let expandCollapse = Array()
+        const expandCollapse = Array();
         this.n2Diag.getSubState(expandCollapse);
 
         // Arrow State
-        let arrowState = this.n2Diag.arrowMgr.savePinnedArrows();
+        const arrowState = this.n2Diag.arrowMgr.savePinnedArrows();
 
-        let dataDict = {
+        const dataDict = {
             'showLinearSolverNames': showLinearSolverNames,
             'showSolvers': showSolvers,
             'zoomedElement': zoomedElement,
@@ -972,9 +944,9 @@ class N2UserInterface {
             'md5_hash': this.n2Diag.model.md5_hash,
         };
 
-        let link = document.createElement('a');
+        const link = document.createElement('a');
         link.setAttribute('download', stateFileName);
-        let data_blob = new Blob([JSON.stringify(dataDict)],
+        const data_blob = new Blob([JSON.stringify(dataDict)],
             { type: 'text/plain' });
 
         // If we are replacing a previously generated file we need to
@@ -1132,13 +1104,16 @@ class ChildSelectDialog extends N2WindowDraggable {
 
     /** Reset the array of hidden vars from the node's array if it exists. */
     _initHiddenVars() {
-        if ('hiddenVars' in this.node) {
-            this.hiddenVars = this.node.hiddenVars;
-            this.existingHiddenVars = true;
-        }
-        else {
-            this.hiddenVars = [];
-            this.existingHiddenVars = false;
+        this.hiddenVars = [];
+        this.existingHiddenVars = false;
+
+        for (const iotype of ['inputs', 'outputs']) {
+            if (this.node.filter[iotype].count > 0) {
+                for (const child of this.node.filter[iotype].children) {
+                    this.hiddenVars.push(child);
+                };
+                this.existingHiddenVars = true;
+            }
         }
     }
 
@@ -1177,13 +1152,13 @@ class ChildSelectDialog extends N2WindowDraggable {
 
             row.append('td').attr('class', 'varname').text(varName);
             const checkId = `${child.toId()}-visible-check`;
-            if (child.varIsHidden && ! this.existingHiddenVars) { this.hiddenVars.push(child); }
+            if (child.isFilteredVariable() && ! this.existingHiddenVars) { this.hiddenVars.push(child); }
 
             // Add a checkbox. When checked, the variable will be displayed.
             row.append('td').attr('class', 'varvis')
                 .append('input')
                 .attr('type', 'checkbox')
-                .property('checked', !child.varIsHidden)
+                .property('checked', !child.isFilteredVariable())
                 .attr('id', checkId)
                 .on('change', e => {
                     const isVisible = d3.select(`#${checkId}`).property('checked');
@@ -1191,7 +1166,7 @@ class ChildSelectDialog extends N2WindowDraggable {
                     else { 
                         const idx = this.hiddenVars.indexOf(child);
                         if (idx > -1 ) { this.hiddenVars.splice(idx, 1); }
-                        else { console.warning("Could not find child in hiddenVars array."); }
+                        else { console.warn('Could not find child in hiddenVars array.', child); }
                     }
                 })
         }
@@ -1219,24 +1194,25 @@ class ChildSelectDialog extends N2WindowDraggable {
     apply() {
         if (this.hiddenVars.length == this.node.children.length || this.varCount == 0) {
             // If every variable was hidden, just collapse the node if it's expanded
-            if (! this.node.isMinimized) { n2Diag.ui.rightClick(this.node); }
+            if (! this.node.draw.minimized) { n2Diag.ui.rightClick(this.node); }
         }
         else {
             n2Diag.ui.rightClickedNode = this.node;
             n2Diag.ui.addBackButtonHistory();
 
             this.node.searchTerm = this.searchTerm;
-            this.node.hiddenVars = this.hiddenVars;
-            
-            if (this.node.isMinimized) {
-                // If node itself is collapsed, expand it
-                this.node.manuallyExpanded = true;
-                this.node.expand();
-                this.node.varIsHidden = false;
+            this.node.filter.inputs.wipe();
+            this.node.filter.outputs.wipe();
+
+            for (const child of this.hiddenVars) {
+                if (child.isInput()) { this.node.filter.inputs.add(child); }
+                else { this.node.filter.outputs.add(child); }
             }
-            for (const child of this.node.children) {
-                // Need to check every child because some may be newly visible
-                child.varIsHidden = (this.hiddenVars.indexOf(child) >= 0);
+            
+            if (this.node.draw.minimized) {
+                // If node itself is collapsed, expand it
+                this.node.draw.manuallyExpanded = true;
+                this.node.expand();
             }
             n2Diag.update();
         }
@@ -1255,6 +1231,7 @@ class ChildSelectDialog extends N2WindowDraggable {
         if (this.foundSearchVars.length > 0) {
             // Select variables not found by search
             for (const child of this.node.children) {
+                if (child.isFilter()) continue;
                 if (this.foundSearchVars.indexOf(child) < 0) {
                     this.hiddenVars.push(child);
                 }
@@ -1269,6 +1246,7 @@ class ChildSelectDialog extends N2WindowDraggable {
         this.hiddenVars = [];
 
         for (const child of this.node.children) {
+            if (child.isFilter()) continue;
             this.hiddenVars.push(child);
         }
 
