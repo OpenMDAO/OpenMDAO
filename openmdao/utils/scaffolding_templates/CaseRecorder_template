@@ -21,7 +21,7 @@ class {class_name}(CaseRecorder):
 
         # initialize attributes here...
 
-    def startup(self, recording_requester):
+    def startup(self, recording_requester, comm=None):
         """
         Prepare for a new run.
 
@@ -29,8 +29,10 @@ class {class_name}(CaseRecorder):
         ----------
         recording_requester : object
             Object to which this recorder is attached.
+        comm : MPI.Comm or <FakeComm> or None
+            The communicator for the recorder (should be the comm for the Problem).
         """
-        super().startup(recording_requester)
+        super().startup(recording_requester, comm)
 
         # put any necessary startup code here...
 

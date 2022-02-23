@@ -10,8 +10,9 @@ from openmdao.test_suite.components.branin import Branin
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.components.sellar_feature import SellarMDA
-from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
 
+from openmdao.utils.general_utils import run_driver
+from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI
 
@@ -706,6 +707,7 @@ class Summer(om.ExplicitComponent):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@use_tempdirs
 class MPITestDifferentialEvolution4Procs(unittest.TestCase):
     N_PROCS = 4
 
@@ -780,15 +782,43 @@ class MPITestDifferentialEvolution4Procs(unittest.TestCase):
         model.add_objective('obj')
 
         driver = prob.driver = om.DifferentialEvolutionDriver()
-        prob.driver.options['pop_size'] = 4
-        prob.driver.options['max_gen'] = 3
-        prob.driver.options['run_parallel'] = True
-        prob.driver.options['procs_per_model'] = 2
+        driver.options['pop_size'] = 4
+        driver.options['max_gen'] = 3
+        driver.options['run_parallel'] = True
+        driver.options['procs_per_model'] = 2
+
+        # also check that parallel recording works
+        driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.setup()
         prob.set_solver_print(level=0)
 
-        prob.run_driver()
+        failed, output = run_driver(prob)
+
+        self.assertFalse(failed)
+
+        # we will have run 2 models in parallel on our 4 procs
+        num_models = prob.comm.size // driver.options['procs_per_model']
+        self.assertEqual(num_models, 2)
+
+        # a separate case file should have been written by rank 0 of each parallel model
+        # (the top two global ranks)
+        rank = prob.comm.rank
+        filename = "cases.sql_%d" % rank
+
+        if rank < num_models:
+            expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
+            self.assertTrue(expect_msg in output)
+
+            cr = om.CaseReader(filename)
+            cases = cr.list_cases('driver')
+
+            # check that cases were recorded on this proc
+            num_cases = len(cases)
+            self.assertTrue(num_cases > 0)
+        else:
+            self.assertFalse("Cases from rank %d are being written" % rank in output)
+            self.assertFalse(os.path.exists(filename))
 
     def test_distributed_obj(self):
         size = 3
