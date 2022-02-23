@@ -2,7 +2,7 @@ import base64
 import re
 import zlib
 import json
-from openmdao.utils.general_utils import default_noraise
+import hashlib
 from pathlib import Path
 
 class HtmlPreprocessor():
@@ -13,23 +13,29 @@ class HtmlPreprocessor():
 
     Recognized directives are:
     <<hpp_insert path/to/file [compress]>>: Paste path/to/file verbatim into the surrounding text
-    <<hpp_script path/to/script>>: Paste path/to/script into the text inside a <script> tag
+    <<hpp_script path/to/script [dup]>>: Paste path/to/script inside a <script> tag
     <<hpp_style path/to/css>>: Paste path/to/css into the text inside a <style> tag
     <<hpp_bin2b64 path/to/file>>: Convert a binary file to a b64 string and insert it
     <<hpp_pyvar variable_name [compress]>>: Insert the string value of the named Python variable.
         If the referenced variable is non-primitive, it's converted to JSON.
 
-    If the compress option is used, the replacement content will be compressed and converted to
-    a base64 string. It's up to the JavaScript code to decode and uncompress it.
+    Flags:
+    compress: The replacement content will be compressed and converted to
+        a base64 string. It's up to the JavaScript code to decode and uncompress it.
+    dup: If a file has already been included once, it will be ignored on subsequent inclusions
+        unless the dup flag is used.
 
-    Commented directives (//, /* */, or <!-- -->) will replace the entire comment.
-    When a directive is commented, it can only be on a single line or the comment-ending
-    chars will not be replaced.
+    - Commented directives (//, /* */, or <!-- -->) will replace the entire comment.
+      When a directive is commented, it can only be on a single line or the comment-ending
+      chars will not be replaced.
+    - All paths in the directives are relative to the directory that the start file
+      is located in unless it is absolute.
 
     Nothing is written until every directive has been successfully processed.
     """
 
-    def __init__(self, start_filename, output_filename, allow_overwrite = False, var_dict = None):
+    def __init__(self, start_filename, output_filename, allow_overwrite = False,
+        var_dict = None, json_dumps_default = None, verbose = False):
         """
         Configure the preprocessor and validate file paths.
 
@@ -43,21 +49,35 @@ class HtmlPreprocessor():
             If true, overwrite the output file if it exists.
         var_dict: dict
             Dictionary of variable names and values that hpp_pyvar will reference.
+        json_dumps_default: function
+            Passed to json.dumps() as the "default" parameter that gets
+            called for objects that can't be serialized.
+        verbose: bool
+            If True, print some status messages to stdout.
         """
-        path = Path(start_filename)
-        if path.is_file() is False:
+        self.start_path = Path(start_filename)
+        if self.start_path.is_file() is False:
             raise FileNotFoundError(f"Error: {start_filename} not found")
 
-        path = Path(output_filename)
-        if path.is_file() and not allow_overwrite:
+        self.output_path = Path(output_filename)
+        if self.output_path.is_file() and not allow_overwrite:
             raise FileExistsError(f"Error: {output_filename} already exists")
 
         self.start_filename = start_filename
+        self.start_dirname = self.start_path.resolve().parent
         self.output_filename = output_filename
         self.allow_overwrite = allow_overwrite
         self.var_dict = var_dict
+        self.json_dumps_default = json_dumps_default
+        self.verbose = verbose
 
-    def load_text_file(self, filename) -> str:
+        # Keep track of md5 hashes of scripts already imported, to make sure
+        # we don't unintentionally include the exact same file twice.
+        self.imported_script_hashes = []
+
+        self.msg("HtmlProcessor object created.")
+
+    def load_text_file(self, filename, rlvl = 0) -> str:
         """
         Open and read the specified text file.
 
@@ -71,12 +91,17 @@ class HtmlPreprocessor():
         str
             The complete contents of the text file.
         """
-        with open(filename, 'r') as f:
+        path = Path(filename)
+        pathname = self.start_dirname / filename if not path.is_absolute() else filename
+
+        self.msg(f"Loading text file {pathname}.", rlvl)
+
+        with open(pathname, 'r') as f:
             file_contents = str(f.read())
 
         return file_contents
 
-    def load_bin_file(self, filename) -> str:
+    def load_bin_file(self, filename, rlvl = 0) -> str:
         """
         Open and read the specified binary file, converting it to a base64 string.
         Parameters
@@ -89,12 +114,20 @@ class HtmlPreprocessor():
         str
             The complete contents represented as a base64 string.
         """
-        with open(filename, 'rb') as f:
+        path = Path(filename)
+        pathname = self.start_dirname / filename if not path.is_absolute() else filename
+
+        self.msg(f"Loading binary file {pathname}.", rlvl)
+
+        with open(pathname, 'rb') as f:
             file_contents = str(base64.b64encode(f.read()).decode("ascii"))
 
         return file_contents
 
-    def parse_contents(self, contents) -> str:
+    def msg(self, msg, rlvl = 0):
+        if self.verbose: print (rlvl * '--' + msg)
+
+    def parse_contents(self, contents: str, rlvl = 0) -> str:
         """
         Find the preprocessor directives in the file and replace them with the desired content.
 
@@ -111,44 +144,63 @@ class HtmlPreprocessor():
             The complete contents represented as a base64 string.
         """
         # Find all possible keywords:
-        keyword_regex = '(//|/\*|<\!--)?\s*<<\s*hpp_(insert|script|style|bin2b64|pyvar)\s+(\S+)(\s+compress)?\s*>>(\*/|-->)?'
+        keyword_regex = '(//|/\*|<\!--)?\s*<<\s*hpp_(insert|script|style|bin2b64|pyvar)\s+(\S+)(\s+compress|\s+dup)?\s*>>(\*/|-->)?'
         matches = re.finditer(keyword_regex, contents)
+        rlvl += 1
+        new_content = None
 
         for found_directive in matches:
+
             full_match = found_directive.group(0)
-            # Group 1 is the possible comment chars
+            comment_start = found_directive.group(1)
             keyword = found_directive.group(2)
             arg = found_directive.group(3)
-            compress_selected = not (found_directive.group(4) is None)
+
+            flags = { 'compress': False, 'dup': False }
+            if found_directive.group(4) is not None:
+                if 'compress' in found_directive.group(4):
+                    flags['compress'] = True
+                elif 'dup' in found_directive.group(4):
+                    flags['dup'] = True
+
             do_compress = False # Change below with directives where it's allowed
+
+            self.msg(f"Handling {keyword} directive.", rlvl)
 
             if keyword == 'insert':
                 # Recursively insert a plain text file which may also have hpp directives
-                new_content = self.parse_contents(self.load_text_file(arg))
+                new_content = self.parse_contents(self.load_text_file(arg, rlvl), rlvl)
 
             elif keyword == 'script':
                 # Recursively insert a JavaScript file which may also have hpp directives
                 new_content = f'<script type="text/javascript">\n' + \
-                    self.parse_contents(self.load_text_file(arg)) + f'\n</script>'
-                do_compress = True if compress_selected else False
+                    self.parse_contents(self.load_text_file(arg, rlvl), rlvl) + f'\n</script>'
+                script_hash = hashlib.md5(new_content.encode())
+
+                # Skip a file that's already been loaded
+                if script_hash in self.imported_script_hashes and not flags['dup']:
+                    continue
+
+                self.imported_script_hashes.append(script_hash)
+                do_compress = True if flags['compress'] else False
 
             elif keyword == 'style':
                 # Recursively insert a CSS file which may also have hpp directives
-                new_content = f'<style type="text/css">\n' + \
-                    self.parse_contents(self.load_text_file(arg)) + f'\n</style>'
+                new_content = '<style type="text/css">\n' + \
+                    self.parse_contents(self.load_text_file(arg, rlvl), rlvl) + f'\n</style>'
                 
             elif keyword == 'bin2b64':
-                new_content = self.load_bin_file(arg)
+                new_content = self.load_bin_file(arg, rlvl)
 
             elif keyword == 'pyvar':
                 if arg in self.var_dict:
                     val = self.var_dict[arg]
                     if type(val) in (str, bool, int, float): # Use string representations of primitive types
                         new_content = str(self.var_dict[arg])
-                        do_compress = True if compress_selected else False
+                        do_compress = True if flags['compress'] else False
                     else:
-                        raw_data = json.dumps(val, default=default_noraise) # .encode('utf8')
-                        if compress_selected:
+                        raw_data = json.dumps(val, default=self.json_dumps_default)
+                        if flags['compress']:
                             new_content = str(base64.b64encode(zlib.compress(raw_data.encode('utf8'))).decode("ascii"))
                         else:
                             new_content = raw_data
@@ -161,10 +213,13 @@ class HtmlPreprocessor():
                 raise ValueError(f"Unrecognized HTML preprocessor directive hpp_{keyword} encountered")
             
             if do_compress:
+                self.msg("Compressing new content.", rlvl)
                 new_content = str(base64.b64encode(zlib.compress(new_content)).decode("ascii"))
 
-            # Replace the directive with the content:
-            contents = re.sub(full_match, new_content, contents)
+            if new_content is not None:
+                self.msg(f"Replacing directive '{full_match}' with new content.", rlvl)
+                # contents = re.sub(full_match, new_content, contents)
+                contents = contents.replace(full_match, new_content)
 
         return contents
 
