@@ -394,7 +394,7 @@ class _TotalJacInfo(object):
                 # reduce size of vector by not including distrib vars
                 arr = np.ones(rowcol_size, dtype=bool)
                 start = end = 0
-                for name in self.sol2jac_map['rev'][2]:  # use names but not the mapping
+                for name, _ in self.sol2jac_map['rev'][2]:
                     meta = model._var_abs2meta['output'][name]
                     end += meta['size']
                     if meta['distributed']:
@@ -422,7 +422,7 @@ class _TotalJacInfo(object):
             full_j_srcs = []
 
             start = end = 0
-            for name in name2jinds:
+            for name, srcinds in name2jinds:
                 if name not in abs2idx:
                     continue
 
@@ -432,7 +432,6 @@ class _TotalJacInfo(object):
                     end += abs2meta_out[name]['size']
 
                 if get_remote and is_dist:
-                    srcinds = name2jinds[name]
                     myinds = srcinds + myoffset
                     for rank in range(nproc):
                         if rank != myrank:
@@ -451,7 +450,6 @@ class _TotalJacInfo(object):
                                 full_j_srcs.append(myinds)
                                 full_j_tgts.append(srcinds + offset)
                 elif owns[name] == myrank:
-                    srcinds = name2jinds[name]
                     myinds = srcinds + myoffset
                     var_idx = abs2idx[name]
                     for rank in range(nproc):
@@ -793,7 +791,7 @@ class _TotalJacInfo(object):
         model = self.model
         fwd = mode == 'fwd'
         myproc = self.comm.rank
-        name2jinds = {}  # map varname to jac row or col idxs that we must scatter to other procs
+        name2jinds = []  # map varname to jac row or col idxs that we must scatter to other procs
 
         inds = []
         jac_inds = []
@@ -836,14 +834,14 @@ class _TotalJacInfo(object):
                         inds.append(full_inds[local_idx.as_array()])
                         jac_inds.append(jstart + dist_offset +
                                         np.arange(local_idx.indexed_src_size, dtype=INT_DTYPE))
-                        name2jinds[name] = jac_inds[-1]
+                        name2jinds.append((path, jac_inds[-1]))
                     else:
                         dist_offset = np.sum(sizes[:myproc, var_idx])
                         inds.append(np.arange(slc.start, slc.stop, dtype=INT_DTYPE))
                         jac_inds.append(np.arange(jstart + dist_offset,
                                         jstart + dist_offset + sizes[myproc, var_idx],
                                         dtype=INT_DTYPE))
-                        name2jinds[name] = jac_inds[-1]
+                        name2jinds.append((path, jac_inds[-1]))
                 else:
                     idx_array = np.arange(slc.start, slc.stop, dtype=INT_DTYPE)
                     if indices is not None:
@@ -851,7 +849,7 @@ class _TotalJacInfo(object):
                     inds.append(idx_array)
                     jac_inds.append(np.arange(jstart, jstart + sz, dtype=INT_DTYPE))
                     if fwd or not self.get_remote:
-                        name2jinds[name] = jac_inds[-1]
+                        name2jinds.append((path, jac_inds[-1]))
 
             if path not in self.remote_vois:
                 jend += sz

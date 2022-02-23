@@ -572,9 +572,9 @@ class Driver(object):
             else:
                 if owner == comm.rank:
                     if indices is None:
-                        val = get(name, flat=True).copy()
+                        val = get(src_name, flat=True).copy()
                     else:
-                        val = get(name, flat=True)[indices.as_array()]
+                        val = get(src_name, flat=True)[indices.as_array()]
                 else:
                     if indices is not None:
                         size = indices.indexed_src_size
@@ -780,10 +780,6 @@ class Driver(object):
 
             if ctype == 'ineq' and meta['equals'] is not None:
                 continue
-
-            # Support for constraint aliases.
-            if 'path' in meta and meta['path']:
-                name = meta['name']
 
             con_dict[name] = self._get_voi_val(name, meta, self._remote_cons,
                                                driver_scaling=driver_scaling)
