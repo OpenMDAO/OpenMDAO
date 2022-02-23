@@ -151,7 +151,8 @@ class Problem(object):
         strings giving the names of the reports to run.
     """
 
-    def __init__(self, model=None, driver=None, comm=None, name=None, reports=_UNDEFINED, **options):
+    def __init__(self, model=None, driver=None, comm=None, name=None,
+                 reports=_UNDEFINED, **options):
         """
         Initialize attributes.
         """

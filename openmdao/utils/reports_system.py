@@ -192,6 +192,7 @@ def clear_reports():
                              inst_id=getattr(report, 'inst_id'), post=getattr(report, 'func'))
     _reports_registry = {}
 
+
 def _should_report_run(reports, report_name):
     # Utility function that checks the _reports attribute on Problem
     #   to determine whether the report named "report_name" should be run
