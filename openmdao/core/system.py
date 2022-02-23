@@ -1631,70 +1631,71 @@ class System(object):
             responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
 
             # If you have response aliases, check for overlapping indices.
+            aliases = {key: value for key, value in responses.items() if value['path']}
+            if len(aliases) > 0:
 
-            used_indices = {}
-            prom2abs_names = {}
-            discrete = self._var_allprocs_discrete
+                used_indices = {}
+                prom2abs_names = {}
+                discrete = self._var_allprocs_discrete
 
-            for data in self._var_allprocs_abs2meta.values():
-                for name, val in data.items():
-                    if name in responses and responses[name]['flat_indices']:
-                        used_indices[name] = np.zeros(val['shape'], dtype='bool').ravel()
+                for data in self._var_allprocs_abs2meta.values():
+                    for name, val in data.items():
+                        if name in responses and responses[name]['flat_indices']:
+                            used_indices[name] = np.zeros(val['shape'], dtype='bool').ravel()
+                        else:
+                            used_indices[name] = np.zeros(val['shape'], dtype='bool')
+
+                for data in self._var_allprocs_prom2abs_list.values():
+                    for name, val in data.items():
+                        prom2abs_names[name] = val
+
+                for name in aliases:
+
+                    if name in discrete['input'] or name in discrete['output']:
+                        continue
+
+                    if responses[name]['path'] is not None:
+                        path_name = responses[name]['path']
                     else:
-                        used_indices[name] = np.zeros(val['shape'], dtype='bool')
+                        path_name = None
 
-            for data in self._var_allprocs_prom2abs_list.values():
-                for name, val in data.items():
-                    prom2abs_names[name] = val
+                    if path_name is not None and path_name not in responses and \
+                       prom2abs_names[path_name][0] not in responses:
+                        raise RuntimeError(f"Alias '{name}' is not needed when only "
+                                           f"adding one constraint to model")
 
-            for name in responses:
+                    path = responses[name]['path']
+                    indices = responses[name]['indices']
+                    msg = (f"{self.msginfo}: '{name}' indices are overlapping "
+                           f"constraint/objective '{path}'.")
 
-                if name in discrete['input'] or name in discrete['output']:
-                    continue
+                    if self.comm.size > 1:
+                        distrib_idx_arr = self.comm.allgather(used_indices)
+                        used_indices = distrib_idx_arr[0]
+                        if len(distrib_idx_arr) > 1:
+                            for idx in distrib_idx_arr:
+                                for key in idx:
+                                    if key in used_indices:
+                                        used_indices[key] = np.concatenate((used_indices[key].ravel(),
+                                                                            idx[key].ravel()))
+                                    else:
+                                        used_indices[key] = idx[key]
 
-                if responses[name]['path'] is not None:
-                    path_name = responses[name]['path']
-                else:
-                    path_name = None
-
-                if name not in responses or \
-                        (path_name is not None and path_name not in responses and
-                         prom2abs_names[path_name][0] not in responses):
-                    raise RuntimeError(f"Alias '{name}' is not needed when only "
-                                       f"adding one constraint to model")
-
-                path = responses[name]['path']
-                indices = responses[name]['indices']
-                msg = (f"{self.msginfo}: '{name}' indices are overlapping "
-                       f"constraint/objective '{path}'.")
-
-                if self.comm.size > 1:
-                    distrib_idx_arr = self.comm.allgather(used_indices)
-                    used_indices = distrib_idx_arr[0]
-                    if len(distrib_idx_arr) > 1:
-                        for idx in distrib_idx_arr:
-                            for key in idx:
-                                if key in used_indices:
-                                    used_indices[key] = np.concatenate((used_indices[key].ravel(),
-                                                                        idx[key].ravel()))
-                                else:
-                                    used_indices[key] = idx[key]
-
-                if path is not None:
-                    name = path
-
-                try:
-                    abs_meta_idx_arr = used_indices[name]
-                except KeyError:
-                    prom_name = prom2abs_names[name][0]
-                    abs_meta_idx_arr = used_indices[prom_name]
-
-                if indices is not None:
-                    indices = _index_sort(indices)
                     if path is not None:
-                        self._indices_check(indices, abs_meta_idx_arr, msg)
-                    for idx in indices:
-                        abs_meta_idx_arr[idx] = True
+                        name = path
+
+                    try:
+                        abs_meta_idx_arr = used_indices[name]
+                    except KeyError:
+                        prom_name = prom2abs_names[name][0]
+                        abs_meta_idx_arr = used_indices[prom_name]
+
+                    if indices is not None:
+                        indices = _index_sort(indices)
+                        if path is not None:
+                            self._indices_check(indices, abs_meta_idx_arr, msg)
+                        for idx in indices:
+                            abs_meta_idx_arr[idx] = True
 
             return self.get_relevant_vars(desvars, responses, mode)
 
@@ -4850,8 +4851,7 @@ class System(object):
                                 vdict[ivc_path] = discrete_vec[ivc_path[offset:]]['val']
                 else:
                     for name in variables:
-                        if name in self._responses and 'path' in self._responses[name] and \
-                                self._responses[name]['path'] is not None:
+                        if name in self._responses and self._responses[name]['path'] is not None:
                             name = self._responses[name]['path']
                         if vec._contains_abs(name):
                             vdict[name] = get(name, False)
@@ -4863,8 +4863,7 @@ class System(object):
                 vdict = {}
                 if discrete_vec:
                     for name in variables:
-                        if name in self._responses and 'path' in self._responses[name] and \
-                                self._responses[name]['path'] is not None:
+                        if name in self._responses and self._responses[name]['path'] is not None:
                             name = self._responses[name]['path']
                         if vec._contains_abs(name):
                             vdict[name] = get(name, get_remote=True, rank=0,

@@ -1,5 +1,6 @@
 """Define a base class for all Drivers in OpenMDAO."""
 from collections import OrderedDict
+from itertools import chain
 import pprint
 import sys
 import os
@@ -341,13 +342,27 @@ class Driver(object):
             sizes = model._var_sizes['output']
             rank = model.comm.rank
             nprocs = model.comm.size
-            for i, (vname, meta) in enumerate(model._var_allprocs_abs2meta['output'].items()):
+
+            # Used for index->name reference.
+            abs2idx = {}
+            for j, item in enumerate(model._var_allprocs_abs2meta['output']):
+                abs2idx[item] = j
+
+            # Loop over all VOIs.
+            for vname in chain(responses, src_design_vars):
+                vpath = vname
+
                 if vname in responses:
+                    # Support for constraint aliases.
+                    if responses[vname]['path'] is not None:
+                        vpath = responses[vname]['path']
                     indices = responses[vname].get('indices')
+
                 elif vname in src_design_vars:
                     indices = src_design_vars[vname].get('indices')
-                else:
-                    continue
+
+                meta = model._var_allprocs_abs2meta['output'][vpath]
+                i = abs2idx[vpath]
 
                 if meta['distributed']:
 
@@ -376,14 +391,14 @@ class Driver(object):
                                             slice(offsets[rank], offsets[rank] + dist_sizes[rank]))
 
                 else:
-                    owner = owning_ranks[vname]
+                    owner = owning_ranks[vpath]
                     sz = sizes[owner, i]
 
-                    if vname in dv_set:
+                    if vpath in dv_set:
                         remote_dv_dict[vname] = (owner, sz)
-                    if vname in con_set:
+                    if vpath in con_set:
                         remote_con_dict[vname] = (owner, sz)
-                    if vname in obj_set:
+                    if vpath in obj_set:
                         remote_obj_dict[vname] = (owner, sz)
 
         self._remote_responses = self._remote_cons.copy()
@@ -529,18 +544,25 @@ class Driver(object):
         get = model._outputs._abs_get_val
         indices = meta['indices']
 
-        if meta.get('ivc_source') is not None:
-            src_name = meta['ivc_source']
+        ivc_src_name = meta.get('ivc_source')
+        if ivc_src_name is not None:
+
+            # Constraint aliases add additional complication.
+            if meta.get('path') and meta['path'] != name:
+                src_name = meta['path']
+                drv_name = name
+            else:
+                drv_name = src_name = ivc_src_name
         else:
-            src_name = name
+            drv_name = src_name = name
 
         if MPI:
-            distributed = comm.size > 0 and src_name in self._dist_driver_vars
+            distributed = comm.size > 0 and drv_name in self._dist_driver_vars
         else:
             distributed = False
 
-        if src_name in remote_vois:
-            owner, size = remote_vois[src_name]
+        if drv_name in remote_vois:
+            owner, size = remote_vois[drv_name]
             # if var is distributed or only gathering to one rank
             # TODO - support distributed var under a parallel group.
             if owner is None or rank is not None:
@@ -563,7 +585,7 @@ class Driver(object):
 
         elif distributed:
             local_val = model.get_val(src_name, get_remote=False, flat=True)
-            local_indices, sizes, _ = self._dist_driver_vars[src_name]
+            local_indices, sizes, _ = self._dist_driver_vars[drv_name]
             if local_indices is not _full_slice:
                 local_val = local_val[local_indices()]
 
@@ -578,7 +600,7 @@ class Driver(object):
 
         else:
             if name in self._designvars_discrete:
-                val = model._discrete_outputs[src_name]
+                val = model._discrete_outputs[drv_name]
 
                 # At present, only integers are supported by OpenMDAO drivers.
                 # We check the values here.

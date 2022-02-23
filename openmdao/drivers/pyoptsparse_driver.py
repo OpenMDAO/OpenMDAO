@@ -794,8 +794,7 @@ class pyOptSparseDriver(Driver):
             return
 
         for res, resdict in total_sparsity.items():
-            if res in self._responses and 'path' in self._responses[res] and \
-                    self._responses[res]['path'] is not None:
+            if res in self._responses and self._responses[res]['path'] is not None:
                 res = self._responses[res]['path']
             if res in self._objs:  # skip objectives
                 continue

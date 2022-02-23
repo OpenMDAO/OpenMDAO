@@ -2920,8 +2920,7 @@ class Group(System):
             for of in self._owns_approx_of:
 
                 # Support for constraint aliases.
-                if of in self._responses and 'path' in self._responses[of] and \
-                        self._responses[of]['path'] is not None:
+                if of in self._responses and self._responses[of]['path'] is not None:
                     path = self._responses[of]['path']
                 else:
                     path = of
@@ -3079,12 +3078,10 @@ class Group(System):
 
         approx_keys = self._get_approx_subjac_keys()
         for key in approx_keys:
-            left, right = key[0], key[1]
-            if left in self._responses and 'path' in self._responses[left] and \
-                    self._responses[left]['path'] is not None:
+            left, right = key
+            if left in self._responses and self._responses[left]['path'] is not None:
                 left = self._responses[left]['path']
-            if right in self._responses and 'path' in self._responses[right] and \
-                    self._responses[right]['path'] is not None:
+            if right in self._responses and self._responses[right]['path'] is not None:
                 right = self._responses[right]['path']
 
             if key in self._subjacs_info:
