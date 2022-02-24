@@ -649,7 +649,7 @@ class Problem(object):
             self.set_val(name, value)
 
         # Clean up cache
-        self._initial_condition_cache = OrderedDict()
+        self._initial_condition_cache = {}
 
     def run_model(self, case_prefix=None, reset_iter_counts=True):
         """

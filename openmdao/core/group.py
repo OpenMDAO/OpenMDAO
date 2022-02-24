@@ -326,10 +326,10 @@ class Group(System):
 
         if name in dct:
             old = dct[name][0]
-            overlap = sorted(set(old).intersection(meta))
+            overlap = set(old).intersection(meta)
             if overlap:
                 issue_warning(f"Setting input defaults for input '{name}' which "
-                              f"override previously set defaults for {overlap}.",
+                              f"override previously set defaults for {sorted(overlap)}.",
                               prefix=self.msginfo, category=PromotionWarning)
             old.update(meta)
         else:
@@ -3433,6 +3433,7 @@ class Group(System):
                 auto2tgt[src] = [tgt]
 
         conns.update(auto_conns)
+        auto_ivc.auto2tgt = auto2tgt
 
         abs2meta_in = self._var_abs2meta['input']
         vars2gather = self._vars_to_gather
@@ -3492,6 +3493,12 @@ class Group(System):
                             val = self.comm.bcast(None, root=vars2gather[abs_in])
                     auto_ivc.add_discrete_output(loc_out_name, val=val)
 
+                src = conns[abs_in]
+                if src in auto_ivc.auto2tgt:
+                    auto_ivc.auto2tgt[src].append(abs_in)
+                else:
+                    auto_ivc.auto2tgt[src] = [abs_in]
+
         if not prom2auto:
             return auto_ivc
 
@@ -3502,7 +3509,7 @@ class Group(System):
 
         # now update our own data structures based on the new auto_ivc component variables
         old = self._subsystems_allprocs
-        self._subsystems_allprocs = allsubs = OrderedDict()
+        self._subsystems_allprocs = allsubs = {}
         allsubs['_auto_ivc'] = _SysInfo(auto_ivc, 0)
         for i, (name, s) in enumerate(old.items()):
             allsubs[name] = s
@@ -3512,7 +3519,7 @@ class Group(System):
 
         io = 'output'  # auto_ivc has only output vars
         old = self._var_allprocs_prom2abs_list[io]
-        p2abs = OrderedDict()
+        p2abs = {}
         for name in auto_ivc._var_allprocs_abs2meta[io]:
             p2abs[name] = [name]
         p2abs.update(old)
@@ -3551,7 +3558,6 @@ class Group(System):
         all_abs2meta_in = self._var_allprocs_abs2meta['input']
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
         a2prom_inf = self._problem_meta['abs_in2prom_info']
-        srcconns = {}
         for tgt, src in self._conn_global_abs_in2out.items():
             if tgt in a2prom_inf and a2prom_inf[tgt][0][0] is not None:
                 # a2prom_inf[tgt][0][0] is the top level _PromotesInfo object
@@ -3564,18 +3570,12 @@ class Group(System):
                                           f"{exc[1]}", exc=exc, category=SetupWarning,
                                           err=self._raise_connection_errors)
 
-            if src.startswith('_auto_ivc.'):
-                if src in srcconns:
-                    srcconns[src].append(tgt)
-                else:
-                    srcconns[src] = [tgt]
-
         abs2prom = self._var_allprocs_abs2prom['input']
         abs2meta_in = self._var_abs2meta['input']
         all_discrete_outs = self._var_allprocs_discrete['output']
         all_discrete_ins = self._var_allprocs_discrete['input']
 
-        for src, tgts in srcconns.items():
+        for src, tgts in self._auto_ivc.auto2tgt.items():
             if len(tgts) < 2:
                 continue
             if src not in all_discrete_outs:
@@ -3584,13 +3584,12 @@ class Group(System):
 
             sval = self.get_val(src, kind='output', get_remote=True, from_src=False)
             errs = set()
-            metadata = set()
 
             prom = abs2prom[tgts[0]]
-            if prom not in self._group_inputs:
-                self._group_inputs[prom] = [{'path': self.pathname, 'prom': prom, 'auto': True}]
-
-            gmeta = self._group_inputs[prom][0]
+            if prom in self._group_inputs:
+                gmeta = self._group_inputs[prom][0]
+            else:
+                gmeta = {'path': self.pathname, 'prom': prom, 'auto': True}
 
             for tgt in tgts:
                 tval = self.get_val(tgt, kind='input', get_remote=True, from_src=False)
@@ -3598,7 +3597,6 @@ class Group(System):
                 if tgt in all_discrete_ins:
                     if 'val' not in gmeta and sval != tval:
                         errs.add('val')
-                        metadata.add('val')
                 else:
                     tmeta = all_abs2meta_in[tgt]
                     tunits = tmeta['units'] if 'units' in tmeta else None
@@ -3607,17 +3605,14 @@ class Group(System):
                         # Detect if either Source or Targe units are None.
                         if sunits is None or tunits is None:
                             errs.add('units')
-                            metadata.add('units')
 
                         elif _find_unit(sunits) != _find_unit(tunits):
                             errs.add('units')
-                            metadata.add('units')
 
                     if 'val' not in gmeta:
                         if tval.shape == sval.shape:
                             if _has_val_mismatch(tunits, tval, sunits, sval):
                                 errs.add('val')
-                                metadata.add('val')
                         else:
                             if all_abs2meta_in[tgt]['has_src_indices'] and tgt in abs2meta_in:
                                 if abs2meta_in[tgt]['flat_src_indices']:
@@ -3626,10 +3621,9 @@ class Group(System):
                                     srcpart = sval[abs2meta_in[tgt]['src_indices']()]
                                 if _has_val_mismatch(tunits, tval, sunits, srcpart):
                                     errs.add('val')
-                                    metadata.add('val')
 
             if errs:
-                self._show_ambiguity_msg(prom, errs, tgts, metadata)
+                self._show_ambiguity_msg(prom, errs, tgts)
             elif src not in all_discrete_outs:
                 gmeta['units'] = sunits
 

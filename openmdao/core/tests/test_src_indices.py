@@ -357,7 +357,7 @@ class SrcIndicesFeatureTestCase(unittest.TestCase):
         p = om.Problem()
         G = p.model.add_subsystem('G', om.Group())
 
-        # At the top level, we assume that the source, and our input 'x', has a shape of (3,3), 
+        # At the top level, we assume that the source, and our input 'x', has a shape of (3,3),
         # and after we slice it with [:,:-1], lower levels will see their source having a shape of (3,2)
         p.model.promotes('G', inputs=['x'], src_indices=om.slicer[:,:-1], src_shape=(3,3))
 
