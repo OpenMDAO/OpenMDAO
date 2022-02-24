@@ -2,7 +2,6 @@ import base64
 import re
 import zlib
 import json
-import hashlib
 from pathlib import Path
 
 class HtmlPreprocessor():
@@ -71,13 +70,13 @@ class HtmlPreprocessor():
         self.json_dumps_default = json_dumps_default
         self.verbose = verbose
 
-        # Keep track of md5 hashes of scripts already imported, to make sure
+        # Keep track of filenames already loaded, to make sure
         # we don't unintentionally include the exact same file twice.
-        self.imported_script_hashes = []
+        self.loaded_filenames = []
 
         self.msg("HtmlProcessor object created.")
 
-    def load_text_file(self, filename, rlvl = 0) -> str:
+    def load_file(self, filename, rlvl = 0, binary = False, allow_dup = False) -> str:
         """
         Open and read the specified text file.
 
@@ -85,46 +84,33 @@ class HtmlPreprocessor():
         ----------
         filename: str
             The path to the text file to read.
+        binary: bool
+            True if the file is to be opened in binary mode and converted to a base64 str.
+        allow_dup: bool
+            If False, return an empty string for a filename that's been previously loaded.
         rlvl: int
             Recursion level to help with indentation when verbose is enabled.
 
         Returns
         -------
         str
-            The complete contents of the text file.
+            The complete contents of the file.
         """
         path = Path(filename)
         pathname = self.start_dirname / filename if not path.is_absolute() else filename
 
-        self.msg(f"Loading text file {pathname}.", rlvl)
+        if pathname in self.loaded_filenames and not allow_dup:
+            self.msg(f"Ignoring previously-loaded file {filename}.", rlvl)
+            return ""
 
-        with open(pathname, 'r') as f:
+        self.loaded_filenames.append(pathname)
+        self.msg(f"Loading file {pathname}.", rlvl)
+
+        with open(pathname, 'rb' if binary else 'r') as f:
             file_contents = str(f.read())
 
-        return file_contents
-
-    def load_bin_file(self, filename, rlvl = 0) -> str:
-        """
-        Open and read the specified binary file, converting it to a base64 string.
-        Parameters
-        ----------
-        filename: str
-            The path to the binary file to read.
-        rlvl: int
-            Recursion level to help with indentation when verbose is enabled.
-
-        Returns
-        -------
-        str
-            The complete contents represented as a base64 string.
-        """
-        path = Path(filename)
-        pathname = self.start_dirname / filename if not path.is_absolute() else filename
-
-        self.msg(f"Loading binary file {pathname}.", rlvl)
-
-        with open(pathname, 'rb') as f:
-            file_contents = str(base64.b64encode(f.read()).decode("ascii"))
+        if binary:
+            file_contents = str(base64.b64encode(file_contents).decode("ascii"))
 
         return file_contents
 
@@ -185,28 +171,24 @@ class HtmlPreprocessor():
 
             if keyword == 'insert':
                 # Recursively insert a plain text file which may also have hpp directives
-                new_content = self.parse_contents(self.load_text_file(arg, rlvl), rlvl)
+                new_content = self.parse_contents(self.load_file(arg, rlvl = rlvl), rlvl)
 
             elif keyword == 'script':
                 # Recursively insert a JavaScript file which may also have hpp directives
-                new_content = f'<script type="text/javascript">\n' + \
-                    self.parse_contents(self.load_text_file(arg, rlvl), rlvl) + f'\n</script>'
-                script_hash = hashlib.md5(new_content.encode())
+                new_content = self.parse_contents(self.load_file(arg, rlvl = rlvl,
+                    allow_dup = flags['dup']), rlvl)
 
-                # Skip a file that's already been loaded
-                if script_hash in self.imported_script_hashes and not flags['dup']:
-                    continue
-
-                self.imported_script_hashes.append(script_hash)
-                do_compress = True if flags['compress'] else False
+                if new_content != "":
+                    new_content = f'<script type="text/javascript">\n{new_content}\n</script>'
+                    do_compress = True if flags['compress'] else False
 
             elif keyword == 'style':
                 # Recursively insert a CSS file which may also have hpp directives
                 new_content = '<style type="text/css">\n' + \
-                    self.parse_contents(self.load_text_file(arg, rlvl), rlvl) + f'\n</style>'
+                    self.parse_contents(self.load_file(arg, rlvl = rlvl), rlvl) + f'\n</style>'
                 
             elif keyword == 'bin2b64':
-                new_content = self.load_bin_file(arg, rlvl)
+                new_content = self.load_file(arg, binary = True, rlvl = rlvl)
 
             elif keyword == 'pyvar':
                 if arg in self.var_dict:
@@ -243,7 +225,7 @@ class HtmlPreprocessor():
         """
         Initiate the preprocessor, then save the result as a new file.
         """
-        new_html_content = self.parse_contents(self.load_text_file(self.start_filename))
+        new_html_content = self.parse_contents(self.load_file(self.start_filename))
 
         path = Path(self.output_filename)
         if path.is_file() and not self.allow_overwrite:
