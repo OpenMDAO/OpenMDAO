@@ -567,7 +567,7 @@ def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddab
     vis_dir = os.path.join(openmdao_dir, "visualization/n2_viewer")
 
     if title:
-        title = "OpenMDAO Model Hierarchy and N2 diagram: %s" % title
+        title = f"OpenMDAO Model Hierarchy and N2 diagram: {title}"
     else:
         title = "OpenMDAO Model Hierarchy and N2 diagram"
 
@@ -578,11 +578,9 @@ def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddab
         'model_data': model_data
     }
 
-    new_n2 = HtmlPreprocessor(os.path.join(vis_dir, "index.html"),
+    HtmlPreprocessor(os.path.join(vis_dir, "index.html"),
         outfile, allow_overwrite = True, var_dict = html_vars,
-        json_dumps_default = default_noraise, verbose = True)
-
-    new_n2.run()
+        json_dumps_default = default_noraise, verbose = False).run()
 
     if notebook:
         # display in Jupyter Notebook

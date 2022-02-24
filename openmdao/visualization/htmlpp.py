@@ -85,6 +85,8 @@ class HtmlPreprocessor():
         ----------
         filename: str
             The path to the text file to read.
+        rlvl: int
+            Recursion level to help with indentation when verbose is enabled.
 
         Returns
         -------
@@ -108,6 +110,8 @@ class HtmlPreprocessor():
         ----------
         filename: str
             The path to the binary file to read.
+        rlvl: int
+            Recursion level to help with indentation when verbose is enabled.
 
         Returns
         -------
@@ -125,6 +129,16 @@ class HtmlPreprocessor():
         return file_contents
 
     def msg(self, msg, rlvl = 0):
+        """
+        Print a message to stdout if self.verbose is True.
+
+        Parameters
+        ----------
+        msg: str
+            The message to print.
+        rlvl: int
+            Recursion level to help with indentation when verbose is enabled.
+        """
         if self.verbose: print (rlvl * '--' + msg)
 
     def parse_contents(self, contents: str, rlvl = 0) -> str:
@@ -137,6 +151,8 @@ class HtmlPreprocessor():
         ----------
         contents: str
             The contents of a preloaded text file.
+        rlvl: int
+            Recursion level to help with indentation when verbose is enabled.
 
         Returns
         -------
