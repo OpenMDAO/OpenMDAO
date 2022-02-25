@@ -11,10 +11,10 @@ class HtmlPreprocessor():
     Source files contain text with directives in the form: <<directive value_arg>>
 
     Recognized directives are:
-    <<hpp_insert path/to/file [compress]>>: Paste path/to/file verbatim into the surrounding text
+    <<hpp_insert path/to/file [compress] [dup]>>: Paste path/to/file verbatim into the text
     <<hpp_script path/to/script [dup]>>: Paste path/to/script inside a <script> tag
-    <<hpp_style path/to/css>>: Paste path/to/css into the text inside a <style> tag
-    <<hpp_bin2b64 path/to/file>>: Convert a binary file to a b64 string and insert it
+    <<hpp_style path/to/css [dup]>>: Paste path/to/css into the text inside a <style> tag
+    <<hpp_bin2b64 path/to/file [dup]>>: Convert a binary file to a b64 string and insert it
     <<hpp_pyvar variable_name [compress]>>: Insert the string value of the named Python variable.
         If the referenced variable is non-primitive, it's converted to JSON.
 
@@ -97,7 +97,7 @@ class HtmlPreprocessor():
             The complete contents of the file.
         """
         path = Path(filename)
-        pathname = self.start_dirname / filename if not path.is_absolute() else filename
+        pathname = filename if path.is_absolute() else self.start_dirname / filename
 
         if pathname in self.loaded_filenames and not allow_dup:
             self.msg(f"Ignoring previously-loaded file {filename}.", rlvl)
@@ -148,7 +148,7 @@ class HtmlPreprocessor():
             The complete contents represented as a base64 string.
         """
         # Find all possible keywords:
-        keyword_regex = '(//|/\*|<\!--)?\s*<<\s*hpp_(insert|script|style|bin2b64|pyvar)\s+(\S+)(\s+compress|\s+dup)?\s*>>(\*/|-->)?'
+        keyword_regex = '(//|/\*|<\!--)?\s*<<\s*hpp_(\S+)\s+(\S+)(\s+compress|\s+dup)*\s*>>(\*/|-->)?'
         matches = re.finditer(keyword_regex, contents)
         rlvl += 1
         new_content = None
@@ -162,10 +162,8 @@ class HtmlPreprocessor():
 
             flags = { 'compress': False, 'dup': False }
             if found_directive.group(4) is not None:
-                if 'compress' in found_directive.group(4):
-                    flags['compress'] = True
-                elif 'dup' in found_directive.group(4):
-                    flags['dup'] = True
+                flags['compress'] = True if 'compress' in found_directive.group(4) else False
+                flags['dup'] = True if 'dup' in found_directive.group(4) else False
 
             do_compress = False # Change below with directives where it's allowed
 
@@ -173,7 +171,11 @@ class HtmlPreprocessor():
 
             if keyword == 'insert':
                 # Recursively insert a plain text file which may also have hpp directives
-                new_content = self.parse_contents(self.load_file(arg, rlvl = rlvl), rlvl)
+                new_content = self.parse_contents(self.load_file(arg, rlvl = rlvl,
+                    allow_dup = flags['dup']), rlvl)
+
+                if new_content != "":
+                    do_compress = True if flags['compress'] else False
 
             elif keyword == 'script':
                 # Recursively insert a JavaScript file which may also have hpp directives
@@ -182,15 +184,15 @@ class HtmlPreprocessor():
 
                 if new_content != "":
                     new_content = f'<script type="text/javascript">\n{new_content}\n</script>'
-                    do_compress = True if flags['compress'] else False
 
             elif keyword == 'style':
                 # Recursively insert a CSS file which may also have hpp directives
                 new_content = '<style type="text/css">\n' + \
-                    self.parse_contents(self.load_file(arg, rlvl = rlvl), rlvl) + f'\n</style>'
+                    self.parse_contents(self.load_file(arg, rlvl = rlvl,
+                    allow_dup = flags['dup']), rlvl) + f'\n</style>'
                 
             elif keyword == 'bin2b64':
-                new_content = self.load_file(arg, binary = True, rlvl = rlvl)
+                new_content = self.load_file(arg, binary = True, allow_dup = flags['dup'], rlvl = rlvl)
 
             elif keyword == 'pyvar':
                 if arg in self.var_dict:
