@@ -88,12 +88,16 @@ class Problem(object):
     name : str
         Problem name. Can be used to specify a Problem instance when multiple Problems
         exist.
-    reports : str, bool, None
+    reports : str, bool, None, _UNDEFINED
         If _UNDEFINED, the OPENMDAO_REPORTS variable is used. Defaults to _UNDEFINED.
-        If given, reports should override OPENMDAO_REPORTS. If boolean, enable/disable all reports.
+        If given, reports overrides OPENMDAO_REPORTS. If boolean, enable/disable all reports.
         Since none is acceptable in the environment variable, a value of reports=None
         is equivalent to reports=False. Otherwise, reports may be a sequence of
         strings giving the names of the reports to run.
+    reports_dir : str, _UNDEFINED
+        Directory in which to place the reports.
+        If _UNDEFINED, the OPENMDAO_REPORTS_DIR variable is used. Defaults to _UNDEFINED.
+        If given, reports_dir overrides OPENMDAO_REPORTS_DIR.
     **options : named args
         All remaining named args are converted to options.
 
@@ -143,16 +147,20 @@ class Problem(object):
         The number of times run_driver or run_model has been called.
     _warned : bool
         Bool to check if `value` deprecation warning has occured yet
-    _reports : str, bool, None
+    _reports : str, bool, None, _UNDEFINED
         If _UNDEFINED, the OPENMDAO_REPORTS variable is used. Defaults to _UNDEFINED.
         If given, reports should override OPENMDAO_REPORTS. If boolean, enable/disable all reports.
         Since none is acceptable in the environment variable, a value of reports=None
         is equivalent to reports=False. Otherwise, reports may be a sequence of
         strings giving the names of the reports to run.
+    _reports_dir : str, _UNDEFINED
+        Directory in which to place the reports.
+        If _UNDEFINED, the OPENMDAO_REPORTS_DIR variable is used. Defaults to _UNDEFINED.
+        If given, reports_dir overrides OPENMDAO_REPORTS_DIR.
     """
 
     def __init__(self, model=None, driver=None, comm=None, name=None,
-                 reports=_UNDEFINED, **options):
+                 reports=_UNDEFINED, reports_dir=_UNDEFINED, **options):
         """
         Initialize attributes.
         """
@@ -221,6 +229,7 @@ class Problem(object):
         self._rec_mgr = RecordingManager()
 
         self._reports = reports
+        self._reports_dir = reports_dir
 
         # General options
         self.options = OptionsDictionary(parent_name=type(self).__name__)
