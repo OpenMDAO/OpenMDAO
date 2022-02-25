@@ -33,8 +33,8 @@ class HtmlPreprocessor():
     Nothing is written until every directive has been successfully processed.
     """
 
-    def __init__(self, start_filename, output_filename, allow_overwrite = False,
-        var_dict = None, json_dumps_default = None, verbose = False):
+    def __init__(self, start_filename: str, output_filename: str, allow_overwrite = False,
+        var_dict: dict = None, json_dumps_default = None, verbose = False):
         """
         Configure the preprocessor and validate file paths.
 
@@ -76,7 +76,7 @@ class HtmlPreprocessor():
 
         self.msg("HtmlProcessor object created.")
 
-    def load_file(self, filename, rlvl = 0, binary = False, allow_dup = False) -> str:
+    def load_file(self, filename: str, rlvl = 0, binary = False, allow_dup = False) -> str:
         """
         Open and read the specified text file.
 
@@ -116,7 +116,7 @@ class HtmlPreprocessor():
 
         return file_contents
 
-    def msg(self, msg, rlvl = 0):
+    def msg(self, msg: str, rlvl = 0):
         """
         Print a message to stdout if self.verbose is True.
 
@@ -203,6 +203,7 @@ class HtmlPreprocessor():
                     else:
                         raw_data = json.dumps(val, default=self.json_dumps_default)
                         if flags['compress']:
+                            self.msg("Compressing content.", rlvl)
                             new_content = str(base64.b64encode(zlib.compress(raw_data.encode('utf8'))).decode("ascii"))
                         else:
                             new_content = raw_data
