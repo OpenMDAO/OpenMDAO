@@ -12,7 +12,7 @@ import openmdao.core.problem
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.assert_utils import assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.utils.reports_system import set_reports_dir, _reports_dir, register_report, \
+from openmdao.utils.reports_system import set_default_reports_dir, _reports_dir, register_report, \
     get_reports_dir, list_reports, clear_reports, run_n2_report, setup_default_reports
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
@@ -47,7 +47,7 @@ class TestReportsSystem(unittest.TestCase):
         # But we need to remember whether it was set so we can restore it
         self.testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
         clear_reports()
-        set_reports_dir(_reports_dir)
+        set_default_reports_dir(_reports_dir)
 
         self.count = 0
 
@@ -56,8 +56,8 @@ class TestReportsSystem(unittest.TestCase):
         if self.testflo_running is not None:
             os.environ['TESTFLO_RUNNING'] = self.testflo_running
 
-    def setup_and_run_simple_problem(self, driver=None, reports=_UNDEFINED):
-        prob = om.Problem(reports=reports)
+    def setup_and_run_simple_problem(self, driver=None, reports=_UNDEFINED, reports_dir=_UNDEFINED):
+        prob = om.Problem(reports=reports, reports_dir=reports_dir)
         model = prob.model
 
         model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
@@ -243,7 +243,7 @@ class TestReportsSystem(unittest.TestCase):
             with open(user_report_filepath, "w") as f:
                 f.write(f"Do some reporting on the Problem, {prob._name}\n")
 
-        register_report("User defined report", user_defined_report, "user defined report",
+        register_report("User defined report", user_defined_report, "user defined report description",
                         'Problem', 'setup', 'pre')
 
         prob = self.setup_and_run_simple_problem()
@@ -425,6 +425,22 @@ class TestReportsSystem(unittest.TestCase):
         self.assertFalse(path.is_file(),
                          f'The problem2 n2 report file, {str(path)}, was found but should not have')
 
+    @hooks_active
+    def test_report_generation_basic_problem_reports_dir_argument(self):
+        setup_default_reports()
+
+        custom_reports_dir = 'user_dir'
+
+        prob = self.setup_and_run_simple_problem(reports=False, reports_dir=custom_reports_dir)
+
+        # get the path to the problem subdirectory
+        problem_reports_dir = pathlib.Path(custom_reports_dir).joinpath(prob._name)
+        path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
+        self.assertFalse(path.is_file(),
+                         f'The N2 report file, {str(path)} was found but should not have')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
+        self.assertFalse(path.is_file(),
+                         f'The scaling report file, {str(path)}, was found but should not have')
 
 
 @use_tempdirs
@@ -446,7 +462,7 @@ class TestReportsSystemMPI(unittest.TestCase):
         # But we need to remember whether it was set so we can restore it
         self.testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
         clear_reports()
-        set_reports_dir(_reports_dir)
+        set_default_reports_dir(_reports_dir)
 
         self.count = 0  # used to keep a count of reports generated
 

@@ -11,6 +11,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook, _unregister_hook
 from openmdao.visualization.n2_viewer.n2_viewer import n2, _default_n2_filename
 from openmdao.visualization.scaling_viewer.scaling_report import _default_scaling_filename
+from openmdao.core.constants import _UNDEFINED
 
 # Keeping track of the registered reports
 _Report = namedtuple('Report', 'func desc class_name inst_id method pre_or_post')
@@ -140,7 +141,7 @@ def list_reports(out_stream=None):
     out_stream.write('\n')
 
 
-def set_reports_dir(reports_dir_path):
+def set_default_reports_dir(reports_dir_path):
     """
     Set the path to where the reports should go. By default, they go into the current directory.
 
@@ -167,7 +168,10 @@ def get_reports_dir(prob):
     str
         The path to the directory where reports should be written.
     """
-    reports_dir = os.environ.get('OPENMDAO_REPORTS_DIR', _reports_dir)
+    if prob._reports_dir is not _UNDEFINED:
+        reports_dir = prob._reports_dir
+    else:
+        reports_dir = os.environ.get('OPENMDAO_REPORTS_DIR', _reports_dir)
 
     # problem_reports_dirname = f'{prob._name}_reports'
     problem_reports_dirname = f'{prob._name}'
