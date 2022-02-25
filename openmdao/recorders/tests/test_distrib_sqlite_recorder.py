@@ -10,6 +10,7 @@ import numpy as np
 from openmdao.utils.mpi import MPI
 
 import openmdao.api as om
+
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.recorders.tests.sqlite_recorder_test_utils import \
     assertDriverIterDataRecorded, assertProblemDataRecorded
@@ -20,6 +21,8 @@ if MPI:
     from openmdao.api import PETScVector
 else:
     PETScVector = None
+
+from openmdao.test_suite.components.paraboloid import Paraboloid
 
 
 class DistributedAdder(om.ExplicitComponent):
@@ -297,10 +300,9 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.run_model()
         prob.record('final')
 
-    def test_regression_bug_fix_issue_2062_sql_meta_file_running_parallel(self):
-
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
+    def test_sql_meta_file_exists(self):
+        # Check that an existing sql_meta file will be deleted/overwritten
+        # if it already exists before a run. (see Issue #2062)
         prob = om.Problem()
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
@@ -318,8 +320,7 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        # Run this again. Because of the bug fix for issue 2062, this code should NOT
-        #   throw an exception
+        # Run this again. It should NOT throw an exception.
         prob = om.Problem()
 
         prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
@@ -337,23 +338,85 @@ class DistributedRecorderTest(unittest.TestCase):
 
         if prob.comm.rank == 0:
             expected_warnings = [
-                                 (UserWarning,
-                                  'The existing case recorder metadata file, cases.sql_meta, '
-                                  'is being overwritten.'),
-                                 (UserWarning,
-                                  'The existing case recorder file, cases.sql_0, is being '
-                                  'overwritten.'),
-                                 ]
+                (UserWarning,
+                'The existing case recorder metadata file, cases.sql_meta, '
+                'is being overwritten.'),
+                (UserWarning,
+                'The existing case recorder file, cases.sql_0, is being '
+                'overwritten.'),
+            ]
         else:
             expected_warnings = [
-                                (UserWarning,
-                                  'The existing case recorder file, cases.sql_1, is being '
-                                  'overwritten.'),
-                                 ]
+                (UserWarning,
+                    'The existing case recorder file, cases.sql_1, is being '
+                    'overwritten.'),
+            ]
         with assert_warnings(expected_warnings):
             prob.run_driver()
 
         prob.cleanup()
+
+    def test_record_on_one_proc(self):
+        # This test verifies that cases can be recorded on a single process in an MPI environment
+        # with more than one process, and the recorded cases can then be processed in parallel
+
+        size = MPI.COMM_WORLD.size
+        rank = MPI.COMM_WORLD.rank
+        my_comm = MPI.COMM_WORLD.Split(rank)
+
+        def run_sequential():
+            # problem will run in the single proc comm for this rank
+            prob = om.Problem(comm=my_comm)
+
+            prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+            prob.model.add_design_var('x', lower=0.0, upper=1.0)
+            prob.model.add_design_var('y', lower=0.0, upper=1.0)
+            prob.model.add_objective('f_xy')
+
+            prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
+            prob.driver.options['run_parallel'] = False
+            prob.driver.options['procs_per_model'] = 1
+            prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+            prob.setup()
+            prob.run_driver()
+            prob.cleanup()
+
+        def run_parallel():
+            # process cases.sql in parallel
+            cr = om.CaseReader("cases.sql")
+
+            cases = cr.list_cases()
+            self.assertEqual(len(cases), 9)
+
+            my_idxs = list(range(len(cases)))[rank::size]
+            my_cases = [cases[i] for i in my_idxs]
+            self.assertEqual(my_cases, [
+                'rank0:DOEDriver_FullFactorial|0',
+                'rank0:DOEDriver_FullFactorial|2',
+                'rank0:DOEDriver_FullFactorial|4',
+                'rank0:DOEDriver_FullFactorial|6',
+                'rank0:DOEDriver_FullFactorial|8'
+            ] if rank == 0 else [
+                'rank0:DOEDriver_FullFactorial|1',
+                'rank0:DOEDriver_FullFactorial|3',
+                'rank0:DOEDriver_FullFactorial|5',
+                'rank0:DOEDriver_FullFactorial|7'
+            ])
+
+            my_responses = [cr.get_case(case_id)['f_xy'] for case_id in my_cases]
+            self.assertEqual(my_responses, [22., 17., 23.75, 31., 27.] if rank == 0 else
+                                           [19.25, 26.25, 21.75, 28.75])
+
+        # Run model on a single processor
+        if rank == 1:
+            run_sequential()
+
+        # Synchronize as generated doe will be used by all procs
+        MPI.COMM_WORLD.barrier()
+
+        # Run by all procs
+        run_parallel()
 
 
 if __name__ == "__main__":
