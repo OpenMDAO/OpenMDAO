@@ -111,28 +111,6 @@ def take_nth(rank, size, seq):
                     return
 
 
-def convert_neg(arr, size):
-    """
-    Convert any negative indices into their positive equivalent.
-
-    This only works for a 1D array.
-
-    Parameters
-    ----------
-    arr : ndarray
-        Array having negative indices converted.
-    size : int
-        Dimension of the array.
-
-    Returns
-    -------
-    ndarray
-        The converted array.
-    """
-    arr[arr < 0] += size
-    return arr
-
-
 def array_viz(arr, prob=None, of=None, wrt=None, stream=sys.stdout):
     """
     Display the structure of a boolean array in a compact form.

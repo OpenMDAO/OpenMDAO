@@ -44,14 +44,17 @@ class SymbolType {
      * @param {ModelData} model Reference to the entire model.
      */
     getType(cell, model) {
-        if (cell.onDiagonal()) {
+        if (cell.srcObj.isFilter() || cell.tgtObj.isFilter()) {
+            this.name = 'filter';
+        }
+        else if (cell.onDiagonal()) {
             if (cell.srcObj.isSubsystem()) this.name = 'group';
             else if (cell.srcObj.isInputOrOutput()) {
                 if (cell.srcObj.dtype == "ndarray") this.name = 'vector';
                 else this.name = 'scalar';
             }
             else {
-                throw ("Output symbol type '" + cell.srcObj.type + "' for cell on diagonal.");
+                throw (`Output symbol type '${cell.srcObj.type}' for cell on diagonal.`);
             }
         }
         else if (cell.srcObj.isSubsystem()) {
@@ -62,7 +65,7 @@ class SymbolType {
             }
             else throw ("Output group symbol type.");
         }
-        else if (cell.srcObj.isInputOrOutput()) {
+        else if (cell.srcObj.isInputOrOutput() ) {
             if (cell.srcObj.dtype == "ndarray") {
                 if (cell.tgtObj.isInputOrOutput()) {
                     if (cell.tgtObj.dtype == "ndarray" || cell.tgtObj.isInput()) {
@@ -94,6 +97,9 @@ class SymbolType {
 
             else throw ("Output vector or scalar symbol type.");
         }
-        else throw ("Completely unrecognized symbol type.")
+        else {
+            console.warn("Completely unrecognized symbol type for cell ", cell)
+            throw ("Completely unrecognized symbol type.")
+        }
     }
 }

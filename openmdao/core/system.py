@@ -1455,6 +1455,9 @@ class System(object):
         return comm
 
     def _setup_recording(self):
+        """
+        Set up case recording.
+        """
         if self._rec_mgr._recorders:
             myinputs = myoutputs = myresiduals = []
 
@@ -1493,7 +1496,7 @@ class System(object):
                 'residual': myresiduals
             }
 
-            self._rec_mgr.startup(self)
+            self._rec_mgr.startup(self, self._problem_meta['comm'])
 
         for subsys in self._subsystems_myproc:
             subsys._setup_recording()
