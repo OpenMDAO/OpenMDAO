@@ -15,10 +15,10 @@ class HtmlPreprocessor():
     Source files contain text with directives in the form: <<directive value_arg>>
 
     Recognized directives are:
-    <<hpp_insert path/to/file [compress] [dup]>>: Paste path/to/file verbatim into the text
-    <<hpp_script path/to/script [dup]>>: Paste path/to/script inside a <script> tag
-    <<hpp_style path/to/css [dup]>>: Paste path/to/css into the text inside a <style> tag
-    <<hpp_bin2b64 path/to/file [dup]>>: Convert a binary file to a b64 string and insert it
+    <<hpp_insert path/to/file [compress] [dup]>>: Paste path/to/file verbatim into the text.
+    <<hpp_script path/to/script [dup]>>: Insert path/to/script between script tags.
+    <<hpp_style path/to/css [dup]>>: Insert path/to/css between style tags.
+    <<hpp_bin2b64 path/to/file [dup]>>: Convert a binary file to a b64 string and insert it.
     <<hpp_pyvar variable_name [compress]>>: Insert the string value of the named Python variable.
         If the referenced variable is non-primitive, it's converted to JSON.
 
