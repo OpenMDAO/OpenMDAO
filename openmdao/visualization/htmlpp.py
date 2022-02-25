@@ -33,8 +33,8 @@ class HtmlPreprocessor():
     Nothing is written until every directive has been successfully processed.
     """
 
-    def __init__(self, start_filename: str, output_filename: str, allow_overwrite = False,
-        var_dict: dict = None, json_dumps_default = None, verbose = False):
+    def __init__(self, start_filename:str, output_filename:str, allow_overwrite=False,
+        var_dict:dict=None, json_dumps_default=None, verbose=False):
         """
         Configure the preprocessor and validate file paths.
 
@@ -76,7 +76,7 @@ class HtmlPreprocessor():
 
         self.msg("HtmlProcessor object created.")
 
-    def load_file(self, filename: str, rlvl = 0, binary = False, allow_dup = False) -> str:
+    def load_file(self, filename: str, rlvl=0, binary=False, allow_dup=False) -> str:
         """
         Open and read the specified text file.
 
@@ -116,7 +116,7 @@ class HtmlPreprocessor():
 
         return file_contents
 
-    def msg(self, msg: str, rlvl = 0):
+    def msg(self, msg: str, rlvl=0):
         """
         Print a message to stdout if self.verbose is True.
 
@@ -129,7 +129,7 @@ class HtmlPreprocessor():
         """
         if self.verbose: print (rlvl * '--' + msg)
 
-    def parse_contents(self, contents: str, rlvl = 0) -> str:
+    def parse_contents(self, contents: str, rlvl=0) -> str:
         """
         Find the preprocessor directives in the file and replace them with the desired content.
 
