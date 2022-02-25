@@ -41,16 +41,38 @@ class HtmlPreprocessor():
     start_filename : str
         The file to begin processing from.
     output_filename : str
-        The path to the new merged HTML file.
+        The path to the newly merged HTML file.
     allow_overwrite : bool
         If true, overwrite the output file if it exists.
     var_dict : dict
-        Dictionary of variable names and values that hpp_pyvar will reference.
+        Dictionary of variable names and values referenced by hpp_pyvar directives.
     json_dumps_default : function
         Passed to json.dumps() as the "default" parameter that gets
         called for objects that can't be serialized.
     verbose : bool
         If True, print some status messages to stdout.
+
+    Attributes
+    ----------
+    start_filename : str
+        The path to the file to begin processing from, normally an HTML file.
+    start_path : Path
+        Path object used to determine relative paths for subsequent directives.
+    start_dirname : str
+        The absolute path of the directory containing the start_file.
+    output_filename : str
+        The path to the newly merged HTML file.
+    var_dict : dict
+        Dictionary of variable names and values referenced by hpp_pyvar directives.
+    allow_overwrite : bool
+        If true, overwrite the output file if it exists.
+    verbose : bool
+        If True, print some status messages to stdout.
+    loaded_filenames : list
+        List of filenames loaded so far, to determine if a file has been already loaded.
+    json_dumps_default : function
+        Passed to json.dumps() as the "default" parameter that gets
+        called for objects that can't be serialized.
     """
 
     def __init__(self, start_filename: str, output_filename: str, allow_overwrite=False,
@@ -62,8 +84,8 @@ class HtmlPreprocessor():
         if self.start_path.is_file() is False:
             raise FileNotFoundError(f"Error: {start_filename} not found")
 
-        self.output_path = Path(output_filename)
-        if self.output_path.is_file() and not allow_overwrite:
+        output_path = Path(output_filename)
+        if output_path.is_file() and not allow_overwrite:
             raise FileExistsError(f"Error: {output_filename} already exists")
 
         self.start_filename = start_filename
