@@ -107,10 +107,12 @@ class HtmlPreprocessor():
         self.msg(f"Loading file {pathname}.", rlvl)
 
         with open(pathname, 'rb' if binary else 'r') as f:
-            file_contents = str(f.read())
+            file_contents = f.read()
 
         if binary:
             file_contents = str(base64.b64encode(file_contents).decode("ascii"))
+        else:
+            file_contents = str(file_contents)
 
         return file_contents
 
