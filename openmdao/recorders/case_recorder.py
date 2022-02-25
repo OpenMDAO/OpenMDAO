@@ -8,6 +8,7 @@ from openmdao.core.problem import Problem
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import check_path
+from openmdao.utils.om_warnings import warn_deprecation
 
 
 # default pickle protocol version for serialization
@@ -42,12 +43,21 @@ class CaseRecorder(object):
     _iteration_coordinate : str
         The unique iteration coordinate of where an iteration originates.
     _parallel : bool
-        Designates if the current recorder is parallel-recording-capable.
+        Flag indicating if this recorder will record on multiple processes.
+    _record_on_proc : bool or None
+        Flag indicating if this recorder will record on the current process (None if unspecified).
+    _recording_ranks : list
+        List of ranks on which this recorder will record if running under MPI.
     """
 
     def __init__(self, record_viewer_data=True):
         """
         Initialize.
+
+        Parameters
+        ----------
+        record_viewer_data : bool, optional
+            If True, record data needed for visualization.
         """
         self._record_viewer_data = record_viewer_data
 
@@ -65,21 +75,72 @@ class CaseRecorder(object):
         # For Drivers, Systems, and Solvers
         self._iteration_coordinate = None
 
-        # By default, this is False, but it should be set to True
-        # if the recorder will record data on each process to avoid
-        # unnecessary gathering.
+        # By default, this is False, but it will be set to True if the recorder
+        # will record data on multiple processes
         self._parallel = False
 
-    def startup(self, recording_requester):
+        # Flag indicating if recording will be performed on the current process.
+        # If the value is not set to True on any process (the default), then
+        # recording will be performed only on rank 0.
+        # If the value is set to True on any process, then the _parallel flag
+        # will be set and recording will occur on all processes for which the
+        # value is True.
+        self._record_on_proc = None
+
+        # List of ranks on which this recorder will record if running under MPI.
+        # Only used when running under MPI with communicator size greater than one.
+        self._recording_ranks = None
+
+    @property
+    def record_on_process(self):
         """
-        Prepare for a new run and calculate inclusion lists.
+        Determine if recording should be performed on this process.
+        """
+        return self._record_on_proc
+
+    @record_on_process.setter
+    def record_on_process(self, record):
+        """
+        Specify that recording should be performed on this process.
+
+        Parameters
+        ----------
+        record : bool
+            If True, then recording should be performed on this process.
+        """
+        self._record_on_proc = record
+
+    @property
+    def parallel(self):
+        """
+        Return True if this recorder is recording on multiple processes.
+        """
+        return self._parallel
+
+    def startup(self, recording_requester, comm=None):
+        """
+        Prepare for a new run.
 
         Parameters
         ----------
         recording_requester : object
             Object to which this recorder is attached.
+        comm : MPI.Comm or <FakeComm> or None
+            The MPI communicator for the recorder (should be the comm for the Problem).
         """
         self._counter = 0
+
+        if MPI and comm and comm.size > 1:
+            record_on_ranks = comm.allgather(self._record_on_proc)
+            recording_ranks = [rnk for rnk, rec in enumerate(record_on_ranks) if rec is True]
+            if recording_ranks:
+                # recording ranks have been specified
+                self._recording_ranks = recording_ranks
+                self._parallel = len(recording_ranks) > 1
+            else:
+                # default to just record on rank 0
+                self._record_on_proc = comm.rank == 0
+                self._recording_ranks = [0]
 
     def record_metadata(self, recording_requester):
         """
@@ -94,6 +155,21 @@ class CaseRecorder(object):
                          "All system and solver options are recorded automatically.")
 
     def _get_metadata_system(self, system):
+        """
+        Get system metadata.
+
+        Parameters
+        ----------
+        system : System
+            The System for which to record metadata.
+
+        Returns
+        -------
+        dict
+            dictionary of scaling vectors
+        OptionsDictionary
+            dictionary with recordable options for system
+        """
         # Cannot handle PETScVector yet
         from openmdao.api import PETScVector
         if PETScVector and isinstance(system._outputs, PETScVector):
@@ -164,25 +240,22 @@ class CaseRecorder(object):
         **kwargs : keyword args
             Some implementations of record_iteration need additional args.
         """
-        if not self._parallel:
-            if MPI and MPI.COMM_WORLD.rank > 0:
-                raise RuntimeError("Non-parallel recorders should not be recording on ranks > 0")
+        if not self._parallel or self._record_on_proc is True:
+            self._counter += 1
 
-        self._counter += 1
+            self._iteration_coordinate = \
+                recording_requester._recording_iter.get_formatted_iteration_coordinate()
 
-        self._iteration_coordinate = \
-            recording_requester._recording_iter.get_formatted_iteration_coordinate()
-
-        if isinstance(recording_requester, Driver):
-            self.record_iteration_driver(recording_requester, data, metadata)
-        elif isinstance(recording_requester, System):
-            self.record_iteration_system(recording_requester, data, metadata)
-        elif isinstance(recording_requester, Solver):
-            self.record_iteration_solver(recording_requester, data, metadata)
-        elif isinstance(recording_requester, Problem):
-            self.record_iteration_problem(recording_requester, data, metadata)
-        else:
-            raise ValueError("Recorders must be attached to Drivers, Systems, or Solvers.")
+            if isinstance(recording_requester, Driver):
+                self.record_iteration_driver(recording_requester, data, metadata)
+            elif isinstance(recording_requester, System):
+                self.record_iteration_system(recording_requester, data, metadata)
+            elif isinstance(recording_requester, Solver):
+                self.record_iteration_solver(recording_requester, data, metadata)
+            elif isinstance(recording_requester, Problem):
+                self.record_iteration_problem(recording_requester, data, metadata)
+            else:
+                raise ValueError("Recorders must be attached to Drivers, Systems, or Solvers.")
 
     def record_iteration_driver(self, recording_requester, data, metadata):
         """
@@ -259,10 +332,6 @@ class CaseRecorder(object):
         **kwargs : keyword args
             Some implementations of record_derivatives need additional args.
         """
-        if not self._parallel:
-            if MPI and MPI.COMM_WORLD.rank > 0:
-                raise RuntimeError("Non-parallel recorders should not be recording on ranks > 0")
-
         self._iteration_coordinate = \
             recording_requester._recording_iter.get_formatted_iteration_coordinate()
 

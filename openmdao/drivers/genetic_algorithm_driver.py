@@ -44,6 +44,8 @@ class SimpleGADriver(Driver):
 
     Attributes
     ----------
+    _problem_comm : MPI.Comm or None
+        The MPI communicator for the Problem.
     _concurrent_pop_size : int
         Number of points to run concurrently when model is a parallel one.
     _concurrent_color : int
@@ -176,6 +178,8 @@ class SimpleGADriver(Driver):
         MPI.Comm or <FakeComm> or None
             The communicator for the Problem model.
         """
+        self._problem_comm = comm
+
         procs_per_model = self.options['procs_per_model']
         if MPI and self.options['run_parallel']:
 
@@ -199,6 +203,31 @@ class SimpleGADriver(Driver):
         self._concurrent_pop_size = 0
         self._concurrent_color = 0
         return comm
+
+    def _setup_recording(self):
+        """
+        Set up case recording.
+        """
+        if MPI:
+            run_parallel = self.options['run_parallel']
+            procs_per_model = self.options['procs_per_model']
+
+            for recorder in self._rec_mgr:
+                if run_parallel:
+                    # write cases only on procs up to the number of parallel models
+                    # (i.e. on the root procs for the cases)
+                    if procs_per_model == 1:
+                        recorder.record_on_process = True
+                    else:
+                        size = self._problem_comm.size // procs_per_model
+                        if self._problem_comm.rank < size:
+                            recorder.record_on_process = True
+
+                elif self._problem_comm.rank == 0:
+                    # if not running cases in parallel, then just record on proc 0
+                    recorder.record_on_process = True
+
+        super()._setup_recording()
 
     def _get_name(self):
         """
