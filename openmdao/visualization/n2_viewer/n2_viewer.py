@@ -579,8 +579,8 @@ def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddab
     }
 
     HtmlPreprocessor(os.path.join(vis_dir, "index.html"),
-        outfile, allow_overwrite = True, var_dict = html_vars,
-        json_dumps_default = default_noraise, verbose = False).run()
+                     outfile, allow_overwrite=True, var_dict=html_vars,
+                     json_dumps_default=default_noraise, verbose=False).run()
 
     if notebook:
         # display in Jupyter Notebook

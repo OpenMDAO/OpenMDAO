@@ -1,8 +1,12 @@
+"""
+Define the HtmlPreprocessor class to generate a single HTML file from many source files.
+"""
 import base64
 import re
 import zlib
 import json
 from pathlib import Path
+
 
 class HtmlPreprocessor():
     """
@@ -31,28 +35,28 @@ class HtmlPreprocessor():
       is located in unless it is absolute.
 
     Nothing is written until every directive has been successfully processed.
+
+    Parameters
+    ----------
+    start_filename : str
+        The file to begin processing from.
+    output_filename : str
+        The path to the new merged HTML file.
+    allow_overwrite : bool
+        If true, overwrite the output file if it exists.
+    var_dict : dict
+        Dictionary of variable names and values that hpp_pyvar will reference.
+    json_dumps_default : function
+        Passed to json.dumps() as the "default" parameter that gets
+        called for objects that can't be serialized.
+    verbose : bool
+        If True, print some status messages to stdout.
     """
 
-    def __init__(self, start_filename:str, output_filename:str, allow_overwrite=False,
-        var_dict:dict=None, json_dumps_default=None, verbose=False):
+    def __init__(self, start_filename: str, output_filename: str, allow_overwrite=False,
+                 var_dict: dict = None, json_dumps_default=None, verbose=False):
         """
         Configure the preprocessor and validate file paths.
-
-        Parameters
-        ----------
-        start_filename: str
-            The file to begin processing from.
-        output_filename: str
-            The path to the new merged HTML file.
-        allow_overwrite: bool
-            If true, overwrite the output file if it exists.
-        var_dict: dict
-            Dictionary of variable names and values that hpp_pyvar will reference.
-        json_dumps_default: function
-            Passed to json.dumps() as the "default" parameter that gets
-            called for objects that can't be serialized.
-        verbose: bool
-            If True, print some status messages to stdout.
         """
         self.start_path = Path(start_filename)
         if self.start_path.is_file() is False:
@@ -82,14 +86,14 @@ class HtmlPreprocessor():
 
         Parameters
         ----------
-        filename: str
+        filename : str
             The path to the text file to read.
-        binary: bool
-            True if the file is to be opened in binary mode and converted to a base64 str.
-        allow_dup: bool
-            If False, return an empty string for a filename that's been previously loaded.
-        rlvl: int
+        rlvl : int
             Recursion level to help with indentation when verbose is enabled.
+        binary : bool
+            True if the file is to be opened in binary mode and converted to a base64 str.
+        allow_dup : bool
+            If False, return an empty string for a filename that's been previously loaded.
 
         Returns
         -------
@@ -122,12 +126,13 @@ class HtmlPreprocessor():
 
         Parameters
         ----------
-        msg: str
+        msg : str
             The message to print.
-        rlvl: int
+        rlvl : int
             Recursion level to help with indentation when verbose is enabled.
         """
-        if self.verbose: print (rlvl * '--' + msg)
+        if self.verbose:
+            print(rlvl * '--' + msg)
 
     def parse_contents(self, contents: str, rlvl=0) -> str:
         """
@@ -137,9 +142,9 @@ class HtmlPreprocessor():
 
         Parameters
         ----------
-        contents: str
+        contents : str
             The contents of a preloaded text file.
-        rlvl: int
+        rlvl : int
             Recursion level to help with indentation when verbose is enabled.
 
         Returns
@@ -148,7 +153,8 @@ class HtmlPreprocessor():
             The complete contents represented as a base64 string.
         """
         # Find all possible keywords:
-        keyword_regex = '(//|/\*|<\!--)?\s*<<\s*hpp_(\S+)\s+(\S+)(\s+compress|\s+dup)*\s*>>(\*/|-->)?'
+        keyword_regex = \
+            r'(//|/\*|<\!--)?\s*<<\s*hpp_(\S+)\s+(\S+)(\s+compress|\s+dup)*\s*>>(\*/|-->)?'
         matches = re.finditer(keyword_regex, contents)
         rlvl += 1
         new_content = None
@@ -160,27 +166,27 @@ class HtmlPreprocessor():
             keyword = found_directive.group(2)
             arg = found_directive.group(3)
 
-            flags = { 'compress': False, 'dup': False }
+            flags = {'compress': False, 'dup': False}
             if found_directive.group(4) is not None:
                 flags['compress'] = True if 'compress' in found_directive.group(4) else False
                 flags['dup'] = True if 'dup' in found_directive.group(4) else False
 
-            do_compress = False # Change below with directives where it's allowed
+            do_compress = False  # Change below with directives where it's allowed
 
             self.msg(f"Handling {keyword} directive.", rlvl)
 
             if keyword == 'insert':
                 # Recursively insert a plain text file which may also have hpp directives
-                new_content = self.parse_contents(self.load_file(arg, rlvl = rlvl,
-                    allow_dup = flags['dup']), rlvl)
+                new_content = self.parse_contents(self.load_file(arg, rlvl=rlvl,
+                                                  allow_dup=flags['dup']), rlvl)
 
                 if new_content != "":
                     do_compress = True if flags['compress'] else False
 
             elif keyword == 'script':
                 # Recursively insert a JavaScript file which may also have hpp directives
-                new_content = self.parse_contents(self.load_file(arg, rlvl = rlvl,
-                    allow_dup = flags['dup']), rlvl)
+                new_content = self.parse_contents(self.load_file(arg, rlvl=rlvl,
+                                                  allow_dup=flags['dup']), rlvl)
 
                 if new_content != "":
                     new_content = f'<script type="text/javascript">\n{new_content}\n</script>'
@@ -188,33 +194,35 @@ class HtmlPreprocessor():
             elif keyword == 'style':
                 # Recursively insert a CSS file which may also have hpp directives
                 new_content = '<style type="text/css">\n' + \
-                    self.parse_contents(self.load_file(arg, rlvl = rlvl,
-                    allow_dup = flags['dup']), rlvl) + f'\n</style>'
-                
+                              self.parse_contents(self.load_file(arg, rlvl=rlvl,
+                                                  allow_dup=flags['dup']), rlvl) + f'\n</style>'
+
             elif keyword == 'bin2b64':
-                new_content = self.load_file(arg, binary = True, allow_dup = flags['dup'], rlvl = rlvl)
+                new_content = self.load_file(arg, binary=True, allow_dup=flags['dup'], rlvl=rlvl)
 
             elif keyword == 'pyvar':
                 if arg in self.var_dict:
                     val = self.var_dict[arg]
-                    if type(val) in (str, bool, int, float): # Use string representations of primitive types
+                    if type(val) in (str, bool, int, float):
+                        # Use string representations of primitive types
                         new_content = str(self.var_dict[arg])
                         do_compress = True if flags['compress'] else False
                     else:
                         raw_data = json.dumps(val, default=self.json_dumps_default)
                         if flags['compress']:
                             self.msg("Compressing content.", rlvl)
-                            new_content = str(base64.b64encode(zlib.compress(raw_data.encode('utf8'))).decode("ascii"))
+                            compressed_content = zlib.compress(raw_data.encode('utf8'))
+                            new_content = str(base64.b64encode(compressed_content).decode("ascii"))
                         else:
                             new_content = raw_data
 
                 else:
-                    raise ValueError(f"Variable substitution requested for undefined variable {arg}")
+                    raise ValueError(f"Can't substitute for undefined variable {arg}")
 
             else:
                 # Bad keyword
-                raise ValueError(f"Unrecognized HTML preprocessor directive hpp_{keyword} encountered")
-            
+                raise ValueError(f"Unknown HTML preprocessor directive hpp_{keyword}")
+
             if do_compress:
                 self.msg("Compressing new content.", rlvl)
                 new_content = str(base64.b64encode(zlib.compress(new_content)).decode("ascii"))
@@ -228,7 +236,7 @@ class HtmlPreprocessor():
 
     def run(self) -> None:
         """
-        Initiate the preprocessor, then save the result as a new file.
+        Initialize the preprocessor, then save the result as a new file.
         """
         new_html_content = self.parse_contents(self.load_file(self.start_filename))
 
