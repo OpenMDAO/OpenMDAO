@@ -3,6 +3,7 @@ Utility functions related to the reporting system which generates reports by def
 """
 
 from collections import namedtuple, defaultdict
+from functools import wraps
 import pathlib
 import sys
 import os
@@ -12,6 +13,8 @@ from openmdao.utils.hooks import _register_hook, _unregister_hook
 from openmdao.visualization.n2_viewer.n2_viewer import n2, _default_n2_filename
 from openmdao.visualization.scaling_viewer.scaling_report import _default_scaling_filename
 from openmdao.core.constants import _UNDEFINED
+from openmdao.core.problem import Problem
+from openmdao.core.driver import Driver
 
 # Keeping track of the registered reports
 _Report = namedtuple('Report', 'func desc class_name inst_id method pre_or_post')
@@ -28,6 +31,37 @@ def _is_rank_0(prob):
         if rank != 0:
             on_rank0 = False
     return on_rank0
+
+
+def report_function(report_filename):
+    """
+    Decorator for report functions. Handles getting the file path to where the report is written.
+
+    Parameters
+    ----------
+    report_filename : str
+        File name for the report.
+    """
+    def decorate(f):
+        @wraps(f)
+        def _wrapper(inst):
+            if isinstance(inst, Problem):
+                prob = inst
+            elif isinstance(inst, Driver):
+                prob = inst._problem()
+            else:
+                raise ValueError("User defined reports currently can only be registered "
+                                 "on Problems and Drivers")
+
+            problem_reports_dirpath = get_reports_dir(prob)
+            if _is_rank_0(prob):
+                pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
+            user_defined_report_filepath = \
+                str(pathlib.Path(problem_reports_dirpath).joinpath(report_filename))
+
+            f(inst, user_defined_report_filepath)
+        return _wrapper
+    return decorate
 
 
 def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=None):

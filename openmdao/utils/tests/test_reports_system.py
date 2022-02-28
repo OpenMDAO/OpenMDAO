@@ -13,7 +13,7 @@ from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.assert_utils import assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.reports_system import set_default_reports_dir, _reports_dir, register_report, \
-    get_reports_dir, list_reports, clear_reports, run_n2_report, setup_default_reports
+    list_reports, clear_reports, run_n2_report, setup_default_reports, report_function
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
 from openmdao.utils.tests.test_hooks import hooks_active
@@ -91,7 +91,7 @@ class TestReportsSystem(unittest.TestCase):
                 self._problem = None
 
             def solve(self):
-                subprob = om.Problem(name=self.prob_name,reports=self.reports)
+                subprob = om.Problem(name=self.prob_name, reports=self.reports)
                 self._problem = subprob
                 subprob.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
                 subprob.model.add_subsystem('comp', om.ExecComp('y=2*x'))
@@ -148,7 +148,6 @@ class TestReportsSystem(unittest.TestCase):
         setup_default_reports()
         prob = self.setup_and_run_simple_problem(driver=om.DOEDriver(om.PlackettBurmanGenerator()))
 
-
         problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
 
         path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
@@ -170,8 +169,10 @@ class TestReportsSystem(unittest.TestCase):
             sys.stdout = stdout
 
         output = strout.getvalue()
-        self.assertTrue('N2 diagram' in output, '"N2 diagram" expected in list_reports output but was not found')
-        self.assertTrue('Driver scaling report' in output, '"Driver scaling report" expected in list_reports output but was not found')
+        self.assertTrue('N2 diagram' in output,
+                        '"N2 diagram" expected in list_reports output but was not found')
+        self.assertTrue('Driver scaling report' in output,
+                        '"Driver scaling report" expected in list_reports output but was not found')
 
     @hooks_active
     def test_report_generation_no_reports_using_env_var(self):
@@ -233,17 +234,13 @@ class TestReportsSystem(unittest.TestCase):
         setup_default_reports()  # So it sees the OPENMDAO_REPORTS var
         user_report_filename = 'user_report.txt'
 
-        def user_defined_report(prob):
-            problem_reports_dirpath = get_reports_dir(prob)
-            user_report_filepath = str(
-                pathlib.Path(problem_reports_dirpath).joinpath(user_report_filename))
-
-            pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
-
-            with open(user_report_filepath, "w") as f:
+        @report_function(user_report_filename)
+        def user_defined_report(prob, report_filepath):
+            with open(report_filepath, "w") as f:
                 f.write(f"Do some reporting on the Problem, {prob._name}\n")
 
-        register_report("User defined report", user_defined_report, "user defined report description",
+        register_report("User defined report", user_defined_report,
+                        "user defined report description",
                         'Problem', 'setup', 'pre')
 
         prob = self.setup_and_run_simple_problem()
@@ -262,16 +259,12 @@ class TestReportsSystem(unittest.TestCase):
         self.count = 0
 
         # A simple report
-        def user_defined_report(prob):
-            problem_reports_dirpath = get_reports_dir(prob)
-            pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
+        user_report_filename = 'user_defined_{count}.txt'
 
-            # Use the self.count value to give the reports a unique name
-            # Ideally we would be able to pass a filename in when registering a report
-            #   but report registration does not support kwargs yet
-            user_defined_report_filepath = str(pathlib.Path(problem_reports_dirpath).joinpath(f"user_defined_{self.count}.txt"))
-
-            with open(user_defined_report_filepath, "w") as f:
+        @report_function(user_report_filename)
+        def user_defined_report(prob, report_filepath):
+            report_filepath = report_filepath.format(count=self.count)
+            with open(report_filepath, "w") as f:
                 f.write(f"Do some reporting on the Problem, {prob._name}\n")
             self.count += 1
 
@@ -285,8 +278,8 @@ class TestReportsSystem(unittest.TestCase):
         problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
 
         self.count = 0
-        for method in ['setup', 'final_setup', 'run_driver']:
-            for pre_or_post in ['pre', 'post']:
+        for _ in ['setup', 'final_setup', 'run_driver']:
+            for _ in ['pre', 'post']:
                 user_report_filename = f"user_defined_{self.count}.txt"
                 path = pathlib.Path(problem_reports_dir).joinpath(user_report_filename)
                 self.assertTrue(path.is_file(),
@@ -378,7 +371,6 @@ class TestReportsSystem(unittest.TestCase):
         self.assertFalse(path.is_file(),
                          f'The scaling report file, {str(path)}, was found but should not have')
 
-
     @hooks_active
     def test_report_generation_basic_problem_reports_argument_n2_only(self):
         setup_default_reports()
@@ -457,8 +449,9 @@ class TestReportsSystemMPI(unittest.TestCase):
 
         os.environ.pop('OPENMDAO_REPORTS', None)
         os.environ.pop('OPENMDAO_REPORTS_DIR', None)
-        # We need to remove the TESTFLO_RUNNING environment variable for these tests to run. The reports code
-        #   checks to see if TESTFLO_RUNNING is set and will not do anything if it is set
+        # We need to remove the TESTFLO_RUNNING environment variable for these tests to run.
+        # The reports code checks to see if TESTFLO_RUNNING is set and will not do anything
+        # if it is set.
         # But we need to remember whether it was set so we can restore it
         self.testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
         clear_reports()
@@ -472,7 +465,7 @@ class TestReportsSystemMPI(unittest.TestCase):
             os.environ['TESTFLO_RUNNING'] = self.testflo_running
 
     @hooks_active
-    def test_reports_system_mpi_basic(self): #  example taken from TestScipyOptimizeDriverMPI
+    def test_reports_system_mpi_basic(self):  # example taken from TestScipyOptimizeDriverMPI
         setup_default_reports()
 
         prob = om.Problem()
@@ -488,7 +481,8 @@ class TestReportsSystemMPI(unittest.TestCase):
         prob.setup()
         prob.set_solver_print(level=0)
 
-        msg = "ScipyOptimizeDriver: The scaling report currently is not supported when running under MPI."
+        msg = "ScipyOptimizeDriver: The scaling report currently is not " \
+              "supported when running under MPI."
         with assert_warning(om.MPIWarning, msg):
             prob.run_driver()
 
