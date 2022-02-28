@@ -12,29 +12,7 @@ class HtmlPreprocessor():
     """
     Recursively substitute and insert source files to produce a single HTML file.
 
-    Source files contain text with directives in the form: <<directive value_arg>>
-
-    Recognized directives are:
-    <<hpp_insert path/to/file [compress] [dup]>>: Paste path/to/file verbatim into the text.
-    <<hpp_script path/to/script [dup]>>: Insert path/to/script between script tags.
-    <<hpp_style path/to/css [dup]>>: Insert path/to/css between style tags.
-    <<hpp_bin2b64 path/to/file [dup]>>: Convert a binary file to a b64 string and insert it.
-    <<hpp_pyvar variable_name [compress]>>: Insert the string value of the named Python variable.
-        If the referenced variable is non-primitive, it's converted to JSON.
-
-    Flags:
-    compress: The replacement content will be compressed and converted to
-        a base64 string. It's up to the JavaScript code to decode and uncompress it.
-    dup: If a file has already been included once, it will be ignored on subsequent inclusions
-        unless the dup flag is used.
-
-    - Commented directives (//, /* */, or <!-- -->) will replace the entire comment.
-      When a directive is commented, it can only be on a single line or the comment-ending
-      chars will not be replaced.
-    - All paths in the directives are relative to the directory that the start file
-      is located in unless it is absolute.
-
-    Nothing is written until every directive has been successfully processed.
+    Source files contain text with directives in the form: <<hpp_directive arg [flag1] [flag2]>>
 
     Parameters
     ----------
@@ -73,6 +51,45 @@ class HtmlPreprocessor():
     json_dumps_default : function
         Passed to json.dumps() as the "default" parameter that gets
         called for objects that can't be serialized.
+
+
+    Notes
+    -----
+    Recognized Directives
+
+    <<hpp_insert path/to/file [compress] [dup]>> :
+        Paste path/to/file verbatim into the text.
+    <<hpp_script path/to/script [dup]>> :
+        Insert path/to/script between script tags.
+    <<hpp_style path/to/css [dup]>> :
+        Insert path/to/css between style tags.
+    <<hpp_bin2b64 path/to/file [dup]>> :
+        Convert a binary file to a b64 string and insert it.
+    <<hpp_pyvar variable_name [compress]>> :
+        Insert the string value of the named Python variable. If the referenced
+        variable is non-primitive, it's converted to JSON.
+
+    Notes
+    -----
+    Flags
+
+    compress :
+        The replacement content will be compressed and converted to
+        a base64 string. It's up to the JavaScript code to decode and uncompress it.
+    dup :
+        If a file has already been included once, it will be ignored on subsequent inclusions
+        unless the dup flag is used.
+
+    Notes
+    -----
+    Commented directives (//, /* */, or <!-- -->) will replace the entire comment.
+    When a directive is commented, it can only be on a single line or the comment-ending
+    chars will not be replaced.
+
+    All paths in the directives are relative to the directory that the start file
+    is located in unless it is absolute.
+
+    Nothing is written until every directive has been successfully processed.
     """
 
     def __init__(self, start_filename: str, output_filename: str, allow_overwrite=False,
