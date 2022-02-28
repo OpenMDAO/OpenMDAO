@@ -23,7 +23,6 @@ from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE, 
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import _full_slice
-from openmdao.utils.indexer import _index_sort
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
@@ -369,8 +368,6 @@ class System(object):
     _tot_jac : __TotalJacInfo or None
         If a total jacobian is being computed and this is the top level System, this will
         be a reference to the _TotalJacInfo object.
-    _resp_indices_map : dict
-        Dictionary of responses and their indices to warn against overlap
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -523,7 +520,6 @@ class System(object):
         self._coloring_info = _DEFAULT_COLORING_META.copy()
         self._first_call_to_linearize = True   # will check in first call to _linearize
         self._tot_jac = None
-        self._resp_indices_map = {}
 
     @property
     def msginfo(self):
@@ -2739,7 +2735,8 @@ class System(object):
         flat_indices : bool
             If True, interpret specified indices as being indices into a flat source array.
         alias : str
-            Name used when adding multiple responses.
+            Alias for this response. Necessary when adding multiple responses on different
+            indices or slices of a single variable.
         """
         # Name must be a string
         if not isinstance(name, str):
@@ -2921,7 +2918,8 @@ class System(object):
         flat_indices : bool
             If True, interpret specified indices as being indices into a flat source array.
         alias : str
-            Name used when adding multiple responses.
+            Alias for this response. Necessary when adding multiple constraints on different
+            indices or slices of a single variable.
 
         Notes
         -----
@@ -2976,7 +2974,8 @@ class System(object):
         flat_indices : bool
             If True, interpret specified indices as being indices into a flat source array.
         alias : str
-            Name used when adding multiple responses.
+            Alias for this response. Necessary when adding multiple objectives on different
+            indices or slices of a single variable.
 
         Notes
         -----

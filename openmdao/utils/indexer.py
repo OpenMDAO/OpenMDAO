@@ -11,37 +11,6 @@ from openmdao.utils.general_utils import shape2tuple
 from openmdao.utils.om_warnings import issue_warning, OMDeprecationWarning
 
 
-def _index_sort(indices):
-    """
-    Convert any index to a numpy array index.
-
-    Parameters
-    ----------
-    indices : Indexer
-        The index array to be represented as a slice.
-
-    Returns
-    -------
-    np.array
-    """
-    if indices is not None:
-        indices = indices()
-        if isinstance(indices, slice):
-            if indices.start is None:
-                start = 0
-            else:
-                start = indices.start
-            if indices.stop is None:
-                end = -2
-            else:
-                end = indices.stop
-            return np.array(range(start, end))
-        elif isinstance(indices, int):
-            return np.array([indices])
-        else:
-            return indices
-
-
 def array2slice(arr):
     """
     Try to convert an array to slice.

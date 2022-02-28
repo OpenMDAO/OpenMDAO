@@ -200,7 +200,7 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
                     val = np.ones(5)
                     self.declare_partials(of='con', wrt='theta_con_g', rows=row, cols=col, val=val)
 
-                    row += 5
+                    row = np.arange(5) + 15
                     self.declare_partials(of='con', wrt='delta_theta_con_g', rows=row, cols=col, val=val)
                     self.declare_partials(of='con', wrt='l_conx_g', rows=np.array([20]), cols=np.array([0]), val=np.array([1.0]))
                     self.declare_partials(of='con', wrt='y', rows=np.array([21]), cols=np.array([0]), val=np.array([1.0]))
