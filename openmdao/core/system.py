@@ -1639,7 +1639,7 @@ class System(object):
 
                     if name not in used_idx and path not in used_idx:
                         size = self._var_allprocs_abs2meta['output'][path]['global_size']
-                        used_idx[path] = np.zeros(size)
+                        used_idx[path] = np.zeros(size, dtype=int)
 
                         # Source won't be in aliases, but we need its indices if a constraint is
                         # declared without an alias.
