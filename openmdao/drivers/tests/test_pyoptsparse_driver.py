@@ -2447,7 +2447,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         model.add_objective('f_sum', index=-1)
 
-        prob.driver = om.pyOptSparseDriver(optimizer='SNOPT')
+        prob.driver = om.pyOptSparseDriver(optimizer='SLSQP')
 
         prob.setup(force_alloc_complex=True)
         prob.run_model()
