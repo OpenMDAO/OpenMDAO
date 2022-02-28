@@ -856,10 +856,11 @@ class System(object):
 
         self._top_level_post_connections(mode)
 
-        self._problem_meta['relevant'] = self._init_relevance(mode)
         self._setup_var_sizes()
 
         self._top_level_post_sizes()
+
+        self._problem_meta['relevant'] = self._init_relevance(mode)
 
         # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
@@ -1600,19 +1601,6 @@ class System(object):
         """
         pass
 
-    def _indices_check(self, indices, abs_meta_idx_arr, msg):
-        """
-        Check for overlapping indices and throw error if there is.
-        """
-        if isinstance(indices, (list, np.ndarray)):
-            for idx in indices:
-                if abs_meta_idx_arr[idx]:
-                    raise RuntimeError(msg)
-
-        elif isinstance(indices, slice):
-            if any(abs_meta_idx_arr[indices.start:indices.stop + 1]):
-                raise RuntimeError(msg)
-
     def _init_relevance(self, mode):
         """
         Create the relevance dictionary.
@@ -1637,68 +1625,47 @@ class System(object):
             aliases = {key: value for key, value in responses.items() if value['path']}
             if len(aliases) > 0:
 
-                used_indices = {}
-                prom2abs_names = {}
+                used_idx = {}
                 discrete = self._var_allprocs_discrete
-
-                for data in self._var_allprocs_abs2meta.values():
-                    for name, val in data.items():
-                        if name in responses and responses[name]['flat_indices']:
-                            used_indices[name] = np.zeros(val['shape'], dtype='bool').ravel()
-                        else:
-                            used_indices[name] = np.zeros(val['shape'], dtype='bool')
-
-                for data in self._var_allprocs_prom2abs_list.values():
-                    for name, val in data.items():
-                        prom2abs_names[name] = val
 
                 for name in aliases:
 
                     if name in discrete['input'] or name in discrete['output']:
                         continue
 
-                    if responses[name]['path'] is not None:
-                        path_name = responses[name]['path']
-                    else:
-                        path_name = None
-
-                    if path_name is not None and path_name not in responses and \
-                       prom2abs_names[path_name][0] not in responses:
-                        raise RuntimeError(f"Alias '{name}' is not needed when only "
-                                           f"adding one constraint to model")
-
                     path = responses[name]['path']
-                    indices = responses[name]['indices']
-                    msg = (f"{self.msginfo}: '{name}' indices are overlapping "
-                           f"constraint/objective '{path}'.")
+                    if path is None:
+                        path = name
 
-                    if self.comm.size > 1:
-                        distrib_idx_arr = self.comm.allgather(used_indices)
-                        used_indices = distrib_idx_arr[0]
-                        if len(distrib_idx_arr) > 1:
-                            for idx in distrib_idx_arr:
-                                for key in idx:
-                                    if key in used_indices:
-                                        used_indices[key] = np.concatenate((used_indices[key].ravel(),
-                                                                            idx[key].ravel()))
-                                    else:
-                                        used_indices[key] = idx[key]
+                    if name not in used_idx and path not in used_idx:
+                        size = self._var_allprocs_abs2meta['output'][path]['global_size']
+                        used_idx[path] = np.zeros(size)
 
-                    if path is not None:
-                        name = path
+                        # Source won't be in aliases, but we need its indices if a constraint is
+                        # declared without an alias.
+                        if path in responses:
+                            idx = responses[path].get('indices')
 
-                    try:
-                        abs_meta_idx_arr = used_indices[name]
-                    except KeyError:
-                        prom_name = prom2abs_names[name][0]
-                        abs_meta_idx_arr = used_indices[prom_name]
+                            if idx is None:
+                                used_idx[path][:] += 1
+                            else:
+                                used_idx[path][idx.flat()] += 1
+                        else:
+                            # If an alias is in responses, but the path isn't, then we need to
+                            # make sure the path is present for the relevancy calculation.
+                            responses[path] = responses[name]
 
-                    if indices is not None:
-                        indices = _index_sort(indices)
-                        if path is not None:
-                            self._indices_check(indices, abs_meta_idx_arr, msg)
-                        for idx in indices:
-                            abs_meta_idx_arr[idx] = True
+                    indices = responses[name].get('indices')
+                    if indices is None:
+                        used_idx[path][:] += 1
+                    else:
+                        used_idx[path][indices.flat()] += 1
+
+                    overlap = np.where(used_idx[path] > 1)
+                    if len(overlap[0]) > 0:
+                        msg = (f"{self.msginfo}: '{name}' indices are overlapping "
+                               f"constraint/objective '{path}'.")
+                        raise RuntimeError(msg)
 
             return self.get_relevant_vars(desvars, responses, mode)
 
@@ -3245,12 +3212,16 @@ class System(object):
                 if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
                     self._problem_meta['using_par_deriv_color'] = True
 
+                path = data['path']
                 if name in prom2abs_out:
-                    if data['path'] is None:
+                    if path is None:
                         abs_name = prom2abs_out[name][0]
                     else:
-                        if data['path'] in prom2abs_out:
-                            data['path'] = prom2abs_out[data['path']][0]
+
+                        # In-place update to absolute path.
+                        if path in prom2abs_out:
+                            data['path'] = prom2abs_out[path][0]
+
                         abs_name = data['name']
                     out[abs_name] = data
                     out[abs_name]['ivc_source'] = abs_name
@@ -3260,14 +3231,21 @@ class System(object):
                 else:
                     # A constraint can be on an auto_ivc input, so use connected
                     # output name.
-                    if data['path'] is None:
+                    if path is None:
                         in_abs = prom2abs_in[name][0]
                         ivc_path = conns[in_abs]
                     else:
                         in_abs = data['name']
-                        if data['path'] in prom2abs_out:
-                            data['path'] = prom2abs_out[data['path']][0]
+
+                        # In-place update to absolute path.
+                        if path in prom2abs_out:
+                            data['path'] = prom2abs_out[path][0]
+                        elif path in prom2abs_in:
+                            path_abs = prom2abs_in[path][0]
+                            data['path'] = conns[path_abs]
+
                         ivc_path = data['path']
+
                     distrib = ivc_path in abs2meta_out and abs2meta_out[ivc_path]['distributed']
                     if use_prom_ivc:
                         out[name] = data

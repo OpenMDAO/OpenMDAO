@@ -2270,7 +2270,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.run_driver()
 
-    def test_multiple_constraints(self):
+    def test_constraint_alias(self):
         p = om.Problem()
 
         exec = om.ExecComp(['y = x**2',
@@ -2318,29 +2318,6 @@ class TestPyoptSparse(unittest.TestCase):
         msg = "Constraint 'exec.z' already exists. Use the 'alias' argument to apply a second constraint"
         with self.assertRaises(RuntimeError) as msg:
             p.model.add_constraint('exec.z', indices=[-1], lower=20)
-
-    def test_single_constraint_with_alias(self):
-        p = om.Problem()
-
-        exec = om.ExecComp(['y = x**2',
-                            'z = a + x**2'],
-                        a={'shape': (1,)},
-                        y={'shape': (101,)},
-                        x={'shape': (101,)},
-                        z={'shape': (101,)})
-
-        p.model.add_subsystem('exec', exec)
-
-        p.model.add_design_var('exec.a', lower=-1000, upper=1000)
-        p.model.add_objective('exec.y', index=50)
-        p.model.add_constraint('exec.z', indices=[-1], lower=20, alias="ALIAS_TEST")
-
-        p.driver = om.pyOptSparseDriver()
-        p.driver.options['optimizer'] = OPTIMIZER
-
-        msg = "Alias 'ALIAS_TEST' is not needed when only adding one constraint to model"
-        with self.assertRaises(RuntimeError) as msg:
-            p.setup()
 
     def test_obj_and_con_same_var_different_indices(self):
 
@@ -2441,6 +2418,52 @@ class TestPyoptSparse(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(ctx.exception), msg)
+
+    def test_constraint_aliases_standalone(self):
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+        ivc.add_output('y', np.ones((size, )))
+        ivc.add_output('a', -3.0 + 0.6 * np.arange(size))
+
+        model.add_subsystem('p', ivc, promotes=['*'])
+        model.add_subsystem("parab", DistParab(arr_size=size, deriv_type='dense'), promotes=['*'])
+
+        model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
+                                                   f_sum=np.ones((size, )),
+                                                   f_xy=np.ones((size, ))),
+                                promotes_outputs=['*'])
+
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+
+        model.add_constraint('f_xy', indices=[5], flat_indices=True, alias='a1', lower=10.0)
+        model.add_constraint('f_xy', indices=[1], flat_indices=True, alias='a2', lower=0.5)
+
+        model.add_objective('f_sum', index=-1)
+
+        prob.driver = om.pyOptSparseDriver(optimizer='SNOPT')
+
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+
+        desvar = prob.driver.get_design_var_values()
+        con = prob.driver.get_constraint_values()
+
+        assert_near_equal(con['a1'], 24.0)
+        assert_near_equal(con['a2'], 24.96)
+
+        totals = prob.check_totals(method='cs', out_stream=None)
+        assert_check_totals(totals)
+
+        # Makes sure relevancy works in this case.
+        prob.run_driver()
+        assert_near_equal(prob.get_val('f_sum')[-1], 160.6500)
 
     def test_fwd_rev_obj_constraint(self):
         # Test equality constraint

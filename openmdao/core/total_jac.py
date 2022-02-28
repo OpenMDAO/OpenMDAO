@@ -476,7 +476,6 @@ class _TotalJacInfo(object):
             self.src_petsc[mode] = src_vec = PETSc.Vec().createWithArray(np.zeros(rowcol_size,
                                                                                   dtype=float),
                                                                          comm=self.comm)
-            print('scatter', full_src_inds, full_tgt_inds)
             return PETSc.Scatter().create(src_vec, src_indexset, tgt_vec, tgt_indexset)
 
     def _get_dict_J(self, J, wrt, prom_wrt, of, prom_of, wrt_meta, of_meta, return_format):
@@ -820,7 +819,6 @@ class _TotalJacInfo(object):
                 else:
                     sz = meta['size']
 
-            print('map', name, path, indices)
             if (path in abs2idx and path in slices and path not in self.remote_vois):
                 var_idx = abs2idx[path]
                 slc = slices[path]
@@ -862,7 +860,6 @@ class _TotalJacInfo(object):
             sol_idxs = np.zeros(0, dtype=INT_DTYPE)
             jac_idxs = np.zeros(0, dtype=INT_DTYPE)
 
-        print('jinds', name2jinds)
         return sol_idxs, jac_idxs, name2jinds
 
     def _get_tuple_map(self, names, vois, abs2meta_out):
@@ -1168,13 +1165,12 @@ class _TotalJacInfo(object):
         """
         if self.get_remote and mode == 'fwd':
             if self.jac_scatters[mode] is not None:
-                print('J before', i, self.J)
                 self.src_petsc[mode].array = self.J[:, i]
                 self.tgt_petsc[mode].array[:] = self.J[:, i]
                 self.jac_scatters[mode].scatter(self.src_petsc[mode], self.tgt_petsc[mode],
                                                 addv=False, mode=False)
                 self.J[:, i] = self.tgt_petsc[mode].array
-                print('J after', i, self.J)
+
         elif mode == 'rev':
             # for rows corresponding to serial 'of' vars, we need to correct for
             # duplication of their seed values by dividing by the number of duplications.
