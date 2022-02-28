@@ -798,6 +798,8 @@ class Group(System):
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
         conns = self._conn_global_abs_in2out
 
+        self._resolve_src_indices()
+
         if self.comm.size > 1:
             abs2idx = self._var_allprocs_abs2idx
             all_abs2meta = self._var_allprocs_abs2meta
@@ -825,7 +827,7 @@ class Group(System):
                 for a in updated:
                     all_abs2meta_in[a]['has_src_indices'] = True
 
-        self._resolve_src_indices()
+        # self._resolve_src_indices()
 
         abs2meta_in = self._var_abs2meta['input']
         allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
@@ -999,16 +1001,16 @@ class Group(System):
         abs2prom = self._var_abs2prom['input']
         tree_level = len(self.pathname.split('.')) if self.pathname else 0
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
-        promseen = set()
+        seen = set()
 
         for tgt in self._var_abs2meta['input']:
             if tgt in abs_in2prom_info:
-                plist = abs_in2prom_info[tgt]
                 prom = abs2prom[tgt]
-                if prom in promseen:
+                if prom in seen:
                     continue
-                promseen.add(prom)
+                seen.add(prom)
 
+                plist = abs_in2prom_info[tgt]
                 pinfo, gshape, _ = plist[tree_level]
                 if pinfo is not None:
                     inds, flat, shape = pinfo
@@ -1094,6 +1096,7 @@ class Group(System):
                             abs2prom[io][abs_name] = prom_name
 
             if isinstance(subsys, Group):
+                # propagate any subsystem 'set_input_defaults' info up to this Group
                 subprom2prom = var_maps['input']
                 for sub_prom, metalist in subsys._group_inputs.items():
                     if sub_prom in subprom2prom:
@@ -1289,17 +1292,19 @@ class Group(System):
                                                       f"{gname} to remove the ambiguity.")
 
             # update all metadata dicts with any missing metadata that was filled in elsewhere
+            # and update src_shape and use_tgt in abs_in2prom_info
             for meta in metalist:
-                meta.update(fullmeta)
                 tree_level = len(meta['path'].split('.')) if meta['path'] else 0
+                prefix = meta['path'] + '.' if meta['path'] else ''
                 if 'src_shape' in meta:
                     # Now update the global promotes info dict
                     for tgt in prom2abs_in[prom]:
-                        if tgt in abs_in2prom_info:
+                        if tgt in abs_in2prom_info and tgt.startswith(prefix):
                             info = abs_in2prom_info[tgt][tree_level]
                             info[1] = meta['src_shape']
                             if meta['auto']:
                                 info[2] = meta['use_tgt']
+                meta.update(fullmeta)
 
     def _find_vars_to_gather(self):
         """
@@ -3247,8 +3252,9 @@ class Group(System):
             start_val = val = np.ones(val_shape)
 
         for tgt in tgts:
+            # if tgt in vars_to_gather and tgt not in abs2meta_in:
             if tgt in vars_to_gather and self.comm.rank != vars_to_gather[tgt]:
-                if info is None or 0 > max_size:
+                if info is None or max_size < 0:
                     info = (tgt, np.zeros(0), True)
                     max_size = 0
                 continue
@@ -3351,40 +3357,6 @@ class Group(System):
                                "a call to set_input_defaults, or by adding "
                                "an IndepVarComp as the source.")
         return info
-
-    def _make_tgt_tree(self, tgts):
-        tree = ({}, set())
-        partslist = sorted([(s, s.split('.')) for s in tgts], key=lambda x: len(x[1]))
-        subsystems = self._subsystems_allprocs
-        for tgt, parts in partslist:
-            node = tree
-            node[1].add(self._var_allprocs_abs2prom['input'][tgt])
-            last = len(parts) - 1
-            subs = subsystems
-            for i, s in enumerate(parts):
-                prom = None
-                if subs is not None and s in subs:
-                    sub = subs[s].system
-                    if sub._is_local:
-                        prom = sub._var_allprocs_abs2prom['input'][tgt]
-                        subs = sub._subsystems_allprocs
-                else:
-                    sub = None
-
-                if s in node:
-                    node, tset = node[s]
-                    if prom:
-                        tset.add(prom)
-                else:
-                    if i == last:
-                        n = node[s] = None
-                    else:
-                        n = node[s] = ({}, set())
-                        node = n[0]
-                        if prom:
-                            n[1].add(prom)
-
-        return tree
 
     def _setup_auto_ivcs(self, mode):
         # only happens at top level
@@ -3678,9 +3650,12 @@ class Group(System):
                     names.extend(s._ordered_comp_name_iter())
                 else:
                     names.append(s.pathname)
+            seen = set()
             for ranknames in self.comm.allgather(names):
                 for name in ranknames:
-                    yield name
+                    if name not in seen:
+                        yield name
+                        seen.add(name)
         else:
             for s in self._subsystems_myproc:
                 if isinstance(s, Group):

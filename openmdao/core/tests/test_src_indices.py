@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
 from openmdao.utils.om_warnings import  OMDeprecationWarning
 
 class Inner(om.Group):
@@ -431,6 +431,63 @@ class SrcIndicesMPITestCase(unittest.TestCase):
             assert_near_equal(p['par.g1.C1.y'], reduced_inp[:, 1]*3.)
         elif commsize == 1 or p.comm.rank == 1:
             assert_near_equal(p['par.g2.C2.y'], reduced_inp.flatten()[[1,5]]*2.)
+
+
+class SrcIndicesSerialMultipoint2(unittest.TestCase):
+
+    def test_multipoint2(self):
+        p = om.Problem()
+        par = p.model.add_subsystem('par', om.ParallelGroup())
+
+        g1 = par.add_subsystem('g1', om.Group(), promotes_inputs=['x'])
+        g1.add_subsystem('C1', om.ExecComp('y = 3*x', shape=1))
+        g1.promotes('C1', inputs=['x'], src_indices=[0], src_shape=(2,))
+
+        g2 = par.add_subsystem('g2', om.Group(), promotes_inputs=['x'])
+        g2.add_subsystem('C2', om.ExecComp('y = 2*x', shape=1))
+        g2.promotes('C2', inputs=['x'], src_indices=[1], src_shape=(2,))
+
+        p.model.set_input_defaults('par.x', val=[7., -5.])
+
+        p.setup()
+        p.run_model()
+
+
+class Multipoint2TooManyProcs(SrcIndicesSerialMultipoint2):
+    N_PROCS = 3
+
+
+class SrcIndicesSerialMultipoint3(unittest.TestCase):
+
+    def test_multipoint2(self):
+        p = om.Problem()
+        par = p.model.add_subsystem('par', om.ParallelGroup())
+
+        g1 = par.add_subsystem('g1', om.Group(), promotes_inputs=['x'])
+        g1.add_subsystem('C1', om.ExecComp('y = 3*x', shape=1))
+        g1.promotes('C1', inputs=['x'], src_indices=[0], src_shape=(3,))
+
+        g2 = par.add_subsystem('g2', om.Group(), promotes_inputs=['x'])
+        g2.add_subsystem('C2', om.ExecComp('y = 2*x', shape=1))
+        g2.promotes('C2', inputs=['x'], src_indices=[1], src_shape=(3,))
+
+        g3 = par.add_subsystem('g3', om.Group(), promotes_inputs=['x'])
+        g3.add_subsystem('C3', om.ExecComp('y = 5*x', shape=1))
+        g3.promotes('C3', inputs=['x'], src_indices=[2], src_shape=(3,))
+
+        p.model.set_input_defaults('par.x', val=[7., -5., 2.])
+
+        p.setup()
+        p.run_model()
+
+        assert_check_totals(p.check_totals(of=['par.g1.C1.y', 'par.g2.C2.y', 'par.g3.C3.y'], wrt=['par.x']))
+
+class Multipoint3SameProcs(SrcIndicesSerialMultipoint3):
+    N_PROCS = 3
+
+
+class Multipoint3TooManyProcs(SrcIndicesSerialMultipoint3):
+    N_PROCS = 4
 
 
 if __name__ == '__main__':
