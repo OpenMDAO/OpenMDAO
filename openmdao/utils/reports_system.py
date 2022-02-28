@@ -35,12 +35,17 @@ def _is_rank_0(prob):
 
 def report_function(report_filename):
     """
-    Decorator for report functions. Handles getting the file path to where the report is written.
+    Decorate report functions. Handles getting the file path to where the report is written.
 
     Parameters
     ----------
     report_filename : str
         File name for the report.
+
+    Returns
+    -------
+    function
+        The wrapper function.
     """
     def decorate(f):
         @wraps(f)
