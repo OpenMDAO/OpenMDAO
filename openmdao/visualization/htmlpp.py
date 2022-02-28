@@ -132,13 +132,12 @@ class HtmlPreprocessor():
         self.loaded_filenames.append(pathname)
         self.msg(f"Loading file {pathname}.", rlvl)
 
-        with open(pathname, 'rb' if binary else 'r') as f:
-            file_contents = f.read()
-
         if binary:
-            file_contents = str(base64.b64encode(file_contents).decode("ascii"))
+            with open(pathname, 'rb') as f:
+                file_contents = str(base64.b64encode(f.read()).decode('UTF-8'))
         else:
-            file_contents = str(file_contents)
+            with open(pathname, 'r', encoding='UTF-8') as f:
+                file_contents = str(f.read())
 
         return file_contents
 
@@ -233,8 +232,8 @@ class HtmlPreprocessor():
                         raw_data = json.dumps(val, default=self.json_dumps_default)
                         if flags['compress']:
                             self.msg("Compressing content.", rlvl)
-                            compressed_content = zlib.compress(raw_data.encode('utf8'))
-                            new_content = str(base64.b64encode(compressed_content).decode("ascii"))
+                            compressed_content = zlib.compress(raw_data.encode('UTF-8'))
+                            new_content = str(base64.b64encode(compressed_content).decode("UTF-8"))
                         else:
                             new_content = raw_data
 
@@ -247,7 +246,7 @@ class HtmlPreprocessor():
 
             if do_compress:
                 self.msg("Compressing new content.", rlvl)
-                new_content = str(base64.b64encode(zlib.compress(new_content)).decode("ascii"))
+                new_content = str(base64.b64encode(zlib.compress(new_content)).decode("UTF-8"))
 
             if new_content is not None:
                 self.msg(f"Replacing directive '{full_match}' with new content.", rlvl)
@@ -266,6 +265,6 @@ class HtmlPreprocessor():
         if path.is_file() and not self.allow_overwrite:
             raise FileExistsError(f"Error: {self.output_filename} already exists")
 
-        output_file = open(self.output_filename, "w")
+        output_file = open(self.output_filename, "w", encoding='UTF-8')
         output_file.write(new_html_content)
         output_file.close()
