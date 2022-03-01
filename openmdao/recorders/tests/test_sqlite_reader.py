@@ -3332,18 +3332,18 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         reader = om.CaseReader(self.filename)
 
-        self.assertEqual(set(reader.list_sources(out_stream=None)), {
-            'root.cycle1.nonlinear_solver',
-            'root.cycle1.cycle1_1.nonlinear_solver',
-            'root.cycle1.cycle1_2.nonlinear_solver',
-            'root.cycle2.nonlinear_solver'
-        })
         self.assertEqual(reader.list_cases(out_stream=None), [
             'rank0:root._solve_nonlinear|0|NLRunOnce|0|cycle1._solve_nonlinear|0|NLRunOnce|0|cycle1.cycle1_1._solve_nonlinear|0|NLRunOnce|0',
             'rank0:root._solve_nonlinear|0|NLRunOnce|0|cycle1._solve_nonlinear|0|NLRunOnce|0|cycle1.cycle1_2._solve_nonlinear|0|NLRunOnce|0',
             'rank0:root._solve_nonlinear|0|NLRunOnce|0|cycle1._solve_nonlinear|0|NLRunOnce|0',
             'rank0:root._solve_nonlinear|0|NLRunOnce|0|cycle2._solve_nonlinear|0|NLRunOnce|0'
         ])
+        self.assertEqual(set(reader.list_sources(out_stream=None)), {
+            'root.cycle1.nonlinear_solver',
+            'root.cycle1.cycle1_1.nonlinear_solver',
+            'root.cycle1.cycle1_2.nonlinear_solver',
+            'root.cycle2.nonlinear_solver'
+        })
 
 
 @use_tempdirs
