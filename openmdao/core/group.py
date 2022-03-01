@@ -3440,20 +3440,26 @@ class Group(System):
                 val = gmeta['val']
 
             if self.comm.size > 1:
-                chosen_tgts = self.comm.allgather((tgt, remote))
                 tgt_local_procs = set()
-                hasrem = False
-                for t, rem in chosen_tgts:
-                    hasrem |= rem
+                # do a preliminary check to avoid the allgather if we can
+                for t in tgts:
                     if t in vars2gather:
                         tgt_local_procs.add(vars2gather[t])
-                if hasrem and len(tgt_local_procs) > 1:
-                    # the 'local' val can only exist on 1 proc (distrib auto_ivcs not allowed),
-                    # so must consolidate onto one proc
-                    rank = sorted(tgt_local_procs)[0]
-                    if rank != self.comm.rank:
-                        val = np.zeros(0)
-                        remote = True
+                    else:   # t is duplicated in all procs
+                        break
+                else:
+                    if len(tgt_local_procs) < self.comm.size:  # don't have a local var in each proc
+                        tgt_local_procs = set()
+                        for t in self.comm.allgather(tgt):
+                            if t in vars2gather:
+                                tgt_local_procs.add(vars2gather[t])
+                        if len(tgt_local_procs) > 1:
+                            # the 'local' val can only exist on 1 proc (distrib auto_ivcs not
+                            # allowed), so must consolidate onto one proc
+                            rank = sorted(tgt_local_procs)[0]
+                            if rank != self.comm.rank:
+                                val = np.zeros(0)
+                                remote = True
 
             relsrc = src.rsplit('.', 1)[-1]
             auto_ivc.add_output(relsrc, val=np.atleast_1d(val), units=units)
