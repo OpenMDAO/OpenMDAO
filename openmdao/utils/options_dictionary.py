@@ -3,6 +3,8 @@
 import re
 
 from openmdao.utils.om_warnings import warn_deprecation
+from openmdao.utils.notebook_utils import notebook_mode
+
 from openmdao.core.constants import _UNDEFINED
 
 
@@ -59,6 +61,8 @@ class OptionsDictionary(object):
         If True, no options can be set after declaration.
     _all_recordable : bool
         Flag to determine if all options in UserOptions are recordable.
+    _widget : OptionsWidget
+        If running in a Jupyter notebook, a widget for viewing/setting options.
     """
 
     def __init__(self, parent_name=None, read_only=False):
@@ -96,6 +100,15 @@ class OptionsDictionary(object):
             The options dictionary.
         """
         return self._dict.__repr__()
+
+    def _repr_pretty_(self, p, cycle):
+        if not cycle and notebook_mode():
+            try:
+                from openmdao.visualization.options_widget import OptionsWidget
+                return OptionsWidget(self)
+            except:
+                pass
+        return repr(self)
 
     def __rst__(self):
         """

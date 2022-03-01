@@ -93,6 +93,7 @@ from openmdao.recorders.case_reader import CaseReader
 from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
 from openmdao.visualization.partial_deriv_plot import partial_deriv_plot
+from openmdao.visualization.options_widget import OptionsWidget
 
 # Notebook Utils
 from openmdao.utils.notebook_utils import notebook_mode, display_source, show_options_table, cite

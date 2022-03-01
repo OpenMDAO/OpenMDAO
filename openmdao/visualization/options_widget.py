@@ -44,7 +44,7 @@ class OptionsWidget(object):
         options to edit.
     """
 
-    def __init__(self, opts, debug=False):
+    def __init__(self, opts):
         """
         Initialize.
         """
@@ -53,23 +53,21 @@ class OptionsWidget(object):
                            "To install it run `pip install openmdao[notebooks]`.")
             return
 
+        messages = widgets.Output()
+
+        @messages.capture(clear_output=True)
         def option_changed(change):
             option = change['owner'].description
-            oldval = change['old']
-            newval = change['new']
-            if debug:
-                print(f'changing {option} from {oldval} to {newval}')
-            opts[option] = newval
+            try:
+                opts[option] = change['new']
+            except ValueError as err:
+                print(str(err))
 
         _dict = opts._dict
-        _widgets = {}
+        _widgets = []
         _style = {'description_width': 'initial', 'align-items': 'center'}
 
         for name, option in _dict.items():
-            if debug is True or debug == name:
-                print(f"{name} {option=}")
-                print(f"----------------")
-
             val = option['val']
             types = option['types']
             values = option['values']
@@ -77,33 +75,30 @@ class OptionsWidget(object):
 
             if values:
                 if types is not list:
-                    _widgets[name] = widgets.Dropdown(
+                    _widgets.append(widgets.Dropdown(
                         description=name,
                         options=values,
                         value=val,
                         disabled=False,
-                        layout=Layout(width='50%'),
                         style=_style
-                    )
+                    ))
                     continue
                 else:
-                    _widgets[name] = widgets.SelectMultiple(
+                    _widgets.append(widgets.SelectMultiple(
                         description=name,
                         options=sorted(values),
                         value=val,
                         disabled=False,
-                        layout=Layout(width='50%'),
                         style=_style
-                    )
+                    ))
                     continue
-
 
             upper = option['upper']
             lower = option['lower']
 
             if upper and lower:
                 if isinstance(val, int):
-                    _widgets[name] = widgets.IntSlider(
+                    _widgets.append(widgets.IntSlider(
                         description=name,
                         min=lower,
                         max=upper,
@@ -114,11 +109,10 @@ class OptionsWidget(object):
                         orientation='horizontal',
                         readout=True,
                         readout_format='d',
-                        layout=Layout(width='50%'),
                         style=_style
-                    )
+                    ))
                 else:
-                    _widgets[name] = widgets.FloatSlider(
+                    _widgets.append(widgets.FloatSlider(
                         description=name,
                         min=lower,
                         max=upper,
@@ -128,13 +122,12 @@ class OptionsWidget(object):
                         orientation='horizontal',
                         readout=True,
                         readout_format='f',
-                        layout=Layout(width='50%'),
                         style=_style
-                    )
+                    ))
                 continue
 
             if isinstance(val, float):
-                _widgets[name] = widgets.FloatText(
+                _widgets.append(widgets.FloatText(
                     description=name,
                     min=lower,
                     max=upper,
@@ -144,13 +137,12 @@ class OptionsWidget(object):
                     orientation='horizontal',
                     readout=True,
                     readout_format='f',
-                    layout=Layout(width='50%'),
                     style=_style
-                )
+                ))
                 continue
 
             if isinstance(val, int):
-                _widgets[name] = widgets.IntText(
+                _widgets.append(widgets.IntText(
                     description=name,
                     min=lower,
                     max=upper,
@@ -161,26 +153,26 @@ class OptionsWidget(object):
                     orientation='horizontal',
                     readout=True,
                     readout_format='d',
-                    layout=Layout(width='50%'),
                     style=_style
-                )
+                ))
                 continue
 
             types = option['types']
 
             if types == list:
-                _widgets[name] = widgets.SelectMultiple(
+                _widgets.append(widgets.SelectMultiple(
                     description=name,
                     options=[],
                     rows=5,
                     disabled=False,
-                    layout=Layout(width='50%'),
                     style=_style
-                )
+                ))
                 continue
 
             print(f"----\nWidget not implemented for {name}: {option}\n----")
 
-        for wdgt in _widgets.values():
-            display(wdgt)
+        for wdgt in _widgets:
             wdgt.observe(option_changed, 'value')
+
+        _widgets.append(messages)
+        display(widgets.GridBox(_widgets))
