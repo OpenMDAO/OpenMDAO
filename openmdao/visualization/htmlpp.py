@@ -52,39 +52,38 @@ class HtmlPreprocessor():
         Passed to json.dumps() as the "default" parameter that gets
         called for objects that can't be serialized.
 
-
     Notes
     -----
-    Recognized Directives
+    Recognized Directives:
 
-    <<hpp_insert path/to/file [compress] [dup]>> :
-        Paste path/to/file verbatim into the text.
-    <<hpp_script path/to/script [dup]>> :
-        Insert path/to/script between script tags.
-    <<hpp_style path/to/css [dup]>> :
-        Insert path/to/css between style tags.
-    <<hpp_bin2b64 path/to/file [dup]>> :
+    :code:`<<hpp_insert path/to/file [compress] [dup]>>`
+        Paste :code:`path/to/file` verbatim into the text.
+
+    :code:`<<hpp_script path/to/script [dup]>>`
+        Insert :code:`path/to/script` between script tags.
+
+    :code:`<<hpp_style path/to/css [dup]>>`
+        Insert :code:`path/to/css` between style tags.
+
+    :code:`<<hpp_bin2b64 path/to/file [dup]>>`
         Convert a binary file to a b64 string and insert it.
-    <<hpp_pyvar variable_name [compress]>> :
+
+    :code:`<<hpp_pyvar variable_name [compress]>>`
         Insert the string value of the named Python variable. If the referenced
         variable is non-primitive, it's converted to JSON.
 
-    Notes
-    -----
-    Flags
+    Flags:
 
-    compress :
+    :code:`compress` :
         The replacement content will be compressed and converted to
         a base64 string. It's up to the JavaScript code to decode and uncompress it.
-    dup :
+    :code:`dup` :
         If a file has already been included once, it will be ignored on subsequent inclusions
         unless the dup flag is used.
 
-    Notes
-    -----
-    Commented directives (//, /* */, or <!-- -->) will replace the entire comment.
-    When a directive is commented, it can only be on a single line or the comment-ending
-    chars will not be replaced.
+    Commented directives (:code:`//`, :code:`/* */`, or :code:`<!-- -->`) will replace the
+    entire comment. When a directive is commented, it can only be on a single line or the
+    comment-ending characters will not be replaced.
 
     All paths in the directives are relative to the directory that the start file
     is located in unless it is absolute.
