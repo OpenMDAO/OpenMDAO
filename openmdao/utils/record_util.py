@@ -95,7 +95,7 @@ def get_source_system(iteration_coordinate):
         match = _coord_system_re.search(part)
         if (match):
             # take the part up to the beginning of the match
-            part = part[:match.span()[0]-1]
+            part = part[:match.span()[0] - 1]
             # get rid of 'rank#:'
             if ':' in part:
                 part = part.split(':')[1]
