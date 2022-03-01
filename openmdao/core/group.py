@@ -3423,7 +3423,6 @@ class Group(System):
             prom = self._var_allprocs_abs2prom['input'][tgts[0]]
             tgt, val, remote = self._get_auto_ivc_out_val(tgts, vars2gather,
                                                           all_abs2meta, abs2meta_in)
-
             prom = abs2prom[tgt]
             if prom not in self._group_inputs:
                 self._group_inputs[prom] = [{'use_tgt': tgt, 'auto': True, 'path': self.pathname,
@@ -3439,6 +3438,22 @@ class Group(System):
 
             if not remote and 'val' in gmeta:
                 val = gmeta['val']
+
+            if self.comm.size > 1:
+                chosen_tgts = self.comm.allgather((tgt, remote))
+                tgt_local_procs = set()
+                hasrem = False
+                for t, rem in chosen_tgts:
+                    hasrem |= rem
+                    if t in vars2gather:
+                        tgt_local_procs.add(vars2gather[t])
+                if hasrem and len(tgt_local_procs) > 1:
+                    # the 'local' val can only exist on 1 proc (distrib auto_ivcs not allowed),
+                    # so must consolidate onto one proc
+                    rank = sorted(tgt_local_procs)[0]
+                    if rank != self.comm.rank:
+                        val = np.zeros(0)
+                        remote = True
 
             relsrc = src.rsplit('.', 1)[-1]
             auto_ivc.add_output(relsrc, val=np.atleast_1d(val), units=units)
