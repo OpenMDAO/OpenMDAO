@@ -3309,6 +3309,42 @@ class TestSqliteCaseReader(unittest.TestCase):
         print(cr.openmdao_version)
         self.assertEqual(openmdao_version, cr.openmdao_version)
 
+    def test_hierarchical_solvers(self):
+        p = om.Problem()
+
+        cycle1 = p.model.add_subsystem('cycle1', om.Group(), promotes=['*'])
+        cycle1_1 = cycle1.add_subsystem('cycle1_1', om.Group(), promotes=['*'])
+        cycle1_1.add_subsystem('comp', om.ExecComp('x1 = 3 + x2'), promotes=["*"])
+
+        cycle1_2 = cycle1.add_subsystem('cycle1_2', om.Group(), promotes=['*'])
+        cycle1_2.add_subsystem('comp',  om.ExecComp('x2 = 3 + x1 + y'), promotes=["*"])
+
+        cycle2 = p.model.add_subsystem('cycle2', om.Group(), promotes=['*'])
+        cycle2.add_subsystem('comp', om.ExecComp('y = x1 + 2'), promotes=['*'])
+
+        cycle1.nonlinear_solver.add_recorder(self.recorder)
+        cycle1_1.nonlinear_solver.add_recorder(self.recorder)
+        cycle1_2.nonlinear_solver.add_recorder(self.recorder)
+        cycle2.nonlinear_solver.add_recorder(self.recorder)
+
+        p.setup()
+        p.run_model()
+
+        reader = om.CaseReader(self.filename)
+
+        self.assertEqual(set(reader.list_sources(out_stream=None)), {
+            'root.cycle1.nonlinear_solver',
+            'root.cycle1.cycle1_1.nonlinear_solver',
+            'root.cycle1.cycle1_2.nonlinear_solver',
+            'root.cycle2.nonlinear_solver'
+        })
+        self.assertEqual(reader.list_cases(out_stream=None), [
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0|cycle1._solve_nonlinear|0|NLRunOnce|0|cycle1.cycle1_1._solve_nonlinear|0|NLRunOnce|0',
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0|cycle1._solve_nonlinear|0|NLRunOnce|0|cycle1.cycle1_2._solve_nonlinear|0|NLRunOnce|0',
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0|cycle1._solve_nonlinear|0|NLRunOnce|0',
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0|cycle2._solve_nonlinear|0|NLRunOnce|0'
+        ])
+
 
 @use_tempdirs
 class TestFeatureSqliteReader(unittest.TestCase):

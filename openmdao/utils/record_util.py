@@ -92,11 +92,14 @@ def get_source_system(iteration_coordinate):
     path = []
     parts = _coord_split_re.split(iteration_coordinate)
     for part in parts:
-        if (_coord_system_re.search(part) is not None):
+        match = _coord_system_re.search(part)
+        if (match):
+            # take the part up to the beginning of the match
+            part = part[:match.span()[0]-1]
+            # get rid of 'rank#:'
             if ':' in part:
-                # get rid of 'rank#:'
                 part = part.split(':')[1]
-            path.append(part.split('.')[0])
+            path.append(part)
 
     # return pathname of the system
     return '.'.join(path)
