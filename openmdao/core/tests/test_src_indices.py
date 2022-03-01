@@ -482,12 +482,51 @@ class SrcIndicesSerialMultipoint3(unittest.TestCase):
 
         assert_check_totals(p.check_totals(of=['par.g1.C1.y', 'par.g2.C2.y', 'par.g3.C3.y'], wrt=['par.x']))
 
+
 class Multipoint3SameProcs(SrcIndicesSerialMultipoint3):
     N_PROCS = 3
 
 
 class Multipoint3TooManyProcs(SrcIndicesSerialMultipoint3):
     N_PROCS = 4
+
+
+class DoubleNestedParallelMultipointTestCase(unittest.TestCase):
+    N_PROCS = 6
+
+    def test_nested_pars(self):
+        p = om.Problem()
+        par = p.model.add_subsystem('par', om.ParallelGroup(), promotes_inputs=['x'])
+
+        G1 = par.add_subsystem('G1', om.Group(), promotes_inputs=['x'])
+        G1p = G1.add_subsystem('G1p', om.ParallelGroup(), promotes_inputs=['x'])
+        G1p.add_subsystem('C1_1', om.ExecComp('y = 3.0*x'))
+        G1p.add_subsystem('C1_2', om.ExecComp('y = -3.0*x'))
+        G1p.promotes('C1_1', inputs=['x'], src_indices=[0])
+        G1p.promotes('C1_2', inputs=['x'], src_indices=[0])
+
+        G2 = par.add_subsystem('G2', om.Group(), promotes_inputs=['x'])
+        G2p = G2.add_subsystem('G2p', om.ParallelGroup(), promotes_inputs=['x'])
+        G2p.add_subsystem('C2_1', om.ExecComp('y = 5.0*x'))
+        G2p.add_subsystem('C2_2', om.ExecComp('y = -5.0*x'))
+        G2p.promotes('C2_1', inputs=['x'], src_indices=[1])
+        G2p.promotes('C2_2', inputs=['x'], src_indices=[1])
+
+        G3 = par.add_subsystem('G3', om.Group(), promotes_inputs=['x'], max_procs=1)  # no nested parallel group here
+        G3s = G3.add_subsystem('G3s', om.Group(), promotes_inputs=['x'])
+        G3s.add_subsystem('C3_1', om.ExecComp('y = 7.0*x'))
+        G3s.add_subsystem('C3_2', om.ExecComp('y = -7.0*x'))
+        G3s.promotes('C3_1', inputs=['x'], src_indices=[2])
+        G3s.promotes('C3_2', inputs=['x'], src_indices=[2])
+
+        par.set_input_defaults('x', val=[.5, 1.5, 2.5])
+
+        p.setup()
+        p.run_model()
+
+        assert_check_totals(p.check_totals(of=['par.G1.G1p.C1_1.y', 'par.G1.G1p.C1_2.y', 
+                                               'par.G2.G2p.C2_1.y', 'par.G2.G2p.C2_2.y', 
+                                               'par.G3.G3s.C3_1.y', 'par.G3.G3s.C3_2.y'], wrt=['x']))
 
 
 if __name__ == '__main__':

@@ -718,15 +718,12 @@ class Problem(object):
             self.driver.iter_count = 0
             self.model._reset_iter_counts()
 
-        print(f"rank {self.comm.rank} start final setup")
         self.final_setup()
-        print(f"rank {self.comm.rank} done final setup")
 
         self._run_counter += 1
         record_model_options(self, self._run_counter)
 
         self.model._clear_iprint()
-        print(f"rank {self.comm.rank} start driver.run")
         return self.driver.run()
 
     def compute_jacvec_product(self, of, wrt, mode, seed):

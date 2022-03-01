@@ -5484,16 +5484,3 @@ class System(object):
             tarr -= toffset
 
         return sarr, tarr, tsize, has_dist_data
-
-    def prom_info_dump(self, tgt):
-        model = self._problem_meta['model_ref']()
-        src = model._conn_global_abs_in2out[tgt]
-        tgts = [t for t, s in model._conn_global_abs_in2out.items() if s == src]
-        abs_in2prom_info = self._problem_meta['abs_in2prom_info']
-        print('For tgt', tgt, 'and src', src, 'connected tgts and prom info are:')
-        for t, s in model._conn_global_abs_in2out.items():
-            if s == src:
-                print('    ', t)
-                if t in abs_in2prom_info:
-                    for p in abs_in2prom_info[t]:
-                        print('        ', p)

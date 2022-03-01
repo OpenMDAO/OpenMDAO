@@ -611,7 +611,7 @@ class Group(System):
                 new_allsubs = OrderedDict()
                 seen = set()
                 gathered = self.comm.allgather(sub_inds)
-                for rank, inds in enumerate(gathered):
+                for inds in gathered:
                     for ind in inds:
                         if ind not in seen:
                             sinfo = allsubs[ind]
@@ -1219,6 +1219,7 @@ class Group(System):
         skip = set(('path', 'use_tgt', 'prom', 'src_shape', 'src_indices', 'auto'))
         prom2abs_in = self._var_allprocs_prom2abs_list['input']
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
+        abs2meta_in = self._var_allprocs_abs2meta['input']
 
         self._auto_ivc_warnings = []
 
@@ -1296,12 +1297,20 @@ class Group(System):
             for meta in metalist:
                 tree_level = len(meta['path'].split('.')) if meta['path'] else 0
                 prefix = meta['path'] + '.' if meta['path'] else ''
-                if 'src_shape' in meta:
+                src_shape = None
+                if 'val' in meta:
+                    abs_in = prom2abs_in[prom][0]
+                    if abs_in in abs2meta_in:  # it's a continuous variable
+                        src_shape = np.asarray(meta['val']).shape
+                elif 'src_shape' in meta:
+                    src_shape = meta['src_shape']
+
+                if src_shape is not None:
                     # Now update the global promotes info dict
                     for tgt in prom2abs_in[prom]:
                         if tgt in abs_in2prom_info and tgt.startswith(prefix):
                             info = abs_in2prom_info[tgt][tree_level]
-                            info[1] = meta['src_shape']
+                            info[1] = src_shape
                             if meta['auto']:
                                 info[2] = meta['use_tgt']
                 meta.update(fullmeta)

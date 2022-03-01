@@ -920,7 +920,6 @@ class Component(System):
                     gsize_out = all_abs2meta_out[src]['global_size']
                     gsize_in = all_abs2meta_in[iname]['global_size']
                     vout_sizes = sizes_out[:, all_abs2idx[src]]
-                    print(gsize_in, gsize_out, vout_sizes, iname)
 
                     offset = None
                     if gsize_out == gsize_in or (not dist_out and np.sum(vout_sizes)
@@ -949,9 +948,6 @@ class Component(System):
 
                     # total sizes differ and output is distributed, so can't determine mapping
                     if offset is None:
-                        # self.prom_info_dump(iname)
-                        # print('dist_in', dist_in, 'dist_out', dist_out, 'gsize_in', gsize_in,
-                        #       'gsize_out', gsize_out)
                         raise RuntimeError(f"{self.msginfo}: Can't determine src_indices "
                                            f"automatically for input '{iname}'. They must be "
                                            "supplied manually.")

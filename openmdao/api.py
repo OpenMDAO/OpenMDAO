@@ -121,13 +121,3 @@ elif env_truthy('OPENMDAO_PROF_MEM'):
     from openmdao.devtools.iprof_mem import setup, start
     setup(os.environ['OPENMDAO_PROF_MEM'])
     start()
-
-
-if env_truthy('FLUSH_PRINT'):
-    import builtins
-
-    old = builtins.print
-    def flushprint(*args, **kwargs):
-        kwargs['flush'] = True
-        old(*args, **kwargs)
-    builtins.print = flushprint
