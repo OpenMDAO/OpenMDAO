@@ -33,6 +33,7 @@ except Exception:
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.general_utils import simple_warning
 
+
 class OptionsWidget(object):
     """
     Widget to set options.
@@ -43,7 +44,7 @@ class OptionsWidget(object):
         options to edit.
     """
 
-    def __init__(self, opts):
+    def __init__(self, opts, debug=False):
         """
         Initialize.
         """
@@ -52,29 +53,50 @@ class OptionsWidget(object):
                            "To install it run `pip install openmdao[notebooks]`.")
             return
 
+        def option_changed(change):
+            option = change['owner'].description
+            oldval = change['old']
+            newval = change['new']
+            if debug:
+                print(f'changing {option} from {oldval} to {newval}')
+            opts[option] = newval
+
         _dict = opts._dict
         _widgets = {}
         _style = {'description_width': 'initial', 'align-items': 'center'}
 
-
         for name, option in _dict.items():
-            print(f"{name} {option=}")
-            print(f"----------------")
+            if debug is True or debug == name:
+                print(f"{name} {option=}")
+                print(f"----------------")
 
             val = option['val']
+            types = option['types']
             values = option['values']
             desc = option['desc']
 
             if values:
-                _widgets[name] = widgets.Dropdown(
-                    description=name,
-                    options=values,
-                    value=val,
-                    disabled=False,
-                    layout=Layout(width='50%'),
-                    style=_style
-                )
-                continue
+                if types is not list:
+                    _widgets[name] = widgets.Dropdown(
+                        description=name,
+                        options=values,
+                        value=val,
+                        disabled=False,
+                        layout=Layout(width='50%'),
+                        style=_style
+                    )
+                    continue
+                else:
+                    _widgets[name] = widgets.SelectMultiple(
+                        description=name,
+                        options=sorted(values),
+                        value=val,
+                        disabled=False,
+                        layout=Layout(width='50%'),
+                        style=_style
+                    )
+                    continue
+
 
             upper = option['upper']
             lower = option['lower']
@@ -161,16 +183,4 @@ class OptionsWidget(object):
 
         for wdgt in _widgets.values():
             display(wdgt)
-
-        # messages = widgets.Output()
-        # @messages.capture(clear_output=True)
-        # def display():
-        #     for wdgt in _widgets.values():
-        #         display(wdgt)
-
-        # display()
-
-        # @messages.capture(clear_output=True)
-        # interact(plot_func, source=w_source, cases=w_cases, xaxis=w_xaxis, yaxis=w_yaxis,
-        #             disabled=False)
-        # display(messages)
+            wdgt.observe(option_changed, 'value')

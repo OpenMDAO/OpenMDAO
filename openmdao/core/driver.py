@@ -23,27 +23,6 @@ from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation
 
 
-def _check_debug_print_opts_valid(name, opts):
-    """
-    Check validity of debug_print option for Driver.
-
-    Parameters
-    ----------
-    name : str
-        The name of the option.
-    opts : list
-        The value of the debug_print option set by the user.
-    """
-    if not isinstance(opts, list):
-        raise ValueError("Option '%s' with value %s is not a list." % (name, opts))
-
-    _valid_opts = ['desvars', 'nl_cons', 'ln_cons', 'objs', 'totals']
-    for opt in opts:
-        if opt not in _valid_opts:
-            raise ValueError("Option '%s' contains value '%s' which is not one of %s." %
-                             (name, opt, _valid_opts))
-
-
 class Driver(object):
     """
     Top-level container for the systems and drivers.
@@ -120,10 +99,10 @@ class Driver(object):
         # Driver options
         self.options = OptionsDictionary(parent_name=type(self).__name__)
 
-        self.options.declare('debug_print', types=list, check_valid=_check_debug_print_opts_valid,
+        self.options.declare('debug_print', types=list,
+                             values=['desvars', 'nl_cons', 'ln_cons', 'objs', 'totals'],
                              desc="List of what type of Driver variables to print at each "
-                                  "iteration. Valid items in list are 'desvars', 'ln_cons', "
-                                  "'nl_cons', 'objs', 'totals'",
+                                  "iteration.",
                              default=[])
 
         # Case recording options
@@ -131,12 +110,10 @@ class Driver(object):
 
         self.recording_options.declare('record_model_metadata', types=bool, default=True,
                                        desc='Deprecated. Recording of model metadata will always '
-                                       'be done',
+                                            'be done',
                                        deprecation="The recording option, record_model_metadata, "
-                                       "on Driver is "
-                                       "deprecated. Recording of model metadata will always "
-                                       "be done",
-                                       )
+                                                   "on Driver is deprecated. Recording of model "
+                                                   "metadata will always be done")
         self.recording_options.declare('record_desvars', types=bool, default=True,
                                        desc='Set to True to record design variables at the '
                                             'driver level')
@@ -151,7 +128,7 @@ class Driver(object):
                                             'driver level')
         self.recording_options.declare('includes', types=list, default=[],
                                        desc='Patterns for variables to include in recording. '
-                                       'Uses fnmatch wildcards')
+                                            'Uses fnmatch wildcards')
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
                                             '(processed post-includes). Uses fnmatch wildcards')
