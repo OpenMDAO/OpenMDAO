@@ -7,6 +7,8 @@ import re
 import openmdao.api as om
 import numpy as np
 
+import matplotlib.pyplot as plt
+import matplotlib as mpl
 from matplotlib import cm
 
 try:
@@ -18,32 +20,47 @@ except Exception:
     widgets = None
 
 
-try:
-    import matplotlib.pyplot as plt
-except Exception:
-    plt = None
-
-
-func_map = {'ravel': np.ravel,
+_func_map = {'ravel': np.ravel,
             'min': np.min,
+            'minabs': lambda x: np.min(np.abs(x)),
             'max': np.max,
-            'norm': np.linalg.norm,
-            'slice': None}
+            'maxabs': lambda x: np.max(np.abs(x)),
+            'log10abs': lambda x: np.log10(np.abs(x)),
+            'norm': np.linalg.norm}
 
 
 def _apply_transform(data, transform):
     """
-    Apply a function from func_map to the data based on the specified transform.
+    Apply a function from _func_map to the data based on the specified transform.
 
     Parameters
     ----------
 
     """
-    func_map[transform]
-    if func_map[transform]:
-        return func_map[transform](data)
+    _func_map[transform]
+    if _func_map[transform]:
+        return _func_map[transform](data)
     return data
 
+def _apply_slice(data, s):
+    """
+    Apply slice s (given as a string) to the data.
+
+    Parameters
+    ----------
+    data : np.array
+        The data to be sliced.
+    s : str
+        A string representation of the slice, e.g. '[...]', '[0, :]', etc.
+
+    Returns
+    -------
+    np.array
+        The sliced data.
+    """
+    safe_funcs = {'index_exp': np.index_exp}
+    sl = eval(f'index_exp{s}', safe_funcs, None)
+    return data[sl]
 
 def _get_val_across_cases(cases, var, transform, sl):
     """
@@ -143,50 +160,55 @@ class CaseViewerWidget(object):
         self._widgets['case_select_button'] = ipw.Button(description='Select ' + '\u27F6',
                                                          layout={'width': '100%'})
 
+        self._widgets['case_select_all_button'] = ipw.Button(description='Select All ' + '\u27F9',
+                                                             layout={'width': '100%'})
+
         self._widgets['case_remove_button'] = ipw.Button(description='Remove ' + '\u274c',
                                                          layout={'width': '100%'})
+
+        # self._widgets['case_remove_all_button'] = ipw.Button(description='Remove All ' + 2*'\u274c',
+        #                                                      layout={'width': '100%'})
 
         self._widgets['cases_list'] = ipw.Select(options=[default_case],
                                                  value=default_case,
                                                  layout=ipw.Layout(width='40%', height='auto'))
 
         self._widgets['x_filter'] = ipw.Text('', description='X-Axis Filter',
-                                             layout=ipw.Layout(width='55%', height='auto'))
+                                             layout=ipw.Layout(width='45%', height='auto'))
 
         self._widgets['x_select'] = ipw.Select(options=[self._case_index_str] + default_outputs_list,
                                                value=self._case_index_str,
                                                description='X-Axis',
-                                               layout=ipw.Layout(width='55%', height='auto'))
+                                               layout=ipw.Layout(width='45%', height='auto'))
 
 
-        self._widgets['x_transform_select'] = ipw.Dropdown(options=['ravel', 'min', 'max', 'norm', 'slice'],
+        self._widgets['x_transform_select'] = ipw.Dropdown(options=_func_map.keys(),
                                                            value='ravel',
                                                            description='X Transform',
                                                            layout=ipw.Layout(width='95%', height='auto'))
 
-        self._widgets['x_slice'] = ipw.Text('[...]', description='X Slice', disabled=True,
+        self._widgets['x_slice'] = ipw.Text('[...]', description='X Slice',
                                             layout=ipw.Layout(width='95%', height='auto'))
 
-        self._widgets['x_info'] = ipw.Text(description='X Shape', disabled=True, layout={'width': '95%'})
+        self._widgets['x_info'] = ipw.HTML(value='', description='X Shape', layout={'width': '95%'})
 
         self._widgets['y_filter'] = ipw.Text('', description='Y-Axis Filter',
-                                 layout=ipw.Layout(width='55%', height='auto'))
+                                 layout=ipw.Layout(width='45%', height='auto'))
 
         self._widgets['y_select'] = ipw.Select(options=default_outputs_list,
                                    description='Y-Axis',
-                                   layout=ipw.Layout(width='55%', height='auto'))
+                                   layout=ipw.Layout(width='45%', height='auto'))
 
-        self._widgets['y_transform_select'] = ipw.Dropdown(options=['ravel', 'min', 'max', 'norm', 'slice'],
-                                               value='ravel',
-                                               description='Y Transform',
-                                               layout=ipw.Layout(width='95%', height='auto'))
+        self._widgets['y_transform_select'] = ipw.Dropdown(options=_func_map.keys(),
+                                                           value='ravel',
+                                                           description='Y Transform',
+                                                           layout=ipw.Layout(width='95%', height='auto'))
 
         self._widgets['y_slice'] = ipw.Text('[...]',
                                 description='Y Slice',
-                                disabled=True,
                                 layout=ipw.Layout(width='95%', height='auto'))
 
-        self._widgets['y_info'] = ipw.Text(description='Y Shape', disabled=True, layout={'width': '95%'})
+        self._widgets['y_info'] = ipw.HTML(value='', description='Y Shape', layout={'width': '95%'})
 
         self._widgets['debug_output'] = ipw.Output(description='Info',
                                                    layout={'border': '1px solid black', 'width': '65%',
@@ -194,24 +216,59 @@ class CaseViewerWidget(object):
 
         display(ipw.VBox([self._widgets['source_select'],
                           ipw.HBox([self._widgets['cases_select'], ipw.VBox([self._widgets['case_select_button'],
+                                                                             self._widgets['case_select_all_button'],
                                                                              self._widgets['case_remove_button']]),
                                     self._widgets['cases_list']], layout={'width': '95%'}),
                           self._widgets['x_filter'],
-                          ipw.HBox([self._widgets['x_select'], ipw.VBox([self._widgets['x_transform_select'],
+                          ipw.HBox([self._widgets['x_select'], ipw.VBox([self._widgets['x_info'],
                                                                          self._widgets['x_slice'],
-                                                                         self._widgets['x_info']])]),
+                                                                         self._widgets['x_transform_select'],
+                                                                         ])]),
                           self._widgets['y_filter'],
-                          ipw.HBox([self._widgets['y_select'], ipw.VBox([self._widgets['y_transform_select'],
+                          ipw.HBox([self._widgets['y_select'], ipw.VBox([self._widgets['y_info'],
                                                                          self._widgets['y_slice'],
-                                                                         self._widgets['y_info']])]),
+                                                                         self._widgets['y_transform_select'],
+                                                                         ])]),
                           ipw.HBox([ipw.Label(value='Info'), self._widgets['debug_output']])]))
 
 
+    def _update_var_info(self, axis):
+        """
+        Updates the variable info displayed.
+
+        Parameters
+        ----------
+        axis : str
+            'x' or 'y' - case insensitive.
+        """
+        if axis.lower() not in ('x', 'y'):
+            raise ValueError(f'Unknown axis: {axis}')
+
+        src = self._widgets['source_select'].value
+        cases = self._widgets['cases_list'].options
+
+        var = self._widgets[f'{axis}_select'].value
+
+        if var == self._case_index_str:
+            shape = (len(cases),)
+            units = None
+        else:
+            meta = self._outputs[self._filename][src][cases[0]][var]
+            shape = meta['shape']
+            units = meta['units']
+
+        self._widgets[f'{axis}_info'].value = f'{shape}'
+
+
     def _register_callbacks(self):
+        self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
 
             self._widgets['case_select_button'].on_click(self._callback_select_case)
+            self._widgets['case_select_all_button'].on_click(self._callback_select_all_cases)
             self._widgets['case_remove_button'].on_click(self._callback_remove_case)
+
+            self._widgets['cases_list'].observe(self._callback_case_list_select)
 
             self._widgets['x_filter'].observe(self._callback_filter_vars, 'value')
             self._widgets['y_filter'].observe(self._callback_filter_vars, 'value')
@@ -219,31 +276,61 @@ class CaseViewerWidget(object):
             self._widgets['x_select'].observe(self._callback_select_var, 'value')
             self._widgets['y_select'].observe(self._callback_select_var, 'value')
 
+            self._widgets['x_slice'].observe(self._callback_change_slice, 'value')
+            self._widgets['y_slice'].observe(self._callback_change_slice, 'value')
+
+            self._widgets['x_transform_select'].observe(self._callback_select_transform, 'value')
+            self._widgets['y_transform_select'].observe(self._callback_select_transform, 'value')
+
     def _callback_select_case(self, *args):
         """
         Add the selected case(s) to the chosen cases list.
         """
+        self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             clw = self._widgets['cases_list']
             current = clw.options
             new = self._widgets['cases_select'].value
             numeric_sorter = lambda case_name: (case_name.split('|')[0], int(case_name.split('|')[-1]))
             self._widgets['cases_list'].options = sorted(list(set(current + new)), key=numeric_sorter)
-            self._set_num_plot_lines(len(clw.options))
+            self._update_plot()
+            # self._set_num_plot_lines(len(clw.options))
+
+    def _callback_case_list_select(self, *args):
+        self._update_plot()
+
+    def _callback_select_all_cases(self, *args):
+        """
+        Add the selected case(s) to the chosen cases list.
+        """
+        self._widgets['debug_output'].clear_output()
+        with self._widgets['debug_output']:
+            clw = self._widgets['cases_list']
+            current = clw.options
+            new = self._widgets['cases_select'].options
+            numeric_sorter = lambda case_name: (case_name.split('|')[0], int(case_name.split('|')[-1]))
+            self._widgets['cases_list'].options = sorted(list(set(current + new)), key=numeric_sorter)
+            self._update_plot()
+            self._update_var_info('x')
+            self._update_var_info('y')
+            # self._set_num_plot_lines(len(clw.options))
 
     def _callback_remove_case(self, *args):
         """
         Removes the selected case from the chosen cases list widget.
         """
+        self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             clw = self._widgets['cases_list']
             new_list = list(clw.options)
             new_list.remove(clw.value)
             clw.options = new_list
-            self._set_num_plot_lines(len(clw.options))
+            self._update_var_info('x')
+            self._update_var_info('y')
 
     def _callback_filter_vars(self, *args):
         event = args[0]
+        self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             w = event['owner']
             s = w.value
@@ -263,16 +350,15 @@ class CaseViewerWidget(object):
 
     def _callback_select_var(self, *args):
         event = args[0]
+        self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             w = event['owner']
             s = w.value
             src = self._widgets['source_select'].value
             cases = self._widgets['cases_list'].options
 
-            if w is self._widgets['x_select']:
-                var_info = self._widgets['x_info']
-            else:
-                var_info = self._widgets['y_info']
+            axis = 'x' if w is self._widgets['x_select'] else 'y'
+            var_info = self._widgets[f'{axis}_info']
 
             if s == self._case_index_str:
                 shape = (len(cases),)
@@ -280,18 +366,40 @@ class CaseViewerWidget(object):
                 shape = self.outputs(src, cases)[s]['shape']
             var_info.value = str(shape)
 
+            self._update_var_info(axis)
             self._update_plot()
 
-    def _set_num_plot_lines(self, n):
-        self._lines.clear()
-        self._cmap = cm.get_cmap('viridis', 256)(np.linspace(0, 1, n))
-        for i in range(n):
-            self._lines.extend(self._ax.plot([], [], color=self._cmap[i, ...]))
-        self._ax.autoscale(True)
+    def _callback_change_slice(self, *args):
+        event = args[0]
 
-    def _update_plot_vs_case_index(self, src, cases, x_var, y_var):
+        self._widgets['debug_output'].clear_output()
+        with self._widgets['debug_output']:
+            w = event['owner']
+            s = w.value
+
+            if s.startswith('[') and s.endswith(']'):
+                self._update_plot()
+
+    def _callback_select_transform(self, *args):
+        self._update_plot()
+
+    def _update_plot_vs_case_index(self, cases, y_var):
+        """
+        Update the plot area by plotting the current y vs the case index.
+
+        Parameters
+        ----------
+        cases
+        y_var
+
+        Returns
+        -------
+
+        """
         x_min = y_min = 1E16
         x_max = y_max = -1E16
+
+        self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             for i, case in enumerate(cases):
                 y_val = self._case_reader.get_case(case).get_val(y_var)
@@ -301,27 +409,121 @@ class CaseViewerWidget(object):
                 x_max = max(x_max, np.max(x_val))
                 y_min = min(y_min, np.min(y_val))
                 y_max = max(y_max, np.max(y_val))
-                self._lines[i].set_data(x_val, y_val)
-                print('updating line', i, x_val, y_val)
-                self._ax.draw_artist(self._lines[i])
+
+                self._ax.plot(x_val, y_val,
+                              color=self._cmap[i, ...],
+                              marker='o',
+                              linestyle='-',
+                              linewidth=1,
+                              markersize=5)
+
                 self._fig.canvas.flush_events()
 
-            print(x_min, x_max, y_min, y_max)
-            self._ax.set_xlim(x_min, x_max)
-            self._ax.set_ylim(y_min, y_max)
+            x_margin = (x_max - x_min) * 0.05
+            x_margin = 0.1 if x_margin < 1.0E-16 else x_margin
+            y_margin = (y_max - y_min) * 0.05
+            y_margin = 0.1 if y_margin < 1.0E-16 else y_margin
+            self._ax.set_xlim(x_min - x_margin, x_max + x_margin)
+            self._ax.set_ylim(y_min - y_margin, y_max + y_margin)
+
+    def _redraw_plot(self, cases, y_var, x_var=None):
+        """
+        Update the plot area by plotting one variable vs another over one or more cases.
+
+        Parameters
+        ----------
+        cases
+        y_var
+        x_var
+
+        Returns
+        -------
+
+        """
+        x_min = y_min = 1E16
+        x_max = y_max = -1E16
+
+        x_slice = self._widgets['x_slice'].value
+        y_slice = self._widgets['y_slice'].value
+
+        x_transform = self._widgets['x_transform_select'].value
+        y_transform = self._widgets['y_transform_select'].value
+
+        selected_case = self._widgets['cases_list'].value
+
+        self._widgets['debug_output'].clear_output()
+        with self._widgets['debug_output']:
+            print(selected_case)
+            for i, case in enumerate(cases):
+                alpha = 1.0 if case == selected_case else 0.1
+                lw = 1.0 if case == selected_case else 0.25
+
+                y_val = self._case_reader.get_case(case).get_val(y_var)
+
+                try:
+                    y_val = _apply_slice(y_val, y_slice)
+                except:
+                    print(f'Error while applying Y slice: {y_slice}')
+                y_val = _apply_transform(y_val, y_transform)
+
+                if x_var not in (None, self._case_index_str):
+                    x_val = self._case_reader.get_case(case).get_val(x_var)
+                    if x_val.shape[0] != y_val.shape[0]:
+                        print(f'Incompatible shapes: x.shape = {x_val.shape}  y.shape = {y_val.shape}.')
+                        print('Size along first axis must agree.')
+                        return
+                else:
+                    x_val = i * np.ones_like(y_val)
+                try:
+                    x_val = _apply_slice(x_val, x_slice)
+                except:
+                    print(f'Error while applying X slice: {x_slice}')
+                x_val = _apply_transform(x_val, x_transform)
+
+                x_min = min(x_min, np.min(x_val))
+                x_max = max(x_max, np.max(x_val))
+                y_min = min(y_min, np.min(y_val))
+                y_max = max(y_max, np.max(y_val))
+
+                self._ax.plot(x_val, y_val,
+                              color=self._cmap[i, ...],
+                              marker='o',
+                              linestyle='-',
+                              linewidth=lw,
+                              markersize=5,
+                              alpha=alpha)
+
+                self._fig.canvas.flush_events()
+
+            x_margin = (x_max - x_min) * 0.05
+            x_margin = 0.1 if x_margin < 1.0E-16 else x_margin
+            y_margin = (y_max - y_min) * 0.05
+            y_margin = 0.1 if y_margin < 1.0E-16 else y_margin
+            self._ax.set_xlim(x_min - x_margin, x_max + x_margin)
+            self._ax.set_ylim(y_min - y_margin, y_max + y_margin)
 
     def _update_plot(self):
+        self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             src = self._widgets['source_select'].value
             cases = self._widgets['cases_list'].options
             x_var = self._widgets['x_select'].value
             y_var = self._widgets['y_select'].value
 
-            if len(self._lines) != len(cases):
-                self._set_num_plot_lines(len(cases))
 
-            if x_var == self._case_index_str:
-                self._update_plot_vs_case_index(src, cases, x_var, y_var)
+            self._ax.clear()
+
+            self._cmap = cm.get_cmap('viridis', 256)(np.linspace(0, 1, len(cases)))
+
+            x_units = 'None' if x_var == self._case_index_str else \
+                self._outputs[self._filename][src][cases[0]][x_var]['units']
+            y_units = self._outputs[self._filename][src][cases[0]][y_var]['units']
+
+            self._redraw_plot(cases, x_var=x_var, y_var=y_var)
+
+            self._ax.set_xlabel(f'{x_var} ({x_units})')
+            self._ax.set_ylabel(f'{y_var} ({y_units})')
+            self._ax.grid(True)
 
 
     def __init__(self, f, source=None, cases=None, x_axis=None, y_axis=None):
@@ -344,9 +546,10 @@ class CaseViewerWidget(object):
 
         self._register_callbacks()
 
-        self._fig, self._ax = plt.subplots(1, 1, figsize=(9, 9/1.6))
+        self._fig, self._ax = plt.subplots(1, 1, figsize=(9, 9/1.6), tight_layout=True)
 
-        self._lines = []
+        self._update_var_info('x')
+        self._update_var_info('y')
 
         return
 
