@@ -24,12 +24,6 @@ try:
 except Exception:
     widgets = None
 
-# from traitlets import Unicode, Bool, validate, TraitError
-
-
-# @register
-# class Email(DOMWidget):
-
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.general_utils import simple_warning
 
@@ -53,40 +47,51 @@ class OptionsWidget(object):
                            "To install it run `pip install openmdao[notebooks]`.")
             return
 
-        messages = widgets.Output()
-
-        @messages.capture(clear_output=True)
-        def option_changed(change):
-            option = change['owner'].description
-            try:
-                opts[option] = change['new']
-            except ValueError as err:
-                print(str(err))
-
         _dict = opts._dict
         _widgets = []
         _style = {'description_width': 'initial', 'align-items': 'center'}
 
-        for name, option in _dict.items():
+        messages = widgets.Output()
+
+        @messages.capture(clear_output=True)
+        def option_changed(change):
+            owner = change['owner']
+            newval = change['new']
+
+            name = owner.description
+            option = _dict[name]
+
+            # if it's an arbitrary list, parse lines of text
+            if option['types'] is list and option['values'] is None:
+                newval = newval.strip().split('\n')
+
+            try:
+                option['val'] = newval
+            except ValueError as err:
+                print(str(err))
+
+        for name, option in sorted(_dict.items()):
             val = option['val']
             types = option['types']
             values = option['values']
             desc = option['desc']
 
             if values:
-                if types is not list:
-                    _widgets.append(widgets.Dropdown(
+                if types is list:
+                    _widgets.append(widgets.SelectMultiple(
                         description=name,
-                        options=values,
+                        tooltip=desc,
+                        options=sorted(values),
                         value=val,
                         disabled=False,
                         style=_style
                     ))
                     continue
                 else:
-                    _widgets.append(widgets.SelectMultiple(
+                    _widgets.append(widgets.Dropdown(
                         description=name,
-                        options=sorted(values),
+                        tooltip=desc,
+                        options=values,
                         value=val,
                         disabled=False,
                         style=_style
@@ -100,6 +105,7 @@ class OptionsWidget(object):
                 if isinstance(val, int):
                     _widgets.append(widgets.IntSlider(
                         description=name,
+                        tooltip=desc,
                         min=lower,
                         max=upper,
                         value=val,
@@ -114,6 +120,7 @@ class OptionsWidget(object):
                 else:
                     _widgets.append(widgets.FloatSlider(
                         description=name,
+                        tooltip=desc,
                         min=lower,
                         max=upper,
                         value=val,
@@ -129,6 +136,7 @@ class OptionsWidget(object):
             if isinstance(val, float):
                 _widgets.append(widgets.FloatText(
                     description=name,
+                    tooltip=desc,
                     min=lower,
                     max=upper,
                     value=val,
@@ -144,6 +152,7 @@ class OptionsWidget(object):
             if isinstance(val, int):
                 _widgets.append(widgets.IntText(
                     description=name,
+                    tooltip=desc,
                     min=lower,
                     max=upper,
                     value=val,
@@ -160,19 +169,34 @@ class OptionsWidget(object):
             types = option['types']
 
             if types == list:
-                _widgets.append(widgets.SelectMultiple(
+                _widgets.append(widgets.Textarea(
                     description=name,
-                    options=[],
+                    tooltip=desc,
+                    value='\n'.join(val),
+                    continuous_update=False,
                     rows=5,
                     disabled=False,
                     style=_style
                 ))
                 continue
 
-            print(f"----\nWidget not implemented for {name}: {option}\n----")
+            # unhandled option type, just show value as uneditable text
+            _widgets.append(widgets.Textarea(
+                description=name,
+                tooltip=desc,
+                value=val,
+                disabled=True,
+                style=_style
+            ))
 
         for wdgt in _widgets:
             wdgt.observe(option_changed, 'value')
 
-        _widgets.append(messages)
-        display(widgets.GridBox(_widgets))
+        # sort widgets by how many rows they use
+        _wdgt_rows = [(wdgt.rows if hasattr(wdgt, 'rows') else 1, wdgt) for wdgt in _widgets]
+        _wdgt_rows.sort(key=lambda x: x[0])
+        _widgets = [wdgt for _, wdgt in _wdgt_rows]
+
+        box_layout = Layout(display='flex', flex_flow='row wrap')
+        display(widgets.GridBox(children=_widgets, layout=box_layout))
+        display(messages)
