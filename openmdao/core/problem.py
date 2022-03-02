@@ -403,17 +403,16 @@ class Problem(object):
         object
             The value of the requested output/input variable.
         """
-        scope = self.model
         if self._metadata['setup_status'] == _SetupStatus.POST_SETUP:
             val = self._get_cached_val(name, get_remote=get_remote)
             if val is not _UNDEFINED:
                 if indices is not None:
                     val = val[indices]
                 if units is not None:
-                    val = scope.convert2units(name, val, simplify_unit(units))
+                    val = self.model.convert2units(name, val, simplify_unit(units))
         else:
-            val = scope.get_val(name, units=units, indices=indices, get_remote=get_remote,
-                                from_src=True)
+            val = self.model.get_val(name, units=units, indices=indices, get_remote=get_remote,
+                                     from_src=True)
 
         if val is _UNDEFINED:
             if get_remote:
@@ -977,8 +976,8 @@ class Problem(object):
                                      # for abs_in of a.b.c.d, dict entry would be
                                      # [None, None, None], corresponding to levels
                                      # a, a.b, and a.b.c, with one of the Nones replaced
-                                     # by promotes info.  Dict entries are only created if a
-                                     # promotion exists that specifies src_indices.
+                                     # by promotes info.  Dict entries are only created if
+                                     # src_indices are applied to the variable somewhere.
             'raise_connection_errors': True,  # If False, connection related errors in setup will
                                               # be converted to warnings.
         }

@@ -1,6 +1,6 @@
 """Define the Group class."""
 import sys
-from collections import Counter, OrderedDict, defaultdict, deque
+from collections import Counter, OrderedDict, defaultdict
 from collections.abc import Iterable
 
 from itertools import product, chain
@@ -143,15 +143,6 @@ class _PromotesInfo(object):
                 mismatches.append('src_indices')
 
         return mismatches
-
-    @staticmethod
-    def dump_plist(plist, tgt):
-        print(f"For target {tgt}")
-        parts = tgt.split('.')
-        for i, (pinfo, shape, use_tgt) in enumerate(plist):
-            print(f"{i}: '{'.'.join(parts[:i])}' {pinfo.src_shape if pinfo else None}, "
-                  f"{pinfo.src_indices if pinfo else None} | "
-                  f"ginput_shape={shape}, tgt={use_tgt}")
 
 
 class Group(System):
@@ -1075,8 +1066,6 @@ class Group(System):
                             pinfo = pinfo.copy()
                             pinfo.promoted_from = subsys.pathname
                             pinfo.prom = sub_prom
-                            # tree_level includes one level for the model (pathname==''), so we
-                            # don't subtract 1 from len(subsys.pathname.split('.'))
                             tree_level = len(subsys.pathname.split('.'))
                             for abs_in in sub_abs:
                                 if abs_in not in abs_in2prom_info:

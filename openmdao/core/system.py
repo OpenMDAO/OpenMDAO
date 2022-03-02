@@ -5,7 +5,7 @@ import hashlib
 import time
 
 from contextlib import contextmanager
-from collections import OrderedDict, defaultdict, deque
+from collections import OrderedDict, defaultdict
 from itertools import chain
 from enum import IntEnum
 
@@ -2464,38 +2464,6 @@ class System(object):
             if recurse:
                 for sub in s.system_iter(recurse=True, typ=typ):
                     yield sub
-
-    def bfs_system_iter(self, include_self=False, typ=None):
-        """
-        Yield a generator of local subsystems of this system.
-
-        Systems are yielded in breadth first order.
-
-        Parameters
-        ----------
-        include_self : bool
-            If True, include this system in the iteration.
-        typ : type
-            If not None, only yield Systems that match that are instances of the
-            given type.
-
-        Yields
-        ------
-        type or None
-        """
-        if include_self and (typ is None or isinstance(self, typ)):
-            yield self
-
-        deq = deque([self.system_iter(recurse=False, typ=typ)])
-        while deq:
-            it = deq.popleft()
-            while True:
-                try:
-                    s = next(it)
-                except StopIteration:
-                    break
-                yield s
-                deq.append(s.system_iter(recurse=False, typ=typ))
 
     def _create_indexer(self, indices, typename, vname, flat_src=False):
         """
