@@ -210,9 +210,13 @@ class CaseViewerWidget(object):
 
         self._widgets['y_info'] = ipw.HTML(value='', description='Y Shape', layout={'width': '95%'})
 
+        self._widgets['case_slider'] = ipw.IntSlider(value=1, min=0, max=1, step=1, description='Case #',
+                                                     disabled=False, continuous_update=False, orientation='horizontal',
+                                                     readout=True, readout_format='d', layout=Layout(width='95%'))
+
         self._widgets['debug_output'] = ipw.Output(description='Info',
-                                                   layout={'border': '1px solid black', 'width': '65%',
-                                                           'height': '400', 'align': 'right'})
+                                                   layout={'border': '0px solid black', 'width': '95%',
+                                                           'height': '400'})
 
         display(ipw.VBox([self._widgets['source_select'],
                           ipw.HBox([self._widgets['cases_select'], ipw.VBox([self._widgets['case_select_button'],
@@ -229,6 +233,7 @@ class CaseViewerWidget(object):
                                                                          self._widgets['y_slice'],
                                                                          self._widgets['y_transform_select'],
                                                                          ])]),
+                          self._widgets['case_slider'],
                           ipw.HBox([ipw.Label(value='Info'), self._widgets['debug_output']])]))
 
 
@@ -282,6 +287,8 @@ class CaseViewerWidget(object):
             self._widgets['x_transform_select'].observe(self._callback_select_transform, 'value')
             self._widgets['y_transform_select'].observe(self._callback_select_transform, 'value')
 
+            self._widgets['case_slider'].observe(self._callback_case_slider, 'value')
+
     def _callback_select_case(self, *args):
         """
         Add the selected case(s) to the chosen cases list.
@@ -297,6 +304,11 @@ class CaseViewerWidget(object):
             # self._set_num_plot_lines(len(clw.options))
 
     def _callback_case_list_select(self, *args):
+        n = len(self._widgets['cases_list'].options)
+        self._widgets['case_slider'].max = n
+        self._widgets['case_slider'].value = n
+
+    def _callback_case_slider(self, *args):
         self._update_plot()
 
     def _callback_select_all_cases(self, *args):
@@ -313,7 +325,6 @@ class CaseViewerWidget(object):
             self._update_plot()
             self._update_var_info('x')
             self._update_var_info('y')
-            # self._set_num_plot_lines(len(clw.options))
 
     def _callback_remove_case(self, *args):
         """
@@ -411,7 +422,7 @@ class CaseViewerWidget(object):
                 y_max = max(y_max, np.max(y_val))
 
                 self._ax.plot(x_val, y_val,
-                              color=self._cmap[i, ...],
+                              color=self._cmap[i, ...] ,
                               marker='o',
                               linestyle='-',
                               linewidth=1,
@@ -449,14 +460,13 @@ class CaseViewerWidget(object):
         x_transform = self._widgets['x_transform_select'].value
         y_transform = self._widgets['y_transform_select'].value
 
-        selected_case = self._widgets['cases_list'].value
+        selected_case_idx = self._widgets['case_slider'].value
 
         self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
-            print(selected_case)
             for i, case in enumerate(cases):
-                alpha = 1.0 if case == selected_case else 0.1
-                lw = 1.0 if case == selected_case else 0.25
+                alpha = 1.0 if (selected_case_idx >= len(cases) or i == selected_case_idx) else 0.2
+                lw = 1.0 if (selected_case_idx >= len(cases) or i == selected_case_idx) else 0.05
 
                 y_val = self._case_reader.get_case(case).get_val(y_var)
 
