@@ -214,7 +214,7 @@ class CaseViewerWidget(object):
                                                      disabled=False, continuous_update=True, orientation='horizontal',
                                                      readout=True, readout_format='d', layout=Layout(width='95%'))
 
-        self._widgets['debug_output'] = ipw.Output(description='Info',
+        self._widgets['debug_output'] = ipw.Output(description='',
                                                    layout={'border': '0px solid black', 'width': '95%',
                                                            'height': '400'})
 
@@ -234,7 +234,7 @@ class CaseViewerWidget(object):
                                                                          self._widgets['y_transform_select'],
                                                                          ])]),
                           self._widgets['case_slider'],
-                          ipw.HBox([ipw.Label(value='Info'), self._widgets['debug_output']])]))
+                          self._widgets['debug_output']]))
 
 
     def _update_var_info(self, axis):
