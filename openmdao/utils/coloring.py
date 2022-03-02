@@ -1919,6 +1919,12 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
 
     driver._total_jac = None
 
+    if problem.comm.size > 1:
+        if problem.comm.rank == 0:
+            problem.comm.bcast(coloring, root=0)
+        else:
+            coloring = problem.comm.bcast(None, root=0)
+
     return coloring
 
 

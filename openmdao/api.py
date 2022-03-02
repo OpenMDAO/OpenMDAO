@@ -108,8 +108,10 @@ from openmdao.utils.om_warnings import issue_warning, reset_warnings, OpenMDAOWa
     OMInvalidCheckDerivativesOptionsWarning
 
 import os
+import builtins
 
 from openmdao.utils.general_utils import wing_dbg, env_truthy
+
 wing_dbg()
 
 # set up tracing or memory profiling if env vars are set.
@@ -121,3 +123,13 @@ elif env_truthy('OPENMDAO_PROF_MEM'):
     from openmdao.devtools.iprof_mem import setup, start
     setup(os.environ['OPENMDAO_PROF_MEM'])
     start()
+
+
+if env_truthy('FLUSH_PRINT'):
+    _oldprint = builtins.print
+
+    def _flushprint(*args, **kwargs):
+        kwargs['flush'] = True
+        _oldprint(*args, **kwargs)
+
+    builtins.print = _flushprint

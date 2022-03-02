@@ -3,11 +3,9 @@
 import sys
 import pprint
 import os
-import logging
 import weakref
-import time
 
-from collections import defaultdict, namedtuple, OrderedDict
+from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
 from itertools import product
 

@@ -3,25 +3,17 @@
 
 import sys
 import os
-from itertools import product, chain
 
 import numpy as np
 from contextlib import contextmanager
 from collections import Counter
 
 from openmdao.core.problem import Problem
-from openmdao.core.group import Group, System
+from openmdao.core.group import Group
 from openmdao.core.implicitcomponent import ImplicitComponent
-from openmdao.approximation_schemes.finite_difference import FiniteDifference
-from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.utils.mpi import MPI
-from openmdao.utils.name_maps import abs_key2rel_key, rel_key2abs_key
-from openmdao.utils.general_utils import simple_warning
 from openmdao.core.constants import _SetupStatus
 from openmdao.utils.om_warnings import issue_warning, MPIWarning
-
-# an object used to detect when a named value isn't found
-_notfound = object()
 
 
 class _NoColor(object):

@@ -605,7 +605,8 @@ class Group(System):
             self._subsystems_myproc = [allsubs[ind].system for ind in sub_inds]
 
             # Define local subsystems
-            if not (np.sum([minp for minp, _, _ in proc_info]) <= comm.size):
+            if (self._mpi_proc_allocator.parallel and
+                    not (np.sum([minp for minp, _, _ in proc_info]) <= comm.size)):
                 # reorder the subsystems_allprocs based on which procs they live on. If we don't
                 # do this, we can get ordering mismatches in some of our data structures.
                 new_allsubs = OrderedDict()
@@ -639,11 +640,11 @@ class Group(System):
             if self._mpi_proc_allocator.parallel:
                 self._problem_meta['parallel_groups'].append(self.pathname)
 
-            allpars = self.comm.allgather(self._problem_meta['parallel_groups'])
-            full = set()
-            for p in allpars:
-                full.update(p)
-            self._problem_meta['parallel_groups'] = sorted(full)
+                allpars = self.comm.allgather(self._problem_meta['parallel_groups'])
+                full = set()
+                for p in allpars:
+                    full.update(p)
+                self._problem_meta['parallel_groups'] = sorted(full)
 
         if self._problem_meta['parallel_groups']:
             prefix = self.pathname + '.' if self.pathname else ''
@@ -826,8 +827,6 @@ class Group(System):
 
                 for a in updated:
                     all_abs2meta_in[a]['has_src_indices'] = True
-
-        # self._resolve_src_indices()
 
         abs2meta_in = self._var_abs2meta['input']
         allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']

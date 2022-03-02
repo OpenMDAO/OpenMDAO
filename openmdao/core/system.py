@@ -3130,9 +3130,8 @@ class System(object):
 
             if self.comm.size > 1 and self._subsystems_allprocs:
                 my_out = out
-                allouts = self.comm.allgather(out)
-                out = OrderedDict()
-                for rank, all_out in enumerate(allouts):
+                out = {}
+                for all_out in self.comm.allgather(my_out):
                     for name, meta in all_out.items():
                         if name not in out:
                             if name in my_out:
@@ -4141,19 +4140,6 @@ class System(object):
         self.iter_count += 1
         if not self.under_approx:
             self.iter_count_without_approx += 1
-
-    def is_active(self):
-        """
-        Determine if the system is active on this rank.
-
-        Returns
-        -------
-        bool
-            If running under MPI, returns True if this `System` has a valid
-            communicator. Always returns True if not running under MPI.
-        """
-        return MPI is None or not (self.comm is None or
-                                   self.comm == MPI.COMM_NULL)
 
     def _clear_iprint(self):
         """

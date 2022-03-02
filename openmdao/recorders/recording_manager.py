@@ -97,7 +97,7 @@ class RecordingManager(object):
         if MPI:
             # TODO Eventually, we think we can get rid of this next check. But to be safe,
             #       we are leaving it in there.
-            if not model.is_active():
+            if not model._is_local:
                 raise RuntimeError("RecordingManager.startup should never be called when "
                                    "running in parallel on an inactive System")
 
