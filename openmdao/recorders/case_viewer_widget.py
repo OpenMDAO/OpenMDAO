@@ -211,7 +211,7 @@ class CaseViewerWidget(object):
         self._widgets['y_info'] = ipw.HTML(value='', description='Y Shape', layout={'width': '95%'})
 
         self._widgets['case_slider'] = ipw.IntSlider(value=1, min=0, max=1, step=1, description='Case #',
-                                                     disabled=False, continuous_update=False, orientation='horizontal',
+                                                     disabled=False, continuous_update=True, orientation='horizontal',
                                                      readout=True, readout_format='d', layout=Layout(width='95%'))
 
         self._widgets['debug_output'] = ipw.Output(description='Info',
