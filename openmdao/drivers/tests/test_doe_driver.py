@@ -4,8 +4,9 @@ Test DOE Driver and Generators.
 import unittest
 
 import os
+import os.path
+import glob
 import csv
-import json
 
 import numpy as np
 
@@ -1541,10 +1542,9 @@ class TestParallelDOE4Proc(unittest.TestCase):
             # a separate case file will be written by rank 0 of each parallel model
             # (the top two global ranks)
             rank = prob.comm.rank
+            filename = "cases.sql_%d" % rank
 
             if rank < num_models:
-                filename = "cases.sql_%d" % rank
-
                 expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
                 self.assertTrue(expect_msg in output)
 
@@ -1564,6 +1564,7 @@ class TestParallelDOE4Proc(unittest.TestCase):
                         self.assertEqual(outputs[name], expected[idx][name])
             else:
                 self.assertFalse("Cases from rank %d are being written" % rank in output)
+                self.assertFalse(os.path.exists(filename))
 
         # total number of cases recorded across all requested procs
         num_cases = prob.comm.allgather(num_cases)
@@ -1644,7 +1645,7 @@ class TestParallelDOE4Proc(unittest.TestCase):
 
     def test_fan_in_grouped_serial_2x2(self):
         # do not run cases in parallel, but with 2 procs per model
-        # (all cases will run on each of the 2 parallel model instances)
+        # (all cases will run on each of the 2 model instances)
         run_parallel = False
         procs_per_model = 2
 
@@ -1686,21 +1687,15 @@ class TestParallelDOE4Proc(unittest.TestCase):
 
         rank = prob.comm.rank
 
-        # we are running the model on two sets of two procs
-        num_models = prob.comm.size // procs_per_model
-
-        if rank < num_models:
-            # a separate case file will be written by rank 0 of each parallel model
-            # (the top two global ranks)
-            filename = "cases.sql_%d" % rank
-
-            expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
-            self.assertTrue(expect_msg in output)
+        if rank == 0:
+            # there will be a single case recording file from proc 0
+            # redundant recordings will not be made on any other procs
+            filename = "cases.sql"
 
             cr = om.CaseReader(filename)
             cases = cr.list_cases('driver', out_stream=None)
 
-            # cases recorded on this proc... each proc will run all cases
+            # cases recorded on proc 0
             num_cases = len(cases)
             self.assertEqual(num_cases, len(expected))
 
@@ -1710,11 +1705,11 @@ class TestParallelDOE4Proc(unittest.TestCase):
                 self.assertEqual(outputs['x1'], expected[idx]['x1'])
                 self.assertEqual(outputs['x2'], expected[idx]['x2'])
                 self.assertEqual(outputs['c3.y'], expected[idx]['c3.y'])
-
-        # total number of cases recorded will be twice the number of cases
-        # (every case will be recorded on all pairs of procs)
-        num_cases = prob.comm.allgather(num_cases)
-        self.assertEqual(sum(num_cases), num_models*len(expected))
+        else:
+            # confirm that redundant recordings are not created
+            self.assertFalse("Cases from rank %d are being written" % rank in output)
+            filename = "cases.sql_%d" % rank
+            self.assertFalse(os.path.exists(filename))
 
     def test_fan_in_grouped_serial_4x1(self):
         # do not run cases in parallel, with 1 proc per model
@@ -1758,37 +1753,54 @@ class TestParallelDOE4Proc(unittest.TestCase):
 
         rank = prob.comm.rank
 
-        # we are running the model on all four procs
-        num_models = prob.comm.size // procs_per_model
+        if rank == 0:
+            # there will be a single case recording file from proc 0
+            # redundant recordings will not be made on any other procs
+            filename = "cases.sql"
 
-        # there will be a separate case file for each proc, containing the cases
-        # run by the instance of the model that runs in serial mode on that proc
-        filename = "cases.sql_%d" % rank
+            cr = om.CaseReader(filename)
+            cases = cr.list_cases('driver', out_stream=None)
 
-        expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
-        self.assertTrue(expect_msg in output)
+            # cases recorded on proc 0
+            num_cases = len(cases)
+            self.assertEqual(num_cases, len(expected))
 
-        # we are running 4 models in parallel, each using 1 proc
-        num_models = prob.comm.size // procs_per_model
+            for idx, case in enumerate(cases):
+                outputs = cr.get_case(case).outputs
 
-        cr = om.CaseReader(filename)
-        cases = cr.list_cases('driver', out_stream=None)
+                self.assertEqual(outputs['x1'], expected[idx]['x1'])
+                self.assertEqual(outputs['x2'], expected[idx]['x2'])
+                self.assertEqual(outputs['c3.y'], expected[idx]['c3.y'])
+        else:
+            # confirm that redundant recordings are not created
+            self.assertFalse("Cases from rank %d are being written" % rank in output)
+            filename = "cases.sql_%d" % rank
+            self.assertFalse(os.path.exists(filename))
 
-        # cases recorded on this proc
-        num_cases = len(cases)
-        self.assertEqual(num_cases, len(expected))
+    def test_sequential_run(self):
+        prob = om.Problem()
 
-        for idx, case in enumerate(cases):
-            outputs = cr.get_case(case).outputs
+        prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+        prob.model.add_design_var('x', lower=0.0, upper=1.0)
+        prob.model.add_design_var('y', lower=0.0, upper=1.0)
+        prob.model.add_objective('f_xy')
 
-            self.assertEqual(outputs['x1'], expected[idx]['x1'])
-            self.assertEqual(outputs['x2'], expected[idx]['x2'])
-            self.assertEqual(outputs['c3.y'], expected[idx]['c3.y'])
+        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
+        prob.driver.add_recorder(om.SqliteRecorder('cases_sequential.sql'))
 
-        # total number of cases recorded will be 4x the number of cases
-        # (every case will be recorded on all procs)
-        num_cases = prob.comm.allgather(num_cases)
-        self.assertEqual(sum(num_cases), num_models*len(expected))
+        # do not run in parallel, only proc 0 should generate a recording file
+        prob.driver.options['run_parallel'] = False
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        # verify we have the single case recording file
+        self.assertTrue(os.path.exists("cases_sequential.sql"))
+
+        # verify we do not have multiple/parallel case recording files
+        filenames = glob.glob('./cases_sequential.sql_*')
+        self.assertEqual(len(filenames), 0, f'Found multiple recording files: {filenames}')
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -1850,12 +1862,11 @@ class TestParallelDOE2proc(unittest.TestCase):
         # check recorded cases from each case file
         rank = MPI.COMM_WORLD.rank
         filename = "cases.sql_%d" % rank
-        self.assertEqual(filename, "cases.sql_%d" % rank)
 
         # SqliteCaseReader will automatically look for cases.sql_meta if
         # metadata_filename is not specified, but test by explicitly
         # using it here.
-        cr = om.CaseReader(filename, metadata_filename = 'cases.sql_meta')
+        cr = om.CaseReader(filename, metadata_filename='cases.sql_meta')
         cases = cr.list_cases('driver')
         self.assertEqual(len(cases), 5 if rank == 0 else 4)
 
@@ -1871,7 +1882,7 @@ class TestParallelDOE2proc(unittest.TestCase):
 
         # Test for missing metadata db file error
         try:
-            cr_test = om.CaseReader(filename, metadata_filename = 'nonexistant_filename')
+            cr_test = om.CaseReader(filename, metadata_filename='nonexistant_filename')
             found_metadata = True
         except IOError:
             found_metadata = False

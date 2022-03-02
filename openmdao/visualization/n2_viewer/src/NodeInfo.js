@@ -542,8 +542,8 @@ class NodeInfo extends N2Window {
         if (DebugFlags.info && node.hasChildren()) {
             InfoPropDefault.addRowWithVal(this.tbody, 'Children', node.children.length);
             InfoPropDefault.addRowWithVal(this.tbody, 'Descendants', node.numDescendants);
-            InfoPropDefault.addRowWithVal(this.tbody, 'Leaves', node.numLeaves);
-            InfoPropDefault.addRowWithVal(this.tbody, 'Manually Expanded', node.manuallyExpanded.toString());
+            InfoPropDefault.addRowWithVal(this.tbody, 'Leaves', node.draw.numLeaves);
+            InfoPropDefault.addRowWithVal(this.tbody, 'Manually Expanded', node.draw.manuallyExpanded.toString());
         }
 
         const propList = isSolver ? this.propListSolvers : this.propList;

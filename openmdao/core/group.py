@@ -679,7 +679,7 @@ class Group(System):
         list
             List of all states.
         """
-        if MPI:
+        if MPI and self.comm.size > 1:
             all_states = set()
             byproc = self.comm.allgather(self._list_states())
             for proc_states in byproc:
@@ -3169,7 +3169,7 @@ class Group(System):
         else:
             systems = [s.name for s in self._subsystems_myproc]
 
-        if MPI:
+        if MPI and self.comm.size > 1:
             sysbyproc = self.comm.allgather(systems)
 
             systems = set()
@@ -3632,7 +3632,7 @@ class Group(System):
         gprom = None
 
         # get promoted name relative to g
-        if MPI is not None and self.comm.size > 1:
+        if MPI and self.comm.size > 1:
             if g is not None and not g._is_local:
                 g = None
             if self.comm.allreduce(int(g is not None)) < self.comm.size:

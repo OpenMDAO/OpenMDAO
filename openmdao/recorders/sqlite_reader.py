@@ -790,7 +790,8 @@ class SqliteCaseReader(BaseCaseReader):
                         current_cases = {table: [case_coord]}
 
         if out_stream:
-            source_cases.append(current_cases)
+            if current_cases:
+                source_cases.append(current_cases)
             write_source_table(source_cases, out_stream)
 
         return cases

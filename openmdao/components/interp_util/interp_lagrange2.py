@@ -409,7 +409,7 @@ class Interp3DLagrange2(InterpAlgorithmFixed):
             dtype = x.dtype
 
         if idx not in self.coeffs:
-            self.coeffs[idx] = self.compute_coeffs(idx)
+            self.coeffs[idx] = self.compute_coeffs(idx, dtype)
         a = self.coeffs[idx]
 
         x, y, z = x
@@ -440,7 +440,7 @@ class Interp3DLagrange2(InterpAlgorithmFixed):
 
         return val, d_x, None, None
 
-    def compute_coeffs(self, idx):
+    def compute_coeffs(self, idx, dtype):
         """
         Compute the tri-lagrange3 interpolation coefficients for this block.
 
@@ -448,6 +448,8 @@ class Interp3DLagrange2(InterpAlgorithmFixed):
         ----------
         idx : int
             List of interval indices for x.
+        dtype : object
+            The dtype for vector allocation; used for complex step.
 
         Returns
         -------
@@ -496,7 +498,7 @@ class Interp3DLagrange2(InterpAlgorithmFixed):
                            x2],
                           [1.0 / (cx12 * cx13),
                            -1.0 / (cx12 * cx23),
-                           1.0 / (cx13 * cx23)]])
+                           1.0 / (cx13 * cx23)]], dtype=dtype)
 
         termy = np.array([[y2 * y3,
                           0.0,
@@ -506,7 +508,7 @@ class Interp3DLagrange2(InterpAlgorithmFixed):
                            y2],
                           [1.0 / (cy12 * cy13),
                            -1.0 / (cy12 * cy23),
-                           1.0 / (cy13 * cy23)]])
+                           1.0 / (cy13 * cy23)]], dtype=dtype)
 
         termz = np.array([[z2 * z3,
                           0.0,
@@ -516,7 +518,7 @@ class Interp3DLagrange2(InterpAlgorithmFixed):
                            z2],
                           [1.0 / (cz12 * cz13),
                            -1.0 / (cz12 * cz23),
-                           1.0 / (cz13 * cz23)]])
+                           1.0 / (cz13 * cz23)]], dtype=dtype)
 
         termx[1, :] *= -termx[2, :]
         termy[1, :] *= -termy[2, :]
@@ -573,19 +575,25 @@ class Interp3DLagrange2(InterpAlgorithmFixed):
         i_y[i_y > ny - 3] = ny - 3
         i_z[i_z > nz - 3] = nz - 3
 
+        # Complex Step
+        if self.values.dtype == complex:
+            dtype = self.values.dtype
+        else:
+            dtype = x_vec.dtype
+
         if self.vec_coeff is None:
             self.coeffs = set()
             grid = self.grid
-            self.vec_coeff = np.empty((nx, ny, nz, 3, 3, 3))
+            self.vec_coeff = np.empty((nx, ny, nz, 3, 3, 3), dtype=dtype)
 
         needed = set(zip(i_x, i_y, i_z))
         uncached = needed.difference(self.coeffs)
         if len(uncached) > 0:
             unc = np.array(list(uncached))
             uncached_idx = (unc[:, 0], unc[:, 1], unc[:, 2])
-            a = self.compute_coeffs_vectorized(uncached_idx)
+            a = self.compute_coeffs_vectorized(uncached_idx, dtype)
             self.vec_coeff[unc[:, 0], unc[:, 1], unc[:, 2], ...] = a
-            self.coeffs = self.coeffs.union(uncached)
+            self.coeffs.update(uncached)
         a = self.vec_coeff[i_x, i_y, i_z, :]
 
         # Taking powers of the "deltas" instead of the actual table inputs eliminates numerical
@@ -593,12 +601,6 @@ class Interp3DLagrange2(InterpAlgorithmFixed):
         x = x_vec[:, 0] - grid[0][i_x]
         y = x_vec[:, 1] - grid[1][i_y]
         z = x_vec[:, 2] - grid[2][i_z]
-
-        # Complex Step
-        if self.values.dtype == complex:
-            dtype = self.values.dtype
-        else:
-            dtype = x.dtype
 
         # Compute interpolated value using the 16 coefficients.
 
@@ -641,7 +643,7 @@ class Interp3DLagrange2(InterpAlgorithmFixed):
 
         return val, d_x, None, None
 
-    def compute_coeffs_vectorized(self, idx):
+    def compute_coeffs_vectorized(self, idx, dtype):
         """
         Compute the tri-lagrange3 interpolation coefficients for this block.
 
@@ -649,6 +651,8 @@ class Interp3DLagrange2(InterpAlgorithmFixed):
         ----------
         idx : int
             List of interval indices for x.
+        dtype : object
+            The dtype for vector allocation; used for complex step.
 
         Returns
         -------
@@ -657,7 +661,7 @@ class Interp3DLagrange2(InterpAlgorithmFixed):
         """
         grid = self.grid
         values = self.values
-        a = np.zeros((3, 3, 3))
+        a = np.zeros((3, 3, 3), dtype=dtype)
 
         i_x, i_y, i_z = idx
         vec_size = len(i_x)
@@ -698,7 +702,7 @@ class Interp3DLagrange2(InterpAlgorithmFixed):
         z2 -= z1
         z3 -= z1
 
-        termx = np.empty((vec_size, 3, 3))
+        termx = np.empty((vec_size, 3, 3), dtype=dtype)
         termx[:, 0, 0] = x2 * x3
         termx[:, 0, 1] = 0.0
         termx[:, 0, 2] = 0.0
@@ -709,7 +713,7 @@ class Interp3DLagrange2(InterpAlgorithmFixed):
         termx[:, 2, 1] = -1.0 / (cx12 * cx23)
         termx[:, 2, 2] = 1.0 / (cx13 * cx23)
 
-        termy = np.empty((vec_size, 3, 3))
+        termy = np.empty((vec_size, 3, 3), dtype=dtype)
         termy[:, 0, 0] = y2 * y3
         termy[:, 0, 1] = 0.0
         termy[:, 0, 2] = 0.0
@@ -720,7 +724,7 @@ class Interp3DLagrange2(InterpAlgorithmFixed):
         termy[:, 2, 1] = -1.0 / (cy12 * cy23)
         termy[:, 2, 2] = 1.0 / (cy13 * cy23)
 
-        termz = np.empty((vec_size, 3, 3))
+        termz = np.empty((vec_size, 3, 3), dtype=dtype)
         termz[:, 0, 0] = z2 * z3
         termz[:, 0, 1] = 0.0
         termz[:, 0, 2] = 0.0
@@ -739,7 +743,7 @@ class Interp3DLagrange2(InterpAlgorithmFixed):
         termy[:, 0, :] *= termy[:, 2, :]
         termz[:, 0, :] *= termz[:, 2, :]
 
-        all_val = np.empty((vec_size, 3, 3, 3))
+        all_val = np.empty((vec_size, 3, 3, 3), dtype=dtype)
         # The only loop in this algorithm, but it doesn't seem to have much impact on time.
         # Broadcasting out the index slices would be a bit complicated.
         for j in range(vec_size):

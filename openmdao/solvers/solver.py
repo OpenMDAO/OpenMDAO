@@ -297,7 +297,7 @@ class Solver(object):
         if isinstance(self, LinearSolver) and not system._use_derivatives:
             return
 
-        self._rec_mgr.startup(self)
+        self._rec_mgr.startup(self, self._problem_meta['comm'])
 
         myoutputs = myresiduals = myinputs = []
         incl = self.recording_options['includes']

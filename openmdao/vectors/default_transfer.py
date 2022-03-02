@@ -6,7 +6,7 @@ import numpy as np
 
 from openmdao.core.constants import INT_DTYPE
 from openmdao.vectors.transfer import Transfer
-from openmdao.utils.array_utils import convert_neg, _global2local_offsets
+from openmdao.utils.array_utils import _global2local_offsets
 from openmdao.utils.mpi import MPI
 
 _empty_idx_array = np.array([], dtype=INT_DTYPE)

@@ -800,7 +800,7 @@ class Problem(object):
         Set up case recording.
         """
         self._filtered_vars_to_record = self.driver._get_vars_to_record(self.recording_options)
-        self._rec_mgr.startup(self)
+        self._rec_mgr.startup(self, self.comm)
 
     def add_recorder(self, recorder):
         """
@@ -948,8 +948,9 @@ class Problem(object):
         # this metadata will be shared by all Systems/Solvers in the system tree
         self._metadata = {
             'name': self._name,  # the name of this Problem
+            'comm': comm,
             'coloring_dir': self.options['coloring_dir'],  # directory for coloring files
-            'recording_iter': _RecIteration(),  # manager of recorder iterations
+            'recording_iter': _RecIteration(comm.rank),  # manager of recorder iterations
             'local_vector_class': local_vector_class,
             'distributed_vector_class': distributed_vector_class,
             'solver_info': SolverInfo(),
