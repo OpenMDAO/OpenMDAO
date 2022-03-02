@@ -564,9 +564,45 @@ class DoubleNestedParallelMultipointTestCase(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_check_totals(p.check_totals(of=['par.G1.G1p.C1_1.y', 'par.G1.G1p.C1_2.y', 
-                                               'par.G2.G2p.C2_1.y', 'par.G2.G2p.C2_2.y', 
+        assert_check_totals(p.check_totals(of=['par.G1.G1p.C1_1.y', 'par.G1.G1p.C1_2.y',
+                                               'par.G2.G2p.C2_1.y', 'par.G2.G2p.C2_2.y',
                                                'par.G3.G3s.C3_1.y', 'par.G3.G3s.C3_2.y'], wrt=['x']))
+
+
+class TestNestedInputDefaults(unittest.TestCase):
+    N_PROCS = 3
+
+    def test_nested(self):
+        # this was failing as reported in github issue #2441
+        # It passes if the two setup() calls don't raise any exceptions.
+
+        class Grp(om.Group):
+            def setup(self):
+                self.add_subsystem("lin", om.ExecComp("y = x" ), promotes_inputs=["x"])
+                self.add_subsystem("quad", om.ExecComp("z = x*x"), promotes_inputs=["x"])
+                # self.set_input_defaults("x", 0.85)
+
+        class Vec(om.Group):
+            def initialize(self):
+                self.options.declare("num", default=1)
+            def setup(self):
+                n = self.options["num"]
+
+                self.set_input_defaults("x", np.full(n, 0.85))
+
+                for node in range(n):
+                    name = f"comp_{node}"
+                    self.add_subsystem(name, Grp())
+                    self.promotes(name, inputs=["x"], src_indices=[node])
+
+        # This one seems to require that set_input_defaults (on line 8) is NOT called in Comp.setup()
+        n = 3
+        p = om.Problem(Vec(num=n))
+        p.setup()
+
+        # This one seems to require that set_input_defaults (on line 8) IS called in Comp.setup()
+        p2 = om.Problem(Grp())
+        p2.setup()
 
 
 if __name__ == '__main__':

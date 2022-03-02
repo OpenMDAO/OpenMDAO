@@ -3017,7 +3017,6 @@ class Test3Deep(unittest.TestCase):
     sub_par = False
 
     def build_model(self):
-        om.wing_dbg()
         p = om.Problem(model=ConfigGroup())
 
         minprocs = 3 if self.cfg_par else 1
@@ -3160,7 +3159,7 @@ class Test3Deep(unittest.TestCase):
     def test_add_output_to_child(self):
         p = self.build_model()
         p.model.cfg.sub.add_var_output('C3.ovar0', 3.0, units='ft')
-                
+
         p.setup()
 
         names = self.get_matching_var_setup_counts(p, 1)

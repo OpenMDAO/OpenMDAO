@@ -312,7 +312,6 @@ class MPITests2(unittest.TestCase):
     def test_distrib_voi_dense(self):
         size = 7
 
-        om.wing_dbg()
         prob = om.Problem()
         model = prob.model
 
@@ -1291,8 +1290,6 @@ class MPITestsBug(unittest.TestCase):
 
         phase.add_objective('rhs_disc.x0dot', index=-1)
 
-        om.wing_dbg()
-        
         p.setup(mode='rev')
         p.final_setup()
         p.run_model()

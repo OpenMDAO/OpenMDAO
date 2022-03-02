@@ -461,8 +461,6 @@ class MPITests(unittest.TestCase):
         C2 = top.add_subsystem("C2", DistribCompSimple(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
 
-        om.wing_dbg()
-        
         p.setup()
 
         # Conclude setup but don't run model.
@@ -1033,8 +1031,6 @@ class MPIFeatureTests(unittest.TestCase):
         size = 15
 
         model = om.Group()
-
-        om.wing_dbg()
 
         # Distributed component "C2" requires an IndepVarComp to supply inputs.
         model.add_subsystem("indep", om.IndepVarComp('x', np.zeros(size)))
