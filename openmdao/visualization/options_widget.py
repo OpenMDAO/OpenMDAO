@@ -184,7 +184,7 @@ class OptionsWidget(object):
             _widgets.append(widgets.Textarea(
                 description=name,
                 tooltip=desc,
-                value=val,
+                value=str(val),
                 disabled=True,
                 style=_style
             ))
@@ -193,7 +193,7 @@ class OptionsWidget(object):
             wdgt.observe(option_changed, 'value')
 
         # sort widgets by how many rows they use
-        _wdgt_rows = [(wdgt.rows if hasattr(wdgt, 'rows') else 1, wdgt) for wdgt in _widgets]
+        _wdgt_rows = [(wdgt.rows if getattr(wdgt, 'rows', None) else 1, wdgt) for wdgt in _widgets]
         _wdgt_rows.sort(key=lambda x: x[0])
         _widgets = [wdgt for _, wdgt in _wdgt_rows]
 
