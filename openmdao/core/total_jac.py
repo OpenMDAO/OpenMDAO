@@ -1222,18 +1222,18 @@ class _TotalJacInfo(object):
                 i = -1
             if mode == 'rev':
                 if i < 0:
-                    raw = self.comm.allgather((i, None))
+                    byrank = self.comm.allgather((i, None))
                 else:
-                    raw = self.comm.allgather((i, self.J[i]))
-                for ind, row in raw:
+                    byrank = self.comm.allgather((i, self.J[i]))
+                for ind, row in byrank:
                     if row is not None:
                         self.J[ind, :] = row
             else:  # fwd
                 if i < 0:
-                    raw = self.comm.allgather((i, None))
+                    byrank = self.comm.allgather((i, None))
                 else:
-                    raw = self.comm.allgather((i, self.J[:, i]))
-                for ind, col in raw:
+                    byrank = self.comm.allgather((i, self.J[:, i]))
+                for ind, col in byrank:
                     if col is not None:
                         self.J[:, ind] = col
         else:

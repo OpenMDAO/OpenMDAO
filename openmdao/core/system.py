@@ -3099,7 +3099,8 @@ class System(object):
                 else:
                     out.update(dvs)
 
-            if self.comm.size > 1 and self._subsystems_allprocs:
+            if (self.comm.size > 1 and self._subsystems_allprocs and
+                    self._mpi_proc_allocator.parallel):
                 my_out = out
                 out = {}
                 for all_out in self.comm.allgather(my_out):
@@ -3226,9 +3227,10 @@ class System(object):
                 else:
                     out.update(resps)
 
-            if self.comm.size > 1 and self._subsystems_allprocs:
+            if (self.comm.size > 1 and self._subsystems_allprocs and
+                    self._mpi_proc_allocator.parallel):
                 all_outs = self.comm.allgather(out)
-                out = OrderedDict()
+                out = {}
                 for rank, all_out in enumerate(all_outs):
                     out.update(all_out)
 

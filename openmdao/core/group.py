@@ -627,15 +627,14 @@ class Group(System):
         # build a list of local subgroups to speed up later loops
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
 
-        if MPI and nproc > 1:
-            if self._mpi_proc_allocator.parallel:
-                self._problem_meta['parallel_groups'].append(self.pathname)
+        if nproc > 1 and self._mpi_proc_allocator.parallel:
+            self._problem_meta['parallel_groups'].append(self.pathname)
 
-                allpars = self.comm.allgather(self._problem_meta['parallel_groups'])
-                full = set()
-                for p in allpars:
-                    full.update(p)
-                self._problem_meta['parallel_groups'] = sorted(full)
+            allpars = self.comm.allgather(self._problem_meta['parallel_groups'])
+            full = set()
+            for p in allpars:
+                full.update(p)
+            self._problem_meta['parallel_groups'] = sorted(full)
 
         if self._problem_meta['parallel_groups']:
             prefix = self.pathname + '.' if self.pathname else ''
@@ -1405,14 +1404,13 @@ class Group(System):
 
                 if abs2discrete[io]:
                     prefix = self.pathname + '.' if self.pathname else ''
-                    all_set = set(abs2discrete[io])
-                    local = set([prefix + n for n in self._var_discrete[io]])
-                    remote = set()
-                    for rank, names in enumerate(self.comm.allgather(local)):
-                        for n in names:
-                            if n not in owns:
-                                owns[n] = rank
-                        remote.update(all_set - names)
+                    for rank, names in enumerate(self.comm.allgather(self._var_discrete[io])):
+                        if prefix:
+                            toadd = {prefix + n for n in names}.difference(owns)
+                        else:
+                            toadd = set(names).difference(owns)
+                        for n in toadd:
+                            owns[n] = rank
         else:
             self._owned_sizes = self._var_sizes['output']
 
@@ -3165,15 +3163,14 @@ class Group(System):
         # add all systems as nodes in the graph so they'll be there even if
         # unconnected.
         if comps_only:
-            systems = [s.pathname for s in self.system_iter(recurse=True, typ=Component)]
+            systems = [s for s in self._ordered_comp_name_iter()]
+            # [s.pathname for s in self.system_iter(recurse=True, typ=Component)]
         else:
             systems = [s.name for s in self._subsystems_myproc]
 
-        if MPI and self.comm.size > 1:
-            sysbyproc = self.comm.allgather(systems)
-
+        if not comps_only and self.comm.size > 1:
             systems = set()
-            for slist in sysbyproc:
+            for slist in self.comm.allgather(systems):
                 systems.update(slist)
 
         graph.add_nodes_from(systems)
