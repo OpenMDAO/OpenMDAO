@@ -437,7 +437,7 @@ class Problem(object):
         """
         self.set_val(name, value)
 
-    def set_val(self, name, val=None, units=None, indices=None, **kwargs):
+    def set_val(self, name, val=None, units=None, indices=None, value=None):
         """
         Set an output/input variable.
 
@@ -447,26 +447,20 @@ class Problem(object):
         ----------
         name : str
             Promoted or relative variable name in the root system's namespace.
-        val : float or ndarray or list or None
+        val : object
             Value to set this variable to.
         units : str, optional
             Units that value is defined in.
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to set to specified value.
-        **kwargs : dict
-            Additional keyword argument for deprecated `value` arg.
+        value : object
+            Deprecated `value` arg.
         """
-        if 'value' not in kwargs:
-            value = None
-        elif 'value' in kwargs:
-            value = kwargs['value']
-
         if value is not None and not self._warned:
             self._warned = True
             warn_deprecation(f"{self.msginfo} 'value' will be deprecated in 4.0. Please use 'val' "
                              "in the future.")
-        elif val is not None:
-            self._warned = True
+        if val is not None:
             value = val
 
         model = self.model
