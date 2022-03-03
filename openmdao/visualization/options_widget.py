@@ -1,19 +1,5 @@
 """
-A widget that lets users set options from the root group of a model,
-after the model has been instantiated but before setup has been called.
-
-Timing is important here. After model has been instantiated, but before setup(),
-the options dict should exist. User could still change option values at this point though.
-
-A widget that lets them interact with common options. Setting any float/int. Checkboxes for bools.
-If there is a set of specific values, provide them in a drop down.
-
-Some options may need to be tagged as non-GUI-able. Ones that take function pointers, classes, or
-instances seem like things you couldn't do in the gui. So we may need to add tags to the options
-(recordable seems like a tag already), or just another metadata field perhaps.
-
-Its critical the user can set these values before setup, because often some of these options change
-the way the model is configured. After setup, these options should not be allowed to change.
+A widget-based representation of OptionsDictionary for use in Jupyter notebooks.
 """
 
 try:
@@ -35,7 +21,7 @@ class OptionsWidget(object):
     Parameters
     ----------
     opts : OptionsDictionary
-        options to edit.
+        Options to edit.
     """
 
     def __init__(self, opts):

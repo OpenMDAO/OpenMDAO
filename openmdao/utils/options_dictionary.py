@@ -106,7 +106,7 @@ class OptionsDictionary(object):
             try:
                 from openmdao.visualization.options_widget import OptionsWidget
                 return OptionsWidget(self)
-            except:
+            except Exception:
                 pass
         return repr(self)
 
