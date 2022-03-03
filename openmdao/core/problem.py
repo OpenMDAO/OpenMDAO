@@ -560,9 +560,18 @@ class Problem(object):
                 indices = _full_slice
 
             if model._outputs._contains_abs(abs_name):
-                model._outputs.set_var(abs_name, value, indices)
+                distrib = all_meta['output'][abs_name]['distributed']
+                if (distrib and indices is _full_slice and
+                        value.size == all_meta['output'][abs_name]['global_size']):
+                    # assume user is setting using full distributed value
+                    sizes = model._var_sizes['output'][:, model._var_allprocs_abs2idx[abs_name]]
+                    start = np.sum(sizes[:myrank])
+                    end = start + sizes[myrank]
+                    model._outputs.set_var(abs_name, value[start:end], indices)
+                else:
+                    model._outputs.set_var(abs_name, value, indices)
             elif abs_name in conns:  # input name given. Set value into output
-                src_is_auto_ivc = src.rsplit('.', 1)[0] == '_auto_ivc'
+                src_is_auto_ivc = src.startswith('_auto_ivc.')
                 # when setting auto_ivc output, error messages should refer
                 # to the promoted name used in the set_val call
                 var_name = name if src_is_auto_ivc else src
