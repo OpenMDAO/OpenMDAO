@@ -17,7 +17,7 @@ from openmdao.utils.general_utils import _prom2ivc_src_dict, \
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.array_utils import sizes2offsets, convert_neg
+from openmdao.utils.array_utils import sizes2offsets
 from openmdao.vectors.vector import _full_slice
 from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation
@@ -487,8 +487,7 @@ class Driver(object):
         Set up case recording.
         """
         self._filtered_vars_to_record = self._get_vars_to_record(self.recording_options)
-
-        self._rec_mgr.startup(self)
+        self._rec_mgr.startup(self, self._problem().comm)
 
     def _get_voi_val(self, name, meta, remote_vois, driver_scaling=True,
                      get_remote=True, rank=None):
