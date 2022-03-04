@@ -10,10 +10,20 @@ class N2TreeNode {
     /**
      * Absorb all the properties of the provided JSON object from the model tree.
      * @param {Object} origNode The node to work from.
+     * @param {Object} attribNames Names of variables in the model.
      */
-    constructor(origNode) {
+    constructor(origNode, attribNames) {
         // Merge all of the props from the original JSON tree node to us.
         Object.assign(this, origNode);
+        if (attribNames.descendants != 'children') {
+            this.children = this[attribNames.descendants];
+            delete this[childAttribName];
+        }
+
+        if (attribNames.uuid != 'uuid') {
+            this.uuid = this[attribNames.uuid];
+            delete this[attribNames.uuid];
+        }
 
         this.sourceParentSet = new Set();
         this.targetParentSet = new Set();
@@ -38,12 +48,8 @@ class N2TreeNode {
         this.depth = -1; // Set by ModelData
         this.parent = null; // Set by ModelData
         this.id = -1; // Set by ModelData
-        this.absPathName = ''; // Set by ModelData
+        this.uuid = ''; // Set by ModelData
         this.numDescendants = 0; // Set by ModelData
-
-        // Solver names may be empty, so set them to "None" instead.
-        if (this.linear_solver == "") this.linear_solver = "None";
-        if (this.nonlinear_solver == "") this.nonlinear_solver = "None";
 
         this.rootIndex = -1;
 
@@ -201,7 +207,7 @@ class N2TreeNode {
         }
 
         if (this.hasChildren()) {
-            for (let child of this.children) {
+            for (const child of this.children) {
                 child._getNodesInChildrenWithCycleArrows(arr);
             }
         }
@@ -294,8 +300,8 @@ class N2TreeNode {
     }
 
     /** If this is a component, add special children that can hold filtered variables */
-    addFilterChildIfComponent() {
-        if (this.isComponent() && this.hasChildren()) {
+    addFilterChild() {
+        if (this.hasChildren()) {
 
             // Separate N2FilterNodes are added for inputs and outputs so
             // they can be inserted at the correct place in the diagram.
@@ -490,4 +496,18 @@ class N2FilterNode extends N2TreeNode {
 
     get targetParentSet() { return this._genParentSet('target'); }
     set targetParentSet(val) { return val; }
+}
+
+class OmTreeNode extends N2TreeNode {
+    constructor(origNode, attribNames) {
+        super(origNode, attribNames);
+
+        // Solver names may be empty, so set them to "None" instead.
+        if (this.linear_solver == "") this.linear_solver = "None";
+        if (this.nonlinear_solver == "") this.nonlinear_solver = "None";
+    }
+
+    addFilterChild() {
+        if (this.isComponent()) { super.addFilterChild(); }
+    }
 }

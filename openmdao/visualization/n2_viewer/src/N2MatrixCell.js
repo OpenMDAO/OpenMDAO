@@ -552,37 +552,24 @@ class N2MatrixCell {
      * @param {N2TreeNode} tgtNode Where the connection ends.
      */
     addOffScreenConn(srcNode, tgtNode) {
-        let debugStr = ": " + srcNode.absPathName + " -> " + tgtNode.absPathName;
+        let offscreenNode = null, dir = '', side = '';
 
         if (srcNode === this.tgtObj) {
-            // Outgoing
-            if (srcNode.rootIndex < tgtNode.rootIndex) {
-                // Top
-                debugInfo("New offscreen outgoing connection on top" + debugStr);
-                this.offScreen.top.outgoing.add(tgtNode);
-            }
-            else {
-                // Bottom
-                debugInfo("New offscreen outgoing connection on bottom" + debugStr);
-                this.offScreen.bottom.outgoing.add(tgtNode);
-            }
+            dir = 'outgoing';
+            offscreenNode = tgtNode;           
         }
         else {
-            // Incoming
-            if (srcNode.rootIndex < tgtNode.rootIndex) {
-                // Top
-                debugInfo("New offscreen incoming connection on top" + debugStr);
-                this.offScreen.top.incoming.add(srcNode);
-            }
-            else {
-                // Bottom
-                debugInfo("New offscreen incoming connection on bottom" + debugStr);
-                this.offScreen.bottom.incoming.add(srcNode);
-            }
+            dir = 'incoming';
+            offscreenNode = srcNode;
         }
+        side = (srcNode.rootIndex < tgtNode.rootIndex)? 'top' : 'bottom';
 
-        this.offScreen.total++;
-        // debugInfo("Total offscreen connections found: " + this.offScreen.total);
+        const offScreenSet = this.offScreen[side][dir];
+
+        if (!offScreenSet.has(offscreenNode)) {
+            offScreenSet.add(offscreenNode);
+            this.offScreen.total++;
+        }
     }
 
     /** Choose a renderer based on our SymbolType. */

@@ -504,8 +504,14 @@ def _get_viewer_data(data_source, case_id=None):
             for vtgt in vtgtlist:
                 connections_list.append({'src': vsrc, 'tgt': vtgt})
 
+    # connections_list2 = []
+    # conns2 = root_group._problem_meta['model_ref']()._conn_global_abs_in2out
+    # for c in conns2:
+    #    connections_list2.append({'src': conns2[c], 'tgt': c})
+
     data_dict['sys_pathnames_list'] = list(sys_idx)
     data_dict['connections_list'] = connections_list
+    # data_dict['connections_list'] = connections_list2
     data_dict['abs2prom'] = root_group._var_abs2prom
 
     data_dict['driver'] = {

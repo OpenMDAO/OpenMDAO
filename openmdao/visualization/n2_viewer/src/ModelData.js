@@ -1,47 +1,124 @@
 // <<hpp_insert libs/pako_inflate.min.js>>
 // <<hpp_insert libs/json5_2.2.0.min.js>>
 
-/** Process the tree, connections, and other info provided about the model. */
 class ModelData {
+    constructor(modelJSON, attribNames = {
+        name: 'name',
+        type: 'type',
+        descendants: 'children',
+        links: 'connections_list'
+    }) {
+        console.log(modelJSON);
 
+        this._attribNames = attribNames;
+        this.conns = modelJSON[attribNames.links];
+        this.maxDepth = 1;
+        this.nodePaths = {};
+        this.nodeIds = [];
+        this.depthCount = [];
+
+        this.root = this.tree = modelJSON.tree = this._adoptNodes(modelJSON.tree);
+        this._setParentsAndDepth(this.root, null, 1);
+        this._computeConnections();
+
+    }
+
+    /**
+     * Recurse over the tree and replace the JSON objects
+     * provided by n2_viewer.py with N2TreeNodes.
+     * @param {Object} element The current element being updated.
+     * @param {Class} nodeType The class of the nodes to create.
+     */
+     _adoptNodes(element, nodeType = N2TreeNode) {
+        const newNode = new nodeType(element, this._attribNames);
+
+        if (newNode.hasChildren()) {
+            for (let i in newNode.children) {
+                newNode.children[i] = this._adoptNodes(newNode.children[i]);
+                newNode.children[i].parent = newNode;
+                if (exists(newNode.children[i].parentComponent))
+                    newNode.children[i].parentComponent = newNode;
+            }
+        }
+
+        newNode.addFilterChild();
+
+        return newNode;
+    }
+
+   /**
+     * Sets parents and depth of all nodes, and determine max depth. Flags the
+     * node as implicit if any children are implicit.
+     * @param {N2TreeNode} node Item to process.
+     * @param {N2TreeNode} parent Parent of node, null for root node.
+     * @param {number} depth Numerical level of ancestry.
+     * @return True is node is implicit, false otherwise.
+     */
+    _setParentsAndDepth(node, parent, depth) {
+        node.depth = depth;
+        node.parent = parent;
+        node.id = this.nodeIds.length;
+        this.nodeIds.push(node);
+
+        // Track # of nodes at each depth
+        if (depth > this.depthCount.length) { this.depthCount.push(1); }
+        else { this.depthCount[depth - 1]++; }
+
+        if (node.parent) {
+            if (node.parent.uuid != "") {
+                node.uuid += node.parent.uuid + ".";
+            }
+
+            node.uuid += node.name;
+            this.nodePaths[node.uuid] = node;
+        }
+
+        this.maxDepth = Math.max(depth, this.maxDepth);
+        node.childNames.add(node.uuid); // Add the node itself
+
+        if (node.hasChildren()) {
+            node.numDescendants = node.children.length;
+            for (const child of node.children) {
+
+                const implicit = this._setParentsAndDepth(child, node, depth + 1);
+                if (implicit) node.implicit = true; // TODO: Only for OM
+
+                node.numDescendants += child.numDescendants;
+
+                // Add absolute pathnames of children to a set for quick searching
+                if (!node.isRoot()) { // All nodes are children of the model root
+                    node.childNames.add(child.uuid);
+                    for (const childName of child.childNames) {
+                        node.childNames.add(childName);
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+}
+
+/** Process the tree, connections, and other info provided about the model. */
+class OmModelData extends ModelData {
     /** Do some discovery in the tree and rearrange & enhance where necessary. */
     constructor(modelJSON) {
+        super(modelJSON);
 
         modelJSON.tree.name = 'model'; // Change 'root' to 'model'
-        this.conns = modelJSON.connections_list;
         this.abs2prom = modelJSON.abs2prom; // May be undefined.
         this.declarePartialsList = modelJSON.declare_partials_list;
         this.useDeclarePartialsList = (this.declarePartialsList.length > 0);
         this.sysPathnamesList = modelJSON.sys_pathnames_list;
 
-        this.maxDepth = 1;
         this.unconnectedInputs = 0;
         this.autoivcSources = 0;
-        this.nodePaths = {};
-        this.nodeIds = [];
-        this.depthCount = [];
-
-        startTimer('ModelData._convertToN2TreeNodes');
-        this.root = this.tree = modelJSON.tree = this._convertToN2TreeNodes(modelJSON.tree);
-        stopTimer('ModelData._convertToN2TreeNodes');
-
-        startTimer('ModelData._setParentsAndDepth');
-        this._setParentsAndDepth(this.root, null, 1);
-        stopTimer('ModelData._setParentsAndDepth');
-
-        this.md5_hash = modelJSON.md5_hash;
+        this.md5_hash = modelJSON.md5_hash; // compute here instead of python?
 
         if (this.unconnectedInputs > 0)
             console.info("Unconnected nodes: ", this.unconnectedInputs);
 
-        startTimer('ModelData._initSubSystemChildren');
         this._initSubSystemChildren(this.root);
-        stopTimer('ModelData._initSubSystemChildren');
-
-        startTimer('ModelData._computeConnections');
-        this._computeConnections();
-        stopTimer('ModelData._computeConnections');
-
         this._updateAutoIvcNames();
 
         debugInfo("New model: ", this);
@@ -51,10 +128,6 @@ class ModelData {
     static uncompressModel(b64str) {
         const compressedData = atob(b64str);
         const jsonStr = window.pako.inflate(compressedData, { to: 'string' });
-            
-        /* for ( let pos = 0; pos < jsonStr.length; pos += 100) {
-            console.log(pos, jsonStr.substring(pos, pos+99));
-        } */
 
         // JSON5 can handle Inf and NaN
         return JSON5.parse(jsonStr); 
@@ -81,28 +154,6 @@ class ModelData {
     }
 
     /**
-     * Recurse over the tree and replace the JSON objects
-     * provided by n2_viewer.py with N2TreeNodes.
-     * @param {Object} element The current element being updated.
-     */
-    _convertToN2TreeNodes(element) {
-        let newNode = new N2TreeNode(element);
-
-        if (newNode.hasChildren()) {
-            for (let i in newNode.children) {
-                newNode.children[i] = this._convertToN2TreeNodes(newNode.children[i]);
-                newNode.children[i].parent = newNode;
-                if (exists(newNode.children[i].parentComponent))
-                    newNode.children[i].parentComponent = newNode;
-            }
-        }
-
-        newNode.addFilterChildIfComponent();
-
-        return newNode;
-    }
-
-    /**
      * Sets parents and depth of all nodes, and determine max depth. Flags the
      * node as implicit if any children are implicit.
      * @param {N2TreeNode} node Item to process.
@@ -110,37 +161,19 @@ class ModelData {
      * @param {number} depth Numerical level of ancestry.
      * @return True is node is implicit, false otherwise.
      */
-    _setParentsAndDepth(node, parent, depth) { // Formerly InitTree()
-        node.depth = depth;
-        node.parent = parent;
-        node.id = this.nodeIds.length;
-        this.nodeIds.push(node);
+     _setParentsAndDepth(node, parent, depth) {
+        super._setParentsAndDepth(node, parent, depth);
 
-        // Track # of nodes at each depth
-        if (depth > this.depthCount.length) { this.depthCount.push(1); }
-        else { this.depthCount[depth - 1]++; }
-
-        if (node.parent) { // not root node? node.parent.absPathName : "";
-            if (node.parent.absPathName != "") {
-                node.absPathName += node.parent.absPathName + ".";
-            }
-
-            node.absPathName += node.name;
-
-            this.nodePaths[node.absPathName] = node;
-
-            if (this.abs2prom.input[node.absPathName] !== undefined) {
-                node.promotedName = this.abs2prom.input[node.absPathName];
-            }
-            else if (this.abs2prom.output[node.absPathName] !== undefined) {
-                node.promotedName = this.abs2prom.output[node.absPathName];
-            }
+        if (this.abs2prom.input[node.uuid] !== undefined) {
+            node.promotedName = this.abs2prom.input[node.uuid];
+        }
+        else if (this.abs2prom.output[node.uuid] !== undefined) {
+            node.promotedName = this.abs2prom.output[node.uuid];
         }
 
         this.identifyUnconnectedInput(node);
-
         if (node.isInputOrOutput()) {
-            let parentComponent = (node.originalParent) ? node.originalParent : node.parent;
+            const parentComponent = (node.originalParent) ? node.originalParent : node.parent;
             if (parentComponent.type == "subsystem" &&
                 parentComponent.subsystem_type == "component") {
                 node.parentComponent = parentComponent;
@@ -150,31 +183,8 @@ class ModelData {
             }
         }
 
-        this.maxDepth = Math.max(depth, this.maxDepth);
-
         if (node.isSubsystem()) {
             this.maxSystemDepth = Math.max(depth, this.maxSystemDepth);
-        }
-
-        node.childNames.add(node.absPathName); // Add the node itself
-
-        if (node.hasChildren()) {
-            node.numDescendants = node.children.length;
-            for (let child of node.children) {
-
-                let implicit = this._setParentsAndDepth(child, node, depth + 1);
-                if (implicit) node.implicit = true;
-
-                node.numDescendants += child.numDescendants;
-
-                // Add absolute pathnames of children to a set for quick searching
-                if (!node.isRoot()) { // All nodes are children of the model root
-                    node.childNames.add(child.absPathName);
-                    for (let childName of child.childNames) {
-                        node.childNames.add(childName);
-                    }
-                }
-            }
         }
 
         return (node.implicit) ? true : false;
@@ -272,7 +282,7 @@ class ModelData {
             return;
         }
 
-        for (let child of node.children) {
+        for (const child of node.children) {
             if (child.isSubsystem()) {
                 if (!node.hasChildren('subsystem_children'))
                     node.subsystem_children = [];
@@ -393,25 +403,24 @@ class ModelData {
              * can resolve the indexes to pathnames to the associated objects.
              */
             if (Array.isPopulatedArray(conn.cycle_arrows)) {
-                let cycleArrowsArray = [];
-                let cycleArrows = conn.cycle_arrows;
-                for (let cycleArrow of cycleArrows) {
+                const cycleArrowsArray = [];
+                for (const cycleArrow of conn.cycle_arrows) {
                     if (cycleArrow.length != 2) {
                         console.warn(throwLbl + "cycleArrowsSplitArray length not 2, got " +
                             cycleArrow.length + ": " + cycleArrow);
                         continue;
                     }
 
-                    let srcPathname = sysPathnames[cycleArrow[0]];
-                    let tgtPathname = sysPathnames[cycleArrow[1]];
+                    const srcPathname = sysPathnames[cycleArrow[0]];
+                    const tgtPathname = sysPathnames[cycleArrow[1]];
 
-                    let arrowBeginObj = this.nodePaths[srcPathname];
+                    const arrowBeginObj = this.nodePaths[srcPathname];
                     if (!arrowBeginObj) {
                         console.warn(throwLbl + "Cannot find cycle arrows begin object " + srcPathname);
                         continue;
                     }
 
-                    let arrowEndObj = this.nodePaths[tgtPathname];
+                    const arrowEndObj = this.nodePaths[tgtPathname];
                     if (!arrowEndObj) {
                         console.warn(throwLbl + "Cannot find cycle arrows end object " + tgtPathname);
                         continue;
@@ -459,14 +468,14 @@ class ModelData {
      * @param {N2TreeNode} node The tree node to work on.
      */
     identifyUnconnectedInput(node) { // Formerly updateRootTypes
-        if (!node.hasOwnProperty('absPathName')) {
-            console.warn("identifyUnconnectedInput error: absPathName not set for ", node);
+        if (!node.hasOwnProperty('uuid')) {
+            console.warn("identifyUnconnectedInput error: uuid not set for ", node);
         }
         else {
             if (node.isInput()) {
-                if (!node.hasChildren() && !this.hasAnyConnection(node.absPathName))
+                if (!node.hasChildren() && !this.hasAnyConnection(node.uuid))
                     node.type = "unconnected_input";
-                else if (this.hasAutoIvcSrc(node.absPathName))
+                else if (this.hasAutoIvcSrc(node.uuid))
                     node.type = "autoivc_input";
             }
         }
