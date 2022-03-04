@@ -57,19 +57,17 @@ class _SysInfo(object):
 
 
 class _PromotesInfo(object):
-    __slots__ = ['src_indices', 'flat', 'src_shape', 'promoted_from', 'prom', 'root_shape']
+    __slots__ = ['src_indices', 'flat', 'src_shape', 'promoted_from', 'prom']
 
-    def __init__(self, src_indices=None, flat=None, src_shape=None, promoted_from='', prom=None,
-                 root_shape=None):
+    def __init__(self, src_indices=None, flat=None, src_shape=None, promoted_from='', prom=None):
         self.flat = flat
-        self.root_shape = src_shape if root_shape is None else root_shape
-        self.src_shape = src_shape if src_shape is not None else self.root_shape
+        self.src_shape = src_shape
         if src_indices is not None:
             if isinstance(src_indices, Indexer):
                 self.src_indices = src_indices.copy()
-                self.src_indices.set_src_shape(self.root_shape)
+                self.src_indices.set_src_shape(self.src_shape)
             else:
-                self.src_indices = indexer(src_indices, src_shape=self.root_shape, flat_src=flat)
+                self.src_indices = indexer(src_indices, src_shape=self.src_shape, flat_src=flat)
         else:
             self.src_indices = None
         self.promoted_from = promoted_from  # pathname of promoting system
@@ -83,7 +81,7 @@ class _PromotesInfo(object):
     def __repr__(self):
         return (f"_PromotesInfo(src_indices={self.src_indices}, flat={self.flat}, "
                 f"src_shape={self.src_shape}, promoted_from={self.promoted_from}, "
-                f"prom={self.prom}, root_shape={self.root_shape})")
+                f"prom={self.prom})")
 
     def prom_path(self):
         if self.promoted_from is None or self.prom is None:
@@ -92,7 +90,7 @@ class _PromotesInfo(object):
 
     def copy(self):
         return _PromotesInfo(self.src_indices, self.flat, self.src_shape, self.promoted_from,
-                             self.prom, self.root_shape)
+                             self.prom)
 
     def set_src_shape(self, shape):
         if self.src_indices is not None:
@@ -110,7 +108,7 @@ class _PromotesInfo(object):
                                     self.src_indices, self.src_shape)
 
         return _PromotesInfo(src_inds, self.flat or len(self.src_indices.indexed_src_shape) == 1,
-                             self.src_shape, self.promoted_from, self.prom, parent.root_shape)
+                             self.src_shape, self.promoted_from, self.prom)
 
     def compare(self, other):
         """
