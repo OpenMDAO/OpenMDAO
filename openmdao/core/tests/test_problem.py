@@ -1995,6 +1995,38 @@ class TestProblem(unittest.TestCase):
         output = strout.getvalue().split('\n')
         self.assertTrue("ALIAS_TEST" in output[13])
 
+    def test_constraint_alias_duplicate_errors(self):
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp1', om.ExecComp('f = x',
+                                                f=np.ones((size, )),
+                                                x=np.ones((size, ))),
+                            promotes=['*'])
+        model.add_subsystem('comp2', om.ExecComp('g = x',
+                                                g=np.ones((size, )),
+                                                x=np.ones((size, ))),
+                            promotes=['*'])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+
+        model.add_constraint('f', indices=[1], flat_indices=True, lower=10.0)
+        model.add_constraint('f', indices=[5], flat_indices=True, alias='g', lower=0.5)
+
+        msg = "Constraint alias 'f' is a duplicate of an existing alias or variable name."
+        with self.assertRaises(TypeError) as cm:
+            model.add_constraint('f', indices=[3], flat_indices=True, alias='f', lower=0.5)
+
+        self.assertEqual(str(cm.exception), msg)
+
+        msg = "Constraint alias 'g' on 'comp1.f' is the same name as an existing variable."
+        with self.assertRaises(RuntimeError) as cm:
+            prob.setup()
+
+        self.assertEqual(str(cm.exception), msg)
+
     def test_list_problem_vars_driver_scaling(self):
         model = SellarDerivatives()
         model.nonlinear_solver = om.NonlinearBlockGS()

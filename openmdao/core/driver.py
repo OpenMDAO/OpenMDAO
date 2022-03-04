@@ -343,11 +343,6 @@ class Driver(object):
             rank = model.comm.rank
             nprocs = model.comm.size
 
-            # Used for index->name reference.
-            abs2idx = {}
-            for j, item in enumerate(model._var_allprocs_abs2meta['output']):
-                abs2idx[item] = j
-
             # Loop over all VOIs.
             for vname in chain(responses, src_design_vars):
                 vpath = vname
@@ -362,7 +357,7 @@ class Driver(object):
                     indices = src_design_vars[vname].get('indices')
 
                 meta = model._var_allprocs_abs2meta['output'][vpath]
-                i = abs2idx[vpath]
+                i = model._var_allprocs_abs2idx[vpath]
 
                 if meta['distributed']:
 

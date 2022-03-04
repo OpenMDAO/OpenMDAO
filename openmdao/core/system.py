@@ -1623,6 +1623,7 @@ class System(object):
 
                 used_idx = {}
                 discrete = self._var_allprocs_discrete
+                outputs = self._var_allprocs_prom2abs_list['output']
 
                 for name in aliases:
 
@@ -1632,6 +1633,12 @@ class System(object):
                     path = responses[name]['path']
                     if path is None:
                         path = name
+
+                    # Constraint alias should never be the same as any openmdao output.
+                    if name in outputs:
+                        msg = f"Constraint alias '{name}' on '{path}' is the same name as an " + \
+                            "existing variable."
+                        raise RuntimeError(msg)
 
                     if name not in used_idx and path not in used_idx:
                         size = self._var_allprocs_abs2meta['output'][path]['global_size']
@@ -1657,8 +1664,9 @@ class System(object):
                     else:
                         used_idx[path][indices.flat()] += 1
 
-                    overlap = np.where(used_idx[path] > 1)
-                    if len(overlap[0]) > 0:
+                    overlap = np.any(used_idx[path] > 1)
+
+                    if overlap:
                         msg = (f"{self.msginfo}: '{name}' indices are overlapping "
                                f"constraint/objective '{path}'.")
                         raise RuntimeError(msg)
@@ -2868,6 +2876,11 @@ class System(object):
         resp['cache_linear_solution'] = cache_linear_solution
         resp['parallel_deriv_color'] = parallel_deriv_color
         resp['flat_indices'] = flat_indices
+
+        if resp['name'] in responses:
+            msg = f"Constraint alias '{name}' is a duplicate of an existing alias or " + \
+                "variable name."
+            raise TypeError(msg)
 
         responses[resp['name']] = resp
 
