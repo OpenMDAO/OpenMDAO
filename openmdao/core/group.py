@@ -3164,7 +3164,6 @@ class Group(System):
         # unconnected.
         if comps_only:
             systems = [s for s in self._ordered_comp_name_iter()]
-            # [s.pathname for s in self.system_iter(recurse=True, typ=Component)]
         else:
             systems = [s.name for s in self._subsystems_myproc]
 
