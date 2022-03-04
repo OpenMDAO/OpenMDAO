@@ -3216,7 +3216,6 @@ class System(object):
         model = self._problem_meta['model_ref']()
         conns = model._conn_global_abs_in2out
         abs2meta_out = model._var_allprocs_abs2meta['output']
-        print(self.pathname)
 
         # Human readable error message during Driver setup.
         try:
@@ -3226,7 +3225,6 @@ class System(object):
                     self._problem_meta['using_par_deriv_color'] = True
 
                 path = data['path']
-                print(name, path)
                 if name in prom2abs_out:
                     if path is None:
                         abs_name = prom2abs_out[name][0]
