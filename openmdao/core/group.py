@@ -1296,6 +1296,9 @@ class Group(System):
                             if pinfo is not None:
                                 p2 = abs_in2prom_info[tgt][tree_level + 1]
                                 if p2 is not None:
+                                    # src_shape from a set_input_defaults call actually
+                                    # must match the promoted src_shape from one level
+                                    # deeper in the tree.
                                     if p2.src_shape is not None and p2.src_shape != src_shape:
                                         raise RuntimeError(f"{self.msginfo}: src_shape {src_shape} "
                                                            f"set by set_input_defaults('{prom}', "
