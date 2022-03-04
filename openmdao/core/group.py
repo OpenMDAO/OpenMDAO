@@ -930,7 +930,7 @@ class Group(System):
             current_pinfo = _PromotesInfo(src_shape=root_shape,
                                           prom=self._var_allprocs_abs2prom['input'][tgt])
             for lst in plist:
-                pinfo, shape, _ = lst
+                pinfo, shape = lst
                 if shape is None:
                     lst[1] = root_shape
                 if pinfo is None:
@@ -1000,7 +1000,7 @@ class Group(System):
                 seen.add(prom)
 
                 plist = abs_in2prom_info[tgt]
-                pinfo, gshape, _ = plist[tree_level]
+                pinfo = plist[tree_level][0]
                 if pinfo is not None:
                     inds, flat, shape = pinfo
                     if inds is not None:
@@ -1070,7 +1070,7 @@ class Group(System):
                                 if abs_in not in abs_in2prom_info:
                                     # need a level for each system including '', so we don't
                                     # subtract 1 from abs_in.split('.') which includes the var name
-                                    abs_in2prom_info[abs_in] = [[None, None, None] for s in
+                                    abs_in2prom_info[abs_in] = [[None, None] for s in
                                                                 abs_in.split('.')]
                                 abs_in2prom_info[abs_in][tree_level][0] = pinfo
                     else:
@@ -1298,8 +1298,6 @@ class Group(System):
                         if tgt in abs_in2prom_info and tgt.startswith(prefix):
                             info = abs_in2prom_info[tgt][tree_level]
                             info[1] = src_shape
-                            if meta['auto']:
-                                info[2] = meta['use_tgt']
                 meta.update(fullmeta)
 
     def _find_vars_to_gather(self):
@@ -1545,11 +1543,8 @@ class Group(System):
 
                     if abs_in in abs2meta:
                         if abs_in not in abs_in2prom_info:
-                            abs_in2prom_info[abs_in] = [[None, None, None] for s in
-                                                        abs_in.split('.')]
+                            abs_in2prom_info[abs_in] = [[None, None] for s in abs_in.split('.')]
                         # place a _PromotesInfo at the top level to handle the src_indices
-                        # TODO: shouldn't really use a _PromotesInfo here since it's not an actual
-                        #       promotion
                         if abs_in2prom_info[abs_in][0][0] is None:
                             abs_in2prom_info[abs_in][0][0] = _PromotesInfo(src_indices=src_indices,
                                                                            flat=flat, prom=abs_in)
@@ -3196,7 +3191,7 @@ class Group(System):
 
         return graph
 
-    def _get_auto_ivc_out_val(self, tgts, vars_to_gather, all_abs2meta_in, abs2meta_in):
+    def _get_auto_ivc_out_val(self, tgts, vars_to_gather, abs2meta_in):
         # all tgts are continuous variables
         # only called from top level group
         info = None
@@ -3230,7 +3225,7 @@ class Group(System):
                 for i in range(nlevels):
                     for tgt, plist, plen in zip(plist_tgts, plists, plens):
                         if i < plen:
-                            pinfo, src_shape, _ = plist[i]
+                            pinfo, src_shape = plist[i]
                             if pinfo is not None and pinfo.src_shape is not None:
                                 val_shape = pinfo.src_shape
                                 break
@@ -3264,7 +3259,7 @@ class Group(System):
                 # If a tgt has no src_indices anywhere, it will not be found in
                 # abs_in2prom_info.
                 newshape = val_shape
-                for pinfo, _, _ in abs_in2prom_info[tgt]:
+                for pinfo, _ in abs_in2prom_info[tgt]:
                     if pinfo is None:
                         continue
                     inds, _, shape = pinfo
@@ -3344,11 +3339,11 @@ class Group(System):
             val = start_val
 
         if src_idx_found:  # auto_ivc connected to local vars with src_indices
-            raise RuntimeError(f"The following inputs {src_idx_found} are defined using "
-                               "src_indices but the total source size is undetermined.  You can "
-                               "specify the src size by setting 'val' or 'src_shape' in "
-                               "a call to set_input_defaults, or by adding "
-                               "an IndepVarComp as the source.")
+            raise RuntimeError("Attaching src_indices to inputs requires that the shape of the "
+                               "source variable is known, but the source shape for inputs "
+                               f"{src_idx_found} is unknown. You can specify the src shape for "
+                               "these inputs by setting 'val' or 'src_shape' in a call to "
+                               "set_input_defaults, or by adding an IndepVarComp as the source.")
         return info
 
     def _setup_auto_ivcs(self, mode):
@@ -3405,8 +3400,7 @@ class Group(System):
 
         for src, tgts in auto2tgt.items():
             prom = self._var_allprocs_abs2prom['input'][tgts[0]]
-            tgt, val, remote = self._get_auto_ivc_out_val(tgts, vars2gather,
-                                                          all_abs2meta, abs2meta_in)
+            tgt, val, remote = self._get_auto_ivc_out_val(tgts, vars2gather, abs2meta_in)
             prom = abs2prom[tgt]
             if prom not in self._group_inputs:
                 self._group_inputs[prom] = [{'use_tgt': tgt, 'auto': True, 'path': self.pathname,

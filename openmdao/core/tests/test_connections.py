@@ -537,8 +537,11 @@ class TestMultiConns(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.setup()
 
-        msg = "The following inputs ['c1.x', 'c2.x'] are defined using src_indices but the total source "
-        msg += "size is undetermined.  You can specify the src size by setting 'val' or 'src_shape' in a call to set_input_defaults, or by adding an IndepVarComp as the source."
+        msg = ("Attaching src_indices to inputs requires that the shape of the "
+               "source variable is known, but the source shape for inputs "
+               "['c1.x', 'c2.x'] is unknown. You can specify the src shape for "
+               "these inputs by setting 'val' or 'src_shape' in a call to "
+               "set_input_defaults, or by adding an IndepVarComp as the source.")
 
         err_msg = str(context.exception).split(':')[-1]
         self.assertEqual(err_msg, msg)
