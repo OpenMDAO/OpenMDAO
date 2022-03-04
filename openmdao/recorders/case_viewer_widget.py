@@ -185,7 +185,7 @@ class CaseViewer(object):
                 self._constraints |= case.get_constraints().keys()
                 self._objectives |= case.get_objectives().keys()
                 self._resids |= {promname for promname, meta in self._outputs[filename][source_name][case_name].items()
-                                 if meta['resids'] != 'Not Recorded'}
+                                 if isinstance(meta['resids'], str) and meta['resids'] != 'Not Recorded'}
 
     def _make_gui(self):
         default_source = list(self.sources().keys())[0]
