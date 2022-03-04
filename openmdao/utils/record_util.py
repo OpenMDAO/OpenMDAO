@@ -68,11 +68,11 @@ def format_iteration_coordinate(coord, prefix=None):
     return ':'.join([prefix, separator.join(iteration_coordinate)])
 
 
-# regular expression used to determine if a node in an iteration coordinate represents a system
-_coord_system_re = re.compile('(_solve_nonlinear|_apply_nonlinear)$')
-
 # Regular expression used for splitting iteration coordinates, removes separator and iter counts
 _coord_split_re = re.compile('\\|\\d+\\|*')
+
+# regular expression used to determine if a node in an iteration coordinate represents a system
+_coord_system_re = re.compile('(\\._solve_nonlinear|\\._apply_nonlinear)$')
 
 
 def get_source_system(iteration_coordinate):
@@ -92,11 +92,14 @@ def get_source_system(iteration_coordinate):
     path = []
     parts = _coord_split_re.split(iteration_coordinate)
     for part in parts:
-        if (_coord_system_re.search(part) is not None):
+        match = _coord_system_re.search(part)
+        if (match):
+            # take the part up to "._solve_nonlinear" or "._apply_nonlinear"
+            part = part[:match.span()[0]]
+            # get rid of 'rank#:'
             if ':' in part:
-                # get rid of 'rank#:'
                 part = part.split(':')[1]
-            path.append(part.split('.')[0])
+            path.append(part)
 
     # return pathname of the system
     return '.'.join(path)
