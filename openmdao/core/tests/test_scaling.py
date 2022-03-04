@@ -1,7 +1,6 @@
 """Define the units/scaling tests."""
 import unittest
 from copy import deepcopy
-from itertools import chain
 
 import numpy as np
 
@@ -1553,6 +1552,10 @@ class TestDriverScalingReport(unittest.TestCase):
         # Now, make sure it runs run_model automatically as long as we final_setup.
         p.final_setup()
         p.driver.scaling_report(show_browser=False)
+
+
+class TestDriverScalingReportMPI(TestDriverScalingReport):
+    N_PROCS=2
 
 
 if __name__ == '__main__':
