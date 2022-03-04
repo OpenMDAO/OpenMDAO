@@ -3216,6 +3216,7 @@ class System(object):
         model = self._problem_meta['model_ref']()
         conns = model._conn_global_abs_in2out
         abs2meta_out = model._var_allprocs_abs2meta['output']
+        print(self.pathname)
 
         # Human readable error message during Driver setup.
         try:
@@ -3225,6 +3226,7 @@ class System(object):
                     self._problem_meta['using_par_deriv_color'] = True
 
                 path = data['path']
+                print(name, path)
                 if name in prom2abs_out:
                     if path is None:
                         abs_name = prom2abs_out[name][0]
@@ -3247,7 +3249,6 @@ class System(object):
                         in_abs = prom2abs_in[name][0]
                         ivc_path = conns[in_abs]
                     else:
-                        in_abs = data['name']
 
                         # In-place update to absolute path.
                         if path in prom2abs_out:
@@ -3257,6 +3258,7 @@ class System(object):
                             data['path'] = conns[path_abs]
 
                         ivc_path = data['path']
+                        in_abs = name
 
                     distrib = ivc_path in abs2meta_out and abs2meta_out[ivc_path]['distributed']
                     if use_prom_ivc:
