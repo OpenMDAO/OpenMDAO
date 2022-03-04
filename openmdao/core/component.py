@@ -270,7 +270,7 @@ class Component(System):
                     if metadata['add_input_src_indices'] and abs_name not in abs_in2prom_info:
                         # need a level for each system including '', so we don't
                         # subtract 1 from abs_in.split('.') which includes the var name
-                        abs_in2prom_info[abs_name] = [[None, None] for s in abs_name.split('.')]
+                        abs_in2prom_info[abs_name] = [None for s in abs_name.split('.')]
 
             for prom_name, val in self._var_discrete[io].items():
                 abs_name = prefix + prom_name
@@ -1602,8 +1602,7 @@ class Component(System):
 
         for tgt, meta in abs2meta_in.items():
             if tgt in abs_in2prom_info:
-                plist = abs_in2prom_info[tgt]
-                pinfo, shape = plist[-1]  # component always last in the plist
+                pinfo = abs_in2prom_info[tgt][-1]  # component always last in the plist
                 if pinfo is not None:
                     inds, flat, shape = pinfo
                     if inds is None:

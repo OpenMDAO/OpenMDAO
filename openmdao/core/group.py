@@ -929,10 +929,10 @@ class Group(System):
             # use a _PromotesInfo for the top level even though there really isn't a promote there
             current_pinfo = _PromotesInfo(src_shape=root_shape,
                                           prom=self._var_allprocs_abs2prom['input'][tgt])
-            for lst in plist:
-                pinfo, shape = lst
-                if shape is None:
-                    lst[1] = root_shape
+            if plist[0] is None:  # no top level pinfo
+                plist[0] = current_pinfo
+
+            for i, pinfo in enumerate(plist):
                 if pinfo is None:
                     pass
                 elif current_pinfo.src_indices is None:
@@ -980,8 +980,7 @@ class Group(System):
                     current_pinfo = _PromotesInfo(src_indices=src_indices, src_shape=root_shape,
                                                   flat=True, promoted_from=pinfo.promoted_from,
                                                   prom=pinfo.prom)
-                    lst[1] = src_indices.indexed_src_shape
-                lst[0] = current_pinfo
+                plist[i] = current_pinfo
 
         with multi_proc_exception_check(self.comm):
             self._resolve_src_inds()
@@ -1000,7 +999,7 @@ class Group(System):
                 seen.add(prom)
 
                 plist = abs_in2prom_info[tgt]
-                pinfo = plist[tree_level][0]
+                pinfo = plist[tree_level]
                 if pinfo is not None:
                     inds, flat, shape = pinfo
                     if inds is not None:
@@ -1070,9 +1069,8 @@ class Group(System):
                                 if abs_in not in abs_in2prom_info:
                                     # need a level for each system including '', so we don't
                                     # subtract 1 from abs_in.split('.') which includes the var name
-                                    abs_in2prom_info[abs_in] = [[None, None] for s in
-                                                                abs_in.split('.')]
-                                abs_in2prom_info[abs_in][tree_level][0] = pinfo
+                                    abs_in2prom_info[abs_in] = [None for s in abs_in.split('.')]
+                                abs_in2prom_info[abs_in][tree_level] = pinfo
                     else:
                         prom_name = sub_prefix + sub_prom
                     if prom_name not in allprocs_prom2abs_list[io]:
@@ -1296,8 +1294,23 @@ class Group(System):
                     # Now update the global promotes info dict
                     for tgt in prom2abs_in[prom]:
                         if tgt in abs_in2prom_info and tgt.startswith(prefix):
-                            info = abs_in2prom_info[tgt][tree_level]
-                            info[1] = src_shape
+                            pinfo = abs_in2prom_info[tgt][tree_level]
+                            if pinfo is not None:
+                                p2 = abs_in2prom_info[tgt][tree_level + 1]
+                                if p2 is not None:
+                                    if p2.src_shape is not None and p2.src_shape != src_shape:
+                                        raise RuntimeError(f"{self.msginfo}: src_shape {src_shape} "
+                                                           f"set by set_input_defaults('{prom}', "
+                                                           f"...) in group '{meta['path']}' "
+                                                           "conflicts with src_shape of "
+                                                           f"{pinfo.src_shape} for promoted input "
+                                                           f"'{pinfo.prom_path()}")
+                                    p2.set_src_shape(src_shape)
+                            else:
+                                abs_in2prom_info[tgt][tree_level] = \
+                                    _PromotesInfo(src_shape=src_shape, prom=prom,
+                                                  promoted_from=self.pathname)
+
                 meta.update(fullmeta)
 
     def _find_vars_to_gather(self):
@@ -1543,11 +1556,11 @@ class Group(System):
 
                     if abs_in in abs2meta:
                         if abs_in not in abs_in2prom_info:
-                            abs_in2prom_info[abs_in] = [[None, None] for s in abs_in.split('.')]
+                            abs_in2prom_info[abs_in] = [None for s in abs_in.split('.')]
                         # place a _PromotesInfo at the top level to handle the src_indices
-                        if abs_in2prom_info[abs_in][0][0] is None:
-                            abs_in2prom_info[abs_in][0][0] = _PromotesInfo(src_indices=src_indices,
-                                                                           flat=flat, prom=abs_in)
+                        if abs_in2prom_info[abs_in][0] is None:
+                            abs_in2prom_info[abs_in][0] = _PromotesInfo(src_indices=src_indices,
+                                                                        flat=flat, prom=abs_in)
 
                         meta = abs2meta[abs_in]
                         if meta['src_indices'] is not None:
@@ -3225,12 +3238,9 @@ class Group(System):
                 for i in range(nlevels):
                     for tgt, plist, plen in zip(plist_tgts, plists, plens):
                         if i < plen:
-                            pinfo, src_shape = plist[i]
+                            pinfo = plist[i]
                             if pinfo is not None and pinfo.src_shape is not None:
                                 val_shape = pinfo.src_shape
-                                break
-                            if src_shape is not None:
-                                val_shape = src_shape
                                 break
                     if val_shape is not None:
                         chosen_tgt = tgt
@@ -3259,7 +3269,7 @@ class Group(System):
                 # If a tgt has no src_indices anywhere, it will not be found in
                 # abs_in2prom_info.
                 newshape = val_shape
-                for pinfo, _ in abs_in2prom_info[tgt]:
+                for pinfo in abs_in2prom_info[tgt]:
                     if pinfo is None:
                         continue
                     inds, _, shape = pinfo
@@ -3539,11 +3549,11 @@ class Group(System):
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
         a2prom_inf = self._problem_meta['abs_in2prom_info']
         for tgt, src in self._conn_global_abs_in2out.items():
-            if tgt in a2prom_inf and a2prom_inf[tgt][0][0] is not None:
-                # a2prom_inf[tgt][0][0] is the top level _PromotesInfo object
+            if tgt in a2prom_inf and a2prom_inf[tgt][0] is not None:
                 if src in all_abs2meta_out:
                     try:
-                        a2prom_inf[tgt][0][0].set_src_shape(all_abs2meta_out[src]['global_shape'])
+                        # a2prom_inf[tgt][0] is the top level _PromotesInfo object
+                        a2prom_inf[tgt][0].set_src_shape(all_abs2meta_out[src]['global_shape'])
                     except Exception:
                         exc = sys.exc_info()
                         conditional_error(f"{self.msginfo}: When connecting '{src}' to '{tgt}': "
