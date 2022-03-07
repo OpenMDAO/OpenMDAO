@@ -1,4 +1,25 @@
-<div id="all_pt_n2_content_div" class="non-embedded-n2" data-openmdao-version="{{om_version}}">
+<!doctype html>
+<html>
+<head>
+<title><!--<<hpp_pyvar title>>--></title>
+
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!--<<hpp_script src/N2ErrorHandling.js>>-->
+
+<!--<<hpp_style style/window.css>>-->
+<!--<<hpp_style style/partition_tree.css>>-->
+<!--<<hpp_style style/n2toolbar-icons.css>>-->
+<!--<<hpp_style style/toolbar.css>>-->
+<!--<<hpp_style style/legend.css>>-->
+<!--<<hpp_style style/awesomplete.css>>-->
+
+<!--<<hpp_script libs/d3.v5.min.js>>-->
+<!--<<hpp_script libs/awesomplete.js>>-->
+<!--<<hpp_script libs/vkBeautify.js>>-->
+
+</head>
+<body>
+<div id="all_pt_n2_content_div" class="<<hpp_pyvar embeddable>>" data-openmdao-version='<<hpp_pyvar openmdao_version>>'>
     <div id="ptN2ContentDivId">
         <!-- Toolbar -->
         <div id="toolbarLoc">
@@ -119,7 +140,7 @@
             <!-- 2D Matrix Showing All Inputs/Outputs and Functions -->
             <div id="svgDiv">
                 <div class="no-show" id="waiting-container">
-                    <img id="waiting-icon" src="data:image/png;base64,{{waiting_icon}}" alt="Processing..." />
+                    <img id="waiting-icon" src="data:image/png;base64,<<hpp_bin2b64 assets/spinner.png>>" alt="Processing..." />
                 </div>
                 <svg id="svgId">
                     <style title='svgStyle'></style>
@@ -245,7 +266,7 @@
     <div id="bottom" class="offgrid" style="visibility: hidden;"></div>
 
     <div id="logo-container">
-        <img id="company-logo" alt="OpenMDAO" src="data:image/png;base64,{{logo_png}}" />
+        <img id="company-logo" alt="OpenMDAO" src="data:image/png;base64,<<hpp_bin2b64 assets/logo.png>>" />
     </div>
 
     <div id="show-error-button-container">
@@ -267,7 +288,7 @@
         <h3>Toolbar Help</h3>
         <div class='help-graphic'>
             <img id="toolbar-snapshot" alt="Snapshot of toolbar buttons"
-                src="data:image/png;base64,{{n2toolbar_png}}" />
+                src="data:image/png;base64,<<hpp_insert assets/n2toolbar_screenshot_png.b64>>" />
             <svg id='help-graphic-svg'></svg>
         </div>
     </div>
@@ -295,10 +316,30 @@
             <button class="apply-variable-selection">Apply</button>
         </div>
     </div>
+</div>
 
-    {d3_lib} {awesomplete_lib} {vk_beautify_lib} {pako_inflate_lib} {json5_lib}
-    {{model_data}}
-    {utils_lib} {symboltype_lib} {n2treenode_lib} {modeldata_lib} {n2style_lib}
-    {n2window_lib} {n2layout_lib} {n2matrixcell_lib} {n2legend_lib} {n2matrix_lib}
-    {n2arrow_lib} {n2search_lib} {n2toolbar_lib} {n2diagram_lib}
-    {nodeinfo_lib} {n2userinterface_lib} {defaults_lib} {ptn2_lib}
+<script type="text/javascript">
+    var compressedModel = "<<hpp_pyvar model_data compress>>";
+</script>
+
+<!--<<hpp_script src/utils.js>>-->
+<!--<<hpp_script src/SymbolType.js>>-->
+<!--<<hpp_script src/N2TreeNode.js>>-->
+<!--<<hpp_script src/ModelData.js>>-->
+<!--<<hpp_script src/N2Style.js>>-->
+<!--<<hpp_script src/N2Window.js>>-->
+<!--<<hpp_script src/N2Layout.js>>-->
+<!--<<hpp_script src/N2MatrixCell.js>>-->
+<!--<<hpp_script src/N2Legend.js>>-->
+<!--<<hpp_script src/N2Matrix.js>>-->
+<!--<<hpp_script src/N2Arrow.js>>-->
+<!--<<hpp_script src/N2Search.js>>-->
+<!--<<hpp_script src/N2Toolbar.js>>-->
+<!--<<hpp_script src/N2Diagram.js>>-->
+<!--<<hpp_script src/NodeInfo.js>>-->
+<!--<<hpp_script src/N2UserInterface.js>>-->
+<!--<<hpp_script src/defaults.js>>-->
+<!--<<hpp_script src/ptN2.js>>-->
+
+</body>
+</html>
