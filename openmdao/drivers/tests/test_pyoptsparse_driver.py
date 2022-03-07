@@ -2394,7 +2394,7 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_constraint('exec.z', indices=[0, 1], equals=25)
 
         # Need to fix up this test to run right
-        msg = "<model> <class Group>: 'ALIAS_TEST' indices are overlapping constraint/objective 'exec.z'."
+        msg = "<model> <class Group>: Indices for aliases ['ALIAS_TEST'] are overlapping constraint/objective 'exec.z'."
         with self.assertRaises(RuntimeError) as ctx:
             p.model.add_constraint('exec.z', indices=om.slicer[1:10], lower=20, alias="ALIAS_TEST")
             p.setup()

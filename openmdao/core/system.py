@@ -1617,63 +1617,62 @@ class System(object):
             desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
             responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
 
-            # If you have response aliases, check for overlapping indices.
-            aliases = {key: value for key, value in responses.items() if value['path']}
-            if len(aliases) > 0:
-
-                used_idx = {}
-                discrete = self._var_allprocs_discrete
-                outputs = self._var_allprocs_prom2abs_list['output']
-
-                for name in aliases:
-
-                    if name in discrete['input'] or name in discrete['output']:
-                        continue
-
-                    path = responses[name]['path']
-                    if path is None:
-                        path = name
-
-                    # Constraint alias should never be the same as any openmdao output.
-                    if name in outputs:
-                        msg = f"Constraint alias '{name}' on '{path}' is the same name as an " + \
-                            "existing variable."
-                        raise RuntimeError(msg)
-
-                    if name not in used_idx and path not in used_idx:
-                        size = self._var_allprocs_abs2meta['output'][path]['global_size']
-                        used_idx[path] = np.zeros(size, dtype=int)
-
-                        # Source won't be in aliases, but we need its indices if a constraint is
-                        # declared without an alias.
-                        if path in responses:
-                            idx = responses[path].get('indices')
-
-                            if idx is None:
-                                used_idx[path][:] += 1
-                            else:
-                                used_idx[path][idx.flat()] += 1
-                        else:
-                            # If an alias is in responses, but the path isn't, then we need to
-                            # make sure the path is present for the relevancy calculation.
-                            responses[path] = responses[name]
-
-                    indices = responses[name].get('indices')
-                    if indices is None:
-                        used_idx[path][:] += 1
-                    else:
-                        used_idx[path][indices.flat()] += 1
-
-                    overlap = np.any(used_idx[path] > 1)
-
-                    if overlap:
-                        msg = (f"{self.msginfo}: '{name}' indices are overlapping "
-                               f"constraint/objective '{path}'.")
-                        raise RuntimeError(msg)
+            self._check_alias_overlaps(desvars, responses)
 
             return self.get_relevant_vars(desvars, responses, mode)
 
         return {'@all': ({'input': ContainsAll(), 'output': ContainsAll()}, ContainsAll())}
+
+    def _check_alias_overlaps(self, desvars, responses):
+        # If you have response aliases, check for overlapping indices.
+        aliases = {key: value for key, value in responses.items() if value['path']}
+        if aliases:
+
+            used_idx = {}
+            discrete = self._var_allprocs_discrete
+            outputs = self._var_allprocs_prom2abs_list['output']
+
+            for name in aliases:
+
+                if name in discrete['input'] or name in discrete['output']:
+                    continue
+
+                path = responses[name]['path']
+
+                if path not in used_idx:
+                    size = self._var_allprocs_abs2meta['output'][path]['global_size']
+                    used_idx[path] = np.zeros(size, dtype=int)
+
+                    # Source won't be in aliases, but we need its indices if a constraint is
+                    # declared without an alias.
+                    if path in responses:
+                        idx = responses[path].get('indices')
+
+                        if idx is None:
+                            used_idx[path][:] += 1
+                        else:
+                            idx.set_src_shape(
+                                self._var_allprocs_abs2meta['output'][path]['global_shape'])
+                            used_idx[path][idx.flat()] += 1
+                    else:
+                        # If an alias is in responses, but the path isn't, then we need to
+                        # make sure the path is present for the relevancy calculation.
+                        responses[path] = responses[name]
+
+                indices = responses[name].get('indices')
+                if indices is None:
+                    used_idx[path][:] += 1
+                else:
+                    indices.set_src_shape(
+                        self._var_allprocs_abs2meta['output'][path]['global_shape'])
+                    used_idx[path][indices.flat()] += 1
+
+            for path, mat in used_idx.items():
+                if np.any(mat > 1):
+                    matching_aliases = sorted(a for a, m in aliases.items() if m['path'] == path)
+                    msg = (f"{self.msginfo}: Indices for aliases {matching_aliases} are overlapping"
+                           f" constraint/objective '{path}'.")
+                    raise RuntimeError(msg)
 
     def _setup_driver_units(self):
         """
@@ -2878,9 +2877,8 @@ class System(object):
         resp['flat_indices'] = flat_indices
 
         if resp['name'] in responses:
-            msg = f"Constraint alias '{name}' is a duplicate of an existing alias or " + \
-                "variable name."
-            raise TypeError(msg)
+            raise TypeError(f"Constraint alias '{name}' is a duplicate of an existing alias or "
+                            "variable name.")
 
         responses[resp['name']] = resp
 
@@ -3229,12 +3227,11 @@ class System(object):
                     if path is None:
                         abs_name = prom2abs_out[name][0]
                     else:
-
-                        # In-place update to absolute path.
+                        # Constraint alias should never be the same as any openmdao output.
                         if path in prom2abs_out:
-                            data['path'] = prom2abs_out[path][0]
-
-                        abs_name = data['name']
+                            path = prom2abs_out[path][0]
+                        raise RuntimeError(f"Constraint alias '{name}' on '{path}' is the "
+                                           "same name as an existing variable.")
                     out[abs_name] = data
                     out[abs_name]['ivc_source'] = abs_name
                     out[abs_name]['distributed'] = \
@@ -3246,7 +3243,7 @@ class System(object):
                     if path is None:
                         in_abs = prom2abs_in[name][0]
                         ivc_path = conns[in_abs]
-                    else:
+                    else:  # name is an alias
 
                         # In-place update to absolute path.
                         if path in prom2abs_out:
@@ -3320,7 +3317,7 @@ class System(object):
             if self.comm.size > 1 and self._subsystems_allprocs:
                 all_outs = self.comm.allgather(out)
                 out = OrderedDict()
-                for rank, all_out in enumerate(all_outs):
+                for all_out in all_outs:
                     out.update(all_out)
 
         return out
