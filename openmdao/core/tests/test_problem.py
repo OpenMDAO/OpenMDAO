@@ -2027,6 +2027,40 @@ class TestProblem(unittest.TestCase):
 
         self.assertEqual(str(cm.exception), msg)
 
+    def test_constraint_ellipses_slice_as_indices(self):
+        # this passes as long as no exceptions are raised
+        p = om.Problem()
+
+        exec_comp = p.model.add_subsystem('exec', om.ExecComp())
+
+        exec_comp.add_expr('y = x**2', y={'shape': (10, 3)}, x={'shape': (10, 3)})
+
+        p.model.add_constraint('exec.y', alias='y0', indices=om.slicer[0, ...], equals=0)
+        p.model.add_constraint('exec.y', alias='yf', indices=om.slicer[1, ...], equals=0)
+
+        p.setup()
+
+        p.set_val('exec.x', np.random.random((10, 3)))
+
+        p.run_model()
+
+    def test_constraint_slice_with_negative_as_indices(self):
+        # this passes as long as no exceptions are raised
+        p = om.Problem()
+
+        exec_comp = p.model.add_subsystem('exec', om.ExecComp())
+
+        exec_comp.add_expr('y = x**2', y={'shape': (10, 3)}, x={'shape': (10, 3)})
+
+        p.model.add_constraint('exec.y', alias='y0', indices=om.slicer[0, -1], equals=0)
+        p.model.add_constraint('exec.y', alias='yf', indices=om.slicer[-1, 0], equals=0)
+
+        p.setup()
+
+        p.set_val('exec.x', np.random.random((10, 3)))
+
+        p.run_model()
+
     def test_list_problem_vars_driver_scaling(self):
         model = SellarDerivatives()
         model.nonlinear_solver = om.NonlinearBlockGS()
