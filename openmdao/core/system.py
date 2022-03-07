@@ -2544,11 +2544,6 @@ class System(object):
         int or None
             The size of the indices, if known.
         """
-        if not (indices is None or _is_slicer_op(indices)):
-            arr = np.asarray(indices)
-            if arr.dtype.kind not in ('i', 'u') or len(arr.shape) == 0:
-                raise ValueError(f"{self.msginfo}: If specified, {typename} '{vname}' indices "
-                                 "must be a sequence of integers.")
         try:
             idxer = indexer(indices, flat_src=flat_src)
         except Exception as err:
