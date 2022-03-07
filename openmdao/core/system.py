@@ -1617,20 +1617,19 @@ class System(object):
             desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
             responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
 
-            self._check_alias_overlaps(desvars, responses)
+            responses = self._check_alias_overlaps(responses)
 
             return self.get_relevant_vars(desvars, responses, mode)
 
         return {'@all': ({'input': ContainsAll(), 'output': ContainsAll()}, ContainsAll())}
 
-    def _check_alias_overlaps(self, desvars, responses):
+    def _check_alias_overlaps(self, responses):
         # If you have response aliases, check for overlapping indices.
         aliases = {key: value for key, value in responses.items() if value['path']}
         if aliases:
 
             used_idx = {}
             discrete = self._var_allprocs_discrete
-            outputs = self._var_allprocs_prom2abs_list['output']
 
             for name in aliases:
 
@@ -1656,7 +1655,9 @@ class System(object):
                             used_idx[path][idx.flat()] += 1
                     else:
                         # If an alias is in responses, but the path isn't, then we need to
-                        # make sure the path is present for the relevancy calculation.
+                        # make sure the path is present for the relevance calculation.
+                        # This is allowed here because this responses dict is not used beyond
+                        # the relevance calculation.
                         responses[path] = responses[name]
 
                 indices = responses[name].get('indices')
@@ -1673,6 +1674,13 @@ class System(object):
                     msg = (f"{self.msginfo}: Indices for aliases {matching_aliases} are overlapping"
                            f" constraint/objective '{path}'.")
                     raise RuntimeError(msg)
+
+            # now remove alias entries from the response dict because we don't need them in the
+            # relevance calculation. This reponse dict is used only for relevance and is *not*
+            # used by the driver.
+            responses = {r: meta for r, meta in responses.items() if r not in aliases}
+
+        return responses
 
     def _setup_driver_units(self):
         """
