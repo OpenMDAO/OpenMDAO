@@ -242,7 +242,7 @@ class Indexer(object):
             The resulting indices (always flat).
         """
         arr = self.shaped_array().ravel()
-        return arr[self.flat()]
+        return arr[subidxer.flat()]
 
     def set_src_shape(self, shape, dist_shape=None):
         """

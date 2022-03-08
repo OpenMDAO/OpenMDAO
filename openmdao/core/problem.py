@@ -3,11 +3,9 @@
 import sys
 import pprint
 import os
-import logging
 import weakref
-import time
 
-from collections import defaultdict, namedtuple, OrderedDict
+from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
 from itertools import product
 
@@ -439,7 +437,7 @@ class Problem(object):
         """
         self.set_val(name, value)
 
-    def set_val(self, name, val=None, units=None, indices=None, **kwargs):
+    def set_val(self, name, val=None, units=None, indices=None, value=None):
         """
         Set an output/input variable.
 
@@ -449,26 +447,20 @@ class Problem(object):
         ----------
         name : str
             Promoted or relative variable name in the root system's namespace.
-        val : float or ndarray or list or None
+        val : object
             Value to set this variable to.
         units : str, optional
             Units that value is defined in.
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to set to specified value.
-        **kwargs : dict
-            Additional keyword argument for deprecated `value` arg.
+        value : object
+            Deprecated `value` arg.
         """
-        if 'value' not in kwargs:
-            value = None
-        elif 'value' in kwargs:
-            value = kwargs['value']
-
         if value is not None and not self._warned:
             self._warned = True
             warn_deprecation(f"{self.msginfo} 'value' will be deprecated in 4.0. Please use 'val' "
                              "in the future.")
-        elif val is not None:
-            self._warned = True
+        if val is not None:
             value = val
 
         model = self.model
@@ -562,9 +554,18 @@ class Problem(object):
                 indices = _full_slice
 
             if model._outputs._contains_abs(abs_name):
-                model._outputs.set_var(abs_name, value, indices)
+                distrib = all_meta['output'][abs_name]['distributed']
+                if (distrib and indices is _full_slice and
+                        value.size == all_meta['output'][abs_name]['global_size']):
+                    # assume user is setting using full distributed value
+                    sizes = model._var_sizes['output'][:, model._var_allprocs_abs2idx[abs_name]]
+                    start = np.sum(sizes[:myrank])
+                    end = start + sizes[myrank]
+                    model._outputs.set_var(abs_name, value[start:end], indices)
+                else:
+                    model._outputs.set_var(abs_name, value, indices)
             elif abs_name in conns:  # input name given. Set value into output
-                src_is_auto_ivc = src.rsplit('.', 1)[0] == '_auto_ivc'
+                src_is_auto_ivc = src.startswith('_auto_ivc.')
                 # when setting auto_ivc output, error messages should refer
                 # to the promoted name used in the set_val call
                 var_name = name if src_is_auto_ivc else src
@@ -576,10 +577,14 @@ class Problem(object):
                     elif tmeta['has_src_indices']:
                         if tlocmeta:  # target is local
                             flat = False
-                            src_indices = tlocmeta['src_indices']
                             if name in model._var_prom2inds:
                                 sshape, inds, flat = model._var_prom2inds[name]
                                 src_indices = inds
+                            elif (tlocmeta.get('manual_connection') or
+                                  model._inputs._contains_abs(name)):
+                                src_indices = tlocmeta['src_indices']
+                            else:
+                                src_indices = None
 
                             if src_indices is None:
                                 model._outputs.set_var(src, value, _full_slice, flat,
@@ -644,7 +649,7 @@ class Problem(object):
             self.set_val(name, value)
 
         # Clean up cache
-        self._initial_condition_cache = OrderedDict()
+        self._initial_condition_cache = {}
 
     def run_model(self, case_prefix=None, reset_iter_counts=True):
         """
@@ -969,6 +974,16 @@ class Problem(object):
                                               # src data for inputs)
             'using_par_deriv_color': False,  # True if parallel derivative coloring is being used
             'mode': mode,  # mode (derivative direction) set by the user.  'auto' by default
+            'abs_in2prom_info': {},  # map of abs input name to list of length = sys tree height
+                                     # down to var location, to allow quick resolution of local
+                                     # src_shape/src_indices due to promotes.  For example,
+                                     # for abs_in of a.b.c.d, dict entry would be
+                                     # [None, None, None], corresponding to levels
+                                     # a, a.b, and a.b.c, with one of the Nones replaced
+                                     # by promotes info.  Dict entries are only created if
+                                     # src_indices are applied to the variable somewhere.
+            'raise_connection_errors': True,  # If False, connection related errors in setup will
+                                              # be converted to warnings.
         }
         model._setup(model_comm, mode, self._metadata)
 
