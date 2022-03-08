@@ -21,7 +21,7 @@ from openmdao.solvers.linesearch.tests.test_backtracking import ImplCompTwoState
 from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRecorded, \
     assertDriverIterDataRecorded, assertSystemIterDataRecorded, assertSolverIterDataRecorded, \
     assertViewerDataRecorded, assertSystemMetadataIdsRecorded, assertSystemIterCoordsRecorded, \
-    assertDriverDerivDataRecorded, assertProblemDerivDataRecorded, database_cursor
+    assertDriverDerivDataRecorded, assertProblemDerivDataRecorded
 
 from openmdao.recorders.tests.recorder_test_utils import run_driver
 from openmdao.utils.assert_utils import assert_near_equal, assert_equal_arrays, \
@@ -1475,7 +1475,6 @@ class TestSqliteRecorder(unittest.TestCase):
         assertSolverIterDataRecorded(self, expected_data, self.eps)
 
     def test_record_solver_nonlinear_newton(self):
-
         prob = SellarProblem(
             linear_solver=om.LinearBlockGS,
             nonlinear_solver=om.NewtonSolver(solve_subsystems=False))
