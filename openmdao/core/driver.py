@@ -328,8 +328,7 @@ class Driver(object):
             remote_cons = set(_prom2ivc_src_name_iter(self._cons)) - local_out_vars
             remote_objs = set(_prom2ivc_src_name_iter(self._objs)) - local_out_vars
 
-            all_remote_vois = model.comm.allgather(
-                (remote_dvs, remote_cons, remote_objs))
+            all_remote_vois = model.comm.allgather((remote_dvs, remote_cons, remote_objs))
             for rem_dvs, rem_cons, rem_objs in all_remote_vois:
                 con_set.update(rem_cons)
                 obj_set.update(rem_objs)
