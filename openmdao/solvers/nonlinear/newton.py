@@ -208,7 +208,6 @@ class NewtonSolver(NonlinearSolver):
             norm0 = norm if norm != 0.0 else 1.0
             rec.rel = norm / norm0
 
-        norm0 = norm if norm != 0.0 else 1.0
         return norm0, norm
 
     def _single_iteration(self):
