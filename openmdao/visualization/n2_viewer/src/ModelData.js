@@ -1,3 +1,6 @@
+// <<hpp_insert libs/pako_inflate.min.js>>
+// <<hpp_insert libs/json5_2.2.0.min.js>>
+
 /** Process the tree, connections, and other info provided about the model. */
 class ModelData {
 
