@@ -231,11 +231,7 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         ref0 = meta.get('ref0')
         lower = meta.get('lower')
         upper = meta.get('upper')
-
-        if meta.get('ivc_source') is not None:
-            src_name = meta['ivc_source']
-        else:
-            src_name = name
+        src_name = meta.get('ivc_source')
 
         if src_name in model._discrete_outputs:
             discretes['dvs'].append(name)
@@ -277,11 +273,7 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         lower = meta.get('lower')
         upper = meta.get('upper')
         equals = meta.get('equals')
-
-        if meta.get('ivc_source') is not None:
-            src_name = meta['ivc_source']
-        else:
-            src_name = name
+        src_name = meta.get('ivc_source')
 
         if src_name in model._discrete_outputs:
             discretes['con'].append(name)
@@ -322,11 +314,7 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         adder = meta['total_adder']
         ref = meta.get('ref')
         ref0 = meta.get('ref0')
-
-        if meta.get('ivc_source') is not None:
-            src_name = meta['ivc_source']
-        else:
-            src_name = name
+        src_name = meta.get('ivc_source')
 
         if src_name in model._discrete_outputs:
             discretes['obj'].append(name)
