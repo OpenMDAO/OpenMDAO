@@ -431,10 +431,6 @@ class CaseViewer(object):
         src = self._widgets['source_select'].value
         cases = self._widgets['cases_list'].options
 
-        print('src and cases')
-        print(src)
-        print(cases)
-
         if not cases:
             self._widgets[f'{axis}_select'].options = []
             self._widgets[f'{axis}_info'].value = 'N/A'
@@ -448,10 +444,6 @@ class CaseViewer(object):
         if var_type == 'optimization':
             opt_vars = _get_opt_vars(self._case_reader, cases)
             output_vars = _get_output_vars(self._case_reader, cases)
-            print('opt')
-            print(opt_vars)
-            print('output')
-            print(output_vars)
             vars = set(opt_vars).intersection(set(output_vars))
         elif var_type == 'residuals':
             vars = _get_resids_vars(self._case_reader, cases)
@@ -652,10 +644,6 @@ class CaseViewer(object):
                 lw = 1.0 if (selected_case_idx >= len(cases) or i == selected_case_idx) else 0.05
                 case = self._case_reader.get_case(case_name)
 
-                print('i', 'case_name')
-                print(i, case_name)
-
-                print('y')
                 if y_var_type == 'residuals':
                     y_val = _get_resids_val(case, y_var)
                     print(y_val)
@@ -669,9 +657,6 @@ class CaseViewer(object):
                         print(f'Error while applying Y slice: {y_slice}')
                     continue
                 y_val = _apply_transform(y_val, y_transform)
-
-                print('y')
-                print(y_val)
 
                 if x_var not in (None, self._case_index_str):
                     if x_var_type == 'residuals':
@@ -688,9 +673,6 @@ class CaseViewer(object):
                         print(f'Error while applying X slice: {x_slice}')
                     continue
                 x_val = _apply_transform(x_val, x_transform)
-
-                print('x')
-                print(x_val)
 
                 if x_val is None or y_val is None:
                     print('x_val = ', x_val)
