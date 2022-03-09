@@ -8,6 +8,8 @@ import webbrowser
 import openmdao.api as om
 import numpy as np
 
+_DEBUG = False
+
 try:
     import matplotlib.pyplot as plt
     import matplotlib as mpl
@@ -49,7 +51,8 @@ def _apply_transform(data, transform):
     """
     _func_map[transform]
     if _func_map[transform]:
-        return _func_map[transform](data)
+        out = _func_map[transform](data)
+        return np.atleast_2d(np.asarray(out))
     return data
 
 
@@ -72,6 +75,136 @@ def _apply_slice(data, s):
     safe_funcs = {'index_exp': np.index_exp, '__builtins__': None}
     sl = eval(f'index_exp{s}', safe_funcs, None)
     return data[sl]
+
+
+def _get_output_meta(cr, case_name, var):
+    """
+    Return the metadata for the variable of the given name in the output cases.
+
+    Parameters
+    ----------
+    cr : om.CaseReader
+        The case reader housing the data.
+    case_name : str
+        The case from which the outputs with avaialble metadata is to be returned.
+    var : str
+        The output whose metadata is desired.
+
+    Returns
+    -------
+    list
+        A dictionary of the metadata for the given output
+    """
+    output_vars = set()
+    case = cr.get_case(case_name)
+    case_outputs = case.list_outputs(prom_name=True, units=True, shape=True, val=False, residuals=False,
+                                     out_stream=None)
+
+    for promname, meta in case_outputs:
+        if promname == var:
+            return meta
+    else:
+        raise KeyError(f'No output named {var} found')
+
+
+def _get_output_vars(cr, case_names):
+    """
+    Return a set of variable names whose values are present in at lease one of the given cases.
+
+    Parameters
+    ----------
+    cr : om.CaseReader
+        The CaseReader housing the data.
+    case_names : Iterable of str
+        The case_names from which the outputs with avaialble residuals out are to be returned.
+
+    Returns
+    -------
+    list
+        A list of the variables with avaialble residuals in at least one of the given cases.
+    """
+    output_vars = set()
+    for case_name in case_names:
+        case = cr.get_case(case_name)
+        case_outputs = case.list_outputs(prom_name=True, units=False, shape=False, val=True, residuals=False,
+                                         out_stream=None)
+        output_vars |= {promname for promname, meta in case_outputs if isinstance(meta['val'], np.ndarray)}
+    return sorted(list(output_vars))
+
+
+def _get_resids_vars(cr, case_names):
+    """
+    Return a set of variable names whose residuals are present in at lease one of the given cases.
+
+    Parameters
+    ----------
+    cr : om.CaseReader
+        The CaseReader housing the data.
+    case_names : Iterable of str
+        The case_names from which the outputs with avaialble residuals out are to be returned.
+
+    Returns
+    -------
+    list
+        A list of the variables with avaialble residuals in at least one of the given cases.
+    """
+    resid_vars = set()
+    for case_name in case_names:
+        case = cr.get_case(case_name)
+        case_outputs = case.list_outputs(prom_name=True, units=True, shape=True, val=False, residuals=True,
+                                         out_stream=None)
+        resid_vars |= {promname for promname, meta in case_outputs if isinstance(meta['resids'], np.ndarray)}
+    return sorted(list(resid_vars))
+
+
+def _get_opt_vars(cr, case_names):
+    """
+    Return a set of variable names whose outputs are present in at lease one of the given cases and are part
+    of the optimization variables in at least one of the cases.
+
+    Parameters
+    ----------
+    cr : om.CaseReader
+        The CaseReader housing the data.
+    case_names : Iterable of str
+        The case_names from which the outputs with avaialble residuals out are to be returned.
+
+    Returns
+    -------
+    list
+        A list of the variables with avaialble residuals in at least one of the given cases.
+    """
+    desvars = set()
+    cons = set()
+    objs = set()
+    for case_name in case_names:
+        case = cr.get_case(case_name)
+        desvars |= case.get_design_vars().keys()
+        cons |= case.get_constraints().keys()
+        objs |= case.get_objectives().keys()
+    return sorted(list(desvars | cons | objs))
+
+
+def _get_resids_val(case, prom_name):
+    """
+    Retrieve residuals associated with the given output in the given case.
+
+    Parameters
+    ----------
+    case : om.Case
+        The CaseReader Case from which residuals are to be retrieved.
+    prom_name : str
+        The promoted name of the output whose residuals are to be retrieved.
+
+    Returns
+    -------
+    np.ndarray
+        The residuals of the given output in the given case.
+
+    """
+    listed_op = case.list_outputs(prom_name=True, residuals=True, val=False, out_stream=None)
+    d = {meta['prom_name']: meta for _, meta in listed_op}
+    return d[prom_name]['resids']
 
 
 class CaseViewer(object):
@@ -124,84 +257,26 @@ class CaseViewer(object):
 
         self._filename = self._case_reader._filename
 
-        self._load_case_file(self._case_reader)
-
         self._make_gui()
 
         self._register_callbacks()
 
         self._fig, self._ax = plt.subplots(1, 1, figsize=(9, 9/1.6), tight_layout=True)
 
+        self._update_source_options()
+        self._update_case_select_options()
+        self._update_var_select_options('x')
+        self._update_var_select_options('y')
         self._update_var_info('x')
         self._update_var_info('y')
 
-    def sources(self):
-        return self._outputs[self._filename] if self._filename in self._outputs else {}
-
-    def cases(self, source):
-        srcs = self.sources()
-        return srcs[source] if source in srcs else {}
-
-    def outputs(self, source, cases):
-        available_cases = self.cases(source)
-        _cases = [cases] if isinstance(cases, str) else cases
-        op = {}
-        for case in _cases:
-            op.update(available_cases[case] if case in available_cases else {})
-        return op
-
-    def _load_case_file(self, cr):
-        """
-        Load a CaseRecorder file into a dictionary structure.
-
-        Parameters
-        ----------
-        cr : om.CaseReader
-            The case reader object to load.
-
-        Returns
-        -------
-        dict
-            A nested dictionary where the metadata of the outputs are keyed with the following layers:
-            `outputs[filename][source_name][case_name][output_name]`
-        """
-        filename = cr._filename
-        self._outputs = {filename: {source_name: {} for source_name in cr.list_sources(out_stream=None)}}
-        self._desvars = set()
-        self._constraints = set()
-        self._objectives = set()
-        self._resids = set()
-
-        for source_name in self._outputs[filename].keys():
-            self._outputs[filename][source_name] = {case: {} for case in
-                                                    cr.list_cases(source=source_name, out_stream=None)}
-
-            for case_name in self._outputs[filename][source_name].keys():
-                case = cr.get_case(case_name)
-                case_outputs = case.list_outputs(prom_name=True, units=True, shape=True, val=False, residuals=True,
-                                                 out_stream=None)
-                self._outputs[filename][source_name][case_name] = {meta['prom_name']: meta for _, meta in case_outputs}
-                self._desvars |= case.get_design_vars().keys()
-                self._constraints |= case.get_constraints().keys()
-                self._objectives |= case.get_objectives().keys()
-                self._resids |= {promname for promname, meta in self._outputs[filename][source_name][case_name].items()
-                                 if isinstance(meta['resids'], str) and meta['resids'] != 'Not Recorded'}
-
     def _make_gui(self):
-        default_source = list(self.sources().keys())[0]
-        default_case = list(self.cases(default_source).keys())[-1]
-        default_outputs_list = list(self.outputs(default_source, default_case).keys())
-
         self._widgets = {}
 
-        self._widgets['source_select'] = ipw.Dropdown(options=self.sources().keys(),
-                                                      value=default_source,
-                                                      description='Source',
+        self._widgets['source_select'] = ipw.Dropdown(description='Source',
                                                       layout=ipw.Layout(width='30%', height='auto'))
 
-        self._widgets['cases_select'] = ipw.SelectMultiple(options=self.cases(default_source).keys(),
-                                                          value=[default_case],
-                                                          description='Cases',
+        self._widgets['cases_select'] = ipw.SelectMultiple(description='Cases',
                                                           layout=ipw.Layout(width='40%', height='auto'))
 
         self._widgets['case_select_button'] = ipw.Button(description='Select ' + '\u27F6',
@@ -213,9 +288,7 @@ class CaseViewer(object):
         self._widgets['case_remove_button'] = ipw.Button(description='Remove ' + '\u274c',
                                                          layout={'width': '100%'})
 
-        self._widgets['cases_list'] = ipw.Select(options=[default_case],
-                                                 value=default_case,
-                                                 layout=ipw.Layout(width='40%', height='auto'))
+        self._widgets['cases_list'] = ipw.Select(layout=ipw.Layout(width='40%', height='auto'))
 
         self._widgets['x_filter'] = ipw.Text('', description='X-Axis Filter',
                                              layout=ipw.Layout(width='49%', height='auto'))
@@ -225,9 +298,7 @@ class CaseViewer(object):
                                                    value='outputs',
                                                    layout={'width': '49%'})
 
-        self._widgets['x_select'] = ipw.Select(options=[self._case_index_str] + default_outputs_list,
-                                               value=self._case_index_str,
-                                               description='X-Axis',
+        self._widgets['x_select'] = ipw.Select(description='X-Axis',
                                                layout=ipw.Layout(width='auto', height='auto'))
 
 
@@ -248,13 +319,12 @@ class CaseViewer(object):
                                              layout={'width': '49%', 'height': 'auto'})
 
         self._widgets['y_var_type'] = ipw.Dropdown(options=['outputs', 'optimization', 'residuals'],
-                                                   description='Y Var Type',
+                                                   description='Y Var Type WTF',
                                                    value='outputs',
                                                    layout={'width': '49%'})
 
-        self._widgets['y_select'] = ipw.Select(options=default_outputs_list,
-                                   description='Y-Axis',
-                                   layout=ipw.Layout(width='auto', height='auto'))
+        self._widgets['y_select'] = ipw.Select(description='Y-Axis',
+                                               layout=ipw.Layout(width='auto', height='auto'))
 
         self._widgets['y_transform_select'] = ipw.Dropdown(options=_func_map.keys(),
                                                            value='None',
@@ -304,6 +374,10 @@ class CaseViewer(object):
                           self._widgets['case_slider'],
                           self._widgets['debug_output']]))
 
+    def _update_source_options(self):
+        sources = self._case_reader.list_sources(out_stream=None)
+        self._widgets['source_select'].options = sources
+        self._widgets['source_select'].value = sources[0]
 
     def _update_var_info(self, axis):
         """
@@ -320,26 +394,88 @@ class CaseViewer(object):
         src = self._widgets['source_select'].value
         cases = self._widgets['cases_list'].options
 
+        if not cases:
+            self._widgets[f'{axis}_info'].value = 'N/A'
+            return
+
         var = self._widgets[f'{axis}_select'].value
 
         if var == self._case_index_str:
             shape = (len(cases),)
-            units = None
         elif var is None:
             shape = 'N/A'
-            units = 'N/A'
         else:
-            meta = self._outputs[self._filename][src][cases[0]][var]
+            meta = _get_output_meta(self._case_reader, cases[0], var)
             shape = meta['shape']
-            units = meta['units']
 
         self._widgets[f'{axis}_info'].value = f'{shape}'
 
+    def _update_case_select_options(self):
+        src = self._widgets['source_select'].value
+        avialable_cases = self._case_reader.list_cases(source=src, recurse=False, out_stream=None)
+        self._widgets['cases_select'].options = avialable_cases
+        self._update_case_slider()
+
+    def _update_var_select_options(self, axis):
+        """
+        Updates the variables available for plotting.
+
+        Parameters
+        ----------
+        axis : str
+            'x' or 'y' - case insensitive.
+        """
+        if axis.lower() not in ('x', 'y'):
+            raise ValueError(f'Unknown axis: {axis}')
+
+        src = self._widgets['source_select'].value
+        cases = self._widgets['cases_list'].options
+
+        print('src and cases')
+        print(src)
+        print(cases)
+
+        if not cases:
+            self._widgets[f'{axis}_select'].options = []
+            self._widgets[f'{axis}_info'].value = 'N/A'
+            return
+
+        w_var_select = self._widgets[f'{axis}_select']
+        var_filter = self._widgets[f'{axis}_filter'].value
+        var_select = w_var_select.value
+        var_type = self._widgets[f'{axis}_var_type'].value
+
+        if var_type == 'optimization':
+            opt_vars = _get_opt_vars(self._case_reader, cases)
+            output_vars = _get_output_vars(self._case_reader, cases)
+            print('opt')
+            print(opt_vars)
+            print('output')
+            print(output_vars)
+            vars = set(opt_vars).intersection(set(output_vars))
+        elif var_type == 'residuals':
+            vars = _get_resids_vars(self._case_reader, cases)
+        else:
+            vars = _get_output_vars(self._case_reader, cases)
+
+        # We have a list of available vars, now filter it.
+        r = re.compile(var_filter)
+        filtered_list = list(filter(r.search, vars))
+
+        w_var_select.options = [self._case_index_str] + filtered_list if axis == 'x' else filtered_list
+
+        self._update_var_info(axis)
+
+    def _update_case_slider(self):
+        n = len(self._widgets['cases_list'].options)
+        self._widgets['case_slider'].max = n
+        self._widgets['case_slider'].value = n
 
     def _register_callbacks(self):
         self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
 
+            self._widgets['source_select'].observe(self._callback_select_source)
             self._widgets['case_select_button'].on_click(self._callback_select_case)
             self._widgets['case_select_all_button'].on_click(self._callback_select_all_cases)
             self._widgets['case_remove_button'].on_click(self._callback_remove_case)
@@ -366,6 +502,14 @@ class CaseViewer(object):
 
             self._widgets['case_slider'].observe(self._callback_case_slider, 'value')
 
+    def _callback_select_source(self, *args):
+        """
+        Repopulate cases_select with cases from the chosen source.
+        """
+        self._widgets['debug_output'].clear_output()
+        with self._widgets['debug_output']:
+            self._update_case_select_options()
+
     def _callback_select_case(self, *args):
         """
         Add the selected case(s) to the chosen cases list.
@@ -377,15 +521,20 @@ class CaseViewer(object):
             new = self._widgets['cases_select'].value
             numeric_sorter = lambda case_name: (case_name.split('|')[0], int(case_name.split('|')[-1]))
             self._widgets['cases_list'].options = sorted(list(set(current + new)), key=numeric_sorter)
+            self._update_case_slider()
+            self._update_var_select_options('x')
+            self._update_var_select_options('y')
             self._update_plot()
 
     def _callback_case_list_select(self, *args):
-        n = len(self._widgets['cases_list'].options)
-        self._widgets['case_slider'].max = n
-        self._widgets['case_slider'].value = n
+        self._widgets['debug_output'].clear_output()
+        with self._widgets['debug_output']:
+            self._update_plot()
 
     def _callback_case_slider(self, *args):
-        self._update_plot()
+        self._widgets['debug_output'].clear_output()
+        with self._widgets['debug_output']:
+            self._update_plot()
 
     def _callback_select_all_cases(self, *args):
         """
@@ -398,9 +547,10 @@ class CaseViewer(object):
             new = self._widgets['cases_select'].options
             numeric_sorter = lambda case_name: (case_name.split('|')[0], int(case_name.split('|')[-1]))
             self._widgets['cases_list'].options = sorted(list(set(current + new)), key=numeric_sorter)
+            self._update_case_slider()
+            self._update_var_select_options('x')
+            self._update_var_select_options('y')
             self._update_plot()
-            self._update_var_info('x')
-            self._update_var_info('y')
 
     def _callback_remove_case(self, *args):
         """
@@ -410,39 +560,22 @@ class CaseViewer(object):
         with self._widgets['debug_output']:
             clw = self._widgets['cases_list']
             new_list = list(clw.options)
-            new_list.remove(clw.value)
+            if clw.value in new_list:
+                new_list.remove(clw.value)
             clw.options = new_list
-            self._update_var_info('x')
-            self._update_var_info('y')
+            self._update_var_select_options('x')
+            self._update_var_select_options('y')
+            self._update_plot()
 
     def _callback_filter_vars(self, *args):
         event = args[0]
         self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             w = event['owner']
-
             axis = 'x' if w is self._widgets['x_filter'] or w is self._widgets['x_var_type'] else 'y'
-
-            var_filter = self._widgets[f'{axis}_filter'].value
-            var_select = self._widgets[f'{axis}_select'].value
-            var_type = self._widgets[f'{axis}_var_type'].value
-
-            src = self._widgets['source_select'].value
-            cases = self._widgets['cases_list'].options
-
-            all_outputs = self.outputs(src, cases).keys()
-
-            r = re.compile(var_filter)
-            filtered_list = list(filter(r.search, self.outputs(src, cases).keys()))
-
-            if var_type == 'optimization':
-                filtered_list = [s for s in filtered_list if
-                                 (s in self._objectives or s in self._desvars or s in self._constraints)]
-            elif var_type.startswith('resid'):
-                filtered_list = [s for s in filtered_list if s in self._resids]
-
-            self._widgets[f'{axis}_select'].options = [self._case_index_str] + filtered_list \
-                if axis == 'x' else filtered_list
+            print(f'updating available vars for {axis}')
+            self._update_var_select_options(axis)
+            self._update_plot()
 
     def _callback_select_var(self, *args):
         event = args[0]
@@ -452,7 +585,6 @@ class CaseViewer(object):
             s = w.value
             src = self._widgets['source_select'].value
             cases = self._widgets['cases_list'].options
-
             axis = 'x' if w is self._widgets['x_select'] else 'y'
 
             self._update_var_info(axis)
@@ -515,33 +647,55 @@ class CaseViewer(object):
 
         self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
-            for i, case in enumerate(cases):
+            for i, case_name in enumerate(cases):
                 alpha = 1.0 if (selected_case_idx >= len(cases) or i == selected_case_idx) else 0.2
                 lw = 1.0 if (selected_case_idx >= len(cases) or i == selected_case_idx) else 0.05
+                case = self._case_reader.get_case(case_name)
 
-                if True:
-                    y_val = self._case_reader.get_case(case).get_val(y_var)
-                elif y_var_type == 'residuals':
-                    listed_op = self._case_reader.get_case(case).list_outputs(prom_name=True, residuals=True, val=False)
-                    d = {meta['prom_name']: meta for _, meta in listed_op}
-                    y_val = d[y_var]['resids']
+                print('i', 'case_name')
+                print(i, case_name)
+
+                print('y')
+                if y_var_type == 'residuals':
+                    y_val = _get_resids_val(case, y_var)
+                    print(y_val)
+                else:
+                    y_val = case.get_val(y_var)
 
                 try:
                     y_val = _apply_slice(y_val, y_slice)
                 except:
-                    print(f'Error while applying Y slice: {y_slice}')
+                    if _DEBUG:
+                        print(f'Error while applying Y slice: {y_slice}')
+                    continue
                 y_val = _apply_transform(y_val, y_transform)
 
+                print('y')
+                print(y_val)
+
                 if x_var not in (None, self._case_index_str):
-                    x_val = self._case_reader.get_case(case).get_val(x_var)
+                    if x_var_type == 'residuals':
+                        x_val = _get_resids_val(case, x_var)
+                    else:
+                        x_val = self._case_reader.get_case(case_name).get_val(x_var)
                 else:
                     x_val = i * np.ones_like(y_val)
 
                 try:
                     x_val = _apply_slice(x_val, x_slice)
                 except:
-                    print(f'Error while applying X slice: {x_slice}')
+                    if _DEBUG:
+                        print(f'Error while applying X slice: {x_slice}')
+                    continue
                 x_val = _apply_transform(x_val, x_transform)
+
+                print('x')
+                print(x_val)
+
+                if x_val is None or y_val is None:
+                    print('x_val = ', x_val)
+                    print('y_val = ', y_val)
+                    continue
 
                 if x_val.shape[0] != y_val.shape[0]:
                     print(f'Incompatible shapes: x.shape = {x_val.shape}  y.shape = {y_val.shape}.')
@@ -582,6 +736,7 @@ class CaseViewer(object):
     def _update_plot(self):
         self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
+            cr = self._case_reader
             src = self._widgets['source_select'].value
             cases = self._widgets['cases_list'].options
             x_var = self._widgets['x_select'].value
@@ -593,9 +748,11 @@ class CaseViewer(object):
 
             self._ax.clear()
 
-            x_units = 'None' if x_var == self._case_index_str else \
-                self._outputs[self._filename][src][cases[0]][x_var]['units']
-            y_units = self._outputs[self._filename][src][cases[0]][y_var]['units']
+            if not cases:
+                return
+
+            x_units = 'None' if x_var == self._case_index_str else _get_output_meta(cr, cases[0], x_var)['units']
+            y_units = _get_output_meta(cr, cases[0], y_var)['units']
 
             self._redraw_plot(cases, x_var=x_var, y_var=y_var)
 
