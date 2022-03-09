@@ -1409,7 +1409,6 @@ class TestDOEDriverListVars(unittest.TestCase):
 
         # Setup driver for 3 cases at a time
         prob.driver = om.DOEDriver(om.ListGenerator(samples))
-        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.setup(derivatives=False)
         prob.run_driver()
