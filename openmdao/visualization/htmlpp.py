@@ -32,23 +32,23 @@ class HtmlPreprocessor():
 
     Attributes
     ----------
-    start_filename : str
+    _start_filename : str
         The path to the file to begin processing from, normally an HTML file.
-    start_path : Path
+    _start_path : Path
         Path object used to determine relative paths for subsequent directives.
-    start_dirname : str
+    _start_dirname : str
         The absolute path of the directory containing the start_file.
-    output_filename : str
+    _output_filename : str
         The path to the newly merged HTML file.
-    var_dict : dict
+    _var_dict : dict
         Dictionary of variable names and values referenced by hpp_pyvar directives.
-    allow_overwrite : bool
+    _allow_overwrite : bool
         If true, overwrite the output file if it exists.
-    verbose : bool
+    _verbose : bool
         If True, print some status messages to stdout.
-    loaded_filenames : list
+    _loaded_filenames : list
         List of filenames loaded so far, to determine if a file has been already loaded.
-    json_dumps_default : function
+    _json_dumps_default : function
         Passed to json.dumps() as the "default" parameter that gets
         called for objects that can't be serialized.
 
@@ -96,25 +96,25 @@ class HtmlPreprocessor():
         """
         Configure the preprocessor and validate file paths.
         """
-        self.start_path = Path(start_filename)
-        if self.start_path.is_file() is False:
+        self._start_path = Path(start_filename)
+        if self._start_path.is_file() is False:
             raise FileNotFoundError(f"Error: {start_filename} not found")
 
         output_path = Path(output_filename)
         if output_path.is_file() and not allow_overwrite:
             raise FileExistsError(f"Error: {output_filename} already exists")
 
-        self.start_filename = start_filename
-        self.start_dirname = self.start_path.resolve().parent
-        self.output_filename = output_filename
-        self.allow_overwrite = allow_overwrite
-        self.var_dict = var_dict
-        self.json_dumps_default = json_dumps_default
-        self.verbose = verbose
+        self._start_filename = start_filename
+        self._start_dirname = self._start_path.resolve().parent
+        self._output_filename = output_filename
+        self._allow_overwrite = allow_overwrite
+        self._var_dict = var_dict
+        self._json_dumps_default = json_dumps_default
+        self._verbose = verbose
 
         # Keep track of filenames already loaded, to make sure
         # we don't unintentionally include the exact same file twice.
-        self.loaded_filenames = []
+        self._loaded_filenames = []
 
         self.msg("HtmlProcessor object created.")
 
@@ -139,13 +139,13 @@ class HtmlPreprocessor():
             The complete contents of the file.
         """
         path = Path(filename)
-        pathname = filename if path.is_absolute() else self.start_dirname / filename
+        pathname = filename if path.is_absolute() else self._start_dirname / filename
 
-        if pathname in self.loaded_filenames and not allow_dup:
+        if pathname in self._loaded_filenames and not allow_dup:
             self.msg(f"Ignoring previously-loaded file {filename}.", rlvl)
             return ""
 
-        self.loaded_filenames.append(pathname)
+        self._loaded_filenames.append(pathname)
         self.msg(f"Loading file {pathname}.", rlvl)
 
         if binary:
@@ -168,7 +168,7 @@ class HtmlPreprocessor():
         rlvl : int
             Recursion level to help with indentation when verbose is enabled.
         """
-        if self.verbose:
+        if self._verbose:
             print(rlvl * '--' + msg)
 
     def parse_contents(self, contents: str, rlvl=0) -> str:
@@ -238,14 +238,14 @@ class HtmlPreprocessor():
                 new_content = self.load_file(arg, binary=True, allow_dup=flags['dup'], rlvl=rlvl)
 
             elif keyword == 'pyvar':
-                if arg in self.var_dict:
-                    val = self.var_dict[arg]
+                if arg in self._var_dict:
+                    val = self._var_dict[arg]
                     if type(val) in (str, bool, int, float):
                         # Use string representations of primitive types
-                        new_content = str(self.var_dict[arg])
+                        new_content = str(self._var_dict[arg])
                         do_compress = True if flags['compress'] else False
                     else:
-                        raw_data = json.dumps(val, default=self.json_dumps_default)
+                        raw_data = json.dumps(val, default=self._json_dumps_default)
                         if flags['compress']:
                             self.msg("Compressing content.", rlvl)
                             compressed_content = zlib.compress(raw_data.encode('UTF-8'))
@@ -275,12 +275,12 @@ class HtmlPreprocessor():
         """
         Initialize the preprocessor, then save the result as a new file.
         """
-        new_html_content = self.parse_contents(self.load_file(self.start_filename))
+        new_html_content = self.parse_contents(self.load_file(self._start_filename))
 
-        path = Path(self.output_filename)
-        if path.is_file() and not self.allow_overwrite:
-            raise FileExistsError(f"Error: {self.output_filename} already exists")
+        path = Path(self._output_filename)
+        if path.is_file() and not self._allow_overwrite:
+            raise FileExistsError(f"Error: {self._output_filename} already exists")
 
-        output_file = open(self.output_filename, "w", encoding='UTF-8')
+        output_file = open(self._output_filename, "w", encoding='UTF-8')
         output_file.write(new_html_content)
         output_file.close()
