@@ -1133,11 +1133,6 @@ class Driver(object):
         dict
             Data used to create html file.
         """
-        if MPI:
-            issue_warning("The scaling report currently is not supported when running under MPI.",
-                          prefix=self.msginfo, category=MPIWarning)
-            return
-
         from openmdao.visualization.scaling_viewer.scaling_report import view_driver_scaling
 
         # Run the model if it hasn't been run yet.

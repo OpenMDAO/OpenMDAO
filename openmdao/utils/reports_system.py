@@ -25,12 +25,7 @@ _reports_dir = './reports'  # the default location for the reports
 
 def _is_rank_0(prob):
     # Utility function to determine if MPI and on rank0 or not on MPI at all
-    on_rank0 = True
-    if MPI:
-        rank = prob.comm.rank
-        if rank != 0:
-            on_rank0 = False
-    return on_rank0
+    return not MPI or prob.comm.rank == 0
 
 
 def report_function(report_filename):
