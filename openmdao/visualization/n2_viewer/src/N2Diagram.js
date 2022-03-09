@@ -26,7 +26,7 @@
 class N2Diagram {
     constructor(modelJSON) {
         this.modelData = modelJSON;
-        this.model = new ModelData(modelJSON);
+        this.model = new OmModelData(modelJSON);
         this.zoomedElement = this.zoomedElementPrev = this.model.root;
         this.showPath = false;
         this.manuallyResized = false; // If the diagram has been sized by the user
@@ -439,7 +439,7 @@ class N2Diagram {
                 return d.draw.prevDims.height * self.prevTransitCoords.model.y;
             })
             .attr("id", function (d) {
-                return N2TreeNode.absPathToId(d.absPathName);
+                return N2TreeNode.uuidToId(d.uuid);
             })
             .attr('rx', 12)
             .attr('ry', 12);

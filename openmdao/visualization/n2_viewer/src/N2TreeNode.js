@@ -6,7 +6,6 @@
  * @property {Number} depth The index of the column this node appears in.
  */
 class N2TreeNode {
-
     /**
      * Absorb all the properties of the provided JSON object from the model tree.
      * @param {Object} origNode The node to work from.
@@ -17,18 +16,13 @@ class N2TreeNode {
         Object.assign(this, origNode);
         if (attribNames.descendants != 'children') {
             this.children = this[attribNames.descendants];
-            delete this[childAttribName];
-        }
-
-        if (attribNames.uuid != 'uuid') {
-            this.uuid = this[attribNames.uuid];
-            delete this[attribNames.uuid];
+            delete this[attribNames.descendants];
         }
 
         this.sourceParentSet = new Set();
         this.targetParentSet = new Set();
 
-        // Node display data
+        // Node display data. TODO: Set outside of N2TreeNode. Maybe its own class?
         this.draw = {
             nameWidthPx: 1, // Width of the label in pixels as computed by N2Layout
             nameSolverWidthPx: 1, // Solver-side label width pixels as computed by N2Layout
@@ -83,9 +77,9 @@ class N2TreeNode {
     }
 
     /**
-     * Determine if the children array exists and has members.
-     * @param {string} [childrenPropName = 'children'] Usually children, but
-     *   sometimes 'subsystem_children'
+     * Determine if a children array exists and has members.
+     * @param {string} [childrenPropName = 'children'] Usually "children", but
+     *   some models have addition child arrays like "subsystem_children".
      * @return {boolean} True if the children property is an Array and length > 0.
      */
     hasChildren(childrenPropName = 'children') {
@@ -162,7 +156,7 @@ class N2TreeNode {
      * @returns {Boolean} True if a match is found, otherwise false.
      */
     hasNodeInChildren(compareNode) {
-        return this.childNames.has(compareNode.absPathName);
+        return this.childNames.has(compareNode.uuid);
     }
 
     /** Look for the supplied node in the parentage of this one.
@@ -195,42 +189,6 @@ class N2TreeNode {
         if (this.hasParent(compareNode, parentLimit)) return true;
 
         return this.hasNodeInChildren(compareNode);
-    }
-
-    /**
-     * Add ourselves to the supplied array if we contain a cycleArrows property.
-     * @param {Array} arr The array to add to.
-     */
-    _getNodesInChildrenWithCycleArrows(arr) {
-        if (this.cycleArrows) {
-            arr.push(this);
-        }
-
-        if (this.hasChildren()) {
-            for (const child of this.children) {
-                child._getNodesInChildrenWithCycleArrows(arr);
-            }
-        }
-    }
-
-    /**
-     * Populate an array with nodes in our lineage that contain a cycleArrows member.
-     * @returns {Array} The array containing all the found nodes with cycleArrows.
-     */
-    getNodesWithCycleArrows() {
-        const arr = [];
-
-        // Check parents first.
-        for (let obj = this.parent; obj != null; obj = obj.parent) {
-            if (obj.cycleArrows) {
-                arr.push(obj);
-            }
-        }
-
-        // Check all descendants as well.
-        this._getNodesInChildrenWithCycleArrows(arr);
-
-        return arr;
     }
 
     /**
@@ -270,12 +228,13 @@ class N2TreeNode {
     }
 
     /**
-     * Convert an absolute path name to a string that's safe to use as an HTML id.
-     * @param {String} absPathName The name to convert.
+     * Convert a uuid to a string that's safe to use as an HTML id. Escapes
+     * space, greater-than, less-than, period, and colon characters.
+     * @param {String} uuid The name to convert.
      * @returns {String} The HTML-safe id.
      */
-    static absPathToId(absPathName) {
-        return absPathName.replace(/[\.<> :]/g, function (c) {
+    static uuidToId(uuid) {
+        return uuid.replace(/[\.<> :]/g, function (c) {
             return {
                 ' ': '__',
                 '<': '_LT',
@@ -286,7 +245,7 @@ class N2TreeNode {
         })
     }
 
-    toId() { return N2TreeNode.absPathToId(this.absPathName); }
+    toId() { return N2TreeNode.uuidToId(this.uuid); }
 
     _insertAsLastInput(newChild) {
         if (!this.hasChildren()) return;
@@ -300,14 +259,14 @@ class N2TreeNode {
     }
 
     /** If this is a component, add special children that can hold filtered variables */
-    addFilterChild() {
+    addFilterChild(attribNames) {
         if (this.hasChildren()) {
 
             // Separate N2FilterNodes are added for inputs and outputs so
             // they can be inserted at the correct place in the diagram.
             this.filter = {
-                inputs: new N2FilterNode(this, 'inputs'),
-                outputs: new N2FilterNode(this, 'outputs')
+                inputs: new N2FilterNode(this, attribNames, 'inputs'),
+                outputs: new N2FilterNode(this, attribNames, 'outputs')
             };
             this._insertAsLastInput(this.filter.inputs);
             this.children.push(this.filter.outputs);
@@ -342,7 +301,6 @@ class N2TreeNode {
     hasFilters() { return ('filter' in this); } // True if we contain filters
     isInputFilter() { return false; } // Always false in base class
     isOutputFilter() { return false; } // Always false in base class
-
 
     /**
      * Create a simple object that can be used to save state to a file.
@@ -379,12 +337,13 @@ class N2FilterNode extends N2TreeNode {
      * @param {N2TreeNode} parentComponent The component that we are filtering variables for.
      * @param {String} suffix Either "inputs" or "outputs".
      */
-    constructor(parentComponent, suffix) {
+    constructor(parentComponent, attribNames, suffix) {
         super(
             {
                 name: `${parentComponent.name}_N2_FILTER_${suffix}`,
                 type: 'filter'
-            }
+            },
+            attribNames
         )
 
         this.parentComponent = parentComponent;
@@ -507,7 +466,46 @@ class OmTreeNode extends N2TreeNode {
         if (this.nonlinear_solver == "") this.nonlinear_solver = "None";
     }
 
-    addFilterChild() {
-        if (this.isComponent()) { super.addFilterChild(); }
+    get absPathName() { return this.uuid; }
+    set absPathName(newName) { this.uuid = newName; return newName; }
+
+    addFilterChild(attribNames) {
+        if (this.isComponent()) { super.addFilterChild(attribNames); }
+    }
+
+    /**
+     * Add ourselves to the supplied array if we contain a cycleArrows property.
+     * @param {Array} arr The array to add to.
+     */
+     _getNodesInChildrenWithCycleArrows(arr) {
+        if (this.cycleArrows) {
+            arr.push(this);
+        }
+
+        if (this.hasChildren()) {
+            for (const child of this.children) {
+                child._getNodesInChildrenWithCycleArrows(arr);
+            }
+        }
+    }
+
+    /**
+     * Populate an array with nodes in our lineage that contain a cycleArrows member.
+     * @returns {Array} The array containing all the found nodes with cycleArrows.
+     */
+    getNodesWithCycleArrows() {
+        const arr = [];
+
+        // Check parents first.
+        for (let obj = this.parent; obj != null; obj = obj.parent) {
+            if (obj.cycleArrows) {
+                arr.push(obj);
+            }
+        }
+
+        // Check all descendants as well.
+        this._getNodesInChildrenWithCycleArrows(arr);
+
+        return arr;
     }
 }

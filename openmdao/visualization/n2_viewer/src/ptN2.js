@@ -1,10 +1,12 @@
+// <<hpp_insert src/ModelData.js>>
+
 var sharedTransition = null;
 
 var enterIndex = 0;
 var exitIndex = 0;
 
 // The modelData object is generated and populated by n2_viewer.py
-var modelData = ModelData.uncompressModel(compressedModel);
+var modelData = OmModelData.uncompressModel(compressedModel);
 delete compressedModel;
 
 var n2Diag = null;
