@@ -1930,6 +1930,14 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
 
     driver._total_jac = None
 
+    # if we're running under MPI, make sure the coloring object is identical on all ranks
+    # by broadcasting rank 0's coloring to the other ranks.
+    if problem.comm.size > 1:
+        if problem.comm.rank == 0:
+            problem.comm.bcast(coloring, root=0)
+        else:
+            coloring = problem.comm.bcast(None, root=0)
+
     return coloring
 
 

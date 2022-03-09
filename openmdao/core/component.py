@@ -1,5 +1,6 @@
 """Define the Component class."""
 
+import sys
 from collections import defaultdict
 from collections.abc import Iterable
 from itertools import product
@@ -18,11 +19,11 @@ from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    find_matches, make_set, convert_src_inds
+    find_matches, make_set, convert_src_inds, conditional_error
 from openmdao.utils.indexer import Indexer, indexer
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
-    DerivativesWarning, warn_deprecation
+    DerivativesWarning, SetupWarning, warn_deprecation
 
 _forbidden_chars = ['.', '*', '?', '!', '[', ']']
 _whitespace = {' ', '\t', '\r', '\n'}
@@ -241,6 +242,7 @@ class Component(System):
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
         abs2prom = self._var_allprocs_abs2prom = self._var_abs2prom
+        abs_in2prom_info = self._problem_meta['abs_in2prom_info']
 
         # Compute the prefix for turning rel/prom names into abs names
         prefix = self.pathname + '.' if self.pathname else ''
@@ -250,7 +252,7 @@ class Component(System):
             allprocs_abs2meta = self._var_allprocs_abs2meta[io]
 
             is_input = io == 'input'
-            for i, prom_name in enumerate(self._var_rel_names[io]):
+            for prom_name in self._var_rel_names[io]:
                 abs_name = prefix + prom_name
                 abs2meta[abs_name] = metadata = self._var_rel2meta[prom_name]
 
@@ -265,6 +267,10 @@ class Component(System):
                 if is_input and 'src_indices' in metadata:
                     allprocs_abs2meta[abs_name]['has_src_indices'] = \
                         metadata['src_indices'] is not None
+                    if metadata['add_input_src_indices'] and abs_name not in abs_in2prom_info:
+                        # need a level for each system including '', so we don't
+                        # subtract 1 from abs_in.split('.') which includes the var name
+                        abs_in2prom_info[abs_name] = [None for s in abs_name.split('.')]
 
             for prom_name, val in self._var_discrete[io].items():
                 abs_name = prefix + prom_name
@@ -898,35 +904,62 @@ class Component(System):
         abs2meta_in = self._var_abs2meta['input']
         all_abs2meta_in = all_abs2meta['input']
         all_abs2meta_out = all_abs2meta['output']
+        abs_in2prom_info = self._problem_meta['abs_in2prom_info']
 
         sizes_in = self._var_sizes['input']
         sizes_out = all_sizes['output']
         added_src_inds = []
         # loop over continuous inputs
         for i, (iname, meta_in) in enumerate(abs2meta_in.items()):
-            src = abs_in2out[iname]
-            if meta_in['src_indices'] is None and (
-                    meta_in['distributed'] or all_abs2meta_out[src]['distributed']):
-                nzs = np.nonzero(sizes_out[:, all_abs2idx[src]])[0]
-                if (all_abs2meta_out[src]['global_size'] ==
-                        all_abs2meta_in[iname]['global_size'] or nzs.size == self.comm.size):
-                    # This offset assumes a 'full' distributed output
-                    offset = np.sum(sizes_in[:iproc, i])
-                    end = offset + sizes_in[iproc, i]
-                else:  # distributed output (may have some zero size entries)
-                    if nzs.size == 1:
-                        offset = 0
-                        end = sizes_out[nzs[0], all_abs2idx[src]]
-                    else:
-                        # total sizes differ and output is distributed, so can't determine mapping
+            if meta_in['src_indices'] is None and iname not in abs_in2prom_info:
+                src = abs_in2out[iname]
+                dist_in = meta_in['distributed']
+                dist_out = all_abs2meta_out[src]['distributed']
+                if dist_in or dist_out:
+                    gsize_out = all_abs2meta_out[src]['global_size']
+                    gsize_in = all_abs2meta_in[iname]['global_size']
+                    vout_sizes = sizes_out[:, all_abs2idx[src]]
+
+                    offset = None
+                    if gsize_out == gsize_in or (not dist_out and np.sum(vout_sizes)
+                                                 == gsize_in):
+                        # This assumes one of:
+                        # 1) a distributed output with total size matching the total size of a
+                        #    distributed input
+                        # 2) a non-distributed output with local size matching the total size of a
+                        #    distributed input
+                        # 3) a non-distributed output with total size matching the total size of a
+                        #    distributed input
+                        if dist_in:
+                            offset = np.sum(sizes_in[:iproc, i])
+                            end = offset + sizes_in[iproc, i]
+                        else:
+                            if src.startswith('_auto_ivc.'):
+                                nzs = np.nonzero(vout_sizes)[0]
+                                if nzs.size == 1:
+                                    # special case where we have a 'distributed' auto_ivc output
+                                    # that has a nonzero value in only one proc, so we can treat
+                                    # it like a non-distributed output. This happens in cases
+                                    # where an auto_ivc output connects to a variable that is
+                                    # remote on at least one proc.
+                                    offset = 0
+                                    end = vout_sizes[nzs[0]]
+
+                    # total sizes differ and output is distributed, so can't determine mapping
+                    if offset is None:
                         raise RuntimeError(f"{self.msginfo}: Can't determine src_indices "
                                            f"automatically for input '{iname}'. They must be "
                                            "supplied manually.")
 
-                inds = np.arange(offset, end, dtype=INT_DTYPE)
-                meta_in['src_indices'] = indexer(inds, flat_src=True)
-                meta_in['flat_src_indices'] = True
-                added_src_inds.append(iname)
+                    if dist_in and not dist_out:
+                        src_shape = self._get_full_dist_shape(src, all_abs2meta_out[src]['shape'])
+                    else:
+                        src_shape = all_abs2meta_out[src]['global_shape']
+
+                    meta_in['src_indices'] = indexer(slice(offset, end), flat_src=True,
+                                                     src_shape=src_shape)
+                    meta_in['flat_src_indices'] = True
+                    added_src_inds.append(iname)
 
         return added_src_inds
 
@@ -1559,44 +1592,55 @@ class Component(System):
                     self._update_subjac_sparsity(coloring.get_subjac_sparsity())
                 self._jacobian._restore_approx_sparsity()
 
-    def _resolve_src_inds(self, my_tdict, top):
-        abs2meta_in = self._var_abs2meta['input']
+    def _resolve_src_inds(self):
+        abs2prom = self._var_abs2prom['input']
+        abs_in2prom_info = self._problem_meta['abs_in2prom_info']
         all_abs2meta_in = self._var_allprocs_abs2meta['input']
-        abs2prom = self._var_allprocs_abs2prom['input']
+        abs2meta_in = self._var_abs2meta['input']
+        conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
+        all_abs2meta_out = self._problem_meta['model_ref']()._var_allprocs_abs2meta['output']
 
-        for tgt, (pinfo, parent_src_shape, oldprom, oldpath) in my_tdict.items():
-            src_inds, flat_src_inds, src_shape = pinfo
+        for tgt, meta in abs2meta_in.items():
+            if tgt in abs_in2prom_info:
+                pinfo = abs_in2prom_info[tgt][-1]  # component always last in the plist
+                if pinfo is not None:
+                    inds, flat, shape = pinfo
+                    if inds is None:
+                        if meta['add_input_src_indices']:
+                            if shape is None:
+                                shape = all_abs2meta_out[conns[tgt]]['global_shape']
+                            meta['src_shape'] = shape
+                            inds = meta['src_indices']
+                    else:
+                        all_abs2meta_in[tgt]['has_src_indices'] = True
+                        meta['src_shape'] = shape = all_abs2meta_out[conns[tgt]]['global_shape']
+                        if meta['add_input_src_indices']:
+                            inds = convert_src_inds(inds, shape, meta['src_indices'], shape)
+                        elif inds._flat_src:
+                            meta['flat_src_indices'] = True
+                        elif meta['flat_src_indices'] is None:
+                            meta['flat_src_indices'] = flat
 
-            # update the input metadata with the final
-            # src_indices, flat_src_indices and src_shape
-            if src_inds is None:
-                prom = abs2prom[tgt]
-                if prom in self._var_prom2inds:
-                    del self._var_prom2inds[prom]
-            else:
-                all_abs2meta_in[tgt]['has_src_indices'] = True
-                meta = abs2meta_in[tgt]
-                shape = pinfo.root_shape if pinfo.root_shape is not None else parent_src_shape
-                if src_shape is None and shape is not None:
-                    try:
-                        src_inds.set_src_shape(shape)
-                    except Exception as err:
-                        raise RuntimeError(f"{self.msginfo}: When promoting '{tgt}' with "
-                                           f"src_indices {src_inds} and source shape "
-                                           f"{shape}: {err}")
-                meta['src_shape'] = src_shape
-                if meta.get('add_input_src_indices'):
-                    src_inds = convert_src_inds(src_inds, src_shape,
-                                                meta['src_indices'], src_shape)
-                elif src_inds._flat_src:
-                    meta['flat_src_indices'] = True
-                elif meta['flat_src_indices'] is None:
-                    meta['flat_src_indices'] = flat_src_inds
+                    if inds is not None:
+                        try:
+                            if not isinstance(inds, Indexer):
+                                meta['src_indices'] = inds = indexer(inds, flat_src=flat,
+                                                                     src_shape=shape)
+                            else:
+                                meta['src_indices'] = inds = inds.copy()
+                                inds.set_src_shape(shape)
+                                self._var_prom2inds[abs2prom[tgt]] = [shape, inds, flat]
+                        except Exception:
+                            exc = sys.exc_info()
+                            conditional_error(f"When accessing '{conns[tgt]}' with src_shape "
+                                              f"{shape} from '{pinfo.prom_path()}' using "
+                                              f"src_indices {inds}: {exc[1]}",
+                                              exc=exc, category=SetupWarning,
+                                              err=self._raise_connection_errors)
 
-                if not isinstance(src_inds, Indexer):
-                    meta['src_indices'] = indexer(src_inds, flat_src=flat_src_inds)
-                else:
-                    meta['src_indices'] = src_inds.copy()
+            elif meta['add_input_src_indices']:
+                self._var_prom2inds[abs2prom[tgt]] = [meta['shape'], meta['src_indices'],
+                                                      meta['src_indices']._flat_src]
 
 
 class _DictValues(object):

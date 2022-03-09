@@ -38,6 +38,8 @@ class DifferentialEvolutionDriver(Driver):
 
     Attributes
     ----------
+    _problem_comm : MPI.Comm or None
+        The MPI communicator for the Problem.
     _concurrent_pop_size : int
         Number of points to run concurrently when model is a parallel one.
     _concurrent_color : int
@@ -151,6 +153,8 @@ class DifferentialEvolutionDriver(Driver):
         MPI.Comm or <FakeComm> or None
             The communicator for the Problem model.
         """
+        self._problem_comm = comm
+
         procs_per_model = self.options['procs_per_model']
         if MPI and self.options['run_parallel']:
 
@@ -174,6 +178,31 @@ class DifferentialEvolutionDriver(Driver):
         self._concurrent_pop_size = 0
         self._concurrent_color = 0
         return comm
+
+    def _setup_recording(self):
+        """
+        Set up case recording.
+        """
+        if MPI:
+            run_parallel = self.options['run_parallel']
+            procs_per_model = self.options['procs_per_model']
+
+            for recorder in self._rec_mgr:
+                if run_parallel:
+                    # write cases only on procs up to the number of parallel models
+                    # (i.e. on the root procs for the cases)
+                    if procs_per_model == 1:
+                        recorder.record_on_process = True
+                    else:
+                        size = self._problem_comm.size // procs_per_model
+                        if self._problem_comm.rank < size:
+                            recorder.record_on_process = True
+
+                elif self._problem_comm.rank == 0:
+                    # if not running cases in parallel, then just record on proc 0
+                    recorder.record_on_process = True
+
+        super()._setup_recording()
 
     def _get_name(self):
         """
@@ -495,8 +524,23 @@ class DifferentialEvolution(object):
             pop_size += 1
         self.npop = int(pop_size)
 
-        # use different seeds in different MPI processes
-        seed = random_state + self.comm.Get_rank() if self.comm else 0
+        if self.comm:
+            if random_state is None:
+                # if no random_state is given, generate one on rank 0 and broadcast it to all
+                # ranks.  Because we add the rank to the starting random state, no ranks will
+                # have the same seed.
+                rng = np.random.default_rng()
+                random_state = rng.integers(1e15)
+                if self.comm.rank == 0:
+                    self.comm.bcast(random_state, root=0)
+                else:
+                    random_state = self.comm.bcast(None, root=0)
+
+            # add rank to ensure different seed in each MPI process
+            seed = random_state + self.comm.rank
+        else:
+            seed = None if random_state is None else random_state
+
         rng = np.random.default_rng(seed)
 
         # create random initial population, scaled to bounds

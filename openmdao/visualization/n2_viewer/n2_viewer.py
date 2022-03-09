@@ -1,9 +1,6 @@
 """Code for generating N2 diagram."""
-import base64
 import inspect
-import json
 import os
-import zlib
 import networkx as nx
 
 import numpy as np
@@ -25,12 +22,10 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import default_noraise
 from openmdao.utils.mpi import MPI
 from openmdao.utils.notebook_utils import notebook, display, HTML, IFrame, colab
-from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
+from openmdao.visualization.htmlpp import HtmlPreprocessor
 from openmdao.utils.om_warnings import issue_warning, warn_deprecation
 from openmdao.core.constants import _UNDEFINED
 from openmdao import __version__ as openmdao_version
-
-_IND = 4  # HTML indentation (spaces)
 
 _MAX_ARRAY_SIZE_FOR_REPR_VAL = 1000  # If var has more elements than this do not pass to N2
 
@@ -561,7 +556,6 @@ def n2(data_source, outfile=_default_n2_filename, case_id=None, show_browser=Tru
     """
     # grab the model viewer data
     model_data = _get_viewer_data(data_source, case_id=case_id)
-
     # if MPI is active only display one copy of the viewer
     if MPI and MPI.COMM_WORLD.rank != 0:
         return
@@ -573,104 +567,25 @@ def n2(data_source, outfile=_default_n2_filename, case_id=None, show_browser=Tru
         warn_deprecation("'use_declare_partial_info' is now the"
                          " default and the option is ignored.")
 
-    raw_data = json.dumps(model_data, default=default_noraise).encode('utf8')
-    b64_data = str(base64.b64encode(zlib.compress(raw_data)).decode("ascii"))
-    model_data = 'var compressedModel = "%s";' % b64_data
-
     import openmdao
     openmdao_dir = os.path.dirname(inspect.getfile(openmdao))
     vis_dir = os.path.join(openmdao_dir, "visualization/n2_viewer")
-    libs_dir = os.path.join(vis_dir, "libs")
-    src_dir = os.path.join(vis_dir, "src")
-    style_dir = os.path.join(vis_dir, "style")
-    assets_dir = os.path.join(vis_dir, "assets")
-
-    # grab the libraries, src and style
-    lib_dct = {
-        'd3': 'd3.v5.min',
-        'awesomplete': 'awesomplete',
-        'vk_beautify': 'vkBeautify',
-        'pako_inflate': 'pako_inflate.min',
-        'json5': 'json5_2.2.0.min'
-    }
-    libs = read_files(lib_dct.values(), libs_dir, 'js')
-    src_names = \
-        'utils', \
-        'SymbolType', \
-        'N2TreeNode', \
-        'ModelData', \
-        'N2Style', \
-        'N2Window', \
-        'N2Layout', \
-        'N2MatrixCell', \
-        'N2Legend', \
-        'N2Matrix', \
-        'N2Arrow', \
-        'N2Search', \
-        'N2Toolbar', \
-        'N2Diagram', \
-        'NodeInfo', \
-        'N2UserInterface', \
-        'defaults', \
-        'ptN2'
-
-    srcs = read_files(src_names, src_dir, 'js')
-
-    style_names = \
-        'window', \
-        'partition_tree', \
-        'n2toolbar-icons', \
-        'toolbar', \
-        'legend', \
-        'awesomplete'
-
-    styles = read_files((style_names), style_dir, 'css')
-
-    with open(os.path.join(style_dir, "n2toolbar-icons-font.woff"), "rb") as f:
-        encoded_font = str(base64.b64encode(f.read()).decode("ascii"))
-
-    with open(os.path.join(style_dir, "logo_png.b64"), "r") as f:
-        logo_png = str(f.read())
-
-    with open(os.path.join(assets_dir, "spinner.png"), "rb") as f:
-        waiting_icon = str(base64.b64encode(f.read()).decode("ascii"))
-
-    with open(os.path.join(assets_dir, "n2toolbar_screenshot_png.b64"), "r") as f:
-        n2toolbar_png = str(f.read())
 
     if title:
-        title = "OpenMDAO Model Hierarchy and N2 diagram: %s" % title
+        title = f"OpenMDAO Model Hierarchy and N2 diagram: {title}"
     else:
         title = "OpenMDAO Model Hierarchy and N2 diagram"
 
-    src_names = ('N2ErrorHandling',)
-    head_srcs = read_files(src_names, src_dir, 'js')
+    html_vars = {
+        'title': title,
+        'embeddable': "embedded-n2" if embeddable else "non-embedded-n2",
+        'openmdao_version': openmdao_version,
+        'model_data': model_data
+    }
 
-    h = DiagramWriter(filename=os.path.join(vis_dir, "index.html"),
-                      title=title,
-                      styles=styles, embeddable=embeddable, head_srcs=head_srcs)
-
-    if (embeddable):
-        h.insert("non-embedded-n2", "embedded-n2")
-
-    # put all style and JS into index
-    h.insert('{{n2toolbar-icons}}', encoded_font)
-    h.insert('{{logo_png}}', logo_png)
-    h.insert('{{waiting_icon}}', waiting_icon)
-    h.insert('{{n2toolbar_png}}', n2toolbar_png)
-    h.insert('{{om_version}}', openmdao_version)
-
-    for k, v in lib_dct.items():
-        h.insert('{{{}_lib}}'.format(k), write_script(libs[v], indent=_IND))
-
-    for name, code in srcs.items():
-        h.insert('{{{}_lib}}'.format(name.lower()),
-                 write_script(code, indent=_IND))
-
-    h.insert('{{model_data}}', write_script(model_data, indent=_IND))
-
-    # Write output file
-    h.write(outfile)
+    HtmlPreprocessor(os.path.join(vis_dir, "index.html"),
+                     outfile, allow_overwrite=True, var_dict=html_vars,
+                     json_dumps_default=default_noraise, verbose=False).run()
 
     if notebook:
         if display_in_notebook:

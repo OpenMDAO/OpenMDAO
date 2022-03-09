@@ -2,13 +2,7 @@
  * Essentially the same as a JSON object from the model tree,
  * with some utility functions.
  * @typedef {N2TreeNode}
- * @property {Object} dims The size and location of the node when drawn.
- * @property {Object} prevDims The previous value of dims.
- * @property {Object} solverDims The size and location of the node within the solver tree.
- * @property {Object} prevSolverDims The previous value of solverDims.
- * @property {Boolean} isMinimized Whether this node or a parent has been collapsed.
- * @property {Number} nameWidthPx The width of the name in pixels as computed by N2Layout.
- * @property {Boolean} manuallyExpanded If this node was right-clicked.
+ * @property {Object} draw Information used for node display.
  * @property {Number} depth The index of the column this node appears in.
  */
 class N2TreeNode {
@@ -23,10 +17,23 @@ class N2TreeNode {
 
         this.sourceParentSet = new Set();
         this.targetParentSet = new Set();
-        this.nameWidthPx = 1; // Set by N2Layout
-        this.numLeaves = 0; // Set by N2Layout
-        this.isMinimized = false;
-        this.manuallyExpanded = false;
+
+        // Node display data
+        this.draw = {
+            nameWidthPx: 1, // Width of the label in pixels as computed by N2Layout
+            nameSolverWidthPx: 1, // Solver-side label width pixels as computed by N2Layout
+            numLeaves: 0, // Set by N2Layout
+            minimized: false, // When true, do not draw children
+            hidden: false, // Do add to matrix at all
+            filtered: false, // Node is a child to be shown w/partially collapsed parent
+            filterParent: null, // When filtered, reference to N2FilterNode container
+            manuallyExpanded: false, // Node was pre-collapsed but expanded by user
+            dims: { x: 1e-6, y: 1e-6, width: 1, height: 1 },
+            prevDims: { x: 1e-6, y: 1e-6, width: 1e-6, height: 1e-6 },
+            solverDims: { x: 1e-6, y: 1e-6, width: 1, height: 1 },
+            prevSolverDims: { x: 1e-6, y: 1e-6, width: 1e-6, height: 1e-6 }
+        }
+
         this.childNames = new Set(); // Set by ModelData
         this.depth = -1; // Set by ModelData
         this.parent = null; // Set by ModelData
@@ -39,41 +46,20 @@ class N2TreeNode {
         if (this.nonlinear_solver == "") this.nonlinear_solver = "None";
 
         this.rootIndex = -1;
-        this.dims = {
-            'x': 1e-6,
-            'y': 1e-6,
-            'width': 1,
-            'height': 1
-        };
-        this.prevDims = {
-            'x': 1e-6,
-            'y': 1e-6,
-            'width': 1e-6,
-            'height': 1e-6
-        };
-        this.solverDims = {
-            'x': 1e-6,
-            'y': 1e-6,
-            'width': 1,
-            'height': 1
-        };
-        this.prevSolverDims = {
-            'x': 1e-6,
-            'y': 1e-6,
-            'width': 1e-6,
-            'height': 1e-6
-        };
+
     }
 
-    /** Run when a node is collapsed. */
-    minimize() {
-        this.isMinimized = true;
-    }
+    // Accessor functions for this.draw.minimized - whether or not to draw children
+    minimize() { this.draw.minimized = true; return this; }
+    expand() { this.draw.minimized = false; return this; }
 
-    /** Run when a node is restored. */
-    expand() {
-        this.isMinimized = false;
-    }
+    // Accessor functions for this.draw.hidden - whether to draw at all
+    hide() { this.draw.hidden = true; return this; }
+    show() { this.draw.hidden = false; return this; }
+
+    // Accessor functions for this.draw.filtered - whether a variable is shown in collapsed form
+    doFilter(filterNode) { this.draw.filtered = true; this.draw.filterParent = filterNode; }
+    undoFilter() { this.draw.filtered = false; this.draw.filterParent = null; }
 
     /**
      * Create a backup of our position and other info.
@@ -81,10 +67,10 @@ class N2TreeNode {
      * @param {number} leafNum Identify this as the nth leaf of the tree
      */
     preserveDims(solver, leafNum) {
-        let dimProp = solver ? 'dims' : 'solverDims';
-        let prevDimProp = solver ? 'prevDims' : 'prevSolverDims';
+        const dimProp = solver ? 'dims' : 'solverDims';
+        const prevDimProp = solver ? 'prevDims' : 'prevSolverDims';
 
-        Object.assign(this[prevDimProp], this[dimProp]);
+        Object.assign(this.draw[prevDimProp], this.draw[dimProp]);
 
         if (this.rootIndex < 0) this.rootIndex = leafNum;
         this.prevRootIndex = this.rootIndex;
@@ -101,9 +87,7 @@ class N2TreeNode {
     }
 
     /** True if this.type is 'input' or 'unconnected_input'. */
-    isInput() {
-        return this.type.match(inputRegex);
-    }
+    isInput() { return this.type.match(inputRegex); }
 
     /** True if this is an input and connected. */
     isConnectedInput() { return (this.type == 'input'); }
@@ -138,17 +122,33 @@ class N2TreeNode {
     /** True if it's a subsystem and this.subsystem_type is 'component' */
     isComponent() { return (this.isSubsystem() && this.subsystem_type == 'component'); }
 
-    /** Not connectable if this is a input group or parents are minimized. */
+    /** True if this is a "fake" node that manages filtered children. */
+    isFilter() { return (this.type == 'filter'); }
+
+    /** Not connectable if this is an input group or parents are minimized. */
     isConnectable() {
         if (this.isInputOrOutput() && !(this.hasChildren() ||
-            this.parent.isMinimized || this.parentComponent.isMinimized)) return true;
+            this.parent.draw.minimized || this.parentComponent.draw.minimized)) return true;
 
-        return this.isMinimized;
+        return this.draw.minimized;
     }
 
-    /** Return false if the node is minimized or hidden */
+    /** Return false if the node is hidden, or filtered */
     isVisible() {
-        return !(this.varIsHidden || this.isMinimized);
+        return !(this.draw.hidden || this.draw.filtered);
+    }
+
+    /** True if node is not hidden and has no visible children */
+    isVisibleLeaf() {
+        if (this.draw.hidden || this.draw.filtered) return false; // Any explicitly hidden node
+        if (this.isInputOrOutput()) return !this.draw.filtered; // Variable
+        if (!this.hasChildren()) return true; // Group or component w/out children
+        return this.draw.minimized; // Collapsed non-variable
+    }
+
+    /** True if this is a variable and will be displayed as partially collapsed. */
+    isFilteredVariable() {
+        return (this.isInputOrOutput() && this.draw.filtered);
     }
 
     /**
@@ -212,7 +212,7 @@ class N2TreeNode {
      * @returns {Array} The array containing all the found nodes with cycleArrows.
      */
     getNodesWithCycleArrows() {
-        let arr = [];
+        const arr = [];
 
         // Check parents first.
         for (let obj = this.parent; obj != null; obj = obj.parent) {
@@ -249,7 +249,7 @@ class N2TreeNode {
      * @returns {Boolean} True if minimized here, false otherwise.
      */
     minimizeIfLarge(depthCount) {
-        if (!(this.isRoot() || this.manuallyExpanded) &&
+        if (!(this.isRoot() || this.draw.manuallyExpanded) &&
             (this.depth >= (this.isComponent() ?
                 Precollapse.cmpDepthStart : Precollapse.grpDepthStart) &&
                 this.numDescendants > Precollapse.threshold &&
@@ -281,4 +281,213 @@ class N2TreeNode {
     }
 
     toId() { return N2TreeNode.absPathToId(this.absPathName); }
+
+    _insertAsLastInput(newChild) {
+        if (!this.hasChildren()) return;
+
+        let idx = -1;
+        for (idx = 0; idx < this.children.length - 1; idx++ ) {
+            if (this.children[idx+1].isOutput()) break;
+        }
+
+        this.children.splice(idx + 1, 0, newChild);
+    }
+
+    /** If this is a component, add special children that can hold filtered variables */
+    addFilterChildIfComponent() {
+        if (this.isComponent() && this.hasChildren()) {
+
+            // Separate N2FilterNodes are added for inputs and outputs so
+            // they can be inserted at the correct place in the diagram.
+            this.filter = {
+                inputs: new N2FilterNode(this, 'inputs'),
+                outputs: new N2FilterNode(this, 'outputs')
+            };
+            this._insertAsLastInput(this.filter.inputs);
+            this.children.push(this.filter.outputs);
+        }
+    }
+
+    /** Add ourselves to the corrent parental filter */
+    addSelfToFilter() {
+        if (this.isInput()) { this.parent.filter.inputs.add(this); }
+        else if (this.isOutput()) { this.parent.filter.outputs.add(this); }
+    }
+
+    /** Remove ourselves from the corrent parental filter */
+    removeSelfFromFilter() {
+        if (this.isInput()) { this.parent.filter.inputs.del(this); }
+        else if (this.isOutput()) { this.parent.filter.outputs.del(this); }
+    }
+
+    /**
+     * Filter ourselves based on the supplied filter state.
+     * @param {Boolean} filtered Whether to filter or not.
+     * @return {Boolean} The newly set state.
+     */
+    filterSelf(filtered) {
+        if (filtered) { this.addSelfToFilter(); }
+        else { this.removeSelfFromFilter(); }
+
+        return this.draw.filtered;
+    }
+
+    isFilter() { return false; } // Always false in base class
+    hasFilters() { return ('filter' in this); } // True if we contain filters
+    isInputFilter() { return false; } // Always false in base class
+    isOutputFilter() { return false; } // Always false in base class
+
+
+    /**
+     * Create a simple object that can be used to save state to a file.
+     * @returns {Object} Reference to required info.
+     */
+    getStateForSave() {
+        return {
+            'minimized': this.draw.minimized,
+            'manuallyExpanded': this.draw.manuallyExpanded,
+            'hidden': this.draw.hidden,
+            'filtered': this.draw.filtered
+        };
+    }
+
+    /**
+     * Provided with loaded state information, update our settings.
+     * @param {Object} state The state loaded from file.
+     */
+    setStateFromLoad(state) {
+        this.draw.minimized = state.minimized;
+        this.draw.manuallyExpanded = state.manuallyExpanded;
+        this.draw.hidden = state.hidden;
+        this.filterSelf(state.filtered);
+    }
+}
+
+/**
+ * Special N2TreeNode subclass whose children are filtered variables of the parent component.
+ * @typedef N2FilterNode
+ */
+class N2FilterNode extends N2TreeNode {
+    /**
+     * Give ourselves a special name and the "filter" type.
+     * @param {N2TreeNode} parentComponent The component that we are filtering variables for.
+     * @param {String} suffix Either "inputs" or "outputs".
+     */
+    constructor(parentComponent, suffix) {
+        super(
+            {
+                name: `${parentComponent.name}_N2_FILTER_${suffix}`,
+                type: 'filter'
+            }
+        )
+
+        this.parentComponent = parentComponent;
+        this.hide();
+        this.minimize();
+        this.suffix = suffix;
+    }
+
+    /**
+     * Add a node to our filtered children, update its state, and make ourselves visible.
+     * @param {N2TreeNode} node Reference to the node to filter.
+     */
+    add(node) {
+        if (!this.hasChildren()) { this.children = []; }
+        this.children.push(node);
+        this.childNames.add(node.absPathName);
+        this.numDescendants += 1;
+        node.doFilter(this);
+        this.show();
+    }
+    
+    /**
+     * Update the node's state and remove it from our children. If nothing is left in
+     * the children array, delete it and hide ourselves.
+     * @param {N2TreeNode} node Reference to the node to unfilter.
+     * @returns {Boolean} True if the node was found in children, otherwise false.
+     */
+    del(node) {
+        node.undoFilter(); // Reset state regardless of being found
+        if (this.hasChildren()) {
+            const idx = this.children.indexOf(node);
+            if (idx >= 0) {
+                this.children.splice(idx);
+                this.childNames.delete(node);
+                this.numDescendants -= 1;
+                if (this.children.length == 0) {
+                    this.children = null;
+                    this.hide();
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Set the state of all children to unfiltered and delete the array */
+    wipe() {
+        if (this.hasChildren()) {
+            for (const child of this.children) { child.undoFilter(); }
+            this.children = null;
+
+            this.numDescendants = 0;
+            this.childNames.clear();
+            this.childNames.add(this.absPathName);
+            this.hide();
+        }
+    }
+
+    /**
+     * Determine if the referenced node is in our array of children.
+     * @param {N2TreeNode} child The node to find.
+     * @returns {Boolean} True if the child was found, false otherwise.
+     */
+    hasChild(child) {
+        return (this.hasChildren()? this.children.indexOf(child) >= 0 : false);
+    }
+
+    /** Return the length of the children array or 0 if it doesn't exist. */
+    get count() { return (this.hasChildren()? this.children.length : 0); }
+    
+    /** Don't expand, always stay minimized. */
+    expand() { return this; }
+
+    /** Only show if there are filtered nodes stored as children */
+    show() {
+        if (this.hasChildren()) { super.show(); }
+        return this;
+    }
+
+    isFilter() { return true; } // Always true for the N2TreeNode class
+    hasFilters() { return false; } // Only components contains filters
+    isInputFilter() { return this.suffix == 'inputs'; } // True if this manages input filters
+    isOutputFilter() { return this.suffix == 'outputs'; } // True if this manages output filters
+
+    /**
+     * For normal nodes, targetParentSet and sourceParentSet are built when the model
+     * is initialized. Since filters are created after that, _genParentSet() generates a
+     * set dynamically based on the specified parent sets of its children.
+     * @param {String} setName Either "source" or "target"
+     * @returns {Set} The merged contents of the parent sets of all children.
+     */
+    _genParentSet(setName) {
+        const tmpSet = new Set();
+        const setPropName = `${setName}ParentSet`;
+
+        if (this.hasChildren()) {
+            for (const child of this.children) {
+                for (const childParent of child[setPropName]) {
+                    tmpSet.add(childParent);
+                }
+            }
+        }
+
+        return tmpSet;
+    }
+
+    get sourceParentSet() { return this._genParentSet('source'); }
+    set sourceParentSet(val) { return val; }
+
+    get targetParentSet() { return this._genParentSet('target'); }
+    set targetParentSet(val) { return val; }
 }

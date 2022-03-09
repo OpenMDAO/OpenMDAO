@@ -29,6 +29,8 @@ from openmdao.test_suite.components.paraboloid_problem import ParaboloidProblem
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
     SellarDis1withDerivatives, SellarDis2withDerivatives, SellarProblem, SellarDerivatives
 from openmdao.test_suite.components.sellar_feature import SellarMDA
+from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import \
+    MultipointBeamGroup
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt, determine_adder_scaler, printoptions
 from openmdao.utils.general_utils import remove_whitespace
@@ -3309,6 +3311,89 @@ class TestSqliteCaseReader(unittest.TestCase):
         print(cr.openmdao_version)
         self.assertEqual(openmdao_version, cr.openmdao_version)
 
+    def test_hierarchical_model(self):
+        # test with model that has a deep system hierarchy
+        model = MultipointBeamGroup(E=1., L=1., b=0.1, volume=0.01,
+                                    num_elements=50, num_cp=5,
+                                    num_load_cases=2)
+
+        prob = om.Problem(model)
+        prob.setup()
+
+        model.add_recorder(self.recorder)
+        model.parallel.sub_0.add_recorder(self.recorder)
+        model.parallel.sub_0.compliance_comp.add_recorder(self.recorder)
+
+        prob.run_model()
+
+        reader = om.CaseReader(self.filename)
+
+        # check that sources are recorded properly
+        sources = sorted(reader.list_sources(out_stream=None), reverse=True)
+        self.assertEqual(sources, [
+            'root.parallel.sub_0.compliance_comp',
+            'root.parallel.sub_0',
+            'root'
+        ])
+
+        # there should be one case from each source
+        cases = reader.list_cases(out_stream=None)
+        self.assertEqual(cases, [
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0|parallel._solve_nonlinear|0|NLRunOnce|0|parallel.sub_0._solve_nonlinear|0|NLRunOnce|0|parallel.sub_0.compliance_comp._solve_nonlinear|0',
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0|parallel._solve_nonlinear|0|NLRunOnce|0|parallel.sub_0._solve_nonlinear|0',
+            'rank0:root._solve_nonlinear|0'
+        ])
+
+        # check that we can properly list cases for each source
+        for i, src in enumerate(sources):
+            self.assertEqual(reader.list_cases(src, recurse=False, out_stream=None), [cases[i]])
+
+    def test_hierarchical_solvers(self):
+        # test with model that has a deep solver hierarchy
+        p = om.Problem()
+
+        cycle1 = p.model.add_subsystem('cycle1', om.Group(), promotes=['*'])
+        cycle1_1 = cycle1.add_subsystem('cycle1_1', om.Group(), promotes=['*'])
+        cycle1_1.add_subsystem('comp', om.ExecComp('x1 = 3 + x2'), promotes=["*"])
+
+        cycle1_2 = cycle1.add_subsystem('cycle1_2', om.Group(), promotes=['*'])
+        cycle1_2.add_subsystem('comp',  om.ExecComp('x2 = 3 + x1 + y'), promotes=["*"])
+
+        cycle2 = p.model.add_subsystem('cycle2', om.Group(), promotes=['*'])
+        cycle2.add_subsystem('comp', om.ExecComp('y = x1 + 2'), promotes=['*'])
+
+        cycle1.nonlinear_solver.add_recorder(self.recorder)
+        cycle1_1.nonlinear_solver.add_recorder(self.recorder)
+        cycle1_2.nonlinear_solver.add_recorder(self.recorder)
+        cycle2.nonlinear_solver.add_recorder(self.recorder)
+
+        p.setup()
+        p.run_model()
+
+        reader = om.CaseReader(self.filename)
+
+        # check that sources are recorded properly
+        sources = sorted(reader.list_sources(out_stream=None))
+        self.assertEqual(sources, [
+            'root.cycle1.cycle1_1.nonlinear_solver',
+            'root.cycle1.cycle1_2.nonlinear_solver',
+            'root.cycle1.nonlinear_solver',
+            'root.cycle2.nonlinear_solver'
+        ])
+
+        # there should be one case from each source
+        cases = reader.list_cases(out_stream=None)
+        self.assertEqual(cases, [
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0|cycle1._solve_nonlinear|0|NLRunOnce|0|cycle1.cycle1_1._solve_nonlinear|0|NLRunOnce|0',
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0|cycle1._solve_nonlinear|0|NLRunOnce|0|cycle1.cycle1_2._solve_nonlinear|0|NLRunOnce|0',
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0|cycle1._solve_nonlinear|0|NLRunOnce|0',
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0|cycle2._solve_nonlinear|0|NLRunOnce|0'
+        ])
+
+        # check that we can properly list cases for each source
+        for i, src in enumerate(sources):
+            self.assertEqual(reader.list_cases(src, recurse=False, out_stream=None), [cases[i]])
+
 
 @use_tempdirs
 class TestFeatureSqliteReader(unittest.TestCase):
@@ -3435,15 +3520,17 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
+        prob.setup()
+
         # add recorder to the driver, model and solver
         recorder = om.SqliteRecorder('cases.sql')
 
         prob.driver.add_recorder(recorder)
         model.add_recorder(recorder)
+        model.cycle.nonlinear_solver.add_recorder(recorder)
         model.nonlinear_solver.add_recorder(recorder)
 
         # run the problem
-        prob.setup()
         prob.set_solver_print(0)
         prob.run_driver()
         prob.cleanup()
@@ -3452,7 +3539,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         cr = om.CaseReader('cases.sql')
 
         sources = cr.list_sources()
-        self.assertEqual(sorted(sources), ['driver', 'root', 'root.nonlinear_solver'])
+        self.assertEqual(sorted(sources), ['driver', 'root', 'root.cycle.nonlinear_solver', 'root.nonlinear_solver'])
 
         driver_vars = cr.list_source_vars('driver')
         self.assertEqual(('inputs:', sorted(driver_vars['inputs']), 'outputs:', sorted(driver_vars['outputs'])),

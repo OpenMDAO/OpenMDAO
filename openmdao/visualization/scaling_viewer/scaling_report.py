@@ -194,9 +194,6 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
     dict
         Data to used to generate html file.
     """
-    if MPI and MPI.COMM_WORLD.rank != 0:
-        return
-
     dv_table = []
     con_table = []
     obj_table = []

@@ -1,3 +1,6 @@
+// <<hpp_insert libs/pako_inflate.min.js>>
+// <<hpp_insert libs/json5_2.2.0.min.js>>
+
 /** Process the tree, connections, and other info provided about the model. */
 class ModelData {
 
@@ -93,6 +96,8 @@ class ModelData {
                     newNode.children[i].parentComponent = newNode;
             }
         }
+
+        newNode.addFilterChildIfComponent();
 
         return newNode;
     }
@@ -246,7 +251,7 @@ class ModelData {
     getAutoIvcTgt(elementPath) {
         if (!elementPath.match(/^_auto_ivc.*$/)) return undefined;
 
-        for (let conn of this.conns) {
+        for (const conn of this.conns) {
             if (conn.src == elementPath) {
                 return conn.tgt;
             }
@@ -320,16 +325,16 @@ class ModelData {
         let sysPathnames = this.sysPathnamesList;
         let throwLbl = 'ModelData._computeConnections: ';
 
-        for (let conn of this.conns) {
+        for (const conn of this.conns) {
             // Process sources
-            let srcObj = this.nodePaths[conn.src];
+            const srcObj = this.nodePaths[conn.src];
 
             if (!srcObj) {
                 console.warn(throwLbl + "Cannot find connection source " + conn.src);
                 continue;
             }
 
-            let srcObjParents = [srcObj];
+            const srcObjParents = [srcObj];
             if (!srcObj.isOutput()) { // source obj must be output
                 console.warn(throwLbl + "Found a source that is not an output.");
                 continue;
@@ -345,7 +350,7 @@ class ModelData {
             }
 
             // Process targets
-            let tgtObj = this.nodePaths[conn.tgt];
+            const tgtObj = this.nodePaths[conn.tgt];
 
             if (!tgtObj) {
                 console.warn(throwLbl + "Cannot find connection target " + conn.tgt);
@@ -367,13 +372,13 @@ class ModelData {
                 continue;
             }
 
-            let tgtObjParents = [tgtObj];
+            const tgtObjParents = [tgtObj];
             for (let parentObj = tgtObj.parent; parentObj != null; parentObj = parentObj.parent) {
                 tgtObjParents.push(parentObj);
             }
 
-            for (let srcParent of srcObjParents) {
-                for (let tgtParent of tgtObjParents) {
+            for (const srcParent of srcObjParents) {
+                for (const tgtParent of tgtObjParents) {
                     if (tgtParent.absPathName != "")
                         srcParent.targetParentSet.add(tgtParent);
 
@@ -430,15 +435,19 @@ class ModelData {
     }
 
     /**
-     *
+     * If the Auto-IVC component exists, rename its child variables to their
+     * promoted names so they can be easily recognized instead of as v0, v1, etc.
      */
     _updateAutoIvcNames() {
         const aivc = this.nodePaths['_auto_ivc'];
         if (aivc !== undefined && aivc.hasChildren()) {
             for (const ivc of aivc.children) {
-                const tgtPath = this.getAutoIvcTgt(ivc.absPathName);
-                if (tgtPath !== undefined) {
-                    ivc.promotedName = this.nodePaths[tgtPath].promotedName;
+                if (!ivc.isFilter()) {
+                    const tgtPath = this.getAutoIvcTgt(ivc.absPathName);
+
+                    if (tgtPath !== undefined) {
+                        ivc.promotedName = this.nodePaths[tgtPath].promotedName;
+                    }
                 }
             }
         }
