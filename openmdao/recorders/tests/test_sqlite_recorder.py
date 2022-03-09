@@ -1507,15 +1507,48 @@ class TestSqliteRecorder(unittest.TestCase):
                           expected_solver_output, expected_solver_residuals),)
         assertSolverIterDataRecorded(self, expected_data, self.eps)
 
+    def test_record_solver_nonlinear_broyden(self):
+        prob = SellarProblem(
+                             linear_solver=om.DirectSolver,
+                             nonlinear_solver=om.BroydenSolver()
+        )
+        prob.setup()
+
+        prob.model.nonlinear_solver.add_recorder(self.recorder)
+
+        prob.set_solver_print(-1)
+        t0, t1 = run_driver(prob)
+        prob.cleanup()
+
+        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'BroydenSolver', (2,)]
+
+        expected_abs_error = 0.0009547575844806033
+        expected_rel_error = 0.00042348707505980126
+
+        expected_solver_output = {
+            '_auto_ivc.v1': [1.],
+            '_auto_ivc.v0': [5., 2.],
+            'd1.y1': [25.58830237],
+            'd2.y2': [12.05848815],
+            'obj_cmp.obj': [28.58830817],
+            'con_cmp1.con1': [-22.42830237],
+            'con_cmp2.con2': [-11.94151185]
+        }
+
+        expected_solver_residuals = None
+
+        expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
+                          expected_solver_output, expected_solver_residuals),)
+        assertSolverIterDataRecorded(self, expected_data, self.eps)
+
         # Also check to make sure the first iteration has correct abs and rel errors
         # as a regression test for
         #   https://github.com/OpenMDAO/OpenMDAO/issues/2435
         cr = om.CaseReader(self.filename)
 
         solver_cases = cr.get_cases("root.nonlinear_solver")
-        self.assertAlmostEqual(solver_cases[0].abs_err, 36.331584, delta=1e-6)
+        self.assertAlmostEqual(solver_cases[0].abs_err, 2.254514106, delta=1e-6)
         self.assertEqual(solver_cases[0].rel_err, 1.0)
-
 
     def test_record_solver_nonlinear_nonlinear_run_once(self):
         prob = SellarProblem(nonlinear_solver=om.NonlinearRunOnce)

@@ -64,7 +64,7 @@ class BroydenSolver(NonlinearSolver):
         Flag that becomes True when Broyden detects it needs to recompute the inverse Jacobian.
     """
 
-    SOLVER = 'BROYDEN'
+    SOLVER = 'NL: BROYDEN'
 
     def __init__(self, **kwargs):
         """
@@ -399,10 +399,9 @@ class BroydenSolver(NonlinearSolver):
             self.set_states(xm)
 
         # Run the model.
-        with Recording('Broyden', 0, self):
-            self._solver_info.append_solver()
-            self._gs_iter()
-            self._solver_info.pop()
+        self._solver_info.append_solver()
+        self._gs_iter()
+        self._solver_info.pop()
 
         self._run_apply()
 
