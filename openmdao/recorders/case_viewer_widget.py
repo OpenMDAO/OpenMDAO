@@ -100,8 +100,8 @@ def _get_output_meta(cr, case_name, var):
     case_outputs = case.list_outputs(prom_name=True, units=True, shape=True, val=False, residuals=False,
                                      out_stream=None)
 
-    for promname, meta in case_outputs:
-        if promname == var:
+    for _, meta in case_outputs:
+        if meta['prom_name'] == var:
             return meta
     else:
         raise KeyError(f'No output named {var} found')
@@ -128,7 +128,7 @@ def _get_output_vars(cr, case_names):
         case = cr.get_case(case_name)
         case_outputs = case.list_outputs(prom_name=True, units=False, shape=False, val=True, residuals=False,
                                          out_stream=None)
-        output_vars |= {promname for promname, meta in case_outputs if isinstance(meta['val'], np.ndarray)}
+        output_vars |= {meta['prom_name'] for abs_path, meta in case_outputs if isinstance(meta['val'], np.ndarray)}
     return sorted(list(output_vars))
 
 
@@ -153,11 +153,11 @@ def _get_resids_vars(cr, case_names):
         case = cr.get_case(case_name)
         case_outputs = case.list_outputs(prom_name=True, units=True, shape=True, val=False, residuals=True,
                                          out_stream=None)
-        resid_vars |= {promname for promname, meta in case_outputs if isinstance(meta['resids'], np.ndarray)}
+        resid_vars |= {meta['prom_name'] for abs_path, meta in case_outputs if isinstance(meta['resids'], np.ndarray)}
     return sorted(list(resid_vars))
 
 
-def _get_opt_vars(cr, case_names):
+def _get_opt_vars(cr, case_names, var_type=None):
     """
     Return a set of variable names whose outputs are present in at lease one of the given cases and are part
     of the optimization variables in at least one of the cases.
@@ -168,21 +168,24 @@ def _get_opt_vars(cr, case_names):
         The CaseReader housing the data.
     case_names : Iterable of str
         The case_names from which the outputs with avaialble residuals out are to be returned.
+    var_type : None or str
+        One of 'desvars', 'constraints', 'objectives', or None.
 
     Returns
     -------
     list
         A list of the variables with avaialble residuals in at least one of the given cases.
     """
-    desvars = set()
-    cons = set()
-    objs = set()
+    vars = set()
     for case_name in case_names:
         case = cr.get_case(case_name)
-        desvars |= case.get_design_vars().keys()
-        cons |= case.get_constraints().keys()
-        objs |= case.get_objectives().keys()
-    return sorted(list(desvars | cons | objs))
+        if var_type in ('desvars', None):
+            vars |= case.get_design_vars().keys()
+        if var_type in ('constraints', None):
+            vars |= case.get_constraints().keys()
+        if var_type in ('objectives', None):
+            vars |= case.get_objectives().keys()
+    return sorted(list(vars))
 
 
 def _get_resids_val(case, prom_name):
@@ -293,7 +296,10 @@ class CaseViewer(object):
         self._widgets['x_filter'] = ipw.Text('', description='X-Axis Filter',
                                              layout=ipw.Layout(width='49%', height='auto'))
 
-        self._widgets['x_var_type'] = ipw.Dropdown(options=['outputs', 'optimization', 'residuals'],
+        var_types_list = ['outputs', 'optimization', 'desvars', 'constraints', 'objectives', 'residuals']
+
+
+        self._widgets['x_var_type'] = ipw.Dropdown(options=var_types_list,
                                                    description='X Var Type',
                                                    value='outputs',
                                                    layout={'width': '49%'})
@@ -318,7 +324,7 @@ class CaseViewer(object):
         self._widgets['y_filter'] = ipw.Text('', description='Y-Axis Filter',
                                              layout={'width': '49%', 'height': 'auto'})
 
-        self._widgets['y_var_type'] = ipw.Dropdown(options=['outputs', 'optimization', 'residuals'],
+        self._widgets['y_var_type'] = ipw.Dropdown(options=var_types_list,
                                                    description='Y Var Type WTF',
                                                    value='outputs',
                                                    layout={'width': '49%'})
@@ -425,38 +431,39 @@ class CaseViewer(object):
         axis : str
             'x' or 'y' - case insensitive.
         """
-        if axis.lower() not in ('x', 'y'):
-            raise ValueError(f'Unknown axis: {axis}')
+        with self._widgets['debug_output']:
+            if axis.lower() not in ('x', 'y'):
+                raise ValueError(f'Unknown axis: {axis}')
 
-        src = self._widgets['source_select'].value
-        cases = self._widgets['cases_list'].options
+            src = self._widgets['source_select'].value
+            cases = self._widgets['cases_list'].options
 
-        if not cases:
-            self._widgets[f'{axis}_select'].options = []
-            self._widgets[f'{axis}_info'].value = 'N/A'
-            return
+            if not cases:
+                self._widgets[f'{axis}_select'].options = []
+                self._widgets[f'{axis}_info'].value = 'N/A'
+                return
 
-        w_var_select = self._widgets[f'{axis}_select']
-        var_filter = self._widgets[f'{axis}_filter'].value
-        var_select = w_var_select.value
-        var_type = self._widgets[f'{axis}_var_type'].value
+            w_var_select = self._widgets[f'{axis}_select']
+            var_filter = self._widgets[f'{axis}_filter'].value
+            var_select = w_var_select.value
+            var_type = self._widgets[f'{axis}_var_type'].value
 
-        if var_type == 'optimization':
-            opt_vars = _get_opt_vars(self._case_reader, cases)
-            output_vars = _get_output_vars(self._case_reader, cases)
-            vars = set(opt_vars).intersection(set(output_vars))
-        elif var_type == 'residuals':
-            vars = _get_resids_vars(self._case_reader, cases)
-        else:
-            vars = _get_output_vars(self._case_reader, cases)
+            if var_type == 'optimization':
+                vars = _get_opt_vars(self._case_reader, cases)
+            elif var_type in ('desvars', 'constraints', 'objectives'):
+                vars = _get_opt_vars(self._case_reader, cases, var_type=var_type)
+            elif var_type == 'residuals':
+                vars = _get_resids_vars(self._case_reader, cases)
+            else:
+                vars = _get_output_vars(self._case_reader, cases)
 
-        # We have a list of available vars, now filter it.
-        r = re.compile(var_filter)
-        filtered_list = list(filter(r.search, vars))
+            # We have a list of available vars, now filter it.
+            r = re.compile(var_filter)
+            filtered_list = list(filter(r.search, vars))
 
-        w_var_select.options = [self._case_index_str] + filtered_list if axis == 'x' else filtered_list
+            w_var_select.options = [self._case_index_str] + filtered_list if axis == 'x' else filtered_list
 
-        self._update_var_info(axis)
+            self._update_var_info(axis)
 
     def _update_case_slider(self):
         n = len(self._widgets['cases_list'].options)
@@ -565,13 +572,12 @@ class CaseViewer(object):
         with self._widgets['debug_output']:
             w = event['owner']
             axis = 'x' if w is self._widgets['x_filter'] or w is self._widgets['x_var_type'] else 'y'
-            print(f'updating available vars for {axis}')
             self._update_var_select_options(axis)
             self._update_plot()
 
     def _callback_select_var(self, *args):
         event = args[0]
-        self._widgets['debug_output'].clear_output()
+        # self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             w = event['owner']
             s = w.value
@@ -646,7 +652,6 @@ class CaseViewer(object):
 
                 if y_var_type == 'residuals':
                     y_val = _get_resids_val(case, y_var)
-                    print(y_val)
                 else:
                     y_val = case.get_val(y_var)
 
@@ -675,8 +680,6 @@ class CaseViewer(object):
                 x_val = _apply_transform(x_val, x_transform)
 
                 if x_val is None or y_val is None:
-                    print('x_val = ', x_val)
-                    print('y_val = ', y_val)
                     continue
 
                 if x_val.shape[0] != y_val.shape[0]:
@@ -716,7 +719,7 @@ class CaseViewer(object):
                 self._ax.set_ylim(y_min - y_margin, y_max + y_margin)
 
     def _update_plot(self):
-        self._widgets['debug_output'].clear_output()
+        # self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             cr = self._case_reader
             src = self._widgets['source_select'].value
@@ -727,10 +730,13 @@ class CaseViewer(object):
             y_slice = '' if self._widgets['y_slice'].value == '[...]' else self._widgets['y_slice'].value
             x_transform = self._widgets['x_transform_select'].value
             y_transform = self._widgets['y_transform_select'].value
+            x_var_type = self._widgets['x_var_type'].value
+            y_var_type = self._widgets['y_var_type'].value
 
             self._ax.clear()
 
-            if not cases:
+            if not cases or not x_var or not y_var:
+                print('Nothing to plot')
                 return
 
             x_units = 'None' if x_var == self._case_index_str else _get_output_meta(cr, cases[0], x_var)['units']
@@ -740,6 +746,12 @@ class CaseViewer(object):
 
             x_label = rf'{x_var}{x_slice}'
             y_label = rf'{y_var}{y_slice}'
+
+            if x_var_type == 'residuals':
+                x_label = f'$\mathcal{{R}}$({x_label})'
+
+            if y_var_type == 'residuals':
+                y_label = f'$\mathcal{{R}}$({y_label})'
 
             if x_transform != 'None':
                 x_label = f'{x_transform}({x_label})'
