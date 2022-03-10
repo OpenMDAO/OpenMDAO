@@ -484,7 +484,8 @@ class OmTreeNode extends N2TreeNode {
 
         if (this.hasChildren()) {
             for (const child of this.children) {
-                child._getNodesInChildrenWithCycleArrows(arr);
+                if (child instanceof OmTreeNode)
+                    child._getNodesInChildrenWithCycleArrows(arr);
             }
         }
     }

@@ -214,6 +214,8 @@ class N2Matrix {
      */
     _findUnseenCycleSources(cell) {
         const node = cell.tgtObj;
+        if (!(node instanceof OmTreeNode)) return;
+        
         const targetsWithCycleArrows = node.getNodesWithCycleArrows();
 
         const offscreenInit = cell.offScreen.total;
