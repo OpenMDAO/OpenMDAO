@@ -1008,8 +1008,8 @@ class N2Diagram {
      * @param {N2TreeNode} startNode The node to begin from.
      */
     manuallyExpandAll(startNode) {
-        startnode.draw.minimized = false;
-        startnode.draw.manuallyExpanded = true;
+        startNode.draw.minimized = false;
+        startNode.draw.manuallyExpanded = true;
 
         if (startNode.hasChildren()) {
             for (const child of startNode.children) {
@@ -1025,8 +1025,8 @@ class N2Diagram {
      */
     minimizeAll(startNode, initialNode = true) {
         if (!initialNode) {
-            startnode.draw.minimized = true;
-            startnode.draw.manuallyExpanded = false;
+            startNode.draw.minimized = true;
+            startNode.draw.manuallyExpanded = false;
         }
 
         if (startNode.hasChildren()) {
