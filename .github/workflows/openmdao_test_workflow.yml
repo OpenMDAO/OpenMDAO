@@ -119,6 +119,15 @@ jobs:
           pip install jax
           pip install jaxlib
 
+      - name: Install libscotch
+        if: matrix.name == 'Oldest'
+        shell: bash -l {0}
+        run: |
+          echo "============================================================="
+          echo "Install libscotch"
+          echo "============================================================="
+          sudo apt-get install -y libscotch-6.0
+
       - name: Install PETSc
         if: matrix.PETSc
         shell: bash -l {0}

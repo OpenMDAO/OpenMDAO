@@ -1594,12 +1594,13 @@ class TestDiscreteScalingReport(unittest.TestCase):
 
         # Setup driver
         prob.driver = om.DOEDriver(om.ListGenerator(samples))
-        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
+        # run driver
         prob.setup()
         prob.run_driver()
         prob.cleanup()
 
+        # generate scaling report
         prob.driver.scaling_report(show_browser=False)
 
 
