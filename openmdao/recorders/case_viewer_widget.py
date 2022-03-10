@@ -265,6 +265,13 @@ class CaseViewer(object):
         self._register_callbacks()
 
         self._fig, self._ax = plt.subplots(1, 1, figsize=(9, 9/1.6), tight_layout=True)
+        # gs = mpl.gridspec.GridSpec(1, 20, figure=self._fig)
+        # self._ax = self._fig.add_subplot(gs[0, :-1])
+        # self._cbar_ax = self._fig.add_subplot(gs[0, -1])
+        # self._cbar_ax.set_axis_off()
+        norm = mpl.colors.Normalize(vmin=0, vmax=1)
+        self._scalar_mappable = cm.ScalarMappable(norm=norm, cmap=self._cmap)
+        self._colorbar = self._fig.colorbar(self._scalar_mappable, label='Case Index')
 
         self._update_source_options()
         self._update_case_select_options()
@@ -274,6 +281,9 @@ class CaseViewer(object):
         self._update_var_info('y')
 
     def _make_gui(self):
+        """
+        Define the widgets for the CaseViewer and displays them.
+        """
         self._widgets = {}
 
         self._widgets['source_select'] = ipw.Dropdown(description='Source',
@@ -325,7 +335,7 @@ class CaseViewer(object):
                                              layout={'width': '49%', 'height': 'auto'})
 
         self._widgets['y_var_type'] = ipw.Dropdown(options=var_types_list,
-                                                   description='Y Var Type WTF',
+                                                   description='Y Var Type',
                                                    value='outputs',
                                                    layout={'width': '49%'})
 
@@ -381,13 +391,16 @@ class CaseViewer(object):
                           self._widgets['debug_output']]))
 
     def _update_source_options(self):
+        """
+        Update the contents of the source selection dropdown menu.
+        """
         sources = self._case_reader.list_sources(out_stream=None)
         self._widgets['source_select'].options = sources
         self._widgets['source_select'].value = sources[0]
 
     def _update_var_info(self, axis):
         """
-        Updates the variable info displayed.
+        Update the variable info displayed.
 
         Parameters
         ----------
@@ -417,6 +430,9 @@ class CaseViewer(object):
         self._widgets[f'{axis}_info'].value = f'{shape}'
 
     def _update_case_select_options(self):
+        """
+        Update the available cases listed in the source_select widget.
+        """
         src = self._widgets['source_select'].value
         avialable_cases = self._case_reader.list_cases(source=src, recurse=False, out_stream=None)
         self._widgets['cases_select'].options = avialable_cases
@@ -424,7 +440,7 @@ class CaseViewer(object):
 
     def _update_var_select_options(self, axis):
         """
-        Updates the variables available for plotting.
+        Update the variables available for plotting.
 
         Parameters
         ----------
@@ -466,11 +482,17 @@ class CaseViewer(object):
             self._update_var_info(axis)
 
     def _update_case_slider(self):
+        """
+        Update the extents of the case slider.
+        """
         n = len(self._widgets['cases_list'].options)
         self._widgets['case_slider'].max = n
         self._widgets['case_slider'].value = n
 
     def _register_callbacks(self):
+        """
+        Register callback functions with the widgets.
+        """
         self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
 
@@ -504,6 +526,11 @@ class CaseViewer(object):
     def _callback_select_source(self, *args):
         """
         Repopulate cases_select with cases from the chosen source.
+
+        Parameters
+        ----------
+        args : tuple
+            The information passed by the widget upon callback.
         """
         self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
@@ -512,6 +539,11 @@ class CaseViewer(object):
     def _callback_select_case(self, *args):
         """
         Add the selected case(s) to the chosen cases list.
+
+        Parameters
+        ----------
+        args : tuple
+            The information passed by the widget upon callback.
         """
         self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
@@ -526,18 +558,39 @@ class CaseViewer(object):
             self._update_plot()
 
     def _callback_case_list_select(self, *args):
+        """
+        Update the plot when a different case is selected in the cases list.
+
+        Parameters
+        ----------
+        args : tuple
+            The information passed by the widget upon callback.
+        """
         self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             self._update_plot()
 
     def _callback_case_slider(self, *args):
+        """
+        Update the plot when the case slider is changed.
+
+        Parameters
+        ----------
+        args : tuple
+            The information passed by the widget upon callback.
+        """
         self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             self._update_plot()
 
     def _callback_select_all_cases(self, *args):
         """
-        Add the selected case(s) to the chosen cases list.
+        Add all available cases to the cases list.
+
+        Parameters
+        ----------
+        args : tuple
+            The information passed by the widget upon callback.
         """
         self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
@@ -553,7 +606,12 @@ class CaseViewer(object):
 
     def _callback_remove_case(self, *args):
         """
-        Removes the selected case from the chosen cases list widget.
+        Remove the selected case from the chosen cases list widget.
+
+        Parameters
+        ----------
+        args : tuple
+            The information passed by the widget upon callback.
         """
         self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
@@ -567,6 +625,14 @@ class CaseViewer(object):
             self._update_plot()
 
     def _callback_filter_vars(self, *args):
+        """
+        Update the plot and the available variables when the filtering criteria is changed.
+
+        Parameters
+        ----------
+        args : tuple
+            The information passed by the widget upon callback.
+        """
         event = args[0]
         self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
@@ -576,8 +642,16 @@ class CaseViewer(object):
             self._update_plot()
 
     def _callback_select_var(self, *args):
+        """
+        Update the variable info and the plot when a new variable is chosen.
+
+        Parameters
+        ----------
+        args : tuple
+            The information passed by the widget upon callback.
+        """
         event = args[0]
-        # self._widgets['debug_output'].clear_output()
+        self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             w = event['owner']
             s = w.value
@@ -593,6 +667,14 @@ class CaseViewer(object):
                 self._update_plot()
 
     def _callback_change_slice(self, *args):
+        """
+        Update the plot when a new, valid slice is provided.
+
+        Parameters
+        ----------
+        args : tuple
+            The information passed by the widget upon callback.
+        """
         event = args[0]
         self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
@@ -603,6 +685,14 @@ class CaseViewer(object):
                 self._update_plot()
 
     def _callback_change_scale(self, *args):
+        """
+        Update the plot when the x or y axis scale is changed.
+
+        Parameters
+        ----------
+        args : tuple
+            The information passed by the widget upon callback.
+        """
         self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             event = args[0]
@@ -613,24 +703,24 @@ class CaseViewer(object):
                 self._ax.set_yscale(w.value)
 
     def _callback_select_transform(self, *args):
-        self._update_plot()
-
-    def _redraw_plot(self, cases, y_var, x_var=None):
         """
-        Update the plot area by plotting one variable vs another over one or more cases.
+        Update the plot when a new transformation is choen for the x or y variable.
 
         Parameters
         ----------
-        cases
-        y_var
-        x_var
+        args : tuple
+            The information passed by the widget upon callback.
+        """
+        self._update_plot()
 
-        Returns
-        -------
-
+    def _redraw_plot(self):
+        """
+        Update the plot area by plotting one variable vs another over one or more cases.
         """
         x_min = y_min = 1E16
         x_max = y_max = -1E16
+
+        cases = self._widgets['cases_list'].options
 
         x_slice = self._widgets['x_slice'].value
         y_slice = self._widgets['y_slice'].value
@@ -638,16 +728,21 @@ class CaseViewer(object):
         x_transform = self._widgets['x_transform_select'].value
         y_transform = self._widgets['y_transform_select'].value
 
+        x_var = self._widgets['x_select'].value
+        y_var = self._widgets['y_select'].value
+
         x_var_type = self._widgets['x_var_type'].value
         y_var_type = self._widgets['y_var_type'].value
 
         selected_case_idx = self._widgets['case_slider'].value
 
+        max_size = 0
+
         self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             for i, case_name in enumerate(cases):
-                alpha = 1.0 if (selected_case_idx >= len(cases) or i == selected_case_idx) else 0.2
-                lw = 1.0 if (selected_case_idx >= len(cases) or i == selected_case_idx) else 0.05
+                alpha = 1.0 if (selected_case_idx >= len(cases) or i == selected_case_idx) else 0.1
+                lw = 2.0 if (selected_case_idx >= len(cases) or i == selected_case_idx) else 0.05
                 case = self._case_reader.get_case(case_name)
 
                 if y_var_type == 'residuals':
@@ -663,7 +758,7 @@ class CaseViewer(object):
                     continue
                 y_val = _apply_transform(y_val, y_transform)
 
-                if x_var not in (None, self._case_index_str):
+                if x_var != self._case_index_str:
                     if x_var_type == 'residuals':
                         x_val = _get_resids_val(case, x_var)
                     else:
@@ -687,12 +782,14 @@ class CaseViewer(object):
                     print('Size along first axis must agree.')
                     return
 
+                max_size = max(max_size, x_val.size)
+
                 x_min = min(x_min, np.min(x_val))
                 x_max = max(x_max, np.max(x_val))
                 y_min = min(y_min, np.min(y_val))
                 y_max = max(y_max, np.max(y_val))
 
-                if x_var in (None, self._case_index_str):
+                if x_var == self._case_index_str:
                     self._ax.scatter(x_val, y_val, c=np.arange(x_val.size), s=20, cmap=self._cmap, alpha=alpha)
                 else:
                     self._ax.plot(x_val, y_val,
@@ -700,7 +797,7 @@ class CaseViewer(object):
                                   marker='o',
                                   linestyle='-',
                                   linewidth=lw,
-                                  markersize=5,
+                                  markersize=2,
                                   alpha=alpha)
 
                 self._fig.canvas.flush_events()
@@ -718,8 +815,21 @@ class CaseViewer(object):
             if not bad_y_bounds:
                 self._ax.set_ylim(y_min - y_margin, y_max + y_margin)
 
+            # Add the colorbar.  Color shows the index of each point in its vector if the x-axis is Case Index,
+            # otherwise it shows the case index.
+            if x_var == self._case_index_str:
+                vmax = max_size
+                cbar_label = 'Array Index'
+            else:
+                vmax = len(cases)
+                cbar_label = self._case_index_str
+            self._scalar_mappable.set_clim(0, vmax)
+            self._colorbar.set_label(cbar_label)
+
     def _update_plot(self):
-        # self._widgets['debug_output'].clear_output()
+        """
+        Update the plot based on the contents of the widgets.
+        """
         with self._widgets['debug_output']:
             cr = self._case_reader
             src = self._widgets['source_select'].value
@@ -733,7 +843,10 @@ class CaseViewer(object):
             x_var_type = self._widgets['x_var_type'].value
             y_var_type = self._widgets['y_var_type'].value
 
-            self._ax.clear()
+            try:
+                self._ax.clear()
+            except AttributeError:
+                return
 
             if not cases or not x_var or not y_var:
                 print('Nothing to plot')
@@ -742,7 +855,7 @@ class CaseViewer(object):
             x_units = 'None' if x_var == self._case_index_str else _get_output_meta(cr, cases[0], x_var)['units']
             y_units = _get_output_meta(cr, cases[0], y_var)['units']
 
-            self._redraw_plot(cases, x_var=x_var, y_var=y_var)
+            self._redraw_plot()
 
             x_label = rf'{x_var}{x_slice}'
             y_label = rf'{y_var}{y_slice}'
