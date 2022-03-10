@@ -143,7 +143,9 @@ class DistributedRecorderTest(unittest.TestCase):
 
         ivc = prob.model.add_subsystem('ivc', om.IndepVarComp(), promotes_outputs=['*'])
         for n, size in enumerate(sizes):
-            ivc.add_output(f'in{n}', np.ones(size), distributed=True)
+            local_sizes, _ = evenly_distrib_idxs(prob.comm.size, size)
+            local_size = local_sizes[prob.comm.rank]
+            ivc.add_output(f'in{n}', np.ones(local_size), distributed=True)
             prob.model.add_design_var(f'in{n}')
 
         prob.model.add_subsystem('adder', DistributedAdder(sizes), promotes=['*'])

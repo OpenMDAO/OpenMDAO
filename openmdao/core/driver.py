@@ -305,8 +305,7 @@ class Driver(object):
             remote_cons = set(_prom2ivc_src_name_iter(self._cons)) - local_out_vars
             remote_objs = set(_prom2ivc_src_name_iter(self._objs)) - local_out_vars
 
-            all_remote_vois = model.comm.allgather(
-                (remote_dvs, remote_cons, remote_objs))
+            all_remote_vois = model.comm.allgather((remote_dvs, remote_cons, remote_objs))
             for rem_dvs, rem_cons, rem_objs in all_remote_vois:
                 con_set.update(rem_cons)
                 obj_set.update(rem_objs)
@@ -553,20 +552,22 @@ class Driver(object):
                 val = local_val
 
         else:
-            if name in self._designvars_discrete:
+            if src_name in model._discrete_outputs:
                 val = model._discrete_outputs[src_name]
-
-                # At present, only integers are supported by OpenMDAO drivers.
-                # We check the values here.
-                msg = "Only integer scalars or ndarrays are supported as values for " + \
-                      "discrete variables when used as a design variable. "
-                if np.isscalar(val) and not isinstance(val, (int, np.integer)):
-                    msg += "A value of type '{}' was specified.".format(val.__class__.__name__)
-                    raise ValueError(msg)
-                elif isinstance(val, np.ndarray) and not np.issubdtype(val[0], np.integer):
-                    msg += "An array of type '{}' was specified.".format(val[0].__class__.__name__)
-                    raise ValueError(msg)
-
+                if name in self._designvars_discrete:
+                    # At present, only integers are supported by OpenMDAO drivers.
+                    # We check the values here.
+                    if not ((np.isscalar(val) and isinstance(val, (int, np.integer))) or
+                            (isinstance(val, np.ndarray) and np.issubdtype(val[0], np.integer))):
+                        if np.isscalar(val):
+                            suffix = f"A value of type '{type(val).__name__}' was specified."
+                        elif isinstance(val, np.ndarray):
+                            suffix = f"An array of type '{val.dtype.name}' was specified."
+                        else:
+                            suffix = ''
+                        raise ValueError("Only integer scalars or ndarrays are supported as values "
+                                         "for discrete variables when used as a design variable. "
+                                         + suffix)
             elif indices is None:
                 val = get(src_name, flat=True).copy()
             else:

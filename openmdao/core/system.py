@@ -130,17 +130,23 @@ class _MetadataDict(dict):
     """
 
     def __getitem__(self, key):
-        if key == 'value':
-            warn_deprecation(value_deprecated_msg)
-            key = 'val'
-        val = dict.__getitem__(self, key)
-        return val
+        try:
+            return dict.__getitem__(self, key)
+        except KeyError:
+            if key == 'value':
+                warn_deprecation(value_deprecated_msg)
+                return dict.__getitem__(self, 'val')
+            raise
 
     def __setitem__(self, key, val):
-        if key == 'value':
-            warn_deprecation(value_deprecated_msg)
-            key = 'val'
-        dict.__setitem__(self, key, val)
+        try:
+            dict.__setitem__(self, key, val)
+        except KeyError:
+            if key == 'value':
+                dict.__setitem__(self, 'val', val)
+                warn_deprecation(value_deprecated_msg)
+            else:
+                raise
 
 
 class System(object):
@@ -368,6 +374,8 @@ class System(object):
     _tot_jac : __TotalJacInfo or None
         If a total jacobian is being computed and this is the top level System, this will
         be a reference to the _TotalJacInfo object.
+    _raise_connection_errors : bool
+        Flag indicating whether connection related errors are raised as an Exception.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -520,6 +528,7 @@ class System(object):
         self._coloring_info = _DEFAULT_COLORING_META.copy()
         self._first_call_to_linearize = True   # will check in first call to _linearize
         self._tot_jac = None
+        self._raise_connection_errors = True
 
     @property
     def msginfo(self):
@@ -1880,8 +1889,6 @@ class System(object):
             to (promoted name, promotion_info) tuple.
         """
         from openmdao.core.group import Group
-        prom_names = self._var_allprocs_prom2abs_list
-        gname = self.name + '.' if self.name else ''
 
         def split_list(lst):
             """
@@ -1915,7 +1922,7 @@ class System(object):
                     raise TypeError(f"when adding subsystem '{self.pathname}', entry '{key}'"
                                     " is not a string or tuple of size 2.")
 
-        def _dup(io, matches, match_type, name, tup):
+        def _check_dup(io, matches, match_type, name, tup):
             """
             Report error or warning when attempting to promote a variable twice.
 
@@ -1991,7 +1998,8 @@ class System(object):
                             nmatch = len(pmap)
                             for n in proms[io]:
                                 if fnmatchcase(n, key):
-                                    if not (n in pmap and _dup(io, matches, match_type, n, tup)):
+                                    if not (n in pmap and _check_dup(io, matches, match_type, n,
+                                                                     tup)):
                                         pmap[n] = (n, key, pinfo, match_type)
                             if len(pmap) > nmatch:
                                 found.add(key)
@@ -2002,7 +2010,7 @@ class System(object):
                         pmap = matches[io]
                         if key in proms[io]:
                             if key in pmap:
-                                _dup(io, matches, match_type, key, tup)
+                                _check_dup(io, matches, match_type, key, tup)
                             pmap[key] = (s, key, pinfo, match_type)
                             if match_type == _MatchType.NAME:
                                 found.add(key)
@@ -2025,16 +2033,17 @@ class System(object):
                 raise RuntimeError(f"{self.msginfo}: '{call}' failed to find any matches for the "
                                    f"following names or patterns: {not_found}.{empty_group_msg}")
 
+        prom2abs_list = self._var_allprocs_prom2abs_list
         maps = {'input': {}, 'output': {}}
 
         if self._var_promotes['input'] or self._var_promotes['output']:
             if self._var_promotes['any']:
                 raise RuntimeError("%s: 'promotes' cannot be used at the same time as "
                                    "'promotes_inputs' or 'promotes_outputs'." % self.msginfo)
-            resolve(self._var_promotes['input'], ('input',), maps, prom_names)
-            resolve(self._var_promotes['output'], ('output',), maps, prom_names)
+            resolve(self._var_promotes['input'], ('input',), maps, prom2abs_list)
+            resolve(self._var_promotes['output'], ('output',), maps, prom2abs_list)
         else:
-            resolve(self._var_promotes['any'], ('input', 'output'), maps, prom_names)
+            resolve(self._var_promotes['any'], ('input', 'output'), maps, prom2abs_list)
 
         return maps
 
@@ -3090,11 +3099,11 @@ class System(object):
                 else:
                     out.update(dvs)
 
-            if self.comm.size > 1 and self._subsystems_allprocs:
+            if (self.comm.size > 1 and self._subsystems_allprocs and
+                    self._mpi_proc_allocator.parallel):
                 my_out = out
-                allouts = self.comm.allgather(out)
-                out = OrderedDict()
-                for rank, all_out in enumerate(allouts):
+                out = {}
+                for all_out in self.comm.allgather(my_out):
                     for name, meta in all_out.items():
                         if name not in out:
                             if name in my_out:
@@ -3218,9 +3227,10 @@ class System(object):
                 else:
                     out.update(resps)
 
-            if self.comm.size > 1 and self._subsystems_allprocs:
+            if (self.comm.size > 1 and self._subsystems_allprocs and
+                    self._mpi_proc_allocator.parallel):
                 all_outs = self.comm.allgather(out)
-                out = OrderedDict()
+                out = {}
                 for rank, all_out in enumerate(all_outs):
                     out.update(all_out)
 
@@ -3341,28 +3351,25 @@ class System(object):
         if isinstance(excludes, str):
             excludes = (excludes,)
 
-        loc2meta = self._var_abs2meta
-        all2meta = self._var_allprocs_abs2meta
-
         gather_keys = {'val', 'src_indices'}
         need_gather = get_remote and self.comm.size > 1
         if metadata_keys is not None:
             keyset = set(metadata_keys)
-            try:
-                # DEPRECATION: if 'value' in keyset, replace with 'val'
+            # DEPRECATION: if 'value' in keyset, replace with 'val'
+            if 'value' in keyset:
                 keyset.remove('value')
                 keyset.add('val')
                 warn_deprecation(value_deprecated_msg)
-            except KeyError:
-                pass
+
             diff = keyset - allowed_meta_names
             if diff:
                 raise RuntimeError(f"{self.msginfo}: {sorted(diff)} are not valid metadata entry "
                                    "names.")
         need_local_meta = metadata_keys is not None and len(gather_keys.intersection(keyset)) > 0
 
+        all2meta = self._var_allprocs_abs2meta
         if need_local_meta:
-            metadict = loc2meta
+            metadict = self._var_abs2meta
             disc_metadict = self._var_discrete
         else:
             metadict = all2meta
@@ -3385,7 +3392,6 @@ class System(object):
                     continue
 
                 rel_name = abs_name[rel_idx:]
-
                 if abs_name in all2meta[iotype]:  # continuous
                     meta = cont2meta[abs_name] if abs_name in cont2meta else None
                     distrib = all2meta[iotype][abs_name]['distributed']
@@ -3403,7 +3409,7 @@ class System(object):
                         ret_meta = _MetadataDict(meta)
                     else:
                         ret_meta = _MetadataDict()
-                        for key in metadata_keys:
+                        for key in keyset:
                             try:
                                 ret_meta[key] = meta[key]
                             except KeyError:
@@ -3420,7 +3426,7 @@ class System(object):
                             if not ret_meta:
                                 ret_meta = _MetadataDict()
                             if distrib:
-                                if 'val' in metadata_keys:
+                                if 'val' in keyset:
                                     # assemble the full distributed value
                                     dist_vals = [m['val'] for m in allproc_metas
                                                  if m is not None and m['val'].size > 0]
@@ -3428,7 +3434,7 @@ class System(object):
                                         ret_meta['val'] = np.concatenate(dist_vals)
                                     else:
                                         ret_meta['val'] = np.zeros(0)
-                                if 'src_indices' in metadata_keys:
+                                if 'src_indices' in keyset:
                                     # assemble full src_indices
                                     dist_src_inds = [m['src_indices'] for m in allproc_metas
                                                      if m is not None and m['src_indices'].size > 0]
@@ -3446,15 +3452,16 @@ class System(object):
                             ret_meta = None
 
                 if ret_meta is not None:
-                    ret_meta['prom_name'] = prom
-                    ret_meta['discrete'] = abs_name not in all2meta
-
-                    vname = rel_name if return_rel_names else abs_name
-
                     if tags and not tagset & ret_meta['tags']:
                         continue
 
-                    result[vname] = ret_meta
+                    ret_meta['prom_name'] = prom
+                    ret_meta['discrete'] = abs_name not in all2meta
+
+                    if return_rel_names:
+                        result[rel_name] = ret_meta
+                    else:
+                        result[abs_name] = ret_meta
 
         return result
 
@@ -4107,19 +4114,6 @@ class System(object):
         if not self.under_approx:
             self.iter_count_without_approx += 1
 
-    def is_active(self):
-        """
-        Determine if the system is active on this rank.
-
-        Returns
-        -------
-        bool
-            If running under MPI, returns True if this `System` has a valid
-            communicator. Always returns True if not running under MPI.
-        """
-        return MPI is None or not (self.comm is None or
-                                   self.comm == MPI.COMM_NULL)
-
     def _clear_iprint(self):
         """
         Clear out the iprint stack from the solvers.
@@ -4552,8 +4546,12 @@ class System(object):
             return self._abs_get_val(src, get_remote, rank, vec_name, 'output', flat,
                                      from_root=True)
 
+        is_prom = len(abs_ins) > 1 or name != abs_ins[0]
+
         if scope_sys is None:
             scope_sys = self
+
+        abs2meta_all_ins = self._var_allprocs_abs2meta['input']
 
         # if we have multiple promoted inputs that are explicitly connected to an output and units
         # have not been specified, look for group input to disambiguate
@@ -4563,39 +4561,56 @@ class System(object):
                 try:
                     units = scope_sys._group_inputs[name][0]['units']
                 except (KeyError, IndexError):
-                    unit0 = self._var_allprocs_abs2meta['input'][abs_ins[0]]['units']
+                    unit0 = abs2meta_all_ins[abs_ins[0]]['units']
                     for n in abs_ins[1:]:
-                        if unit0 != self._var_allprocs_abs2meta['input'][n]['units']:
+                        if unit0 != abs2meta_all_ins[n]['units']:
                             self._show_ambiguity_msg(name, ('units',), abs_ins)
                             break
 
-        if abs_name in self._var_abs2meta['input']:  # input is local
+        is_local = abs_name in self._var_abs2meta['input']
+        src_indices = vshape = None
+        if is_local:  # input is local
             vmeta = self._var_abs2meta['input'][abs_name]
-            src_indices = vmeta['src_indices']
+            if vmeta.get('manual_connection') or not is_prom:
+                src_indices = vmeta['src_indices']
+                vshape = vmeta['shape']
         else:
-            vmeta = self._var_allprocs_abs2meta['input'][abs_name]
-            src_indices = None  # FIXME: remote var could have src_indices
+            vmeta = abs2meta_all_ins[abs_name]
 
         distrib = vmeta['distributed']
-        vshape = vmeta['shape']
         vdynshape = vmeta['shape_by_conn']
-        has_src_indices = any(self._var_allprocs_abs2meta['input'][n]['has_src_indices']
-                              for n in abs_ins)
-
-        # see if we have any 'intermediate' level src_indices when using a promoted name
-        if name in scope_sys._var_prom2inds:
-            src_shape, inds, _ = scope_sys._var_prom2inds[name]
-            if inds is None:
-                if len(abs_ins) > 1 or name != abs_ins[0]:  # using a promoted lookup
-                    src_indices = None
-                    vshape = None
-                    has_src_indices = False
-            else:
-                shp = inds.indexed_src_shape
-                src_indices = inds
+        for n in abs_ins:
+            if abs2meta_all_ins[n]['has_src_indices']:
                 has_src_indices = True
-                if len(abs_ins) > 1 or name != abs_name:
-                    vshape = shp
+                break
+        else:
+            has_src_indices = False
+
+        if is_prom:
+            # see if we have any 'intermediate' level src_indices when using a promoted name
+            n = name
+            scope = scope_sys
+            while n:
+                if n in scope._var_prom2inds:
+                    src_shape, inds, _ = scope._var_prom2inds[n]
+                    if inds is None:
+                        if is_prom:  # using a promoted lookup
+                            src_indices = None
+                            vshape = None
+                            has_src_indices = False
+                    else:
+                        shp = inds.indexed_src_shape
+                        src_indices = inds
+                        has_src_indices = True
+                        if is_prom:
+                            vshape = shp
+                    break
+                parts = n.split('.', 1)
+                n = n[len(parts[0]) + 1:]
+                if len(parts) > 1:
+                    s = scope._get_subsystem(parts[0])
+                    if s is not None:
+                        scope = s
 
         if self.comm.size > 1 and get_remote:
             if self.comm.rank == self._owning_rank[abs_name]:
@@ -4625,8 +4640,11 @@ class System(object):
         val = self._abs_get_val(src, get_remote, rank, vec_name, 'output', flat, from_root=True)
 
         if has_src_indices:
-            if src_indices is None:  # input is remote
+            if not is_local:
                 val = np.zeros(0)
+            elif src_indices is None:
+                if vshape is not None:
+                    val = val.reshape(vshape)
             else:
                 if distrib and (sdistrib or dynshape or not slocal) and not get_remote:
                     var_idx = self._var_allprocs_abs2idx[src]
@@ -4651,8 +4669,16 @@ class System(object):
                 else:
                     if src_indices._flat_src:
                         val = val.ravel()[src_indices.flat()]
+                        # if at component level, just keep shape of the target and don't flatten
+                        if not flat and not is_prom:
+                            shp = vmeta['shape']
+                            val.shape = shp
                     else:
                         val = val[src_indices()]
+                        if vshape is not None and val.shape != vshape:
+                            val.shape = vshape
+                        elif not is_prom and vmeta is not None and val.shape != vmeta['shape']:
+                            val.shape = vmeta['shape']
 
             if get_remote and self.comm.size > 1:
                 if distrib:
@@ -4674,8 +4700,8 @@ class System(object):
                         val = self.comm.bcast(None, root=self._owning_rank[abs_name])
 
             if distrib and get_remote:
-                val.shape = self._var_allprocs_abs2meta['input'][abs_name]['global_shape']
-            elif not flat and val.size > 0:
+                val.shape = abs2meta_all_ins[abs_name]['global_shape']
+            elif not flat and val.size > 0 and vshape is not None:
                 val.shape = vshape
         elif vshape is not None:
             val = val.reshape(vshape)
@@ -5299,10 +5325,19 @@ class System(object):
         tuple
             The distributed shape for the given variable.
         """
-        io = 'output' if abs_name in self._var_allprocs_abs2meta['output'] else 'input'
-        meta = self._var_allprocs_abs2meta[io][abs_name]
-        var_idx = self._var_allprocs_abs2idx[abs_name]
-        global_size = np.sum(self._var_sizes[io][:, var_idx])
+        if abs_name in self._var_allprocs_abs2meta['output']:
+            io = 'output'
+            scope = self
+        elif abs_name in self._problem_meta['model_ref']()._var_allprocs_abs2meta['output']:
+            io = 'output'
+            scope = self._problem_meta['model_ref']()
+        else:
+            io = 'input'
+            scope = self
+        # io = 'output' if abs_name in self._var_allprocs_abs2meta['output'] else 'input'
+        meta = scope._var_allprocs_abs2meta[io][abs_name]
+        var_idx = scope._var_allprocs_abs2idx[abs_name]
+        global_size = np.sum(scope._var_sizes[io][:, var_idx])
 
         # assume that all but the first dimension of the shape of a
         # distributed variable is the same on all procs

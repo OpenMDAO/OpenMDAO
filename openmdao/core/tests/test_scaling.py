@@ -1,7 +1,6 @@
 """Define the units/scaling tests."""
 import unittest
 from copy import deepcopy
-from itertools import chain
 
 import numpy as np
 
@@ -1553,6 +1552,59 @@ class TestDriverScalingReport(unittest.TestCase):
         # Now, make sure it runs run_model automatically as long as we final_setup.
         p.final_setup()
         p.driver.scaling_report(show_browser=False)
+
+
+class TestDiscreteScalingReport(unittest.TestCase):
+
+    def test_scaling_report(self):
+        class ParaboloidDiscrete(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_discrete_input('x', val=10)
+                self.add_discrete_input('y', val=0)
+                self.add_discrete_output('f_xy', val=0)
+
+            def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+                x = discrete_inputs['x']
+                y = discrete_inputs['y']
+                f_xy = (x - 3.0)**2 + x * y + (y + 4.0)**2 - 3.0
+                discrete_outputs['f_xy'] = int(f_xy)
+
+        prob = om.Problem()
+        model = prob.model
+
+        # Add independent variables
+        indeps = model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        indeps.add_discrete_output('x', 4)
+        indeps.add_discrete_output('y', 3)
+
+        # Add components
+        model.add_subsystem('parab', ParaboloidDiscrete(), promotes=['*'])
+
+        # Specify design variable range and objective
+        model.add_design_var('x')
+        model.add_design_var('y')
+        model.add_objective('f_xy')
+
+        samples = [
+            [('x', 5), ('y', 1)],
+            [('x', 3), ('y', 6)],
+            [('x', -1), ('y', 3)],
+        ]
+
+        # Setup driver
+        prob.driver = om.DOEDriver(om.ListGenerator(samples))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        prob.driver.scaling_report(show_browser=False)
+
+
+class TestDriverScalingReportMPI(TestDriverScalingReport):
+    N_PROCS=2
 
 
 if __name__ == '__main__':
