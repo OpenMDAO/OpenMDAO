@@ -82,12 +82,12 @@ class ModelData {
         else { this.depthCount[depth - 1]++; }
 
         if (node.parent) {
-            node.uuid = (node.parent.uuid == '')? node.name : `${node.parent.uuid}.${node.name}`;
-            this.nodePaths[node.uuid] = node;
+            node.path = (node.parent.path == '')? node.name : `${node.parent.path}.${node.name}`;
+            this.nodePaths[node.path] = node;
         }
 
         this.maxDepth = Math.max(depth, this.maxDepth);
-        node.childNames.add(node.uuid); // Add the node itself
+        node.childNames.add(node.path); // Add the node itself
 
         if (node.hasChildren()) {
             node.numDescendants = node.children.length;
@@ -97,7 +97,7 @@ class ModelData {
 
                 // Add absolute pathnames of children to a set for quick searching
                 if (!node.isRoot()) { // All nodes are children of the model root
-                    node.childNames.add(child.uuid);
+                    node.childNames.add(child.path);
                     for (const childName of child.childNames) {
                         node.childNames.add(childName);
                     }

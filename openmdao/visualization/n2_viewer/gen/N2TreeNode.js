@@ -42,7 +42,7 @@ class N2TreeNode {
         this.depth = -1; // Set by ModelData
         this.parent = null; // Set by ModelData
         this.id = -1; // Set by ModelData
-        this.uuid = ''; // Set by ModelData
+        this.path = ''; // Set by ModelData
         this.numDescendants = 0; // Set by ModelData
 
         this.rootIndex = -1;
@@ -156,7 +156,7 @@ class N2TreeNode {
      * @returns {Boolean} True if a match is found, otherwise false.
      */
     hasNodeInChildren(compareNode) {
-        return this.childNames.has(compareNode.uuid);
+        return this.childNames.has(compareNode.path);
     }
 
     /** Look for the supplied node in the parentage of this one.
@@ -228,13 +228,13 @@ class N2TreeNode {
     }
 
     /**
-     * Convert a uuid to a string that's safe to use as an HTML id. Escapes
+     * Convert a path to a string that's safe to use as an HTML id. Escapes
      * space, greater-than, less-than, period, and colon characters.
-     * @param {String} uuid The name to convert.
+     * @param {String} path The name to convert.
      * @returns {String} The HTML-safe id.
      */
-    static uuidToId(uuid) {
-        return uuid.replace(/[\.<> :]/g, function (c) {
+    static pathToId(path) {
+        return path.replace(/[\.<> :]/g, function (c) {
             return {
                 ' ': '__',
                 '<': '_LT',
@@ -245,7 +245,7 @@ class N2TreeNode {
         })
     }
 
-    toId() { return N2TreeNode.uuidToId(this.uuid); }
+    toId() { return N2TreeNode.pathToId(this.path); }
 
     _insertAsLastInput(newChild) {
         if (!this.hasChildren()) return;

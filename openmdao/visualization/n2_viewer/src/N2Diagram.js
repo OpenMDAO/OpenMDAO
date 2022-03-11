@@ -439,7 +439,7 @@ class N2Diagram {
                 return d.draw.prevDims.height * self.prevTransitCoords.model.y;
             })
             .attr("id", function (d) {
-                return N2TreeNode.uuidToId(d.uuid);
+                return N2TreeNode.pathToId(d.path);
             })
             .attr('rx', 12)
             .attr('ry', 12);

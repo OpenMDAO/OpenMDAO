@@ -8,8 +8,8 @@ class OmTreeNode extends N2TreeNode {
         if (this.nonlinear_solver == "") this.nonlinear_solver = "None";
     }
 
-    get absPathName() { return this.uuid; }
-    set absPathName(newName) { this.uuid = newName; return newName; }
+    get absPathName() { return this.path; }
+    set absPathName(newName) { this.path = newName; return newName; }
 
     addFilterChild(attribNames) {
         if (this.isComponent()) { super.addFilterChild(attribNames); }

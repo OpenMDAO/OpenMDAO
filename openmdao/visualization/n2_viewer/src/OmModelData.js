@@ -64,11 +64,11 @@ class OmModelData extends ModelData {
      _setParentsAndDepth(node, parent, depth) {
         super._setParentsAndDepth(node, parent, depth);
 
-        if (this.abs2prom.input[node.uuid] !== undefined) {
-            node.promotedName = this.abs2prom.input[node.uuid];
+        if (this.abs2prom.input[node.path] !== undefined) {
+            node.promotedName = this.abs2prom.input[node.path];
         }
-        else if (this.abs2prom.output[node.uuid] !== undefined) {
-            node.promotedName = this.abs2prom.output[node.uuid];
+        else if (this.abs2prom.output[node.path] !== undefined) {
+            node.promotedName = this.abs2prom.output[node.path];
         }
 
         this.identifyUnconnectedInput(node);
@@ -230,14 +230,14 @@ class OmModelData extends ModelData {
      * @param {N2TreeNode} node The tree node to work on.
      */
     identifyUnconnectedInput(node) {
-        if (!node.hasOwnProperty('uuid')) {
-            console.warn("identifyUnconnectedInput error: uuid not set for ", node);
+        if (!node.hasOwnProperty('path')) {
+            console.warn("identifyUnconnectedInput error: path not set for ", node);
         }
         else {
             if (node.isInput()) {
-                if (!node.hasChildren() && !this.hasAnyConnection(node.uuid))
+                if (!node.hasChildren() && !this.hasAnyConnection(node.path))
                     node.type = "unconnected_input";
-                else if (this.hasAutoIvcSrc(node.uuid))
+                else if (this.hasAutoIvcSrc(node.path))
                     node.type = "autoivc_input";
             }
         }

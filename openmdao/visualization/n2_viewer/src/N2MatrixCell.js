@@ -625,7 +625,7 @@ class N2MatrixCell {
 
         let obj = (varType == 'target') ? this.tgtObj : this.srcObj;
         if (obj.draw.filtered) { obj = obj.draw.filterParent; }
-        const treeId = N2TreeNode.uuidToId(obj.uuid);
+        const treeId = N2TreeNode.pathToId(obj.path);
         const treeNode = d3.select('rect#' + treeId);
 
         let fill = treeNode.style('fill');

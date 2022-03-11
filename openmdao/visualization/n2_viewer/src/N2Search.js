@@ -125,7 +125,7 @@ class N2Search {
         if (node === this.zoomedElement) return didMatch;
 
         if (!didMatch && !node.hasChildren() && node.isInputOrOutput()) {
-            didMatch = regexMatch.test(node.uuid);
+            didMatch = regexMatch.test(node.path);
             if (didMatch) {
                 // only inputs and outputs can count as matches
                 ++this.numMatches;
@@ -284,7 +284,7 @@ class N2Search {
         }
 
         let localPathName = (this.zoomedElement === this.modelRoot) ?
-            node.uuid : node.uuid.slice(this.zoomedElement.uuid.length + 1);
+            node.path : node.path.slice(this.zoomedElement.path.length + 1);
 
         if (!this.autoComplete.paths.set.hasOwnProperty(localPathName)) {
             this.autoComplete.paths.set[localPathName] = true;
