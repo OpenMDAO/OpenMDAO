@@ -126,6 +126,7 @@ setup(
             'assets/*png*',
             'libs/*.js',
             'src/*.js',
+            'gen/*.js',
             'style/*',
             'tests/*.js',
             'tests/*.json',
