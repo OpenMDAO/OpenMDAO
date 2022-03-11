@@ -1,4 +1,31 @@
 /**
+ * Manage display info associated with the node.
+ * @typedef NodeDisplayData
+ */
+class NodeDisplayData {
+    constructor() {
+        this.nameWidthPx = 1; // Width of the label in pixels as computed by N2Layout
+        this.numLeaves = 0; // Set by N2Layout
+        this.minimized = false; // When true, do not draw children
+        this.hidden = false; // Do add to matrix at all
+        this.filtered = false; // Node is a child to be shown w/partially collapsed parent
+        this.filterParent = null; // When filtered, reference to N2FilterNode container
+        this.manuallyExpanded = false; // Node was pre-collapsed but expanded by user
+
+        this.dims = { x: 1e-6, y: 1e-6, width: 1, height: 1 };
+        this.prevDims = { x: 1e-6, y: 1e-6, width: 1e-6, height: 1e-6 };
+    }
+
+    /** Copy the current dims to the previous ones */
+    preserveDims() {
+        this.prevDims = {};
+        for (const prop in this.dims) {
+            this.prevDims[prop] = this.dims[prop];
+        }
+    }
+}
+
+/**
  * Essentially the same as a JSON object from the model tree,
  * with some utility functions.
  * @typedef {TreeNode}
@@ -22,21 +49,8 @@ class TreeNode {
         this.sourceParentSet = new Set();
         this.targetParentSet = new Set();
 
-        // Node display data. TODO: Set outside of TreeNode. Maybe its own class?
-        this.draw = {
-            nameWidthPx: 1, // Width of the label in pixels as computed by N2Layout
-            nameSolverWidthPx: 1, // Solver-side label width pixels as computed by N2Layout
-            numLeaves: 0, // Set by N2Layout
-            minimized: false, // When true, do not draw children
-            hidden: false, // Do add to matrix at all
-            filtered: false, // Node is a child to be shown w/partially collapsed parent
-            filterParent: null, // When filtered, reference to N2FilterNode container
-            manuallyExpanded: false, // Node was pre-collapsed but expanded by user
-            dims: { x: 1e-6, y: 1e-6, width: 1, height: 1 },
-            prevDims: { x: 1e-6, y: 1e-6, width: 1e-6, height: 1e-6 },
-            solverDims: { x: 1e-6, y: 1e-6, width: 1, height: 1 },
-            prevSolverDims: { x: 1e-6, y: 1e-6, width: 1e-6, height: 1e-6 }
-        }
+        // Node display data.
+        this.draw = this._newDisplayData()
 
         this.childNames = new Set(); // Set by ModelData
         this.depth = -1; // Set by ModelData
@@ -48,6 +62,8 @@ class TreeNode {
         this.rootIndex = -1;
 
     }
+
+    _newDisplayData() { return new NodeDisplayData(); }
 
     // Accessor functions for this.draw.minimized - whether or not to draw children
     minimize() { this.draw.minimized = true; return this; }
@@ -63,14 +79,10 @@ class TreeNode {
 
     /**
      * Create a backup of our position and other info.
-     * @param {boolean} solver Whether to use .dims or .solverDims.
      * @param {number} leafNum Identify this as the nth leaf of the tree
      */
-    preserveDims(solver, leafNum) {
-        const dimProp = solver ? 'dims' : 'solverDims';
-        const prevDimProp = solver ? 'prevDims' : 'prevSolverDims';
-
-        Object.assign(this.draw[prevDimProp], this.draw[dimProp]);
+    preserveDims(leafNum) {
+        this.draw.preserveDims();
 
         if (this.rootIndex < 0) this.rootIndex = leafNum;
         this.prevRootIndex = this.rootIndex;

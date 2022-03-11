@@ -410,6 +410,10 @@ class N2Layout {
      */
     _computeSolverNormalizedPositions(node, leafCounter,
         isChildOfZoomed, earliestMinimizedParent) {
+
+        // Fix until solver display is removed entirely from generic code:
+        if (!(node instanceof OmTreeNode)) return;
+
         if (!isChildOfZoomed) {
             isChildOfZoomed = (node === this.zoomedElement);
         }
