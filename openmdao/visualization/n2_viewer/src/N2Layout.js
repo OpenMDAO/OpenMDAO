@@ -2,10 +2,10 @@
  * Calculates and stores the size and positions of visible elements.
  * @typedef N2Layout
  * @property {ModelData} model Reference to the preprocessed model.
- * @property {N2TreeNode} zoomedElement Reference to zoomedElement managed by N2Diagram.
- * @property {N2TreeNode[]} zoomedNodes  Child workNodes of the current zoomed element.
- * @property {N2TreeNode[]} visibleNodes Zoomed workNodes that are actually drawn.
- * @property {N2TreeNode[]} zoomedSolverNodes Child solver workNodes of the current zoomed element.
+ * @property {OmTreeNode} zoomedElement Reference to zoomedElement managed by N2Diagram.
+ * @property {OmTreeNode[]} zoomedNodes  Child workNodes of the current zoomed element.
+ * @property {OmTreeNode[]} visibleNodes Zoomed workNodes that are actually drawn.
+ * @property {OmTreeNode[]} zoomedSolverNodes Child solver workNodes of the current zoomed element.
  * @property {Object} svg Reference to the top-level SVG element in the document.
  * @property {Object} size The dimensions of the model and solver trees.
  */
@@ -141,7 +141,7 @@ class N2Layout {
 
     /** Determine the text associated with the node. Normally its name,
      * but can be changed if promoted.
-     * @param {N2TreeNode} node The item to operate on.
+     * @param {OmTreeNode} node The item to operate on.
      * @return {string} The selected text.
      */
     getText(node) {
@@ -166,7 +166,7 @@ class N2Layout {
     /**
      * Return the name of the linear or non-linear solver depending
      * on the current setting.
-     * @param {N2TreeNode} node The item to get the solver text from.
+     * @param {OmTreeNode} node The item to get the solver text from.
      */
     getSolverText(node) {
         testThis(this, 'N2Layout', 'getSolverText');
@@ -183,7 +183,7 @@ class N2Layout {
 
     /**
      * Determine text widths for all descendents of the specified node.
-     * @param {N2TreeNode} [node = this.zoomedElement] Item to begin looking from.
+     * @param {OmTreeNode} [node = this.zoomedElement] Item to begin looking from.
      */
     _updateTextWidths(node = this.zoomedElement) {
         if (node.draw.hidden) return;
@@ -206,7 +206,7 @@ class N2Layout {
     /**
      * Recurse through the tree and add up the number of leaves that each
      * node has, based on their array of visible children.
-     * @param {N2TreeNode} [node = this.model.root] The starting node.
+     * @param {OmTreeNode} [node = this.model.root] The starting node.
      */
     _computeLeaves(node = this.model.root) {
         node.draw.numLeaves = 0;
@@ -234,7 +234,7 @@ class N2Layout {
     /**
      * For visible nodes with children, choose a column width
      * large enough to accomodate the widest label in their column.
-     * @param {N2TreeNode} node The item to operate on.
+     * @param {OmTreeNode} node The item to operate on.
      * @param {string} childrenProp Either 'children' or 'subsystem_children'.
      * @param {Object[]} colArr The array of column info.
      * @param {number[]} leafArr The array of leaf width info.
@@ -265,7 +265,7 @@ class N2Layout {
 
     /**
      * Compute column widths across the model, then adjust ends as needed.
-     * @param {N2TreeNode} [node = this.zoomedElement] Item to operate on.
+     * @param {OmTreeNode} [node = this.zoomedElement] Item to operate on.
      */
     _computeColumnWidths(node = this.zoomedElement) {
         this.greatestDepth = 0;
@@ -295,7 +295,7 @@ class N2Layout {
 
     /**
      * Compute solver column widths across the model, then adjust ends as needed.
-     * @param {N2TreeNode} [node = this.zoomedElement] Item to operate on.
+     * @param {OmTreeNode} [node = this.zoomedElement] Item to operate on.
      */
     _computeSolverColumnWidths(node = this.zoomedElement) {
         this.greatestDepth = 0;
@@ -349,7 +349,7 @@ class N2Layout {
      * Recurse over the model tree and determine the coordinates and
      * size of visible nodes. If a parent is minimized, operations are
      * performed on it instead.
-     * @param {N2TreeNode} node The node to operate on.
+     * @param {OmTreeNode} node The node to operate on.
      * @param {number} leafCounter Tally of leaves encountered so far.
      * @param {Boolean} isChildOfZoomed Whether node is a descendant of this.zoomedElement.
      * @param {Object} earliestMinimizedParent The minimized parent, if any, appearing
@@ -402,7 +402,7 @@ class N2Layout {
     /**
      * Recurse over the model tree and determine the coordinates and size of visible
      * solver nodes. If a parent is minimized, operations are performed on it instead.
-     * @param {N2TreeNode} node The node to operate on.
+     * @param {OmTreeNode} node The node to operate on.
      * @param {number} leafCounter Tally of leaves encountered so far.
      * @param {Boolean} isChildOfZoomed Whether node is a descendant of this.zoomedElement.
      * @param {Object} earliestMinimizedParent The minimized parent, if any, appearing

@@ -1,6 +1,7 @@
 // <<hpp_insert libs/pako_inflate.min.js>>
 // <<hpp_insert libs/json5_2.2.0.min.js>>
-// <<hpp_insert gen/N2TreeNode.js>>
+// <<hpp_insert gen/TreeNode.js>>
+// <<hpp_insert gen/NodeConnection.js>>
 
 const defaultAttribNames = {
     name: 'name',              // Human-readable label for the node
@@ -10,12 +11,24 @@ const defaultAttribNames = {
                                // a [{src: "srcname1", tgt: "tgtname1", ...}] format
 };
 
+/**
+ * Manages the data in the model and the connections between nodes.
+ * @typedef ModelData
+ * @property {Object[]} conns Connections: array of objects in format {src: 'path', tgt: 'path'}
+ * @property {NodeConnection[]} connObjs The array of processed connection objects.
+ * @property {Number} maxDepth The farthest distance of any descendant from the root node.
+ * @property {Object} nodePaths An object with keys that are the pathnames of nodes, and values
+ *  that are the associated TreeNode.
+ * @property {TreeNode[]} nodeIds An array whose indices are the ids of their assicated values.
+ * @property {Number[]} depthCount The tally of nodes at each depth.
+ * @property {TreeNode} root The starting node in the tree.
+ */
 class ModelData {
     constructor(modelJSON, attribNames = defaultAttribNames) {
-        // console.log(modelJSON);
 
         this._attribNames = attribNames;
         this.conns = modelJSON[attribNames.links];
+        this.connObjs = [];
         this.maxDepth = 1;
         this.nodePaths = {};
         this.nodeIds = [];
@@ -25,12 +38,25 @@ class ModelData {
 
         this.root = this.tree = modelJSON.tree = this._adoptNodes(modelJSON.tree);
         this._setParentsAndDepth(this.root, null, 1);
-        this._computeConnections();
+
+        for (const conn of this.conns) {
+            this.connObjs.push(this._newConnectionObj(conn));
+        }
 
     }
 
+    /**
+     * Tasks to perform early from the superclass constructor.
+     * @param {Object} modelJSON The model object generated from a JSON string.
+     */
     _init(modelJSON) { }
 
+    /**
+     * Given a string with base64-encoded, zlib-compressed JSON data, uncompress it
+     * and return an Object created from the data.
+     * @param {String} b64str The string with base64-encoded, zlib-compressed JSON.
+     * @returns {Object} Created from supplied JSON.
+     */
     static uncompressModel(b64str) {
         const compressedData = atob(b64str);
         const jsonStr = window.pako.inflate(compressedData, { to: 'string' });
@@ -39,13 +65,29 @@ class ModelData {
         return JSON5.parse(jsonStr); 
     }
 
+    /**
+     * Create a new TreeNode object for this type of model tree. Can be overridden
+     * to create different type of node objects derived from TreeNode.
+     * @param {Object} element A simple object that will be REPLACED with the TreeNode.
+     * @param {Object} attribNames The customized attribute names for this model.
+     */
     _newNode(element, attribNames) {
-        return new N2TreeNode(element, attribNames);
+        return new TreeNode(element, attribNames);
+    }
+
+    /**
+     * Create a new connection object based on the src and tgt values in conn.
+     * Can be overwritten to generate different type of connection objects.
+     * @param {Object} conn An Object with src and tgt strings containing path names.
+     * @returns {NodeConnection} The new object.
+     */
+    _newConnectionObj(conn) {
+        return new NodeConnection(conn, this.nodePaths);
     }
 
     /**
      * Recurse over the tree and replace the JSON objects
-     * provided by n2_viewer.py with N2TreeNodes.
+     * provided by n2_viewer.py with TreeNodes.
      * @param {Object} element The current element being updated.
      */
      _adoptNodes(element) {
@@ -67,8 +109,8 @@ class ModelData {
 
    /**
      * Sets parents and depth of all nodes, and determine max depth.
-     * @param {N2TreeNode} node Item to process.
-     * @param {N2TreeNode} parent Parent of node, null for root node.
+     * @param {TreeNode} node Item to process.
+     * @param {TreeNode} parent Parent of node, null for root node.
      * @param {number} depth Numerical level of ancestry.
      */
     _setParentsAndDepth(node, parent, depth) {
@@ -156,88 +198,10 @@ class ModelData {
         return false;
     }
 
-    /** A stub to be overridden by a derived class */
-    _additionalConnProcessing(conn, srcObj, tgtObj) { }
-
-    /**
-     * Iterate over the connections list, and find the objects that make up
-     * each connection, and do some error checking. Store an array containing the
-     * target object and all of its parents in the source object and all of *its*
-     * parents.
-     */
-    _computeConnections() {
-        const throwLbl = 'ModelData._computeConnections: ';
-
-        for (const conn of this.conns) {
-            // Process sources
-            const srcObj = this.nodePaths[conn.src];
-
-            if (!srcObj) {
-                console.warn(throwLbl + "Cannot find connection source " + conn.src);
-                continue;
-            }
-
-            const srcObjParents = [srcObj];
-            if (!srcObj.isOutput()) { // source obj must be output
-                console.warn(throwLbl + "Found a source that is not an output.");
-                continue;
-            }
-
-            if (srcObj.hasChildren()) {
-                console.warn(throwLbl + "Found a source that has children.");
-                continue;
-            }
-
-            for (let obj = srcObj.parent; obj != null; obj = obj.parent) {
-                srcObjParents.push(obj);
-            }
-
-            // Process targets
-            const tgtObj = this.nodePaths[conn.tgt];
-
-            if (!tgtObj) {
-                console.warn(throwLbl + "Cannot find connection target " + conn.tgt);
-                continue;
-            }
-
-            // Target obj must be an input
-            if (!tgtObj.isInput()) {
-                console.warn(throwLbl + "Found a target that is NOT a input.");
-                continue;
-            }
-            if (tgtObj.hasChildren()) {
-                console.warn(throwLbl + "Found a target that has children.");
-                continue;
-            }
-
-            if (!tgtObj.parentComponent) {
-                console.warn(`${throwLbl} Target object ${conn.tgt} is missing a parent component.`);
-                continue;
-            }
-
-            const tgtObjParents = [tgtObj];
-            for (let parentObj = tgtObj.parent; parentObj != null; parentObj = parentObj.parent) {
-                tgtObjParents.push(parentObj);
-            }
-
-            for (const srcParent of srcObjParents) {
-                for (const tgtParent of tgtObjParents) {
-                    if (tgtParent.absPathName != "")
-                        srcParent.targetParentSet.add(tgtParent);
-
-                    if (srcParent.absPathName != "")
-                        tgtParent.sourceParentSet.add(srcParent);
-                }
-            }
-
-            this._additionalConnProcessing(conn, srcObj, tgtObj);
-        }
-    }
-
     /**
      * Add all leaf descendents of specified node to the array.
-     * @param {N2TreeNode} node Current node to work on.
-     * @param {N2TreeNode[]} objArray Array to add to.
+     * @param {TreeNode} node Current node to work on.
+     * @param {TreeNode[]} objArray Array to add to.
      */
      _addLeaves(node, objArray) {
         if (!node.isInput()) {

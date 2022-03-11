@@ -28,7 +28,7 @@ class N2Arrow {
 
         /*
          * Generate a CSS id for the arrow. This is based on the ids of the
-         * N2TreeNodes it points to rather than the cells, so if it's pinned
+         * OmTreeNodes it points to rather than the cells, so if it's pinned
          * and the matrix is redrawn, we know whether to transition it. The color
          * is included because there can be identical arrows of different colors
          * stacked on each other.

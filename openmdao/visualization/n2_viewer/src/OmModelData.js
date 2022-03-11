@@ -1,5 +1,5 @@
 // <<hpp_insert gen/ModelData.js>>
-// <<hpp_insert src/OmTreeNode.js>>
+// <<hpp_insert src/OmNodeConnection.js>>
 
 /** Process the tree, connections, and other info provided about the model. */
 class OmModelData extends ModelData {
@@ -31,15 +31,15 @@ class OmModelData extends ModelData {
     }
 
     /**
-     * For debugging: Make sure every tree member is an N2TreeNode.
-     * @param {N2TreeNode} [node = this.root] The node to start with.
+     * For debugging: Make sure every tree member is an OmTreeNode.
+     * @param {OmTreeNode} [node = this.root] The node to start with.
      */
     errorCheck(node = this.root) {
-        if (!(node instanceof N2TreeNode))
+        if (!(node instanceof OmTreeNode))
             debugInfo('Node with problem: ', node);
 
         for (const prop of ['parent', 'originalParent', 'parentComponent']) {
-            if (node[prop] && !(node[prop] instanceof N2TreeNode))
+            if (node[prop] && !(node[prop] instanceof OmTreeNode))
                 debugInfo('Node with problem ' + prop + ': ', node);
         }
 
@@ -57,8 +57,8 @@ class OmModelData extends ModelData {
     /**
      * Sets parents and depth of all nodes, and determine max depth. Flags the
      * parent node as implicit if the node itself is implicit.
-     * @param {N2TreeNode} node Item to process.
-     * @param {N2TreeNode} parent Parent of node, null for root node.
+     * @param {OmTreeNode} node Item to process.
+     * @param {OmTreeNode} parent Parent of node, null for root node.
      * @param {number} depth Numerical level of ancestry.
      */
      _setParentsAndDepth(node, parent, depth) {
@@ -124,7 +124,7 @@ class OmModelData extends ModelData {
      * Create an array in each node containing references to its
      * children that are subsystems. Runs recursively over the node's
      * children array.
-     * @param {N2TreeNode} node Node with children to check.
+     * @param {OmTreeNode} node Node with children to check.
      */
     _initSubSystemChildren(node) {
         if (!node.hasChildren()) {
@@ -155,54 +155,8 @@ class OmModelData extends ModelData {
         return this.declarePartialsList.includes(partialsStr);
     }
 
-    /**
-     * The cycle_arrows object in each connection is an array of length-2 arrays,
-     * each of which is an index into the sysPathnames array. Using that array we
-     * can resolve the indexes to pathnames to the associated objects.
-     * @param {Object} conn Reference to the connection to operate on.
-     */
-    _additionalConnProcessing(conn, srcObj, tgtObj) {
-        const sysPathnames = this.sysPathnamesList;
-        const throwLbl = 'ModelData._computeConnections: ';
-
-        if (Array.isPopulatedArray(conn.cycle_arrows)) {
-            const cycleArrowsArray = [];
-            for (const cycleArrow of conn.cycle_arrows) {
-                if (cycleArrow.length != 2) {
-                    console.warn(throwLbl + "cycleArrowsSplitArray length not 2, got " +
-                        cycleArrow.length + ": " + cycleArrow);
-                    continue;
-                }
-
-                const srcPathname = sysPathnames[cycleArrow[0]];
-                const tgtPathname = sysPathnames[cycleArrow[1]];
-
-                const arrowBeginObj = this.nodePaths[srcPathname];
-                if (!arrowBeginObj) {
-                    console.warn(throwLbl + "Cannot find cycle arrows begin object " + srcPathname);
-                    continue;
-                }
-
-                const arrowEndObj = this.nodePaths[tgtPathname];
-                if (!arrowEndObj) {
-                    console.warn(throwLbl + "Cannot find cycle arrows end object " + tgtPathname);
-                    continue;
-                }
-
-                cycleArrowsArray.push({
-                    "begin": arrowBeginObj,
-                    "end": arrowEndObj
-                });
-            }
-
-            if (!tgtObj.parent.hasOwnProperty("cycleArrows")) {
-                tgtObj.parent.cycleArrows = [];
-            }
-            tgtObj.parent.cycleArrows.push({
-                "src": srcObj,
-                "arrows": cycleArrowsArray
-            });
-        }
+    _newConnectionObj(conn) {
+        return new OmNodeConnection(conn, this.nodePaths, this.sysPathnamesList);
     }
 
     /**
@@ -227,7 +181,7 @@ class OmModelData extends ModelData {
     /**
      * If an element has no connection naming it as a source or target,
      * relabel it as unconnected.
-     * @param {N2TreeNode} node The tree node to work on.
+     * @param {OmTreeNode} node The tree node to work on.
      */
     identifyUnconnectedInput(node) {
         if (!node.hasOwnProperty('path')) {

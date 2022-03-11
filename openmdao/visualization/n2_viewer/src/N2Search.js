@@ -6,8 +6,8 @@
 class N2Search {
     /**
      * Initialize N2Search object properties and Awesomeplete.
-     * @param {N2TreeNode} zoomedElement The selected node in the model tree.
-     * @param {N2TreeNode} root The base element of the model tree.
+     * @param {OmTreeNode} zoomedElement The selected node in the model tree.
+     * @param {OmTreeNode} root The base element of the model tree.
      */
     constructor(zoomedElement, root) {
         // Used for autocomplete suggestions:
@@ -107,7 +107,7 @@ class N2Search {
     /**
      * Recurse through the tree and find nodes with pathnames that match
      * the computed regular expression. Minimize/hide nodes that don't match.
-     * @param {N2TreeNode} node The current node to operate on.
+     * @param {OmTreeNode} node The current node to operate on.
      * @param {RegExp} regexMatch A regular expression assembled from the search values.
      * @param {Array} undoList List of nodes that have been hidden/minimized.
      * @returns {Boolean} True if a match was found, false otherwise.
@@ -246,8 +246,8 @@ class N2Search {
 
     /**
      * Find the earliest minimized parent of the specified node.
-     * @param {N2TreeNode} node The node to search from.
-     * @returns {N2TreeNode} The earliest mimimized parent node.
+     * @param {OmTreeNode} node The node to search from.
+     * @returns {OmTreeNode} The earliest mimimized parent node.
      */
     findRootOfChangeForSearch(node) {
         let earliestObj = node;
@@ -260,7 +260,7 @@ class N2Search {
     /**
      * Recurse through the children of the node and add their names to the
      * autocomplete list of names, if they're not already in it.
-     * @param {N2TreeNode} node The node to search from.
+     * @param {OmTreeNode} node The node to search from.
      */
     _populateAutoCompleteList(node) {
         if (node.hasChildren() && !node.draw.minimized) {
@@ -294,8 +294,8 @@ class N2Search {
 
     /**
      * If the zoomed element has changed, update the auto complete lists.
-     * @param {N2TreeNode} zoomedElement The selected node in the model tree.
-     * @param {N2TreeNode} root The base element of the model tree.
+     * @param {OmTreeNode} zoomedElement The selected node in the model tree.
+     * @param {OmTreeNode} root The base element of the model tree.
      */
     update(zoomedElement, root) {
         this.zoomedElement = zoomedElement;

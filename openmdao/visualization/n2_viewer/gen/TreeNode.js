@@ -1,11 +1,11 @@
 /**
  * Essentially the same as a JSON object from the model tree,
  * with some utility functions.
- * @typedef {N2TreeNode}
+ * @typedef {TreeNode}
  * @property {Object} draw Information used for node display.
  * @property {Number} depth The index of the column this node appears in.
  */
-class N2TreeNode {
+class TreeNode {
     /**
      * Absorb all the properties of the provided JSON object from the model tree.
      * @param {Object} origNode The node to work from.
@@ -22,7 +22,7 @@ class N2TreeNode {
         this.sourceParentSet = new Set();
         this.targetParentSet = new Set();
 
-        // Node display data. TODO: Set outside of N2TreeNode. Maybe its own class?
+        // Node display data. TODO: Set outside of TreeNode. Maybe its own class?
         this.draw = {
             nameWidthPx: 1, // Width of the label in pixels as computed by N2Layout
             nameSolverWidthPx: 1, // Solver-side label width pixels as computed by N2Layout
@@ -160,8 +160,8 @@ class N2TreeNode {
     }
 
     /** Look for the supplied node in the parentage of this one.
-     * @param {N2TreeNode} compareNode The node to look for.
-     * @param {N2TreeNode} [parentLimit = null] Stop searching at this common parent.
+     * @param {TreeNode} compareNode The node to look for.
+     * @param {TreeNode} [parentLimit = null] Stop searching at this common parent.
      * @returns {Boolean} True if the node is found, otherwise false.
      */
     hasParent(compareNode, parentLimit = null) {
@@ -176,8 +176,8 @@ class N2TreeNode {
 
     /**
      * Look for the supplied node in the lineage of this one.
-     * @param {N2TreeNode} compareNode The node to look for.
-     * @param {N2TreeNode} [parentLimit = null] Stop searching at this common parent.
+     * @param {TreeNode} compareNode The node to look for.
+     * @param {TreeNode} [parentLimit = null] Stop searching at this common parent.
      * @returns {Boolean} True if the node is found, otherwise false.
      */
     hasNode(compareNode, parentLimit = null) {
@@ -193,8 +193,8 @@ class N2TreeNode {
 
     /**
      * Find the closest parent shared by two nodes; farthest should be tree root.
-     * @param {N2TreeNode} other Another node to compare parents with.
-     * @returns {N2TreeNode} The first common parent found.
+     * @param {TreeNode} other Another node to compare parents with.
+     * @returns {TreeNode} The first common parent found.
      */
     nearestCommonParent(other) {
         for (let myParent = this.parent; myParent != null; myParent = myParent.parent)
@@ -245,7 +245,7 @@ class N2TreeNode {
         })
     }
 
-    toId() { return N2TreeNode.pathToId(this.path); }
+    toId() { return TreeNode.pathToId(this.path); }
 
     _insertAsLastInput(newChild) {
         if (!this.hasChildren()) return;
@@ -328,13 +328,13 @@ class N2TreeNode {
 }
 
 /**
- * Special N2TreeNode subclass whose children are filtered variables of the parent component.
+ * Special TreeNode subclass whose children are filtered variables of the parent component.
  * @typedef N2FilterNode
  */
-class N2FilterNode extends N2TreeNode {
+class N2FilterNode extends TreeNode {
     /**
      * Give ourselves a special name and the "filter" type.
-     * @param {N2TreeNode} parentComponent The component that we are filtering variables for.
+     * @param {TreeNode} parentComponent The component that we are filtering variables for.
      * @param {String} suffix Either "inputs" or "outputs".
      */
     constructor(parentComponent, attribNames, suffix) {
@@ -354,7 +354,7 @@ class N2FilterNode extends N2TreeNode {
 
     /**
      * Add a node to our filtered children, update its state, and make ourselves visible.
-     * @param {N2TreeNode} node Reference to the node to filter.
+     * @param {TreeNode} node Reference to the node to filter.
      */
     add(node) {
         if (!this.hasChildren()) { this.children = []; }
@@ -368,7 +368,7 @@ class N2FilterNode extends N2TreeNode {
     /**
      * Update the node's state and remove it from our children. If nothing is left in
      * the children array, delete it and hide ourselves.
-     * @param {N2TreeNode} node Reference to the node to unfilter.
+     * @param {TreeNode} node Reference to the node to unfilter.
      * @returns {Boolean} True if the node was found in children, otherwise false.
      */
     del(node) {
@@ -404,7 +404,7 @@ class N2FilterNode extends N2TreeNode {
 
     /**
      * Determine if the referenced node is in our array of children.
-     * @param {N2TreeNode} child The node to find.
+     * @param {TreeNode} child The node to find.
      * @returns {Boolean} True if the child was found, false otherwise.
      */
     hasChild(child) {
@@ -423,7 +423,7 @@ class N2FilterNode extends N2TreeNode {
         return this;
     }
 
-    isFilter() { return true; } // Always true for the N2TreeNode class
+    isFilter() { return true; } // Always true for the TreeNode class
     hasFilters() { return false; } // Only components contains filters
     isInputFilter() { return this.suffix == 'inputs'; } // True if this manages input filters
     isOutputFilter() { return this.suffix == 'outputs'; } // True if this manages output filters

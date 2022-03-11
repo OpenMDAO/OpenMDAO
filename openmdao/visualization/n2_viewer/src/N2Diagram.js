@@ -7,8 +7,8 @@
  * @property {N2Style} style Manages N2-related styles and functions.
  * @property {N2Layout} layout Sizes and positions of visible elements.
  * @property {N2Matrix} matrix Manages the grid of visible model parameters.
- * @property {N2TreeNode} zoomedElement The element the diagram is currently based on.
- * @property {N2TreeNode} zoomedElementPrev Reference to last zoomedElement.
+ * @property {OmTreeNode} zoomedElement The element the diagram is currently based on.
+ * @property {OmTreeNode} zoomedElementPrev Reference to last zoomedElement.
  * @property {Object} dom Container for references to web page elements.
  * @property {Object} dom.parentDiv The outermost div we work with.
  * @property {Object} dom.svgDiv The div containing the SVG element.
@@ -143,7 +143,7 @@ class N2Diagram {
     /**
      * Recurse and pull state info from model for saving.
      * @param {Array} dataList Array of objects with state info for each node.
-     * @param {N2TreeNode} node The current node being examined.
+     * @param {OmTreeNode} node The current node being examined.
      */
     getSubState(dataList, node = this.model.root) {
         if (node.isFilter()) return; // Ignore state for N2FilterNodes
@@ -160,7 +160,7 @@ class N2Diagram {
     /**
      * Recurse and set state info into model.
      * @param {Array} dataList Array of objects with state info for each node. 
-     * @param {N2TreeNode} node The node currently being restored.
+     * @param {OmTreeNode} node The node currently being restored.
      */
     setSubState(dataList, node = this.model.root) {
         if (node.isFilter()) return; // Ignore state for N2FilterNodes
@@ -439,7 +439,7 @@ class N2Diagram {
                 return d.draw.prevDims.height * self.prevTransitCoords.model.y;
             })
             .attr("id", function (d) {
-                return N2TreeNode.pathToId(d.path);
+                return OmTreeNode.pathToId(d.path);
             })
             .attr('rx', 12)
             .attr('ry', 12);
@@ -926,7 +926,7 @@ class N2Diagram {
      * add it to the hiddenList array, and optionally reset its state.
      * @param {Object[]} hiddenList The provided array to populate.
      * @param {Boolean} reveal If true, make the node visible.
-     * @param {N2TreeNode} node The current node to operate on.
+     * @param {OmTreeNode} node The current node to operate on.
      */
     findAllHidden(hiddenList, reveal = false, node = this.model.root) {
         // Filtered nodes are handled by their true parents
@@ -961,7 +961,7 @@ class N2Diagram {
     /**
      * Restore the minimized/hidden value to all the specified nodes.
      * @param {Object[]} hiddenList The list of preserved objects
-     * @param {N2TreeNode} node The current node to operate on.
+     * @param {OmTreeNode} node The current node to operate on.
     */
     resetAllHidden(hiddenList, node = this.model.root) {
         // Filtered nodes are handled by their true parents
@@ -1005,7 +1005,7 @@ class N2Diagram {
     /**
      * Set the node as not minimized and manually expanded, as well as
      * all children.
-     * @param {N2TreeNode} startNode The node to begin from.
+     * @param {OmTreeNode} startNode The node to begin from.
      */
     manuallyExpandAll(startNode) {
         startNode.draw.minimized = false;
@@ -1020,7 +1020,7 @@ class N2Diagram {
 
     /**
      * Set all the children of the specified node as minimized and not manually expanded.
-     * @param {N2TreeNode} startNode The node to begin from.
+     * @param {OmTreeNode} startNode The node to begin from.
      * @param {Boolean} [initialNode = true] Indicate the starting node.
      */
     minimizeAll(startNode, initialNode = true) {
@@ -1038,7 +1038,7 @@ class N2Diagram {
 
     /**
      * Recursively minimize non-input nodes to the specified depth.
-     * @param {N2TreeNode} node The node to work on.
+     * @param {OmTreeNode} node The node to work on.
      */
     _minimizeToDepth(node) {
         if (node.isInputOrOutput()) {

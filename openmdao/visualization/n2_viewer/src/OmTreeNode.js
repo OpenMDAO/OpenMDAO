@@ -1,5 +1,5 @@
-// <<hpp_insert gen/N2TreeNode.js
-class OmTreeNode extends N2TreeNode {
+// <<hpp_insert gen/TreeNode.js
+class OmTreeNode extends TreeNode {
     constructor(origNode, attribNames) {
         super(origNode, attribNames);
 

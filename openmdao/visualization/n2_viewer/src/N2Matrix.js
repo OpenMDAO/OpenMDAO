@@ -2,7 +2,7 @@
  * Use the model tree to build the matrix of variables and connections, display, and
  * perform operations with it.
  * @typedef N2Matrix
- * @property {N2TreeNodes[]} nodes Reference to nodes that will be drawn.
+ * @property {OmTreeNodes[]} nodes Reference to nodes that will be drawn.
  * @property {ModelData} model Reference to the pre-processed model.
  * @property {N2Layout} layout Reference to object managing columns widths and such.
  * @property {Object} n2Groups References to <g> SVG elements created by N2Diagram.
@@ -118,7 +118,7 @@ class N2Matrix {
     /**
      * Given the node ID, determine if one of the cells in the matrix
      * represents it or contains it.
-     * @param {Number} nodeId The id of the N2TreeNode to search for
+     * @param {Number} nodeId The id of the OmTreeNode to search for
      * @returns {Object} Contains reference to cell if found, and flags describing it.
      */
     findCellByNodeId(nodeId) {
