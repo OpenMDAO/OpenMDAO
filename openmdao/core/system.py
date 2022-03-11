@@ -1625,7 +1625,7 @@ class System(object):
 
     def _check_alias_overlaps(self, responses):
         # If you have response aliases, check for overlapping indices.
-        aliases = {key: value for key, value in responses.items() if value['path']}
+        aliases = {n: meta for n, meta in responses.items() if meta['alias']}
         if aliases:
 
             used_idx = {}
@@ -1636,7 +1636,7 @@ class System(object):
                 if name in discrete['input'] or name in discrete['output']:
                     continue
 
-                path = responses[name]['path']
+                path = self._get_abs_response_path(name, responses)
 
                 if path not in used_idx:
                     size = self._var_allprocs_abs2meta['output'][path]['global_size']
@@ -1670,7 +1670,8 @@ class System(object):
 
             for path, mat in used_idx.items():
                 if np.any(mat > 1):
-                    matching_aliases = sorted(a for a, m in aliases.items() if m['path'] == path)
+                    matching_aliases = sorted(a for a in aliases
+                                              if self._get_abs_response_path(a, responses) == path)
                     msg = (f"{self.msginfo}: Indices for aliases {matching_aliases} are overlapping"
                            f" constraint/objective '{path}'.")
                     raise RuntimeError(msg)
@@ -2777,12 +2778,12 @@ class System(object):
                    "constraint".format(self.msginfo, typemap[type_], name))
             raise RuntimeError(msg.format(name))
 
+        resp['name'] = name
         if alias is not None:
-            resp['name'] = alias
-            resp['path'] = name
+            resp['alias'] = alias
+            name = alias
         else:
-            resp['name'] = name
-            resp['path'] = None
+            resp['alias'] = None
 
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
@@ -2879,11 +2880,11 @@ class System(object):
         resp['parallel_deriv_color'] = parallel_deriv_color
         resp['flat_indices'] = flat_indices
 
-        if resp['name'] in responses:
+        if resp['alias'] in responses:
             raise TypeError(f"Constraint alias '{name}' is a duplicate of an existing alias or "
                             "variable name.")
 
-        responses[resp['name']] = resp
+        responses[name] = resp
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None, units=None,
@@ -3189,12 +3190,16 @@ class System(object):
 
         return out
 
+    # FIXME:  fix this docstring describing keys of return dict, hopefully after
+    #         simplifying the key handling because it's a mess.
     def get_responses(self, recurse=True, get_sizes=True, use_prom_ivc=False):
         """
         Get the response variable settings from this system.
 
         Retrieve all response variable settings from the system as a dict,
-        keyed by variable name.
+        keyed by either absolute variable name, promoted name, or alias name,
+        depending on the value of use_prom_ivc and whether the original key was
+        a promoted output, promoted input, or an alias.
 
         Parameters
         ----------
@@ -3225,48 +3230,45 @@ class System(object):
                 if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
                     self._problem_meta['using_par_deriv_color'] = True
 
-                path = data['path']
+                alias = data['alias']  # may be None
+                prom = data['name']  # always a promoted var name
                 if name in prom2abs_out:
-                    if path is None:
-                        abs_name = prom2abs_out[name][0]
-                    else:
-                        # Constraint alias should never be the same as any openmdao output.
-                        if path in prom2abs_out:
-                            path = prom2abs_out[path][0]
-                        raise RuntimeError(f"Constraint alias '{name}' on '{path}' is the "
-                                           "same name as an existing variable.")
+                    # Constraint alias should never be the same as any openmdao output.
+                    if alias is not None:
+                        path = prom2abs_out[prom][0] if prom in prom2abs_out else prom
+                        raise RuntimeError(f"Constraint alias '{alias}' on '{path}' "
+                                           "is the same name as an existing variable.")
+                    abs_name = prom2abs_out[name][0]
                     out[abs_name] = data
                     out[abs_name]['ivc_source'] = abs_name
                     out[abs_name]['distributed'] = \
                         abs_name in abs2meta_out and abs2meta_out[abs_name]['distributed']
 
                 else:
-                    # A constraint can be on an auto_ivc input, so use connected
-                    # output name.
-                    if path is None:
-                        in_abs = prom2abs_in[name][0]
-                        ivc_path = conns[in_abs]
+                    if alias is None:
+                        # A constraint can be on an auto_ivc input, so use connected
+                        # output name.
+                        key = in_abs = prom2abs_in[name][0]
+                        src_path = conns[in_abs]
                     else:  # name is an alias
 
                         # In-place update to absolute path.
-                        if path in prom2abs_out:
-                            data['path'] = prom2abs_out[path][0]
-                        elif path in prom2abs_in:
-                            path_abs = prom2abs_in[path][0]
-                            data['path'] = conns[path_abs]
+                        if prom in prom2abs_out:
+                            src_path = prom2abs_out[prom][0]
+                        elif prom in prom2abs_in:
+                            src_path = conns[prom2abs_in[prom][0]]
 
-                        ivc_path = data['path']
-                        in_abs = name
+                        key = alias
 
-                    distrib = ivc_path in abs2meta_out and abs2meta_out[ivc_path]['distributed']
+                    distrib = src_path in abs2meta_out and abs2meta_out[src_path]['distributed']
                     if use_prom_ivc:
                         out[name] = data
-                        out[name]['ivc_source'] = ivc_path
+                        out[name]['ivc_source'] = src_path
                         out[name]['distributed'] = distrib
                     else:
-                        out[in_abs] = data
-                        out[in_abs]['ivc_source'] = ivc_path
-                        out[in_abs]['distributed'] = distrib
+                        out[key] = data
+                        out[key]['ivc_source'] = src_path
+                        out[key]['distributed'] = distrib
 
         except KeyError as err:
             msg = "{}: Output not found for response {}."
@@ -4844,8 +4846,8 @@ class System(object):
                                 vdict[ivc_path] = discrete_vec[ivc_path[offset:]]['val']
                 else:
                     for name in variables:
-                        if name in self._responses and self._responses[name]['path'] is not None:
-                            name = self._responses[name]['path']
+                        if name in self._responses and self._responses[name]['alias'] is not None:
+                            name = self._get_abs_response_path(name, self._responses)
                         if vec._contains_abs(name):
                             vdict[name] = get(name, False)
                         else:
@@ -4856,8 +4858,8 @@ class System(object):
                 vdict = {}
                 if discrete_vec:
                     for name in variables:
-                        if name in self._responses and self._responses[name]['path'] is not None:
-                            name = self._responses[name]['path']
+                        if name in self._responses and self._responses[name]['alias'] is not None:
+                            name = self._get_abs_response_path(name, self._responses)
                         if vec._contains_abs(name):
                             vdict[name] = get(name, get_remote=True, rank=0,
                                               vec_name=vec_name, kind=kind)
@@ -5511,3 +5513,6 @@ class System(object):
             tarr -= toffset
 
         return sarr, tarr, tsize, has_dist_data
+
+    def _get_abs_response_path(self, name, responses):
+        return responses[name]['ivc_source']

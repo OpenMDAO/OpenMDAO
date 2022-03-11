@@ -592,8 +592,8 @@ class _TotalJacInfo(object):
             non_rel_outs = False
 
         for name in input_list:
-            if name in self.responses and self.responses[name]['path'] is not None:
-                path = self.responses[name]['path']
+            if name in self.responses and self.responses[name]['alias'] is not None:
+                path = model._get_abs_response_path(name, model._responses)
             else:
                 path = name
 
@@ -801,10 +801,8 @@ class _TotalJacInfo(object):
 
         for name in names:
 
-            # Support for constraint aliases.
-            if name in self.responses and 'path' in self.responses[name] and \
-                    self.responses[name]['path'] is not None:
-                path = self.responses[name]['path']
+            if name in self.responses:
+                path = model._get_abs_response_path(name, self.responses)
             else:
                 path = name
 
@@ -892,6 +890,8 @@ class _TotalJacInfo(object):
         get_remote = self.get_remote
         has_dist = False
 
+        responses = vois if vois is self.responses else None
+
         for name in names:
             path = name
 
@@ -905,10 +905,8 @@ class _TotalJacInfo(object):
                 else:
                     size = voi['size']
                 indices = vois[name]['indices']
-
-                # Support for constraint aliases.
-                if 'path' in voi and voi['path'] is not None:
-                    path = voi['path']
+                if responses:
+                    path = self.model._get_abs_response_path(name, vois)
 
             else:
                 size = abs2meta_out[path]['global_size']
@@ -1539,10 +1537,8 @@ class _TotalJacInfo(object):
             zero_rows = []
             for name, tup in self.of_meta.items():
 
-                # Support for constraint aliases.
-                if name in self.responses and 'path' in self.responses[name] and \
-                        self.responses[name]['path'] is not None:
-                    name = self.responses[name]['path']
+                if name in self.responses:
+                    name = self.model._get_abs_response_path(name, self.responses)
 
                 zero_idxs = self._get_zero_inds(name, tup, col)
 
@@ -1570,10 +1566,8 @@ class _TotalJacInfo(object):
             zero_cols = []
             for name, tup in self.wrt_meta.items():
 
-                # Support for constraint aliases.
-                if name in self.responses and 'path' in self.responses[name] and \
-                        self.responses[name]['path'] is not None:
-                    name = self.responses[name]['path']
+                if name in self.responses:
+                    name = self.model._get_abs_response_path(name, self.responses)
 
                 zero_idxs = self._get_zero_inds(name, tup, row)
 

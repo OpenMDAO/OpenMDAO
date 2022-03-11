@@ -348,9 +348,7 @@ class Driver(object):
                 vpath = vname
 
                 if vname in responses:
-                    # Support for constraint aliases.
-                    if responses[vname]['path'] is not None:
-                        vpath = responses[vname]['path']
+                    vpath = model._get_abs_response_path(vname, responses)
                     indices = responses[vname].get('indices')
 
                 elif vname in src_design_vars:
@@ -538,17 +536,17 @@ class Driver(object):
         get = model._outputs._abs_get_val
         indices = meta['indices']
 
-        ivc_src_name = meta.get('ivc_source')
-        if ivc_src_name is not None:
+        src_name = meta.get('ivc_source')
+        if src_name is not None:
 
             # Constraint aliases add additional complication.
-            if meta.get('path') and meta['path'] != name:
-                src_name = meta['path']
+            if meta.get('alias'):
                 drv_name = name
             else:
-                drv_name = src_name = ivc_src_name
+                drv_name = src_name
         else:
             drv_name = src_name = name
+            raise RuntimeError("FOO")
 
         if MPI:
             distributed = comm.size > 0 and drv_name in self._dist_driver_vars

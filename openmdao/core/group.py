@@ -2920,8 +2920,8 @@ class Group(System):
             for of in self._owns_approx_of:
 
                 # Support for constraint aliases.
-                if of in self._responses and self._responses[of]['path'] is not None:
-                    path = self._responses[of]['path']
+                if of in self._responses and self._responses[of]['alias'] is not None:
+                    path = self._get_abs_response_path(of, self._responses)
                 else:
                     path = of
 
@@ -3059,7 +3059,6 @@ class Group(System):
         """
         self._jacobian = DictionaryJacobian(system=self)
 
-        abs2prom = self._var_allprocs_abs2prom
         abs2meta = self._var_allprocs_abs2meta
         info = self._coloring_info
 
@@ -3079,10 +3078,10 @@ class Group(System):
         approx_keys = self._get_approx_subjac_keys()
         for key in approx_keys:
             left, right = key
-            if left in self._responses and self._responses[left]['path'] is not None:
-                left = self._responses[left]['path']
-            if right in self._responses and self._responses[right]['path'] is not None:
-                right = self._responses[right]['path']
+            if left in self._responses and self._responses[left]['alias'] is not None:
+                left = self._get_abs_response_path(left, self._responses)
+            if right in self._responses and self._responses[right]['alias'] is not None:
+                right = self._get_abs_response_path(right, self._responses)
 
             if key in self._subjacs_info:
                 meta = self._subjacs_info[key]

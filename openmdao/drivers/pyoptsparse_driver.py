@@ -381,14 +381,16 @@ class pyOptSparseDriver(Driver):
             size = meta['global_size'] if meta['distributed'] else meta['size']
             lower = upper = meta['equals']
             if fwd:
-                if meta['path'] is not None:
-                    wrt = [v for v in indep_list if meta['path'] in
+                if meta['alias'] is not None:
+                    # FIXME: not sure this block is need since all vois have ivc_source defined
+                    path = model._get_abs_response_path(name, model._responses)
+                    wrt = [v for v in indep_list if path in
                            relevant[input_meta[v]['ivc_source']]]
                 else:
                     wrt = [v for v in indep_list if name in relevant[input_meta[v]['ivc_source']]]
             else:
-                if meta['path'] is not None:
-                    rels = relevant[meta['path']]
+                if meta['alias'] is not None:
+                    rels = relevant[model._get_abs_response_path(name, model._responses)]
                 else:
                     rels = relevant[name]
                 wrt = [v for v in indep_list if input_meta[v]['ivc_source'] in rels]
@@ -418,14 +420,16 @@ class pyOptSparseDriver(Driver):
             upper = meta['upper']
 
             if fwd:
-                if meta['path'] is not None:
-                    wrt = [v for v in indep_list if meta['path'] in
+                if meta['alias'] is not None:
+                    path = model._get_abs_response_path(name, model._responses)
+                    wrt = [v for v in indep_list if path in
                            relevant[input_meta[v]['ivc_source']]]
                 else:
                     wrt = [v for v in indep_list if name in relevant[input_meta[v]['ivc_source']]]
             else:
-                if meta['path'] is not None:
-                    rels = relevant[meta['path']]
+                if meta['alias'] is not None:
+                    path = model._get_abs_response_path(name, model._responses)
+                    rels = relevant[path]
                 else:
                     rels = relevant[name]
                 wrt = [v for v in indep_list if input_meta[v]['ivc_source'] in rels]
@@ -793,9 +797,10 @@ class pyOptSparseDriver(Driver):
         if total_sparsity is None:
             return
 
+        model = self._problem().model
         for res, resdict in total_sparsity.items():
-            if res in self._responses and self._responses[res]['path'] is not None:
-                res = self._responses[res]['path']
+            if res in self._responses and self._responses[res]['alias'] is not None:
+                res = model._get_abs_response_path(res, self._responses)
             if res in self._objs:  # skip objectives
                 continue
             self._res_jacs[res] = {}

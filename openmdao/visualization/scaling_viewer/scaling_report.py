@@ -264,18 +264,15 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         lower = meta.get('lower')
         upper = meta.get('upper')
         equals = meta.get('equals')
-        alias = meta.get('path')
+        alias = meta.get('alias', '')
 
         dval = con_vals[name]
         mval = _unscale(dval, scaler, adder, default)
 
         index, inds = get_inds(dval, meta)
 
-        if alias is not None:
-            alias = name
-            name = meta.get('path')
-        if alias is None:
-            alias = ''
+        if alias:
+            name = meta['name']
 
         dct = {
             'id': idx,
@@ -309,18 +306,15 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         adder = meta['total_adder']
         ref = meta.get('ref')
         ref0 = meta.get('ref0')
-        alias = meta.get('path')
+        alias = meta.get('alias', '')
 
         dval = obj_vals[name]
         mval = _unscale(dval, scaler, adder, default)
 
         index, inds = get_inds(dval, meta)
 
-        if alias is not None:
-            alias = name
-            name = meta.get('path')
-        if alias is None:
-            alias = ''
+        if alias:
+            name = meta['name']
 
         dct = {
             'id': idx,
