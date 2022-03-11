@@ -7,7 +7,6 @@ additional MPI capability.
 """
 
 import sys
-from collections import OrderedDict
 import json
 import signal
 from distutils.version import LooseVersion
@@ -695,10 +694,10 @@ class pyOptSparseDriver(Driver):
                 # if we don't convert to 'coo' here, pyoptsparse will do a
                 # conversion of our dense array into a fully dense 'coo', which is bad.
                 # TODO: look into getting rid of all of these conversions!
-                new_sens = OrderedDict()
+                new_sens = {}
                 res_jacs = self._res_jacs
                 for okey in func_dict:
-                    new_sens[okey] = newdv = OrderedDict()
+                    new_sens[okey] = newdv = {}
                     okey_src = self._responses[okey]['ivc_source']
                     for ikey in dv_dict:
                         ikey_src = self._designvars[ikey]['ivc_source']
@@ -716,9 +715,9 @@ class pyOptSparseDriver(Driver):
                 # We need to cobble together a sens_dict of the correct size.
                 # Best we can do is return zeros.
 
-                sens_dict = OrderedDict()
+                sens_dict = {}
                 for okey, oval in func_dict.items():
-                    sens_dict[okey] = OrderedDict()
+                    sens_dict[okey] = {}
                     osize = len(oval)
                     for ikey, ival in dv_dict.items():
                         isize = len(ival)

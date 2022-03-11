@@ -1,5 +1,4 @@
 """Define a base class for all Drivers in OpenMDAO."""
-from collections import OrderedDict
 from itertools import chain
 import pprint
 import sys
@@ -536,17 +535,10 @@ class Driver(object):
         get = model._outputs._abs_get_val
         indices = meta['indices']
 
-        src_name = meta.get('ivc_source')
-        if src_name is not None:
+        src_name = meta['ivc_source']
 
-            # Constraint aliases add additional complication.
-            if meta.get('alias'):
-                drv_name = name
-            else:
-                drv_name = src_name
-        else:
-            drv_name = src_name = name
-            raise RuntimeError("FOO")
+        # If there's an alias, use that for driver related stuff
+        drv_name = name if meta.get('alias') else src_name
 
         if MPI:
             distributed = comm.size > 0 and drv_name in self._dist_driver_vars
@@ -811,8 +803,8 @@ class Driver(object):
         int
             Total size of design vars.
         """
-        self._objs = objs = OrderedDict()
-        self._cons = cons = OrderedDict()
+        self._objs = objs = {}
+        self._cons = cons = {}
 
         model._setup_driver_units()
 

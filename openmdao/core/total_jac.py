@@ -1,7 +1,7 @@
 """
 Helper class for total jacobian computation.
 """
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from itertools import chain
 from copy import deepcopy
 import os
@@ -504,15 +504,15 @@ class _TotalJacInfo(object):
 
         Returns
         -------
-        OrderedDict
+        dict
             Dict form of the total jacobian that contains views of the ndarray jacobian.
         """
-        J_dict = OrderedDict()
+        J_dict = {}
         if return_format == 'dict':
             for i, out in enumerate(of):
                 if out in self.remote_vois:
                     continue
-                J_dict[prom_of[i]] = outer = OrderedDict()
+                J_dict[prom_of[i]] = outer = {}
                 out_slice = of_meta[out][0]
                 for j, inp in enumerate(wrt):
                     if inp not in self.remote_vois:
@@ -558,7 +558,7 @@ class _TotalJacInfo(object):
         var_sizes = model._var_sizes
         var_offsets = model._get_var_offsets()
         abs2idx = model._var_allprocs_abs2idx
-        idx_iter_dict = OrderedDict()  # a dict of index iterators
+        idx_iter_dict = {}  # a dict of index iterators
 
         simul_coloring = self.simul_coloring
         if simul_coloring:

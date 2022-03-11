@@ -5,7 +5,7 @@ import hashlib
 import time
 
 from contextlib import contextmanager
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from itertools import chain
 from enum import IntEnum
 
@@ -203,7 +203,7 @@ class System(object):
         MPI communicator object used when System's comm is split for parallel FD.
     _solver_print_cache : list
         Allows solver iprints to be set to requested values after setup calls.
-    _subsystems_allprocs : OrderedDict
+    _subsystems_allprocs : dict
         Dict mapping subsystem name to SysInfo(system, index) for children of this system.
     _subsystems_myproc : [<System>, ...]
         List of local subsystems that exist on this proc.
@@ -267,7 +267,7 @@ class System(object):
         Nonlinear solver to be used for solve_nonlinear.
     _linear_solver : <LinearSolver>
         Linear solver to be used for solve_linear; not the Newton system.
-    _approx_schemes : OrderedDict
+    _approx_schemes : dict
         A mapping of approximation types to the associated ApproximationScheme.
     _jacobian : <Jacobian>
         <Jacobian> object to be used in apply_linear.
@@ -304,7 +304,7 @@ class System(object):
         dict of all driver responses added to the system.
     _rec_mgr : <RecordingManager>
         object that manages all recorders added to this system.
-    _static_subsystems_allprocs : OrderedDict
+    _static_subsystems_allprocs : dict
         Dict of SysInfo(subsys, index) that stores all subsystems added outside of setup.
     _static_design_vars : dict of dict
         Driver design variables added outside of setup.
@@ -462,7 +462,7 @@ class System(object):
         self._linear_solver = None
 
         self._jacobian = None
-        self._approx_schemes = OrderedDict()
+        self._approx_schemes = {}
         self._subjacs_info = {}
         self._approx_subjac_keys = None
         self.matrix_free = False
@@ -478,15 +478,15 @@ class System(object):
         self.under_complex_step = False
         self.under_finite_difference = False
 
-        self._design_vars = OrderedDict()
-        self._responses = OrderedDict()
+        self._design_vars = {}
+        self._responses = {}
         self._rec_mgr = RecordingManager()
 
         self._conn_global_abs_in2out = {}
 
         self._static_subsystems_allprocs = {}
-        self._static_design_vars = OrderedDict()
-        self._static_responses = OrderedDict()
+        self._static_design_vars = {}
+        self._static_responses = {}
 
         self._mode = None
 
@@ -696,9 +696,7 @@ class System(object):
         """
         # save root vecs as an attribute so that we can reuse the nonlinear scaling vecs in the
         # linear root vec
-        self._root_vecs = root_vectors = {'input': OrderedDict(),
-                                          'output': OrderedDict(),
-                                          'residual': OrderedDict()}
+        self._root_vecs = root_vectors = {'input': {}, 'output': {}, 'residual': {}}
 
         force_alloc_complex = self._problem_meta['force_alloc_complex']
 
@@ -1528,8 +1526,8 @@ class System(object):
         self.options._parent_name = self.msginfo
         self.recording_options._parent_name = self.msginfo
         self._mode = mode
-        self._design_vars = OrderedDict()
-        self._responses = OrderedDict()
+        self._design_vars = {}
+        self._responses = {}
         self._design_vars.update(self._static_design_vars)
         self._responses.update(self._static_responses)
 
@@ -1538,7 +1536,7 @@ class System(object):
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
         """
         self._var_prom2inds = {}
-        self._var_allprocs_prom2abs_list = {'input': OrderedDict(), 'output': OrderedDict()}
+        self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
@@ -1788,9 +1786,7 @@ class System(object):
         root_vectors : dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         """
-        self._vectors = vectors = {'input': OrderedDict(),
-                                   'output': OrderedDict(),
-                                   'residual': OrderedDict()}
+        self._vectors = vectors = {'input': {}, 'output': {}, 'residual': {}}
 
         # Allocate complex if root vector was allocated complex.
         alloc_complex = root_vectors['output']['nonlinear']._alloc_complex
@@ -2626,7 +2622,7 @@ class System(object):
             except ValueError as e:
                 raise(ValueError(f"{str(e)[:-1]} for design_var '{name}'."))
 
-        dv = OrderedDict()
+        dv = {}
 
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
@@ -2770,7 +2766,7 @@ class System(object):
             except ValueError as e:
                 raise(ValueError(f"{str(e)[:-1]} for response '{name}'."))
 
-        resp = OrderedDict()
+        resp = {}
 
         typemap = {'con': 'Constraint', 'obj': 'Objective'}
         if (name in self._responses or name in self._static_responses) and alias is None:
@@ -2780,8 +2776,7 @@ class System(object):
 
         resp['name'] = name
         if alias is not None:
-            resp['alias'] = alias
-            name = alias
+            resp['alias'] = name = alias
         else:
             resp['alias'] = None
 
@@ -3078,7 +3073,7 @@ class System(object):
         abs2meta_out = model._var_allprocs_abs2meta['output']
 
         # Human readable error message during Driver setup.
-        out = OrderedDict()
+        out = {}
         try:
             for name, data in self._design_vars.items():
                 if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
@@ -3172,7 +3167,7 @@ class System(object):
             if self.comm.size > 1 and self._subsystems_allprocs:
                 my_out = out
                 allouts = self.comm.allgather(out)
-                out = OrderedDict()
+                out = {}
                 for rank, all_out in enumerate(allouts):
                     for name, meta in all_out.items():
                         if name not in out:
@@ -3252,7 +3247,6 @@ class System(object):
                         src_path = conns[in_abs]
                     else:  # name is an alias
 
-                        # In-place update to absolute path.
                         if prom in prom2abs_out:
                             src_path = prom2abs_out[prom][0]
                         elif prom in prom2abs_in:
@@ -3321,7 +3315,7 @@ class System(object):
 
             if self.comm.size > 1 and self._subsystems_allprocs:
                 all_outs = self.comm.allgather(out)
-                out = OrderedDict()
+                out = {}
                 for all_out in all_outs:
                     out.update(all_out)
 
@@ -3345,9 +3339,8 @@ class System(object):
         dict
             The constraints defined in the current system.
         """
-        return OrderedDict((key, response) for (key, response) in
-                           self.get_responses(recurse=recurse).items()
-                           if response['type'] == 'con')
+        return {key: response for key, response in self.get_responses(recurse=recurse).items()
+                if response['type'] == 'con'}
 
     def get_objectives(self, recurse=True):
         """
@@ -3367,9 +3360,8 @@ class System(object):
         dict
             The objectives defined in the current system.
         """
-        return OrderedDict((key, response) for (key, response) in
-                           self.get_responses(recurse=recurse).items()
-                           if response['type'] == 'obj')
+        return {key: response for key, response in self.get_responses(recurse=recurse).items()
+                if response['type'] == 'obj'}
 
     def run_apply_nonlinear(self):
         """

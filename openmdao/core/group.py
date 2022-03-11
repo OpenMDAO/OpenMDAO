@@ -1,5 +1,5 @@
 """Define the Group class."""
-from collections import Counter, OrderedDict, defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Iterable
 
 from itertools import product, chain
@@ -601,7 +601,7 @@ class Group(System):
             if not (np.sum([minp for minp, _, _ in proc_info]) <= comm.size):
                 # reorder the subsystems_allprocs based on which procs they live on. If we don't
                 # do this, we can get ordering mismatches in some of our data structures.
-                new_allsubs = OrderedDict()
+                new_allsubs = {}
                 seen = set()
                 gathered = self.comm.allgather(sub_inds)
                 for rank, inds in enumerate(gathered):
@@ -1152,12 +1152,12 @@ class Group(System):
 
             gathered = self.comm.allgather(raw)
 
-            # start with a fresh OrderedDict to keep order the same in all procs
+            # start with a fresh dict to keep order the same in all procs
             old_abs2meta = allprocs_abs2meta
-            allprocs_abs2meta = {'input': OrderedDict(), 'output': OrderedDict()}
+            allprocs_abs2meta = {'input': {}, 'output': {}}
 
             for io in ['input', 'output']:
-                allprocs_prom2abs_list[io] = OrderedDict()
+                allprocs_prom2abs_list[io] = {}
 
             myrank = self.comm.rank
             for rank, (proc_discrete, proc_prom2abs_list, proc_abs2meta,
@@ -1185,7 +1185,7 @@ class Group(System):
             for io in ('input', 'output'):
                 if allprocs_abs2meta[io]:
                     # update new allprocs_abs2meta with our local version (now that we have a
-                    # consistent order for our OrderedDict), so that the 'size' metadata will
+                    # consistent order for our dict), so that the 'size' metadata will
                     # accurately reflect this proc's var size instead of one from some other proc.
                     allprocs_abs2meta[io].update(old_abs2meta[io])
 
@@ -2797,7 +2797,7 @@ class Group(System):
             method provides its default value.
         """
         self._has_approx = True
-        self._approx_schemes = OrderedDict()
+        self._approx_schemes = {}
         approx_scheme = self._get_approx_scheme(method)
 
         default_opts = approx_scheme.DEFAULT_OPTIONS
@@ -3418,7 +3418,7 @@ class Group(System):
 
         # now update our own data structures based on the new auto_ivc component variables
         old = self._subsystems_allprocs
-        self._subsystems_allprocs = allsubs = OrderedDict()
+        self._subsystems_allprocs = allsubs = {}
         allsubs['_auto_ivc'] = _SysInfo(auto_ivc, 0)
         for i, (name, s) in enumerate(old.items()):
             allsubs[name] = s
@@ -3428,7 +3428,7 @@ class Group(System):
 
         io = 'output'  # auto_ivc has only output vars
         old = self._var_allprocs_prom2abs_list[io]
-        p2abs = OrderedDict()
+        p2abs = {}
         for name in auto_ivc._var_allprocs_abs2meta[io]:
             p2abs[name] = [name]
         p2abs.update(old)
