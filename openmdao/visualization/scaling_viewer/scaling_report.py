@@ -202,7 +202,12 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
     obj_vals = driver.get_objective_values(driver_scaling=True)
     con_vals = driver.get_constraint_values(driver_scaling=True)
 
-    mod_meta = driver._problem().model._var_allprocs_abs2meta['output']
+    model = driver._problem().model
+
+    mod_meta = model._var_allprocs_abs2meta['output']
+    mod_meta.update(model._var_allprocs_discrete['output'])
+
+    discretes = {'dvs': [], 'con': [], 'obj': []}
 
     if driver._problem()._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
         raise RuntimeError("Driver scaling report cannot be generated before calling final_setup "
@@ -228,6 +233,10 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
         ref0 = meta.get('ref0')
         lower = meta.get('lower')
         upper = meta.get('upper')
+        src_name = meta.get('ivc_source')
+
+        if src_name in model._discrete_outputs:
+            discretes['dvs'].append(name)
 
         dval = dv_vals[name]
         mval = _unscale(dval, scaler, adder, default)
@@ -241,7 +250,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
             'driver_val': _get_val_and_size(dval),
             'driver_units': _getdef(meta['units'], default),
             'model_val': _get_val_and_size(mval),
-            'model_units': _getdef(mod_meta[meta['ivc_source']]['units'], default),
+            'model_units': _getdef(mod_meta[src_name].get('units'), default),
             'ref': _get_val_and_size(ref, default),
             'ref0': _get_val_and_size(ref0, default),
             'scaler': _get_val_and_size(scaler, default),
@@ -266,6 +275,10 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
         lower = meta.get('lower')
         upper = meta.get('upper')
         equals = meta.get('equals')
+        src_name = meta.get('ivc_source')
+
+        if src_name in model._discrete_outputs:
+            discretes['con'].append(name)
 
         dval = con_vals[name]
         mval = _unscale(dval, scaler, adder, default)
@@ -280,7 +293,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
             'driver_val': _get_val_and_size(dval),
             'driver_units': _getdef(meta.get('units'), default),
             'model_val': _get_val_and_size(mval),
-            'model_units': _getdef(mod_meta[meta['ivc_source']]['units'], default),
+            'model_units': _getdef(mod_meta[src_name].get('units'), default),
             'ref': _get_val_and_size(ref, default),
             'ref0': _get_val_and_size(ref0, default),
             'scaler': _get_val_and_size(scaler, default),
@@ -303,6 +316,10 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
         adder = meta['total_adder']
         ref = meta.get('ref')
         ref0 = meta.get('ref0')
+        src_name = meta.get('ivc_source')
+
+        if src_name in model._discrete_outputs:
+            discretes['obj'].append(name)
 
         dval = obj_vals[name]
         mval = _unscale(dval, scaler, adder, default)
@@ -317,7 +334,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
             'driver_val': _get_val_and_size(dval),
             'driver_units': _getdef(meta.get('units'), default),
             'model_val': _get_val_and_size(mval),
-            'model_units': _getdef(mod_meta[meta['ivc_source']]['units'], default),
+            'model_units': _getdef(mod_meta[src_name].get('units'), default),
             'ref': _get_val_and_size(meta.get('ref'), default),
             'ref0': _get_val_and_size(meta.get('ref0'), default),
             'scaler': _get_val_and_size(scaler, default),
@@ -345,6 +362,16 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
 
     if jac and not driver._problem().model._use_derivatives:
         print("\nCan't display jacobian because derivatives are turned off.\n")
+        jac = False
+
+    elif jac and (discretes['dvs'] or discretes['con'] or discretes['obj']):
+        print("\nCan't display jacobian because the following variables are discrete:")
+        if discretes['dvs']:
+            print(f"  Design Vars: {discretes['dvs']}")
+        if discretes['con']:
+            print(f"  Constraints: {discretes['con']}")
+        if discretes['obj']:
+            print(f"  Objectives: {discretes['obj']}")
         jac = False
 
     if jac:
