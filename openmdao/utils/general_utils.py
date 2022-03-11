@@ -452,6 +452,28 @@ def find_matches(pattern, var_list):
     return [name for name in var_list if fnmatchcase(name, pattern)]
 
 
+def _find_dict_meta(dct, key):
+    """
+    Return True if the given key is found in any metadata values in the given dict.
+
+    Parameters
+    ----------
+    dct : dict
+        The metadata dictionary (a dict of dicts).
+    key : str
+        The metadata key being searched for.
+
+    Returns
+    -------
+    bool
+        True if non-None metadata at the given key was found.
+    """
+    for meta in dct.values():
+        if key in meta and meta[key] is not None:
+            return True
+    return False
+
+
 def pad_name(name, pad_num=10, quotes=False):
     """
     Pad a string so that they all line up when stacked.

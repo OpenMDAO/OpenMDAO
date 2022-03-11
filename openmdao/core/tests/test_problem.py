@@ -1882,9 +1882,9 @@ class TestProblem(unittest.TestCase):
         self.assertEquals(output[1], r'Design Variables')
         self.assertRegex(output[5], r'^z +\|[0-9. e+-]+\| +2')
         self.assertEquals(output[9], r'Constraints')
-        self.assertRegex(output[14], r'^con_cmp2.con2 +\[[0-9. e+-]+\] +1')
+        self.assertRegex(output[14], r'^con2 +\[[0-9. e+-]+\] +1')
         self.assertEquals(output[17], r'Objectives')
-        self.assertRegex(output[21], r'^obj_cmp.obj +\[[0-9. e+-]+\] +1')
+        self.assertRegex(output[21], r'^obj +\[[0-9. e+-]+\] +1')
 
         # With show_promoted_name=False
         stdout = sys.stdout
@@ -1896,8 +1896,8 @@ class TestProblem(unittest.TestCase):
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
         self.assertRegex(output[5], r'^z +\|[0-9. e+-]+\| +2')
-        self.assertRegex(output[14], r'^con2 +\[[0-9. e+-]+\] +1')
-        self.assertRegex(output[21], r'^obj +\[[0-9. e+-]+\] +1')
+        self.assertRegex(output[14], r'^con_cmp2.con2 +\[[0-9. e+-]+\] +1')
+        self.assertRegex(output[21], r'^obj_cmp.obj +\[[0-9. e+-]+\] +1')
 
         # With all the optional columns
         stdout = sys.stdout
