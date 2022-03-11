@@ -277,7 +277,7 @@ class Driver(object):
 
         # Determine if any design variables are discrete.
         self._designvars_discrete = [name for name, meta in self._designvars.items()
-                                     if meta['ivc_source'] in model._discrete_outputs]
+                                     if meta['source'] in model._discrete_outputs]
         if not self.supports['integer_design_vars'] and len(self._designvars_discrete) > 0:
             msg = "Discrete design variables are not supported by this driver: "
             msg += '.'.join(self._designvars_discrete)
@@ -296,7 +296,7 @@ class Driver(object):
             for dv, meta in self._designvars.items():
 
                 # For Auto-ivcs, we need to check the distributed metadata on the target instead.
-                if meta['ivc_source'].startswith('_auto_ivc.'):
+                if meta['source'].startswith('_auto_ivc.'):
                     for abs_name in model._var_allprocs_prom2abs_list['input'][dv]:
                         if abs_name in discrete_in:
                             # Discrete vars aren't distributed.
@@ -535,7 +535,7 @@ class Driver(object):
         get = model._outputs._abs_get_val
         indices = meta['indices']
 
-        src_name = meta['ivc_source']
+        src_name = meta['source']
 
         # If there's an alias, use that for driver related stuff
         drv_name = name if meta.get('alias') else src_name
@@ -657,7 +657,7 @@ class Driver(object):
         problem = self._problem()
         meta = self._designvars[name]
 
-        src_name = meta['ivc_source']
+        src_name = meta['source']
 
         # if the value is not local, don't set the value
         if (src_name in self._remote_dvs and

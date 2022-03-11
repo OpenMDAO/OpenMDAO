@@ -1697,10 +1697,10 @@ class System(object):
             dv[name]['total_scaler'] = dv[name]['scaler']
 
             if units is not None:
-                # If derivatives are not being calculated, then you reach here before ivc_source
+                # If derivatives are not being calculated, then you reach here before source
                 # is placed in the meta.
                 try:
-                    units_src = meta['ivc_source']
+                    units_src = meta['source']
                 except KeyError:
                     units_src = self.get_source(name)
 
@@ -1736,10 +1736,10 @@ class System(object):
             resp[name]['total_adder'] = resp[name]['adder']
 
             if units is not None:
-                # If derivatives are not being calculated, then you reach here before ivc_source
+                # If derivatives are not being calculated, then you reach here before source
                 # is placed in the meta.
                 try:
-                    units_src = meta['ivc_source']
+                    units_src = meta['source']
                 except KeyError:
                     units_src = self.get_source(name)
 
@@ -3084,7 +3084,7 @@ class System(object):
                     # This is an output name, most likely a manual indepvarcomp.
                     abs_name = pro2abs_out[name][0]
                     out[abs_name] = data
-                    out[abs_name]['ivc_source'] = abs_name
+                    out[abs_name]['source'] = abs_name
                     out[abs_name]['distributed'] = \
                         abs_name in abs2meta_out and abs2meta_out[abs_name]['distributed']
 
@@ -3096,11 +3096,11 @@ class System(object):
                     distrib = ivc_path in abs2meta_out and abs2meta_out[ivc_path]['distributed']
                     if use_prom_ivc:
                         out[name] = data
-                        out[name]['ivc_source'] = ivc_path
+                        out[name]['source'] = ivc_path
                         out[name]['distributed'] = distrib
                     else:
                         out[ivc_path] = data
-                        out[ivc_path]['ivc_source'] = ivc_path
+                        out[ivc_path]['source'] = ivc_path
                         out[ivc_path]['distributed'] = distrib
 
         except KeyError as err:
@@ -3116,8 +3116,8 @@ class System(object):
             for name, meta in out.items():
 
                 src_name = name
-                if meta['ivc_source'] is not None:
-                    src_name = meta['ivc_source']
+                if meta['source'] is not None:
+                    src_name = meta['source']
 
                 if 'size' not in meta:
                     if src_name in abs2idx:
@@ -3235,7 +3235,7 @@ class System(object):
                                            "is the same name as an existing variable.")
                     abs_name = prom2abs_out[name][0]
                     out[abs_name] = data
-                    out[abs_name]['ivc_source'] = abs_name
+                    out[abs_name]['source'] = abs_name
                     out[abs_name]['distributed'] = \
                         abs_name in abs2meta_out and abs2meta_out[abs_name]['distributed']
 
@@ -3257,11 +3257,11 @@ class System(object):
                     distrib = src_path in abs2meta_out and abs2meta_out[src_path]['distributed']
                     if use_prom_ivc:
                         out[name] = data
-                        out[name]['ivc_source'] = src_path
+                        out[name]['source'] = src_path
                         out[name]['distributed'] = distrib
                     else:
                         out[key] = data
-                        out[key]['ivc_source'] = src_path
+                        out[key]['source'] = src_path
                         out[key]['distributed'] = distrib
 
         except KeyError as err:
@@ -3274,7 +3274,7 @@ class System(object):
             abs2idx = model._var_allprocs_abs2idx
             owning_rank = model._owning_rank
             for response in out.values():
-                name = response['ivc_source']
+                name = response['source']
 
                 # Discrete vars
                 if name not in abs2idx:
@@ -5507,4 +5507,4 @@ class System(object):
         return sarr, tarr, tsize, has_dist_data
 
     def _get_abs_response_path(self, name, responses):
-        return responses[name]['ivc_source']
+        return responses[name]['source']

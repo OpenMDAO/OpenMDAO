@@ -404,7 +404,7 @@ class SqliteRecorder(CaseRecorder):
 
                     # Design variables, constraints and objectives can be requested by input name.
                     if var_type != 'output':
-                        name = var_set[name]['ivc_source']
+                        name = var_set[name]['source']
 
                     if name not in self._abs2meta:
                         if name in real_meta_out:

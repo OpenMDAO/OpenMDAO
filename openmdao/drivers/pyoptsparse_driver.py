@@ -381,18 +381,18 @@ class pyOptSparseDriver(Driver):
             lower = upper = meta['equals']
             if fwd:
                 if meta['alias'] is not None:
-                    # FIXME: not sure this block is need since all vois have ivc_source defined
+                    # FIXME: not sure this block is need since all vois have source defined
                     path = model._get_abs_response_path(name, model._responses)
                     wrt = [v for v in indep_list if path in
-                           relevant[input_meta[v]['ivc_source']]]
+                           relevant[input_meta[v]['source']]]
                 else:
-                    wrt = [v for v in indep_list if name in relevant[input_meta[v]['ivc_source']]]
+                    wrt = [v for v in indep_list if name in relevant[input_meta[v]['source']]]
             else:
                 if meta['alias'] is not None:
                     rels = relevant[model._get_abs_response_path(name, model._responses)]
                 else:
                     rels = relevant[name]
-                wrt = [v for v in indep_list if input_meta[v]['ivc_source'] in rels]
+                wrt = [v for v in indep_list if input_meta[v]['source'] in rels]
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
@@ -401,7 +401,7 @@ class pyOptSparseDriver(Driver):
             else:
                 if name in self._res_jacs:
                     resjac = self._res_jacs[name]
-                    jac = {n: resjac[input_meta[n]['ivc_source']] for n in wrt}
+                    jac = {n: resjac[input_meta[n]['source']] for n in wrt}
                 else:
                     jac = None
 
@@ -422,16 +422,16 @@ class pyOptSparseDriver(Driver):
                 if meta['alias'] is not None:
                     path = model._get_abs_response_path(name, model._responses)
                     wrt = [v for v in indep_list if path in
-                           relevant[input_meta[v]['ivc_source']]]
+                           relevant[input_meta[v]['source']]]
                 else:
-                    wrt = [v for v in indep_list if name in relevant[input_meta[v]['ivc_source']]]
+                    wrt = [v for v in indep_list if name in relevant[input_meta[v]['source']]]
             else:
                 if meta['alias'] is not None:
                     path = model._get_abs_response_path(name, model._responses)
                     rels = relevant[path]
                 else:
                     rels = relevant[name]
-                wrt = [v for v in indep_list if input_meta[v]['ivc_source'] in rels]
+                wrt = [v for v in indep_list if input_meta[v]['source'] in rels]
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
@@ -440,7 +440,7 @@ class pyOptSparseDriver(Driver):
             else:
                 if name in self._res_jacs:
                     resjac = self._res_jacs[name]
-                    jac = {n: resjac[input_meta[n]['ivc_source']] for n in wrt}
+                    jac = {n: resjac[input_meta[n]['source']] for n in wrt}
                 else:
                     jac = None
                 opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt, jac=jac)
@@ -698,9 +698,9 @@ class pyOptSparseDriver(Driver):
                 res_jacs = self._res_jacs
                 for okey in func_dict:
                     new_sens[okey] = newdv = {}
-                    okey_src = self._responses[okey]['ivc_source']
+                    okey_src = self._responses[okey]['source']
                     for ikey in dv_dict:
-                        ikey_src = self._designvars[ikey]['ivc_source']
+                        ikey_src = self._designvars[ikey]['source']
                         if okey_src in res_jacs and ikey_src in res_jacs[okey_src]:
                             arr = sens_dict[okey][ikey]
                             coo = res_jacs[okey_src][ikey_src]

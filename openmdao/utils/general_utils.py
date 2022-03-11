@@ -979,8 +979,8 @@ def _prom2ivc_src_name_iter(prom_dict):
         name
     """
     for name, meta in prom_dict.items():
-        if meta['ivc_source'] is not None:
-            yield meta['ivc_source']
+        if meta['source'] is not None:
+            yield meta['source']
         else:
             yield name
 
@@ -1001,12 +1001,12 @@ def _prom2ivc_src_item_iter(prom_dict):
     tuple
         name, metadata
     """
-    # FIXME: I think this can be simplified since all vois have ivc_source defined
+    # FIXME: I think this can be simplified since all vois have source defined
     for name, meta in prom_dict.items():
         if 'alias' in meta and meta['alias'] is not None:
             yield meta['alias'], meta
-        elif meta['ivc_source'] is not None:
-            yield meta['ivc_source'], meta
+        elif meta['source'] is not None:
+            yield meta['source'], meta
         else:
             yield name, meta
 

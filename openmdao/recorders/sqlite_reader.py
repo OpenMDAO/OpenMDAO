@@ -228,7 +228,7 @@ class SqliteCaseReader(BaseCaseReader):
                 if 'upper' in meta and meta['upper'] is not None:
                     meta['upper'] = np.resize(np.array(meta['upper']), meta['shape'])
 
-            # Map ivc_source names to input display text.
+            # Map source names to input display text.
             if version >= 11:
                 self._auto_ivc_map = auto_ivc_map = {}
                 abs2prom_in = self._abs2prom['input']
