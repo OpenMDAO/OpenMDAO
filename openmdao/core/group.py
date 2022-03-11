@@ -2921,7 +2921,7 @@ class Group(System):
 
                 # Support for constraint aliases.
                 if of in self._responses and self._responses[of]['alias'] is not None:
-                    path = self._get_abs_response_path(of, self._responses)
+                    path = self._responses[of]['source']
                 else:
                     path = of
 
@@ -3079,9 +3079,9 @@ class Group(System):
         for key in approx_keys:
             left, right = key
             if left in self._responses and self._responses[left]['alias'] is not None:
-                left = self._get_abs_response_path(left, self._responses)
+                left = self._responses[left]['source']
             if right in self._responses and self._responses[right]['alias'] is not None:
-                right = self._get_abs_response_path(right, self._responses)
+                right = self._responses[right]['source']
 
             if key in self._subjacs_info:
                 meta = self._subjacs_info[key]

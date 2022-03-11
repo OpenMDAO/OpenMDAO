@@ -382,14 +382,14 @@ class pyOptSparseDriver(Driver):
             if fwd:
                 if meta['alias'] is not None:
                     # FIXME: not sure this block is need since all vois have source defined
-                    path = model._get_abs_response_path(name, model._responses)
+                    path = model._responses[name]['source']
                     wrt = [v for v in indep_list if path in
                            relevant[input_meta[v]['source']]]
                 else:
                     wrt = [v for v in indep_list if name in relevant[input_meta[v]['source']]]
             else:
                 if meta['alias'] is not None:
-                    rels = relevant[model._get_abs_response_path(name, model._responses)]
+                    rels = relevant[model._responses[name]['source']]
                 else:
                     rels = relevant[name]
                 wrt = [v for v in indep_list if input_meta[v]['source'] in rels]
@@ -420,14 +420,14 @@ class pyOptSparseDriver(Driver):
 
             if fwd:
                 if meta['alias'] is not None:
-                    path = model._get_abs_response_path(name, model._responses)
+                    path = model._responses[name]['source']
                     wrt = [v for v in indep_list if path in
                            relevant[input_meta[v]['source']]]
                 else:
                     wrt = [v for v in indep_list if name in relevant[input_meta[v]['source']]]
             else:
                 if meta['alias'] is not None:
-                    path = model._get_abs_response_path(name, model._responses)
+                    path = model._responses[name]['source']
                     rels = relevant[path]
                 else:
                     rels = relevant[name]
@@ -799,7 +799,7 @@ class pyOptSparseDriver(Driver):
         model = self._problem().model
         for res, resdict in total_sparsity.items():
             if res in self._responses and self._responses[res]['alias'] is not None:
-                res = model._get_abs_response_path(res, self._responses)
+                res = self._responses[res]['source']
             if res in self._objs:  # skip objectives
                 continue
             self._res_jacs[res] = {}

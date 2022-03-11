@@ -593,7 +593,7 @@ class _TotalJacInfo(object):
 
         for name in input_list:
             if name in self.responses and self.responses[name]['alias'] is not None:
-                path = model._get_abs_response_path(name, model._responses)
+                path = model._responses[name]['source']
             else:
                 path = name
 
@@ -802,7 +802,7 @@ class _TotalJacInfo(object):
         for name in names:
 
             if name in self.responses:
-                path = model._get_abs_response_path(name, self.responses)
+                path = self.responses[name]['source']
             else:
                 path = name
 
@@ -906,7 +906,7 @@ class _TotalJacInfo(object):
                     size = voi['size']
                 indices = vois[name]['indices']
                 if responses:
-                    path = self.model._get_abs_response_path(name, vois)
+                    path = vois[name]['source']
 
             else:
                 size = abs2meta_out[path]['global_size']
@@ -1538,7 +1538,7 @@ class _TotalJacInfo(object):
             for name, tup in self.of_meta.items():
 
                 if name in self.responses:
-                    name = self.model._get_abs_response_path(name, self.responses)
+                    name = self.responses[name]['source']
 
                 zero_idxs = self._get_zero_inds(name, tup, col)
 
@@ -1567,7 +1567,7 @@ class _TotalJacInfo(object):
             for name, tup in self.wrt_meta.items():
 
                 if name in self.responses:
-                    name = self.model._get_abs_response_path(name, self.responses)
+                    name = self.responses[name]['source']
 
                 zero_idxs = self._get_zero_inds(name, tup, row)
 

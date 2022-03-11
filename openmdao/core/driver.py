@@ -347,7 +347,7 @@ class Driver(object):
                 vpath = vname
 
                 if vname in responses:
-                    vpath = model._get_abs_response_path(vname, responses)
+                    vpath = responses[vname]['source']
                     indices = responses[vname].get('indices')
 
                 elif vname in src_design_vars:

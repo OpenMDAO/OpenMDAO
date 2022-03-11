@@ -1634,7 +1634,7 @@ class System(object):
                 if name in discrete['input'] or name in discrete['output']:
                     continue
 
-                path = self._get_abs_response_path(name, responses)
+                path = responses[name]['source']
 
                 if path not in used_idx:
                     size = self._var_allprocs_abs2meta['output'][path]['global_size']
@@ -1668,8 +1668,7 @@ class System(object):
 
             for path, mat in used_idx.items():
                 if np.any(mat > 1):
-                    matching_aliases = sorted(a for a in aliases
-                                              if self._get_abs_response_path(a, responses) == path)
+                    matching_aliases = sorted(a for a in aliases if responses[a]['source'] == path)
                     msg = (f"{self.msginfo}: Indices for aliases {matching_aliases} are overlapping"
                            f" constraint/objective '{path}'.")
                     raise RuntimeError(msg)
@@ -3115,9 +3114,7 @@ class System(object):
 
             for name, meta in out.items():
 
-                src_name = name
-                if meta['source'] is not None:
-                    src_name = meta['source']
+                src_name = meta['source']
 
                 if 'size' not in meta:
                     if src_name in abs2idx:
@@ -4839,7 +4836,7 @@ class System(object):
                 else:
                     for name in variables:
                         if name in self._responses and self._responses[name]['alias'] is not None:
-                            name = self._get_abs_response_path(name, self._responses)
+                            name = self._responses[name]['source']
                         if vec._contains_abs(name):
                             vdict[name] = get(name, False)
                         else:
@@ -4851,7 +4848,7 @@ class System(object):
                 if discrete_vec:
                     for name in variables:
                         if name in self._responses and self._responses[name]['alias'] is not None:
-                            name = self._get_abs_response_path(name, self._responses)
+                            name = self._responses[name]['source']
                         if vec._contains_abs(name):
                             vdict[name] = get(name, get_remote=True, rank=0,
                                               vec_name=vec_name, kind=kind)
@@ -5505,6 +5502,3 @@ class System(object):
             tarr -= toffset
 
         return sarr, tarr, tsize, has_dist_data
-
-    def _get_abs_response_path(self, name, responses):
-        return responses[name]['source']
