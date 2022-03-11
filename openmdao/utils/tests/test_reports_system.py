@@ -74,7 +74,7 @@ class TestReportsSystem(unittest.TestCase):
         else:
             prob.driver = om.ScipyOptimizeDriver()
 
-        prob.setup()
+        prob.setup(False)
         prob.run_driver()
         prob.cleanup()
 
@@ -234,14 +234,18 @@ class TestReportsSystem(unittest.TestCase):
         setup_default_reports()  # So it sees the OPENMDAO_REPORTS var
         user_report_filename = 'user_report.txt'
 
-        @report_function(user_report_filename)
+        # @report_function(user_report_filename)
+        @report_function()
         def user_defined_report(prob, report_filepath):
             with open(report_filepath, "w") as f:
                 f.write(f"Do some reporting on the Problem, {prob._name}\n")
 
+        # register_report("User defined report", user_defined_report,
+        #                 "user defined report description",
+        #                 'Problem', 'setup', 'pre')
         register_report("User defined report", user_defined_report,
                         "user defined report description",
-                        'Problem', 'setup', 'pre')
+                        'Problem', 'setup', 'pre', user_report_filename)
 
         prob = self.setup_and_run_simple_problem()
 
@@ -261,7 +265,8 @@ class TestReportsSystem(unittest.TestCase):
         # A simple report
         user_report_filename = 'user_defined_{count}.txt'
 
-        @report_function(user_report_filename)
+        # @report_function(user_report_filename)
+        @report_function()
         def user_defined_report(prob, report_filepath):
             report_filepath = report_filepath.format(count=self.count)
             with open(report_filepath, "w") as f:
@@ -271,7 +276,8 @@ class TestReportsSystem(unittest.TestCase):
         for method in ['setup', 'final_setup', 'run_driver']:
             for pre_or_post in ['pre', 'post']:
                 register_report(f"User defined report {method} {pre_or_post}", user_defined_report,
-                                "user defined report", 'Problem', method, pre_or_post)
+                                "user defined report", 'Problem', method, pre_or_post,
+                                user_report_filename)
 
         prob = self.setup_and_run_simple_problem()
 
@@ -305,6 +311,7 @@ class TestReportsSystem(unittest.TestCase):
         # to simplify things, just do n2.
         clear_reports()
         register_report("n2_report", run_n2_report, 'N2 diagram', 'Problem', 'final_setup', 'post',
+                        self.n2_filename,
                         inst_id='problem2')
 
         probname, subprobname = self.setup_and_run_model_with_subproblem()
@@ -481,10 +488,7 @@ class TestReportsSystemMPI(unittest.TestCase):
         prob.setup()
         prob.set_solver_print(level=0)
 
-        msg = "ScipyOptimizeDriver: The scaling report currently is not " \
-              "supported when running under MPI."
-        with assert_warning(om.MPIWarning, msg):
-            prob.run_driver()
+        prob.run_driver()
 
         # get the path to the problem subdirectory
         problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
@@ -492,8 +496,7 @@ class TestReportsSystemMPI(unittest.TestCase):
         path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
         self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
-        self.assertFalse(path.is_file(),
-                         f'The scaling report file, {str(path)}, was found but should not have')
+        self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
 
 
 if __name__ == '__main__':

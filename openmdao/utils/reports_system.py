@@ -17,7 +17,7 @@ from openmdao.core.problem import Problem
 from openmdao.core.driver import Driver
 
 # Keeping track of the registered reports
-_Report = namedtuple('Report', 'func desc class_name inst_id method pre_or_post')
+_Report = namedtuple('Report', 'func desc class_name inst_id method pre_or_post report_filename')
 _reports_registry = {}
 
 _reports_dir = './reports'  # the default location for the reports
@@ -28,7 +28,8 @@ def _is_rank_0(prob):
     return not MPI or prob.comm.rank == 0
 
 
-def report_function(report_filename):
+# def report_function(report_filename):
+def report_function():
     """
     Decorate report functions. Handles getting the file path to where the report is written.
 
@@ -44,7 +45,8 @@ def report_function(report_filename):
     """
     def decorate(f):
         @wraps(f)
-        def _wrapper(inst):
+        def _wrapper(inst, kwargs):
+        # def _wrapper(inst):
             if isinstance(inst, Problem):
                 prob = inst
             elif isinstance(inst, Driver):
@@ -56,6 +58,8 @@ def report_function(report_filename):
             problem_reports_dirpath = get_reports_dir(prob)
             if _is_rank_0(prob):
                 pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
+
+            report_filename = kwargs['report_filename']
             user_defined_report_filepath = \
                 str(pathlib.Path(problem_reports_dirpath).joinpath(report_filename))
 
@@ -63,8 +67,8 @@ def report_function(report_filename):
         return _wrapper
     return decorate
 
-
-def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=None):
+def register_report(name, func, desc, class_name, method, pre_or_post, report_filename, inst_id=None):
+# def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=None):
     """
     Register a report with the reporting system.
 
@@ -88,15 +92,15 @@ def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=N
     """
     global _reports_registry
 
-    report = _Report(func, desc, class_name, inst_id, method, pre_or_post)
+    report = _Report(func, desc, class_name, inst_id, method, pre_or_post, report_filename)
     if name in _reports_registry:
         raise ValueError(f"A report with the name {name} already exists")
     _reports_registry[name] = report
 
     if pre_or_post == 'pre':
-        _register_hook(method, class_name, pre=func, inst_id=inst_id)
+        _register_hook(method, class_name, pre=func, inst_id=inst_id, report_filename=report_filename)
     elif pre_or_post == 'post':
-        _register_hook(method, class_name, post=func, inst_id=inst_id)
+        _register_hook(method, class_name, post=func, inst_id=inst_id, report_filename=report_filename)
     else:
         raise ValueError(
             f"The argument 'pre_or_post' can only have values of 'pre' or 'post', but {pre_or_post}"
@@ -251,7 +255,8 @@ def _should_report_run(reports, report_name):
 # Need to create these closures so that functions can keep track of how many times they have
 # been called per Problem (or Driver). In the case of the n2, it is Problem
 def _run_n2_report_enclosing():
-    def run_n2_report_inner(prob):
+    # def run_n2_report_inner(prob):
+    def run_n2_report_inner(prob, kwargs):
 
         if not _should_report_run(prob._reports, 'n2'):
             return
@@ -282,7 +287,8 @@ run_n2_report = _run_n2_report_enclosing()
 
 # scaling report definition
 def _run_scaling_report_enclosing():
-    def run_scaling_report_inner(driver):
+    # def run_scaling_report_inner(driver):
+    def run_scaling_report_inner(driver, kwargs):
 
         prob = driver._problem()
 
@@ -316,10 +322,17 @@ def _run_scaling_report_enclosing():
 
 run_scaling_report = _run_scaling_report_enclosing()
 
+# _default_reports = {
+#     'n2': (run_n2_report, 'N2 diagram', 'Problem', 'final_setup', 'post', None),
+#     'scaling': (run_scaling_report, 'Driver scaling report', 'Driver', '_compute_totals', 'post',
+#                 None)
+# }
+
 _default_reports = {
-    'n2': (run_n2_report, 'N2 diagram', 'Problem', 'final_setup', 'post', None),
+    'n2': (run_n2_report, 'N2 diagram', 'Problem', 'final_setup', 'post', _default_n2_filename,
+           None),
     'scaling': (run_scaling_report, 'Driver scaling report', 'Driver', '_compute_totals', 'post',
-                None)
+                _default_scaling_filename, None)
 }
 
 
