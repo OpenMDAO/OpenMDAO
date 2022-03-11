@@ -88,15 +88,13 @@ def _run_hooks(hooks, inst):
         Object instance to pass to hook functions.
     """
     for i, (hook, ncalls, ex, kwargs) in enumerate(hooks):
-    # for i, (hook, ncalls, ex) in enumerate(hooks):
         if ncalls is None or ncalls > 0:
-            # hook(inst)
-            hook(inst, kwargs)
+            hook(inst, **kwargs)
             if ex:
                 sys.exit()
             if ncalls is not None:
                 ncalls -= 1
-                hooks[i] = (hook, ncalls, ex)
+                hooks[i] = (hook, ncalls, ex, kwargs)
 
 
 def _hook_decorator(f, inst, hookmeta):
@@ -154,7 +152,8 @@ def _get_hook_lists(class_name, inst_id, fname):
     return imeta[fname]
 
 
-def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=None, exit=False, **kwargs):
+def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=None, exit=False,
+                   **kwargs):
     """
     Register a hook function.
 
@@ -178,16 +177,16 @@ def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=
     exit : bool
         If True, run sys.exit() after calling the hook function.  If post is registered, this
         affects only post, else it will affect pre.
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be passed to the hook function.
     """
     if pre is None and post is None:
         raise RuntimeError("In _register_hook you must specify pre or post.")
 
     pre_hooks, post_hooks = _get_hook_lists(class_name, inst_id, fname)
     if pre is not None and (ncalls is None or ncalls > 0):
-        # pre_hooks.append((pre, ncalls, exit and post is None))
         pre_hooks.append((pre, ncalls, exit and post is None, kwargs))
     if post is not None and (ncalls is None or ncalls > 0):
-        # post_hooks.append((post, ncalls, exit))
         post_hooks.append((post, ncalls, exit, kwargs))
 
 
@@ -215,7 +214,6 @@ def _remove_hook(to_remove, hooks, class_name, fname, hook_loc):
             hooks[:] = []
         else:
             for hook in hooks:
-                # p, _, _ = hook
                 p, _, _, _ = hook
                 if p is to_remove:
                     hooks.remove(hook)
