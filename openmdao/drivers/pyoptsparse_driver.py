@@ -379,19 +379,11 @@ class pyOptSparseDriver(Driver):
                 continue
             size = meta['global_size'] if meta['distributed'] else meta['size']
             lower = upper = meta['equals']
+            path = model._responses[name]['source'] if meta['alias'] is not None else name
             if fwd:
-                if meta['alias'] is not None:
-                    # FIXME: not sure this block is need since all vois have source defined
-                    path = model._responses[name]['source']
-                    wrt = [v for v in indep_list if path in
-                           relevant[input_meta[v]['source']]]
-                else:
-                    wrt = [v for v in indep_list if name in relevant[input_meta[v]['source']]]
+                wrt = [v for v in indep_list if path in relevant[input_meta[v]['source']]]
             else:
-                if meta['alias'] is not None:
-                    rels = relevant[model._responses[name]['source']]
-                else:
-                    rels = relevant[name]
+                rels = relevant[path]
                 wrt = [v for v in indep_list if input_meta[v]['source'] in rels]
 
             if meta['linear']:
@@ -418,19 +410,12 @@ class pyOptSparseDriver(Driver):
             lower = meta['lower']
             upper = meta['upper']
 
+            path = model._responses[name]['source'] if meta['alias'] is not None else name
+
             if fwd:
-                if meta['alias'] is not None:
-                    path = model._responses[name]['source']
-                    wrt = [v for v in indep_list if path in
-                           relevant[input_meta[v]['source']]]
-                else:
-                    wrt = [v for v in indep_list if name in relevant[input_meta[v]['source']]]
+                wrt = [v for v in indep_list if path in relevant[input_meta[v]['source']]]
             else:
-                if meta['alias'] is not None:
-                    path = model._responses[name]['source']
-                    rels = relevant[path]
-                else:
-                    rels = relevant[name]
+                rels = relevant[path]
                 wrt = [v for v in indep_list if input_meta[v]['source'] in rels]
 
             if meta['linear']:
