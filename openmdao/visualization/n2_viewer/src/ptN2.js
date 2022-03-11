@@ -1,4 +1,4 @@
-// <<hpp_insert src/ModelData.js>>
+// <<hpp_insert src/OmModelData.js>>
 
 var sharedTransition = null;
 
