@@ -89,9 +89,9 @@ def get_source_system(iteration_coordinate):
     str
         The pathname of the system that is the source of the iteration.
     """
-    path = []
+    # find the last part of the coordinate that contains a solve/apply nonlinear call
     parts = _coord_split_re.split(iteration_coordinate)
-    for part in parts:
+    for part in reversed(parts):
         match = _coord_system_re.search(part)
         if (match):
             # take the part up to "._solve_nonlinear" or "._apply_nonlinear"
@@ -99,10 +99,10 @@ def get_source_system(iteration_coordinate):
             # get rid of 'rank#:'
             if ':' in part:
                 part = part.split(':')[1]
-            path.append(part)
+            # system pathname must always start with "root"
+            return part if part == 'root' or part.startswith('root.') else f'root.{part}'
 
-    # return pathname of the system
-    return '.'.join(path)
+    return 'root'
 
 
 def check_valid_sqlite3_db(filename):

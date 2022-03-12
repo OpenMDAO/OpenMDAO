@@ -30,6 +30,9 @@ class TestDifferentialEvolution(unittest.TestCase):
         import os  # import needed in setup for tests in documentation
         os.environ['DifferentialEvolutionDriver_seed'] = '11'  # make RNG repeatable
 
+    def tearDown(self):
+        del os.environ['DifferentialEvolutionDriver_seed']  # clean up environment
+
     def test_basic_with_assert(self):
         prob = om.Problem()
         model = prob.model
@@ -286,6 +289,9 @@ class TestDriverOptionsDifferentialEvolution(unittest.TestCase):
     def setUp(self):
         os.environ['DifferentialEvolutionDriver_seed'] = '11'
 
+    def tearDown(self):
+        del os.environ['DifferentialEvolutionDriver_seed']  # clean up environment
+
     def test_driver_options(self):
         """Tests if F and Pc options can be set."""
         prob = om.Problem()
@@ -314,6 +320,9 @@ class TestMultiObjectiveDifferentialEvolution(unittest.TestCase):
 
     def setUp(self):
         os.environ['DifferentialEvolutionDriver_seed'] = '11'
+
+    def tearDown(self):
+        del os.environ['DifferentialEvolutionDriver_seed']  # clean up environment
 
     def test_multi_obj(self):
         class Box(om.ExplicitComponent):
@@ -423,6 +432,9 @@ class TestConstrainedDifferentialEvolution(unittest.TestCase):
 
     def setUp(self):
         os.environ['DifferentialEvolutionDriver_seed'] = '11'
+
+    def tearDown(self):
+        del os.environ['DifferentialEvolutionDriver_seed']  # clean up environment
 
     def test_constrained_with_penalty(self):
         class Cylinder(om.ExplicitComponent):
@@ -657,6 +669,9 @@ class MPITestDifferentialEvolution(unittest.TestCase):
     def setUp(self):
         os.environ['DifferentialEvolutionDriver_seed'] = '11'
 
+    def tearDown(self):
+        del os.environ['DifferentialEvolutionDriver_seed']  # clean up environment
+
     def test_mpi_bug_solver(self):
         # This test verifies that mpi doesn't hang due to collective calls in the solver.
         prob = om.Problem()
@@ -675,6 +690,47 @@ class MPITestDifferentialEvolution(unittest.TestCase):
         prob.setup()
         prob.set_solver_print(level=0)
 
+        prob.run_driver()
+
+    def test_random_state_bug(self):
+        # this test passes if it raises no exceptions
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', Branin(), promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
+
+        model.add_design_var('xI', lower=-5.0, upper=10.0)
+        model.add_design_var('xC', lower=0.0, upper=15.0)
+        model.add_objective('comp.f')
+
+        prob.driver = om.DifferentialEvolutionDriver()
+        prob.driver.options['max_gen'] = 5
+        prob.driver.options['run_parallel'] = True
+
+        prob.setup()
+        prob.run_driver()
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class MPITestDifferentialEvolutionNoSetSeed(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_random_state_bug(self):
+        # this test passes if it raises no exceptions
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', Branin(), promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
+
+        model.add_design_var('xI', lower=-5.0, upper=10.0)
+        model.add_design_var('xC', lower=0.0, upper=15.0)
+        model.add_objective('comp.f')
+
+        prob.driver = om.DifferentialEvolutionDriver()
+        prob.driver.options['max_gen'] = 5
+        prob.driver.options['run_parallel'] = True
+
+        prob.setup()
         prob.run_driver()
 
 
@@ -770,6 +826,9 @@ class MPITestDifferentialEvolution4Procs(unittest.TestCase):
 
     def setUp(self):
         os.environ['DifferentialEvolutionDriver_seed'] = '11'
+
+    def tearDown(self):
+        del os.environ['DifferentialEvolutionDriver_seed']  # clean up environment
 
     def test_indivisible_error(self):
         prob = om.Problem()

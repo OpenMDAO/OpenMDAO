@@ -1,4 +1,5 @@
 """Define the Group class."""
+import sys
 from collections import Counter, defaultdict
 from collections.abc import Iterable
 
@@ -56,22 +57,20 @@ class _SysInfo(object):
 
 
 class _PromotesInfo(object):
-    __slots__ = ['src_indices', 'flat', 'src_shape', 'parent_sys', 'prom', 'root_shape']
+    __slots__ = ['src_indices', 'flat', 'src_shape', 'promoted_from', 'prom']
 
-    def __init__(self, src_indices=None, flat=None, src_shape=None, parent_sys='', prom=None,
-                 root_shape=None):
+    def __init__(self, src_indices=None, flat=None, src_shape=None, promoted_from='', prom=None):
         self.flat = flat
-        self.root_shape = src_shape if root_shape is None else root_shape
-        self.src_shape = src_shape if src_shape is not None else self.root_shape
+        self.src_shape = src_shape
         if src_indices is not None:
             if isinstance(src_indices, Indexer):
                 self.src_indices = src_indices.copy()
-                self.src_indices.set_src_shape(self.root_shape)
+                self.src_indices.set_src_shape(self.src_shape)
             else:
-                self.src_indices = indexer(src_indices, src_shape=self.root_shape, flat_src=flat)
+                self.src_indices = indexer(src_indices, src_shape=self.src_shape, flat_src=flat)
         else:
             self.src_indices = None
-        self.parent_sys = parent_sys  # pathname of promoting system
+        self.promoted_from = promoted_from  # pathname of promoting system
         self.prom = prom  # local promoted name of input
 
     def __iter__(self):
@@ -81,17 +80,17 @@ class _PromotesInfo(object):
 
     def __repr__(self):
         return (f"_PromotesInfo(src_indices={self.src_indices}, flat={self.flat}, "
-                f"src_shape={self.src_shape}, parent_sys={self.parent_sys}, "
-                f"prom={self.prom}, root_shape={self.root_shape})")
+                f"src_shape={self.src_shape}, promoted_from={self.promoted_from}, "
+                f"prom={self.prom})")
 
     def prom_path(self):
-        if self.parent_sys is None or self.prom is None:
+        if self.promoted_from is None or self.prom is None:
             return ''
-        return '.'.join((self.parent_sys, self.prom)) if self.parent_sys else self.prom
+        return '.'.join((self.promoted_from, self.prom)) if self.promoted_from else self.prom
 
     def copy(self):
-        return _PromotesInfo(self.src_indices, self.flat, self.src_shape, self.parent_sys,
-                             self.prom, self.root_shape)
+        return _PromotesInfo(self.src_indices, self.flat, self.src_shape, self.promoted_from,
+                             self.prom)
 
     def set_src_shape(self, shape):
         if self.src_indices is not None:
@@ -109,7 +108,7 @@ class _PromotesInfo(object):
                                     self.src_indices, self.src_shape)
 
         return _PromotesInfo(src_inds, self.flat or len(self.src_indices.indexed_src_shape) == 1,
-                             self.src_shape, self.parent_sys, self.prom, parent.root_shape)
+                             self.src_shape, self.promoted_from, self.prom)
 
     def compare(self, other):
         """
@@ -188,8 +187,6 @@ class Group(System):
     _contains_parallel_group : bool
         If True, this Group contains a ParallelGroup. Only used to determine if a parallel
         group or distributed component is below a DirectSolver so that we can raise an exception.
-    _raise_connection_errors : bool
-        Flag indicating whether connection errors are raised as an Exception.
     _order_set : bool
         Flag to check if set_order has been called.
     _auto_ivc_warnings : list
@@ -221,7 +218,6 @@ class Group(System):
         self._discrete_transfers = {}
         self._setup_procs_finished = False
         self._contains_parallel_group = False
-        self._raise_connection_errors = True
         self._order_set = False
         self._shapes_graph = None
         self._shape_knowns = None
@@ -319,10 +315,10 @@ class Group(System):
 
         if name in dct:
             old = dct[name][0]
-            overlap = sorted(set(old).intersection(meta))
+            overlap = set(old).intersection(meta)
             if overlap:
                 issue_warning(f"Setting input defaults for input '{name}' which "
-                              f"override previously set defaults for {overlap}.",
+                              f"override previously set defaults for {sorted(overlap)}.",
                               prefix=self.msginfo, category=PromotionWarning)
             old.update(meta)
         else:
@@ -598,13 +594,14 @@ class Group(System):
             self._subsystems_myproc = [allsubs[ind].system for ind in sub_inds]
 
             # Define local subsystems
-            if not (np.sum([minp for minp, _, _ in proc_info]) <= comm.size):
+            if (self._mpi_proc_allocator.parallel and
+                    not (np.sum([minp for minp, _, _ in proc_info]) <= comm.size)):
                 # reorder the subsystems_allprocs based on which procs they live on. If we don't
                 # do this, we can get ordering mismatches in some of our data structures.
                 new_allsubs = {}
                 seen = set()
                 gathered = self.comm.allgather(sub_inds)
-                for rank, inds in enumerate(gathered):
+                for inds in gathered:
                     for ind in inds:
                         if ind not in seen:
                             sinfo = allsubs[ind]
@@ -628,9 +625,8 @@ class Group(System):
         # build a list of local subgroups to speed up later loops
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
 
-        if MPI and nproc > 1:
-            if self._mpi_proc_allocator.parallel:
-                self._problem_meta['parallel_groups'].append(self.pathname)
+        if nproc > 1 and self._mpi_proc_allocator.parallel:
+            self._problem_meta['parallel_groups'].append(self.pathname)
 
             allpars = self.comm.allgather(self._problem_meta['parallel_groups'])
             full = set()
@@ -765,23 +761,22 @@ class Group(System):
         prom2abs_out = self._var_allprocs_prom2abs_list['output']
         abs2meta = self._var_allprocs_abs2meta
 
-        for io in ('input', 'output'):
-            for absname in abs2meta[io]:
-                if absname in prom2abs_in:
-                    for name in prom2abs_in[absname]:
-                        if name != absname:
-                            raise RuntimeError(f"{self.msginfo}: Absolute variable name '{absname}'"
-                                               " is masked by a matching promoted name. Try"
-                                               " promoting to a different name. This can be caused"
-                                               " by promoting '*' at group level or promoting using"
-                                               " dotted names.")
-                elif absname in prom2abs_out:
-                    if absname != prom2abs_out[absname][0]:
-                        raise RuntimeError(f"{self.msginfo}: Absolute variable name '{absname}' is"
-                                           " masked by a matching promoted name. Try"
+        for absname in chain(abs2meta['input'], abs2meta['output']):
+            if absname in prom2abs_in:
+                for name in prom2abs_in[absname]:
+                    if name != absname:
+                        raise RuntimeError(f"{self.msginfo}: Absolute variable name '{absname}'"
+                                           " is masked by a matching promoted name. Try"
                                            " promoting to a different name. This can be caused"
                                            " by promoting '*' at group level or promoting using"
                                            " dotted names.")
+            elif absname in prom2abs_out:
+                if absname != prom2abs_out[absname][0]:
+                    raise RuntimeError(f"{self.msginfo}: Absolute variable name '{absname}' is"
+                                       " masked by a matching promoted name. Try"
+                                       " promoting to a different name. This can be caused"
+                                       " by promoting '*' at group level or promoting using"
+                                       " dotted names.")
 
     def _top_level_post_sizes(self):
         # this runs after the variable sizes are known
@@ -791,6 +786,8 @@ class Group(System):
 
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
         conns = self._conn_global_abs_in2out
+
+        self._resolve_src_indices()
 
         if self.comm.size > 1:
             abs2idx = self._var_allprocs_abs2idx
@@ -819,8 +816,6 @@ class Group(System):
                 for a in updated:
                     all_abs2meta_in[a]['has_src_indices'] = True
 
-        self._resolve_src_indices()
-
         abs2meta_in = self._var_abs2meta['input']
         allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
         allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
@@ -829,10 +824,9 @@ class Group(System):
             for abs_in, abs_out in sorted(conns.items()):
                 if abs_out not in allprocs_abs2meta_out:
                     continue  # discrete var
-                all_meta_out = allprocs_abs2meta_out[abs_out]
-                all_meta_in = allprocs_abs2meta_in[abs_in]
-                in_dist = all_meta_in['distributed']
-                out_dist = all_meta_out['distributed']
+
+                in_dist = allprocs_abs2meta_in[abs_in]['distributed']
+                out_dist = allprocs_abs2meta_out[abs_out]['distributed']
 
                 # check that src_indices match for dist->serial connection
                 # FIXME: this transfers src_indices from all ranks to the owning rank so we could
@@ -845,7 +839,12 @@ class Group(System):
                     if abs_in in abs2meta_in:  # input is local
                         src_inds = abs2meta_in[abs_in]['src_indices']
                         if src_inds is not None:
-                            src_inds = src_inds.shaped_instance()
+                            shaped = src_inds.shaped_instance()
+                            if shaped is None:
+                                raise RuntimeError(f"For connection from '{abs_out}' to '{abs_in}',"
+                                                   f" src_indices {src_inds} have no source shape.")
+                            else:
+                                src_inds = shaped
                     else:
                         src_inds = None
                     if self.comm.rank == owner:
@@ -875,179 +874,137 @@ class Group(System):
                                            "without specifying src_indices.")
 
     def _get_group_input_meta(self, prom_in, meta_name):
+        """
+        Return the value for meta_name from the metadata associated with a set_input_defaults call.
+
+        Returns None if the metadata isn't found.
+
+        Parameters
+        ----------
+        prom_in : str
+            Promoted input name.
+        meta_name : str
+            Name of the metadata to be returned.
+
+        Returns
+        -------
+        object
+            Contents of the metadata dict corresponding to meta_name.
+        """
         if prom_in in self._group_inputs:
             meta = self._group_inputs[prom_in][0]
             if meta_name in meta:
                 return meta[meta_name]
 
-    def _get_promotes_call_info(self, abs_in):
-        prefix_len = len(self.pathname) + 1 if self.pathname else 0
-        subname = abs_in[prefix_len:].split('.', 1)[0]
-        sub, _ = self._subsystems_allprocs[subname]
-        subprom = sub._var_allprocs_abs2prom['input'][abs_in]
-        if subname in self._promotes_src_indices:
-            if subprom in self._promotes_src_indices[subname]:
-                return subname, subprom, self._promotes_src_indices[subname][subprom]
-        return subname, subprom, None
-
     def _resolve_src_indices(self):
-        # called at top level only
-        # create a dict mapping abs inputs to top level _PromotesInfo
+        """
+        Populate the promotes info list for each absolute input.
+
+        This is called only at the top level of the system tree.
+        """
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
-        abs2meta_in = self._var_abs2meta['input']
-        abs2prom = self._var_abs2prom['input']
+        all_abs2meta_in = self._var_allprocs_abs2meta['input']
+        conns = self._conn_global_abs_in2out
 
-        tdict = {}
-        for tgt, src in self._conn_global_abs_in2out.items():
-            # skip remote vars, discretes and non-distributed auto_ivcs
-            if tgt not in abs2meta_in or src not in all_abs2meta_out:
-                continue
-
+        for tgt, plist in self._problem_meta['abs_in2prom_info'].items():
+            src = conns[tgt]
             smeta = all_abs2meta_out[src]
-            if src.startswith('_auto_ivc.') and not smeta['distributed']:
-                continue
-
-            tmeta = abs2meta_in[tgt]
-
-            src_inds = flat_src_inds = None
+            tmeta = all_abs2meta_in[tgt]
 
             if not smeta['distributed'] and tmeta['distributed']:
-                src_shape = self._get_full_dist_shape(src, smeta['shape'])
+                root_shape = self._get_full_dist_shape(src, smeta['shape'])
             else:
-                src_shape = smeta['global_shape']
+                root_shape = smeta['global_shape']
 
-            src_shape = shape2tuple(src_shape)
+            # plist is a list of (pinfo, shape, use_tgt) tuples, one for each level in the
+            # system tree corresponding to an absolute input name, e.g., a plist for the
+            # input 'abc.def.ghi.x' would look like [tup0, tup1, tup2, tup3] corresponding to
+            # the ['', 'abc', 'abc.def', 'abc.def.ghi'] levels in the tree.
 
-            # use src_indices coming from 'connect' call as our starting ones
-            if not tmeta.get('add_input_src_indices'):
-                src_inds = tmeta['src_indices']
-                flat_src_inds = tmeta['flat_src_indices']
+            # After this routine runs, all pinfo entries will have src_indices wrt the root
+            # shape.
 
-            try:
-                tdict[tgt] = (_PromotesInfo(src_inds, flat_src_inds, src_shape,
-                                            prom=abs2prom[tgt]),
-                              src_shape, src, self.pathname)
-            except Exception as err:
-                s, sprom, tprom = get_connection_owner(self, tgt)
-                if s is not None:
-                    s = self._get_subsystem(s)
-                if s is None:
-                    s = self
-                else:
-                    src = sprom
-                    tgt = tprom
-                conditional_error(f"{s.msginfo}: When connecting '{src}' to '{tgt}': {str(err)}",
-                                  exc=err.__class__, category=SetupWarning,
-                                  err=s._raise_connection_errors)
+            # use a _PromotesInfo for the top level even though there really isn't a promote there
+            current_pinfo = _PromotesInfo(src_shape=root_shape,
+                                          prom=self._var_allprocs_abs2prom['input'][tgt])
+            if plist[0] is None:  # no top level pinfo
+                plist[0] = current_pinfo
+
+            for i, pinfo in enumerate(plist):
+                if pinfo is None:
+                    pass
+                elif current_pinfo.src_indices is None:
+                    try:
+                        if pinfo.src_shape is None:
+                            pinfo.set_src_shape(root_shape)
+                        elif pinfo.src_indices is not None and root_shape != pinfo.src_shape:
+                            raise RuntimeError(f"Promoted src_shape of {pinfo.src_shape} for "
+                                               f"'{pinfo.prom_path()}' differs from src_shape "
+                                               f"{root_shape} for '{current_pinfo.prom_path()}'.")
+                    except Exception:
+                        exc = sys.exc_info()
+                        conditional_error(f"In connection from '{conns[tgt]}' to "
+                                          f"'{pinfo.prom_path()}', error was: {exc[1]}", exc=exc,
+                                          category=SetupWarning, err=self._raise_connection_errors)
+                    current_pinfo = pinfo
+                    continue
+                elif pinfo.src_indices is None:
+                    pinfo = pinfo.copy()  # TODO: make sure we really need this copy here
+                    pinfo.src_indices = current_pinfo.src_indices
+                    if pinfo.src_shape is None:
+                        pinfo.set_src_shape(current_pinfo.src_shape)
+                    current_pinfo = pinfo
+                else:  # both have src_indices
+                    try:
+                        if pinfo.src_shape is None:
+                            pinfo.set_src_shape(current_pinfo.src_indices.indexed_src_shape)
+                        sinds = convert_src_inds(current_pinfo.src_indices, current_pinfo.src_shape,
+                                                 pinfo.src_indices, pinfo.src_shape)
+                    except Exception:
+                        exc = sys.exc_info()
+                        raise exc[0](f"In connection from '{conns[tgt]}' to '{pinfo.prom_path()}', "
+                                     f"input '{current_pinfo.prom_path()}' src_indices are "
+                                     f"{current_pinfo.src_indices} and indexing into those failed "
+                                     f"using src_indices {pinfo.src_indices} from input "
+                                     f"'{pinfo.prom_path()}'. Error was: "
+                                     f"{exc[1]}").with_traceback(exc[2])
+
+                    # final src_indices are wrt original full sized source and are flat,
+                    # so use val.shape and flat_src=True
+                    # It would be nice if we didn't have to convert these and could just keep
+                    # them in their original form and stack them to get the final result. We can
+                    # do this when doing a get_val, but it doesn't work when doing a set_val.
+                    src_indices = indexer(sinds, src_shape=root_shape, flat_src=True)
+                    current_pinfo = _PromotesInfo(src_indices=src_indices, src_shape=root_shape,
+                                                  flat=True, promoted_from=pinfo.promoted_from,
+                                                  prom=pinfo.prom)
+                plist[i] = current_pinfo
 
         with multi_proc_exception_check(self.comm):
-            self._resolve_src_inds(tdict, self)
+            self._resolve_src_inds()
 
-    def _resolve_src_inds(self, my_tdict, top):
-        abs2prom = self._var_allprocs_abs2prom['input']
-        tdict = {}  # maps subname to map of abs input to _PromotesInfo
-        model = self._problem_meta['model_ref']()
-        conns = model._conn_global_abs_in2out
-        abs2meta = self._var_abs2meta['input']
+    def _resolve_src_inds(self):
+        abs2prom = self._var_abs2prom['input']
+        tree_level = len(self.pathname.split('.')) if self.pathname else 0
+        abs_in2prom_info = self._problem_meta['abs_in2prom_info']
+        seen = set()
 
-        for tgt, (oldinfo, parent_src_shape, oldprom, oldpath) in my_tdict.items():
-            prom = abs2prom[tgt]
+        for tgt in self._var_abs2meta['input']:
+            if tgt in abs_in2prom_info:
+                prom = abs2prom[tgt]
+                if prom in seen:
+                    continue
+                seen.add(prom)
 
-            subname, subprom, tup = self._get_promotes_call_info(tgt)
-            if tup is not None:
-                pinfo, _ = tup
-                if parent_src_shape is not None and pinfo.src_shape is not None:
-                    if parent_src_shape != pinfo.src_shape:
-                        if oldinfo.src_indices is not None:
-                            parent_src_shape = oldinfo.src_indices.indexed_src_shape
-                            oldprom = prom
-                            oldpath = self.pathname
-                        if parent_src_shape != pinfo.src_shape:
-                            msg = (f"{self.msginfo}: Promoted src_shape of {pinfo.src_shape} for "
-                                   f"'{subprom}' in "
-                                   f"'{'.'.join((self.pathname, subname)).lstrip('.')}' "
-                                   f"differs from src_shape {parent_src_shape} for '{oldprom}' in "
-                                   f"'{oldpath}'.")
-                            raise RuntimeError(msg)
-
-                if parent_src_shape is None:
-                    parent_src_shape = pinfo.src_shape
-                    oldprom = prom
-                    oldpath = self.pathname
-
-                if oldinfo.src_indices is not None and pinfo.src_indices is not None:
-                    if oldinfo.src_indices._src_shape is None:
-                        src = conns[tgt]
-                        if src.startswith('_auto_ivc.'):
-                            # we don't know size of auto_ivcs yet. Assume same size as input.
-                            oldinfo.src_indices.set_src_shape(abs2meta[tgt]['shape'])
-                        else:
-                            oldinfo.src_indices.set_src_shape(
-                                model._var_allprocs_abs2meta['output'][src]['global_shape'])
-                    if pinfo.src_shape is None:
-                        pinfo.set_src_shape(oldinfo.src_shape)
-                    try:
-                        pinfo = pinfo.convert_from(oldinfo)
-                    except Exception as err:
-                        parinput = prom if oldinfo.parent_sys is None else oldinfo.prom_path()
-                        if tgt in conns:
-                            src = conns[tgt]
-                            owner, sprom, tprom = get_connection_owner(self, tgt)
-                            if owner is not None:
-                                msg = (f"In connection from '{sprom}' to '{tprom}' in group "
-                                       f"'{owner}', ")
-                            else:
-                                msg = f"In connection from '{src}' to '{tgt}', "
-
-                            raise RuntimeError(f"{msg}input '{parinput}' src_indices are "
-                                               f"{oldinfo.src_indices} and indexing into those "
-                                               f"failed using src_indices {pinfo.src_indices} from "
-                                               f"input '{pinfo.prom_path()}'. Error was: {err}.")
-                        else:
-                            raise RuntimeError(f"Input '{parinput}' src_indices are "
-                                               f"{oldinfo.src_indices} and indexing into those "
-                                               f"failed using src_indices {pinfo.src_indices} from "
-                                               f"input '{pinfo.prom_path()}'. Error was: {err}.")
-            else:
-                pinfo = oldinfo.copy()
-
-            gsrc_shape = self._get_group_input_meta(prom, 'src_shape')
-            if gsrc_shape is not None:
-                parent_src_shape = gsrc_shape
-                oldprom = prom
-                oldpath = self.pathname
-
-            if subname in tdict:
-                tdict[subname][tgt] = (pinfo, parent_src_shape, oldprom, oldpath)
-            else:
-                tdict[subname] = {tgt: (pinfo, parent_src_shape, oldprom, oldpath)}
-
-            shape = None
-            if pinfo.src_shape is not None:
-                shape = pinfo.src_shape
-            if shape is None:
-                if parent_src_shape is not None:
-                    shape = parent_src_shape
-
-            # as soon as we get a src_shape, set that at the top so we can use it to
-            # set auto_ivc shape
-            if shape is not None:
-                top_prom = top._var_allprocs_abs2prom['input'][tgt]
-                if top_prom not in top._var_prom2inds:
-                    top._var_prom2inds[top_prom] = [None, None, None]
-                if top._var_prom2inds[top_prom][0] is None:
-                    top._var_prom2inds[top_prom][0] = shape
-
-            # store shape, indices info under the prom name
-            if self.pathname == '':
-                self._var_prom2inds[prom] = [shape, pinfo.src_indices, pinfo.flat]
-            else:
-                self._var_prom2inds[prom] = [parent_src_shape, oldinfo.src_indices, oldinfo.flat]
+                plist = abs_in2prom_info[tgt]
+                pinfo = plist[tree_level]
+                if pinfo is not None:
+                    inds, flat, shape = pinfo
+                    if inds is not None:
+                        self._var_prom2inds[prom] = [shape, inds, flat]
 
         for s in self._subsystems_myproc:
-            if s.name in tdict:
-                s._resolve_src_inds(tdict[s.name], top)
-                del tdict[s.name]
+            s._resolve_src_inds()
 
     def _setup_var_data(self):
         """
@@ -1075,6 +1032,7 @@ class Group(System):
             self._group_inputs[n] = lst.copy()  # must copy the list manually
 
         self._has_distrib_vars = False
+        abs_in2prom_info = self._problem_meta['abs_in2prom_info']
         self._promotes_src_indices = {}
 
         for subsys in self._subsystems_myproc:
@@ -1084,7 +1042,6 @@ class Group(System):
             self._has_distrib_vars |= subsys._has_distrib_vars
 
             var_maps = subsys._get_promotion_maps()
-            promotes_src_indices = {}
 
             sub_prefix = subsys.name + '.'
 
@@ -1101,11 +1058,17 @@ class Group(System):
                 for sub_prom, sub_abs in subsys._var_allprocs_prom2abs_list[io].items():
                     if sub_prom in subprom2prom:
                         prom_name, _, pinfo, _ = subprom2prom[sub_prom]
-                        if io == 'input' and pinfo is not None:
+                        if pinfo is not None and io == 'input':
                             pinfo = pinfo.copy()
-                            pinfo.parent_sys = subsys.pathname
+                            pinfo.promoted_from = subsys.pathname
                             pinfo.prom = sub_prom
-                            promotes_src_indices[sub_prom] = (pinfo, sub_abs)
+                            tree_level = len(subsys.pathname.split('.'))
+                            for abs_in in sub_abs:
+                                if abs_in not in abs_in2prom_info:
+                                    # need a level for each system including '', so we don't
+                                    # subtract 1 from abs_in.split('.') which includes the var name
+                                    abs_in2prom_info[abs_in] = [None for s in abs_in.split('.')]
+                                abs_in2prom_info[abs_in][tree_level] = pinfo
                     else:
                         prom_name = sub_prefix + sub_prom
                     if prom_name not in allprocs_prom2abs_list[io]:
@@ -1116,6 +1079,7 @@ class Group(System):
                             abs2prom[io][abs_name] = prom_name
 
             if isinstance(subsys, Group):
+                # propagate any subsystem 'set_input_defaults' info up to this Group
                 subprom2prom = var_maps['input']
                 for sub_prom, metalist in subsys._group_inputs.items():
                     if sub_prom in subprom2prom:
@@ -1126,9 +1090,6 @@ class Group(System):
                         self._group_inputs[key] = [{'path': self.pathname, 'prom': key,
                                                     'auto': True}]
                     self._group_inputs[key].extend(metalist)
-
-            if promotes_src_indices:
-                self._promotes_src_indices[subsys.name] = promotes_src_indices
 
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
@@ -1225,11 +1186,13 @@ class Group(System):
         else:
             self._discrete_inputs = self._discrete_outputs = ()
 
-        self._vars_to_gather = self._find_remote_var_owners()
+        self._vars_to_gather = self._find_vars_to_gather()
 
     def _resolve_group_input_defaults(self, show_warnings=False):
         """
         Resolve any ambiguities in group input defaults throughout the model.
+
+        Only called at the model level.
 
         Parameters
         ----------
@@ -1238,6 +1201,8 @@ class Group(System):
         """
         skip = set(('path', 'use_tgt', 'prom', 'src_shape', 'src_indices', 'auto'))
         prom2abs_in = self._var_allprocs_prom2abs_list['input']
+        abs_in2prom_info = self._problem_meta['abs_in2prom_info']
+        abs2meta_in = self._var_allprocs_abs2meta['input']
 
         self._auto_ivc_warnings = []
 
@@ -1254,7 +1219,7 @@ class Group(System):
             fullmeta = {n: _UNDEFINED for n in allmeta - skip}
 
             for key in sorted(fullmeta):
-                for i, submeta in enumerate(metalist):
+                for submeta in metalist:
                     if submeta['auto']:
                         continue
                     if key in submeta:
@@ -1311,10 +1276,45 @@ class Group(System):
                                                       f"{gname} to remove the ambiguity.")
 
             # update all metadata dicts with any missing metadata that was filled in elsewhere
+            # and update src_shape and use_tgt in abs_in2prom_info
             for meta in metalist:
+                tree_level = len(meta['path'].split('.')) if meta['path'] else 0
+                prefix = meta['path'] + '.' if meta['path'] else ''
+                src_shape = None
+                if 'val' in meta:
+                    abs_in = prom2abs_in[prom][0]
+                    if abs_in in abs2meta_in:  # it's a continuous variable
+                        src_shape = np.asarray(meta['val']).shape
+                elif 'src_shape' in meta:
+                    src_shape = meta['src_shape']
+
+                if src_shape is not None:
+                    # Now update the global promotes info dict
+                    for tgt in prom2abs_in[prom]:
+                        if tgt in abs_in2prom_info and tgt.startswith(prefix):
+                            pinfo = abs_in2prom_info[tgt][tree_level]
+                            if pinfo is not None:
+                                p2 = abs_in2prom_info[tgt][tree_level + 1]
+                                if p2 is not None:
+                                    # src_shape from a set_input_defaults call actually
+                                    # must match the promoted src_shape from one level
+                                    # deeper in the tree.
+                                    if p2.src_shape is not None and p2.src_shape != src_shape:
+                                        raise RuntimeError(f"{self.msginfo}: src_shape {src_shape} "
+                                                           f"set by set_input_defaults('{prom}', "
+                                                           f"...) in group '{meta['path']}' "
+                                                           "conflicts with src_shape of "
+                                                           f"{pinfo.src_shape} for promoted input "
+                                                           f"'{pinfo.prom_path()}")
+                                    p2.set_src_shape(src_shape)
+                            else:
+                                abs_in2prom_info[tgt][tree_level] = \
+                                    _PromotesInfo(src_shape=src_shape, prom=prom,
+                                                  promoted_from=self.pathname)
+
                 meta.update(fullmeta)
 
-    def _find_remote_var_owners(self):
+    def _find_vars_to_gather(self):
         """
         Return a mapping of var pathname to owning rank.
 
@@ -1416,14 +1416,13 @@ class Group(System):
 
                 if abs2discrete[io]:
                     prefix = self.pathname + '.' if self.pathname else ''
-                    all_set = set(abs2discrete[io])
-                    local = set([prefix + n for n in self._var_discrete[io]])
-                    remote = set()
-                    for rank, names in enumerate(self.comm.allgather(local)):
-                        for n in names:
-                            if n not in owns:
-                                owns[n] = rank
-                        remote.update(all_set - names)
+                    for rank, names in enumerate(self.comm.allgather(self._var_discrete[io])):
+                        if prefix:
+                            toadd = {prefix + n for n in names}.difference(owns)
+                        else:
+                            toadd = set(names).difference(owns)
+                        for n in toadd:
+                            owns[n] = rank
         else:
             self._owned_sizes = self._var_sizes['output']
 
@@ -1453,10 +1452,7 @@ class Group(System):
         allprocs_discrete_in = self._var_allprocs_discrete['input']
         allprocs_discrete_out = self._var_allprocs_discrete['output']
 
-        all_abs2meta_in = self._var_allprocs_abs2meta['input']
-        all_abs2meta_out = self._var_allprocs_abs2meta['output']
-        abs2meta_in = self._var_abs2meta['input']
-        abs2meta_out = self._var_abs2meta['output']
+        abs_in2prom_info = self._problem_meta['abs_in2prom_info']
 
         pathname = self.pathname
 
@@ -1560,6 +1556,13 @@ class Group(System):
                                          "is currently unsupported.")
 
                     if abs_in in abs2meta:
+                        if abs_in not in abs_in2prom_info:
+                            abs_in2prom_info[abs_in] = [None for s in abs_in.split('.')]
+                        # place a _PromotesInfo at the top level to handle the src_indices
+                        if abs_in2prom_info[abs_in][0] is None:
+                            abs_in2prom_info[abs_in][0] = _PromotesInfo(src_indices=src_indices,
+                                                                        flat=flat, prom=abs_in)
+
                         meta = abs2meta[abs_in]
                         if meta['src_indices'] is not None:
                             msg = f"{self.msginfo}: src_indices has been defined in both " + \
@@ -1568,6 +1571,8 @@ class Group(System):
                             conditional_error(msg, exc=RuntimeError, category=SetupWarning,
                                               err=self._raise_connection_errors)
                             continue
+
+                        meta['manual_connection'] = True
                         meta['src_indices'] = src_indices
                         meta['flat_src_indices'] = flat
 
@@ -1842,8 +1847,6 @@ class Group(System):
         allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
         abs2meta_in = self._var_abs2meta['input']
         abs2meta_out = self._var_abs2meta['output']
-        sizes_out = self._var_sizes['output']
-        out_idxs = self._var_allprocs_abs2idx
 
         nproc = self.comm.size
 
@@ -1992,18 +1995,7 @@ class Group(System):
                         src_indices.set_src_shape(shp, dist_shape=out_shape)
                         src_indices = src_indices.shaped_instance()
                     except Exception as err:
-                        s, sprom, tprom = get_connection_owner(self, abs_in)
-                        if sprom is None:
-                            src = abs_out
-                            tgt = abs_in
-                        else:
-                            src = sprom
-                            tgt = tprom
-                        if s is not None and s != self.pathname:
-                            s = self._get_subsystem(s)
-                        else:
-                            s = self
-
+                        s, src, tgt = get_connection_owner(self, abs_in)
                         conditional_error(f"{s.msginfo}: When connecting '{src}' to '{tgt}': "
                                           f"{str(err)}", exc=err.__class__, category=SetupWarning,
                                           err=s._raise_connection_errors)
@@ -2062,8 +2054,8 @@ class Group(System):
             will issue a warning and the offending connection will be ignored.
         """
         for sub, _ in self._subsystems_allprocs.values():
+            sub._raise_connection_errors = val
             if isinstance(sub, Group):
-                sub._raise_connection_errors = val
                 sub._set_subsys_connection_errors(val)
 
     def _transfer(self, vec_name, mode, sub=None):
@@ -2234,9 +2226,11 @@ class Group(System):
             promoted = inputs if inputs else any
             try:
                 src_indices = indexer(src_indices, flat_src=flat_src_indices)
-            except Exception as err:
-                raise err.__class__(f"{self.msginfo}: When promoting {promoted} from "
-                                    f"'{subsys_name}': {err}")
+            except Exception:
+                exc = sys.exc_info()
+                conditional_error(f"{self.msginfo}: When promoting {promoted} from '{subsys_name}':"
+                                  f" {exc[1]}", exc=exc, category=SetupWarning,
+                                  err=self._raise_connection_errors)
 
             if outputs:
                 raise RuntimeError(f"{self.msginfo}: Trying to promote outputs {outputs} while "
@@ -2429,9 +2423,11 @@ class Group(System):
         if src_indices is not None:
             try:
                 src_indices = indexer(src_indices, flat_src=flat_src_indices)
-            except Exception as err:
-                raise err.__class__(f"{self.msginfo}: When connecting from '{src_name}' to "
-                                    f"'{tgt_name}': {err}")
+            except Exception:
+                exc = sys.exc_info()
+                conditional_error(f"{self.msginfo}: When connecting from '{src_name}' to "
+                                  f"'{tgt_name}': {exc[1]}", exc=exc, category=SetupWarning,
+                                  err=self._raise_connection_errors)
 
         # target should not already be connected
         for manual_connections in [self._manual_connections, self._static_manual_connections]:
@@ -3189,15 +3185,13 @@ class Group(System):
         # add all systems as nodes in the graph so they'll be there even if
         # unconnected.
         if comps_only:
-            systems = [s.pathname for s in self.system_iter(recurse=True, typ=Component)]
+            systems = [s for s in self._ordered_comp_name_iter()]
         else:
             systems = [s.name for s in self._subsystems_myproc]
 
-        if MPI and self.comm.size > 1:
-            sysbyproc = self.comm.allgather(systems)
-
+        if not comps_only and self.comm.size > 1:
             systems = set()
-            for slist in sysbyproc:
+            for slist in self.comm.allgather(systems):
                 systems.update(slist)
 
         graph.add_nodes_from(systems)
@@ -3224,53 +3218,115 @@ class Group(System):
 
         return graph
 
-    def _get_auto_ivc_out_val(self, tgts, vars_to_gather, all_abs2meta_in, abs2meta_in):  # , tree):
+    def _get_auto_ivc_out_val(self, tgts, vars_to_gather, abs2meta_in):
         # all tgts are continuous variables
         # only called from top level group
         info = None
         src_idx_found = []
-        abs2prom = self._var_allprocs_abs2prom['input']
         max_size = -1
         found_dup = False
 
-        for tgt in tgts:
-            all_meta = all_abs2meta_in[tgt]
-            if all_meta['distributed']:
-                # OpenMDAO currently can't create an automatic IndepVarComp for inputs on
-                # distributed components.
-                raise RuntimeError(f'Distributed component input "{tgt}" requires an IndepVarComp.')
+        abs_in2prom_info = self._problem_meta['abs_in2prom_info']
 
+        start_val = val = None
+        val_shape = None
+        chosen_tgt = None
+
+        # first, find the auto_ivc output shape
+        loc_tgts = [t for t in tgts if t in abs2meta_in]
+        full_tgts = [t for t in loc_tgts if t not in abs_in2prom_info]
+        if full_tgts:  # full variable connections without any src_indices
+            val_shape = abs2meta_in[full_tgts[0]]['shape']
+            for tgt in full_tgts:
+                if tgt not in vars_to_gather:
+                    found_dup = True
+                    chosen_tgt = tgt
+                    break
+        else:
+            plist_tgts = [tgt for tgt in loc_tgts if tgt in abs_in2prom_info]
+            if plist_tgts:
+                plists = [abs_in2prom_info[tgt] for tgt in plist_tgts]
+                plens = [len(plist) for plist in plists]
+                nlevels = max(plens)
+                # find highest specification of src_shape in bfs order to shape the auto_ivc output
+                for i in range(nlevels):
+                    for tgt, plist, plen in zip(plist_tgts, plists, plens):
+                        if i < plen:
+                            pinfo = plist[i]
+                            if pinfo is not None and pinfo.src_shape is not None:
+                                val_shape = pinfo.src_shape
+                                break
+                    if val_shape is not None:
+                        chosen_tgt = tgt
+                        break
+
+        if val_shape is not None:
+            start_val = val = np.ones(val_shape)
+
+        for tgt in tgts:
+            # if tgt in vars_to_gather and tgt not in abs2meta_in:
             if tgt in vars_to_gather and self.comm.rank != vars_to_gather[tgt]:
-                if info is None or 0 > max_size:
-                    info = (tgt, 0, np.zeros(0), True)
+                if info is None or max_size < 0:
+                    info = (tgt, np.zeros(0), True)
+                    max_size = 0
                 continue
 
             # if we get here, tgt is local
-            prom = abs2prom[tgt]
             meta = abs2meta_in[tgt]
             size = meta['size']
-            has_src_inds = meta['src_indices'] is not None
-
             value = meta['val']
-            val = None
-            if prom in self._var_prom2inds:
-                src_shape = self._var_prom2inds[prom][0]
-                if src_shape is not None:
-                    val = np.ones(src_shape)
+            src_indices = None
+            if tgt in abs_in2prom_info:
+                # traverse down the promotes list, (abs_in2prom_info[tgt]), to get the
+                # final src_indices down at the component level so we can set the value of
+                # that component input into the appropriate place(s) in the auto_ivc output.
+                # If a tgt has no src_indices anywhere, it will not be found in
+                # abs_in2prom_info.
+                newshape = val_shape
+                for pinfo in abs_in2prom_info[tgt]:
+                    if pinfo is None:
+                        continue
+                    inds, _, shape = pinfo
+                    if inds is not None:
+                        if shape is None:
+                            shape = newshape
+                            if inds._src_shape is None:
+                                try:
+                                    inds.set_src_shape(shape)
+                                except IndexError as err:
+                                    exc = sys.exc_info()
+                                    raise exc[0](f"When promoting '{pinfo.prom}' from system "
+                                                 f"'{pinfo.promoted_from}' with src_indices {inds}"
+                                                 f" and src_shape {shape}: {err}"
+                                                 ).with_traceback(exc[2])
 
-            if has_src_inds:
+                        if src_indices is None:
+                            src_indices = inds
+                        else:
+                            sinds = convert_src_inds(src_indices, newshape, inds, shape)
+                            # final src_indices are wrt original full sized source and are flat,
+                            # so use val_shape and flat_src=True
+                            src_indices = indexer(sinds, src_shape=val_shape, flat_src=True)
+                        newshape = src_indices.indexed_src_shape
+
+            if src_indices is None:
+                # for an auto_ivc connection, src_indices here, if they exist, must be coming from
+                # an add_input call (this is a deprecated feature and will be removed eventually)
+                src_indices = meta['src_indices']
+
+            if src_indices is not None:
                 if val is None:
-                    src_idx_found.append(tgt)
+                    if val_shape is None and not found_dup:
+                        src_idx_found.append(tgt)
+                    val = value
                 else:
                     try:
-                        if meta['flat_src_indices']:
-                            val.ravel()[meta['src_indices'].flat()] = value.flat
+                        if src_indices._flat_src:
+                            val.ravel()[src_indices.flat()] = value.flat
                         else:
-                            val[meta['src_indices']()] = value
+                            val[src_indices()] = value
                     except ValueError as err:
-                        print(err)
                         src = self._conn_global_abs_in2out[tgt]
-                        src_indices = meta['src_indices']
                         msg = f"{self.msginfo}: The source indices " + \
                               f"{src_indices} do not specify a " + \
                               f"valid shape for the connection '{src}' to " + \
@@ -3281,27 +3337,37 @@ class Group(System):
             else:
                 if val is None:
                     val = value
-                else:
-                    try:
+                elif np.isscalar(value):
+                    if val.size > 1:
+                        raise ValueError(f"Shape of input '{tgt}', (), doesn't match shape "
+                                         f"{val.shape}.")
+                elif val.shape != value.shape:
+                    raise ValueError(f"Shape of input '{tgt}', {value.shape}, doesn't match shape "
+                                     f"{val.shape}.")
+                if val is not value:
+                    if val.shape:
                         val[:] = value
-                    except ValueError as err:
-                        raise ValueError(f"Input '{tgt}': {str(err)}")
+                    else:
+                        val = value
 
                 if tgt not in vars_to_gather:
                     found_dup = True
 
-            if size > max_size:
+            if tgt == chosen_tgt:
                 max_size = size
-                info = (tgt, size, val, False)
+                info = (tgt, val, False)
+            elif chosen_tgt is None and size > max_size:
+                max_size = size
+                info = (tgt, val, False)
 
-        if src_idx_found and not found_dup:  # auto_ivc connected to local vars with src_indices
-            raise RuntimeError(f"The following inputs {src_idx_found} are defined using "
-                               "src_indices but the total source size is undetermined.  You can "
-                               "specify the src size by setting 'val' or 'src_shape' in "
-                               "a call to set_input_defaults, or by adding "
-                               "an IndepVarComp as the source.")
+            val = start_val
 
-        # return max sized (tgt, size, value, remote)
+        if src_idx_found:  # auto_ivc connected to local vars with src_indices
+            raise RuntimeError("Attaching src_indices to inputs requires that the shape of the "
+                               "source variable is known, but the source shape for inputs "
+                               f"{src_idx_found} is unknown. You can specify the src shape for "
+                               "these inputs by setting 'val' or 'src_shape' in a call to "
+                               "set_input_defaults, or by adding an IndepVarComp as the source.")
         return info
 
     def _setup_auto_ivcs(self, mode):
@@ -3320,15 +3386,19 @@ class Group(System):
         count = 0
         auto2tgt = {}
         abs2prom = self._var_allprocs_abs2prom['input']
-        abs2meta = self._var_abs2meta['input']
         all_abs2meta = self._var_allprocs_abs2meta['input']
         conns = self._conn_global_abs_in2out
         auto_conns = {}
-        nproc = self.comm.size
 
         for tgt in all_abs2meta:
             if tgt in conns:
                 continue
+
+            all_meta = all_abs2meta[tgt]
+            if all_meta['distributed']:
+                # OpenMDAO currently can't create an automatic IndepVarComp for inputs on
+                # distributed components.
+                raise RuntimeError(f'Distributed component input "{tgt}" requires an IndepVarComp.')
 
             prom = abs2prom[tgt]
             if prom in prom2auto:
@@ -3347,18 +3417,14 @@ class Group(System):
                 auto2tgt[src] = [tgt]
 
         conns.update(auto_conns)
+        auto_ivc.auto2tgt = auto2tgt
 
         abs2meta_in = self._var_abs2meta['input']
-        tdict = {t: (_PromotesInfo(), None, t, self.pathname) for t, _ in auto_conns.items()
-                 if t in abs2meta_in}
-        self._resolve_src_inds(tdict, self)
-
         vars2gather = self._vars_to_gather
 
         for src, tgts in auto2tgt.items():
-            tgt, _, val, remote = self._get_auto_ivc_out_val(tgts, vars2gather,
-                                                             all_abs2meta, abs2meta)
-
+            prom = self._var_allprocs_abs2prom['input'][tgts[0]]
+            tgt, val, remote = self._get_auto_ivc_out_val(tgts, vars2gather, abs2meta_in)
             prom = abs2prom[tgt]
             if prom not in self._group_inputs:
                 self._group_inputs[prom] = [{'use_tgt': tgt, 'auto': True, 'path': self.pathname,
@@ -3374,6 +3440,29 @@ class Group(System):
 
             if not remote and 'val' in gmeta:
                 val = gmeta['val']
+
+            if self.comm.size > 1:
+                tgt_local_procs = set()
+                # do a preliminary check to avoid the allgather if we can
+                for t in tgts:
+                    if t in vars2gather:
+                        tgt_local_procs.add(vars2gather[t])
+                    else:   # t is duplicated in all procs
+                        break
+                else:
+                    if len(tgt_local_procs) < self.comm.size:  # don't have a local var in each proc
+                        tgt_local_procs = set()
+                        for t in self.comm.allgather(tgt):
+                            if t in vars2gather:
+                                tgt_local_procs.add(vars2gather[t])
+                        if len(tgt_local_procs) > 1:
+                            # the 'local' val can only exist on 1 proc (distrib auto_ivcs not
+                            # allowed), so must consolidate onto one proc
+                            rank = sorted(tgt_local_procs)[0]
+                            if rank != self.comm.rank:
+                                val = np.zeros(0)
+                                remote = True
+
             relsrc = src.rsplit('.', 1)[-1]
             auto_ivc.add_output(relsrc, val=np.atleast_1d(val), units=units)
             if remote:
@@ -3407,6 +3496,12 @@ class Group(System):
                         else:
                             val = self.comm.bcast(None, root=vars2gather[abs_in])
                     auto_ivc.add_discrete_output(loc_out_name, val=val)
+
+                src = conns[abs_in]
+                if src in auto_ivc.auto2tgt:
+                    auto_ivc.auto2tgt[src].append(abs_in)
+                else:
+                    auto_ivc.auto2tgt[src] = [abs_in]
 
         if not prom2auto:
             return auto_ivc
@@ -3464,23 +3559,27 @@ class Group(System):
 
         This should only be called on the top level Group.
         """
-        srcconns = {}
-        for tgt, src in self._conn_global_abs_in2out.items():
-            if src.startswith('_auto_ivc.'):
-                if src in srcconns:
-                    srcconns[src].append(tgt)
-                else:
-                    srcconns[src] = [tgt]
-
-        abs2prom = self._var_allprocs_abs2prom['input']
         all_abs2meta_in = self._var_allprocs_abs2meta['input']
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
+        a2prom_inf = self._problem_meta['abs_in2prom_info']
+        for tgt, src in self._conn_global_abs_in2out.items():
+            if tgt in a2prom_inf and a2prom_inf[tgt][0] is not None:
+                if src in all_abs2meta_out:
+                    try:
+                        # a2prom_inf[tgt][0] is the top level _PromotesInfo object
+                        a2prom_inf[tgt][0].set_src_shape(all_abs2meta_out[src]['global_shape'])
+                    except Exception:
+                        exc = sys.exc_info()
+                        conditional_error(f"{self.msginfo}: When connecting '{src}' to '{tgt}': "
+                                          f"{exc[1]}", exc=exc, category=SetupWarning,
+                                          err=self._raise_connection_errors)
+
+        abs2prom = self._var_allprocs_abs2prom['input']
         abs2meta_in = self._var_abs2meta['input']
-        abs2meta_out = self._var_abs2meta['output']
         all_discrete_outs = self._var_allprocs_discrete['output']
         all_discrete_ins = self._var_allprocs_discrete['input']
 
-        for src, tgts in srcconns.items():
+        for src, tgts in self._auto_ivc.auto2tgt.items():
             if len(tgts) < 2:
                 continue
             if src not in all_discrete_outs:
@@ -3489,13 +3588,12 @@ class Group(System):
 
             sval = self.get_val(src, kind='output', get_remote=True, from_src=False)
             errs = set()
-            metadata = set()
 
             prom = abs2prom[tgts[0]]
-            if prom not in self._group_inputs:
-                self._group_inputs[prom] = [{'path': self.pathname, 'prom': prom, 'auto': True}]
-
-            gmeta = self._group_inputs[prom][0]
+            if prom in self._group_inputs:
+                gmeta = self._group_inputs[prom][0]
+            else:
+                gmeta = {'path': self.pathname, 'prom': prom, 'auto': True}
 
             for tgt in tgts:
                 tval = self.get_val(tgt, kind='input', get_remote=True, from_src=False)
@@ -3503,7 +3601,6 @@ class Group(System):
                 if tgt in all_discrete_ins:
                     if 'val' not in gmeta and sval != tval:
                         errs.add('val')
-                        metadata.add('val')
                 else:
                     tmeta = all_abs2meta_in[tgt]
                     tunits = tmeta['units'] if 'units' in tmeta else None
@@ -3512,17 +3609,14 @@ class Group(System):
                         # Detect if either Source or Targe units are None.
                         if sunits is None or tunits is None:
                             errs.add('units')
-                            metadata.add('units')
 
                         elif _find_unit(sunits) != _find_unit(tunits):
                             errs.add('units')
-                            metadata.add('units')
 
                     if 'val' not in gmeta:
                         if tval.shape == sval.shape:
                             if _has_val_mismatch(tunits, tval, sunits, sval):
                                 errs.add('val')
-                                metadata.add('val')
                         else:
                             if all_abs2meta_in[tgt]['has_src_indices'] and tgt in abs2meta_in:
                                 if abs2meta_in[tgt]['flat_src_indices']:
@@ -3531,10 +3625,9 @@ class Group(System):
                                     srcpart = sval[abs2meta_in[tgt]['src_indices']()]
                                 if _has_val_mismatch(tunits, tval, sunits, srcpart):
                                     errs.add('val')
-                                    metadata.add('val')
 
             if errs:
-                self._show_ambiguity_msg(prom, errs, tgts, metadata)
+                self._show_ambiguity_msg(prom, errs, tgts)
             elif src not in all_discrete_outs:
                 gmeta['units'] = sunits
 
@@ -3589,9 +3682,12 @@ class Group(System):
                     names.extend(s._ordered_comp_name_iter())
                 else:
                     names.append(s.pathname)
+            seen = set()
             for ranknames in self.comm.allgather(names):
                 for name in ranknames:
-                    yield name
+                    if name not in seen:
+                        yield name
+                        seen.add(name)
         else:
             for s in self._subsystems_myproc:
                 if isinstance(s, Group):

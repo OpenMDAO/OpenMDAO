@@ -70,6 +70,25 @@ class _ReprClass(object):
         """
         return self._repr_string
 
+    def __eq__(self, other):
+        """
+        Return True if other equals self.
+
+        Parameters
+        ----------
+        other : object
+            The object we're being compared to.
+
+        Returns
+        -------
+        bool
+            True if self and other are equal, else False.
+        """
+        return isinstance(other, _ReprClass) and self._repr_string == other._repr_string
+
+    def __hash__(self):
+        return hash(self._repr_string)
+
 
 # unique object to check if default is given (when None is an allowed value)
 _UNDEFINED = _ReprClass("UNDEFINED")

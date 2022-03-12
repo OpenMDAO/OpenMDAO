@@ -522,8 +522,23 @@ class DifferentialEvolution(object):
             pop_size += 1
         self.npop = int(pop_size)
 
-        # use different seeds in different MPI processes
-        seed = random_state + self.comm.Get_rank() if self.comm else 0
+        if self.comm:
+            if random_state is None:
+                # if no random_state is given, generate one on rank 0 and broadcast it to all
+                # ranks.  Because we add the rank to the starting random state, no ranks will
+                # have the same seed.
+                rng = np.random.default_rng()
+                random_state = rng.integers(1e15)
+                if self.comm.rank == 0:
+                    self.comm.bcast(random_state, root=0)
+                else:
+                    random_state = self.comm.bcast(None, root=0)
+
+            # add rank to ensure different seed in each MPI process
+            seed = random_state + self.comm.rank
+        else:
+            seed = None if random_state is None else random_state
+
         rng = np.random.default_rng(seed)
 
         # create random initial population, scaled to bounds

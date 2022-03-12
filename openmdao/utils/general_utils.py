@@ -72,8 +72,10 @@ def conditional_error(msg, exc=RuntimeError, category=UserWarning, err=None):
     ----------
     msg : str
         The error/warning message.
-    exc : Exception class
-        This exception class is used to create the exception to be raised.
+    exc : Exception class or exception info tuple (exception class, exception instance, traceback)
+        This exception class is used to create the exception to be raised, or an exception info
+        tuple from a previously raised exception that is to be re-raised, contingent on the value
+        of 'err'.
     category : warning class
         This category is the class of warning to be issued.
     err : bool
@@ -83,7 +85,10 @@ def conditional_error(msg, exc=RuntimeError, category=UserWarning, err=None):
     if (err is None and ignore_errors()) or err is False:
         issue_warning(msg, category=category)
     else:
-        raise exc(msg)
+        if isinstance(exc, tuple):
+            raise exc[0](msg).with_traceback(exc[2])
+        else:
+            raise exc(msg)
 
 
 @contextmanager
@@ -1118,7 +1123,7 @@ def get_connection_owner(system, tgt):
     Returns
     -------
     tuple
-        (wning group, promoted source name, promoted target name).
+        (owning group, promoted source name, promoted target name).
     """
     from openmdao.core.group import Group
 
@@ -1133,9 +1138,9 @@ def get_connection_owner(system, tgt):
                 if g._manual_connections:
                     tprom = g._var_allprocs_abs2prom['input'][tgt]
                     if tprom in g._manual_connections:
-                        return g.pathname, g._var_allprocs_abs2prom['output'][src], tprom
+                        return g, g._var_allprocs_abs2prom['output'][src], tprom
 
-    return None, None, None
+    return system, src, tgt
 
 
 def wing_dbg():
