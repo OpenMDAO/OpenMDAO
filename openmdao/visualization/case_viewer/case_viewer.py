@@ -1,13 +1,12 @@
 """Widgets for accessing CaseReader in a Jupyter notebook."""
 
-import ast
-import pathlib
 import re
-import webbrowser
 
 import openmdao.api as om
 import numpy as np
 
+
+# Enable _DEBUG to prevent the debug_output display from clearing itself.
 _DEBUG = False
 
 try:
@@ -77,9 +76,9 @@ def _apply_slice(data, s):
     return data[sl]
 
 
-def _get_output_meta(cr, case_name, var):
+def _get_var_meta(cr, case_name, var):
     """
-    Return the metadata for the variable of the given name in the output cases.
+    Return the metadata for the variable of the given name in the given case.
 
     Parameters
     ----------
@@ -97,17 +96,20 @@ def _get_output_meta(cr, case_name, var):
     """
     output_vars = set()
     case = cr.get_case(case_name)
+
+    case_inputs = case.list_inputs(prom_name=True, units=True, shape=True, val=False, out_stream=None)
+
     case_outputs = case.list_outputs(prom_name=True, units=True, shape=True, val=False, residuals=False,
                                      out_stream=None)
 
-    for _, meta in case_outputs:
+    for _, meta in case_outputs + case_inputs:
         if meta['prom_name'] == var:
             return meta
     else:
         raise KeyError(f'No output named {var} found')
 
 
-def _get_output_vars(cr, case_names):
+def _get_vars(cr, case_names, var_types=None):
     """
     Return a set of variable names whose values are present in at lease one of the given cases.
 
@@ -117,19 +119,25 @@ def _get_output_vars(cr, case_names):
         The CaseReader housing the data.
     case_names : Iterable of str
         The case_names from which the outputs with avaialble residuals out are to be returned.
+    var_types : None or Iterable of str
+        The type of variables to be returned.  Either 'inputs', 'outputs', or None for both inputs and outputs.
 
     Returns
     -------
     list
         A list of the variables with avaialble residuals in at least one of the given cases.
     """
-    output_vars = set()
+    vars = set()
     for case_name in case_names:
         case = cr.get_case(case_name)
-        case_outputs = case.list_outputs(prom_name=True, units=False, shape=False, val=True, residuals=False,
-                                         out_stream=None)
-        output_vars |= {meta['prom_name'] for abs_path, meta in case_outputs if isinstance(meta['val'], np.ndarray)}
-    return sorted(list(output_vars))
+        if var_types is None or 'outputs' in var_types:
+            case_outputs = case.list_outputs(prom_name=True, units=False, shape=False, val=True, residuals=False,
+                                             out_stream=None)
+            vars |= {meta['prom_name'] for abs_path, meta in case_outputs}
+        if var_types is None or 'inputs' in var_types:
+            case_inputs = case.list_inputs(prom_name=True, units=False, shape=False, val=True, out_stream=None)
+            vars |= {meta['prom_name'] for abs_path, meta in case_inputs}
+    return sorted(list(vars))
 
 
 def _get_resids_vars(cr, case_names):
@@ -210,28 +218,53 @@ def _get_resids_val(case, prom_name):
     return d[prom_name]['resids']
 
 
+def _get_plot_style(i, selected_case_idx, num_cases):
+    """
+    Return plot attributes based on the index of the selected case and the number of cases.
+    Parameters
+    ----------
+    i : int
+        Indes of the current case.
+    selected_case_idx : int
+        Index of the selected case.
+    num_cases : int
+        Total number of cases being plotted.
+
+    Returns
+    -------
+    lw : float
+        Linewidth attribute for matplotlib line.
+    ms : float
+        Marker size attribute for matplotlib line.
+    s : float
+        Marker size attribute for matplotlib scatter.
+    alpha : float
+        Alpha attribute for matplotlib line.
+    """
+    if selected_case_idx >= num_cases:
+        # Settings when all plots should be displayed "equally".
+        alpha = 1.0
+        lw = 1
+        ms = 2
+        s = 10
+    else:
+        alpha = 0.1 if i != selected_case_idx else 1.0
+        lw = 0.5 if i != selected_case_idx else 2
+        ms = 2. if i != selected_case_idx else 6.
+        s = 10 if i != selected_case_idx else 40
+    return lw, ms, s, alpha
+
+
 class CaseViewer(object):
     """
     Widget to plot data from a CaseReader.
 
     Parameters
     ----------
-    cr : CaseReader or str
-        CaseReader or path to the recorded data file.
-    source : str, optional
-        Initial value for source.
-    cases : 2-tuple of int
-        Initial value for cases.
-    x_axis : str, optional
-        Initial value for x_axis.
-    y_axis : str or list of str, optional
-        Initial value for y_axis.
-
-    Attributes
-    ----------
-
+    f : str
+        The file from which the cases are to be viewed.
     """
-    def __init__(self, f, source=None, cases=None, x_axis=None, y_axis=None):
+    def __init__(self, f):
         """
         Initialize the case viewer interface.
         """
@@ -265,13 +298,11 @@ class CaseViewer(object):
         self._register_callbacks()
 
         self._fig, self._ax = plt.subplots(1, 1, figsize=(9, 9/1.6), tight_layout=True)
-        # gs = mpl.gridspec.GridSpec(1, 20, figure=self._fig)
-        # self._ax = self._fig.add_subplot(gs[0, :-1])
-        # self._cbar_ax = self._fig.add_subplot(gs[0, -1])
-        # self._cbar_ax.set_axis_off()
         norm = mpl.colors.Normalize(vmin=0, vmax=1)
         self._scalar_mappable = cm.ScalarMappable(norm=norm, cmap=self._cmap)
         self._colorbar = self._fig.colorbar(self._scalar_mappable, label='Case Index')
+        self._scatters = []
+        self._lines = []
 
         self._update_source_options()
         self._update_case_select_options()
@@ -306,7 +337,7 @@ class CaseViewer(object):
         self._widgets['x_filter'] = ipw.Text('', description='X-Axis Filter',
                                              layout=ipw.Layout(width='49%', height='auto'))
 
-        var_types_list = ['outputs', 'optimization', 'desvars', 'constraints', 'objectives', 'residuals']
+        var_types_list = ['outputs', 'inputs', 'optimization', 'desvars', 'constraints', 'objectives', 'residuals']
 
 
         self._widgets['x_var_type'] = ipw.Dropdown(options=var_types_list,
@@ -424,7 +455,7 @@ class CaseViewer(object):
         elif var is None:
             shape = 'N/A'
         else:
-            meta = _get_output_meta(self._case_reader, cases[0], var)
+            meta = _get_var_meta(self._case_reader, cases[0], var)
             shape = meta['shape']
 
         self._widgets[f'{axis}_info'].value = f'{shape}'
@@ -471,7 +502,7 @@ class CaseViewer(object):
             elif var_type == 'residuals':
                 vars = _get_resids_vars(self._case_reader, cases)
             else:
-                vars = _get_output_vars(self._case_reader, cases)
+                vars = _get_vars(self._case_reader, cases, var_types=var_type)
 
             # We have a list of available vars, now filter it.
             r = re.compile(var_filter)
@@ -566,7 +597,8 @@ class CaseViewer(object):
         args : tuple
             The information passed by the widget upon callback.
         """
-        self._widgets['debug_output'].clear_output()
+        if not _DEBUG:
+            self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             self._update_plot()
 
@@ -579,9 +611,28 @@ class CaseViewer(object):
         args : tuple
             The information passed by the widget upon callback.
         """
-        self._widgets['debug_output'].clear_output()
+        if not _DEBUG:
+            self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
-            self._update_plot()
+            selected_case_idx = self._widgets['case_slider'].value
+            cases = self._widgets['cases_list'].options
+
+            if not _DEBUG:
+                self._widgets['debug_output'].clear_output()
+            with self._widgets['debug_output']:
+                for i, case_name in enumerate(cases):
+                    lw, ms, s, alpha = _get_plot_style(i, selected_case_idx, len(cases))
+                    if i < len(self._scatters):
+                        scat = self._scatters[i]
+                        scat.set_sizes(s * np.ones_like(scat.get_sizes()))
+                        scat.set_alpha(alpha)
+                    if i < len(self._lines):
+                        line = self._lines[i]
+                        for l in line:
+                            l.set_linewidth(lw)
+                            l.set_markersize(ms)
+                            l.set_alpha(alpha)
+
 
     def _callback_select_all_cases(self, *args):
         """
@@ -592,7 +643,8 @@ class CaseViewer(object):
         args : tuple
             The information passed by the widget upon callback.
         """
-        self._widgets['debug_output'].clear_output()
+        if not _DEBUG:
+            self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             clw = self._widgets['cases_list']
             current = clw.options
@@ -613,7 +665,8 @@ class CaseViewer(object):
         args : tuple
             The information passed by the widget upon callback.
         """
-        self._widgets['debug_output'].clear_output()
+        if not _DEBUG:
+            self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             clw = self._widgets['cases_list']
             new_list = list(clw.options)
@@ -634,7 +687,8 @@ class CaseViewer(object):
             The information passed by the widget upon callback.
         """
         event = args[0]
-        self._widgets['debug_output'].clear_output()
+        if not _DEBUG:
+            self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             w = event['owner']
             axis = 'x' if w is self._widgets['x_filter'] or w is self._widgets['x_var_type'] else 'y'
@@ -651,7 +705,8 @@ class CaseViewer(object):
             The information passed by the widget upon callback.
         """
         event = args[0]
-        self._widgets['debug_output'].clear_output()
+        if not _DEBUG:
+            self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             w = event['owner']
             s = w.value
@@ -676,7 +731,8 @@ class CaseViewer(object):
             The information passed by the widget upon callback.
         """
         event = args[0]
-        self._widgets['debug_output'].clear_output()
+        if not _DEBUG:
+            self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             w = event['owner']
             s = w.value
@@ -693,7 +749,8 @@ class CaseViewer(object):
         args : tuple
             The information passed by the widget upon callback.
         """
-        self._widgets['debug_output'].clear_output()
+        if not _DEBUG:
+             self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             event = args[0]
             w = event['owner']
@@ -738,11 +795,11 @@ class CaseViewer(object):
 
         max_size = 0
 
-        self._widgets['debug_output'].clear_output()
+        if not _DEBUG:
+            self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             for i, case_name in enumerate(cases):
-                alpha = 1.0 if (selected_case_idx >= len(cases) or i == selected_case_idx) else 0.1
-                lw = 2.0 if (selected_case_idx >= len(cases) or i == selected_case_idx) else 0.05
+                lw, ms, s, alpha = _get_plot_style(i, selected_case_idx, len(cases))
                 case = self._case_reader.get_case(case_name)
 
                 if y_var_type == 'residuals':
@@ -777,8 +834,8 @@ class CaseViewer(object):
                 if x_val is None or y_val is None:
                     continue
 
-                if x_val.shape[0] != y_val.shape[0]:
-                    print(f'Incompatible shapes: x.shape = {x_val.shape}  y.shape = {y_val.shape}.')
+                if x_val.ravel().shape[0] != y_val.T.shape[0]:
+                    print(f'Incompatible shapes: x.shape = {x_val.ravel().shape[0]}  y.shape = {y_val.T.shape[0]}.')
                     print('Size along first axis must agree.')
                     return
 
@@ -790,15 +847,19 @@ class CaseViewer(object):
                 y_max = max(y_max, np.max(y_val))
 
                 if x_var == self._case_index_str:
-                    self._ax.scatter(x_val, y_val, c=np.arange(x_val.size), s=20, cmap=self._cmap, alpha=alpha)
+                    s = self._ax.scatter(x_val, y_val, c=np.arange(x_val.size), s=s, cmap=self._cmap, alpha=alpha)
+                    self._scatters.append(s)
                 else:
-                    self._ax.plot(x_val, y_val,
-                                  color=self._cmap(float(i)/len(cases)),
-                                  marker='o',
-                                  linestyle='-',
-                                  linewidth=lw,
-                                  markersize=2,
-                                  alpha=alpha)
+                    l = self._ax.plot(x_val.ravel(), y_val.T,
+                                      c=self._cmap(float(i)/len(cases)),
+                                      mfc=self._cmap(float(i)/len(cases)),
+                                      mec='k',
+                                      marker='o',
+                                      linestyle='-',
+                                      linewidth=lw,
+                                      markersize=ms,
+                                      alpha=alpha)
+                    self._lines.append(l)
 
                 self._fig.canvas.flush_events()
 
@@ -845,6 +906,8 @@ class CaseViewer(object):
 
             try:
                 self._ax.clear()
+                self._scatters.clear()
+                self._lines.clear()
             except AttributeError:
                 return
 
@@ -852,8 +915,8 @@ class CaseViewer(object):
                 print('Nothing to plot')
                 return
 
-            x_units = 'None' if x_var == self._case_index_str else _get_output_meta(cr, cases[0], x_var)['units']
-            y_units = _get_output_meta(cr, cases[0], y_var)['units']
+            x_units = 'None' if x_var == self._case_index_str else _get_var_meta(cr, cases[0], x_var)['units']
+            y_units = _get_var_meta(cr, cases[0], y_var)['units']
 
             self._redraw_plot()
 
