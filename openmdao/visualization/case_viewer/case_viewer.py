@@ -2,9 +2,9 @@
 
 import re
 
-import openmdao.api as om
 import numpy as np
 
+from openmdao.recorders.case_reader import CaseReader
 
 # Enable _DEBUG to prevent the debug_output display from clearing itself.
 _DEBUG = False
@@ -82,7 +82,7 @@ def _get_var_meta(cr, case_name, var):
 
     Parameters
     ----------
-    cr : om.CaseReader
+    cr : CaseReader
         The case reader housing the data.
     case_name : str
         The case from which the outputs with avaialble metadata is to be returned.
@@ -116,7 +116,7 @@ def _get_vars(cr, case_names, var_types=None):
 
     Parameters
     ----------
-    cr : om.CaseReader
+    cr : CaseReader
         The CaseReader housing the data.
     case_names : Iterable of str
         The case_names from which the outputs with avaialble residuals out are to be returned.
@@ -149,7 +149,7 @@ def _get_resids_vars(cr, case_names):
 
     Parameters
     ----------
-    cr : om.CaseReader
+    cr : CaseReader
         The CaseReader housing the data.
     case_names : Iterable of str
         The case_names from which the outputs with available residuals out are to be returned.
@@ -175,7 +175,7 @@ def _get_opt_vars(cr, case_names, var_type=None):
 
     Parameters
     ----------
-    cr : om.CaseReader
+    cr : CaseReader
         The CaseReader housing the data.
     case_names : Iterable of str
         The case_names from which the outputs with available residuals out are to be returned.
@@ -205,7 +205,7 @@ def _get_resids_val(case, prom_name):
 
     Parameters
     ----------
-    case : om.Case
+    case : Case
         The CaseReader Case from which residuals are to be retrieved.
     prom_name : str
         The promoted name of the output whose residuals are to be retrieved.
@@ -290,7 +290,7 @@ class CaseViewer(object):
         self._objectives = set()
         self._resids = set()
 
-        self._case_reader = om.CaseReader(f) if isinstance(f, str) else f
+        self._case_reader = CaseReader(f) if isinstance(f, str) else f
 
         self._cmap = cm.viridis
 
