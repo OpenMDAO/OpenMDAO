@@ -13,7 +13,7 @@ try:
     import matplotlib.pyplot as plt
     import matplotlib as mpl
     from matplotlib import cm
-except:
+except ImportError:
     mpl = None
 
 try:
@@ -29,12 +29,12 @@ except ImportError:
 
 
 _func_map = {'None': lambda x: x,
-            'ravel': np.ravel,
-            'min': np.min,
-            'minabs': lambda x: np.min(np.abs(x)),
-            'max': np.max,
-            'maxabs': lambda x: np.max(np.abs(x)),
-            'norm': np.linalg.norm}
+             'ravel': np.ravel,
+             'min': np.min,
+             'minabs': lambda x: np.min(np.abs(x)),
+             'max': np.max,
+             'maxabs': lambda x: np.max(np.abs(x)),
+             'norm': np.linalg.norm}
 
 
 def _apply_transform(data, transform):
@@ -97,10 +97,11 @@ def _get_var_meta(cr, case_name, var):
     output_vars = set()
     case = cr.get_case(case_name)
 
-    case_inputs = case.list_inputs(prom_name=True, units=True, shape=True, val=False, out_stream=None)
+    case_inputs = case.list_inputs(prom_name=True, units=True, shape=True, val=False,
+                                   out_stream=None)
 
-    case_outputs = case.list_outputs(prom_name=True, units=True, shape=True, val=False, residuals=False,
-                                     out_stream=None)
+    case_outputs = case.list_outputs(prom_name=True, units=True, shape=True, val=False,
+                                     residuals=False, out_stream=None)
 
     for _, meta in case_outputs + case_inputs:
         if meta['prom_name'] == var:
@@ -120,7 +121,8 @@ def _get_vars(cr, case_names, var_types=None):
     case_names : Iterable of str
         The case_names from which the outputs with avaialble residuals out are to be returned.
     var_types : None or Iterable of str
-        The type of variables to be returned.  Either 'inputs', 'outputs', or None for both inputs and outputs.
+        The type of variables to be returned.
+        Either 'inputs', 'outputs', or None for both inputs and outputs.
 
     Returns
     -------
@@ -131,11 +133,12 @@ def _get_vars(cr, case_names, var_types=None):
     for case_name in case_names:
         case = cr.get_case(case_name)
         if var_types is None or 'outputs' in var_types:
-            case_outputs = case.list_outputs(prom_name=True, units=False, shape=False, val=True, residuals=False,
-                                             out_stream=None)
+            case_outputs = case.list_outputs(prom_name=True, units=False, shape=False,
+                                             val=True, residuals=False, out_stream=None)
             vars |= {meta['prom_name'] for abs_path, meta in case_outputs}
         if var_types is None or 'inputs' in var_types:
-            case_inputs = case.list_inputs(prom_name=True, units=False, shape=False, val=True, out_stream=None)
+            case_inputs = case.list_inputs(prom_name=True, units=False, shape=False,
+                                           val=True, out_stream=None)
             vars |= {meta['prom_name'] for abs_path, meta in case_inputs}
     return sorted(list(vars))
 
@@ -149,40 +152,40 @@ def _get_resids_vars(cr, case_names):
     cr : om.CaseReader
         The CaseReader housing the data.
     case_names : Iterable of str
-        The case_names from which the outputs with avaialble residuals out are to be returned.
+        The case_names from which the outputs with available residuals out are to be returned.
 
     Returns
     -------
     list
-        A list of the variables with avaialble residuals in at least one of the given cases.
+        A list of the variables with available residuals in at least one of the given cases.
     """
     resid_vars = set()
     for case_name in case_names:
         case = cr.get_case(case_name)
-        case_outputs = case.list_outputs(prom_name=True, units=True, shape=True, val=False, residuals=True,
-                                         out_stream=None)
-        resid_vars |= {meta['prom_name'] for abs_path, meta in case_outputs if isinstance(meta['resids'], np.ndarray)}
+        case_outputs = case.list_outputs(prom_name=True, units=True, shape=True, val=False,
+                                         residuals=True, out_stream=None)
+        resid_vars |= {meta['prom_name'] for abs_path, meta in case_outputs
+                       if isinstance(meta['resids'], np.ndarray)}
     return sorted(list(resid_vars))
 
 
 def _get_opt_vars(cr, case_names, var_type=None):
     """
-    Return a set of variable names whose outputs are present in at lease one of the given cases and are part
-    of the optimization variables in at least one of the cases.
+    Return names of vars that are part of the optimization variables in at least one of the cases.
 
     Parameters
     ----------
     cr : om.CaseReader
         The CaseReader housing the data.
     case_names : Iterable of str
-        The case_names from which the outputs with avaialble residuals out are to be returned.
+        The case_names from which the outputs with available residuals out are to be returned.
     var_type : None or str
         One of 'desvars', 'constraints', 'objectives', or None.
 
     Returns
     -------
     list
-        A list of the variables with avaialble residuals in at least one of the given cases.
+        A list of the variables with available residuals in at least one of the given cases.
     """
     vars = set()
     for case_name in case_names:
@@ -221,10 +224,11 @@ def _get_resids_val(case, prom_name):
 def _get_plot_style(i, selected_case_idx, num_cases):
     """
     Return plot attributes based on the index of the selected case and the number of cases.
+
     Parameters
     ----------
     i : int
-        Indes of the current case.
+        Index of the current case.
     selected_case_idx : int
         Index of the selected case.
     num_cases : int
@@ -233,13 +237,13 @@ def _get_plot_style(i, selected_case_idx, num_cases):
     Returns
     -------
     lw : float
-        Linewidth attribute for matplotlib line.
+        The linewidth attribute for matplotlib line.
     ms : float
-        Marker size attribute for matplotlib line.
+        The markersize attribute for matplotlib line.
     s : float
-        Marker size attribute for matplotlib scatter.
+        The s (marker size) attribute for matplotlib scatter.
     alpha : float
-        Alpha attribute for matplotlib line.
+        The alpha (transparency) attribute for matplotlib line and scatter.
     """
     if selected_case_idx >= num_cases:
         # Settings when all plots should be displayed "equally".
@@ -257,13 +261,14 @@ def _get_plot_style(i, selected_case_idx, num_cases):
 
 class CaseViewer(object):
     """
-    Widget to plot data from a CaseReader.
+    Notebook GUI to plot data from a CaseReader.
 
     Parameters
     ----------
     f : str
         The file from which the cases are to be viewed.
     """
+
     def __init__(self, f):
         """
         Initialize the case viewer interface.
@@ -297,7 +302,7 @@ class CaseViewer(object):
 
         self._register_callbacks()
 
-        self._fig, self._ax = plt.subplots(1, 1, figsize=(9, 9/1.6), tight_layout=True)
+        self._fig, self._ax = plt.subplots(1, 1, figsize=(9, 9 / 1.6), tight_layout=True)
         norm = mpl.colors.Normalize(vmin=0, vmax=1)
         self._scalar_mappable = cm.ScalarMappable(norm=norm, cmap=self._cmap)
         self._colorbar = self._fig.colorbar(self._scalar_mappable, label='Case Index')
@@ -318,10 +323,12 @@ class CaseViewer(object):
         self._widgets = {}
 
         self._widgets['source_select'] = ipw.Dropdown(description='Source',
-                                                      layout=ipw.Layout(width='30%', height='auto'))
+                                                      layout=ipw.Layout(width='30%',
+                                                                        height='auto'))
 
         self._widgets['cases_select'] = ipw.SelectMultiple(description='Cases',
-                                                          layout=ipw.Layout(width='40%', height='auto'))
+                                                           layout=ipw.Layout(width='40%',
+                                                                             height='auto'))
 
         self._widgets['case_select_button'] = ipw.Button(description='Select ' + '\u27F6',
                                                          layout={'width': '100%'})
@@ -337,8 +344,8 @@ class CaseViewer(object):
         self._widgets['x_filter'] = ipw.Text('', description='X-Axis Filter',
                                              layout=ipw.Layout(width='49%', height='auto'))
 
-        var_types_list = ['outputs', 'inputs', 'optimization', 'desvars', 'constraints', 'objectives', 'residuals']
-
+        var_types_list = ['outputs', 'inputs', 'optimization', 'desvars',
+                          'constraints', 'objectives', 'residuals']
 
         self._widgets['x_var_type'] = ipw.Dropdown(options=var_types_list,
                                                    description='X Var Type',
@@ -348,19 +355,20 @@ class CaseViewer(object):
         self._widgets['x_select'] = ipw.Select(description='X-Axis',
                                                layout=ipw.Layout(width='auto', height='auto'))
 
-
         self._widgets['x_transform_select'] = ipw.Dropdown(options=_func_map.keys(),
                                                            value='None',
                                                            description='X Transform',
-                                                           layout=ipw.Layout(width='95%', height='auto'))
+                                                           layout=ipw.Layout(width='95%',
+                                                                             height='auto'))
 
         self._widgets['x_slice'] = ipw.Text('[...]', description='X Slice',
                                             layout=ipw.Layout(width='95%', height='auto'))
 
-        self._widgets['x_info'] = ipw.HTML(value='', description='X Shape', layout={'width': '95%'})
+        self._widgets['x_info'] = ipw.HTML(value='', description='X Shape',
+                                           layout={'width': '95%'})
 
-        self._widgets['x_scale'] = ipw.Dropdown(options=['linear', 'log'], value='linear', description='X Scale',
-                                                layout={'width': '95%'})
+        self._widgets['x_scale'] = ipw.Dropdown(options=['linear', 'log'], value='linear',
+                                                description='X Scale', layout={'width': '95%'})
 
         self._widgets['y_filter'] = ipw.Text('', description='Y-Axis Filter',
                                              layout={'width': '49%', 'height': 'auto'})
@@ -376,31 +384,40 @@ class CaseViewer(object):
         self._widgets['y_transform_select'] = ipw.Dropdown(options=_func_map.keys(),
                                                            value='None',
                                                            description='Y Transform',
-                                                           layout=ipw.Layout(width='95%', height='auto'))
+                                                           layout=ipw.Layout(width='95%',
+                                                                             height='auto'))
 
         self._widgets['y_slice'] = ipw.Text('[...]',
-                                description='Y Slice',
-                                layout=ipw.Layout(width='95%', height='auto'))
+                                            description='Y Slice',
+                                            layout=ipw.Layout(width='95%', height='auto'))
 
-        self._widgets['y_info'] = ipw.HTML(value='', description='Y Shape', layout={'width': '95%'})
+        self._widgets['y_info'] = ipw.HTML(value='', description='Y Shape',
+                                           layout={'width': '95%'})
 
-        self._widgets['y_scale'] = ipw.Dropdown(options=['linear', 'log'], value='linear', description='Y Scale',
+        self._widgets['y_scale'] = ipw.Dropdown(options=['linear', 'log'], value='linear',
+                                                description='Y Scale',
                                                 layout={'width': '95%'})
 
-        self._widgets['case_slider'] = ipw.IntSlider(value=1, min=0, max=1, step=1, description='Case #',
-                                                     disabled=False, continuous_update=True, orientation='horizontal',
-                                                     readout=True, readout_format='d', layout={'width': '95%'})
+        self._widgets['case_slider'] = ipw.IntSlider(value=1, min=0, max=1, step=1,
+                                                     description='Case #',
+                                                     disabled=False, continuous_update=True,
+                                                     orientation='horizontal',
+                                                     readout=True, readout_format='d',
+                                                     layout={'width': '95%'})
 
         self._widgets['debug_output'] = ipw.Output(description='',
-                                                   layout={'border': '0px solid black', 'width': '95%',
+                                                   layout={'border': '0px solid black',
+                                                           'width': '95%',
                                                            'height': '400'})
 
         display(ipw.VBox([self._widgets['source_select'],
-                          ipw.HBox([self._widgets['cases_select'], ipw.VBox([self._widgets['case_select_button'],
-                                                                             self._widgets['case_select_all_button'],
-                                                                             self._widgets['case_remove_button']]),
+                          ipw.HBox([self._widgets['cases_select'],
+                                    ipw.VBox([self._widgets['case_select_button'],
+                                              self._widgets['case_select_all_button'],
+                                              self._widgets['case_remove_button']]),
                                     self._widgets['cases_list']], layout={'width': '95%'}),
-                          ipw.HBox([ipw.VBox([ipw.HBox([self._widgets['x_filter'], self._widgets['x_var_type']]),
+                          ipw.HBox([ipw.VBox([ipw.HBox([self._widgets['x_filter'],
+                                                        self._widgets['x_var_type']]),
                                               self._widgets['x_select']],
                                              layout={'width': '50%'}),
                                     ipw.VBox([self._widgets['x_info'],
@@ -409,7 +426,8 @@ class CaseViewer(object):
                                               self._widgets['x_scale']],
                                              layout={'width': '20%'}),
                                     ]),
-                          ipw.HBox([ipw.VBox([ipw.HBox([self._widgets['y_filter'], self._widgets['y_var_type']]),
+                          ipw.HBox([ipw.VBox([ipw.HBox([self._widgets['y_filter'],
+                                                        self._widgets['y_var_type']]),
                                               self._widgets['y_select']],
                                              layout={'width': '50%'}),
                                     ipw.VBox([self._widgets['y_info'],
@@ -508,7 +526,8 @@ class CaseViewer(object):
             r = re.compile(var_filter)
             filtered_list = list(filter(r.search, vars))
 
-            w_var_select.options = [self._case_index_str] + filtered_list if axis == 'x' else filtered_list
+            w_var_select.options = [self._case_index_str] + filtered_list \
+                if axis == 'x' else filtered_list
 
             self._update_var_info(axis)
 
@@ -581,8 +600,12 @@ class CaseViewer(object):
             clw = self._widgets['cases_list']
             current = clw.options
             new = self._widgets['cases_select'].value
-            numeric_sorter = lambda case_name: (case_name.split('|')[0], int(case_name.split('|')[-1]))
-            self._widgets['cases_list'].options = sorted(list(set(current + new)), key=numeric_sorter)
+
+            def _numeric_sorter(case_name):
+                return case_name.split('|')[0], int(case_name.split('|')[-1])
+
+            self._widgets['cases_list'].options = sorted(list(set(current + new)),
+                                                         key=_numeric_sorter)
             self._update_case_slider()
             self._update_var_select_options('x')
             self._update_var_select_options('y')
@@ -628,11 +651,10 @@ class CaseViewer(object):
                         scat.set_alpha(alpha)
                     if i < len(self._lines):
                         line = self._lines[i]
-                        for l in line:
-                            l.set_linewidth(lw)
-                            l.set_markersize(ms)
-                            l.set_alpha(alpha)
-
+                        for li in line:
+                            li.set_linewidth(lw)
+                            li.set_markersize(ms)
+                            li.set_alpha(alpha)
 
     def _callback_select_all_cases(self, *args):
         """
@@ -649,8 +671,12 @@ class CaseViewer(object):
             clw = self._widgets['cases_list']
             current = clw.options
             new = self._widgets['cases_select'].options
-            numeric_sorter = lambda case_name: (case_name.split('|')[0], int(case_name.split('|')[-1]))
-            self._widgets['cases_list'].options = sorted(list(set(current + new)), key=numeric_sorter)
+
+            def _numeric_sorter(case_name):
+                return case_name.split('|')[0], int(case_name.split('|')[-1])
+
+            self._widgets['cases_list'].options = sorted(list(set(current + new)),
+                                                         key=_numeric_sorter)
             self._update_case_slider()
             self._update_var_select_options('x')
             self._update_var_select_options('y')
@@ -691,7 +717,8 @@ class CaseViewer(object):
             self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             w = event['owner']
-            axis = 'x' if w is self._widgets['x_filter'] or w is self._widgets['x_var_type'] else 'y'
+            axis = 'x' if w is self._widgets['x_filter'] \
+                or w is self._widgets['x_var_type'] else 'y'
             self._update_var_select_options(axis)
             self._update_plot()
 
@@ -710,8 +737,6 @@ class CaseViewer(object):
         with self._widgets['debug_output']:
             w = event['owner']
             s = w.value
-            src = self._widgets['source_select'].value
-            cases = self._widgets['cases_list'].options
             axis = 'x' if w is self._widgets['x_select'] else 'y'
 
             self._update_var_info(axis)
@@ -750,7 +775,7 @@ class CaseViewer(object):
             The information passed by the widget upon callback.
         """
         if not _DEBUG:
-             self._widgets['debug_output'].clear_output()
+            self._widgets['debug_output'].clear_output()
         with self._widgets['debug_output']:
             event = args[0]
             w = event['owner']
@@ -809,7 +834,7 @@ class CaseViewer(object):
 
                 try:
                     y_val = _apply_slice(y_val, y_slice)
-                except:
+                except ValueError:
                     if _DEBUG:
                         print(f'Error while applying Y slice: {y_slice}')
                     continue
@@ -825,7 +850,7 @@ class CaseViewer(object):
 
                 try:
                     x_val = _apply_slice(x_val, x_slice)
-                except:
+                except ValueError:
                     if _DEBUG:
                         print(f'Error while applying X slice: {x_slice}')
                     continue
@@ -835,7 +860,8 @@ class CaseViewer(object):
                     continue
 
                 if x_val.ravel().shape[0] != y_val.T.shape[0]:
-                    print(f'Incompatible shapes: x.shape = {x_val.ravel().shape[0]}  y.shape = {y_val.T.shape[0]}.')
+                    print(f'Incompatible shapes: x.shape = {x_val.ravel().shape[0]} '
+                          f' y.shape = {y_val.T.shape[0]}.')
                     print('Size along first axis must agree.')
                     return
 
@@ -847,19 +873,20 @@ class CaseViewer(object):
                 y_max = max(y_max, np.max(y_val))
 
                 if x_var == self._case_index_str:
-                    s = self._ax.scatter(x_val, y_val, c=np.arange(x_val.size), s=s, cmap=self._cmap, alpha=alpha)
+                    s = self._ax.scatter(x_val, y_val, c=np.arange(x_val.size), s=s,
+                                         cmap=self._cmap, alpha=alpha)
                     self._scatters.append(s)
                 else:
-                    l = self._ax.plot(x_val.ravel(), y_val.T,
-                                      c=self._cmap(float(i)/len(cases)),
-                                      mfc=self._cmap(float(i)/len(cases)),
-                                      mec='k',
-                                      marker='o',
-                                      linestyle='-',
-                                      linewidth=lw,
-                                      markersize=ms,
-                                      alpha=alpha)
-                    self._lines.append(l)
+                    line = self._ax.plot(x_val.ravel(), y_val.T,
+                                         c=self._cmap(float(i) / len(cases)),
+                                         mfc=self._cmap(float(i) / len(cases)),
+                                         mec='k',
+                                         marker='o',
+                                         linestyle='-',
+                                         linewidth=lw,
+                                         markersize=ms,
+                                         alpha=alpha)
+                    self._lines.append(line)
 
                 self._fig.canvas.flush_events()
 
@@ -876,7 +903,8 @@ class CaseViewer(object):
             if not bad_y_bounds:
                 self._ax.set_ylim(y_min - y_margin, y_max + y_margin)
 
-            # Add the colorbar.  Color shows the index of each point in its vector if the x-axis is Case Index,
+            # Add the colorbar.
+            # Color shows the index of each point in its vector if the x-axis is Case Index,
             # otherwise it shows the case index.
             if x_var == self._case_index_str:
                 vmax = max_size
@@ -897,8 +925,10 @@ class CaseViewer(object):
             cases = self._widgets['cases_list'].options
             x_var = self._widgets['x_select'].value
             y_var = self._widgets['y_select'].value
-            x_slice = '' if self._widgets['x_slice'].value == '[...]' else self._widgets['x_slice'].value
-            y_slice = '' if self._widgets['y_slice'].value == '[...]' else self._widgets['y_slice'].value
+            x_slice = '' if self._widgets['x_slice'].value == '[...]' \
+                else self._widgets['x_slice'].value
+            y_slice = '' if self._widgets['y_slice'].value == '[...]' \
+                else self._widgets['y_slice'].value
             x_transform = self._widgets['x_transform_select'].value
             y_transform = self._widgets['y_transform_select'].value
             x_var_type = self._widgets['x_var_type'].value
@@ -915,7 +945,8 @@ class CaseViewer(object):
                 print('Nothing to plot')
                 return
 
-            x_units = 'None' if x_var == self._case_index_str else _get_var_meta(cr, cases[0], x_var)['units']
+            x_units = 'None' if x_var == self._case_index_str \
+                else _get_var_meta(cr, cases[0], x_var)['units']
             y_units = _get_var_meta(cr, cases[0], y_var)['units']
 
             self._redraw_plot()
@@ -924,10 +955,10 @@ class CaseViewer(object):
             y_label = rf'{y_var}{y_slice}'
 
             if x_var_type == 'residuals':
-                x_label = f'$\mathcal{{R}}$({x_label})'
+                x_label = rf'$\mathcal{{R}}$({x_label})'
 
             if y_var_type == 'residuals':
-                y_label = f'$\mathcal{{R}}$({y_label})'
+                y_label = rf'$\mathcal{{R}}$({y_label})'
 
             if x_transform != 'None':
                 x_label = f'{x_transform}({x_label})'
