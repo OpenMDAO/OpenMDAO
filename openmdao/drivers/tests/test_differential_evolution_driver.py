@@ -431,7 +431,10 @@ class TestMultiObjectiveDifferentialEvolution(unittest.TestCase):
 class TestConstrainedDifferentialEvolution(unittest.TestCase):
 
     def setUp(self):
-        os.environ['DifferentialEvolutionDriver_seed'] = '11'
+        # This env var was changed from '11' to '0' to avoid having to change test results.
+        # The old implementation of the seed calculation erroneously set the seed to 0
+        # regardless of the value of the random_state passed in (in the non-MPI case only).
+        os.environ['DifferentialEvolutionDriver_seed'] = '0'
 
     def tearDown(self):
         del os.environ['DifferentialEvolutionDriver_seed']  # clean up environment

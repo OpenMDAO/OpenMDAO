@@ -497,8 +497,8 @@ class DifferentialEvolution(object):
             Number of points in the population.
         max_gen : int
             Number of generations to run the GA.
-        random_state : np.random.RandomState, int
-            Random state (or seed-number) which controls the seed and random draws.
+        random_state : int
+            Seed-number which controls the random draws.
         F : float
             Differential rate.
         Pc : float
