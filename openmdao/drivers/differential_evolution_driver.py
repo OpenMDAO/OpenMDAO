@@ -522,7 +522,7 @@ class DifferentialEvolution(object):
             pop_size += 1
         self.npop = int(pop_size)
 
-        if self.comm:
+        if self.comm is not None and self.comm.size > 1:
             if random_state is None:
                 # if no random_state is given, generate one on rank 0 and broadcast it to all
                 # ranks.  Because we add the rank to the starting random state, no ranks will
@@ -537,7 +537,7 @@ class DifferentialEvolution(object):
             # add rank to ensure different seed in each MPI process
             seed = random_state + self.comm.rank
         else:
-            seed = None if random_state is None else random_state
+            seed = random_state
 
         rng = np.random.default_rng(seed)
 
