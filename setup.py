@@ -113,6 +113,7 @@ setup(
         'openmdao.utils',
         'openmdao.vectors',
         'openmdao.visualization',
+        'openmdao.visualization.case_viewer',
         'openmdao.visualization.connection_viewer',
         'openmdao.visualization.scaling_viewer',
         'openmdao.visualization.n2_viewer',
