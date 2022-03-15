@@ -439,6 +439,9 @@ class TestConstrainedDifferentialEvolution(unittest.TestCase):
     def tearDown(self):
         del os.environ['DifferentialEvolutionDriver_seed']  # clean up environment
 
+    def tearDown(self):
+        del os.environ['DifferentialEvolutionDriver_seed']  # clean up environment
+
     def test_constrained_with_penalty(self):
         class Cylinder(om.ExplicitComponent):
             def setup(self):
