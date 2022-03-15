@@ -1638,12 +1638,12 @@ class System(object):
             used_idx = {}
             discrete = self._var_allprocs_discrete
 
-            for name in aliases:
+            for name, meta in aliases.items():
 
                 if name in discrete['input'] or name in discrete['output']:
                     continue
 
-                path = responses[name]['source']
+                path = meta['source']
 
                 if path not in used_idx:
                     size = self._var_allprocs_abs2meta['output'][path]['global_size']
@@ -1665,9 +1665,9 @@ class System(object):
                         # make sure the path is present for the relevance calculation.
                         # This is allowed here because this responses dict is not used beyond
                         # the relevance calculation.
-                        responses[path] = responses[name]
+                        responses[path] = meta
 
-                indices = responses[name].get('indices')
+                indices = meta.get('indices')
                 if indices is None:
                     used_idx[path][:] += 1
                 else:
