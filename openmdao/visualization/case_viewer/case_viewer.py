@@ -85,7 +85,7 @@ def _get_var_meta(cr, case_name, var):
     cr : CaseReader
         The case reader housing the data.
     case_name : str
-        The case from which the outputs with avaialble metadata is to be returned.
+        The case from which the outputs with available metadata is to be returned.
     var : str
         The output whose metadata is desired.
 
@@ -94,7 +94,6 @@ def _get_var_meta(cr, case_name, var):
     list
         A dictionary of the metadata for the given output
     """
-    output_vars = set()
     case = cr.get_case(case_name)
 
     case_inputs = case.list_inputs(prom_name=True, units=True, shape=True, val=False,
@@ -119,7 +118,7 @@ def _get_vars(cr, case_names, var_types=None):
     cr : CaseReader
         The CaseReader housing the data.
     case_names : Iterable of str
-        The case_names from which the outputs with avaialble residuals out are to be returned.
+        The case_names from which the outputs with available residuals out are to be returned.
     var_types : None or Iterable of str
         The type of variables to be returned.
         Either 'inputs', 'outputs', or None for both inputs and outputs.
@@ -127,7 +126,7 @@ def _get_vars(cr, case_names, var_types=None):
     Returns
     -------
     list
-        A list of the variables with avaialble residuals in at least one of the given cases.
+        A list of the variables with available residuals in at least one of the given cases.
     """
     vars = set()
     for case_name in case_names:
