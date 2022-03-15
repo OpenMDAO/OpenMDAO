@@ -1631,60 +1631,59 @@ class System(object):
         return {'@all': ({'input': ContainsAll(), 'output': ContainsAll()}, ContainsAll())}
 
     def _check_alias_overlaps(self, responses):
-        # If you have response aliases, check for overlapping indices.
-        aliases = {n: meta for n, meta in responses.items() if meta['alias']}
-        if aliases:
+        # If you have response aliases, check for overlapping indices.  Also adds aliased
+        # sources to responses if they're not already there so relevance will work properly.
+        aliases = set()
+        aliased_srcs = {}
+        to_add = {}
+        discrete = self._var_allprocs_discrete
 
-            used_idx = {}
-            discrete = self._var_allprocs_discrete
+        # group all aliases by source so we can compute overlaps for each source individually
+        for name, meta in responses.items():
+            if meta['alias'] and not (name in discrete['input'] or name in discrete['output']):
+                aliases.add(name)  # name is the same as meta['alias'] here
+                src = meta['source']
+                if src in aliased_srcs:
+                    aliased_srcs[src].append(meta)
+                else:
+                    aliased_srcs[src] = [meta]
 
-            for name, meta in aliases.items():
-
-                if name in discrete['input'] or name in discrete['output']:
-                    continue
-
-                path = meta['source']
-
-                if path not in used_idx:
-                    size = self._var_allprocs_abs2meta['output'][path]['global_size']
-                    used_idx[path] = np.zeros(size, dtype=int)
-
-                    # Source won't be in aliases, but we need its indices if a constraint is
-                    # declared without an alias.
-                    if path in responses:
-                        idx = responses[path].get('indices')
-
-                        if idx is None:
-                            used_idx[path][:] += 1
-                        else:
-                            idx.set_src_shape(
-                                self._var_allprocs_abs2meta['output'][path]['global_shape'])
-                            used_idx[path][idx.flat()] += 1
+                    if src in responses:
+                        # source itself is also a constraint, so need to know indices
+                        aliased_srcs[src].append(responses[src])
                     else:
-                        # If an alias is in responses, but the path isn't, then we need to
-                        # make sure the path is present for the relevance calculation.
+                        # If an alias is in responses, but the src isn't, then we need to
+                        # make sure the src is present for the relevance calculation.
                         # This is allowed here because this responses dict is not used beyond
                         # the relevance calculation.
-                        responses[path] = meta
+                        to_add[src] = meta
 
-                indices = meta.get('indices')
+        for src, metalist in aliased_srcs.items():
+            if len(metalist) == 1:
+                continue
+
+            size = self._var_allprocs_abs2meta['output'][src]['global_size']
+            shape = self._var_allprocs_abs2meta['output'][src]['global_shape']
+            mat = np.zeros(size, dtype=np.ushort)
+
+            for meta in metalist:
+                indices = meta['indices']
                 if indices is None:
-                    used_idx[path][:] += 1
+                    mat[:] += 1
                 else:
-                    indices.set_src_shape(
-                        self._var_allprocs_abs2meta['output'][path]['global_shape'])
-                    used_idx[path][indices.flat()] += 1
+                    indices.set_src_shape(shape)
+                    mat[indices.flat()] += 1
 
-            for path, mat in used_idx.items():
-                if np.any(mat > 1):
-                    matching_aliases = sorted(a for a in aliases if responses[a]['source'] == path)
-                    msg = (f"{self.msginfo}: Indices for aliases {matching_aliases} are overlapping"
-                           f" constraint/objective '{path}'.")
-                    raise RuntimeError(msg)
+            if np.any(mat > 1):
+                matching_aliases = sorted(m['alias'] for m in metalist if m['alias'])
+                raise RuntimeError(f"{self.msginfo}: Indices for aliases {matching_aliases} are "
+                                   f"overlapping constraint/objective '{src}'.")
 
+        if aliases:
             # now remove alias entries from the response dict because we don't need them in the
             # relevance calculation. This reponse dict is used only for relevance and is *not*
             # used by the driver.
+            responses.update(to_add)
             responses = {r: meta for r, meta in responses.items() if r not in aliases}
 
         return responses
