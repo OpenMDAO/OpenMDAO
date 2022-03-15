@@ -991,45 +991,41 @@ def _is_slicer_op(indices):
     return isinstance(indices, slice)
 
 
-def _prom2ivc_src_name_iter(prom_dict):
+def _prom2_src_or_alias_name_iter(proms):
     """
-    Yield keys from prom_dict with promoted input names converted to ivc source names.
+    Yield keys from proms with promoted input names converted to source or alias names.
 
     Parameters
     ----------
-    prom_dict : dict
+    proms : dict
         Original dict with some promoted paths.
 
     Yields
     ------
     str
-        name
+        source pathname or alias name
     """
-    for name, meta in prom_dict.items():
-        if meta['source'] is not None:
-            yield meta['source']
-        else:
-            yield name
+    for name, meta in proms.items():
+        yield meta['source'] if meta['source'] is not None else name
 
 
-def _prom2ivc_src_item_iter(prom_dict):
+def _prom2_src_or_alias_item_iter(proms):
     """
-    Yield items from prom_dict with promoted input names converted to ivc source names.
+    Yield items from proms with promoted input names converted to source or alias names.
 
     The result is that all names are absolute.
 
     Parameters
     ----------
-    prom_dict : dict
+    proms : dict
         Original dict with some promoted paths.
 
     Yields
     ------
     tuple
-        name, metadata
+        src_or_alias_name, metadata
     """
-    # FIXME: I think this can be simplified since all vois have source defined
-    for name, meta in prom_dict.items():
+    for name, meta in proms.items():
         if 'alias' in meta and meta['alias'] is not None:
             yield meta['alias'], meta
         elif meta['source'] is not None:
@@ -1038,9 +1034,9 @@ def _prom2ivc_src_item_iter(prom_dict):
             yield name, meta
 
 
-def _prom2ivc_src_dict(prom_dict):
+def _prom2src_or_alias_dict(prom_dict):
     """
-    Convert a dictionary with promoted input names into one with ivc source names.
+    Convert a dict with promoted input names into one with source or alias names.
 
     Parameters
     ----------
@@ -1050,9 +1046,9 @@ def _prom2ivc_src_dict(prom_dict):
     Returns
     -------
     dict
-        New dict with ivc source pathnames.
+        New dict with source pathnames or alias names.
     """
-    return {name: meta for name, meta in _prom2ivc_src_item_iter(prom_dict)}
+    return {name: meta for name, meta in _prom2_src_or_alias_item_iter(prom_dict)}
 
 
 def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shape):

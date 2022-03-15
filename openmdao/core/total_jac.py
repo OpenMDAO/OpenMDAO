@@ -11,7 +11,7 @@ import time
 import numpy as np
 
 from openmdao.core.constants import INT_DTYPE
-from openmdao.utils.general_utils import ContainsAll, _prom2ivc_src_dict
+from openmdao.utils.general_utils import ContainsAll, _prom2src_or_alias_dict
 
 from openmdao.utils.mpi import MPI, check_mpi_env
 from openmdao.utils.coloring import _initialize_model_approx, Coloring
@@ -146,8 +146,8 @@ class _TotalJacInfo(object):
 
         # convert designvar and response dicts to use src names
         # keys will all be absolute names after conversion
-        design_vars = _prom2ivc_src_dict(driver._designvars)
-        self.responses = responses = _prom2ivc_src_dict(driver._responses)
+        design_vars = _prom2src_or_alias_dict(driver._designvars)
+        self.responses = responses = _prom2src_or_alias_dict(driver._responses)
 
         if not model._use_derivatives:
             raise RuntimeError("Derivative support has been turned off but compute_totals "

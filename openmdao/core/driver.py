@@ -12,8 +12,8 @@ from openmdao.core.constants import INT_DTYPE
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.general_utils import _prom2ivc_src_dict, \
-    _prom2ivc_src_name_iter
+from openmdao.utils.general_utils import _prom2src_or_alias_dict, \
+    _prom2_src_or_alias_name_iter
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
@@ -320,13 +320,13 @@ class Driver(object):
             obj_set = set()
             dv_set = set()
 
-            src_design_vars = _prom2ivc_src_dict(self._designvars)
-            responses = _prom2ivc_src_dict(self._responses)
+            src_design_vars = _prom2src_or_alias_dict(self._designvars)
+            responses = _prom2src_or_alias_dict(self._responses)
 
             local_out_vars = set(model._outputs._abs_iter())
             remote_dvs = set(src_design_vars) - local_out_vars
-            remote_cons = set(_prom2ivc_src_name_iter(self._cons)) - local_out_vars
-            remote_objs = set(_prom2ivc_src_name_iter(self._objs)) - local_out_vars
+            remote_cons = set(_prom2_src_or_alias_name_iter(self._cons)) - local_out_vars
+            remote_objs = set(_prom2_src_or_alias_name_iter(self._objs)) - local_out_vars
 
             all_remote_vois = model.comm.allgather((remote_dvs, remote_cons, remote_objs))
             for rem_dvs, rem_cons, rem_objs in all_remote_vois:
@@ -337,23 +337,23 @@ class Driver(object):
             # If we have remote VOIs, pick an owning rank for each and use that
             # to bcast to others later
             owning_ranks = model._owning_rank
+            abs2idx = model._var_allprocs_abs2idx
+            abs2meta_out = model._var_allprocs_abs2meta['output']
             sizes = model._var_sizes['output']
             rank = model.comm.rank
             nprocs = model.comm.size
 
             # Loop over all VOIs.
             for vname in chain(responses, src_design_vars):
-                vpath = vname
-
                 if vname in responses:
                     vpath = responses[vname]['source']
                     indices = responses[vname].get('indices')
-
-                elif vname in src_design_vars:
+                else:  # in src_design_vars
                     indices = src_design_vars[vname].get('indices')
+                    vpath = vname
 
-                meta = model._var_allprocs_abs2meta['output'][vpath]
-                i = model._var_allprocs_abs2idx[vpath]
+                meta = abs2meta_out[vpath]
+                i = abs2idx[vpath]
 
                 if meta['distributed']:
 

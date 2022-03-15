@@ -1982,8 +1982,7 @@ class Problem(object):
         for name, meta in meta.items():
 
             row = {}
-            alias = meta.get('alias')
-            vname = meta['name'] if alias else name
+            vname = meta['name'] if meta.get('alias') else name
 
             for col_name in col_names:
                 if col_name == 'name':

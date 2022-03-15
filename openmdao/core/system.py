@@ -2783,10 +2783,9 @@ class System(object):
             raise RuntimeError(msg.format(name))
 
         resp['name'] = name
+        resp['alias'] = alias
         if alias is not None:
-            resp['alias'] = name = alias
-        else:
-            resp['alias'] = None
+            name = alias
 
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
@@ -2883,8 +2882,8 @@ class System(object):
         resp['parallel_deriv_color'] = parallel_deriv_color
         resp['flat_indices'] = flat_indices
 
-        if resp['alias'] in responses:
-            raise TypeError(f"Constraint alias '{name}' is a duplicate of an existing alias or "
+        if alias in responses:
+            raise TypeError(f"Constraint alias '{alias}' is a duplicate of an existing alias or "
                             "variable name.")
 
         responses[name] = resp
@@ -3191,8 +3190,6 @@ class System(object):
 
         return out
 
-    # FIXME:  fix this docstring describing keys of return dict, hopefully after
-    #         simplifying the key handling because it's a mess.
     def get_responses(self, recurse=True, get_sizes=True, use_prom_ivc=False):
         """
         Get the response variable settings from this system.
@@ -3247,15 +3244,13 @@ class System(object):
 
                 else:
                     if alias is None:
-                        # A constraint can be on an auto_ivc input, so use connected
-                        # output name.
+                        # A constraint can be on an input, so use connected output name.
                         key = in_abs = prom2abs_in[name][0]
                         src_path = conns[in_abs]
                     else:  # name is an alias
-
                         if prom in prom2abs_out:
                             src_path = prom2abs_out[prom][0]
-                        elif prom in prom2abs_in:
+                        else:
                             src_path = conns[prom2abs_in[prom][0]]
 
                         key = alias

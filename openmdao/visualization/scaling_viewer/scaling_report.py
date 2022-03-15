@@ -424,14 +424,12 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
             save = driver._total_jac
             driver._total_jac = None
 
-            print("LINEAR COMPUTE_TOTALS")
             try:
                 lintotals = driver._compute_totals(of=lindata['oflabels'], wrt=data['wrtlabels'],
                                                    return_format='array')
                 lin_response_vals = {n: full_response_vals[n] for n in lindata['oflabels']}
             finally:
                 driver._total_jac = save
-            print("DONE LINEAR COMPUTE_TOTALS")
 
             _compute_jac_view_info(lintotals, lindata, dv_vals, lin_response_vals, None)
 
