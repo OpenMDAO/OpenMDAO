@@ -303,6 +303,10 @@ class CaseViewer(object):
             raise RuntimeError('CaseViewer requires ipywidgets')
         if get_ipython() is None:
             raise RuntimeError('CaseViewer must be run from within a Jupyter notebook.')
+        try:
+            import ipympl
+        except ImportError:
+            raise RuntimeError('CaseViewer requires ipympl')
 
         get_ipython().run_line_magic('matplotlib', 'widget')
 
