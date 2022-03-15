@@ -13,7 +13,7 @@ from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.general_utils import _prom2src_or_alias_dict, \
-    _prom2_src_or_alias_name_iter
+    _prom2_src_name_iter
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
@@ -316,17 +316,14 @@ class Driver(object):
 
         # Now determine if later we'll need to allgather cons, objs, or desvars.
         if model.comm.size > 1 and model._subsystems_allprocs:
+            loc_vars = set(model._outputs._abs_iter())
+            remote_dvs = [n for n in _prom2_src_name_iter(self._designvars) if n not in loc_vars]
+            remote_cons = [n for n in _prom2_src_name_iter(self._cons) if n not in loc_vars]
+            remote_objs = [n for n in _prom2_src_name_iter(self._objs) if n not in loc_vars]
+
             con_set = set()
             obj_set = set()
             dv_set = set()
-
-            src_design_vars = _prom2src_or_alias_dict(self._designvars)
-            responses = _prom2src_or_alias_dict(self._responses)
-
-            local_out_vars = set(model._outputs._abs_iter())
-            remote_dvs = set(src_design_vars) - local_out_vars
-            remote_cons = set(_prom2_src_or_alias_name_iter(self._cons)) - local_out_vars
-            remote_objs = set(_prom2_src_or_alias_name_iter(self._objs)) - local_out_vars
 
             all_remote_vois = model.comm.allgather((remote_dvs, remote_cons, remote_objs))
             for rem_dvs, rem_cons, rem_objs in all_remote_vois:
@@ -343,14 +340,13 @@ class Driver(object):
             rank = model.comm.rank
             nprocs = model.comm.size
 
+            src_design_vars = _prom2src_or_alias_dict(self._designvars)
+            responses = _prom2src_or_alias_dict(self._responses)
+
             # Loop over all VOIs.
-            for vname in chain(responses, src_design_vars):
-                if vname in responses:
-                    vpath = responses[vname]['source']
-                    indices = responses[vname].get('indices')
-                else:  # in src_design_vars
-                    indices = src_design_vars[vname].get('indices')
-                    vpath = vname
+            for vname, voimeta in chain(responses.items(), src_design_vars.items()):
+                indices = voimeta['indices']
+                vpath = voimeta['source']
 
                 meta = abs2meta_out[vpath]
                 i = abs2idx[vpath]
@@ -645,6 +641,8 @@ class Driver(object):
         """
         Set the value of a design variable.
 
+        'name' can be a promoted output name or an alias.
+
         Parameters
         ----------
         name : str
@@ -683,8 +681,8 @@ class Driver(object):
 
         elif problem.model._outputs._contains_abs(src_name):
             desvar = problem.model._outputs._abs_get_val(src_name)
-            if src_name in self._dist_driver_vars:
-                loc_idxs, _, dist_idxs = self._dist_driver_vars[src_name]
+            if name in self._dist_driver_vars:
+                loc_idxs, _, dist_idxs = self._dist_driver_vars[name]
             else:
                 loc_idxs = meta['indices']
                 if loc_idxs is None:

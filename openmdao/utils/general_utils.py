@@ -991,9 +991,9 @@ def _is_slicer_op(indices):
     return isinstance(indices, slice)
 
 
-def _prom2_src_or_alias_name_iter(proms):
+def _prom2_src_name_iter(proms):
     """
-    Yield keys from proms with promoted input names converted to source or alias names.
+    Yield keys from proms with promoted input names converted to source names.
 
     Parameters
     ----------
@@ -1003,10 +1003,10 @@ def _prom2_src_or_alias_name_iter(proms):
     Yields
     ------
     str
-        source pathname or alias name
+        source pathname name
     """
-    for name, meta in proms.items():
-        yield meta['source'] if meta['source'] is not None else name
+    for meta in proms.values():
+        yield meta['source']
 
 
 def _prom2_src_or_alias_item_iter(proms):
