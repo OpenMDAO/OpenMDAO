@@ -12,8 +12,7 @@ from openmdao.core.constants import INT_DTYPE
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.general_utils import _prom2src_or_alias_dict, \
-    _prom2_src_name_iter
+from openmdao.utils.general_utils import _src_name_iter
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
@@ -317,9 +316,9 @@ class Driver(object):
         # Now determine if later we'll need to allgather cons, objs, or desvars.
         if model.comm.size > 1 and model._subsystems_allprocs:
             loc_vars = set(model._outputs._abs_iter())
-            remote_dvs = [n for n in _prom2_src_name_iter(self._designvars) if n not in loc_vars]
-            remote_cons = [n for n in _prom2_src_name_iter(self._cons) if n not in loc_vars]
-            remote_objs = [n for n in _prom2_src_name_iter(self._objs) if n not in loc_vars]
+            remote_dvs = [n for n in _src_name_iter(self._designvars) if n not in loc_vars]
+            remote_cons = [n for n in _src_name_iter(self._cons) if n not in loc_vars]
+            remote_objs = [n for n in _src_name_iter(self._objs) if n not in loc_vars]
 
             con_set = set()
             obj_set = set()
@@ -340,11 +339,8 @@ class Driver(object):
             rank = model.comm.rank
             nprocs = model.comm.size
 
-            src_design_vars = _prom2src_or_alias_dict(self._designvars)
-            responses = _prom2src_or_alias_dict(self._responses)
-
             # Loop over all VOIs.
-            for vname, voimeta in chain(responses.items(), src_design_vars.items()):
+            for vname, voimeta in chain(self._responses.items(), self._designvars.items()):
                 indices = voimeta['indices']
                 vpath = voimeta['source']
 

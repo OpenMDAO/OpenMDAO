@@ -11,7 +11,7 @@ import time
 import numpy as np
 
 from openmdao.core.constants import INT_DTYPE
-from openmdao.utils.general_utils import ContainsAll, _prom2src_or_alias_dict
+from openmdao.utils.general_utils import ContainsAll, _src_or_alias_dict
 
 from openmdao.utils.mpi import MPI, check_mpi_env
 from openmdao.utils.coloring import _initialize_model_approx, Coloring
@@ -144,10 +144,10 @@ class _TotalJacInfo(object):
         if isinstance(of, str):
             of = [of]
 
-        # convert designvar and response dicts to use src names
-        # keys will all be absolute names after conversion
-        design_vars = _prom2src_or_alias_dict(driver._designvars)
-        self.responses = responses = _prom2src_or_alias_dict(driver._responses)
+        # convert designvar and response dicts to use src or alias names
+        # keys will all be absolute names or aliases after conversion
+        design_vars = _src_or_alias_dict(driver._designvars)
+        self.responses = responses = _src_or_alias_dict(driver._responses)
 
         if not model._use_derivatives:
             raise RuntimeError("Derivative support has been turned off but compute_totals "
@@ -178,10 +178,10 @@ class _TotalJacInfo(object):
                 wrt_name = name
             wrt.append(wrt_name)
 
-        # Convert 'of' names from promoted to absolute
+        # Convert 'of' names from promoted to absolute (or alias)
         prom_of = of
         of = []
-        for name in prom_of:
+        for name in prom_of:  # these names could be aliases
             if name in prom2abs:
                 of_name = prom2abs[name][0]
             elif name in prom2abs_in:

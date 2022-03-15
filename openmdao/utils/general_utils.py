@@ -991,7 +991,7 @@ def _is_slicer_op(indices):
     return isinstance(indices, slice)
 
 
-def _prom2_src_name_iter(proms):
+def _src_name_iter(proms):
     """
     Yield keys from proms with promoted input names converted to source names.
 
@@ -1009,7 +1009,7 @@ def _prom2_src_name_iter(proms):
         yield meta['source']
 
 
-def _prom2_src_or_alias_item_iter(proms):
+def _src_or_alias_item_iter(proms):
     """
     Yield items from proms with promoted input names converted to source or alias names.
 
@@ -1034,7 +1034,7 @@ def _prom2_src_or_alias_item_iter(proms):
             yield name, meta
 
 
-def _prom2src_or_alias_dict(prom_dict):
+def _src_or_alias_dict(prom_dict):
     """
     Convert a dict with promoted input names into one with source or alias names.
 
@@ -1048,7 +1048,7 @@ def _prom2src_or_alias_dict(prom_dict):
     dict
         New dict with source pathnames or alias names.
     """
-    return {name: meta for name, meta in _prom2_src_or_alias_item_iter(prom_dict)}
+    return {name: meta for name, meta in _src_or_alias_item_iter(prom_dict)}
 
 
 def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shape):

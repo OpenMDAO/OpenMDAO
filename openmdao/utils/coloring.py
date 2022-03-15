@@ -14,8 +14,8 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 
 from openmdao.core.constants import INT_DTYPE
-from openmdao.utils.general_utils import _prom2src_or_alias_dict, \
-    _prom2_src_name_iter, _prom2_src_or_alias_item_iter
+from openmdao.utils.general_utils import _src_or_alias_dict, \
+    _src_name_iter, _src_or_alias_item_iter
 from openmdao.utils.array_utils import array_viz
 import openmdao.utils.hooks as hooks
 from openmdao.utils.mpi import MPI
@@ -1638,7 +1638,7 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
         prob.run_model(reset_iter_counts=False)
 
     if of is None or wrt is None:
-        driver_wrt = list(_prom2_src_name_iter(driver._designvars))
+        driver_wrt = list(_src_name_iter(driver._designvars))
         driver_of = driver._get_ordered_nl_responses()
         if not driver_wrt or not driver_of:
             raise RuntimeError("When computing total jacobian sparsity, either 'of' and 'wrt' "
@@ -1687,7 +1687,7 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
 
 
 def _get_desvar_info(driver, names=None, use_abs_names=True):
-    desvars = _prom2src_or_alias_dict(driver._designvars)
+    desvars = _src_or_alias_dict(driver._designvars)
 
     if names is None:
         abs_names = list(desvars)
@@ -2320,11 +2320,11 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
         else:
             model._owns_approx_of_idx = {
                 key: meta['indices']
-                    for key, meta in _prom2_src_or_alias_item_iter(driver._responses)
+                    for key, meta in _src_or_alias_item_iter(driver._responses)
                 if meta['indices'] is not None
             }
         model._owns_approx_wrt_idx = {
-            key: meta['indices'] for key, meta in _prom2_src_or_alias_item_iter(design_vars)
+            key: meta['indices'] for key, meta in _src_or_alias_item_iter(design_vars)
             if meta['indices'] is not None
         }
 
