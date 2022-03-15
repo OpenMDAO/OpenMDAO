@@ -266,6 +266,29 @@ class CaseViewer(object):
     ----------
     f : str
         The file from which the cases are to be viewed.
+
+    Attributes
+    ----------
+    _filename : str
+        The filename associated with the record file.
+    _case_reader : CaseReader
+        The CaseReader instance used to retrieve data from the case file.
+    _lines : list of mpl.Line2D
+        The line objects on the matplotlib Axes.
+    _scatters : list of PathCollection
+        The scatter plot objects on the matplotlib Axes.
+    _fig : mpl.Figure
+        The figure on which the plots are displayed.
+    _ax : mpl.Axes
+        The matplotlib Axes on which the plots are displayed.
+    _cmap : mpl.ColorMap
+        The matplotlib color map used to show variation in the plots.
+    _scalar_mappable : cm.ScalarMappable
+        The object used to provide the extents of the color mapping.
+    _colorbar : mpl.Colorbar
+        The colorbar shown on the right side of the figure.
+    _case_index_str : str
+        Constant defining the "Case Index" string used throughout the CaseViewer.
     """
 
     def __init__(self, f):
@@ -282,12 +305,6 @@ class CaseViewer(object):
             raise RuntimeError('CaseViewer must be run from within a Jupyter notebook.')
 
         get_ipython().run_line_magic('matplotlib', 'widget')
-
-        self._outputs = {}
-        self._desvars = set()
-        self._constraints = set()
-        self._objectives = set()
-        self._resids = set()
 
         self._case_reader = CaseReader(f) if isinstance(f, str) else f
 
