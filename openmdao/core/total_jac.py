@@ -4,7 +4,6 @@ Helper class for total jacobian computation.
 from collections import defaultdict
 from itertools import chain
 from copy import deepcopy
-import os
 import pprint
 import sys
 import time
@@ -408,6 +407,7 @@ class _TotalJacInfo(object):
                 loc_size = np.array([rowcol_size], dtype=INT_DTYPE)
                 jac_sizes = np.zeros(nproc, dtype=INT_DTYPE)
                 self.comm.Allgather(loc_size, jac_sizes)
+
                 myoffset = np.sum(jac_sizes[:myrank])
 
             _, _, name2jinds = self.sol2jac_map[mode]
@@ -468,14 +468,17 @@ class _TotalJacInfo(object):
                 full_src_inds = np.zeros(0, dtype=INT_DTYPE)
                 full_tgt_inds = np.zeros(0, dtype=INT_DTYPE)
 
+            tgt_vec = PETSc.Vec().createWithArray(np.zeros(rowcol_size, dtype=float),
+                                                  comm=self.comm)
+            self.tgt_petsc[mode] = tgt_vec
+
+            src_vec = PETSc.Vec().createWithArray(np.zeros(rowcol_size, dtype=float),
+                                                  comm=self.comm)
+            self.src_petsc[mode] = src_vec
+
             src_indexset = PETSc.IS().createGeneral(full_src_inds, comm=self.comm)
             tgt_indexset = PETSc.IS().createGeneral(full_tgt_inds, comm=self.comm)
-            self.tgt_petsc[mode] = tgt_vec = PETSc.Vec().createWithArray(np.zeros(rowcol_size,
-                                                                                  dtype=float),
-                                                                         comm=self.comm)
-            self.src_petsc[mode] = src_vec = PETSc.Vec().createWithArray(np.zeros(rowcol_size,
-                                                                                  dtype=float),
-                                                                         comm=self.comm)
+
             return PETSc.Scatter().create(src_vec, src_indexset, tgt_vec, tgt_indexset)
 
     def _get_dict_J(self, J, wrt, prom_wrt, of, prom_of, wrt_meta, of_meta, return_format):
