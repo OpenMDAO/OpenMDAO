@@ -46,10 +46,9 @@ def _apply_transform(data, transform):
     data : np.array
         The data to be transformed.
     transform : str
-        The name of the transform to be applied.  This will be looed up in _func_map.
+        The name of the transform to be applied.  This will be looked up in _func_map.
     """
-    _func_map[transform]
-    if _func_map[transform]:
+    if transform in _func_map:
         out = _func_map[transform](data)
         return np.atleast_2d(np.asarray(out))
     return data
@@ -126,7 +125,7 @@ def _get_vars(cr, case_names, var_types=None):
     Returns
     -------
     list
-        A list of the variables with available residuals in at least one of the given cases.
+        A list of the variables available in at least one of the given cases.
     """
     vars = set()
     for case_name in case_names:
