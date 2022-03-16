@@ -1009,11 +1009,17 @@ def _src_name_iter(proms):
         yield meta['source']
 
 
+def _src_or_alias_name(meta):
+    if 'alias' in meta:
+        alias = meta['alias']
+        if alias:
+            return alias
+    return meta['source']
+
+
 def _src_or_alias_item_iter(proms):
     """
     Yield items from proms with promoted input names converted to source or alias names.
-
-    The result is that all names are absolute.
 
     Parameters
     ----------

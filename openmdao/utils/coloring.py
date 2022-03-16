@@ -1690,21 +1690,21 @@ def _get_desvar_info(driver, names=None, use_abs_names=True):
     desvars = _src_or_alias_dict(driver._designvars)
 
     if names is None:
-        abs_names = list(desvars)
-        return abs_names, [desvars[n]['size'] for n in abs_names]
+        vnames = list(desvars)
+        return vnames, [desvars[n]['size'] for n in vnames]
 
     model = driver._problem().model
     abs2meta_out = model._var_allprocs_abs2meta['output']
 
     if use_abs_names:
-        abs_names = names
+        vnames = names
     else:
         prom2abs = model._var_allprocs_prom2abs_list['output']
-        abs_names = [prom2abs[n][0] for n in names]
+        vnames = [prom2abs[n][0] for n in names]
 
     # if a variable happens to be a design var, use that size
     sizes = []
-    for n in abs_names:
+    for n in vnames:
         if n in desvars:
             sizes.append(desvars[n]['size'])
         elif n in abs2meta_out:
@@ -1712,33 +1712,33 @@ def _get_desvar_info(driver, names=None, use_abs_names=True):
         else:  # it's an input name w/o corresponding design var
             sizes.append(abs2meta_out[model.get_source(n)]['global_size'])
 
-    return abs_names, sizes
+    return vnames, sizes
 
 
 def _get_response_info(driver, names=None, use_abs_names=True):
     responses = driver._responses
     if names is None:
-        abs_names = driver._get_ordered_nl_responses()
-        return abs_names, [responses[n]['size'] for n in abs_names]
+        vnames = driver._get_ordered_nl_responses()
+        return vnames, [responses[n]['size'] for n in vnames]
 
     model = driver._problem().model
     abs2meta_out = model._var_allprocs_abs2meta['output']
 
     if use_abs_names:
-        abs_names = names
+        vnames = names
     else:
         prom2abs = model._var_allprocs_prom2abs_list['output']
-        abs_names = [prom2abs[n][0] for n in names]
+        vnames = [prom2abs[n][0] if n in prom2abs else n for n in names]
 
     # if a variable happens to be a response var, use that size
     sizes = []
-    for n in abs_names:
+    for n in vnames:
         if n in responses:
             sizes.append(responses[n]['size'])
         else:
             sizes.append(abs2meta_out[n]['global_size'])
 
-    return abs_names, sizes
+    return vnames, sizes
 
 
 def _compute_coloring(J, mode):
@@ -1858,7 +1858,7 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
     fname : filename or None
         File where output coloring info will be written. If None, no info will be written.
     use_abs_names : bool
-        If True, use absolute naming for of and wrt variables.
+        If True, use absolute naming for of and wrt variables unless they are aliases.
 
     Returns
     -------

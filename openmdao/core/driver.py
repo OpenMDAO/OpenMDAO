@@ -317,6 +317,8 @@ class Driver(object):
         # Now determine if later we'll need to allgather cons, objs, or desvars.
         if model.comm.size > 1 and model._subsystems_allprocs:
             loc_vars = set(model._outputs._abs_iter())
+            # some of these lists could have duplicate src names if aliases are used. We'll
+            # fix that when we convert to sets after the allgather.
             remote_dvs = [n for n in _src_name_iter(self._designvars) if n not in loc_vars]
             remote_cons = [n for n in _src_name_iter(self._cons) if n not in loc_vars]
             remote_objs = [n for n in _src_name_iter(self._objs) if n not in loc_vars]
@@ -342,11 +344,13 @@ class Driver(object):
 
             # Loop over all VOIs.
             for vname, voimeta in chain(self._responses.items(), self._designvars.items()):
-                indices = voimeta['indices']
-                vpath = voimeta['source']
+                # vname may be a source or an alias
 
-                meta = abs2meta_out[vpath]
-                i = abs2idx[vpath]
+                indices = voimeta['indices']
+                vsrc = voimeta['source']
+
+                meta = abs2meta_out[vsrc]
+                i = abs2idx[vsrc]
 
                 if meta['distributed']:
 
@@ -375,14 +379,14 @@ class Driver(object):
                                             slice(offsets[rank], offsets[rank] + dist_sizes[rank]))
 
                 else:
-                    owner = owning_ranks[vpath]
+                    owner = owning_ranks[vsrc]
                     sz = sizes[owner, i]
 
-                    if vpath in dv_set:
+                    if vsrc in dv_set:
                         remote_dv_dict[vname] = (owner, sz)
-                    if vpath in con_set:
+                    if vsrc in con_set:
                         remote_con_dict[vname] = (owner, sz)
-                    if vpath in obj_set:
+                    if vsrc in obj_set:
                         remote_obj_dict[vname] = (owner, sz)
 
         self._remote_responses = self._remote_cons.copy()

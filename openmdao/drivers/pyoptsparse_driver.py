@@ -28,6 +28,7 @@ import openmdao.utils.coloring as c_mod
 from openmdao.utils.class_util import WeakMethodWrapper
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
+from openmdao.utils.general_utils import _src_or_alias_name
 
 
 # names of optimizers that use gradients
@@ -681,15 +682,15 @@ class pyOptSparseDriver(Driver):
                 # conversion of our dense array into a fully dense 'coo', which is bad.
                 # TODO: look into getting rid of all of these conversions!
                 new_sens = {}
-                res_jacs = self._res_subjacs
+                res_subjacs = self._res_subjacs
                 for okey in func_dict:
                     new_sens[okey] = newdv = {}
-                    okey_src = self._responses[okey]['source']
+                    osrc_or_alias = _src_or_alias_name(self._responses[okey])
                     for ikey in dv_dict:
                         ikey_src = self._designvars[ikey]['source']
-                        if okey_src in res_jacs and ikey_src in res_jacs[okey_src]:
+                        if osrc_or_alias in res_subjacs and ikey_src in res_subjacs[osrc_or_alias]:
                             arr = sens_dict[okey][ikey]
-                            coo = res_jacs[okey_src][ikey_src]
+                            coo = res_subjacs[osrc_or_alias][ikey_src]
                             row, col, data = coo['coo']
                             coo['coo'][2] = arr[row, col].flatten()
                             newdv[ikey] = coo
