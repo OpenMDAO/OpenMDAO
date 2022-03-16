@@ -379,7 +379,7 @@ class pyOptSparseDriver(Driver):
                 continue
             size = meta['global_size'] if meta['distributed'] else meta['size']
             lower = upper = meta['equals']
-            path = model._responses[name]['source'] if meta['alias'] is not None else name
+            path = meta['source'] if meta['alias'] is not None else name
             if fwd:
                 wrt = [v for v in indep_list if path in relevant[input_meta[v]['source']]]
             else:
@@ -410,7 +410,7 @@ class pyOptSparseDriver(Driver):
             lower = meta['lower']
             upper = meta['upper']
 
-            path = model._responses[name]['source'] if meta['alias'] is not None else name
+            path = meta['source'] if meta['alias'] is not None else name
 
             if fwd:
                 wrt = [v for v in indep_list if path in relevant[input_meta[v]['source']]]

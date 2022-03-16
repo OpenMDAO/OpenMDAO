@@ -596,7 +596,7 @@ class _TotalJacInfo(object):
 
         for name in input_list:
             if name in self.responses and self.responses[name]['alias'] is not None:
-                path = model._responses[name]['source']
+                path = self.responses[name]['source']
             else:
                 path = name
 

@@ -459,11 +459,11 @@ class Driver(object):
 
         myoutputs = set(myoutputs)
         if recording_options['record_desvars']:
-            myoutputs.update(model.get_source(n) for n in self._designvars)
+            myoutputs.update(_src_name_iter(self._designvars))
         if recording_options['record_objectives'] or recording_options['record_responses']:
-            myoutputs.update(self._objs)
+            myoutputs.update(_src_name_iter(self._objs))
         if recording_options['record_constraints'] or recording_options['record_responses']:
-            myoutputs.update(self._cons)
+            myoutputs.update(_src_name_iter(self._cons))
 
         # inputs (if in options). inputs use _absolute_ names for includes/excludes
         if 'record_inputs' in recording_options:
