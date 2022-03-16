@@ -72,7 +72,7 @@ def _apply_slice(data, s):
         The sliced data.
     """
     safe_funcs = {'index_exp': np.index_exp, '__builtins__': None}
-    sl = eval(f'index_exp{s}', safe_funcs, None)
+    sl = eval(f'index_exp{s}', safe_funcs, None)  # nosec: scope limited
     return data[sl]
 
 
