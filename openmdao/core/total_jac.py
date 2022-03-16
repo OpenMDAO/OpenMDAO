@@ -537,7 +537,7 @@ class _TotalJacInfo(object):
                 out_slice = of_meta[out][0]
                 for j, inp in enumerate(wrt):
                     if inp not in self.remote_vois:
-                        key = "%s!%s" % (prom_of[i], prom_wrt[j])
+                        key = '!'.join((prom_of[i], prom_wrt[j]))
                         J_dict[key] = J[out_slice, wrt_meta[inp][0]]
         else:
             raise ValueError("'%s' is not a valid jacobian return format." % return_format)
