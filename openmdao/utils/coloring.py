@@ -1629,7 +1629,7 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
     """
     # clear out any old simul coloring info
     driver = prob.driver
-    driver._res_jacs = {}
+    driver._res_subjacs = {}
 
     if setup:
         prob.setup(mode=prob._mode)

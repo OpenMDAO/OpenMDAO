@@ -331,11 +331,11 @@ class pyOptSparseDriver(Driver):
                                 comm=comm)
 
         # Add all design variables
-        input_meta = self._designvars
-        self._indep_list = indep_list = list(input_meta)
+        dv_meta = self._designvars
+        self._indep_list = indep_list = list(dv_meta)
         input_vals = self.get_design_var_values()
 
-        for name, meta in input_meta.items():
+        for name, meta in dv_meta.items():
             size = meta['global_size'] if meta['distributed'] else meta['size']
             opt_prob.addVarGroup(name, size, type='c',
                                  value=input_vals[name],
@@ -381,19 +381,19 @@ class pyOptSparseDriver(Driver):
             lower = upper = meta['equals']
             path = meta['source'] if meta['alias'] is not None else name
             if fwd:
-                wrt = [v for v in indep_list if path in relevant[input_meta[v]['source']]]
+                wrt = [v for v in indep_list if path in relevant[dv_meta[v]['source']]]
             else:
                 rels = relevant[path]
-                wrt = [v for v in indep_list if input_meta[v]['source'] in rels]
+                wrt = [v for v in indep_list if dv_meta[v]['source'] in rels]
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
                 opt_prob.addConGroup(name, size, lower=lower, upper=upper,
                                      linear=True, wrt=wrt, jac=jac)
             else:
-                if name in self._res_jacs:
-                    resjac = self._res_jacs[name]
-                    jac = {n: resjac[input_meta[n]['source']] for n in wrt}
+                if name in self._res_subjacs:
+                    resjac = self._res_subjacs[name]
+                    jac = {n: resjac[dv_meta[n]['source']] for n in wrt}
                 else:
                     jac = None
 
@@ -413,19 +413,19 @@ class pyOptSparseDriver(Driver):
             path = meta['source'] if meta['alias'] is not None else name
 
             if fwd:
-                wrt = [v for v in indep_list if path in relevant[input_meta[v]['source']]]
+                wrt = [v for v in indep_list if path in relevant[dv_meta[v]['source']]]
             else:
                 rels = relevant[path]
-                wrt = [v for v in indep_list if input_meta[v]['source'] in rels]
+                wrt = [v for v in indep_list if dv_meta[v]['source'] in rels]
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
                 opt_prob.addConGroup(name, size, upper=upper, lower=lower,
                                      linear=True, wrt=wrt, jac=jac)
             else:
-                if name in self._res_jacs:
-                    resjac = self._res_jacs[name]
-                    jac = {n: resjac[input_meta[n]['source']] for n in wrt}
+                if name in self._res_subjacs:
+                    resjac = self._res_subjacs[name]
+                    jac = {n: resjac[dv_meta[n]['source']] for n in wrt}
                 else:
                     jac = None
                 opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt, jac=jac)
@@ -630,9 +630,10 @@ class pyOptSparseDriver(Driver):
         Parameters
         ----------
         dv_dict : dict
-            Dictionary of design variable values.
+            Dictionary of design variable values. All keys are sources.
         func_dict : dict
-            Dictionary of all functional variables evaluated at design point.
+            Dictionary of all functional variables evaluated at design point. Keys are
+            sources and aliases.
 
         Returns
         -------
@@ -680,7 +681,7 @@ class pyOptSparseDriver(Driver):
                 # conversion of our dense array into a fully dense 'coo', which is bad.
                 # TODO: look into getting rid of all of these conversions!
                 new_sens = {}
-                res_jacs = self._res_jacs
+                res_jacs = self._res_subjacs
                 for okey in func_dict:
                     new_sens[okey] = newdv = {}
                     okey_src = self._responses[okey]['source']
@@ -765,7 +766,7 @@ class pyOptSparseDriver(Driver):
             Current coloring.
         """
         total_sparsity = None
-        self._res_jacs = {}
+        self._res_subjacs = {}
         coloring = coloring if coloring is not None else self._get_static_coloring()
         if coloring is not None:
             total_sparsity = coloring.get_subjac_sparsity()
@@ -787,12 +788,12 @@ class pyOptSparseDriver(Driver):
                 res = self._responses[res]['source']
             if res in self._objs:  # skip objectives
                 continue
-            self._res_jacs[res] = {}
+            self._res_subjacs[res] = {}
             for dv, (rows, cols, shape) in resdict.items():
                 rows = np.array(rows, dtype=INT_DTYPE)
                 cols = np.array(cols, dtype=INT_DTYPE)
 
-                self._res_jacs[res][dv] = {
+                self._res_subjacs[res][dv] = {
                     'coo': [rows, cols, np.zeros(rows.size)],
                     'shape': shape,
                 }

@@ -97,8 +97,9 @@ class Driver(object):
         Metadata pertaining to total coloring.
     _total_jac_sparsity : dict, str, or None
         Specifies sparsity of sub-jacobians of the total jacobian. Only used by pyOptSparseDriver.
-    _res_jacs : dict
+    _res_subjacs : dict
         Dict of sparse subjacobians for use with certain optimizers, e.g. pyOptSparseDriver.
+        Keyed by sources and aliases.
     _total_jac : _TotalJacInfo or None
         Cached total jacobian handling object.
     """
@@ -186,7 +187,7 @@ class Driver(object):
         self._coloring_info = coloring_mod._get_coloring_meta()
 
         self._total_jac_sparsity = None
-        self._res_jacs = {}
+        self._res_subjacs = {}
         self._total_jac = None
 
         self.fail = False
