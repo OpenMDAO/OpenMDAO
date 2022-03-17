@@ -1,4 +1,79 @@
 ***********************************
+# Release Notes for OpenMDAO 3.17.0
+
+March 21, 2022
+
+OpenMDAO 3.17.0 adds a few significant capabilities, as well as several bugfixes and performance improvements.
+
+The first major capability is the addition of a reports system.  OpenMDAO has provided various feedback through
+standard output, either automatically or at the users request.  The new report capability will allow OpenMDAO to provide
+richer feedback via html and other outputs.  In addition, reports that are useful and cheap to generate, such as the N2
+diagram and the scaling report, will be generated automatically and placed in a reports directory.  The location of
+this reports directory is user-configurable, and options exists for disabling reports when they are unwanted.  Finally,
+the reports system is intended to be extensible, so developers of tools which use OpenMDAO will be able to generate
+their own reports.
+
+OpenMDAO will now also allow aliases for constraints.  This feature will enable users to apply multiple constraints
+to the same variable - such as imposing a equality constraint on one array element and lower/upper bounds on other
+elements.  In the past, users would typically create new "pass-thru" components that would accept different portions
+of these array outputs.  Using the OpenMDAO model hierarchy to "namespace" constraints is also no longer necessary,
+since aliases can be used to give a more human-readable description of the constraint.
+
+We're continuing to add visualization tools. This release features OptionsWidget and CaseViewer.  OptionsWidget provides
+a simple GUI to change options of a model in a Jupyter notebook.  CaseViewer provides a GUI for rapidly plotting
+variables across case iterations from a case record file.  CaseViewer currently only works in a Jupyter notebook,
+but we plan on allowing it to be used as a standalone tool in the future.
+
+## New Deprecations
+
+- Added deprecation if options names are not valid python names. [#2378](https://github.com/OpenMDAO/OpenMDAO/pull/2378)
+
+## Backwards Incompatible API Changes
+
+- None
+
+## Backwards Incompatible Non-API Changes
+
+- None
+
+## New Features
+
+- Added several updates to the hooks system. [#2404](https://github.com/OpenMDAO/OpenMDAO/pull/2404)
+- N2 toolbar buttons added to access collapse/expand and variable filter modes [#2407](https://github.com/OpenMDAO/OpenMDAO/pull/2407)
+- Represent filtered variables in the N2 as collapsed instead of hidden [#2422](https://github.com/OpenMDAO/OpenMDAO/pull/2422)
+- Allow complex numbers in InterpND, more fixed-size interpolants for 1D and 2D slinear, and some slinear performance improvements. [#2436](https://github.com/OpenMDAO/OpenMDAO/pull/2436)
+- Implementation of the reports system, per POEM 060. [#2448](https://github.com/OpenMDAO/OpenMDAO/pull/2448)
+- Added a widget to modify options in a Jupyter notebook environment before setup. [#2456](https://github.com/OpenMDAO/OpenMDAO/pull/2456)
+- Added a CaseViewer tool for quick visualization of case data in a Jupyter notebook. [#2470](https://github.com/OpenMDAO/OpenMDAO/pull/2470)
+- Implementation of POEM 063, constraint aliases and allowing multiple constraints on different indices of array variables. [#2473](https://github.com/OpenMDAO/OpenMDAO/pull/2473)
+
+## Bug Fixes
+
+- When generating the scaling report, run the model if it hasn't been run. [#2413](https://github.com/OpenMDAO/OpenMDAO/pull/2413)
+- Allow leading underscore in valid options names. [#2418](https://github.com/OpenMDAO/OpenMDAO/pull/2418)
+- Removed exception when get_io_metadata called on dyn shaped variable before shape is known [#2424](https://github.com/OpenMDAO/OpenMDAO/pull/2424)
+- Fixed Iterable deprecation and a couple tests for Python 3.10 [#2426](https://github.com/OpenMDAO/OpenMDAO/pull/2426)
+- DOE driver no longer generates redundant recordings when not running in parallel [#2430](https://github.com/OpenMDAO/OpenMDAO/pull/2430)
+- Fixed a bug when a flat slice is specified as the src_indices for a non-flat source, and added usage of slicer to connection documentation. [#2443](https://github.com/OpenMDAO/OpenMDAO/pull/2443)
+- Fixed a bug and some changes to recording under MPI [#2445](https://github.com/OpenMDAO/OpenMDAO/pull/2445)
+- Fixed a bug in CaseReader's parsing of iteration coordinates. [#2454](https://github.com/OpenMDAO/OpenMDAO/pull/2454)
+- Fixed some issues with src indices under promotion and some MPI issues. [#2455](https://github.com/OpenMDAO/OpenMDAO/pull/2455)
+- Fixed an MPI hang when running the scaling report. [#2457](https://github.com/OpenMDAO/OpenMDAO/pull/2457)
+- Fixed a broken usage message for cmd line tools. [#2458](https://github.com/OpenMDAO/OpenMDAO/pull/2458)
+- Finished fixing logic to parse system from iteration coordinate. [#2459](https://github.com/OpenMDAO/OpenMDAO/pull/2459)
+- Added a check for discrete outputs that are not design vars in Driver._get_voi_val. [#2464](https://github.com/OpenMDAO/OpenMDAO/pull/2464)
+- Added a test for solver recording when Broyden is the solver and also eliminate double recording of Broyden solver iterations. [#2465](https://github.com/OpenMDAO/OpenMDAO/pull/2465)
+- Added handling of discrete variables to the scaling report. [#2466](https://github.com/OpenMDAO/OpenMDAO/pull/2466)
+
+## Miscellaneous
+
+- Removed 'remove-output' tag on metamodel notebooks with options tables [#2403](https://github.com/OpenMDAO/OpenMDAO/pull/2403)
+- Updated docstrings for numpydoc 1.2 compatibility [#2421](https://github.com/OpenMDAO/OpenMDAO/pull/2421)
+- Refactored the HTML preprocessor implementation for the N2. [#2452](https://github.com/OpenMDAO/OpenMDAO/pull/2452)
+- Added installation of `libscotch` to the oldest workflow. [#2467](https://github.com/OpenMDAO/OpenMDAO/pull/2467)
+- Continued N2 refactor by adding generic classes for ModelData, TreeNode, and others. [#2468](https://github.com/OpenMDAO/OpenMDAO/pull/2468)
+
+***********************************
 # Release Notes for OpenMDAO 3.16.0
 
 January 06, 2022
