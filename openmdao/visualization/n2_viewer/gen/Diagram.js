@@ -270,7 +270,7 @@ class Diagram {
             .attr("transform", d =>
                 `translate(${scale.x(d.draw.prevDims.x)},${scale.y(d.draw.prevDims.y)})`)
             .on("click", d => self.leftClickSelector(this, d))
-            .on("contextmenu", d => {
+            .on("contextmenu", function(d) {
                 if (d3.event.altKey) {
                     const color = d3.select(this).select('rect').style('fill');
                     self.ui.altRightClick(d, color);
@@ -279,8 +279,9 @@ class Diagram {
                     self.ui.rightClick(d, this);
                 }
             })
-            .on("mouseover", d =>
-                self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill')))
+            .on("mouseover", function(d) {
+                self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'))
+            })
             .on("mouseleave", () => self.ui.nodeInfoBox.clear())
             .on("mousemove", () => self.ui.nodeInfoBox.moveNearMouse(d3.event));
 

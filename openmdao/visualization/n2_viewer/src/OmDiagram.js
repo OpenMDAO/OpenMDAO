@@ -77,8 +77,8 @@ class OmDiagram extends Diagram {
                 return `translate(${scale.x(x)},${scale.y(d.draw.prevSolverDims.y)})`;
             })
             .on("click", d => self.leftClickSelector(this, d))
-            .on("contextmenu", d => self.ui.rightClick(d, this))
-            .on("mouseover", d => {
+            .on("contextmenu", function (d) { self.ui.rightClick(d, this)})
+            .on("mouseover", function(d) {
                 self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'), true)
 
                 if (self.model.abs2prom != undefined) {
