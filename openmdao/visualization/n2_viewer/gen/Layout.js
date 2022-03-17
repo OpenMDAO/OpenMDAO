@@ -1,66 +1,124 @@
 /**
+ * Translate coordinates from the range 0 - 1 to 0 - pixel size.
+ * @typedef Scale
+ * @property {Function} x Scale in the horizontal direction.
+ * @property {Function} y Scale in the vertical direction.
+ */
+class Scale {
+    /**
+     * Initialize the Scale.
+     * @param {Object} obj Any object with width and height properties.
+     */
+    constructor(obj) {
+        this.x = d3.scaleLinear().range([0, obj.width]);
+        this.y = d3.scaleLinear().range([0, obj.height]);
+        this.prev = { x: null, y: null};
+    }
+
+    /**
+     * Duplicate another Scale object.
+     * @param {Scale} other The object to copy from.
+     */
+    copyFrom(other) {
+        this.x = other.x.copy();
+        this.y = other.y.copy();
+    }
+
+    preserve() {
+        this.prev = {
+            x: this.x.copy(),
+            y: this.y.copy()
+        }
+    }
+}
+
+/**
+ * Provide a simple interface for handling & preserving x,y coordinates.
+ * @typedef Coords
+ * @property {Number} x X coordinate to store.
+ * @property {Number} y Y coordinate to store.
+ * @property {Object} prev Previous set of coordinates.
+ */
+class Coords {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.prev = { x: 0, y: 0 };
+    }
+
+    copyFrom(other) {
+        this.x = other.x;
+        this.y = other.y;
+    }
+
+    preserve() {
+        this.prev = {
+            x: this.x,
+            y: this.y
+        }
+    }
+}
+
+/**
  * Calculates and stores the size and positions of visible elements.
- * @typedef N2Layout
+ * @typedef Layout
  * @property {ModelData} model Reference to the preprocessed model.
  * @property {OmTreeNode} zoomedElement Reference to zoomedElement managed by N2Diagram.
  * @property {OmTreeNode[]} zoomedNodes  Child workNodes of the current zoomed element.
  * @property {OmTreeNode[]} visibleNodes Zoomed workNodes that are actually drawn.
- * @property {OmTreeNode[]} zoomedSolverNodes Child solver workNodes of the current zoomed element.
  * @property {Object} svg Reference to the top-level SVG element in the document.
- * @property {Object} size The dimensions of the model and solver trees.
+ * @property {Object} size The dimensions of the model tree.
+ * @property {Object} scales Scalers in the X and Y directions to associate the relative
+ *   position of an element to actual pixel coordinates.
+ * @property {Object} transitCoords
  */
-class N2Layout {
-
+class Layout {
     /**
      * Compute the new layout based on the model data and the zoomed element.
      * @param {ModelData} model The pre-processed model object.
      * @param {Object} newZoomedElement The element the new layout is based around.
-     * @param {boolean} showLinearSolverNames Whether to show linear or non-linear solver names.
      * @param {Object} dims The initial sizes for multiple tree elements.
      */
-    constructor(model, newZoomedElement, showLinearSolverNames, showSolvers, dims) {
+    constructor(model, newZoomedElement, dims) {
         this.model = model;
 
         this.zoomedElement = newZoomedElement;
-        this.showLinearSolverNames = showLinearSolverNames;
 
         this.zoomedNodes = [];
         this.visibleNodes = [];
 
-        this.zoomedSolverNodes = [];
-        this.visibleSolverNodes = [];
         this.curVisibleNodeCount = 0;
         this.prevVisibleNodeCount = 0;
-
-        this.showSolvers = showSolvers ;
 
         // Initial size values derived from read-only defaults
         this.size = dims.size;
         this.svg = d3.select("#svgId");
+    }
 
+    init() {
         this._computeLeaves();
-
         this._setupTextRenderer();
         this._updateTextWidths();
         delete (this.textRenderer);
-
         this._computeColumnWidths();
+        this._setColumnLocations(this.size.partitionTree, this.cols);
 
-        if (this.showSolvers) { this._computeSolverColumnWidths(); }
-
-        this._setColumnLocations();
         this._computeNormalizedPositions(this.model.root, 0, false, null);
         if (this.zoomedElement.parent)
             this.zoomedNodes.push(this.zoomedElement.parent);
 
-        if (this.showSolvers) {
-            this._computeSolverNormalizedPositions(this.model.root, 0, false, null);
-            if (this.zoomedElement.parent) {
-                this.zoomedSolverNodes.push(this.zoomedElement.parent);
-            }
+        this.setTransitionPermission();
+
+        this.scales = {
+            model: new Scale(this.size.partitionTree),
+            firstRun: true
         }
 
-        this.setTransitionPermission();
+        this.transitCoords = {
+            model: new Coords(0, 0)
+        }
+
+        return this;
     }
 
     /**
@@ -145,8 +203,6 @@ class N2Layout {
      * @return {string} The selected text.
      */
     getText(node) {
-        testThis(this, 'N2Layout', 'getText');
-
         let retVal = node.name;
 
         if (node.name == '_auto_ivc') {
@@ -164,24 +220,6 @@ class N2Layout {
     }
 
     /**
-     * Return the name of the linear or non-linear solver depending
-     * on the current setting.
-     * @param {OmTreeNode} node The item to get the solver text from.
-     */
-    getSolverText(node) {
-        testThis(this, 'N2Layout', 'getSolverText');
-
-        let solver_name = this.showLinearSolverNames ? node.linear_solver : node.nonlinear_solver;
-
-        if (!this.showLinearSolverNames && node.hasOwnProperty("solve_subsystems") && node.solve_subsystems) {
-            return solver_name + " (sub_solve)";
-        }
-        else {
-            return solver_name;
-        }
-    }
-
-    /**
      * Determine text widths for all descendents of the specified node.
      * @param {OmTreeNode} [node = this.zoomedElement] Item to begin looking from.
      */
@@ -190,11 +228,6 @@ class N2Layout {
 
         node.draw.nameWidthPx = this._getTextWidth(this.getText(node)) + 2 *
             this.size.rightTextMargin;
-
-        if (!node.isInputOrOutput()) {
-            node.draw.nameSolverWidthPx = this._getTextWidth(this.getSolverText(node)) + 2 *
-                this.size.rightTextMargin;
-        }
 
         if (node.hasChildren() && !node.draw.minimized) {
             for (const child of node.children) {
@@ -270,13 +303,8 @@ class N2Layout {
     _computeColumnWidths(node = this.zoomedElement) {
         this.greatestDepth = 0;
         this.leafWidthsPx = new Array(this.model.maxDepth + 1).fill(0.0);
-        this.cols = Array.from({
-            length: this.model.maxDepth + 1
-        }, () =>
-            ({
-                'width': 0.0,
-                'location': 0.0
-            }));
+        this.cols = Array.from({length: this.model.maxDepth + 1},
+            () => ({ 'width': 0.0, 'location': 0.0 }));
 
         this._setColumnWidthsFromWidestText(node, 'children', this.cols,
             this.leafWidthsPx, 'nameWidthPx');
@@ -285,7 +313,7 @@ class N2Layout {
         let lastColumnWidth = 0;
         for (let i = this.leafWidthsPx.length - 1; i >= this.zoomedElement.depth; --i) {
             sum += this.cols[i].width;
-            let lastWidthNeeded = this.leafWidthsPx[i] - sum;
+            const lastWidthNeeded = this.leafWidthsPx[i] - sum;
             lastColumnWidth = Math.max(lastWidthNeeded, lastColumnWidth);
         }
 
@@ -293,57 +321,15 @@ class N2Layout {
         this.cols[this.greatestDepth].width = lastColumnWidth;
     }
 
-    /**
-     * Compute solver column widths across the model, then adjust ends as needed.
-     * @param {OmTreeNode} [node = this.zoomedElement] Item to operate on.
-     */
-    _computeSolverColumnWidths(node = this.zoomedElement) {
-        this.greatestDepth = 0;
-        this.leafSolverWidthsPx = new Array(this.model.maxDepth + 1).fill(0.0);
-        this.solverCols = Array.from({
-            length: this.model.maxDepth + 1
-        }, () =>
-            ({
-                'width': 0.0,
-                'location': 0.0
-            }));
-
-        this._setColumnWidthsFromWidestText(node, 'subsystem_children', this.solverCols,
-            this.leafSolverWidthsPx, 'nameSolverWidthPx');
-
-        let sum = 0;
-        let lastColumnWidth = 0;
-        for (let i = this.leafSolverWidthsPx.length - 1; i >= this.zoomedElement.depth; --i) {
-            sum += this.solverCols[i].width;
-            let lastWidthNeeded = this.leafSolverWidthsPx[i] - sum;
-            lastColumnWidth = Math.max(lastWidthNeeded, lastColumnWidth);
-        }
-
-        this.solverCols[this.zoomedElement.depth - 1].width = this.size.parentNodeWidth;
-        this.solverCols[this.greatestDepth].width = lastColumnWidth;
-    }
-
     /** Set the location of the columns based on the width of the columns to the left. */
-    _setColumnLocations() {
-        this.size.partitionTree.width = 0;
-        this.size.solverTree.width = 0;
+    _setColumnLocations(obj, cols) {
+        obj.width = 0;
 
         for (let depth = 1; depth <= this.model.maxDepth; ++depth) {
-            this.cols[depth].location = this.size.partitionTree.width;
-            this.size.partitionTree.width += this.cols[depth].width;
-
-             if (this.showSolvers) {
-                 this.solverCols[depth].location = this.size.solverTree.width;
-                 this.size.solverTree.width += this.solverCols[depth].width;
-             }
+            cols[depth].location = obj.width;
+            obj.width += cols[depth].width;
         }
-
     }
-
-    /**TODO: _computeNormalizedPositions and _computeSolverNormalizedPositions do almost
-     * identical things, just storing info in different variables, so they should be
-     * merged as much as possible.
-     */
 
     /**
      * Recurse over the model tree and determine the coordinates and
@@ -370,20 +356,22 @@ class N2Layout {
             }
         }
 
-        const workNode = (earliestMinimizedParent) ? earliestMinimizedParent : node;
         node.preserveDims(false, leafCounter);
+        const workNode = (earliestMinimizedParent) ? earliestMinimizedParent : node;
+        const dims = node.draw.dims;
 
         if (! node.isVisible()) { // input or hidden leaf leaving
-            node.draw.dims.x = this.cols[node.parentComponent.depth + 1].location / this.size.partitionTree.width;
-            node.draw.dims.y = node.parentComponent.draw.dims.y;
-            node.draw.dims.width = node.draw.dims.height = 1e-6;
+            dims.x = this.cols[node.parentComponent.depth + 1].location / this.size.partitionTree.width;
+            dims.y = node.parentComponent.draw.dims.y;
+            dims.width = 1e-6;
+            dims.height = 1e-6;
         }
         else {
-            node.draw.dims.x = this.cols[workNode.depth].location / this.size.partitionTree.width;
-            node.draw.dims.y = leafCounter / this.model.root.draw.numLeaves;
-            node.draw.dims.width = (node.hasChildren() && !node.draw.minimized && !node.draw.filtered) ?
+            dims.x = this.cols[workNode.depth].location / this.size.partitionTree.width;
+            dims.y = leafCounter / this.model.root.draw.numLeaves;
+            dims.width = (node.hasChildren() && !node.draw.minimized && !node.draw.filtered) ?
                 (this.cols[workNode.depth].width / this.size.partitionTree.width) : 1 - workNode.draw.dims.x;
-            node.draw.dims.height = workNode.draw.numLeaves / this.model.root.draw.numLeaves;
+            dims.height = workNode.draw.numLeaves / this.model.root.draw.numLeaves;
         }
 
         if (node.hasChildren()) {
@@ -400,73 +388,6 @@ class N2Layout {
     }
 
     /**
-     * Recurse over the model tree and determine the coordinates and size of visible
-     * solver nodes. If a parent is minimized, operations are performed on it instead.
-     * @param {OmTreeNode} node The node to operate on.
-     * @param {number} leafCounter Tally of leaves encountered so far.
-     * @param {Boolean} isChildOfZoomed Whether node is a descendant of this.zoomedElement.
-     * @param {Object} earliestMinimizedParent The minimized parent, if any, appearing
-     *   highest in the tree hierarchy. Null if none exist.
-     */
-    _computeSolverNormalizedPositions(node, leafCounter,
-        isChildOfZoomed, earliestMinimizedParent) {
-
-        // Fix until solver display is removed entirely from generic code:
-        if (!(node instanceof OmTreeNode)) return;
-
-        if (!isChildOfZoomed) {
-            isChildOfZoomed = (node === this.zoomedElement);
-        }
-
-        if (earliestMinimizedParent == null && isChildOfZoomed) {
-            if (node.type.match(/^(subsystem|root)$/)) {
-                this.zoomedSolverNodes.push(node);
-            }
-            if (node.isVisibleLeaf()) { //at a "leaf" workNode
-                if (!node.isInput()) {
-                    this.visibleSolverNodes.push(node);
-                }
-                earliestMinimizedParent = node;
-            }
-            else if (node.draw.filtered) {
-                earliestMinimizedParent = node.draw.filterParent;
-            }
-        }
-
-        const workNode = (earliestMinimizedParent) ? earliestMinimizedParent : node;
-        node.preserveDims(true, leafCounter);
-
-        if (! node.isVisible()) { //input or hidden leaf leaving
-            node.draw.solverDims.x = this.cols[node.parentComponent.depth + 1].location /
-                this.size.partitionTree.width;
-            node.draw.solverDims.y = node.parentComponent.draw.dims.y;
-            node.draw.solverDims.width = node.draw.solverDims.height = 1e-6;
-        }
-        else {
-            node.draw.solverDims.x = this.solverCols[workNode.depth].location / this.size.solverTree.width;
-            node.draw.solverDims.y = leafCounter / this.model.root.draw.numLeaves;
-            node.draw.solverDims.width = (node.subsystem_children && !node.draw.minimized) ?
-                (this.solverCols[workNode.depth].width / this.size.solverTree.width) :
-                1 - workNode.draw.solverDims.x;
-    
-            node.draw.solverDims.height = workNode.draw.numLeaves / this.model.root.draw.numLeaves;
-        }
-
-        if (node.hasChildren()) {
-            for (const child of node.children) {
-                if (!child.isInputOrOutput() || !child.draw.minimized) {
-                    this._computeSolverNormalizedPositions(child,
-                        leafCounter, isChildOfZoomed,
-                        child.draw.filterParent? child.draw.filterParent : earliestMinimizedParent);
-                    if (earliestMinimizedParent == null) { //numleaves is only valid passed nonminimized nodes
-                        leafCounter += child.draw.numLeaves;
-                    }
-                }
-            }
-        }
-    }
-
-    /**
      * Calculate new dimensions for the div element enclosing the main SVG element.
      * @returns {Object} Members width and height as strings with the unit appended.
      */
@@ -474,16 +395,12 @@ class N2Layout {
         let width = (this.size.partitionTree.width +
             this.size.n2matrix.margin +
             this.size.n2matrix.width +
-            this.size.solverTree.width +
             this.size.n2matrix.margin);
 
         let height = (this.size.n2matrix.height +
             this.size.n2matrix.margin * 2);
 
-        return ({
-            'width': width,
-            'height': height
-        });
+        return {'width': width, 'height': height};
     }
 
     /**
@@ -494,17 +411,12 @@ class N2Layout {
         let width = this.size.partitionTree.width +
             this.size.n2matrix.margin +
             this.size.n2matrix.width +
-            this.size.solverTree.width +
             this.size.n2matrix.margin;
 
         let height = this.size.partitionTree.height;
         let margin = this.size.n2matrix.margin;
 
-        return ({
-            'width': width,
-            'height': height,
-            'margin': margin
-        });
+        return {'width': width, 'height': height, 'margin': margin};
     }
 
     /**
@@ -523,8 +435,8 @@ class N2Layout {
 
         this.transitionStartDelay = N2TransitionDefaults.startDelay;
 
-        let outerDims = this.newOuterDims();
-        let innerDims = this.newInnerDims();
+        const outerDims = this.newOuterDims();
+        const innerDims = this.newInnerDims();
 
         this.ratio = (window.innerWidth - 200) / outerDims.width;
         if (this.ratio > 1 || manuallyResized) this.ratio = 1;
@@ -577,23 +489,14 @@ class N2Layout {
             .attr("height", innerDims.height)
             .attr("transform", "translate(0 0)");
 
-        dom.pSolverTreeGroup.transition(sharedTransition)
-            .attr("height", innerDims.height)
-            .attr("transform", "translate(" + (this.size.partitionTree.width +
-                innerDims.margin +
-                innerDims.height +
-                innerDims.margin) + " " +
-                innerDims.margin + ")");
     }
 
     calcWidthBasedOnNewHeight(height) {
-        return this.size.partitionTree.width + height + this.size.solverTree.width +
-            this.size.n2matrix.margin * 2;
+        return this.size.partitionTree.width + height + this.size.n2matrix.margin * 2;
     }
 
     calcHeightBasedOnNewWidth(width) {
-        return width - this.size.partitionTree.width - this.size.solverTree.width -
-            this.size.n2matrix.margin * 2;
+        return width - this.size.partitionTree.width - this.size.n2matrix.margin * 2;
     }
 
     calcFitDims() {
@@ -606,5 +509,33 @@ class N2Layout {
         }
 
         return { 'width': width, 'height': height };
+    }
+
+    /**
+     * Make a copy of the previous transit coordinates and linear scalers before
+     * setting new ones.
+     */
+    preservePreviousScaleValues() {
+        this.transitCoords.model.preserve();
+        this.scales.model.preserve();
+    }
+
+    updateScaleValues() {
+        if (!this.scales.firstRun) this.preservePreviousScaleValues();
+
+        const elemDims = this.zoomedElement.draw.dims;
+        const treeSize = this.size.partitionTree;
+
+        this.transitCoords.model.x = (elemDims.x ?
+            treeSize.width - this.size.parentNodeWidth : treeSize.width) / (1 - elemDims.x);
+        this.transitCoords.model.y = treeSize.height / elemDims.height;
+
+        this.scales.model.x
+            .domain([elemDims.x, 1])
+            .range([elemDims.x ? this.size.parentNodeWidth : 0, treeSize.width]);
+
+        this.scales.model.y
+            .domain([elemDims.y, elemDims.y + elemDims.height])
+            .range([0, treeSize.height]);
     }
 }

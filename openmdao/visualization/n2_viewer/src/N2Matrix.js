@@ -46,7 +46,7 @@ class N2Matrix {
         }
         this.arrowMgr.setNodeSize(this.nodeSize);
 
-        let markerSize = Math.max(2, this.nodeSize.width * .04, this.nodeSize.height * .04);
+        const markerSize = Math.max(2, this.nodeSize.width * .04, this.nodeSize.height * .04);
         d3.select("#arrow").attr("markerWidth", markerSize).attr("markerHeight", markerSize);
         d3.select("#offgridArrow").attr("markerWidth", markerSize * 2).attr("markerHeight", markerSize);
 

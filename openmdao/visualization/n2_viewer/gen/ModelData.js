@@ -214,4 +214,140 @@ class ModelData {
             }
         }
     }
+
+   /**
+     * Recurse through the model, and determine whether a group/component is
+     * minimized or manually expanded, or an input/output hidden. If it is,
+     * add it to the hiddenList array, and optionally reset its state.
+     * @param {Object[]} hiddenList The provided array to populate.
+     * @param {Boolean} reveal If true, make the node visible.
+     * @param {OmTreeNode} node The current node to operate on.
+     */
+    findAllHidden(hiddenList, reveal = false, node = this.root) {
+        // Filtered nodes are handled by their true parents
+        if (node.isFilter()) return;
+
+        if (!node.isVisible() || node.draw.minimized || node.draw.manuallyExpanded) {
+            hiddenList.push({
+                'node': node,
+                'draw': {
+                    'minimized': node.draw.minimized,
+                    'hidden': node.draw.hidden,
+                    'filtered': node.draw.filtered,
+                    'manuallyExpanded': node.draw.manuallyExpanded
+                }
+            })
+
+            if (reveal) {
+                node.expand();
+                node.show();
+                node.draw.manuallyExpanded = false;
+                node.removeSelfFromFilter();
+            }
+        }
+
+        if (node.hasChildren()) {
+            for (const child of node.children) {
+                this.findAllHidden(hiddenList, reveal, child);
+            }
+        }
+    }
+
+    /**
+     * Restore the minimized/hidden value to all the specified nodes.
+     * @param {Object[]} hiddenList The list of preserved objects
+     * @param {OmTreeNode} node The current node to operate on.
+     */
+    resetAllHidden(hiddenList, node = this.root) {
+        // Filtered nodes are handled by their true parents
+        if (!hiddenList || node.isFilter()) return;
+
+        const foundEntry = hiddenList.find(item => item.node === node);
+
+        // If variables were selectively hidden, force the variable selection
+        // dialog to rebuild the hiddenVars array.
+        if (node.hasFilters()) { node.filter.inputs.wipe(); node.filter.outputs.wipe(); }
+
+        if (!foundEntry) { // Not found, reset values to default
+            node.expand();
+            node.show();
+            node.draw.manuallyExpanded = false;
+            node.removeSelfFromFilter();
+        }
+        else { // Found, restore values
+            node.draw.minimized = foundEntry.draw.minimized;
+            node.draw.hidden = foundEntry.draw.hidden;
+            node.draw.manuallyExpanded = foundEntry.draw.manuallyExpanded;
+            if (foundEntry.draw.filtered) { node.addSelfToFilter(); }
+            else { node.removeSelfFromFilter(); }
+        }
+
+        if (node.hasChildren()) {
+            for (const child of node.children) {
+                this.resetAllHidden(hiddenList, child);
+            }
+        }
+    }
+
+    /**
+     * Set the node as not minimized and manually expanded, as well as
+     * all children.
+     * @param {OmTreeNode} startNode The node to begin from.
+     */
+     manuallyExpandAll(startNode) {
+        startNode.draw.minimized = false;
+        startNode.draw.manuallyExpanded = true;
+
+        if (startNode.hasChildren()) {
+            for (const child of startNode.children) {
+                this.manuallyExpandAll(child);
+            }
+        }
+    }
+
+    /**
+     * Set all the children of the specified node as minimized and not manually expanded.
+     * @param {OmTreeNode} startNode The node to begin from.
+     * @param {Boolean} [initialNode = true] Indicate the starting node.
+     */
+    minimizeAll(startNode, initialNode = true) {
+        if (!initialNode) {
+            startNode.draw.minimized = true;
+            startNode.draw.manuallyExpanded = false;
+        }
+
+        if (startNode.hasChildren()) {
+            for (const child of startNode.children) {
+                this.minimizeAll(child, false);
+            }
+        }
+    }
+
+    /**
+     * Recursively minimize non-input nodes to the specified depth.
+     * @param {OmTreeNode} node The node to work on.
+     * @param {Number} chosenCollapseDepth If the node's depth is the same or more, collapse it.
+     */
+    minimizeToDepth(node, chosenCollapseDepth) {
+        if (node.isInputOrOutput()) {
+            return;
+        }
+
+        if (node.depth < chosenCollapseDepth) {
+            node.draw.minimized = false;
+            node.draw.manuallyExpanded = true;
+        }
+        else {
+            node.draw.minimized = true;
+            node.draw.manuallyExpanded = false;
+        }
+
+        if (node.hasChildren()) {
+            for (const child of node.children) {
+                this._minimizeToDepth(child, chosenCollapseDepth);
+            }
+        }
+    }
+
+
 }

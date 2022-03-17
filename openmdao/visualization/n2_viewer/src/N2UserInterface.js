@@ -496,7 +496,7 @@ class N2UserInterface {
      */
     addBackButtonHistory(clearForward = true) {
         let formerHidden = [];
-        this.n2Diag.findAllHidden(formerHidden, false);
+        this.n2Diag.model.findAllHidden(formerHidden, false);
 
         this.backButtonHistory.push({
             'node': this.n2Diag.zoomedElement,
@@ -515,7 +515,7 @@ class N2UserInterface {
      */
     addForwardButtonHistory(node) {
         let formerHidden = [];
-        this.n2Diag.findAllHidden(formerHidden, true);
+        this.n2Diag.model.findAllHidden(formerHidden, true);
 
         this.forwardButtonHistory.push({
             'node': node,
@@ -564,7 +564,7 @@ class N2UserInterface {
             this._setupLeftClick(oldZoomedElement);
         }
 
-        this.n2Diag.resetAllHidden(history.hidden);
+        this.n2Diag.model.resetAllHidden(history.hidden);
         this.n2Diag.update();
     }
 
@@ -602,7 +602,7 @@ class N2UserInterface {
         this.addBackButtonHistory(false);
         this._setupLeftClick(node);
 
-        this.n2Diag.resetAllHidden(history.hidden);
+        this.n2Diag.model.resetAllHidden(history.hidden);
         this.n2Diag.update();
     }
 
