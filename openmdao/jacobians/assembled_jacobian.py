@@ -1,6 +1,6 @@
 """Define the AssembledJacobian class."""
 import sys
-from collections import defaultdict, OrderedDict
+from collections import defaultdict
 
 import numpy as np
 
@@ -78,10 +78,10 @@ class AssembledJacobian(Jacobian):
 
         Returns
         -------
-        OrderedDict
+        dict
             Tuples of the form (start, end) keyed on variable name.
         """
-        ranges = OrderedDict()
+        ranges = {}
         start = end = 0
         for name, meta in system._var_abs2meta[vtype].items():
             end += meta['size']

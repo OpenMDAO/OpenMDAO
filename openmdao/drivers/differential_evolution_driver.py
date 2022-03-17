@@ -49,8 +49,8 @@ class DifferentialEvolutionDriver(Driver):
         design variables.
     _ga : <DifferentialEvolution>
         Main genetic algorithm lies here.
-    _randomstate : np.random.RandomState, int
-         Random state (or seed-number) which controls the seed and random draws.
+    _randomstate : int
+        Seed-number which controls the random draws.
     """
 
     def __init__(self, **kwargs):

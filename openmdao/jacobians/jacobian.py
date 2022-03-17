@@ -1,12 +1,10 @@
 """Define the base Jacobian class."""
 import weakref
-import sys
 
 import numpy as np
-from numpy.random import rand
 
-from collections import OrderedDict, defaultdict
-from scipy.sparse import issparse, coo_matrix
+from collections import defaultdict
+from scipy.sparse import issparse
 
 from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.name_maps import key2abs_key, rel_name2abs_name
@@ -63,7 +61,7 @@ class Jacobian(object):
         self._subjacs_info = system._subjacs_info
         self._under_complex_step = False
         self._abs_keys = defaultdict(bool)
-        self._randgen = False
+        self._randgen = None
         self._col_var_offset = None
         self._col_varnames = None
         self._col2name_ind = None
@@ -276,7 +274,7 @@ class Jacobian(object):
         """
         if isinstance(subjac, sparse_types):  # sparse
             sparse = subjac.copy()
-            sparse.data = rand(sparse.data.size)
+            sparse.data = self._randgen.random(sparse.data.size)
             sparse.data += 1.0
             return sparse
 
@@ -291,11 +289,11 @@ class Jacobian(object):
             assert subjac_info['rows'] is None
             rows, cols, shape = subjac_info['sparsity']
             r = np.zeros(shape)
-            val = rand(len(rows))
+            val = self._randgen.random(len(rows))
             val += 1.0
             r[rows, cols] = val
         else:
-            r = rand(*subjac.shape)
+            r = self._randgen.random(subjac.shape)
             r += 1.0
         return r
 
