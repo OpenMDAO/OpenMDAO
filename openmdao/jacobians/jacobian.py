@@ -44,8 +44,9 @@ class Jacobian(object):
         When True, this Jacobian is under complex step, using a complex jacobian.
     _abs_keys : defaultdict
         A cache dict for key to absolute key.
-    _randomize : bool
-        If True, sparsity is being computed for simultaneous derivative coloring.
+    _randgen : Generator or None
+        If not None, use the generator to generate random numbers during computation of
+        sparsity for for simultaneous derivative coloring.
     _col_var_offset : dict
         Maps column name to offset into the result array.
     _col_varnames : list
@@ -62,7 +63,7 @@ class Jacobian(object):
         self._subjacs_info = system._subjacs_info
         self._under_complex_step = False
         self._abs_keys = defaultdict(bool)
-        self._randomize = False
+        self._randgen = False
         self._col_var_offset = None
         self._col_varnames = None
         self._col2name_ind = None

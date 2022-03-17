@@ -338,7 +338,7 @@ class AssembledJacobian(Jacobian):
         if ext_mtx is not None:
             ext_mtx._pre_update()
 
-        if self._randomize:
+        if self._randgen:
             for key in iters:
                 int_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['val'], key))
 

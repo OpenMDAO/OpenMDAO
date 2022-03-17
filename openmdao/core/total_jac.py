@@ -181,6 +181,7 @@ class _TotalJacInfo(object):
         # Convert 'of' names from promoted to absolute (or alias)
         prom_of = of
         of = []
+        src_of = []
         for name in prom_of:  # these names could be aliases
             if name in prom2abs:
                 of_name = prom2abs[name][0]
@@ -192,9 +193,13 @@ class _TotalJacInfo(object):
             else:
                 of_name = name
             of.append(of_name)
+            if name in responses:
+                src_of.append(responses[name]['source'])
+            else:
+                src_of.append(of_name)
 
         if not get_remote and self.comm.size > 1:
-            self.remote_vois = frozenset(n for n in chain(of, wrt)
+            self.remote_vois = frozenset(n for n in chain(src_of, wrt)
                                          if n not in model._var_abs2meta['output'])
         else:
             self.remote_vois = frozenset()

@@ -1561,8 +1561,6 @@ def _compute_total_coloring_context(top):
     top : System
         Top of the system hierarchy where coloring will be done.
     """
-    np.random.seed(41)  # set seed for consistency
-
     for system in top.system_iter(recurse=True, include_self=True):
         if system.matrix_free:
             raise RuntimeError("%s: simultaneous coloring does not currently work with matrix free "
@@ -1572,7 +1570,7 @@ def _compute_total_coloring_context(top):
         if jac is None:
             jac = system._jacobian
         if jac is not None:
-            jac._randomize = True
+            jac._randgen = np.random.default_rng(41)  # set seed for consistency
 
     try:
         yield
@@ -1582,7 +1580,7 @@ def _compute_total_coloring_context(top):
             if jac is None:
                 jac = system._jacobian
             if jac is not None:
-                jac._randomize = False
+                jac._randgen = None
 
 
 def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
@@ -1867,7 +1865,7 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
     """
     driver = problem.driver
 
-    abs_ofs, of_sizes = _get_response_info(driver, of, use_abs_names)
+    ofs, of_sizes = _get_response_info(driver, of, use_abs_names)
     abs_wrts, wrt_sizes = _get_desvar_info(driver, wrt, use_abs_names)
 
     model = problem.model
@@ -1882,11 +1880,11 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
                            (mode, problem._mode))
 
     if model._approx_schemes:  # need to use total approx coloring
-        if len(abs_ofs) != len(driver._responses):
+        if len(ofs) != len(driver._responses):
             raise NotImplementedError("Currently there is no support for approx coloring when "
                                       "linear constraint derivatives are computed separately "
                                       "from nonlinear ones.")
-        _initialize_model_approx(model, driver, abs_ofs, abs_wrts)
+        _initialize_model_approx(model, driver, ofs, abs_wrts)
         if model._coloring_info['coloring'] is None:
             kwargs = {n: v for n, v in model._coloring_info.items()
                       if n in _DEF_COMP_SPARSITY_ARGS and v is not None}
@@ -1899,11 +1897,11 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
     else:
         J, sparsity_info = _get_bool_total_jac(problem, num_full_jacs=num_full_jacs, tol=tol,
                                                orders=orders, setup=setup,
-                                               run_model=run_model, of=abs_ofs, wrt=abs_wrts,
+                                               run_model=run_model, of=ofs, wrt=abs_wrts,
                                                use_abs_names=True)
         coloring = _compute_coloring(J, mode)
         if coloring is not None:
-            coloring._row_vars = abs_ofs
+            coloring._row_vars = ofs
             coloring._row_var_sizes = of_sizes
             coloring._col_vars = abs_wrts
             coloring._col_var_sizes = wrt_sizes
