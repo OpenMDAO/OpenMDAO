@@ -1,6 +1,6 @@
 """Define the Group class."""
 import sys
-from collections import Counter, OrderedDict, defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Iterable
 
 from itertools import product, chain
@@ -598,7 +598,7 @@ class Group(System):
                     not (np.sum([minp for minp, _, _ in proc_info]) <= comm.size)):
                 # reorder the subsystems_allprocs based on which procs they live on. If we don't
                 # do this, we can get ordering mismatches in some of our data structures.
-                new_allsubs = OrderedDict()
+                new_allsubs = {}
                 seen = set()
                 gathered = self.comm.allgather(sub_inds)
                 for inds in gathered:
@@ -1113,12 +1113,12 @@ class Group(System):
 
             gathered = self.comm.allgather(raw)
 
-            # start with a fresh OrderedDict to keep order the same in all procs
+            # start with a fresh dict to keep order the same in all procs
             old_abs2meta = allprocs_abs2meta
-            allprocs_abs2meta = {'input': OrderedDict(), 'output': OrderedDict()}
+            allprocs_abs2meta = {'input': {}, 'output': {}}
 
             for io in ['input', 'output']:
-                allprocs_prom2abs_list[io] = OrderedDict()
+                allprocs_prom2abs_list[io] = {}
 
             myrank = self.comm.rank
             for rank, (proc_discrete, proc_prom2abs_list, proc_abs2meta,
@@ -1146,7 +1146,7 @@ class Group(System):
             for io in ('input', 'output'):
                 if allprocs_abs2meta[io]:
                     # update new allprocs_abs2meta with our local version (now that we have a
-                    # consistent order for our OrderedDict), so that the 'size' metadata will
+                    # consistent order for our dict), so that the 'size' metadata will
                     # accurately reflect this proc's var size instead of one from some other proc.
                     allprocs_abs2meta[io].update(old_abs2meta[io])
 
@@ -2793,7 +2793,7 @@ class Group(System):
             method provides its default value.
         """
         self._has_approx = True
-        self._approx_schemes = OrderedDict()
+        self._approx_schemes = {}
         approx_scheme = self._get_approx_scheme(method)
 
         default_opts = approx_scheme.DEFAULT_OPTIONS
@@ -2914,17 +2914,24 @@ class Group(System):
             # we're computing totals/semi-totals (vars may not be local)
             start = end = 0
             for of in self._owns_approx_of:
-                meta = abs2meta[of]
+
+                # Support for constraint aliases.
+                if of in self._responses and self._responses[of]['alias'] is not None:
+                    path = self._responses[of]['source']
+                else:
+                    path = of
+
+                meta = abs2meta[path]
                 if meta['distributed']:
-                    dist_sizes = sizes[:, abs2idx[of]]
+                    dist_sizes = sizes[:, abs2idx[path]]
                 else:
                     dist_sizes = None
                 if of in approx_of_idx:
                     end += approx_of_idx[of].indexed_src_size
-                    yield of, start, end, approx_of_idx[of].shaped_array().ravel(), dist_sizes
+                    yield path, start, end, approx_of_idx[of].shaped_array().ravel(), dist_sizes
                 else:
-                    end += abs2meta[of][szname]
-                    yield of, start, end, _full_slice, dist_sizes
+                    end += abs2meta[path][szname]
+                    yield path, start, end, _full_slice, dist_sizes
 
                 start = end
         else:
@@ -3048,7 +3055,6 @@ class Group(System):
         """
         self._jacobian = DictionaryJacobian(system=self)
 
-        abs2prom = self._var_allprocs_abs2prom
         abs2meta = self._var_allprocs_abs2meta
         info = self._coloring_info
 
@@ -3067,12 +3073,19 @@ class Group(System):
 
         approx_keys = self._get_approx_subjac_keys()
         for key in approx_keys:
+            left, right = key
+            if left in self._responses and self._responses[left]['alias'] is not None:
+                left = self._responses[left]['source']
+            if right in self._responses and self._responses[right]['alias'] is not None:
+                right = self._responses[right]['source']
+
             if key in self._subjacs_info:
                 meta = self._subjacs_info[key]
             else:
                 meta = SUBJAC_META_DEFAULTS.copy()
-                if key[0] == key[1]:
-                    size = abs2meta['output'][key[0]]['size']
+
+                if left == right:
+                    size = abs2meta['output'][left]['size']
                     meta['rows'] = meta['cols'] = np.arange(size)
                     # All group approximations are treated as explicit components, so we
                     # have a -1 on the diagonal.
@@ -3083,15 +3096,15 @@ class Group(System):
 
             meta.update(self._owns_approx_jac_meta)
 
-            if wrt_matches is None or key[1] in wrt_matches:
+            if wrt_matches is None or right in wrt_matches:
                 self._update_approx_coloring_meta(meta)
 
             if meta['val'] is None:
-                if key[1] in abs2meta['input']:
-                    sz = abs2meta['input'][key[1]]['size']
+                if right in abs2meta['input']:
+                    sz = abs2meta['input'][right]['size']
                 else:
-                    sz = abs2meta['output'][key[1]]['size']
-                shape = (abs2meta['output'][key[0]]['size'], sz)
+                    sz = abs2meta['output'][right]['size']
+                shape = (abs2meta['output'][left]['size'], sz)
                 meta['shape'] = shape
                 if meta['rows'] is not None:  # subjac is sparse
                     meta['val'] = np.zeros(len(meta['rows']))

@@ -231,7 +231,7 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         ref0 = meta.get('ref0')
         lower = meta.get('lower')
         upper = meta.get('upper')
-        src_name = meta.get('ivc_source')
+        src_name = meta.get('source')
 
         if src_name in model._discrete_outputs:
             discretes['dvs'].append(name)
@@ -273,7 +273,8 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         lower = meta.get('lower')
         upper = meta.get('upper')
         equals = meta.get('equals')
-        src_name = meta.get('ivc_source')
+        alias = meta.get('alias', '')
+        src_name = meta.get('source')
 
         if src_name in model._discrete_outputs:
             discretes['con'].append(name)
@@ -283,9 +284,13 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
 
         index, inds = get_inds(dval, meta)
 
+        if alias:
+            name = meta['name']
+
         dct = {
             'id': idx,
             'name': name,
+            'alias': alias,
             'size': meta['size'],
             'index': index,
             'driver_val': _get_val_and_size(dval),
@@ -314,7 +319,8 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         adder = meta['total_adder']
         ref = meta.get('ref')
         ref0 = meta.get('ref0')
-        src_name = meta.get('ivc_source')
+        alias = meta.get('alias', '')
+        src_name = meta.get('source')
 
         if src_name in model._discrete_outputs:
             discretes['obj'].append(name)
@@ -324,9 +330,13 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
 
         index, inds = get_inds(dval, meta)
 
+        if alias:
+            name = meta['name']
+
         dct = {
             'id': idx,
             'name': name,
+            'alias': alias,
             'size': meta['size'],
             'index': index,
             'driver_val': _get_val_and_size(dval),

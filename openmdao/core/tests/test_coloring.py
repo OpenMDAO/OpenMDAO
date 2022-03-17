@@ -16,6 +16,7 @@ except ImportError:
     load_npz = None
 
 import openmdao.api as om
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.array_utils import array_viz
 from openmdao.utils.coloring import _compute_coloring, compute_total_coloring, Coloring
@@ -89,7 +90,7 @@ class DynPartialsComp(om.ExplicitComponent):
 
 def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True,
             recorder=None, has_lin_constraint=True, has_diag_partials=True, partial_coloring=False,
-            use_vois=True, auto_ivc=False, **options):
+            use_vois=True, auto_ivc=False, con_alias=False, **options):
 
     p = om.Problem(model=CounterGroup())
 
@@ -174,17 +175,69 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
         p.model.add_design_var('y')
         p.model.add_design_var('r', lower=.5, upper=10)
 
-        # nonlinear constraints
-        p.model.add_constraint('r_con.g', equals=0)
+        if con_alias:
 
-        p.model.add_constraint('theta_con.g', lower=-1e-5, upper=1e-5, indices=EVEN_IND)
-        p.model.add_constraint('delta_theta_con.g', lower=-1e-5, upper=1e-5)
+            class MuxComp(om.ExplicitComponent):
+                """
+                This component muxes all of the constraints in the model into a single wide vector.
+                This includes a variety of sizes.
+                """
 
-        # this constrains x[0] to be 1 (see definition of l_conx)
-        p.model.add_constraint('l_conx.g', equals=0, linear=False, indices=[0,])
+                def setup(self):
+                    self.add_input('r_con_g', val=np.ones(10))
+                    self.add_input('theta_con_g', val=np.ones(5))
+                    self.add_input('delta_theta_con_g', val=np.ones(5))
+                    self.add_input('l_conx_g', val=1.0)
+                    self.add_input('y', val=1.0)
+                    self.add_output('con', val=np.ones(22))
 
-        # linear constraint (if has_lin_constraint is set)
-        p.model.add_constraint('y', equals=0, indices=[0,], linear=has_lin_constraint)
+                    row_col = np.arange(10)
+                    val = np.ones(10)
+                    self.declare_partials(of='con', wrt='r_con_g', rows=row_col, cols=row_col, val=val)
+
+                    row = np.arange(5) + 10
+                    col = np.arange(5)
+                    val = np.ones(5)
+                    self.declare_partials(of='con', wrt='theta_con_g', rows=row, cols=col, val=val)
+
+                    row = np.arange(5) + 15
+                    self.declare_partials(of='con', wrt='delta_theta_con_g', rows=row, cols=col, val=val)
+                    self.declare_partials(of='con', wrt='l_conx_g', rows=np.array([20]), cols=np.array([0]), val=np.array([1.0]))
+                    self.declare_partials(of='con', wrt='y', rows=np.array([21]), cols=np.array([0]), val=np.array([1.0]))
+
+                def compute(self, inputs, outputs):
+                    con = outputs['con']
+                    con[:10] = inputs['r_con_g']
+                    con[10:15] = inputs['theta_con_g']
+                    con[15:20] = inputs['delta_theta_con_g']
+                    con[20] = inputs['l_conx_g']
+                    con[21] = inputs['y']
+
+            p.model.add_subsystem('mux', MuxComp())
+            p.model.connect('r_con.g', 'mux.r_con_g')
+            p.model.connect('theta_con.g', 'mux.theta_con_g', src_indices=[0, 2, 4, 6, 8])
+            p.model.connect('delta_theta_con.g', 'mux.delta_theta_con_g')
+            p.model.connect('l_conx.g', 'mux.l_conx_g', src_indices=[0, ])
+            p.model.connect('y', 'mux.y', src_indices=[0, ])
+
+            p.model.add_constraint('mux.con', indices=om.slicer[0:10], equals=0)
+            p.model.add_constraint('mux.con', indices=om.slicer[10:15], lower=-1e-5, upper=1e-5, alias='c2')
+            p.model.add_constraint('mux.con', indices=om.slicer[15:20], lower=-1e-5, upper=1e-5, alias='c3')
+            p.model.add_constraint('mux.con', indices=[20], equals=0, linear=False, alias='c4')
+            p.model.add_constraint('mux.con', indices=[21], equals=0, linear=has_lin_constraint, alias='c5')
+
+        else:
+            # nonlinear constraints
+            p.model.add_constraint('r_con.g', equals=0)
+
+            p.model.add_constraint('theta_con.g', lower=-1e-5, upper=1e-5, indices=EVEN_IND)
+            p.model.add_constraint('delta_theta_con.g', lower=-1e-5, upper=1e-5)
+
+            # this constrains x[0] to be 1 (see definition of l_conx)
+            p.model.add_constraint('l_conx.g', equals=0, linear=False, indices=[0,])
+
+            # linear constraint (if has_lin_constraint is set)
+            p.model.add_constraint('y', equals=0, indices=[0,], linear=has_lin_constraint)
 
         p.model.add_objective('circle.area', ref=-1)
 
@@ -591,6 +644,24 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         # first, run w/o coloring
         p = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False)
         p_color = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
+
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
+
+        # - bidirectional coloring saves 16 solves per driver iter  (5 vs 21)
+        # - initial solve for linear constraints takes 21 in both cases (only done once)
+        # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
+        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
+        # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
+        self.assertEqual((p.model._solve_count - 21) / 21,
+                         (p_color.model._solve_count - 21 * 4) / 5)
+
+    def test_dynamic_total_coloring_auto_con_alias(self):
+        # This test makes sure that coloring works with aliased constraints.
+
+        # first, run w/o coloring
+        p = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, con_alias=True)
+        p_color = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True, con_alias=True)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)

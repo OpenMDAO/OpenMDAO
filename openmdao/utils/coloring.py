@@ -14,8 +14,8 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 
 from openmdao.core.constants import INT_DTYPE
-from openmdao.utils.general_utils import _prom2ivc_src_dict, \
-    _prom2ivc_src_name_iter, _prom2ivc_src_item_iter
+from openmdao.utils.general_utils import _src_or_alias_dict, \
+    _src_name_iter, _src_or_alias_item_iter
 from openmdao.utils.array_utils import array_viz
 import openmdao.utils.hooks as hooks
 from openmdao.utils.mpi import MPI
@@ -1561,8 +1561,6 @@ def _compute_total_coloring_context(top):
     top : System
         Top of the system hierarchy where coloring will be done.
     """
-    np.random.seed(41)  # set seed for consistency
-
     for system in top.system_iter(recurse=True, include_self=True):
         if system.matrix_free:
             raise RuntimeError("%s: simultaneous coloring does not currently work with matrix free "
@@ -1572,7 +1570,7 @@ def _compute_total_coloring_context(top):
         if jac is None:
             jac = system._jacobian
         if jac is not None:
-            jac._randomize = True
+            jac._randgen = np.random.default_rng(41)  # set seed for consistency
 
     try:
         yield
@@ -1582,7 +1580,7 @@ def _compute_total_coloring_context(top):
             if jac is None:
                 jac = system._jacobian
             if jac is not None:
-                jac._randomize = False
+                jac._randgen = None
 
 
 def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
@@ -1629,7 +1627,7 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
     """
     # clear out any old simul coloring info
     driver = prob.driver
-    driver._res_jacs = {}
+    driver._res_subjacs = {}
 
     if setup:
         prob.setup(mode=prob._mode)
@@ -1638,7 +1636,7 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
         prob.run_model(reset_iter_counts=False)
 
     if of is None or wrt is None:
-        driver_wrt = list(_prom2ivc_src_name_iter(driver._designvars))
+        driver_wrt = list(_src_name_iter(driver._designvars))
         driver_of = driver._get_ordered_nl_responses()
         if not driver_wrt or not driver_of:
             raise RuntimeError("When computing total jacobian sparsity, either 'of' and 'wrt' "
@@ -1687,24 +1685,24 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
 
 
 def _get_desvar_info(driver, names=None, use_abs_names=True):
-    desvars = _prom2ivc_src_dict(driver._designvars)
+    desvars = _src_or_alias_dict(driver._designvars)
 
     if names is None:
-        abs_names = list(desvars)
-        return abs_names, [desvars[n]['size'] for n in abs_names]
+        vnames = list(desvars)
+        return vnames, [desvars[n]['size'] for n in vnames]
 
     model = driver._problem().model
     abs2meta_out = model._var_allprocs_abs2meta['output']
 
     if use_abs_names:
-        abs_names = names
+        vnames = names
     else:
         prom2abs = model._var_allprocs_prom2abs_list['output']
-        abs_names = [prom2abs[n][0] for n in names]
+        vnames = [prom2abs[n][0] for n in names]
 
     # if a variable happens to be a design var, use that size
     sizes = []
-    for n in abs_names:
+    for n in vnames:
         if n in desvars:
             sizes.append(desvars[n]['size'])
         elif n in abs2meta_out:
@@ -1712,33 +1710,33 @@ def _get_desvar_info(driver, names=None, use_abs_names=True):
         else:  # it's an input name w/o corresponding design var
             sizes.append(abs2meta_out[model.get_source(n)]['global_size'])
 
-    return abs_names, sizes
+    return vnames, sizes
 
 
 def _get_response_info(driver, names=None, use_abs_names=True):
     responses = driver._responses
     if names is None:
-        abs_names = driver._get_ordered_nl_responses()
-        return abs_names, [responses[n]['size'] for n in abs_names]
+        vnames = driver._get_ordered_nl_responses()
+        return vnames, [responses[n]['size'] for n in vnames]
 
     model = driver._problem().model
     abs2meta_out = model._var_allprocs_abs2meta['output']
 
     if use_abs_names:
-        abs_names = names
+        vnames = names
     else:
         prom2abs = model._var_allprocs_prom2abs_list['output']
-        abs_names = [prom2abs[n][0] for n in names]
+        vnames = [prom2abs[n][0] if n in prom2abs else n for n in names]
 
     # if a variable happens to be a response var, use that size
     sizes = []
-    for n in abs_names:
+    for n in vnames:
         if n in responses:
             sizes.append(responses[n]['size'])
         else:
             sizes.append(abs2meta_out[n]['global_size'])
 
-    return abs_names, sizes
+    return vnames, sizes
 
 
 def _compute_coloring(J, mode):
@@ -1858,7 +1856,7 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
     fname : filename or None
         File where output coloring info will be written. If None, no info will be written.
     use_abs_names : bool
-        If True, use absolute naming for of and wrt variables.
+        If True, use absolute naming for of and wrt variables unless they are aliases.
 
     Returns
     -------
@@ -1867,7 +1865,7 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
     """
     driver = problem.driver
 
-    abs_ofs, of_sizes = _get_response_info(driver, of, use_abs_names)
+    ofs, of_sizes = _get_response_info(driver, of, use_abs_names)
     abs_wrts, wrt_sizes = _get_desvar_info(driver, wrt, use_abs_names)
 
     model = problem.model
@@ -1882,11 +1880,11 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
                            (mode, problem._mode))
 
     if model._approx_schemes:  # need to use total approx coloring
-        if len(abs_ofs) != len(driver._responses):
+        if len(ofs) != len(driver._responses):
             raise NotImplementedError("Currently there is no support for approx coloring when "
                                       "linear constraint derivatives are computed separately "
                                       "from nonlinear ones.")
-        _initialize_model_approx(model, driver, abs_ofs, abs_wrts)
+        _initialize_model_approx(model, driver, ofs, abs_wrts)
         if model._coloring_info['coloring'] is None:
             kwargs = {n: v for n, v in model._coloring_info.items()
                       if n in _DEF_COMP_SPARSITY_ARGS and v is not None}
@@ -1899,11 +1897,11 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
     else:
         J, sparsity_info = _get_bool_total_jac(problem, num_full_jacs=num_full_jacs, tol=tol,
                                                orders=orders, setup=setup,
-                                               run_model=run_model, of=abs_ofs, wrt=abs_wrts,
+                                               run_model=run_model, of=ofs, wrt=abs_wrts,
                                                use_abs_names=True)
         coloring = _compute_coloring(J, mode)
         if coloring is not None:
-            coloring._row_vars = abs_ofs
+            coloring._row_vars = ofs
             coloring._row_var_sizes = of_sizes
             coloring._col_vars = abs_wrts
             coloring._col_var_sizes = wrt_sizes
@@ -2319,11 +2317,12 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
                     of_idx[key] = meta['indices']
         else:
             model._owns_approx_of_idx = {
-                key: meta['indices'] for key, meta in _prom2ivc_src_item_iter(driver._responses)
+                key: meta['indices']
+                    for key, meta in _src_or_alias_item_iter(driver._responses)
                 if meta['indices'] is not None
             }
         model._owns_approx_wrt_idx = {
-            key: meta['indices'] for key, meta in _prom2ivc_src_item_iter(design_vars)
+            key: meta['indices'] for key, meta in _src_or_alias_item_iter(design_vars)
             if meta['indices'] is not None
         }
 
