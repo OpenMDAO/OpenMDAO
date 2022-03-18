@@ -2634,8 +2634,8 @@ class TestPyoptSparse(unittest.TestCase):
         p.run_driver()
 
         assert_check_totals(p.check_totals())
-        assert_near_equal(p.get_val('exec.z')[0], 25)
-        assert_near_equal(p.get_val('exec.z')[50], -75)
+        assert_near_equal(p.get_val('exec.z')[0], 25, tolerance=1e-4)
+        assert_near_equal(p.get_val('exec.z')[50], -75, tolerance=1e-4)
 
     def test_fwd_rev_compute_totals_check(self):
         p = om.Problem()
