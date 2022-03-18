@@ -2296,8 +2296,8 @@ class TestPyoptSparse(unittest.TestCase):
 
         p.run_driver()
 
-        assert_near_equal(p.get_val('exec.z')[0], 25)
-        assert_near_equal(p.get_val('exec.z')[50], -75)
+        assert_near_equal(p.get_val('exec.z')[0], 25, tolerance=1e-4)
+        assert_near_equal(p.get_val('exec.z')[50], -75, tolerance=1e-4)
 
     def test_multiple_constraints_no_alias(self):
         p = om.Problem()
@@ -2374,8 +2374,8 @@ class TestPyoptSparse(unittest.TestCase):
 
         p.run_driver()
 
-        assert_near_equal(p.get_val('z')[-1], 30)
-        assert_near_equal(p.get_val('z')[50], -70)
+        assert_near_equal(p.get_val('z')[-1], 30, tolerance=1e-4)
+        assert_near_equal(p.get_val('z')[50], -70, tolerance=1e-4)
 
     def test_overlapping_response_indices(self):
         p = om.Problem()
@@ -2623,8 +2623,8 @@ class TestPyoptSparse(unittest.TestCase):
         p.run_driver()
 
         assert_check_totals(p.check_totals())
-        assert_near_equal(p.get_val('exec.z')[0], 25)
-        assert_near_equal(p.get_val('exec.z')[50], -75)
+        assert_near_equal(p.get_val('exec.z')[0], 25, tolerance=1e-4)
+        assert_near_equal(p.get_val('exec.z')[50], -75, tolerance=1e-4)
 
         # REV
         p.setup(mode='rev')
@@ -2634,8 +2634,8 @@ class TestPyoptSparse(unittest.TestCase):
         p.run_driver()
 
         assert_check_totals(p.check_totals())
-        assert_near_equal(p.get_val('exec.z')[0], 25)
-        assert_near_equal(p.get_val('exec.z')[50], -75)
+        assert_near_equal(p.get_val('exec.z')[0], 25, tolerance=1e-4)
+        assert_near_equal(p.get_val('exec.z')[50], -75, tolerance=1e-4)
 
     def test_fwd_rev_compute_totals_check(self):
         p = om.Problem()
@@ -2720,8 +2720,8 @@ class TestPyoptSparse(unittest.TestCase):
         assert_near_equal(J[('exec.y', 'exec.a')].flatten(), np.array([-0]))
         assert_near_equal(J[('exec.z', 'exec.a')].flatten(), np.array([1.]))
         assert_near_equal(J[('ALIAS_TEST', 'exec.a')].flatten(), np.array([1.]))
-        assert_near_equal(p.get_val('exec.z')[0], 25)
-        assert_near_equal(p.get_val('exec.z')[50], -75)
+        assert_near_equal(p.get_val('exec.z')[0], 25, tolerance=1e-4)
+        assert_near_equal(p.get_val('exec.z')[50], -75, tolerance=1e-4)
 
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
