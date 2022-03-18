@@ -4,6 +4,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, \
      SellarDis2withDerivatives
@@ -607,21 +608,15 @@ class TestConstraintOnModel(unittest.TestCase):
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(TypeError) as context:
             prob.model.add_constraint('con1', lower=0.0, upper=5.0, indices='foo')
 
-        self.assertEqual(str(context.exception), "<class SellarDerivatives>: If specified, constraint 'con1' indices must "
-                                                 "be a sequence of integers.")
+        self.assertEqual(str(context.exception), "<class SellarDerivatives>: Invalid indices foo for constraint 'con1'.")
 
-        with self.assertRaises(ValueError) as context:
-            prob.model.add_constraint('con1', lower=0.0, upper=5.0, indices=1)
+        with self.assertRaises(TypeError) as context:
+            prob.model.add_constraint('con3', lower=0.0, upper=5.0, indices=[1, 'k'])
 
-        self.assertEqual(str(context.exception), "<class SellarDerivatives>: If specified, constraint 'con1' indices must be a sequence of integers.")
-
-        with self.assertRaises(ValueError) as context:
-            prob.model.add_constraint('con1', lower=0.0, upper=5.0, indices=[1, 'k'])
-
-        self.assertEqual(str(context.exception), "<class SellarDerivatives>: If specified, constraint 'con1' indices must be a sequence of integers.")
+        self.assertEqual(str(context.exception), "<class SellarDerivatives>: Invalid indices [1, 'k'] for constraint 'con3'.")
 
         # passing an iterator for indices should be valid
         prob.model.add_constraint('con1', lower=0.0, upper=5.0, indices=range(2))
@@ -926,6 +921,46 @@ class TestObjectiveOnModel(unittest.TestCase):
         self.assertEqual(str(context.exception), '<class SellarDerivatives>: If specified, objective index must be an int.')
 
         prob.model.add_objective('obj', index=1)
+
+    def test_constrained_indices_scalar_support(self):
+        p = om.Problem()
+
+        indeps = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['*'])
+
+        indeps.add_output('x', np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,  0.62183717,
+                                          0.04007379,  0.46044942, -0.10129622,  0.27720413, -0.37107886]))
+        indeps.add_output('y', np.array([ 0.52577864,  0.30894559,  0.8420792 ,  0.35039912, -0.67290778,
+                                         -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
+        indeps.add_output('r', .7)
+
+        arctan_yox = om.ExecComp('g=arctan(y/x)', has_diag_partials=True,
+                                 g=np.ones(10), x=np.ones(10), y=np.ones(10))
+
+        p.model.add_subsystem('arctan_yox', arctan_yox)
+
+        p.model.add_subsystem('circle', om.ExecComp('area=pi*r**2'))
+
+        p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', has_diag_partials=True,
+                                                   g=np.ones(10), x=np.ones(10), y=np.ones(10)))
+
+        p.model.connect('r', ('circle.r', 'r_con.r'))
+        p.model.connect('x', ['r_con.x', 'arctan_yox.x'])
+        p.model.connect('y', ['r_con.y', 'arctan_yox.y'])
+
+        p.model.approx_totals(method='cs')
+
+        p.model.add_design_var('x')
+        p.model.add_design_var('y')
+        p.model.add_design_var('r', lower=.5, upper=10)
+        p.model.add_constraint('y', equals=0, indices=0)
+        p.model.add_objective('circle.area', ref=-1)
+
+        p.setup(derivatives=True, force_alloc_complex=True)
+
+        p.run_model()
+        # Formerly a KeyError
+        derivs = p.check_totals(compact_print=True, out_stream=None)
+        assert_near_equal(0.0, derivs['indeps.y', 'indeps.x']['abs error'][0])
 
 
 if __name__ == '__main__':

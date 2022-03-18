@@ -1886,6 +1886,39 @@ class TestDistribBugs(unittest.TestCase):
         msg = "'D1' <class Distrib_DerivsFD>: component has defined partial ('out_nd', 'in_dist') which is a non-distributed output wrt a distributed input. This is only supported using the matrix free API."
         self.assertEqual(str(cm.exception), msg)
 
+    def test_constraint_aliases(self):
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+        ivc.add_output('y', np.ones((size, )))
+        ivc.add_output('a', -3.0 + 0.6 * np.arange(size))
+
+        model.add_subsystem('p', ivc, promotes=['*'])
+        model.add_subsystem("parab", DistParab(arr_size=size, deriv_type='dense'), promotes=['*'])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+
+        model.add_constraint('f_xy', indices=[5], flat_indices=True, lower=10.0)
+        model.add_constraint('f_xy', indices=[1], flat_indices=True, alias='a2', lower=0.5)
+
+        prob.setup(mode='fwd', force_alloc_complex=True)
+
+        prob.run_driver()
+
+        desvar = prob.driver.get_design_var_values()
+        con = prob.driver.get_constraint_values()
+
+        assert_near_equal(con['parab.f_xy'], 24.0)
+        assert_near_equal(con['a2'], 24.96)
+
+        totals = prob.check_totals(method='cs', out_stream=None)
+        self._compare_totals(totals)
+
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests

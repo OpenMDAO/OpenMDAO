@@ -25,10 +25,12 @@ optional_dependencies = {
         'notebook',
         'tabulate',
         'ipython',
-        'ipywidgets>=7.6.5'
+        'ipywidgets>=7.6.5',
+        'ipympl'
     ],
     'visualization': [
         'bokeh>=1.3.4',
+        'matplotlib',
         'colorama'
     ],
     'test': [
@@ -112,6 +114,7 @@ setup(
         'openmdao.utils',
         'openmdao.vectors',
         'openmdao.visualization',
+        'openmdao.visualization.case_viewer',
         'openmdao.visualization.connection_viewer',
         'openmdao.visualization.scaling_viewer',
         'openmdao.visualization.n2_viewer',

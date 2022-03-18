@@ -4,7 +4,6 @@ Class definition for SqliteRecorder, which provides dictionary backed by SQLite.
 
 from copy import deepcopy
 from io import BytesIO
-from collections import OrderedDict
 
 import os
 import gc
@@ -356,8 +355,8 @@ class SqliteRecorder(CaseRecorder):
             if driver is None:
                 desvars = system.get_design_vars(True, get_sizes=False, use_prom_ivc=False)
                 responses = system.get_responses(True, get_sizes=False)
-                constraints = OrderedDict()
-                objectives = OrderedDict()
+                constraints = {}
+                objectives = {}
                 for name, data in responses.items():
                     if data['type'] == 'con':
                         constraints[name] = data
@@ -404,18 +403,26 @@ class SqliteRecorder(CaseRecorder):
 
                     # Design variables, constraints and objectives can be requested by input name.
                     if var_type != 'output':
-                        name = var_set[name]['ivc_source']
+                        srcname = var_set[name]['source']
+                    else:
+                        srcname = name
 
-                    if name not in self._abs2meta:
-                        try:
-                            self._abs2meta[name] = real_meta_out[name].copy()
-                        except KeyError:
-                            self._abs2meta[name] = disc_meta_out[name].copy()
-                        self._abs2meta[name]['type'] = []
-                        self._abs2meta[name]['explicit'] = name not in states
+                    if srcname not in self._abs2meta:
+                        if srcname in real_meta_out:
+                            self._abs2meta[srcname] = real_meta_out[srcname].copy()
+                        elif srcname in disc_meta_out:
+                            self._abs2meta[srcname] = disc_meta_out[srcname].copy()
+                        elif name in system._responses:
+                            for io in self._prom2abs:
+                                if srcname in self._prom2abs[io]:
+                                    abs_in = self._prom2abs[io][srcname][0]
+                                    self._abs2meta[srcname] = real_meta_in[abs_in].copy()
+                                    break
+                        self._abs2meta[srcname]['type'] = []
+                        self._abs2meta[srcname]['explicit'] = srcname not in states
 
-                    if var_type not in self._abs2meta[name]['type']:
-                        self._abs2meta[name]['type'].append(var_type)
+                    if var_type not in self._abs2meta[srcname]['type']:
+                        self._abs2meta[srcname]['type'].append(var_type)
 
             for name in inputs:
                 try:
@@ -535,7 +542,7 @@ class SqliteRecorder(CaseRecorder):
                driver._designvars and driver._responses:
                 totals = data['totals']
             else:
-                totals = OrderedDict([])
+                totals = {}
             totals_array = dict_to_structured_array(totals)
             totals_blob = array_to_blob(totals_array)
 

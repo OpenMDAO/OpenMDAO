@@ -29,7 +29,8 @@ from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data, \
     record_model_options
 from openmdao.utils.record_util import create_local_meta
-from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable
+from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable, \
+    _find_dict_meta
 from openmdao.utils.mpi import MPI, FakeComm, multi_proc_exception_check, check_mpi_env
 from openmdao.utils.name_maps import name2abs_names
 from openmdao.utils.options_dictionary import OptionsDictionary
@@ -1897,9 +1898,8 @@ class Problem(object):
         cons_opts : list of str
             List of optional columns to be displayed in the cons table.
             Allowed values are:
-            ['lower', 'upper', 'equals', 'ref', 'ref0', 'indices', 'index', 'adder', 'scaler',
-            'linear', 'parallel_deriv_color',
-            'cache_linear_solution', 'units', 'min', 'max'].
+            ['lower', 'upper', 'equals', 'ref', 'ref0', 'indices', 'adder', 'scaler',
+            'linear', 'parallel_deriv_color', 'cache_linear_solution', 'units', 'min', 'max'].
         objs_opts : list of str
             List of optional columns to be displayed in the objs table.
             Allowed values are:
@@ -1912,7 +1912,9 @@ class Problem(object):
         desvars = self.driver._designvars
         vals = self.driver.get_design_var_values(get_remote=True, driver_scaling=driver_scaling)
         header = "Design Variables"
-        col_names = default_col_names + desvar_opts
+        def_desvar_opts = [opt for opt in ('indices',) if opt not in desvar_opts and
+                           _find_dict_meta(desvars, opt)]
+        col_names = default_col_names + def_desvar_opts + desvar_opts
         self._write_var_info_table(header, col_names, desvars, vals,
                                    show_promoted_name=show_promoted_name,
                                    print_arrays=print_arrays,
@@ -1922,7 +1924,10 @@ class Problem(object):
         cons = self.driver._cons
         vals = self.driver.get_constraint_values(driver_scaling=driver_scaling)
         header = "Constraints"
-        col_names = default_col_names + cons_opts
+        # detect any cons that use aliases
+        def_cons_opts = [opt for opt in ('indices', 'alias') if opt not in cons_opts and
+                         _find_dict_meta(cons, opt)]
+        col_names = default_col_names + def_cons_opts + cons_opts
         self._write_var_info_table(header, col_names, cons, vals,
                                    show_promoted_name=show_promoted_name,
                                    print_arrays=print_arrays,
@@ -1931,7 +1936,9 @@ class Problem(object):
         objs = self.driver._objs
         vals = self.driver.get_objective_values(driver_scaling=driver_scaling)
         header = "Objectives"
-        col_names = default_col_names + objs_opts
+        def_obj_opts = [opt for opt in ('indices',) if opt not in objs_opts and
+                        _find_dict_meta(objs, opt)]
+        col_names = default_col_names + def_obj_opts + objs_opts
         self._write_var_info_table(header, col_names, objs, vals,
                                    show_promoted_name=show_promoted_name,
                                    print_arrays=print_arrays,
@@ -1975,18 +1982,20 @@ class Problem(object):
         for name, meta in meta.items():
 
             row = {}
+            vname = meta['name'] if meta.get('alias') else name
+
             for col_name in col_names:
                 if col_name == 'name':
                     if show_promoted_name:
-                        row[col_name] = name
-                    else:
-                        if name in abs2prom['input']:
-                            row[col_name] = abs2prom['input'][name]
-                        elif name in abs2prom['output']:
-                            row[col_name] = abs2prom['output'][name]
+                        if vname in abs2prom['input']:
+                            row[col_name] = abs2prom['input'][vname]
+                        elif vname in abs2prom['output']:
+                            row[col_name] = abs2prom['output'][vname]
                         else:
                             # Promoted auto_ivc name. Keep it promoted
-                            row[col_name] = name
+                            row[col_name] = vname
+                    else:
+                        row[col_name] = vname
 
                 elif col_name == 'val':
                     row[col_name] = vals[name]
