@@ -8,8 +8,8 @@ class OmNodeDisplayData extends NodeDisplayData {
     constructor() {
         super();
         this.nameSolverWidthPx = 1; // Solver-side label width pixels as computed by N2Layout
-        this.solverDims = { x: 1e-6, y: 1e-6, width: 1, height: 1 };
-        this.prevSolverDims = { x: 1e-6, y: 1e-6, width: 1e-6, height: 1e-6 };
+        this.solverDims = new Dimensions({ x: 1e-6, y: 1e-6, width: 1, height: 1 });
+        this.solverDims.preserve()
     }
 
     /**
@@ -17,14 +17,8 @@ class OmNodeDisplayData extends NodeDisplayData {
      * @param {Boolean} solver True if the solver dims should be copied.
      */
     preserveDims(solver) {
-        if (solver) {
-            for (const prop in this.solverDims) {
-                this.prevSolverDims[prop] = this.solverDims[prop];
-            }
-        }
-        else {
-            super.preserveDims();
-        }
+        if (solver) this.solverDims.preserve();
+        else super.preserveDims();
     }
 }
 

@@ -40,6 +40,7 @@ class OmDiagram extends Diagram {
         this.dom.clips.solverTree = d3.select("#solverTreeClip > rect");
     }
 
+    /** Recalculate the scale and apply new dimensions to diagram objects. Adds solver handling. */
     _updateScale() {
         if (super._updateScale()) {
             const innerDims = this.layout.newInnerDims();
@@ -54,15 +55,38 @@ class OmDiagram extends Diagram {
         }
     }
 
-    _createSolverCells() {
+    /** Add SVG groups & contents coupled to the visible nodes in the trees. */
+    _updateTreeCells() {
+        super._updateTreeCells();
+
+        /*
+        Select all <g> elements that have class "solver_group". If any already
+        exist, join to their associated nodes in the solver tree. If no
+        existing <g> matches a displayable node, add it to the "enter"
+        selection so the <g> can be created. If a <g> exists but there is
+        no longer a displayable node for it, put it in the "exit" selection so
+        it can be removed:
+        */
+        const selection = this.dom.pSolverTreeGroup.selectAll("g.solver_group")
+            .data(this.layout.zoomedSolverNodes, d => d.id);
+
+        const enterSelection = this._addNewSolverCells(selection);
+        this._mergeSolverCells(selection, enterSelection);
+        this._removeOldSolverCells(selection);
+    }
+
+    /**
+     * Using the visible nodes in the solver tree as data points, create SVG objects to
+     * represent each one. Dimensions are obtained from the precalculated layout.
+     * @param {Object} selection The selected group of solver tree <g> elements.
+     */
+    _addNewSolverCells(selection) {
         const self = this; // For callbacks that change "this". Alternative to using .bind().
         const scale = this.layout.scales.solver.prev;
         const transitCoords = this.layout.transitCoords.solver.prev;  
 
-        const selection = this.dom.pSolverTreeGroup.selectAll(".solver_group")
-            .data(this.layout.zoomedSolverNodes, d => d.id);
-
-        const nodeEnter = selection.enter()
+        // Create a <g> for each node in zoomedSolverNodes that doesn't already have one.
+        const enterSelection = selection.enter()
             .append("g")
             .attr("class", d => {
                 const solver_class = self.style.getSolverClass(self.showLinearSolverNames,
@@ -71,12 +95,14 @@ class OmDiagram extends Diagram {
             })
             .attr("transform", d => {
 
-                const x = 1.0 - d.draw.prevSolverDims.x - d.draw.prevSolverDims.width;
+                const x = 1.0 - d.draw.solverDims.prev.x - d.draw.solverDims.prev.width;
                 // The magic for reversing the blocks on the right side
                 // The solver tree goes from the root on the right and expands to the left
-                return `translate(${scale.x(x)},${scale.y(d.draw.prevSolverDims.y)})`;
-            })
-            .on("click", d => self.leftClickSelector(this, d))
+                return `translate(${scale.x(x)},${scale.y(d.draw.solverDims.prev.y)})`;
+            });
+
+        enterSelection // Add event handlers.
+            .on("click", function(d) {self.leftClickSelector(this, d)})
             .on("contextmenu", function (d) { self.ui.rightClick(d, this)})
             .on("mouseover", function(d) {
                 self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'), true)
@@ -108,28 +134,32 @@ class OmDiagram extends Diagram {
                 }
             });
 
-        nodeEnter.append("rect")
-            .attr("width", d => d.draw.prevSolverDims.width * transitCoords.x)
-            .attr("height", d => d.draw.prevSolverDims.height * transitCoords.y)
+        enterSelection // Add the visible rectangle
+            .append("rect")
+            .attr("width", d => d.draw.solverDims.prev.width * transitCoords.x)
+            .attr("height", d => d.draw.solverDims.prev.height * transitCoords.y)
             .attr("id", d => d.absPathName.replace(/\./g, '_'));
 
-        nodeEnter.append("text")
+        enterSelection // Add a label
+            .append("text")
             .attr("dy", ".35em")
             .attr("transform", d => {
-                const anchorX = d.draw.prevSolverDims.width * transitCoords.x -
+                const anchorX = d.draw.solverDims.prev.width * transitCoords.x -
                     self.layout.size.rightTextMargin;
-                return `translate(${anchorX},${d.draw.prevSolverDims.height*transitCoords.y / 2})`;
+                return `translate(${anchorX},${d.draw.solverDims.prev.height*transitCoords.y / 2})`;
             })
             .style("opacity", d => (d.depth < self.zoomedElement.depth)? 0 : d.textOpacity)
             .text(self.layout.getSolverText.bind(self.layout));
 
-        return ({
-            'selection': selection,
-            'nodeEnter': nodeEnter
-        });
+        return enterSelection;
     }
 
-    _setupSolverTransition(d3Refs) {
+    /**
+     * Merge the existing <g> with the newly created nodes. Enable a transition from
+     * the old locations to the new ones.
+     * @param {Object} selection The selected group of solver tree <g> elements.
+     */
+    _mergeSolverCells(selection, enterSelection) {
         const self = this; // For callbacks that change "this". Alternative to using .bind().
         const scale = this.layout.scales.solver;
         const transitCoords = this.layout.transitCoords.solver;
@@ -138,8 +168,9 @@ class OmDiagram extends Diagram {
             .transition(sharedTransition)
             .attr('height', this.dims.size.solverTree.height);
 
-        const nodeUpdate = d3Refs.nodeEnter.merge(d3Refs.selection)
-            .transition(sharedTransition)
+        const mergedSelection = selection.merge(enterSelection).transition(sharedTransition);
+
+        mergedSelection
             .attr("class", d => {
                 const solver_class = self.style.getSolverClass(self.showLinearSolverNames, {
                     'linear': d.linear_solver,
@@ -154,13 +185,15 @@ class OmDiagram extends Diagram {
                 return `translate(${scale.x(x)},${scale.y(d.draw.solverDims.y)})`;
             });
 
-        nodeUpdate.select("rect")
+        mergedSelection
+            .select("rect")
             .attr("width", d => d.draw.solverDims.width * transitCoords.x)
             .attr("height", d => d.draw.solverDims.height * transitCoords.y)
             .attr('rx', 12)
             .attr('ry', 12);
 
-        nodeUpdate.select("text")
+        mergedSelection
+            .select("text")
             .attr("transform", d => {
                 const anchorX = d.draw.solverDims.width * transitCoords.x -
                     self.layout.size.rightTextMargin;
@@ -168,25 +201,32 @@ class OmDiagram extends Diagram {
             })
             .style("opacity", d => (d.depth < self.zoomedElement.depth)? 0 : d.textOpacity)
             .text(self.layout.getSolverText.bind(self.layout));
+
     }
 
-    _runSolverTransition(selection) {
+    /**
+     * Remove <g> that no longer have displayable nodes associated with them, and
+     * transition them away.
+     * @param {Object} selection The selected group of solver tree <g> elements.
+     */
+    _removeOldSolverCells(selection) {
         const self = this; // For callbacks that change "this". Alternative to using .bind().
         const scale = this.layout.scales.solver; 
         const transitCoords = this.layout.transitCoords.solver;
 
         // Transition exiting nodes to the parent's new position.
-        const nodeExit = selection.exit()
-            .transition(sharedTransition)
+        const exitSelection = selection.exit().transition(sharedTransition);
+
+        exitSelection
             .attr("transform", d =>
                 `translate(${scale.x(d.draw.solverDims.x)},${scale.y(d.draw.solverDims.y)})`)
             .remove();
 
-        nodeExit.select("rect")
+        exitSelection.select("rect")
             .attr("width", d => d.draw.solverDims.width * transitCoords.x)
             .attr("height", d => d.draw.solverDims.height * transitCoords.y);
 
-        nodeExit.select("text")
+        exitSelection.select("text")
             .attr("transform", d => {
                 const anchorX = d.draw.solverDims.width * transitCoords.x -
                     self.layout.size.rightTextMargin;
@@ -207,15 +247,6 @@ class OmDiagram extends Diagram {
             item => d3.select("#" + item.replaceAll(".", "_")).classed('opt-vars', false)
             );
         d3.select("#_auto_ivc").classed('opt-vars', false)
-    }
-
-    /** Add HTML elements coupled to the visible nodes in the solver tree. */
-    _newTreeCells() {
-        super._newTreeCells();
-
-        const d3SolverRefs = this._createSolverCells();
-        this._setupSolverTransition(d3SolverRefs);
-        this._runSolverTransition(d3SolverRefs.selection);
     }
 
     /**

@@ -172,6 +172,13 @@ class Diagram {
         this.layout.zoomedElement = this.zoomedElement;
     }
 
+
+    /**
+     * The mouse interface to the diagram can be in normal left-click mode, node info mode,
+     * expand/collapse mode, or variable filter mode. This function performs the correct callback.
+     * @param {Object} obj The HTML element that was clicked on.
+     * @param {TreeNode} node The node associated with the element.
+     */
     leftClickSelector(obj, node) {
         switch (this.ui.click.clickEffect) {
             case N2Click.ClickEffect.NodeInfo:
@@ -189,6 +196,7 @@ class Diagram {
         }
     }
 
+    /** Recalculate the scale and apply new dimensions to diagram objects. */
     _updateScale() {
         this.layout.updateScaleValues();
 
@@ -253,27 +261,46 @@ class Diagram {
         return false;
     }
 
-    _createPartitionCells() {
+    /** Add SVG groups & contents coupled to the visible nodes in the model tree. */
+    _updateTreeCells() {
+        /*
+        Select all <g> elements that have class "partition_group". If any already
+        exist, join to their associated nodes in the model tree. If no
+        existing <g> matches a displayable node, add it to the "enter"
+        selection so the <g> can be created. If a <g> exists but there is
+        no longer a displayable node for it, put it in the "exit" selection so
+        it can be removed:
+        */
+        const selection = this.dom.pTreeGroup.selectAll("g.partition_group")
+            .data(this.layout.zoomedNodes, node => node.id);
+        
+        const enterSelection = this._addNewTreeCells(selection);
+        this._mergeTreeCells(selection, enterSelection);
+        this._removeOldTreeCells(selection);
+    }
+
+    /**
+     * Using the visible nodes in the model tree as data points, create SVG objects to
+     * represent each one. Dimensions are obtained from the precalculated layout.
+     * @param {Object} selection The selected group of model tree <g> elements.
+     */
+     _addNewTreeCells(selection) {
         const self = this; // For callbacks that change "this". Alternative to using .bind().
         const scale = this.layout.scales.model.prev;
         const transitCoords = this.layout.transitCoords.model.prev;        
 
-        const selection = this.dom.pTreeGroup.selectAll(".partition_group")
-            .data(this.layout.zoomedNodes, function (node) {
-                return node.id;
-            });
-
-        // Create a new SVG group for each node in zoomedNodes
-        const nodeEnter = selection.enter()
+        // Create a <g> for each node in zoomedNodes that doesn't already have one.
+        const enterSelection = selection.enter()
             .append("g")
             .attr("class", d => `partition_group ${self.style.getNodeClass(d)}`)
             .attr("transform", d =>
-                `translate(${scale.x(d.draw.dims.prev.x)},${scale.y(d.draw.dims.prev.y)})`)
-            .on("click", d => self.leftClickSelector(this, d))
+                `translate(${scale.x(d.draw.dims.prev.x)},${scale.y(d.draw.dims.prev.y)})`);
+
+        enterSelection // Add event handlers
+            .on("click", function(d) { self.leftClickSelector(this, d); })
             .on("contextmenu", function(d) {
                 if (d3.event.altKey) {
-                    const color = d3.select(this).select('rect').style('fill');
-                    self.ui.altRightClick(d, color);
+                    self.ui.altRightClick(d, d3.select(this).select('rect').style('fill'));
                 }
                 else {
                     self.ui.rightClick(d, this);
@@ -285,14 +312,18 @@ class Diagram {
             .on("mouseleave", () => self.ui.nodeInfoBox.clear())
             .on("mousemove", () => self.ui.nodeInfoBox.moveNearMouse(d3.event));
 
-        nodeEnter.append("rect")
+        // Add the rectangle that is the visible shape.
+        enterSelection
+            .append("rect")
             .attr("width", d => d.draw.dims.prev.width * transitCoords.x)
             .attr("height", d => d.draw.dims.prev.height * transitCoords.y)
             .attr("id", d => OmTreeNode.pathToId(d.path))
             .attr('rx', 12)
             .attr('ry', 12);
 
-        nodeEnter.append("text")
+        // Add a label
+        enterSelection
+            .append("text")
             .attr("dy", ".35em")
             .attr("transform", d => {
                 const anchorX = d.draw.dims.prev.width * transitCoords.x -
@@ -302,33 +333,37 @@ class Diagram {
             .style("opacity", d => (d.depth < self.zoomedElement.depth)? 0 : d.textOpacity)
             .text(self.layout.getText.bind(self.layout));
 
-        return {
-            'selection': selection,
-            'nodeEnter': nodeEnter
-        };
+        return enterSelection;
     }
 
-    _setupPartitionTransition(d3Refs) {
+    /**
+     * Merge the existing <g> with the newly created nodes. Enable a transition from
+     * the old locations to the new ones.
+     * @param {Object} selection The selected group of model tree <g> elements.
+     */
+     _mergeTreeCells(selection, enterSelection) {
         const self = this; // For callbacks that change "this". Alternative to using .bind().
         const scale = this.layout.scales.model;
         const transitCoords = this.layout.transitCoords.model;
 
         this.dom.clips.partitionTree
-            .transition(sharedTransition)
             .attr('height', this.dims.size.partitionTree.height);
 
-        const nodeUpdate = d3Refs.nodeEnter.merge(d3Refs.selection)
-            .transition(sharedTransition)
+        const mergedSelection = selection.merge(enterSelection).transition(sharedTransition);
+
+        mergedSelection
             .attr("class", d => `partition_group ${self.style.getNodeClass(d)}`)
             .attr("transform", d => `translate(${scale.x(d.draw.dims.x)},${scale.y(d.draw.dims.y)})`);
 
-        nodeUpdate.select("rect")
+        mergedSelection
+            .select("rect")
             .attr("width", d => d.draw.dims.width * transitCoords.x)
             .attr("height", d => d.draw.dims.height * transitCoords.y)
             .attr('rx', 12)
             .attr('ry', 12);
 
-        nodeUpdate.select("text")
+        mergedSelection
+            .select("text")
             .attr("transform", d => {
                 const anchorX = d.draw.dims.width * transitCoords.x -
                     self.layout.size.rightTextMargin;
@@ -336,23 +371,31 @@ class Diagram {
             })
             .style("opacity", d => (d.depth < self.zoomedElement.depth)? 0 : d.textOpacity)
             .text(self.layout.getText.bind(self.layout));
+
     }
 
-    _runPartitionTransition(selection) {
+    /**
+     * Remove <g> that no longer have displayable nodes associated with them, and
+     * transition them away.
+     * @param {Object} selection The selected group of model tree <g> elements.
+     */
+    _removeOldTreeCells(selection) {
         const self = this; // For callbacks that change "this". Alternative to using .bind().
         const scale = this.layout.scales.model; 
         const transitCoords = this.layout.transitCoords.model;
 
         // Transition exiting nodes to the parent's new position.
-        const nodeExit = selection.exit().transition(sharedTransition)
+        const exitSelection = selection.exit().transition(sharedTransition);
+
+        exitSelection
             .attr("transform", d => `translate(${scale.x(d.draw.dims.x)},${scale.y(d.draw.dims.y)})`)
             .remove();
 
-        nodeExit.select("rect")
+        exitSelection.select("rect")
             .attr("width", d => d.draw.dims.width * transitCoords.x)
             .attr("height", d => d.draw.dims.height * transitCoords.y);
 
-        nodeExit.select("text")
+        exitSelection.select("text")
             .attr("transform", d => {
                 const anchorX = d.draw.dims.width * transitCoords.x -
                     self.layout.size.rightTextMargin;
@@ -384,6 +427,11 @@ class Diagram {
         }
     }
 
+    /**
+     * Sleep for the specified number of milliseconds.
+     * @param {Number} time Milliseconds to return after
+     * @returns {Promise} Promise that can be awaited on until the timer expires.
+     */
     delay(time) {
         return new Promise(function(resolve) {
             setTimeout(resolve, time)
@@ -395,13 +443,6 @@ class Diagram {
 
     /** Hide the animation after the transition completes */
     hideWaiter() { this.dom.waiter.attr('class', 'no-show'); }
-
-    /** Add HTML elements coupled to the visible nodes in the model tree. */
-    _newTreeCells() {
-        const d3PartRefs = this._createPartitionCells();
-        this._setupPartitionTransition(d3PartRefs);
-        this._runPartitionTransition(d3PartRefs.selection);
-    }
 
     /**
      * Refresh the diagram when something has visually changed.
@@ -426,7 +467,7 @@ class Diagram {
 
         this._updateScale();
         this.layout.updateTransitionInfo(this.dom, this.transitionStartDelay, this.manuallyResized);
-        this._newTreeCells();
+        this._updateTreeCells();
         this.arrowMgr.transition(this.matrix);
         this.matrix.draw();
 

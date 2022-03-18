@@ -9,7 +9,7 @@
  * @property {Object} prev Previous set of coordinates.
  */
  class Dimensions {
-    static allowedVals = ['x', 'y', 'height', 'width', 'margin'];
+    static allowedVals = ['x', 'y', 'z', 'height', 'width', 'margin', 'top', 'right', 'bottom', 'left'];
 
     constructor(obj, unit = 'px') {
         this.initFrom(obj, unit)
