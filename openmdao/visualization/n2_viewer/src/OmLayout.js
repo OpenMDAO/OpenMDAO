@@ -21,16 +21,17 @@ class OmLayout extends Layout {
      * @param {Boolean} showSolvers Whether to display the solver tree.
      */
     constructor(model, zoomedElement, dims, showLinearSolverNames, showSolvers) {
-        super(model, zoomedElement, dims);
+        super(model, zoomedElement, dims, false);
 
         this.zoomedSolverNodes = [];
         this.visibleSolverNodes = [];
         this.showLinearSolverNames = showLinearSolverNames;
         this.showSolvers = showSolvers;
+        this._init();
     }
 
-    init() {
-        super.init();
+    _init() {
+        super._init();
         if (this.showSolvers) {
             this._computeSolverColumnWidths();
             this._setColumnLocations(this.size.solverTree, this.solverCols);
@@ -42,7 +43,7 @@ class OmLayout extends Layout {
             this.scales.solver = new Scale(this.size.solverTree);
         }
 
-        this.transitCoords.solver = new Coords(0, 0);
+        this.transitCoords.solver = new Dimensions({x: 0, y: 0});
 
         return this;
     }

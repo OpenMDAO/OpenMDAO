@@ -86,7 +86,7 @@ class Diagram {
 
     /** Create a Layout object. Can be overridden to create different types of Layouts */
     _newLayout() {
-        return new Layout(this.model, this.zoomedElement, this.dims).init();
+        return new Layout(this.model, this.zoomedElement, this.dims);
     }
 
     /**

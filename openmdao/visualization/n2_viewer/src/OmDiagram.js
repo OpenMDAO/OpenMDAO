@@ -20,7 +20,7 @@ class OmDiagram extends Diagram {
             this.showSolvers = true;
 
         return new OmLayout(this.model, this.zoomedElement, this.dims,
-            this.showLinearSolverNames, this.showSolvers).init();
+            this.showLinearSolverNames, this.showSolvers);
     }
 
     /**

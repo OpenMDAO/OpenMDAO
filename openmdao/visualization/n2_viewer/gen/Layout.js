@@ -12,7 +12,7 @@ class Scale {
     constructor(obj) {
         this.x = d3.scaleLinear().range([0, obj.width]);
         this.y = d3.scaleLinear().range([0, obj.height]);
-        this.prev = { x: null, y: null};
+        this.prev = { x: null, y: null };
     }
 
     /**
@@ -24,6 +24,7 @@ class Scale {
         this.y = other.y.copy();
     }
 
+    /** Backup the current scale objects for future reference. */
     preserve() {
         this.prev = {
             x: this.x.copy(),
@@ -46,15 +47,76 @@ class Coords {
         this.prev = { x: 0, y: 0 };
     }
 
+    /**
+     * Duplicate another Coords object.
+     * @param {Coords} other The object to copy from.
+     */
     copyFrom(other) {
         this.x = other.x;
         this.y = other.y;
     }
 
+    /** Backup the current values for future reference. */
     preserve() {
         this.prev = {
             x: this.x,
             y: this.y
+        }
+    }
+}
+
+/**
+ * A simple interface for handling & preserving numerical coordinates and dimensions.
+ * @typedef Dimensions
+ * @property {Number} x X coordinate to store (if set).
+ * @property {Number} y Y coordinate to store (if set).
+ * @property {Number} width Horizontal length to store (if set).
+ * @property {Number} height Vertical length to store (if set).
+ * @property {String} unit The unit of measurement that applied to all values.
+ * @property {Object} prev Previous set of coordinates.
+ */
+ class Dimensions {
+    static allowedVals = ['x', 'y', 'height', 'width', 'margin'];
+
+    constructor(obj, unit = 'px') {
+        this.initFrom(obj, unit)
+    }
+
+    /**
+     * Duplicate known values from any Object. Reset managed values and previous dimensions.
+     * @param {Object} obj The object to find values in.
+     * @param {String} unit The unit of measurement that applied to all values.
+     */
+    initFrom(obj, unit = 'px') {
+        this.unit = unit;
+        this._managedVals = new Set();
+        this.prev = {};
+
+        for (const val of Dimensions.allowedVals) {
+            if (val in obj) {
+                this._managedVals.add(val);
+                this[val] = obj[val];
+                this.prev[val] = 0;
+            }
+        } 
+    }
+
+    /**
+     * Duplicate another Dimensions object.
+     * @param {Coords} other The object to copy from.
+     */
+    copyFrom(other) {
+        this.prev = other.prev;
+        this._managedVals = other._managedVals;
+        for (const val of this._managedVals) {
+            this[val] = other[val]
+        }
+    }
+
+    /** Backup the current values for future reference. */
+    preserve() {
+        for (const val of this._managedVals) {
+            this.prev[val] = this[val];
         }
     }
 }
@@ -78,8 +140,9 @@ class Layout {
      * @param {ModelData} model The pre-processed model object.
      * @param {Object} newZoomedElement The element the new layout is based around.
      * @param {Object} dims The initial sizes for multiple tree elements.
+     * @param {Boolean} callInit Whether to call _init() or have a subclass do it.
      */
-    constructor(model, newZoomedElement, dims) {
+    constructor(model, newZoomedElement, dims, callInit = true) {
         this.model = model;
 
         this.zoomedElement = newZoomedElement;
@@ -93,9 +156,11 @@ class Layout {
         // Initial size values derived from read-only defaults
         this.size = dims.size;
         this.svg = d3.select("#svgId");
+
+        if (callInit) this._init();
     }
 
-    init() {
+    _init() {
         this._computeLeaves();
         this._setupTextRenderer();
         this._updateTextWidths();
@@ -115,10 +180,8 @@ class Layout {
         }
 
         this.transitCoords = {
-            model: new Coords(0, 0)
+            model: new Dimensions({ x: 0, y: 0})
         }
-
-        return this;
     }
 
     /**
