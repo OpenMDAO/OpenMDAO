@@ -95,17 +95,21 @@ def _get_var_meta(cr, case_name, var):
     """
     case = cr.get_case(case_name)
 
-    case_inputs = case.list_inputs(prom_name=True, units=True, shape=True, val=False,
-                                   out_stream=None)
-
     case_outputs = case.list_outputs(prom_name=True, units=True, shape=True, val=False,
                                      residuals=False, out_stream=None)
 
-    for _, meta in case_outputs + case_inputs:
+    for _, meta in case_outputs:
         if meta['prom_name'] == var:
             return meta
-    else:
-        raise KeyError(f'No output named {var} found')
+
+    case_inputs = case.list_inputs(prom_name=True, units=True, shape=True, val=False,
+                                   out_stream=None)
+
+    for _, meta in case_inputs:
+        if meta['prom_name'] == var:
+            return meta
+
+    raise KeyError(f'No output named {var} found')
 
 
 def _get_vars(cr, case_names, var_types=None):
@@ -337,7 +341,7 @@ class CaseViewer(object):
 
     def _make_gui(self):
         """
-        Define the widgets for the CaseViewer and displays them.
+        Define the widgets for the CaseViewer and display them.
         """
         self._widgets = {}
 

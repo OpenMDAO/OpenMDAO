@@ -3,6 +3,8 @@
 import re
 
 from openmdao.utils.om_warnings import warn_deprecation
+from openmdao.utils.notebook_utils import notebook_mode
+
 from openmdao.core.constants import _UNDEFINED
 
 
@@ -59,6 +61,8 @@ class OptionsDictionary(object):
         If True, no options can be set after declaration.
     _all_recordable : bool
         Flag to determine if all options in UserOptions are recordable.
+    _widget : OptionsWidget
+        If running in a Jupyter notebook, a widget for viewing/setting options.
     """
 
     def __init__(self, parent_name=None, read_only=False):
@@ -96,6 +100,15 @@ class OptionsDictionary(object):
             The options dictionary.
         """
         return self._dict.__repr__()
+
+    def _repr_pretty_(self, p, cycle):
+        if not cycle and notebook_mode():
+            try:
+                from openmdao.visualization.options_widget import OptionsWidget
+                return OptionsWidget(self)
+            except Exception:
+                pass
+        return repr(self)
 
     def __rst__(self):
         """
@@ -248,12 +261,14 @@ class OptionsDictionary(object):
         if not (value is None and meta['allow_none']):
             # If only values is declared
             if values is not None:
-                if value not in values:
-                    if isinstance(value, str):
-                        value = "'{}'".format(value)
-                    self._raise("Value ({}) of option '{}' is not one of {}.".format(value, name,
-                                                                                     values),
-                                ValueError)
+                check_vals = [value] if types is not list else value
+                for val in check_vals:
+                    if val not in values:
+                        if isinstance(value, str):
+                            value = f"'{value}'"
+                        self._raise(f"Value ({value}) of option '{name}' is not one of {values}.",
+                                    ValueError)
+
             # If only types is declared
             elif types is not None:
                 if not isinstance(value, types):
@@ -342,7 +357,7 @@ class OptionsDictionary(object):
             self._raise(f"In declaration of option '{name}', the 'types' arg must be None, a type "
                         f"or a tuple - not {types}.", exc_type=TypeError)
 
-        if types is not None and values is not None:
+        if types is not None and types is not list and values is not None:
             self._raise(f"'types' and 'values' were both specified for option '{name}'.")
 
         if types is bool:
