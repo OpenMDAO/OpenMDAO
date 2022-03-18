@@ -268,7 +268,7 @@ class Diagram {
             .append("g")
             .attr("class", d => `partition_group ${self.style.getNodeClass(d)}`)
             .attr("transform", d =>
-                `translate(${scale.x(d.draw.prevDims.x)},${scale.y(d.draw.prevDims.y)})`)
+                `translate(${scale.x(d.draw.dims.prev.x)},${scale.y(d.draw.dims.prev.y)})`)
             .on("click", d => self.leftClickSelector(this, d))
             .on("contextmenu", function(d) {
                 if (d3.event.altKey) {
@@ -286,8 +286,8 @@ class Diagram {
             .on("mousemove", () => self.ui.nodeInfoBox.moveNearMouse(d3.event));
 
         nodeEnter.append("rect")
-            .attr("width", d => d.draw.prevDims.width * transitCoords.x)
-            .attr("height", d => d.draw.prevDims.height * transitCoords.y)
+            .attr("width", d => d.draw.dims.prev.width * transitCoords.x)
+            .attr("height", d => d.draw.dims.prev.height * transitCoords.y)
             .attr("id", d => OmTreeNode.pathToId(d.path))
             .attr('rx', 12)
             .attr('ry', 12);
@@ -295,9 +295,9 @@ class Diagram {
         nodeEnter.append("text")
             .attr("dy", ".35em")
             .attr("transform", d => {
-                const anchorX = d.draw.prevDims.width * transitCoords.x -
+                const anchorX = d.draw.dims.prev.width * transitCoords.x -
                     self.layout.size.rightTextMargin;
-                return `translate(${anchorX},${(d.draw.prevDims.height * transitCoords.y / 2)})`;
+                return `translate(${anchorX},${(d.draw.dims.prev.height * transitCoords.y / 2)})`;
             })
             .style("opacity", d => (d.depth < self.zoomedElement.depth)? 0 : d.textOpacity)
             .text(self.layout.getText.bind(self.layout));
