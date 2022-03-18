@@ -566,7 +566,7 @@ class NodeInfo extends N2Window {
 class PersistentNodeInfo extends N2WindowDraggable {
     constructor(nodeInfo) {
         super('persistentNodeInfo-' + uuidv4(), '#' + nodeInfo.window.attr('id'));
-        console.log(nodeInfo.window.attr('id'))
+
         // Avoid just copying the reference because nodeInfo.values will be wiped:
         this.values = JSON.parse(JSON.stringify(nodeInfo.values));
         this.ui = nodeInfo.ui;
