@@ -49,8 +49,7 @@ def _apply_transform(data, transform):
         The name of the transform to be applied.  This will be looked up in _func_map.
     """
     if transform in _func_map:
-        out = _func_map[transform](data)
-        return out
+        return _func_map[transform](data)
     return data
 
 
