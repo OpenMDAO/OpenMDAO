@@ -549,7 +549,7 @@ class System(object):
         return f"<class {type(self).__name__}>"
 
     def _get_inst_id(self):
-        return self.pathname
+        return self.pathname if self.pathname is not None else ''
 
     def abs_name_iter(self, iotype, local=True, cont=True, discrete=False):
         """

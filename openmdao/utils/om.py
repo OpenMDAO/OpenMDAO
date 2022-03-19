@@ -55,6 +55,7 @@ from openmdao.utils.coloring import _total_coloring_setup_parser, _total_colorin
     _partial_coloring_setup_parser, _partial_coloring_cmd, \
     _view_coloring_setup_parser, _view_coloring_exec
 from openmdao.utils.scaffold import _scaffold_setup_parser, _scaffold_exec
+from openmdao.utils.timer import _timing_setup_parser, _timing_cmd
 from openmdao.utils.file_utils import _load_and_exec, _to_filename
 from openmdao.utils.entry_points import _list_installed_setup_parser, _list_installed_cmd, \
     split_ep, _compute_entry_points_setup_parser, _compute_entry_points_exec, \
@@ -490,6 +491,8 @@ _command_map = {
                  'Generate a simple scaffold for a component.'),
     'summary': (_config_summary_setup_parser, _config_summary_cmd,
                 'Print a short top-level summary of the problem.'),
+    'timing': (_timing_setup_parser, _timing_cmd,
+                 'Collect timing information for all systems.'),
     'total_coloring': (_total_coloring_setup_parser, _total_coloring_cmd,
                        'Compute a coloring for the total jacobian.'),
     'trace': (_itrace_setup_parser, _itrace_exec, 'Dump trace output.'),

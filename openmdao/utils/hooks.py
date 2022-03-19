@@ -145,9 +145,8 @@ def _get_hook_lists(class_name, inst_id, fname):
         imeta = cmeta[inst_id]
     else:
         cmeta[inst_id] = imeta = {}
-    if fname in imeta:
-        return imeta[fname]
-    imeta[fname] = [[], []]
+    if fname not in imeta:
+        imeta[fname] = [[], []]
     return imeta[fname]
 
 

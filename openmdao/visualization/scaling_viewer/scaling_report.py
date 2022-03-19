@@ -6,7 +6,6 @@ import functools
 
 import numpy as np
 
-import openmdao
 from openmdao.core.constants import _SetupStatus, INF_BOUND
 import openmdao.utils.coloring as coloring_mod
 import openmdao.utils.hooks as hooks

@@ -2,7 +2,6 @@
 
 
 import sys
-import os
 
 import numpy as np
 from contextlib import contextmanager
@@ -193,8 +192,8 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
             cprint("%s%s: %s\n" % (vindent, name, val))
 
 
-def _get_printer(comm, stream):
-    if comm.rank == 0:
+def _get_printer(comm, stream, rank=0):
+    if comm.rank == rank:
         def p(*args, **kwargs):
             print(*args, file=stream, **kwargs)
     else:
