@@ -29,6 +29,7 @@ from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
 from openmdao.visualization.scaling_viewer.scaling_report import _scaling_setup_parser, \
     _scaling_cmd
+from openmdao.visualization.timing_viewer.timer import _timing_setup_parser, _timing_cmd
 from openmdao.visualization.dyn_shape_plot import _view_dyn_shapes_setup_parser, \
     _view_dyn_shapes_cmd
 try:
@@ -55,7 +56,6 @@ from openmdao.utils.coloring import _total_coloring_setup_parser, _total_colorin
     _partial_coloring_setup_parser, _partial_coloring_cmd, \
     _view_coloring_setup_parser, _view_coloring_exec
 from openmdao.utils.scaffold import _scaffold_setup_parser, _scaffold_exec
-from openmdao.utils.timer import _timing_setup_parser, _timing_cmd
 from openmdao.utils.file_utils import _load_and_exec, _to_filename
 from openmdao.utils.entry_points import _list_installed_setup_parser, _list_installed_cmd, \
     split_ep, _compute_entry_points_setup_parser, _compute_entry_points_exec, \
