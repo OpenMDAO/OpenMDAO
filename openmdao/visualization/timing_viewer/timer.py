@@ -117,13 +117,16 @@ def _timing_setup_parser(parser):
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-o', default=None, action='store', dest='outfile',
-                        help='Output file name. By default, output goes to stdout.')
+                        help='Name of ascii output file. By default, output goes to stdout if '
+                        '--no_browser is set, and otherwise it goes to "timings.out".')
     parser.add_argument('-f', '--func', action='append', default=[],
                         dest='funcs', help='Time a specified function. Can be applied multiple '
                         'times to specify multiple functions. '
                         f'Default methods are {_default_timer_methods}.')
     parser.add_argument('--no_browser', action='store_false', dest='browser',
-                        help='Do not view timings in a browser.')
+                        help='Do not view timings in a browser.  Even if this is set, a '
+                        'browser-viewable file called "timing_report.html" will always be '
+                        'generated.')
 
 
 def _setup_timer_hook(system):
