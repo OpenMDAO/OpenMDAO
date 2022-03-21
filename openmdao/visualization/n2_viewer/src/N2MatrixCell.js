@@ -437,8 +437,8 @@ class N2FilterCell extends N2VectorBase {
  * @typedef {Object} N2MatrixCell
  * @property {number} row Vertical coordinate of the cell in the matrix.
  * @property {number} col Horizontal coordinate of the cell in the matrix.
- * @property {N2TreeNode} srcObj The node in the model tree this cell is associated with.
- * @property {N2TreeNode} tgtObj The model tree node that this outputs to.
+ * @property {OmTreeNode} srcObj The node in the model tree this cell is associated with.
+ * @property {OmTreeNode} tgtObj The model tree node that this outputs to.
  * @property {string} id The srcObj id appended with the tgtObj id.
  * @property {SymbolType} symbolType Info about the type of symbol represented by the node.
  */
@@ -447,8 +447,8 @@ class N2MatrixCell {
      * Initialize the cell.
      * @param {number} row Vertical coordinate of the cell in the matrix.
      * @param {number} col Horizontal coordinate of the cell in the matrix.
-     * @param {N2TreeNode} srcObj The node in the model tree this node is associated with.
-     * @param {N2TreeNode} tgtObj The model tree node that this outputs to.
+     * @param {OmTreeNode} srcObj The node in the model tree this node is associated with.
+     * @param {OmTreeNode} tgtObj The model tree node that this outputs to.
      * @param {ModelData} model Reference to the model to get some info from it.
      * @param {N2CellRenderer} renderer The object that draws the cell.
      */
@@ -523,7 +523,7 @@ class N2MatrixCell {
     }
 
     /**
-     * Choose a color based on our location and state of the associated N2TreeNode.
+     * Choose a color based on our location and state of the associated OmTreeNode.
      */
     color() {
         if (this.symbolType.potentialDeclaredPartial &&
@@ -548,41 +548,28 @@ class N2MatrixCell {
      * Determine whether the arrow should be in the top or bottom section of the
      * matrix based on rootIndex, and add to the appropriate array of
      * tracked offscreen connections.
-     * @param {N2TreeNode} srcNode Where the connection starts.
-     * @param {N2TreeNode} tgtNode Where the connection ends.
+     * @param {OmTreeNode} srcNode Where the connection starts.
+     * @param {OmTreeNode} tgtNode Where the connection ends.
      */
     addOffScreenConn(srcNode, tgtNode) {
-        let debugStr = ": " + srcNode.absPathName + " -> " + tgtNode.absPathName;
+        let offscreenNode = null, dir = '', side = '';
 
         if (srcNode === this.tgtObj) {
-            // Outgoing
-            if (srcNode.rootIndex < tgtNode.rootIndex) {
-                // Top
-                debugInfo("New offscreen outgoing connection on top" + debugStr);
-                this.offScreen.top.outgoing.add(tgtNode);
-            }
-            else {
-                // Bottom
-                debugInfo("New offscreen outgoing connection on bottom" + debugStr);
-                this.offScreen.bottom.outgoing.add(tgtNode);
-            }
+            dir = 'outgoing';
+            offscreenNode = tgtNode;           
         }
         else {
-            // Incoming
-            if (srcNode.rootIndex < tgtNode.rootIndex) {
-                // Top
-                debugInfo("New offscreen incoming connection on top" + debugStr);
-                this.offScreen.top.incoming.add(srcNode);
-            }
-            else {
-                // Bottom
-                debugInfo("New offscreen incoming connection on bottom" + debugStr);
-                this.offScreen.bottom.incoming.add(srcNode);
-            }
+            dir = 'incoming';
+            offscreenNode = srcNode;
         }
+        side = (srcNode.rootIndex < tgtNode.rootIndex)? 'top' : 'bottom';
 
-        this.offScreen.total++;
-        // debugInfo("Total offscreen connections found: " + this.offScreen.total);
+        const offScreenSet = this.offScreen[side][dir];
+
+        if (!offScreenSet.has(offscreenNode)) {
+            offScreenSet.add(offscreenNode);
+            this.offScreen.total++;
+        }
     }
 
     /** Choose a renderer based on our SymbolType. */
@@ -638,7 +625,7 @@ class N2MatrixCell {
 
         let obj = (varType == 'target') ? this.tgtObj : this.srcObj;
         if (obj.draw.filtered) { obj = obj.draw.filterParent; }
-        const treeId = N2TreeNode.absPathToId(obj.absPathName);
+        const treeId = OmTreeNode.pathToId(obj.path);
         const treeNode = d3.select('rect#' + treeId);
 
         let fill = treeNode.style('fill');

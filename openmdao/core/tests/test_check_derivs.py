@@ -12,6 +12,7 @@ from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
+from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, \
@@ -2314,7 +2315,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.run_model()
 
         data = prob.check_partials(out_stream=None, compact_print=True)
-        print(data)
 
     def test_set_step_on_comp(self):
 
@@ -3565,6 +3565,71 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         assert_near_equal(J_driver['stuff.y', 'x']['J_fwd'][0, 0], 1.0)
         assert_near_equal(J_driver['stuff.lcy', 'x']['J_fwd'][0, 0], 3.0)
+
+    def test_alias_constraints(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
+        model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
+        model.add_subsystem('obj', om.ExecComp('o = areas[0, 0] + areas[1, 1]', areas=np.zeros((2, 2))),
+                            promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        model.add_design_var('widths', lower=-50.0, upper=50.0)
+        model.add_objective('o')
+
+        model.add_constraint('areas', equals=24.0, indices=[0], flat_indices=True)
+        model.add_constraint('areas', equals=21.0, indices=[1], flat_indices=True, alias='a2')
+        model.add_constraint('areas', equals=3.5, indices=[2], flat_indices=True, alias='a3')
+        model.add_constraint('areas', equals=17.5, indices=[3], flat_indices=True, alias='a4')
+
+        prob.setup(mode='fwd')
+
+        failed = prob.run_driver()
+
+        totals = prob.check_totals(out_stream=None)
+
+        assert_near_equal(totals['comp.areas', 'p1.widths']['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(totals['a2', 'p1.widths']['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(totals['a3', 'p1.widths']['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(totals['a4', 'p1.widths']['abs error'][0], 0.0, 1e-6)
+
+        l = prob.list_problem_vars(show_promoted_name=True, print_arrays=False,
+                                   cons_opts=['indices', 'alias'])
+
+        # Rev mode
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
+        model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
+        model.add_subsystem('obj', om.ExecComp('o = areas[0, 0] + areas[1, 1]', areas=np.zeros((2, 2))),
+                            promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        model.add_design_var('widths', lower=-50.0, upper=50.0)
+        model.add_objective('o')
+
+        model.add_constraint('areas', equals=24.0, indices=[0], flat_indices=True)
+        model.add_constraint('areas', equals=21.0, indices=[1], flat_indices=True, alias='a2')
+        model.add_constraint('areas', equals=3.5, indices=[2], flat_indices=True, alias='a3')
+        model.add_constraint('areas', equals=17.5, indices=[3], flat_indices=True, alias='a4')
+
+        prob.setup(mode='rev')
+
+        failed = prob.run_driver()
+        print(failed)
+
+        totals = prob.check_totals(out_stream=None)
+
+        assert_near_equal(totals['comp.areas', 'p1.widths']['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(totals['a2', 'p1.widths']['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(totals['a3', 'p1.widths']['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(totals['a4', 'p1.widths']['abs error'][0], 0.0, 1e-6)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

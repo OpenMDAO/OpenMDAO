@@ -40,7 +40,7 @@ class InfoPropDefault {
      * If the object contains a non-empty property with our key, create
      * a new row with it in the supplied table body.
      * @param {Object} tbody D3 reference to an existing table body.
-     * @param {N2TreeNode} node Reference to the node that may have the property.
+     * @param {OmTreeNode} node Reference to the node that may have the property.
      */
     addRow(tbody, node) {
         if (this.canShow(node)) {
@@ -109,7 +109,7 @@ class InfoPropOptions extends InfoPropDefault {
     /**
      * There may be a list of options, so create a subsection in the table for them.
      * @param {Object} tbody D3 reference to an existing table body.
-     * @param {N2TreeNode} node Reference to the node that may have the property.
+     * @param {OmTreeNode} node Reference to the node that may have the property.
      */
     addRow(tbody, node) {
         if (!this.canShow(node)) return;
@@ -143,7 +143,7 @@ class InfoPropExpr extends InfoPropDefault {
     /**
      * There may be a list of expressions, so create a subsection in the table for them.
      * @param {Object} tbody D3 reference to an existing table body.
-     * @param {N2TreeNode} node Reference to the node that may have the property.
+     * @param {OmTreeNode} node Reference to the node that may have the property.
      */
     addRow(tbody, node) {
         if (!this.canShow(node)) return;
@@ -527,7 +527,7 @@ class NodeInfo extends N2Window {
      * Iterate over the list of known properties and display them
      * if the specified object contains them.
      * @param {Object} event The related event so we can get position.
-     * @param {N2TreeNode} node The node to examine.
+     * @param {OmTreeNode} node The node to examine.
      * @param {String} color Match the color of the node for the header/footer.
      * @param {Boolean} [isSolver = false] Whether to use solver properties or not.
      */

@@ -128,7 +128,7 @@ class DictionaryJacobian(Jacobian):
                         continue
 
                     subjac_info = subjacs_info[abs_key]
-                    if self._randomize:
+                    if self._randgen:
                         subjac = self._randomize_subjac(subjac_info['val'], abs_key)
                     else:
                         subjac = subjac_info['val']

@@ -118,8 +118,8 @@ class N2Click {
  * Handle input events for the matrix and toolbar.
  * @typedef N2UserInterface
  * @property {N2Diagram} n2Diag Reference to the main diagram.
- * @property {N2TreeNode} leftClickedNode The last node that was left-clicked.
- * @property {N2TreeNode} rightClickedNode The last node that was right-clicked, if any.
+ * @property {OmTreeNode} leftClickedNode The last node that was left-clicked.
+ * @property {OmTreeNode} rightClickedNode The last node that was right-clicked, if any.
  * @property {Boolean} lastClickWasLeft True is last mouse click was left, false if right.
  * @property {Boolean} leftClickIsForward True if the last node clicked has a greater depth
  *  than the current zoomed element.
@@ -352,7 +352,7 @@ class N2UserInterface {
     /**
      * Make sure the clicked node is deeper than the zoomed node, that
      * it's not the root node, and that it actually has children.
-     * @param {N2TreeNode} node The right-clicked node to check.
+     * @param {OmTreeNode} node The right-clicked node to check.
      */
     isCollapsible(node) {
         return (node.depth > this.n2Diag.zoomedElement.depth &&
@@ -387,7 +387,7 @@ class N2UserInterface {
 
     /**
      * When a node is right-clicked, collapse it if it's allowed.
-     * @param {N2TreeNode} node The node that was right-clicked.
+     * @param {OmTreeNode} node The node that was right-clicked.
      */
     rightClick(node) {
         testThis(this, 'N2UserInterface', 'rightClick');
@@ -415,7 +415,7 @@ class N2UserInterface {
     /**
      * When a node with variables is alt-right-clicked, present a dialog with the
      * list of variables and allow the user to select which ones should be displayed.
-     * @param {N2TreeNode} node The node that was alt-right-clicked.
+     * @param {OmTreeNode} node The node that was alt-right-clicked.
      * @param {String} color The color of the clicked node, to use for the dialog ribbons.
      */
     altRightClick(node, color) {
@@ -434,7 +434,7 @@ class N2UserInterface {
     /**
      * Update states as if a left-click was performed, which may or may not have
      * actually happened.
-     * @param {N2TreeNode} node The node that was targetted.
+     * @param {OmTreeNode} node The node that was targetted.
      */
     _setupLeftClick(node) {
         this.leftClickedNode = node;
@@ -451,7 +451,7 @@ class N2UserInterface {
 
     /**
      * React to a left-clicked node by zooming in on it.
-     * @param {N2TreeNode} node The targetted node.
+     * @param {OmTreeNode} node The targetted node.
      */
     leftClick(node) {
         // Don't do it if the node is already zoomed
@@ -511,7 +511,7 @@ class N2UserInterface {
     /**
      * Preserve the specified node as the zoomed element,
      * and remember the state of all hidden elements.
-     * @param {N2TreeNode} node The node to preserve as the zoomed element.
+     * @param {OmTreeNode} node The node to preserve as the zoomed element.
      */
     addForwardButtonHistory(node) {
         let formerHidden = [];
@@ -660,7 +660,7 @@ class N2UserInterface {
 
     /**
      * Minimize the specified node and recursively minimize its children.
-     * @param {N2TreeNode} node The current node to operate on.
+     * @param {OmTreeNode} node The current node to operate on.
      */
     _collapseOutputs(node) {
         if (node.subsystem_type && node.subsystem_type == 'component') {
@@ -675,7 +675,7 @@ class N2UserInterface {
 
     /**
      * React to a button click and collapse all outputs of the specified node.
-     * @param {N2TreeNode} node The initial node, usually the currently zoomed element.
+     * @param {OmTreeNode} node The initial node, usually the currently zoomed element.
      */
     collapseOutputsButtonClick(startNode) {
         testThis(this, 'N2UserInterface', 'collapseOutputsButtonClick');
@@ -690,7 +690,7 @@ class N2UserInterface {
 
     /**
      * Mark this node and all of its children as unminimized/unhidden
-     * @param {N2TreeNode} node The node to operate on.
+     * @param {OmTreeNode} node The node to operate on.
      */
     _uncollapse(node) {
         node.expand().show();
@@ -707,7 +707,7 @@ class N2UserInterface {
 
     /**
      * React to a button click and uncollapse the specified node.
-     * @param {N2TreeNode} startNode The initial node.
+     * @param {OmTreeNode} startNode The initial node.
      */
     uncollapseButtonClick(startNode) {
         testThis(this, 'N2UserInterface', 'uncollapseButtonClick');
@@ -981,7 +981,7 @@ class N2UserInterface {
 class ChildSelectDialog extends N2WindowDraggable {
     /**
      * Setup the basic structure of the variable selection dialog.
-     * @param {N2TreeNode} node The node to examine the variables of.
+     * @param {OmTreeNode} node The node to examine the variables of.
      * @param {String} color The color to make the window header/footer ribbons.
      */
      constructor(node, color) {

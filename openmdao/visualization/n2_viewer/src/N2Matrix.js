@@ -2,7 +2,7 @@
  * Use the model tree to build the matrix of variables and connections, display, and
  * perform operations with it.
  * @typedef N2Matrix
- * @property {N2TreeNodes[]} nodes Reference to nodes that will be drawn.
+ * @property {OmTreeNodes[]} nodes Reference to nodes that will be drawn.
  * @property {ModelData} model Reference to the pre-processed model.
  * @property {N2Layout} layout Reference to object managing columns widths and such.
  * @property {Object} n2Groups References to <g> SVG elements created by N2Diagram.
@@ -118,7 +118,7 @@ class N2Matrix {
     /**
      * Given the node ID, determine if one of the cells in the matrix
      * represents it or contains it.
-     * @param {Number} nodeId The id of the N2TreeNode to search for
+     * @param {Number} nodeId The id of the OmTreeNode to search for
      * @returns {Object} Contains reference to cell if found, and flags describing it.
      */
     findCellByNodeId(nodeId) {
@@ -214,7 +214,11 @@ class N2Matrix {
      */
     _findUnseenCycleSources(cell) {
         const node = cell.tgtObj;
+        if (!(node instanceof OmTreeNode)) return;
+        
         const targetsWithCycleArrows = node.getNodesWithCycleArrows();
+
+        const offscreenInit = cell.offScreen.total;
 
         for (const twca of targetsWithCycleArrows) {
             for (const ai of twca.cycleArrows) {
@@ -233,11 +237,16 @@ class N2Matrix {
                     for (const tgt of ai.src.targetParentSet) {
                         if (tgt.absPathName == node.absPathName) {
                             debugInfo("Adding offscreen connection from _findUnseenCycleSources().")
-                            cell.addOffScreenConn(ai.src, node)
+                            debugInfo(`Offscreen cycle conn from ${ai.src.absPathName}(${ai.src.type}) to ${node.absPathName}(${node.type}).`)
+                            cell.addOffScreenConn(ai.src, node);
                         }
                     }
                 }
             }
+        }
+
+        if (cell.offScreen.total > offscreenInit) {
+            console.log(`Cell ${cell.id} added ${cell.offScreen.total - offscreenInit} of ${cell.offScreen.total} offscreen connections due to cycle arrows.`);
         }
     }
 
@@ -263,7 +272,6 @@ class N2Matrix {
             // On the diagonal
             const newDiagCell = new N2MatrixCell(srcIdx, srcIdx, diagNode, diagNode, this.model);
             this._addCell(srcIdx, srcIdx, newDiagCell);
-            this._findUnseenCycleSources(newDiagCell);
 
             for (const tgt of diagNode.targetParentSet) {
                 const tgtNode = tgt.draw.filtered? tgt.draw.filterParent : tgt;
@@ -313,6 +321,8 @@ class N2Matrix {
                     }
                 }
             }
+
+            this._findUnseenCycleSources(newDiagCell);
         }
     }
 
@@ -811,8 +821,8 @@ class N2Matrix {
      * @param {N2MatrixCell} cell The off-diagonal cell to draw arrows for.
      */
     drawOffDiagonalArrows(cell) {
-        let src = this.diagNodes[cell.row];
-        let tgt = this.diagNodes[cell.col];
+        const src = this.diagNodes[cell.row];
+        const tgt = this.diagNodes[cell.col];
 
         this.arrowMgr.addFullArrow(cell.id, {
             'start': {
@@ -828,21 +838,23 @@ class N2Matrix {
             'color': N2Style.color.inputArrow,
         });
 
+        /* Cycle arrows are only drawn in the bottom triangle of the diagram */
         if (cell.row > cell.col) {
-            let targetsWithCycleArrows = tgt.getNodesWithCycleArrows();
+            // Get an array of all the parents and children of the target with cycle arrows
+            const relativesWithCycleArrows = tgt.getNodesWithCycleArrows();
 
-            for (let twca of targetsWithCycleArrows) {
-                for (let ai of twca.cycleArrows) {
+            for (const relative of relativesWithCycleArrows) {
+                for (const ai of relative.cycleArrows) {
                     if (src.hasNode(ai.src)) {
-                        for (let arrow of ai.arrows) {
+                        for (const arrow of ai.arrows) {
                             let firstBeginIndex = -1,
                                 firstEndIndex = -1;
 
                             // find first begin index
-                            for (let mi in this.diagNodes) {
-                                let rtNode = this.diagNodes[mi];
-                                if (rtNode.hasNode(arrow.begin)) {
-                                    firstBeginIndex = mi;
+                            for (let diagIdx in this.diagNodes) {
+                                const diagNode = this.diagNodes[diagIdx];
+                                if (diagNode.hasNode(arrow.begin)) {
+                                    firstBeginIndex = diagIdx;
                                     break;
                                 }
                             }
@@ -851,10 +863,10 @@ class N2Matrix {
                             }
 
                             // find first end index
-                            for (let mi in this.diagNodes) {
-                                let rtNode = this.diagNodes[mi];
-                                if (rtNode.hasNode(arrow.end)) {
-                                    firstEndIndex = mi;
+                            for (let diagIdx in this.diagNodes) {
+                                const diagNode = this.diagNodes[diagIdx];
+                                if (diagNode.hasNode(arrow.end)) {
+                                    firstEndIndex = diagIdx;
                                     break;
                                 }
                             }
