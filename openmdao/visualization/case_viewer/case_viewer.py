@@ -49,8 +49,7 @@ def _apply_transform(data, transform):
         The name of the transform to be applied.  This will be looked up in _func_map.
     """
     if transform in _func_map:
-        out = _func_map[transform](data)
-        return np.atleast_2d(np.asarray(out))
+        return _func_map[transform](data)
     return data
 
 
@@ -869,7 +868,7 @@ class CaseViewer(object):
                     else:
                         x_val = self._case_reader.get_case(case_name).get_val(x_var)
                 else:
-                    x_val = i * np.ones_like(y_val)
+                    x_val = i * np.ones(y_val.size)
 
                 try:
                     x_val = _apply_slice(x_val, x_slice)
@@ -882,9 +881,9 @@ class CaseViewer(object):
                 if x_val is None or y_val is None:
                     continue
 
-                if x_val.ravel().shape[0] != y_val.T.shape[0]:
-                    print(f'Incompatible shapes: x.shape = {x_val.ravel().shape[0]} '
-                          f' y.shape = {y_val.T.shape[0]}.')
+                if x_val.shape[0] != y_val.shape[0]:
+                    print(f'Incompatible shapes: x.shape = {x_val.shape} '
+                          f' y.shape = {y_val.shape}.')
                     print('Size along first axis must agree.')
                     return
 
@@ -900,7 +899,7 @@ class CaseViewer(object):
                                          cmap=self._cmap, alpha=alpha)
                     self._scatters.append(s)
                 else:
-                    line = self._ax.plot(x_val.ravel(), y_val.T,
+                    line = self._ax.plot(x_val, y_val,
                                          c=self._cmap(float(i) / len(cases)),
                                          mfc=self._cmap(float(i) / len(cases)),
                                          mec='k',

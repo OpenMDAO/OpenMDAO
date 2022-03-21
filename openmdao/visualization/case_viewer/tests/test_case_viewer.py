@@ -120,22 +120,22 @@ class TestOtherFuncs(unittest.TestCase):
     def test_apply_transform(self):
         x = np.random.random((20, 3)) - 0.5
 
-        max = np.atleast_2d(np.max(x))
+        max = np.max(x)
         assert_near_equal(_apply_transform(x, 'max'), max)
 
-        min = np.atleast_2d(np.min(x))
+        min = np.min(x)
         assert_near_equal(_apply_transform(x, 'min'), min)
 
-        maxabs = np.atleast_2d(np.max(np.abs(x)))
+        maxabs = np.max(np.abs(x))
         assert_near_equal(_apply_transform(x, 'maxabs'), maxabs)
 
-        minabs = np.atleast_2d(np.min(np.abs(x)))
+        minabs = np.min(np.abs(x))
         assert_near_equal(_apply_transform(x, 'minabs'), minabs)
 
-        norm = np.atleast_2d(np.linalg.norm(x))
+        norm = np.linalg.norm(x)
         assert_near_equal(_apply_transform(x, 'norm'), norm)
 
-        ravel = np.atleast_2d(np.ravel(x))
+        ravel = np.ravel(x)
         assert_near_equal(_apply_transform(x, 'ravel'), ravel)
 
         assert_near_equal(_apply_transform(x, 'None'), x)
