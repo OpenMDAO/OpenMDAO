@@ -168,7 +168,7 @@ class OmDiagram extends Diagram {
             .transition(sharedTransition)
             .attr('height', this.dims.size.solverTree.height);
 
-        const mergedSelection = selection.merge(enterSelection).transition(sharedTransition);
+        const mergedSelection = enterSelection.merge(selection).transition(sharedTransition);
 
         mergedSelection
             .attr("class", d => {
@@ -176,7 +176,7 @@ class OmDiagram extends Diagram {
                     'linear': d.linear_solver,
                     'nonLinear': d.nonlinear_solver
                 });
-                return solver_class + " solver_group " + self.style.getNodeClass(d);
+                return `${solver_class} solver_group ${self.style.getNodeClass(d)}`;
             })
             .attr("transform", d => {
                 const x = 1.0 - d.draw.solverDims.x - d.draw.solverDims.width;

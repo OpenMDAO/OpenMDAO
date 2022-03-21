@@ -9,7 +9,7 @@ class OmNodeDisplayData extends NodeDisplayData {
         super();
         this.nameSolverWidthPx = 1; // Solver-side label width pixels as computed by N2Layout
         this.solverDims = new Dimensions({ x: 1e-6, y: 1e-6, width: 1, height: 1 });
-        this.solverDims.preserve()
+        this.solverDims.preserve();
     }
 
     /**

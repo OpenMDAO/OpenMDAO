@@ -272,7 +272,7 @@ class Diagram {
         it can be removed:
         */
         const selection = this.dom.pTreeGroup.selectAll("g.partition_group")
-            .data(this.layout.zoomedNodes, node => node.id);
+            .data(this.layout.zoomedNodes, d => d.id);
         
         const enterSelection = this._addNewTreeCells(selection);
         this._mergeTreeCells(selection, enterSelection);
@@ -285,7 +285,7 @@ class Diagram {
      * @param {Object} selection The selected group of model tree <g> elements.
      */
      _addNewTreeCells(selection) {
-        const self = this; // For callbacks that change "this". Alternative to using .bind().
+        const self = this; // For callbacks that might change "this".
         const scale = this.layout.scales.model.prev;
         const transitCoords = this.layout.transitCoords.model.prev;        
 
@@ -294,7 +294,7 @@ class Diagram {
             .append("g")
             .attr("class", d => `partition_group ${self.style.getNodeClass(d)}`)
             .attr("transform", d =>
-                `translate(${scale.x(d.draw.dims.prev.x)},${scale.y(d.draw.dims.prev.y)})`);
+                `translate(${scale.x(d.draw.dims.prev.x)}, ${scale.y(d.draw.dims.prev.y)})`);
 
         enterSelection // Add event handlers
             .on("click", function(d) { self.leftClickSelector(this, d); })
@@ -317,7 +317,7 @@ class Diagram {
             .append("rect")
             .attr("width", d => d.draw.dims.prev.width * transitCoords.x)
             .attr("height", d => d.draw.dims.prev.height * transitCoords.y)
-            .attr("id", d => OmTreeNode.pathToId(d.path))
+            .attr("id", d => TreeNode.pathToId(d.path))
             .attr('rx', 12)
             .attr('ry', 12);
 
@@ -328,7 +328,7 @@ class Diagram {
             .attr("transform", d => {
                 const anchorX = d.draw.dims.prev.width * transitCoords.x -
                     self.layout.size.rightTextMargin;
-                return `translate(${anchorX},${(d.draw.dims.prev.height * transitCoords.y / 2)})`;
+                return `translate(${anchorX}, ${(d.draw.dims.prev.height * transitCoords.y / 2)})`;
             })
             .style("opacity", d => (d.depth < self.zoomedElement.depth)? 0 : d.textOpacity)
             .text(self.layout.getText.bind(self.layout));
@@ -347,13 +347,14 @@ class Diagram {
         const transitCoords = this.layout.transitCoords.model;
 
         this.dom.clips.partitionTree
+            .transition(sharedTransition)
             .attr('height', this.dims.size.partitionTree.height);
 
-        const mergedSelection = selection.merge(enterSelection).transition(sharedTransition);
+        const mergedSelection = enterSelection.merge(selection).transition(sharedTransition);
 
         mergedSelection
             .attr("class", d => `partition_group ${self.style.getNodeClass(d)}`)
-            .attr("transform", d => `translate(${scale.x(d.draw.dims.x)},${scale.y(d.draw.dims.y)})`);
+            .attr("transform", d => `translate(${scale.x(d.draw.dims.x)}, ${scale.y(d.draw.dims.y)})`);
 
         mergedSelection
             .select("rect")
@@ -367,7 +368,7 @@ class Diagram {
             .attr("transform", d => {
                 const anchorX = d.draw.dims.width * transitCoords.x -
                     self.layout.size.rightTextMargin;
-                return `translate(${anchorX},${(d.draw.dims.height * transitCoords.y/2)})`;
+                return `translate(${anchorX}, ${(d.draw.dims.height * transitCoords.y/2)})`;
             })
             .style("opacity", d => (d.depth < self.zoomedElement.depth)? 0 : d.textOpacity)
             .text(self.layout.getText.bind(self.layout));
@@ -388,7 +389,7 @@ class Diagram {
         const exitSelection = selection.exit().transition(sharedTransition);
 
         exitSelection
-            .attr("transform", d => `translate(${scale.x(d.draw.dims.x)},${scale.y(d.draw.dims.y)})`)
+            .attr("transform", d => `translate(${scale.x(d.draw.dims.x)}, ${scale.y(d.draw.dims.y)})`)
             .remove();
 
         exitSelection.select("rect")
@@ -399,7 +400,7 @@ class Diagram {
             .attr("transform", d => {
                 const anchorX = d.draw.dims.width * transitCoords.x -
                     self.layout.size.rightTextMargin;
-                return `translate(${anchorX},${(d.draw.dims.height * transitCoords.y / 2)})`;
+                return `translate(${anchorX}, ${(d.draw.dims.height * transitCoords.y / 2)})`;
             })
             .style("opacity", 0);
     }

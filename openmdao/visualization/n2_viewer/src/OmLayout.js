@@ -211,12 +211,12 @@ class OmLayout extends Layout {
          const innerDims = this.newInnerDims();
 
          dom.pSolverTreeGroup.transition(sharedTransition)
-         .attr("height", innerDims.height)
-         .attr("transform", "translate(" + (this.size.partitionTree.width +
-             innerDims.margin +
-             innerDims.height +
-             innerDims.margin) + " " +
-             innerDims.margin + ")");         
+            .attr("height", innerDims.height)
+            .attr("transform", "translate(" + (this.size.partitionTree.width +
+                innerDims.margin +
+                innerDims.height +
+                innerDims.margin) + " " +
+                innerDims.margin + ")");         
      }
 
     calcWidthBasedOnNewHeight(height) {
