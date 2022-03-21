@@ -140,7 +140,7 @@ def list_reports(out_stream=None):
                     val = str(val)
             column_widths[column_name] = max(column_widths[column_name], len(val))
 
-    out_stream.write("\nHere are the reports registered to run:\n\n")
+    out_stream.write("\nHere are the reports available:\n\n")
 
     column_header = ''
     column_dashes = ''
