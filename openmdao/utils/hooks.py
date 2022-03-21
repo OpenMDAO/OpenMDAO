@@ -21,8 +21,8 @@ _hooks = {}
 # classes found here are known to contain no hooks within themselves or their ancestors
 _hook_skip_classes = set()
 
-# global switch that turns hook machinery on/off
-use_hooks = False
+# global switch that turns hook machinery on/off. But need it on for reporting system
+use_hooks = True
 
 
 def _reset_all_hooks():
@@ -87,14 +87,14 @@ def _run_hooks(hooks, inst):
     inst : object
         Object instance to pass to hook functions.
     """
-    for i, (hook, ncalls, ex) in enumerate(hooks):
+    for i, (hook, ncalls, ex, kwargs) in enumerate(hooks):
         if ncalls is None or ncalls > 0:
-            hook(inst)
+            hook(inst, **kwargs)
             if ex:
                 sys.exit()
             if ncalls is not None:
                 ncalls -= 1
-                hooks[i] = (hook, ncalls, ex)
+                hooks[i] = (hook, ncalls, ex, kwargs)
 
 
 def _hook_decorator(f, inst, hookmeta):
@@ -112,6 +112,7 @@ def _hook_decorator(f, inst, hookmeta):
     """
     pre_hooks, post_hooks = hookmeta
 
+    # args and kwargs are arguments to the method that is being wrapped
     def execute_hooks(*args, **kwargs):
         _run_hooks(pre_hooks, inst)
         ret = f(*args, **kwargs)
@@ -151,7 +152,8 @@ def _get_hook_lists(class_name, inst_id, fname):
     return imeta[fname]
 
 
-def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=None, exit=False):
+def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=None, exit=False,
+                   **kwargs):
     """
     Register a hook function.
 
@@ -175,15 +177,17 @@ def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=
     exit : bool
         If True, run sys.exit() after calling the hook function.  If post is registered, this
         affects only post, else it will affect pre.
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be passed to the hook function.
     """
     if pre is None and post is None:
         raise RuntimeError("In _register_hook you must specify pre or post.")
 
     pre_hooks, post_hooks = _get_hook_lists(class_name, inst_id, fname)
     if pre is not None and (ncalls is None or ncalls > 0):
-        pre_hooks.append((pre, ncalls, exit and post is None))
+        pre_hooks.append((pre, ncalls, exit and post is None, kwargs))
     if post is not None and (ncalls is None or ncalls > 0):
-        post_hooks.append((post, ncalls, exit))
+        post_hooks.append((post, ncalls, exit, kwargs))
 
 
 def _remove_hook(to_remove, hooks, class_name, fname, hook_loc):
@@ -210,7 +214,7 @@ def _remove_hook(to_remove, hooks, class_name, fname, hook_loc):
             hooks[:] = []
         else:
             for hook in hooks:
-                p, _, _ = hook
+                p, _, _, _ = hook
                 if p is to_remove:
                     hooks.remove(hook)
                     break

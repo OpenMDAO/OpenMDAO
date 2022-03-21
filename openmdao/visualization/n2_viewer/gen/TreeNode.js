@@ -1,53 +1,69 @@
 /**
+ * Manage display info associated with the node.
+ * @typedef NodeDisplayData
+ */
+class NodeDisplayData {
+    constructor() {
+        this.nameWidthPx = 1; // Width of the label in pixels as computed by N2Layout
+        this.numLeaves = 0; // Set by N2Layout
+        this.minimized = false; // When true, do not draw children
+        this.hidden = false; // Do add to matrix at all
+        this.filtered = false; // Node is a child to be shown w/partially collapsed parent
+        this.filterParent = null; // When filtered, reference to N2FilterNode container
+        this.manuallyExpanded = false; // Node was pre-collapsed but expanded by user
+
+        this.dims = { x: 1e-6, y: 1e-6, width: 1, height: 1 };
+        this.prevDims = { x: 1e-6, y: 1e-6, width: 1e-6, height: 1e-6 };
+    }
+
+    /** Copy the current dims to the previous ones */
+    preserveDims() {
+        this.prevDims = {};
+        for (const prop in this.dims) {
+            this.prevDims[prop] = this.dims[prop];
+        }
+    }
+}
+
+/**
  * Essentially the same as a JSON object from the model tree,
  * with some utility functions.
- * @typedef {N2TreeNode}
+ * @typedef {TreeNode}
  * @property {Object} draw Information used for node display.
  * @property {Number} depth The index of the column this node appears in.
  */
-class N2TreeNode {
-
+class TreeNode {
     /**
      * Absorb all the properties of the provided JSON object from the model tree.
      * @param {Object} origNode The node to work from.
+     * @param {Object} attribNames Names of variables in the model.
      */
-    constructor(origNode) {
+    constructor(origNode, attribNames) {
         // Merge all of the props from the original JSON tree node to us.
         Object.assign(this, origNode);
+        if (attribNames.descendants != 'children') {
+            this.children = this[attribNames.descendants];
+            delete this[attribNames.descendants];
+        }
 
         this.sourceParentSet = new Set();
         this.targetParentSet = new Set();
 
-        // Node display data
-        this.draw = {
-            nameWidthPx: 1, // Width of the label in pixels as computed by N2Layout
-            nameSolverWidthPx: 1, // Solver-side label width pixels as computed by N2Layout
-            numLeaves: 0, // Set by N2Layout
-            minimized: false, // When true, do not draw children
-            hidden: false, // Do add to matrix at all
-            filtered: false, // Node is a child to be shown w/partially collapsed parent
-            filterParent: null, // When filtered, reference to N2FilterNode container
-            manuallyExpanded: false, // Node was pre-collapsed but expanded by user
-            dims: { x: 1e-6, y: 1e-6, width: 1, height: 1 },
-            prevDims: { x: 1e-6, y: 1e-6, width: 1e-6, height: 1e-6 },
-            solverDims: { x: 1e-6, y: 1e-6, width: 1, height: 1 },
-            prevSolverDims: { x: 1e-6, y: 1e-6, width: 1e-6, height: 1e-6 }
-        }
+        // Node display data.
+        this.draw = this._newDisplayData()
 
         this.childNames = new Set(); // Set by ModelData
         this.depth = -1; // Set by ModelData
         this.parent = null; // Set by ModelData
         this.id = -1; // Set by ModelData
-        this.absPathName = ''; // Set by ModelData
+        this.path = ''; // Set by ModelData
         this.numDescendants = 0; // Set by ModelData
-
-        // Solver names may be empty, so set them to "None" instead.
-        if (this.linear_solver == "") this.linear_solver = "None";
-        if (this.nonlinear_solver == "") this.nonlinear_solver = "None";
 
         this.rootIndex = -1;
 
     }
+
+    _newDisplayData() { return new NodeDisplayData(); }
 
     // Accessor functions for this.draw.minimized - whether or not to draw children
     minimize() { this.draw.minimized = true; return this; }
@@ -63,23 +79,19 @@ class N2TreeNode {
 
     /**
      * Create a backup of our position and other info.
-     * @param {boolean} solver Whether to use .dims or .solverDims.
      * @param {number} leafNum Identify this as the nth leaf of the tree
      */
-    preserveDims(solver, leafNum) {
-        const dimProp = solver ? 'dims' : 'solverDims';
-        const prevDimProp = solver ? 'prevDims' : 'prevSolverDims';
-
-        Object.assign(this.draw[prevDimProp], this.draw[dimProp]);
+    preserveDims(leafNum) {
+        this.draw.preserveDims();
 
         if (this.rootIndex < 0) this.rootIndex = leafNum;
         this.prevRootIndex = this.rootIndex;
     }
 
     /**
-     * Determine if the children array exists and has members.
-     * @param {string} [childrenPropName = 'children'] Usually children, but
-     *   sometimes 'subsystem_children'
+     * Determine if a children array exists and has members.
+     * @param {string} [childrenPropName = 'children'] Usually "children", but
+     *   some models have addition child arrays like "subsystem_children".
      * @return {boolean} True if the children property is an Array and length > 0.
      */
     hasChildren(childrenPropName = 'children') {
@@ -156,12 +168,12 @@ class N2TreeNode {
      * @returns {Boolean} True if a match is found, otherwise false.
      */
     hasNodeInChildren(compareNode) {
-        return this.childNames.has(compareNode.absPathName);
+        return this.childNames.has(compareNode.path);
     }
 
     /** Look for the supplied node in the parentage of this one.
-     * @param {N2TreeNode} compareNode The node to look for.
-     * @param {N2TreeNode} [parentLimit = null] Stop searching at this common parent.
+     * @param {TreeNode} compareNode The node to look for.
+     * @param {TreeNode} [parentLimit = null] Stop searching at this common parent.
      * @returns {Boolean} True if the node is found, otherwise false.
      */
     hasParent(compareNode, parentLimit = null) {
@@ -176,8 +188,8 @@ class N2TreeNode {
 
     /**
      * Look for the supplied node in the lineage of this one.
-     * @param {N2TreeNode} compareNode The node to look for.
-     * @param {N2TreeNode} [parentLimit = null] Stop searching at this common parent.
+     * @param {TreeNode} compareNode The node to look for.
+     * @param {TreeNode} [parentLimit = null] Stop searching at this common parent.
      * @returns {Boolean} True if the node is found, otherwise false.
      */
     hasNode(compareNode, parentLimit = null) {
@@ -192,45 +204,9 @@ class N2TreeNode {
     }
 
     /**
-     * Add ourselves to the supplied array if we contain a cycleArrows property.
-     * @param {Array} arr The array to add to.
-     */
-    _getNodesInChildrenWithCycleArrows(arr) {
-        if (this.cycleArrows) {
-            arr.push(this);
-        }
-
-        if (this.hasChildren()) {
-            for (let child of this.children) {
-                child._getNodesInChildrenWithCycleArrows(arr);
-            }
-        }
-    }
-
-    /**
-     * Populate an array with nodes in our lineage that contain a cycleArrows member.
-     * @returns {Array} The array containing all the found nodes with cycleArrows.
-     */
-    getNodesWithCycleArrows() {
-        const arr = [];
-
-        // Check parents first.
-        for (let obj = this.parent; obj != null; obj = obj.parent) {
-            if (obj.cycleArrows) {
-                arr.push(obj);
-            }
-        }
-
-        // Check all descendants as well.
-        this._getNodesInChildrenWithCycleArrows(arr);
-
-        return arr;
-    }
-
-    /**
      * Find the closest parent shared by two nodes; farthest should be tree root.
-     * @param {N2TreeNode} other Another node to compare parents with.
-     * @returns {N2TreeNode} The first common parent found.
+     * @param {TreeNode} other Another node to compare parents with.
+     * @returns {TreeNode} The first common parent found.
      */
     nearestCommonParent(other) {
         for (let myParent = this.parent; myParent != null; myParent = myParent.parent)
@@ -264,12 +240,13 @@ class N2TreeNode {
     }
 
     /**
-     * Convert an absolute path name to a string that's safe to use as an HTML id.
-     * @param {String} absPathName The name to convert.
+     * Convert a path to a string that's safe to use as an HTML id. Escapes
+     * space, greater-than, less-than, period, and colon characters.
+     * @param {String} path The name to convert.
      * @returns {String} The HTML-safe id.
      */
-    static absPathToId(absPathName) {
-        return absPathName.replace(/[\.<> :]/g, function (c) {
+    static pathToId(path) {
+        return path.replace(/[\.<> :]/g, function (c) {
             return {
                 ' ': '__',
                 '<': '_LT',
@@ -280,7 +257,7 @@ class N2TreeNode {
         })
     }
 
-    toId() { return N2TreeNode.absPathToId(this.absPathName); }
+    toId() { return TreeNode.pathToId(this.path); }
 
     _insertAsLastInput(newChild) {
         if (!this.hasChildren()) return;
@@ -294,14 +271,14 @@ class N2TreeNode {
     }
 
     /** If this is a component, add special children that can hold filtered variables */
-    addFilterChildIfComponent() {
-        if (this.isComponent() && this.hasChildren()) {
+    addFilterChild(attribNames) {
+        if (this.hasChildren()) {
 
             // Separate N2FilterNodes are added for inputs and outputs so
             // they can be inserted at the correct place in the diagram.
             this.filter = {
-                inputs: new N2FilterNode(this, 'inputs'),
-                outputs: new N2FilterNode(this, 'outputs')
+                inputs: new N2FilterNode(this, attribNames, 'inputs'),
+                outputs: new N2FilterNode(this, attribNames, 'outputs')
             };
             this._insertAsLastInput(this.filter.inputs);
             this.children.push(this.filter.outputs);
@@ -337,7 +314,6 @@ class N2TreeNode {
     isInputFilter() { return false; } // Always false in base class
     isOutputFilter() { return false; } // Always false in base class
 
-
     /**
      * Create a simple object that can be used to save state to a file.
      * @returns {Object} Reference to required info.
@@ -364,21 +340,22 @@ class N2TreeNode {
 }
 
 /**
- * Special N2TreeNode subclass whose children are filtered variables of the parent component.
+ * Special TreeNode subclass whose children are filtered variables of the parent component.
  * @typedef N2FilterNode
  */
-class N2FilterNode extends N2TreeNode {
+class N2FilterNode extends TreeNode {
     /**
      * Give ourselves a special name and the "filter" type.
-     * @param {N2TreeNode} parentComponent The component that we are filtering variables for.
+     * @param {TreeNode} parentComponent The component that we are filtering variables for.
      * @param {String} suffix Either "inputs" or "outputs".
      */
-    constructor(parentComponent, suffix) {
+    constructor(parentComponent, attribNames, suffix) {
         super(
             {
                 name: `${parentComponent.name}_N2_FILTER_${suffix}`,
                 type: 'filter'
-            }
+            },
+            attribNames
         )
 
         this.parentComponent = parentComponent;
@@ -389,7 +366,7 @@ class N2FilterNode extends N2TreeNode {
 
     /**
      * Add a node to our filtered children, update its state, and make ourselves visible.
-     * @param {N2TreeNode} node Reference to the node to filter.
+     * @param {TreeNode} node Reference to the node to filter.
      */
     add(node) {
         if (!this.hasChildren()) { this.children = []; }
@@ -403,7 +380,7 @@ class N2FilterNode extends N2TreeNode {
     /**
      * Update the node's state and remove it from our children. If nothing is left in
      * the children array, delete it and hide ourselves.
-     * @param {N2TreeNode} node Reference to the node to unfilter.
+     * @param {TreeNode} node Reference to the node to unfilter.
      * @returns {Boolean} True if the node was found in children, otherwise false.
      */
     del(node) {
@@ -439,7 +416,7 @@ class N2FilterNode extends N2TreeNode {
 
     /**
      * Determine if the referenced node is in our array of children.
-     * @param {N2TreeNode} child The node to find.
+     * @param {TreeNode} child The node to find.
      * @returns {Boolean} True if the child was found, false otherwise.
      */
     hasChild(child) {
@@ -458,7 +435,7 @@ class N2FilterNode extends N2TreeNode {
         return this;
     }
 
-    isFilter() { return true; } // Always true for the N2TreeNode class
+    isFilter() { return true; } // Always true for the TreeNode class
     hasFilters() { return false; } // Only components contains filters
     isInputFilter() { return this.suffix == 'inputs'; } // True if this manages input filters
     isOutputFilter() { return this.suffix == 'outputs'; } // True if this manages output filters

@@ -13,7 +13,7 @@ jobs:
   ubuntu_tests:
     runs-on: ubuntu-20.04
 
-    timeout-minutes: 90
+    timeout-minutes: 110
 
     strategy:
       fail-fast: false
@@ -252,6 +252,7 @@ jobs:
           echo "============================================================="
           echo "Build the docs"
           echo "============================================================="
+          export OPENMDAO_REPORTS=0
           python build_source_docs.py
           jupyter-book build -W --keep-going openmdao_book
           python copy_build_artifacts.py

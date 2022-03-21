@@ -13,8 +13,6 @@ if [[ -f "$CFG_FILE" ]]; then
 else
   echo "creating ipcluster configuration: $CFG_FILE"
   ipython profile create --parallel --profile=mpi
-  echo "c.IPClusterEngines.engine_launcher_class = 'MPIEngineSetLauncher'" >> $CFG_FILE
-  echo "c.IPClusterStart.controller_launcher_class = 'MPIControllerLauncher'" >> $CFG_FILE
 fi
 
-ipcluster start -n 4 --profile=mpi &
+ipcluster start -n 4 --profile=mpi --engines='ipyparallel.cluster.launcher.MPIEngineSetLauncher' &

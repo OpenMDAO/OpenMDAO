@@ -29,6 +29,8 @@ from openmdao import __version__ as openmdao_version
 
 _MAX_ARRAY_SIZE_FOR_REPR_VAL = 1000  # If var has more elements than this do not pass to N2
 
+_default_n2_filename = 'n2.html'
+
 
 def _convert_nans_in_nested_list(val_as_list):
     """
@@ -504,8 +506,14 @@ def _get_viewer_data(data_source, case_id=None):
             for vtgt in vtgtlist:
                 connections_list.append({'src': vsrc, 'tgt': vtgt})
 
+    # connections_list2 = []
+    # conns2 = root_group._problem_meta['model_ref']()._conn_global_abs_in2out
+    # for c in conns2:
+    #    connections_list2.append({'src': conns2[c], 'tgt': c})
+
     data_dict['sys_pathnames_list'] = list(sys_idx)
     data_dict['connections_list'] = connections_list
+    # data_dict['connections_list'] = connections_list2
     data_dict['abs2prom'] = root_group._var_abs2prom
 
     data_dict['driver'] = {
@@ -522,8 +530,8 @@ def _get_viewer_data(data_source, case_id=None):
     return data_dict
 
 
-def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddable=False,
-       title=None, use_declare_partial_info=False):
+def n2(data_source, outfile=_default_n2_filename, case_id=None, show_browser=True, embeddable=False,
+       title=None, use_declare_partial_info=False, display_in_notebook=True):
     """
     Generate an HTML file containing a tree viewer.
 
@@ -548,6 +556,9 @@ def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddab
     use_declare_partial_info : ignored
         This option is no longer used because it is now always true.
         Still present for backwards compatibility.
+    display_in_notebook : bool, optional
+        If True, display the N2 diagram in the notebook, if this is called from a notebook.
+        Defaults to True.
     """
     # grab the model viewer data
     model_data = _get_viewer_data(data_source, case_id=case_id)
@@ -583,12 +594,13 @@ def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddab
                      json_dumps_default=default_noraise, verbose=False).run()
 
     if notebook:
-        # display in Jupyter Notebook
-        outfile = os.path.relpath(outfile)
-        if not colab:
-            display(IFrame(src=outfile, width="100%", height=700))
-        else:
-            display(HTML(outfile))
+        if display_in_notebook:
+            # display in Jupyter Notebook
+            outfile = os.path.relpath(outfile)
+            if not colab:
+                display(IFrame(src=outfile, width="100%", height=700))
+            else:
+                display(HTML(outfile))
     elif show_browser:
         # open it up in the browser
         from openmdao.utils.webview import webview

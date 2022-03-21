@@ -14,7 +14,7 @@ optional_dependencies = {
         'jupyter',
         'nbconvert',
         'testflo',
-        'ipyparallel<7',
+        'ipyparallel',
         'numpydoc>=1.1',
         'tabulate',
         'jupyter-book',
@@ -24,10 +24,13 @@ optional_dependencies = {
     'notebooks': [
         'notebook',
         'tabulate',
-        'ipython'
+        'ipython',
+        'ipywidgets>=7.6.5',
+        'ipympl'
     ],
     'visualization': [
         'bokeh>=1.3.4',
+        'matplotlib',
         'colorama'
     ],
     'test': [
@@ -111,6 +114,7 @@ setup(
         'openmdao.utils',
         'openmdao.vectors',
         'openmdao.visualization',
+        'openmdao.visualization.case_viewer',
         'openmdao.visualization.connection_viewer',
         'openmdao.visualization.scaling_viewer',
         'openmdao.visualization.n2_viewer',
@@ -126,6 +130,7 @@ setup(
             'assets/*png*',
             'libs/*.js',
             'src/*.js',
+            'gen/*.js',
             'style/*',
             'tests/*.js',
             'tests/*.json',

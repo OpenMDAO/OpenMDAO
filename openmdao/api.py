@@ -93,6 +93,8 @@ from openmdao.recorders.case_reader import CaseReader
 from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
 from openmdao.visualization.partial_deriv_plot import partial_deriv_plot
+from openmdao.visualization.options_widget import OptionsWidget
+from openmdao.visualization.case_viewer.case_viewer import CaseViewer
 
 # Notebook Utils
 from openmdao.utils.notebook_utils import notebook_mode, display_source, show_options_table, cite
@@ -106,6 +108,9 @@ from openmdao.utils.om_warnings import issue_warning, reset_warnings, OpenMDAOWa
     DriverWarning, CacheWarning, PromotionWarning, UnusedOptionWarning, DerivativesWarning, \
     MPIWarning, UnitsWarning, SolverWarning, OMDeprecationWarning, \
     OMInvalidCheckDerivativesOptionsWarning
+
+# Reports System
+from openmdao.utils.reports_system import register_report, get_reports_dir, list_reports
 
 import os
 import builtins
