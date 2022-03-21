@@ -2,30 +2,24 @@
 """Define a function to view driver timing."""
 import os
 import json
+import pickle
 
 from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import default_noraise
 from openmdao.utils.mpi import MPI
 
 
+def _timing_iter(timing_managers):
+    for probname, tmanager in timing_managers.items():
+        for sysname, timers in tmanager._timers.items():
+            for t in timers:
+                if t.ncalls > 0:
+                    yield probname, sysname, t.name, t.ncalls, t.avg(), t.min, t.max, t.tot
+
+
 def _timing_file_iter(timing_file):
-    with open(timing_file, 'r') as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            if line.startswith("Timings for problem '"):
-                probname = line.split("'")[1]
-                continue
-
-            parts = [p for p in line.split(' ') if p]
-            ncalls = parts[0]
-            mintime = parts[2]
-            maxtime = parts[4]
-            avgtime = parts[6]
-            sysname, method = parts[8].split(':')
-
-            yield probname, sysname, method, ncalls, avgtime, mintime, maxtime
+    with open(timing_file, 'rb') as f:
+        yield from _timing_iter(pickle.load(f))
 
 
 def view_timing(timing_file, outfile='timing_report.html', show_browser=True, title=''):
@@ -56,7 +50,8 @@ def view_timing(timing_file, outfile='timing_report.html', show_browser=True, ti
     idx = 1  # unique ID for use by Tabulator
 
     # set up timing table data
-    for pname, sname, method, ncalls, avgtime, mintime, maxtime in _timing_file_iter(timing_file):
+    for pname, sname, method, ncalls, avgtime, mintime, maxtime, tottime in \
+            _timing_file_iter(timing_file):
 
         dct = {
             'id': idx,
@@ -67,6 +62,7 @@ def view_timing(timing_file, outfile='timing_report.html', show_browser=True, ti
             'avgtime': avgtime,
             'mintime': mintime,
             'maxtime': maxtime,
+            'tottime': tottime,
         }
 
         timing_table.append(dct)

@@ -1,15 +1,17 @@
 
 import sys
 import atexit
+import pickle
 from time import perf_counter
 
 import numpy as np
 from functools import wraps, partial
 
 import openmdao.utils.hooks as hooks
-from openmdao.utils.file_utils import _load_and_exec
+from openmdao.utils.file_utils import _load_and_exec, _to_filename
 from openmdao.utils.mpi import MPI
-from openmdao.visualization.timing_viewer.timing_viewer import view_timing
+from openmdao.visualization.timing_viewer.timing_viewer import view_timing, _timing_iter, \
+    _timing_file_iter
 
 class FuncTimer(object):
     """
@@ -39,13 +41,6 @@ class FuncTimer(object):
         if self.ncalls > 0:
             return self.tot / self.ncalls
         return 0.
-
-    def write(self, sysname, f=sys.stdout):
-        if self.ncalls == 0:
-            return
-
-        print(f"{self.ncalls:7} (calls) {self.min:12.6f} (min) "
-              f"{self.max:12.6f} (max) {self.avg():12.6f} (avg) {sysname}:{self.name}", file=f)
 
 
 def _timer_wrap(f, timer):
@@ -117,16 +112,14 @@ def _timing_setup_parser(parser):
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-o', default=None, action='store', dest='outfile',
-                        help='Name of ascii output file. By default, output goes to stdout if '
-                        '--no_browser is set, and otherwise it goes to "timings.out".')
+                        help='Name of pickled output file. By default it goes to "timings.pkl".')
     parser.add_argument('-f', '--func', action='append', default=[],
                         dest='funcs', help='Time a specified function. Can be applied multiple '
                         'times to specify multiple functions. '
                         f'Default methods are {_default_timer_methods}.')
-    parser.add_argument('--no_browser', action='store_false', dest='browser',
-                        help='Do not view timings in a browser.  Even if this is set, a '
-                        'browser-viewable file called "timing_report.html" will always be '
-                        'generated.')
+    parser.add_argument('-v', '--view', action='store', dest='view', default='browser',
+                        help='View the output.  Default view is "browser".  Other options are '
+                        '"text" for ascii output or "none" for no output.')
 
 
 def _setup_timer_hook(system):
@@ -148,27 +141,34 @@ def _set_timer_setup_hook(problem):
         hooks._setup_hooks(problem.model)
 
 
-def _postprocess(timing_file, browser):
+def _to_ascii(timing_iter, f):
+    for probname, sysname, method, ncalls, avg, min, max, tot in timing_iter:
+        print(f"{ncalls:7} (calls) {min:12.6f} (min) "
+              f"{max:12.6f} (max) {avg:12.6f} (avg) {tot:12.6f} "
+              f"(tot) {probname} {sysname}:{method}", file=f)
+
+
+def _postprocess(timing_file, options):
     global _timer_methods, _timing_managers
 
     if timing_file is None:
-        if browser:
-            timing_file = 'timings.out'
-            f = open(timing_file, 'w')
-        else:
-            f = sys.stdout
+        timing_file = 'timings.pkl'
+
+    with open(timing_file, 'wb') as f:
+        print("Saving timing data to '{timing_file}'.")
+        pickle.dump(_timing_managers, f, pickle.HIGHEST_PROTOCOL)
+
+    view = options.view.lower()
+
+    if view == 'browser':
+        view_timing(timing_file, outfile='timing_report.html', show_browser=True)
+    elif view == 'text':
+        _to_ascii(_timing_iter(_timing_managers), sys.stdout)
+    elif view == 'none':
+        pass
     else:
-        f = open(timing_file, 'w')
-
-    for probname, tmanager in _timing_managers.items():
-        print(f"\nTimings for problem '{probname}':", file=f)
-        for sysname, timers in tmanager._timers.items():
-            for timer in timers:
-                timer.write(sysname, f)
-
-    if timing_file is not None:
-        f.close()
-        view_timing(timing_file, outfile='timing_report.html', show_browser=browser)
+        print(f"\nViewing option '{view}' ignored.  Doing nothing.  Valid options are "
+              "['browser', 'text', 'none'].")
 
 
 def _timing_cmd(options, user_args):
@@ -183,18 +183,33 @@ def _timing_cmd(options, user_args):
         Args to be passed to the user script.
     """
     global _timer_methods, _timing_managers
-    _timer_methods = options.funcs
-    if not _timer_methods:
-        _timer_methods = _default_timer_methods.copy()
 
-    hooks._register_hook('setup', 'Problem', pre=_set_timer_setup_hook)
+    filename = _to_filename(options.file[0])
+    if filename.endswith('.py'):
+        _timer_methods = options.funcs
+        if not _timer_methods:
+            _timer_methods = _default_timer_methods.copy()
 
-    if options.outfile is not None and MPI:
-        outfile = f"{options.outfile}.{MPI.COMM_WORLD.rank}"
-    else:
-        outfile = options.outfile
+        hooks._register_hook('setup', 'Problem', pre=_set_timer_setup_hook)
 
-    # register an atexit function to write out all of the timing data
-    atexit.register(partial(_postprocess, outfile, options.browser))
+        if options.outfile is not None and MPI:
+            outfile = f"{options.outfile}.{MPI.COMM_WORLD.rank}"
+        else:
+            outfile = options.outfile
 
-    _load_and_exec(options.file[0], user_args)
+        # register an atexit function to write out all of the timing data
+        atexit.register(partial(_postprocess, outfile, options))
+
+        _load_and_exec(options.file[0], user_args)
+    else:  # assume file is a pickle file
+        view = options.view.lower()
+
+        if view == 'browser':
+            view_timing(options.file[0], outfile='timing_report.html', show_browser=True)
+        elif view == 'text':
+            _to_ascii(_timing_file_iter(options.file[0]), sys.stdout)
+        elif view == 'none':
+            pass
+        else:
+            print(f"\nViewing option '{view}' ignored.  Doing nothing.  Valid options are "
+                "['browser', 'text', 'none'].")
