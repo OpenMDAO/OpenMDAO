@@ -60,6 +60,7 @@ _force_dyn_coloring = False
 # path or system pathname
 _STD_COLORING_FNAME = object()
 
+_default_coloring_imagefile = 'jacobian_to_compute_coloring.png'
 
 # default values related to the computation of a sparsity matrix
 _DEF_COMP_SPARSITY_ARGS = {
@@ -686,9 +687,16 @@ class Coloring(object):
             raise RuntimeError("Internal coloring bug: jacobian has entries where fwd and rev "
                                "colorings overlap!")
 
-    def display(self):
+    def display(self, show=True, fname=_default_coloring_imagefile):
         """
         Display a plot of the sparsity pattern, showing grouping by color.
+
+        Parameters
+        ----------
+        show : bool
+            If True, show the plot. Otherwise, just save the plot in a file. Default is True.
+        fname : str
+            Path to the location where the plot file should be saved.
         """
         try:
             from matplotlib import pyplot, axes, cm
@@ -843,7 +851,10 @@ class Coloring(object):
         pyplot.imshow(J, interpolation="none")
         fig.tight_layout()
 
-        pyplot.show()
+        if show:
+            pyplot.show()
+        else:
+            pyplot.savefig(fname)
 
     def get_dense_sparsity(self, dtype=bool):
         """

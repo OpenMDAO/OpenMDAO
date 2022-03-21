@@ -19,7 +19,9 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import sizes2offsets
 from openmdao.vectors.vector import _full_slice
 from openmdao.utils.indexer import indexer
-from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, MPIWarning, \
+    warn_deprecation
+from openmdao.utils.hooks import _setup_hooks
 
 
 class Driver(object):
@@ -171,6 +173,9 @@ class Driver(object):
 
         self._declare_options()
         self.options.update(kwargs)
+
+        # Want to allow the setting of hooks on Drivers
+        _setup_hooks(self)
 
     def _get_inst_id(self):
         if self._problem is None:

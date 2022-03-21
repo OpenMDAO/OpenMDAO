@@ -14,7 +14,7 @@ optional_dependencies = {
         'jupyter',
         'nbconvert',
         'testflo',
-        'ipyparallel<7',
+        'ipyparallel',
         'numpydoc>=1.1',
         'tabulate',
         'jupyter-book',

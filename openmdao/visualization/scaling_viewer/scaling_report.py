@@ -16,6 +16,8 @@ from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import ignore_errors, default_noraise
 from openmdao.utils.file_utils import _load_and_exec
 
+_default_scaling_filename = 'driver_scaling_report.html'
+
 
 def _unscale(val, scaler, adder, default=''):
     if val is None:
@@ -166,7 +168,7 @@ def _compute_jac_view_info(totals, data, dv_vals, response_vals, coloring):
     data['var_mat_list'] = varmatlist
 
 
-def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_browser=True,
+def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=True,
                         title=None, jac=True):
     """
     Generate a self-contained html file containing a table of scaling data.
@@ -478,7 +480,7 @@ def _scaling_setup_parser(parser):
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
-    parser.add_argument('-o', default='driver_scaling_report.html', action='store', dest='outfile',
+    parser.add_argument('-o', default=_default_scaling_filename, action='store', dest='outfile',
                         help='html output file.')
     parser.add_argument('-t', '--title', action='store', dest='title',
                         help='title of web page.')
