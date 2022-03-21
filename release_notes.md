@@ -64,6 +64,7 @@ but we plan on allowing it to be used as a standalone tool in the future.
 - Added a check for discrete outputs that are not design vars in Driver._get_voi_val. [#2464](https://github.com/OpenMDAO/OpenMDAO/pull/2464)
 - Added a test for solver recording when Broyden is the solver and also eliminate double recording of Broyden solver iterations. [#2465](https://github.com/OpenMDAO/OpenMDAO/pull/2465)
 - Added handling of discrete variables to the scaling report. [#2466](https://github.com/OpenMDAO/OpenMDAO/pull/2466)
+- Fixed some issues with indexing values for plots in the CaseViewer [#2477](https://github.com/OpenMDAO/OpenMDAO/pull/2477)
 
 ## Miscellaneous
 
