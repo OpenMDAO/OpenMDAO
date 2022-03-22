@@ -14,15 +14,16 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.file_utils import _load_and_exec, _to_filename
 import openmdao.visualization.timing_viewer.timer as timer_mod
 from openmdao.visualization.timing_viewer.timer import timing_context, _set_timer_setup_hook, \
-    _timing_file_iter
+    _timing_file_iter, _total_time
 from openmdao.utils.om_warnings import issue_warning
+from openmdao.core.constants import _DEFAULT_OUT_STREAM
 
 
 _default_timer_methods = sorted(['_solve_nonlinear', '_apply_nonlinear', '_solve_linear',
                                  '_apply_linear', '_linearize'])
 
 
-def view_timing_text(timing_file, out_stream):
+def view_timing_text(timing_file, out_stream=_DEFAULT_OUT_STREAM):
     """
     Print timing data to a file or to stdout.
 
@@ -30,18 +31,24 @@ def view_timing_text(timing_file, out_stream):
     ----------
     timing_file : str
         The name of the pickle file contining the timing data.
-    out_stream : file-like
-        Where the output will be printed.
+    out_stream : file-like or None
+        Where the output will be printed. If None, generate no output.
     """
+    if out_stream is None:
+        return
+    elif out_stream is _DEFAULT_OUT_STREAM:
+        out_stream = sys.stdout
+
     for (rank, probname, sysname, _, parallel, method, ncalls,
-         avg, min, max, tot) in _timing_file_iter(timing_file):
+         avg, min, max, tot, global_tot) in _timing_file_iter(timing_file):
         parallel = '(parallel)' if parallel else ''
+        pct = tot / global_tot * 100.
         print(f"{rank:4} (rank) {ncalls:7} (calls) {min:12.6f} (min) "
               f"{max:12.6f} (max) {avg:12.6f} (avg) {tot:12.6f} "
-              f"(tot) {parallel} {probname} {sysname}:{method}", file=out_stream)
+              f"(tot) {pct:6.2f} % {parallel} {probname} {sysname}:{method}", file=out_stream)
 
 
-def view_timing(timing_file, outfile='timing_report.html', show_browser=True, title=''):
+def view_timing(timing_file, outfile='timing_report.html', show_browser=True):
     """
     Generate a self-contained html file containing a table of timing data.
 
@@ -56,8 +63,6 @@ def view_timing(timing_file, outfile='timing_report.html', show_browser=True, ti
     show_browser : bool, optional
         If True, pop up a browser to view the generated html file.
         Defaults to True.
-    title : str, optional
-        Sets the title of the web page.
 
     Returns
     -------
@@ -68,9 +73,11 @@ def view_timing(timing_file, outfile='timing_report.html', show_browser=True, ti
 
     idx = 1  # unique ID for use by Tabulator
 
+    tot_by_rank = {}
+
     # set up timing table data
-    for rank, pname, sname, level, parallel, method, ncalls, avgtime, mintime, maxtime, tottime in \
-            _timing_file_iter(timing_file):
+    for rank, pname, sname, level, parallel, method, ncalls, avgtime, mintime, maxtime, tottime, \
+            globaltot in _timing_file_iter(timing_file):
 
         dct = {
             'id': idx,
@@ -85,14 +92,16 @@ def view_timing(timing_file, outfile='timing_report.html', show_browser=True, ti
             'mintime': mintime,
             'maxtime': maxtime,
             'tottime': tottime,
+            'pct': tottime / globaltot * 100.
         }
 
         timing_table.append(dct)
+        tot_by_rank[rank] = globaltot
 
         idx += 1
 
     data = {
-        'title': title,
+        'title': f"Total time: {max(tot_by_rank.values()):12.6f} sec",
         'timing_table': timing_table,
     }
 
@@ -132,7 +141,7 @@ def view_timing(timing_file, outfile='timing_report.html', show_browser=True, ti
 
 
 def _show_view(timing_file, options):
-    # given a pickled timing file, display based on options.view
+    # given a timing file, display based on options.view
     view = options.view.lower()
 
     if view == 'browser':
@@ -148,6 +157,8 @@ def _show_view(timing_file, options):
 
 def _postprocess(timing_file, options):
     # this is called by atexit after all timing data has been collected
+    # Note that this will not be called if the program exits via sys.exit() with a nonzero
+    # exit code.
     timing_managers = timer_mod._timing_managers
 
     if timing_file is None:
@@ -155,11 +166,11 @@ def _postprocess(timing_file, options):
 
     if MPI is not None:
         # need to consolidate the timing data from different procs
-        all_managers = MPI.COMM_WORLD.gather(timing_managers, root=0)
+        all_managers = MPI.COMM_WORLD.gather((timing_managers, timer_mod._total_time), root=0)
         if MPI.COMM_WORLD.rank != 0:
             return
     else:
-        all_managers = [timing_managers]
+        all_managers = [(timing_managers, timer_mod._total_time)]
 
     with open(timing_file, 'wb') as f:
         print(f"Saving timing data to '{timing_file}'.")
@@ -222,5 +233,7 @@ def _timing_cmd(options, user_args):
             _load_and_exec(options.file[0], user_args)
 
     else:  # assume file is a pickle file
-
+        if options.use_context:
+            issue_warning(f"Since given file '{options.file[0]}' is not a python script, the "
+                          "'--use_context' option is ignored.")
         _show_view(options.file[0], options)

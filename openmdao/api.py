@@ -94,6 +94,7 @@ from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
 from openmdao.visualization.partial_deriv_plot import partial_deriv_plot
 from openmdao.visualization.timing_viewer.timer import timing_context
+from openmdao.visualization.timing_viewer.timing_viewer import view_timing, view_timing_text
 
 # Notebook Utils
 from openmdao.utils.notebook_utils import notebook_mode, display_source, show_options_table, cite

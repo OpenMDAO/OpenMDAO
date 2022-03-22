@@ -13,6 +13,7 @@ from openmdao.core.parallel_group import ParallelGroup
 
 # can use this to globally turn timing on/off so we can time specific sections of code
 _timing_active = False
+_total_time = 0.
 _timing_managers = {}
 
 class _RestrictedUnpickler(pickle.Unpickler):
@@ -31,14 +32,14 @@ def _restricted_load(f):
 
 
 def _timing_iter(all_timing_managers):
-    for rank, timing_managers in enumerate(all_timing_managers):
+    for rank, (timing_managers, tot_time) in enumerate(all_timing_managers):
         for probname, tmanager in timing_managers.items():
             for sysname, timers in tmanager._timers.items():
                 for t, parallel in timers:
                     if t.ncalls > 0:
                         level = len(sysname.split('.')) if sysname else 0
                         yield rank, probname, sysname, level, parallel, t.name, t.ncalls, t.avg(),\
-                            t.min, t.max, t.tot
+                            t.min, t.max, t.tot, tot_time
 
 
 def _timing_file_iter(timing_file):
@@ -128,17 +129,24 @@ def timing_context(active):
     active : bool
         Is timing active or inactive?
     """
-    global _timing_active
+    global _timing_active, _total_time
 
-    if _timing_active and bool(active):
+    active = bool(active)
+    ignore = _timing_active and active
+    if ignore:
         issue_warning("Timing is already active outside of this timing_context, so it will be "
                       "ignored.")
+
+    start_time = perf_counter()
+
     save = _timing_active
-    _timing_active = bool(active)
+    _timing_active = active
     try:
         yield
     finally:
         _timing_active = save
+        if active and not ignore:
+            _total_time += perf_counter() - start_time
 
 
 def _setup_sys_timers(system, method_names):

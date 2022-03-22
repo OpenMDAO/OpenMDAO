@@ -99,6 +99,8 @@
 
 var timing_tabledata = data.timing_table;
 
+document.getElementById("timing_title").innerHTML = data.title
+
 var d3_format = d3.format(".6~g");
 
 function val_cell_formatter(cell, formatterParams, onRendered) {
@@ -161,6 +163,7 @@ var timingtable = new Tabulator("#timing-table", {
         {title: "Method", field:"method", hozAlign:"left", headerFilter:true, visible:true,},
         {title: "Calls", field:"ncalls", hozAlign:"center", headerFilter:false, visible:true,},
         numcol("Total Time", "tottime"),
+        numcol("Pct of Total", "pct"),
         numcol("Avg Time", "avgtime"),
         numcol("Min Time", "mintime"),
         numcol("Max Time", "maxtime"),
