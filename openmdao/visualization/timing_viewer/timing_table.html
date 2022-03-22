@@ -101,14 +101,13 @@ var timing_tabledata = data.timing_table;
 
 var d3_format = d3.format(".6~g");
 
-// function val_cell_formatter(cell, formatterParams, onRendered) {
-//     // cell value is actually [value, size]
-//     let val = cell.getValue();
-//     if (val[0] === "") {
-//         return "";
-//     }
-//     return d3_format(val[0]);
-// }
+function val_cell_formatter(cell, formatterParams, onRendered) {
+    let val = cell.getValue();
+    if (val === "") {
+        return "";
+    }
+    return d3_format(val);
+}
 
 
 function val_sorter(a, b, aRow, bRow, column, dir, sorterParams) {
@@ -129,7 +128,7 @@ function numcol(title, field) {
         hozAlign: "right",
         visible: true,
         headerFilter: false,
-        // formatter: val_cell_formatter,
+        formatter: val_cell_formatter,
         sorter: val_sorter,
     }
 }

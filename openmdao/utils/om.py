@@ -29,7 +29,7 @@ from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
 from openmdao.visualization.scaling_viewer.scaling_report import _scaling_setup_parser, \
     _scaling_cmd
-from openmdao.visualization.timing_viewer.timer import _timing_setup_parser, _timing_cmd
+from openmdao.visualization.timing_viewer.timing_viewer import _timing_setup_parser, _timing_cmd
 from openmdao.visualization.dyn_shape_plot import _view_dyn_shapes_setup_parser, \
     _view_dyn_shapes_cmd
 try:

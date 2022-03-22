@@ -1,23 +1,49 @@
-
-import sys
-import atexit
+import builtins
 import pickle
+
 from time import perf_counter
 from contextlib import contextmanager
 
-import numpy as np
 from functools import wraps, partial
 
 import openmdao.utils.hooks as hooks
-from openmdao.utils.file_utils import _load_and_exec, _to_filename
-from openmdao.utils.mpi import MPI
-from openmdao.visualization.timing_viewer.timing_viewer import view_timing, _timing_iter, \
-    _timing_file_iter
+from openmdao.utils.om_warnings import issue_warning
 
 from openmdao.core.parallel_group import ParallelGroup
 
 # can use this to globally turn timing on/off so we can time specific sections of code
-_timing_active = True
+_timing_active = False
+_timing_managers = {}
+
+class _RestrictedUnpickler(pickle.Unpickler):
+
+    def find_class(self, module, name):
+        # Only allow classes from this module.
+        if module == 'openmdao.visualization.timing_viewer.timer':
+            return globals().get(name)
+        # Forbid everything else.
+        raise pickle.UnpicklingError(f"global '{module}.{name}' is forbidden in timing file.")
+
+
+def _restricted_load(f):
+    """Like pickle.load() but restricted to a specific set of classes."""
+    return _RestrictedUnpickler(f).load()
+
+
+def _timing_iter(all_timing_managers):
+    for rank, timing_managers in enumerate(all_timing_managers):
+        for probname, tmanager in timing_managers.items():
+            for sysname, timers in tmanager._timers.items():
+                for t, parallel in timers:
+                    if t.ncalls > 0:
+                        level = len(sysname.split('.')) if sysname else 0
+                        yield rank, probname, sysname, level, parallel, t.name, t.ncalls, t.avg(),\
+                            t.min, t.max, t.tot
+
+
+def _timing_file_iter(timing_file):
+    with open(timing_file, 'rb') as f:
+        yield from _timing_iter(_restricted_load(f))
 
 class FuncTimer(object):
     """
@@ -32,10 +58,12 @@ class FuncTimer(object):
         self.tot = 0
 
     def tick(self):
+        global _timing_active
         if _timing_active:
             self.start = perf_counter()
 
     def tock(self):
+        global _timing_active
         if _timing_active:
             dt = perf_counter() - self.start
             if dt < self.min:
@@ -90,14 +118,6 @@ class TimingManager(object):
             setattr(obj, method_name, _timer_wrap(method, timer))
 
 
-_default_timer_methods = sorted(['_solve_nonlinear', '_apply_nonlinear', '_solve_linear',
-                                 '_apply_linear', '_linearize'])
-
-
-_timing_managers = {}
-_timer_methods = None  # TODO: use kwargs instead after Herb's PR goes in
-
-
 @contextmanager
 def timing_context(active):
     """
@@ -110,6 +130,9 @@ def timing_context(active):
     """
     global _timing_active
 
+    if _timing_active and bool(active):
+        issue_warning("Timing is already active outside of this timing_context, so it will be "
+                      "ignored.")
     save = _timing_active
     _timing_active = bool(active)
     try:
@@ -118,7 +141,8 @@ def timing_context(active):
         _timing_active = save
 
 
-def _setup_sys_timers(system, method_names=tuple(_default_timer_methods)):
+def _setup_sys_timers(system, method_names):
+    # decorate all specified System methods
     global _timing_managers
 
     probname = system._problem_meta['name']
@@ -129,126 +153,24 @@ def _setup_sys_timers(system, method_names=tuple(_default_timer_methods)):
     tmanager.add_timings(name_sys, method_names)
 
 
-def _timing_setup_parser(parser):
-    """
-    Set up the openmdao subparser for the 'openmdao timing' command.
+def _setup_timers(options, system):
+    # hook called after _setup_procs to decorate all specified System methods
+    global _timing_managers
 
-    Parameters
-    ----------
-    parser : argparse subparser
-        The parser we're adding options to.
-    """
-    parser.add_argument('file', nargs=1, help='Python file containing the model.')
-    parser.add_argument('-o', default=None, action='store', dest='outfile',
-                        help='Name of pickled output file. By default it goes to "timings.pkl".')
-    parser.add_argument('-f', '--func', action='append', default=[],
-                        dest='funcs', help='Time a specified function. Can be applied multiple '
-                        'times to specify multiple functions. '
-                        f'Default methods are {_default_timer_methods}.')
-    parser.add_argument('-v', '--view', action='store', dest='view', default='browser',
-                        help='View the output.  Default view is "browser".  Other options are '
-                        '"text" for ascii output or "none" for no output.')
-
-
-def _setup_timer_hook(system):
-    global _timer_methods, _timing_managers
+    timer_methods = options.funcs
 
     tmanager = _timing_managers.get(system._problem_meta['name'])
     if tmanager is not None and not tmanager._timers:
-        _setup_sys_timers(system, method_names=_timer_methods)
+        _setup_sys_timers(system, method_names=timer_methods)
 
 
-def _set_timer_setup_hook(problem):
+def _set_timer_setup_hook(options, problem):
+    # this just sets a hook into the top level system of the model after we know it exists.
     global _timing_managers
 
-    # this just sets a hook into the top level system of the model after we know it exists.
     inst_id = problem._get_inst_id()
     if inst_id not in _timing_managers:
         _timing_managers[inst_id] = TimingManager()
-        hooks._register_hook('_setup_procs', 'System', inst_id='', post=_setup_timer_hook)
+        hooks._register_hook('_setup_procs', 'System', inst_id='',
+                             post=partial(_setup_timers, options))
         hooks._setup_hooks(problem.model)
-
-
-def _to_ascii(timing_iter, f):
-    for rank, probname, sysname, _, parallel, method, ncalls, avg, min, max, tot in timing_iter:
-        parallel = '(parallel)' if parallel else ''
-        print(f"{rank:4} (rank) {ncalls:7} (calls) {min:12.6f} (min) "
-              f"{max:12.6f} (max) {avg:12.6f} (avg) {tot:12.6f} "
-              f"(tot) {parallel} {probname} {sysname}:{method}", file=f)
-
-
-def _postprocess(timing_file, options):
-    global _timer_methods, _timing_managers
-
-    if timing_file is None:
-        timing_file = 'timings.pkl'
-
-    if MPI is not None:
-        # need to consolidate the timing data from different procs
-        all_managers = MPI.COMM_WORLD.gather(_timing_managers, root=0)
-        if MPI.COMM_WORLD.rank == 0:
-            pass
-        else:
-            return
-    else:
-        all_managers = [_timing_managers]
-
-    with open(timing_file, 'wb') as f:
-        print(f"Saving timing data to '{timing_file}'.")
-        pickle.dump(all_managers, f, pickle.HIGHEST_PROTOCOL)
-
-    view = options.view.lower()
-
-    if view == 'browser':
-        view_timing(timing_file, outfile='timing_report.html', show_browser=True)
-    elif view == 'text':
-        _to_ascii(_timing_iter(all_managers), sys.stdout)
-    elif view == 'none':
-        pass
-    else:
-        print(f"\nViewing option '{view}' ignored.  Doing nothing.  Valid options are "
-              "['browser', 'text', 'none'].")
-
-
-def _timing_cmd(options, user_args):
-    """
-    Return the post_setup hook function for 'openmdao timing'.
-
-    Parameters
-    ----------
-    options : argparse Namespace
-        Command line options.
-    user_args : list of str
-        Args to be passed to the user script.
-    """
-    global _timer_methods, _timing_managers
-
-    filename = _to_filename(options.file[0])
-    if filename.endswith('.py'):
-        _timer_methods = options.funcs
-        if not _timer_methods:
-            _timer_methods = _default_timer_methods.copy()
-
-        hooks._register_hook('setup', 'Problem', pre=_set_timer_setup_hook)
-
-        if options.outfile is not None and MPI:
-            outfile = f"{options.outfile}.{MPI.COMM_WORLD.rank}"
-        else:
-            outfile = options.outfile
-
-        # register an atexit function to write out all of the timing data
-        atexit.register(partial(_postprocess, outfile, options))
-
-        _load_and_exec(options.file[0], user_args)
-    else:  # assume file is a pickle file
-        view = options.view.lower()
-
-        if view == 'browser':
-            view_timing(options.file[0], outfile='timing_report.html', show_browser=True)
-        elif view == 'text':
-            _to_ascii(_timing_file_iter(options.file[0]), sys.stdout)
-        elif view == 'none':
-            pass
-        else:
-            print(f"\nViewing option '{view}' ignored.  Doing nothing.  Valid options are "
-                "['browser', 'text', 'none'].")
