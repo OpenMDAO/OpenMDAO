@@ -145,7 +145,18 @@ var timingtable = new Tabulator("#timing-table", {
     dataTreeStartExpanded:false,
     data:timing_tabledata, //assign data to table
     layout:"fitDataFill", //"fitColumns", "fitDataFill",
+    groupBy: "probname",
     columns:[ //Define Table Columns
+        {title: "Rank", field:"rank", hozAlign:"center", headerFilter:true, visible:true,},
+        {title: "Tree Level", field:"level", hozAlign:"center", headerFilter:true, visible:true,},
+        {title: "Parallel", field:"parallel", hozAlign:"center", visible: true,
+         headerFilter: "tickCross",
+         headerFilterParams:{"tristate": true}, // need 3 filter states (checked/unchecked/mixed)
+         headerFilterEmptyCheck: function(value){return value === null},
+         formatter:"tickCross",
+         formatterParams: {
+            crossElement: false,  // gets rid of 'x' elements so only check marks show
+         }},
         {title: "Problem", field:"probname", hozAlign:"left", headerFilter:true, visible:true,},
         {title: "System", field:"sysname", hozAlign:"left", headerFilter:true, visible:true,},
         {title: "Method", field:"method", hozAlign:"left", headerFilter:true, visible:true,},

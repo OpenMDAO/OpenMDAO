@@ -9,12 +9,15 @@ from openmdao.utils.general_utils import default_noraise
 from openmdao.utils.mpi import MPI
 
 
-def _timing_iter(timing_managers):
-    for probname, tmanager in timing_managers.items():
-        for sysname, timers in tmanager._timers.items():
-            for t in timers:
-                if t.ncalls > 0:
-                    yield probname, sysname, t.name, t.ncalls, t.avg(), t.min, t.max, t.tot
+def _timing_iter(all_timing_managers):
+    for rank, timing_managers in enumerate(all_timing_managers):
+        for probname, tmanager in timing_managers.items():
+            for sysname, timers in tmanager._timers.items():
+                for t, parallel in timers:
+                    if t.ncalls > 0:
+                        level = len(sysname.split('.')) if sysname else 0
+                        yield rank, probname, sysname, level, parallel, t.name, t.ncalls, t.avg(),\
+                            t.min, t.max, t.tot
 
 
 def _timing_file_iter(timing_file):
@@ -50,13 +53,16 @@ def view_timing(timing_file, outfile='timing_report.html', show_browser=True, ti
     idx = 1  # unique ID for use by Tabulator
 
     # set up timing table data
-    for pname, sname, method, ncalls, avgtime, mintime, maxtime, tottime in \
+    for rank, pname, sname, level, parallel, method, ncalls, avgtime, mintime, maxtime, tottime in \
             _timing_file_iter(timing_file):
 
         dct = {
             'id': idx,
+            'rank': rank,
             'probname': pname,
             'sysname': sname,
+            'level': level,
+            'parallel': parallel,
             'method': method,
             'ncalls': ncalls,
             'avgtime': avgtime,
@@ -74,8 +80,7 @@ def view_timing(timing_file, outfile='timing_report.html', show_browser=True, ti
         'timing_table': timing_table,
     }
 
-
-    if MPI is None or MPI.COMM_WORLD.comm.rank == 0:
+    if MPI is None or MPI.COMM_WORLD.rank == 0:
 
         viewer = 'timing_table.html'
 
