@@ -50,6 +50,8 @@ class FuncTimer(object):
     """
     Keep track of execution times for a function.
     """
+    __slots__ = ['name', 'ncalls', 'start', 'min', 'max', 'tot']
+
     def __init__(self, name,):
         self.name = name
         self.ncalls = 0
@@ -120,7 +122,7 @@ class TimingManager(object):
 
 
 @contextmanager
-def timing_context(active):
+def timing_context(active=True):
     """
     Context manager to set whether timing is active or not.
 

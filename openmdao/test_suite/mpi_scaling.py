@@ -1,8 +1,10 @@
 
 import time
+from itertools import repeat
 import numpy as np
 import openmdao.api as om
 from openmdao.utils.general_utils import shape2tuple
+from openmdao.utils.mpi import MPI
 
 
 class ExplicitSleepComp(om.ExplicitComponent):
@@ -69,6 +71,7 @@ class ExplicitSleepComp(om.ExplicitComponent):
             partials[oname, iname] = val
 
 
+# A few solver classes that will just run to whatever maxiter is set to
 class FixedIterNLBGS(om.NonlinearBlockGS):
     def _iter_get_norm(self):
         return 1.0
@@ -89,10 +92,47 @@ class FixedIterLinBlockJac(om.LinearBlockJac):
         return 1.0
 
 
-def make_group(par, ncomps, compclass, nliters=1, liniters=1, **kwargs):
-    g = om.ParallelGroup() if par else om.Group()
-    for i in range(ncomps):
-        g.add_subsystem(f"C{i}", compclass(**kwargs))
+def expand_kwargs(**kwargs):
+    # this expects all entries of kwargs to be iterators of the same length.
+    # It yields one kwargs dict for each iter of all kwargs entries,
+    # e.g., if kwargs is {'a': [1,2,3], 'b': [4,5,6]}, it yields
+    # {'a': 1, 'b':4}, {'a': 2, 'b': 5}, {'a': 3, 'b': 6}
+    if not kwargs:
+        return
+
+    lstkwargs = {k: list(v) for k, v in kwargs.items()}
+    for v in lstkwargs.values():
+        nitems = len(v)
+        break
+
+    try:
+        for idx in range(nitems):
+            yield {k: v[idx] for k, v in lstkwargs.items()}
+    except IndexError:
+        raise IndexError("expand_kwargs() requires that all kwargs entries have the same number of "
+                         "items.")
+
+
+def dup_inst(n, klass, *kwargs):
+    # yield n duplicate instances of klass constructed using kwargs
+    for i in range(n):
+        yield klass(**kwargs)
+
+
+def inst_iter(class_iter, kwargs_iter):
+    # yields an instance of klass for each kwargs in kwargs_iter
+    for klass, kwargs in zip(class_iter, kwargs_iter):
+        yield klass(**kwargs)
+
+
+def make_group(par, sysiter, nliters=1, liniters=1):
+    # return a group (ParallelGroup or Group based on 'par' arg) that contains
+    # system instances from sysiter.  The group
+    # will have block (jac/gs depending on 'par') linear and nl solvers with
+    # maxiters of 'liniters' and 'nliters' respectively.
+    g = om.ParallelGroup() if par and MPI is not None else om.Group()
+    for i, inst in enumerate(sysiter):
+        g.add_subsystem(f"C{i}", inst)
 
     if par:
         g.nonlinear_solver = FixedIterNLJac(maxiter=nliters)
@@ -105,6 +145,8 @@ def make_group(par, ncomps, compclass, nliters=1, liniters=1, **kwargs):
 
 
 def sys_var_path_iter(ncomps, nvars, path=''):
+    # yield system_path, input_path, output_path for each input/output pair using
+    # the default naming scheme (Component is 'C?', inputs are 'i?' and outputs are 'o?').
     if path:
         path = path + '.'
     for c in range(ncomps):
@@ -124,12 +166,16 @@ if __name__ == '__main__':
     ncomps = 10
 
     p = om.Problem()
-    p.model.add_subsystem('par', make_group(True, ncomps, ExplicitSleepComp, nliters=2, liniters=1,
-                                            compute_delay=0.1, nvars=nvars, use_coloring=True))
+    compiter = inst_iter(repeat(ExplicitSleepComp, ncomps),
+                         expand_kwargs(nvars=repeat(nvars, ncomps),
+                                       use_coloring=repeat(True, ncomps),
+                                       compute_delay=[.01]*6 + [.1,.1,.1,1.]))
+    p.model.add_subsystem('par', make_group(True, compiter, nliters=2, liniters=1))
     p.setup()
 
-    for i in range(nruns):
-        p.run_model()
+    with om.timing_context():
+        for i in range(nruns):
+            p.run_model()
 
     # ofs = []
     # wrts = []
