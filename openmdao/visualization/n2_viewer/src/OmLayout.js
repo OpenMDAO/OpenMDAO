@@ -43,7 +43,7 @@ class OmLayout extends Layout {
             this.scales.solver = new Scale(this.size.solverTree);
         }
 
-        this.transitCoords.solver = new Dimensions({x: 0, y: 0});
+        this.treeSize.solver = new Dimensions({width: 0, height: 0});
 
         return this;
     }
@@ -180,10 +180,10 @@ class OmLayout extends Layout {
 
     /**
      * Calculate new dimensions for the div element enclosing the main SVG element.
-     * @returns {Object} Members width and height as strings with the unit appended.
+     * @returns {Dimensions} Members width and height.
      */
-     newOuterDims() {
-        const dims = super.newOuterDims();
+     calcOuterDims() {
+        const dims = super.calcOuterDims();
         dims.width += this.size.solverTree.width;
 
         return dims;
@@ -191,13 +191,26 @@ class OmLayout extends Layout {
 
     /**
      * Calculate new dimensions for the main SVG element.
-     * @returns {Object} Members width and height as numbers.
+     * @returns {Dimensions} Members width, height, and margin as numbers.
      */
-    newInnerDims() {
-        const dims = super.newInnerDims();
+    calcInnerDims() {
+        const dims = super.calcInnerDims();
         dims.width += this.size.solverTree.width;
 
         return dims;
+    }
+
+    applyGeometryFirstRun(dom) {
+        super.applyGeometryFirstRun(dom);
+        const innerDims = this.calcInnerDims();
+
+        const x = this.size.partitionTree.width +
+            innerDims.height + innerDims.margin * 2;
+        const y = innerDims.margin;
+
+        dom.pSolverTreeGroup
+            .attr("height", innerDims.height)
+            .attr("transform", `translate(${x},${y})`);        
     }
 
     /**
@@ -208,15 +221,13 @@ class OmLayout extends Layout {
      */
      updateTransitionInfo(dom, transitionStartDelay, manuallyResized) {
          super.updateTransitionInfo(dom, transitionStartDelay, manuallyResized);
-         const innerDims = this.newInnerDims();
+         const innerDims = this.calcInnerDims();
 
          dom.pSolverTreeGroup.transition(sharedTransition)
-            .attr("height", innerDims.height)
-            .attr("transform", "translate(" + (this.size.partitionTree.width +
-                innerDims.margin +
-                innerDims.height +
-                innerDims.margin) + " " +
-                innerDims.margin + ")");         
+            .attr('height', innerDims.height)
+            .attr('transform', `translate(${this.size.partitionTree.width +
+                innerDims.margin + innerDims.height +
+                innerDims.margin},${innerDims.margin})`);
      }
 
     calcWidthBasedOnNewHeight(height) {
@@ -234,26 +245,26 @@ class OmLayout extends Layout {
      preservePreviousScaleValues() {
         super.preservePreviousScaleValues()
 
-        this.transitCoords.solver.preserve();
+        this.treeSize.solver.preserve();
         this.scales.solver.preserve();
     }
 
-    updateScaleValues() {
-        super.updateScaleValues();
+    updateGeometryValues() {
+        super.updateGeometryValues();
         const elemDims = this.zoomedElement.draw.solverDims;
-        const treeSize = this.size.solverTree;
+        const initSize = this.size.solverTree;
 
-        this.transitCoords.solver.x = (elemDims.x ?
-            treeSize.width - this.size.parentNodeWidth : treeSize.width) / (1 - elemDims.x);
+        this.treeSize.solver.width = (elemDims.x ?
+            initSize.width - this.size.parentNodeWidth : initSize.width) / (1 - elemDims.x);
 
-        this.transitCoords.solver.y = treeSize.height / elemDims.height;
+        this.treeSize.solver.height = initSize.height / elemDims.height;
 
         this.scales.solver.x
             .domain([elemDims.x, 1])
-            .range([elemDims.x ? this.size.parentNodeWidth : 0, treeSize.width]);
+            .range([elemDims.x ? this.size.parentNodeWidth : 0, initSize.width]);
 
         this.scales.solver.y
             .domain([elemDims.y, elemDims.y + elemDims.height])
-            .range([0, treeSize.height]);        
+            .range([0, initSize.height]);        
     }
 }

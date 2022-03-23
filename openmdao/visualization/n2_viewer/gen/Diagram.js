@@ -179,86 +179,21 @@ class Diagram {
      * @param {Object} obj The HTML element that was clicked on.
      * @param {TreeNode} node The node associated with the element.
      */
-    leftClickSelector(obj, node) {
+    leftClickSelector(e, obj, node) {
         switch (this.ui.click.clickEffect) {
             case N2Click.ClickEffect.NodeInfo:
                 this.ui.nodeInfoBox.pin();
                 break;
             case N2Click.ClickEffect.Collapse:
-                this.ui.rightClick(node, obj);
+                this.ui.rightClick(e, node, obj);
                 break;
             case N2Click.ClickEffect.Filter:
                 const color = d3.select(obj).select('rect').style('fill');
-                this.ui.altRightClick(node, color);
+                this.ui.altRightClick(e, node, color);
                 break;
             default:
-                this.ui.leftClick(node);
+                this.ui.leftClick(e, node);
         }
-    }
-
-    /** Recalculate the scale and apply new dimensions to diagram objects. */
-    _updateScale() {
-        this.layout.updateScaleValues();
-
-        if (this.layout.scales.firstRun) { // first run, duplicate what we just calculated
-            this.layout.scales.firstRun = false;
-            this.layout.preservePreviousScaleValues();
-
-            // Update svg dimensions before size changes
-            const outerDims = this.layout.newOuterDims();
-            const innerDims = this.layout.newInnerDims();
-            const size = this.dims.size;
-
-            this.dom.svgDiv
-                .style("width", outerDims.width + size.unit)
-                .style("height", outerDims.height + size.unit);
-
-            this.dom.svg
-                .attr("width", outerDims.width)
-                .attr("height", outerDims.height)
-                .attr("transform", "translate(0,0)");
-
-            this.dom.pTreeGroup
-                .attr("height", innerDims.height)
-                .attr("width", size.partitionTree.width)
-                .attr("transform", `translate(0,${innerDims.margin})`);
-
-            this.dom.highlightBar
-                .attr("height", innerDims.height)
-                .attr("width", "8")
-                .attr("transform", `translate(${size.partitionTree.width + 1},${innerDims.margin})`);
-
-            this.dom.n2OuterGroup
-                .attr("height", outerDims.height)
-                .attr("width", outerDims.height)
-                .attr("transform", `translate(${size.partitionTree.width},0)`);
-
-            this.dom.n2InnerGroup
-                .attr("height", innerDims.height)
-                .attr("width", innerDims.height)
-                .attr("transform", `translate(${innerDims.margin},${innerDims.margin})`)
-                .transition(sharedTransition);
-
-            this.dom.n2BackgroundRect
-                .attr("width", innerDims.height)
-                .attr("height", innerDims.height)
-                .attr("transform", "translate(0,0)");
-
-            const offgridHeight = size.font + 2;
-            this.dom.n2Groups.offgrid.top
-                .attr("transform", `translate(${innerDims.margin},0)`)
-                .attr("width", innerDims.height)
-                .attr("height", offgridHeight);
-
-            this.dom.n2Groups.offgrid.bottom
-                .attr("transform", `translate(0,${innerDims.height + offgridHeight})`)
-                .attr("width", outerDims.height)
-                .attr("height", offgridHeight);
-
-            return true;
-        }
-
-        return false;
     }
 
     /** Add SVG groups & contents coupled to the visible nodes in the model tree. */
@@ -271,7 +206,7 @@ class Diagram {
         no longer a displayable node for it, put it in the "exit" selection so
         it can be removed:
         */
-        const selection = this.dom.pTreeGroup.selectAll("g.partition_group")
+        const selection = this.dom.pTreeGroup.selectAll(".partition_group")
             .data(this.layout.zoomedNodes, d => d.id);
         
         const enterSelection = this._addNewTreeCells(selection);
@@ -286,37 +221,39 @@ class Diagram {
      */
      _addNewTreeCells(selection) {
         const self = this; // For callbacks that might change "this".
-        const scale = this.layout.scales.model.prev;
-        const transitCoords = this.layout.transitCoords.model.prev;        
+        const prevScale = this.layout.scales.model.prev;
+        const prevSize = this.layout.treeSize.model.prev;        
 
-        // Create a <g> for each node in zoomedNodes that doesn't already have one.
+        // Create a <g> for each node in zoomedNodes that doesn't already have one. Dimensions
+        // are obtained from the previous geometry so the new nodes can appear to transition
+        // to the new size together with the existing nodes.
         const enterSelection = selection.enter()
             .append("g")
             .attr("class", d => `partition_group ${self.style.getNodeClass(d)}`)
             .attr("transform", d =>
-                `translate(${scale.x(d.draw.dims.prev.x)}, ${scale.y(d.draw.dims.prev.y)})`);
+                `translate(${prevScale.x(d.draw.dims.prev.x)},${prevScale.y(d.draw.dims.prev.y)})`);
 
         enterSelection // Add event handlers
-            .on("click", function(d) { self.leftClickSelector(this, d); })
-            .on("contextmenu", function(d) {
-                if (d3.event.altKey) {
+            .on("click", function(e,d) { self.leftClickSelector(e, this, d); })
+            .on("contextmenu", function(e,d) {
+                if (e.altKey) {
                     self.ui.altRightClick(d, d3.select(this).select('rect').style('fill'));
                 }
                 else {
                     self.ui.rightClick(d, this);
                 }
             })
-            .on("mouseover", function(d) {
-                self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'))
+            .on("mouseover", function(e,d) {
+                self.ui.nodeInfoBox.update(e, d, d3.select(this).select('rect').style('fill'))
             })
             .on("mouseleave", () => self.ui.nodeInfoBox.clear())
-            .on("mousemove", () => self.ui.nodeInfoBox.moveNearMouse(d3.event));
+            .on("mousemove", e => self.ui.nodeInfoBox.moveNearMouse(e));
 
         // Add the rectangle that is the visible shape.
         enterSelection
             .append("rect")
-            .attr("width", d => d.draw.dims.prev.width * transitCoords.x)
-            .attr("height", d => d.draw.dims.prev.height * transitCoords.y)
+            .attr("width", d => d.draw.dims.prev.width * prevSize.width)
+            .attr("height", d => d.draw.dims.prev.height * prevSize.height)
             .attr("id", d => TreeNode.pathToId(d.path))
             .attr('rx', 12)
             .attr('ry', 12);
@@ -326,9 +263,9 @@ class Diagram {
             .append("text")
             .attr("dy", ".35em")
             .attr("transform", d => {
-                const anchorX = d.draw.dims.prev.width * transitCoords.x -
+                const anchorX = d.draw.dims.prev.width * prevSize.width -
                     self.layout.size.rightTextMargin;
-                return `translate(${anchorX}, ${(d.draw.dims.prev.height * transitCoords.y / 2)})`;
+                return `translate(${anchorX}, ${(d.draw.dims.prev.height * prevSize.height / 2)})`;
             })
             .style("opacity", d => (d.depth < self.zoomedElement.depth)? 0 : d.textOpacity)
             .text(self.layout.getText.bind(self.layout));
@@ -342,37 +279,35 @@ class Diagram {
      * @param {Object} selection The selected group of model tree <g> elements.
      */
      _mergeTreeCells(selection, enterSelection) {
-        const self = this; // For callbacks that change "this". Alternative to using .bind().
+        const self = this; // For callbacks that change "this".
         const scale = this.layout.scales.model;
-        const transitCoords = this.layout.transitCoords.model;
+        const treeSize = this.layout.treeSize.model;
 
         this.dom.clips.partitionTree
             .transition(sharedTransition)
             .attr('height', this.dims.size.partitionTree.height);
 
-        const mergedSelection = enterSelection.merge(selection).transition(sharedTransition);
+        // New location for each group
+        const mergedSelection = enterSelection.merge(selection)
+            .transition(sharedTransition)
+            .attr("transform", d => 
+                `translate(${scale.x(d.draw.dims.x)}, ${scale.y(d.draw.dims.y)})`);
 
-        mergedSelection
-            .attr("class", d => `partition_group ${self.style.getNodeClass(d)}`)
-            .attr("transform", d => `translate(${scale.x(d.draw.dims.x)}, ${scale.y(d.draw.dims.y)})`);
-
+        // Resize each rectangle
         mergedSelection
             .select("rect")
-            .attr("width", d => d.draw.dims.width * transitCoords.x)
-            .attr("height", d => d.draw.dims.height * transitCoords.y)
-            .attr('rx', 12)
-            .attr('ry', 12);
+            .attr("width", d => d.draw.dims.width * treeSize.width)
+            .attr("height", d => d.draw.dims.height * treeSize.height);
 
+        // Move the text label
         mergedSelection
             .select("text")
             .attr("transform", d => {
-                const anchorX = d.draw.dims.width * transitCoords.x -
+                const anchorX = d.draw.dims.width * treeSize.width -
                     self.layout.size.rightTextMargin;
-                return `translate(${anchorX}, ${(d.draw.dims.height * transitCoords.y/2)})`;
+                return `translate(${anchorX}, ${(d.draw.dims.height * treeSize.height/2)})`;
             })
-            .style("opacity", d => (d.depth < self.zoomedElement.depth)? 0 : d.textOpacity)
-            .text(self.layout.getText.bind(self.layout));
-
+            .style("opacity", d => (d.depth < self.zoomedElement.depth)? 0 : d.textOpacity);
     }
 
     /**
@@ -383,24 +318,24 @@ class Diagram {
     _removeOldTreeCells(selection) {
         const self = this; // For callbacks that change "this". Alternative to using .bind().
         const scale = this.layout.scales.model; 
-        const transitCoords = this.layout.transitCoords.model;
+        const treeSize = this.layout.treeSize.model;
 
         // Transition exiting nodes to the parent's new position.
-        const exitSelection = selection.exit().transition(sharedTransition);
-
-        exitSelection
-            .attr("transform", d => `translate(${scale.x(d.draw.dims.x)}, ${scale.y(d.draw.dims.y)})`)
+        const exitSelection = selection.exit()
+            .transition(sharedTransition)
+            .attr("transform", d => 
+                `translate(${scale.x(d.draw.dims.x)},${scale.y(d.draw.dims.y)})`)
             .remove();
 
         exitSelection.select("rect")
-            .attr("width", d => d.draw.dims.width * transitCoords.x)
-            .attr("height", d => d.draw.dims.height * transitCoords.y);
+            .attr("width", d => d.draw.dims.width * treeSize.width)
+            .attr("height", d => d.draw.dims.height * treeSize.height);
 
         exitSelection.select("text")
             .attr("transform", d => {
-                const anchorX = d.draw.dims.width * transitCoords.x -
+                const anchorX = d.draw.dims.width * treeSize.width -
                     self.layout.size.rightTextMargin;
-                return `translate(${anchorX}, ${(d.draw.dims.height * transitCoords.y / 2)})`;
+                return `translate(${anchorX}, ${(d.draw.dims.height * treeSize.height / 2)})`;
             })
             .style("opacity", 0);
     }
@@ -466,7 +401,7 @@ class Diagram {
                 this.ui.findRootOfChangeFunction, this.matrix.nodeSize);
         }
 
-        this._updateScale();
+        this.layout.updateGeometry(this.dom);
         this.layout.updateTransitionInfo(this.dom, this.transitionStartDelay, this.manuallyResized);
         this._updateTreeCells();
         this.arrowMgr.transition(this.matrix);
@@ -527,10 +462,10 @@ class Diagram {
      * rather than setting one up that points directly to a specific matrix.
      * @param {N2MatrixCell} cell The cell the event occured on.
      */
-    mouseOverOnDiagonal(cell) {
+    mouseOverOnDiagonal(e, cell) {
         if (this.matrix.cellExists(cell)) {
             this.matrix.mouseOverOnDiagonal(cell);
-            this.ui.nodeInfoBox.update(d3.event, cell.obj, cell.color());
+            this.ui.nodeInfoBox.update(e, cell.obj, cell.color());
         }
     }
 
@@ -538,9 +473,9 @@ class Diagram {
      * Move the node info panel around if it's visible
      * @param {N2MatrixCell} cell The cell the event occured on.
      */
-    mouseMoveOnDiagonal(cell) {
+    mouseMoveOnDiagonal(e, cell) {
         if (this.matrix.cellExists(cell)) {
-            this.ui.nodeInfoBox.moveNearMouse(d3.event);
+            this.ui.nodeInfoBox.moveNearMouse(e);
         }
     }
 
@@ -548,7 +483,7 @@ class Diagram {
      * Since the matrix can be destroyed and recreated, use this to invoke the callback
      * rather than setting one up that points directly to a specific matrix.
      */
-    mouseOverOffDiagonal(cell) {
+    mouseOverOffDiagonal(e, cell) {
         if (this.matrix.cellExists(cell)) {
             this.matrix.mouseOverOffDiagonal(cell);
         }
@@ -634,7 +569,7 @@ class Diagram {
         this.matrix = new N2Matrix(this.model, this.layout,
             this.dom.n2Groups, this.arrowMgr, this.ui.lastClickWasLeft,
             this.ui.findRootOfChangeFunction, this.matrix.nodeSize);
-        this._updateScale();
+        this.layout.updateGeometry(this.dom);
         this.layout.updateTransitionInfo(this.dom, this.transitionStartDelay, this.manuallyResized);
 
         // Arrow State

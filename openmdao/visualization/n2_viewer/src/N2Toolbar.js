@@ -28,21 +28,21 @@ class N2ToolbarButtonNoClick {
     }
 
     /** When the mouse enters the element, show the tool tip */
-    mouseOver() {
+    mouseOver(e) {
         this.tooltipBox
             .text(this.tooltips[0])
             .style("visibility", "visible");
     }
 
     /** When the mouse leaves the element, hide the tool tip */
-    mouseLeave() {
+    mouseLeave(e) {
         this.tooltipBox.style("visibility", "hidden");
     }
 
     /** Keep the tool-tip near the mouse */
-    mouseMove() {
-        this.tooltipBox.style("top", (d3.event.pageY - 30) + "px")
-            .style("left", (d3.event.pageX + 5) + "px");
+    mouseMove(e) {
+        this.tooltipBox.style("top", (e.pageY - 30) + "px")
+            .style("left", (e.pageX + 5) + "px");
     }
 
     /**
@@ -100,15 +100,15 @@ class N2ToolbarButtonClick extends N2ToolbarButtonNoClick {
 
         let self = this;
 
-        this.toolbarButton.on('click', function () { self.click(this); });
+        this.toolbarButton.on('click', function (e) { self.click(e, this); });
     }
 
     /**
      * Defined separately so the derived class can override
      * @param {Object} target Reference to the HTML element that was clicked
      */
-    click(target) {
-        this.clickFn(target);
+    click(e, target) {
+        this.clickFn(e, target);
     }
 }
 
@@ -151,8 +151,8 @@ class N2ToolbarButtonToggle extends N2ToolbarButtonClick {
      * based on the result of the predicate function.
      * @param {Object} target Reference to the HTML element that was clicked
      */
-    click(target) {
-        this.clickFn(target);
+    click(e, target) {
+        this.clickFn(e, target);
 
         this.tooltipBox
             .text(this.predicateFn() ? this.tooltips[0] : this.tooltips[1])
@@ -322,107 +322,94 @@ class N2Toolbar {
         );
 
         this._addButton(new N2ToolbarButtonClick('#reset-graph', tooltipBox,
-            "View entire model starting from root", e => { n2ui.homeButtonClick(); }));
+            "View entire model starting from root", () => n2ui.homeButtonClick()));
 
         this._addButton(new N2ToolbarButtonClick('#undo-graph', tooltipBox,
-            "Move back in view history", e => { n2ui.backButtonPressed() }));
+            "Move back in view history", () => n2ui.backButtonPressed()));
 
         this._addButton(new N2ToolbarButtonClick('#redo-graph', tooltipBox,
-            "Move forward in view history", e => { n2ui.forwardButtonPressed() }));
+            "Move forward in view history", () => n2ui.forwardButtonPressed()));
 
         this._addButton(new N2ToolbarButtonClick('#collapse-element', tooltipBox,
             "Control variable collapsing",
-            e => { n2ui.collapseAll(n2ui.n2Diag.zoomedElement) }));
+            () => n2ui.collapseAll(n2ui.n2Diag.zoomedElement)));
 
         this._addButton(new N2ToolbarButtonClick('#collapse-element-2', tooltipBox,
             "Collapse only variables in current view",
-            function (target) {
+            (e, target) => {
                 n2ui.collapseAll(n2ui.n2Diag.zoomedElement);
                 self._setRootButton(target);
             }));
 
         this._addButton(new N2ToolbarButtonClick('#collapse-all', tooltipBox,
             "Collapse all variables in entire model",
-            function (target) {
+            (e, target) => {
                 n2ui.collapseAll(n2ui.n2Diag.model.root);
                 self._setRootButton(target);
             }));
 
         this._addButton(new N2ToolbarButtonClick('#expand-element', tooltipBox,
             "Expand only variables in current view",
-            function (target) {
+            (e, target) => { 
                 n2ui.expandAll(n2ui.n2Diag.zoomedElement);
                 self._setRootButton(target);
             }));
 
         this._addButton(new N2ToolbarButtonClick('#expand-all', tooltipBox,
             "Expand all variables in entire model",
-            function (target) {
+            (e, target) => {
                 n2ui.expandAll(n2ui.n2Diag.model.root);
                 self._setRootButton(target);
             }));
 
         this._addButton(new N2ToolbarButtonToggle('#info-button', tooltipBox,
             ["Hide detailed node information", "Show detailed node information"],
-            pred => { return n2ui.nodeInfoBox.active; },
-            function(target) {
-                n2ui.click.toggle('nodeinfo');
-            })).setHelpInfo("Select left-click action");
+            () => { return n2ui.nodeInfoBox.active; },
+            () => { n2ui.click.toggle('nodeinfo'); })).setHelpInfo("Select left-click action");
 
         this._addButton(new N2ToolbarButtonToggle('#info-button-2', tooltipBox,
             ["Hide detailed node information", "Show detailed node information"],
-            pred => { return n2ui.nodeInfoBox.active; },
-            function(target) {
+            () => { return n2ui.nodeInfoBox.active; },
+            (e, target) => {
                 n2ui.click.toggle('nodeinfo');
                 self._setRootButton(target);
             })).setHelpInfo("Toggle detailed node info mode");
 
         this._addButton(new N2ToolbarButtonToggle('#collapse-target', tooltipBox,
             ["Exit collapse/expand mode", "Enter collapse/expand mode"],
-            pred => { return n2ui.click.clickEffect == N2Click.ClickEffect.Collapse; },
-            function (target) {
+            () => { return n2ui.click.clickEffect == N2Click.ClickEffect.Collapse; },
+            (e, target) => {
                 n2ui.click.toggle('collapse');
                 self._setRootButton(target);
             })).setHelpInfo("Toggle collapse/expand mode");
 
         this._addButton(new N2ToolbarButtonToggle('#filter-target', tooltipBox,
             ["Exit variable filtering mode", "Enter variable filtering mode"],
-            pred => { return n2ui.click.clickEffect == N2Click.ClickEffect.Filter; },
-            function (target) {
+            () => { return n2ui.click.clickEffect == N2Click.ClickEffect.Filter; },
+            (e, target) => {
                 n2ui.click.toggle('filter');
                 self._setRootButton(target);
             })).setHelpInfo("Toggle variable filtering mode");
 
         this._addButton(new N2ToolbarButtonClick('#hide-connections', tooltipBox,
             "Set connections visibility",
-            function () {
-                n2ui.n2Diag.clearArrows();
-            }));
+            () => n2ui.n2Diag.clearArrows()));
 
         this._addButton(new N2ToolbarButtonClick('#hide-connections-2', tooltipBox,
             "Remove all connection arrows",
-            function (target) {
-                n2ui.n2Diag.clearArrows();
-                self._setRootButton(target);
-            }));
+            (e, target) => { n2ui.n2Diag.clearArrows(); self._setRootButton(target); }));
 
         this._addButton(new N2ToolbarButtonClick('#show-all-connections', tooltipBox,
             "Show all connections in view",
-            function (target) {
-                n2ui.n2Diag.showAllArrows();
-                self._setRootButton(target);
-            }));
+            (e, target) => { n2ui.n2Diag.showAllArrows(); self._setRootButton(target); }));
 
         this._addButton(new N2ToolbarButtonClick('#linear-solver-button', tooltipBox,
             "Control solver tree display",
-            function (target) {
-                n2ui.setSolvers(true);
-                n2ui.showSolvers();
-            }));
+            () => { n2ui.setSolvers(true); n2ui.showSolvers(); }));
 
         this._addButton(new N2ToolbarButtonClick('#linear-solver-button-2', tooltipBox,
             "Show linear solvers",
-            function (target) {
+            (e, target) => {
                 n2ui.setSolvers(true);
                 n2ui.showSolvers();
                 self._setRootButton(target);
@@ -430,7 +417,7 @@ class N2Toolbar {
 
         this._addButton(new N2ToolbarButtonClick('#non-linear-solver-button', tooltipBox,
             "Show non-linear solvers",
-            function (target) {
+            (e, target) => {
                 n2ui.setSolvers(false);
                 n2ui.showSolvers();
                 self._setRootButton(target);
@@ -438,16 +425,15 @@ class N2Toolbar {
 
         this._addButton(new N2ToolbarButtonClick('#no-solver-button', tooltipBox,
             "Hide solvers",
-            function (target) {
+            (e, target) => {
                 n2ui.hideSolvers();
                 self._setRootButton(target);
             }));
 
         this._addButton(new N2ToolbarButtonToggle('#desvars-button', tooltipBox,
             ["Show optimization variables", "Hide optimization variables"],
-            pred => { return n2ui.desVars; },
-            e => { n2ui.toggleDesVars(); }
-        )).setHelpInfo("Toggle optimization variables");
+            () => n2ui.desVars, () => n2ui.toggleDesVars()))
+            .setHelpInfo("Toggle optimization variables");
 
         this._addButton(new N2ToolbarButtonNoClick('#text-slider-button', tooltipBox,
             "Set text height"));
@@ -460,47 +446,36 @@ class N2Toolbar {
             "Save or load an image or view"));
 
         this._addButton(new N2ToolbarButtonClick('#save-button', tooltipBox,
-            "Save to SVG", e => { n2ui.n2Diag.saveSvg() }));
+            "Save to SVG", () => n2ui.n2Diag.saveSvg() ));
 
         this._addButton(new N2ToolbarButtonClick('#save-state-button', tooltipBox,
-            "Save View", e => { n2ui.saveState() }));
+            "Save View", () => n2ui.saveState() ));
 
         this._addButton(new N2ToolbarButtonClick('#load-state-button', tooltipBox,
-            "Load View", e => { n2ui.loadState() }));
+            "Load View", () => n2ui.loadState() ));
 
         this._addButton(new N2ToolbarButtonToggle('#legend-button', tooltipBox,
             ["Show legend", "Hide legend"],
-            pred => { return n2ui.legend.hidden; },
-            function(target) {
-                n2ui.toggleLegend();
-                self._setRootButton(target);
-            }
-        )).setHelpInfo("Toggle legend");
+            () => n2ui.legend.hidden,
+            (e, target) => { n2ui.toggleLegend(); self._setRootButton(target); }))
+            .setHelpInfo("Toggle legend");
 
         this._addButton(new N2ToolbarButtonClick('#question-button', tooltipBox,
             "Show N2 diagram help",
-            function(target) {
-                self._showHelp()
-                self._setRootButton(target);
-            }));
+            (e, target) => { self._showHelp(); self._setRootButton(target); }));
 
         this._addButton(new N2ToolbarButtonClick('#question-button-2', tooltipBox,
             "Show N2 diagram help",
-            function(target) {
-                self._showHelp()
-                self._setRootButton(target);
-            }));
+            (e, target) => { self._showHelp(); self._setRootButton(target); }));
 
         // Don't add this to the array of tracked buttons because it confuses
         // the help screen generation
         new N2ToolbarButtonToggle('#hide-toolbar', tooltipBox,
             ["Show toolbar", "Hide toolbar"],
-            pred => { return self.hidden },
-            e => { self.toggle() }
-        );
+            () => self.hidden, () => self.toggle());
 
         // The font size slider is a range input
-        this.toolbar.select('#text-slider').on('input', function () {
+        this.toolbar.select('#text-slider').on('input', () => {
             const fontSize = this.value;
             n2ui.n2Diag.fontSizeSelectChange(fontSize);
 
@@ -510,10 +485,8 @@ class N2Toolbar {
 
         // The model height slider is a range input
         this.toolbar.select('#model-slider')
-            .on('input', function () {
-                d3.select('#model-slider-label').html(this.value + "%");
-            })
-            .on('mouseup', function () {
+            .on('input', () => d3.select('#model-slider-label').html(`${this.value}%`))
+            .on('mouseup', () => {
                 n2ui.n2Diag.manuallyResized = true;
                 const modelHeight = window.innerHeight * (parseInt(this.value) / 100);
                 n2ui.n2Diag.verticalResize(modelHeight);
@@ -522,7 +495,7 @@ class N2Toolbar {
             });
 
         this.toolbar.select('#model-slider-fit')
-            .on('click', function () {
+            .on('click', () => {
                 n2ui.n2Diag.manuallyResized = false;
                 d3.select('#model-slider').node().value = '95';
                 d3.select('#model-slider-label').html("95%")

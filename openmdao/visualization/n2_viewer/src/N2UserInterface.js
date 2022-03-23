@@ -247,8 +247,8 @@ class N2UserInterface {
             box.attr('class', 'active-resizer-box');
 
             const startPos = {
-                'x': d3.event.clientX,
-                'y': d3.event.clientY
+                'x': e.clientX,
+                'y': e.clientY
             };
             const startDims = {
                 'width': parseInt(box.style('width')),
@@ -294,10 +294,10 @@ class N2UserInterface {
                         .on('mouseup', null);
                 })
                 .on('mousemove', e => {
-                    const newHeight = d3.event.clientY - offset.y;
+                    const newHeight = e.clientY - offset.y;
                     if (newHeight + n2Diag.layout.gapDist * 2 >= window.innerHeight * .5) {
                         newDims = {
-                            'x': d3.event.clientX - offset.x,
+                            'x': e.clientX - offset.x,
                             'y': newHeight
                         };
 
@@ -318,7 +318,7 @@ class N2UserInterface {
                     }
                 });
 
-            d3.event.preventDefault();
+            e.preventDefault();
         });
 
     }
@@ -389,11 +389,11 @@ class N2UserInterface {
      * When a node is right-clicked, collapse it if it's allowed.
      * @param {OmTreeNode} node The node that was right-clicked.
      */
-    rightClick(node) {
+    rightClick(e, node) {
         testThis(this, 'N2UserInterface', 'rightClick');
 
-        d3.event.preventDefault();
-        d3.event.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
 
         if (node.draw.minimized) {
             this.rightClickedNode = node;
@@ -418,16 +418,16 @@ class N2UserInterface {
      * @param {OmTreeNode} node The node that was alt-right-clicked.
      * @param {String} color The color of the clicked node, to use for the dialog ribbons.
      */
-    altRightClick(node, color) {
+    altRightClick(e, node, color) {
         testThis(this, 'N2UserInterface', 'altRightClick');
-        d3.event.preventDefault();
-        d3.event.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
         window.getSelection().empty();
 
         // Make sure node is collapsible and window doesn't exist yet.
         if (this.isCollapsible(node) && !node.isFilter() && 
             d3.select('#childSelect-' + node.toId()).empty()) {
-            new ChildSelectDialog(node, color); // Create the modal dialog
+            new ChildSelectDialog(e, node, color); // Create the modal dialog
         }
     }
 
@@ -453,16 +453,16 @@ class N2UserInterface {
      * React to a left-clicked node by zooming in on it.
      * @param {OmTreeNode} node The targetted node.
      */
-    leftClick(node) {
+    leftClick(e, node) {
         // Don't do it if the node is already zoomed
         if (node === this.n2Diag.zoomedElement) return;
 
         testThis(this, 'N2UserInterface', 'leftClick');
-        d3.event.preventDefault();
-        d3.event.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
 
         if (!node.hasChildren() || node.isInput()) return;
-        if (d3.event.button != 0) return;
+        if (e.button != 0) return;
         this.addBackButtonHistory();
         node.expand();
         node.draw.manuallyExpanded = true;
@@ -984,7 +984,7 @@ class ChildSelectDialog extends N2WindowDraggable {
      * @param {OmTreeNode} node The node to examine the variables of.
      * @param {String} color The color to make the window header/footer ribbons.
      */
-     constructor(node, color) {
+     constructor(e, node, color) {
         super('childSelect-' + node.toId());
         this.node = node;
         this.nodeColor = color;
@@ -995,7 +995,7 @@ class ChildSelectDialog extends N2WindowDraggable {
         
         // Don't do anything else if the node has no variables
         if ( ! this._fetchVarNames() ) { this.close(); }
-        else { this._initialSetup(); }
+        else { this._initialSetup(e); }
     }
     
     /**
@@ -1026,7 +1026,7 @@ class ChildSelectDialog extends N2WindowDraggable {
     /**
      * Configure the window structure, then call repopulate() to list the variable names.
      */
-    _initialSetup() {
+    _initialSetup(e) {
         const self = this;
 
         this.minWidth = 300;
@@ -1072,12 +1072,12 @@ class ChildSelectDialog extends N2WindowDraggable {
         this.searchContainer.select('.search-clear').on('click', e => {
             self.searchTerm = '';
             self.searchBox.property('value', '');
-            self.updateSearch(true);
+            self.updateSearch(e, true);
         });
 
         // Execute the search by clicking on the arrow button
         this.searchContainer.select('.search-perform').on('click', e => {
-            self.updateSearch(true);
+            self.updateSearch(e, true);
         });
 
         this.buttonContainer = this.body.select('div.button-container');
@@ -1098,7 +1098,7 @@ class ChildSelectDialog extends N2WindowDraggable {
         this.repopulate();
         this.resize();
         this.modal(true)
-            .moveNearMouse(d3.event)
+            .moveNearMouse(e)
             .show();
     }
 
@@ -1285,8 +1285,8 @@ class ChildSelectDialog extends N2WindowDraggable {
     }
 
     /** Update the variable list based on the provided search term. */
-    updateSearch(clicked = false) {
-        if (d3.event.keyCode == 13 || clicked) {
+    updateSearch(e, clicked = false) {
+        if (e.keyCode == 13 || clicked) {
                 this.searchTerm = this.searchBox.property('value');
                 this.repopulate();
                 this.resize();

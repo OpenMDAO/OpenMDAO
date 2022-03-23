@@ -33,7 +33,7 @@
 
     /**
      * Duplicate another Dimensions object.
-     * @param {Coords} other The object to copy from.
+     * @param {Dimensions} other The object to copy from.
      */
     copyFrom(other) {
         this.initFrom(other, other.unit, false);

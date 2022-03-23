@@ -12,7 +12,7 @@
  * @property {Object} size The dimensions of the model tree.
  * @property {Object} scales Scalers in the X and Y directions to associate the relative
  *   position of an element to actual pixel coordinates.
- * @property {Object} transitCoords
+ * @property {Object} treeSize
  */
 class Layout {
     /**
@@ -55,12 +55,12 @@ class Layout {
         this.setTransitionPermission();
 
         this.scales = {
-            model: new Scale(this.size.partitionTree),
-            firstRun: true
+            'model': new Scale(this.size.partitionTree),
+            'firstRun': true
         }
 
-        this.transitCoords = {
-            model: new Dimensions({ x: 0, y: 0})
+        this.treeSize = {
+            'model': new Dimensions({ 'width': 0, 'height': 0})
         }
     }
 
@@ -332,34 +332,97 @@ class Layout {
 
     /**
      * Calculate new dimensions for the div element enclosing the main SVG element.
-     * @returns {Object} Members width and height as strings with the unit appended.
+     * @returns {Dimensions} Members width and height.
      */
-    newOuterDims() {
-        let width = (this.size.partitionTree.width +
-            this.size.n2matrix.margin +
-            this.size.n2matrix.width +
-            this.size.n2matrix.margin);
+    calcOuterDims() {
+        const width = this.size.partitionTree.width + this.size.n2matrix.width +
+            this.size.n2matrix.margin * 2;
 
-        let height = (this.size.n2matrix.height +
-            this.size.n2matrix.margin * 2);
+        const height = this.size.n2matrix.height + this.size.n2matrix.margin * 2;
 
-        return {'width': width, 'height': height};
+        return new Dimensions({'width': width, 'height': height});
     }
 
     /**
      * Calculate new dimensions for the main SVG element.
-     * @returns {Object} Members width and height as numbers.
+     * @returns {Dimensions} Members width, height, and margin as numbers.
      */
-    newInnerDims() {
-        let width = this.size.partitionTree.width +
-            this.size.n2matrix.margin +
-            this.size.n2matrix.width +
-            this.size.n2matrix.margin;
+    calcInnerDims() {
+        const width = this.size.partitionTree.width + this.size.n2matrix.margin +
+            this.size.n2matrix.width + this.size.n2matrix.margin;
 
-        let height = this.size.partitionTree.height;
-        let margin = this.size.n2matrix.margin;
+        const height = this.size.partitionTree.height;
+        const margin = this.size.n2matrix.margin;
 
-        return {'width': width, 'height': height, 'margin': margin};
+        return new Dimensions({'width': width, 'height': height, 'margin': margin});
+    }
+
+    applyGeometryFirstRun(dom) {
+        // Update svg dimensions before size changes
+        const outerDims = this.calcOuterDims();
+        const innerDims = this.calcInnerDims();
+        const size = this.size;
+
+        dom.svgDiv
+            .style('width', `${outerDims.width}${size.unit}`)
+            .style('height', `${outerDims.height}${size.unit}`);
+
+        dom.svg
+            .attr('width', outerDims.width)
+            .attr('height', outerDims.height)
+            .attr('transform', 'translate(0,0)');
+
+        dom.pTreeGroup
+            .attr('height', innerDims.height)
+            .attr('width', size.partitionTree.width)
+            .attr('transform', `translate(0,${innerDims.margin})`);
+
+        dom.highlightBar
+            .attr('height', innerDims.height)
+            .attr('width', '8')
+            .attr('transform', `translate(${size.partitionTree.width + 1},${innerDims.margin})`);
+
+        dom.n2OuterGroup
+            .attr('height', outerDims.height)
+            .attr('width', outerDims.height)
+            .attr('transform', `translate(${size.partitionTree.width},0)`);
+
+        dom.n2InnerGroup
+            .attr('height', innerDims.height)
+            .attr('width', innerDims.height)
+            .attr('transform', `translate(${innerDims.margin},${innerDims.margin})`)
+//            .transition(sharedTransition);
+
+        dom.n2BackgroundRect
+            .attr('width', innerDims.height)
+            .attr('height', innerDims.height)
+            .attr('transform', 'translate(0,0)');
+
+        const offgridHeight = size.font + 2;
+        dom.n2Groups.offgrid.top
+            .attr('transform', `translate(${innerDims.margin},0)`)
+            .attr('width', innerDims.height)
+            .attr('height', offgridHeight);
+
+        dom.n2Groups.offgrid.bottom
+            .attr('transform', `translate(0,${innerDims.height + offgridHeight})`)
+            .attr('width', outerDims.height)
+            .attr('height', offgridHeight);
+    }
+
+    /** Recalculate the scale and apply new dimensions to diagram objects. */
+    updateGeometry(dom) {
+        this.updateGeometryValues();
+
+        if (this.scales.firstRun) { // first run, duplicate what we just calculated
+            this.scales.firstRun = false;
+            this.preservePreviousScaleValues();
+            this.applyGeometryFirstRun(dom);
+
+            return true;
+        }
+
+        return false;        
     }
 
     /**
@@ -369,69 +432,58 @@ class Layout {
      * @param {number} transitionStartDelay ms to wait before performing transition
      */
     updateTransitionInfo(dom, transitionStartDelay, manuallyResized) {
-
         sharedTransition = d3.transition()
             .duration(N2TransitionDefaults.duration)
             .delay(transitionStartDelay)
             // Hide the transition waiting animation when it ends:
             .on('end', function () { dom.waiter.attr('class', 'no-show'); });
 
-        this.transitionStartDelay = N2TransitionDefaults.startDelay;
-
-        const outerDims = this.newOuterDims();
-        const innerDims = this.newInnerDims();
+        const outerDims = this.calcOuterDims();
+        const u = outerDims.unit;
+        const innerDims = this.calcInnerDims();
 
         this.ratio = (window.innerWidth - 200) / outerDims.width;
         if (this.ratio > 1 || manuallyResized) this.ratio = 1;
         else if (this.ratio < 1)
-            debugInfo("Scaling diagram to " + Math.round(this.ratio * 100) + "%");
+            debugInfo(`Scaling diagram to ${Math.round(this.ratio * 100)}%`);
 
         dom.svgDiv
-            .style("width", (outerDims.width * this.ratio) + this.size.unit)
-            .style("height", (outerDims.height * this.ratio) + this.size.unit)
+            .style('width', `${outerDims.width * this.ratio}${u}`)
+            .style('height',`${outerDims.height * this.ratio}${u}`)
 
-        dom.svg
-            .transition(sharedTransition)
-            .style("transform", "scale(" + this.ratio + ")")
-            .attr("width", outerDims.width + this.size.unit)
-            .attr("height", outerDims.height + this.size.unit);
+        dom.svg.transition(sharedTransition)
+            .style('transform', `scale(${this.ratio})`)
+            .attr('width', `${outerDims.width}${u}`)
+            .attr('height', `${outerDims.height}${u}`);
 
-        this.gapDist = (this.size.partitionTreeGap * this.ratio) - 3;
-        this.gapSpace = this.gapDist + this.size.unit
-        d3.select('#n2-resizer-box')
-            .transition(sharedTransition)
-            .style('bottom', this.gapSpace);
+        d3.select('#n2-resizer-box').transition(sharedTransition)
+            .style('bottom', `${(this.size.partitionTreeGap * this.ratio) - 3}${u}`);
 
-        dom.pTreeGroup
-            .transition(sharedTransition)
-            .attr("height", innerDims.height)
-            .attr("width", this.size.partitionTree.width)
-            .attr("transform", "translate(0 " + innerDims.margin + ")");
+        dom.pTreeGroup.transition(sharedTransition)
+            .attr('height', innerDims.height)
+            .attr('width', this.size.partitionTree.width)
+            .attr('transform', `translate(0,${innerDims.margin})`);
 
-        dom.highlightBar
-            .transition(sharedTransition)
-            .attr("height", innerDims.height)
-            .attr("width", "8")
-            .attr("transform", "translate(" + this.size.partitionTree.width + 1 + " " + innerDims.margin + ")");
+        dom.highlightBar.transition(sharedTransition)
+            .attr('height', innerDims.height)
+            .attr('width', 8)
+            .attr('transform', `translate(${this.size.partitionTree.width + 1},${innerDims.margin})`);
 
         // Move n2 outer group to right of partition tree, spaced by the margin.
-        dom.n2OuterGroup
-            .transition(sharedTransition)
-            .attr("height", outerDims.height)
-            .attr("width", outerDims.height)
-            .attr("transform", "translate(" +
-                (this.size.partitionTree.width) + " 0)");
+        dom.n2OuterGroup.transition(sharedTransition)
+            .attr('height', outerDims.height)
+            .attr('width', outerDims.height)
+            .attr('transform', `translate(${this.size.partitionTree.width},0)`);
 
         dom.n2InnerGroup.transition(sharedTransition)
-            .attr("height", innerDims.height)
-            .attr("width", innerDims.height)
-            .attr("transform", "translate(" + innerDims.margin + " " + innerDims.margin + ")");
+            .attr('height', innerDims.height)
+            .attr('width', innerDims.height)
+            .attr('transform', `translate(${innerDims.margin},${innerDims.margin})`);
 
         dom.n2BackgroundRect.transition(sharedTransition)
-            .attr("width", innerDims.height)
-            .attr("height", innerDims.height)
-            .attr("transform", "translate(0 0)");
-
+            .attr('width', innerDims.height)
+            .attr('height', innerDims.height)
+            .attr('transform', 'translate(0,0)');
     }
 
     calcWidthBasedOnNewHeight(height) {
@@ -459,26 +511,26 @@ class Layout {
      * setting new ones.
      */
     preservePreviousScaleValues() {
-        this.transitCoords.model.preserve();
+        this.treeSize.model.preserve();
         this.scales.model.preserve();
     }
 
-    updateScaleValues() {
+    updateGeometryValues() {
         if (!this.scales.firstRun) this.preservePreviousScaleValues();
 
         const elemDims = this.zoomedElement.draw.dims;
-        const treeSize = this.size.partitionTree;
+        const initSize = this.size.partitionTree;
 
-        this.transitCoords.model.x = (elemDims.x ?
-            treeSize.width - this.size.parentNodeWidth : treeSize.width) / (1 - elemDims.x);
-        this.transitCoords.model.y = treeSize.height / elemDims.height;
+        this.treeSize.model.width = (elemDims.x ?
+            initSize.width - this.size.parentNodeWidth : initSize.width) / (1 - elemDims.x);
+        this.treeSize.model.height = initSize.height / elemDims.height;
 
         this.scales.model.x
             .domain([elemDims.x, 1])
-            .range([elemDims.x ? this.size.parentNodeWidth : 0, treeSize.width]);
+            .range([elemDims.x ? this.size.parentNodeWidth : 0, initSize.width]);
 
         this.scales.model.y
             .domain([elemDims.y, elemDims.y + elemDims.height])
-            .range([0, treeSize.height]);
+            .range([0, initSize.height]);
     }
 }

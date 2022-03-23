@@ -33,7 +33,7 @@ class N2Window {
         this._enabledModal = false;
 
         const self = this;
-        this._closeButton.on('click', e => { self.close(); })
+        this._closeButton.on('click', e => self.close(e))
 
         this.bringToFront(true);
     }
@@ -225,7 +225,7 @@ class N2Window {
     }
 
     /** Delete the window element from the document and remove the event handler. */
-    close() {
+    close(e) {
         this.closeButton.on('click', null);
         this.modal(false);
         this.window.remove();
@@ -449,13 +449,13 @@ class N2WindowDraggable extends N2Window {
     }
 
     /** Remove the mousedown event handler and call the superclass close() */
-    close() {
+    close(e) {
         this.header.on('mousedown', null);
-        super.close();
+        super.close(e);
     }
 
-    _doDragHeader() { this._doDrag('.window-header'); }
-    _doDragFooter() { this._doDrag('.window-footer'); }
+    _doDragHeader(e) { this._doDrag(e, '.window-header'); }
+    _doDragFooter(e) { this._doDrag(e, '.window-footer'); }
 
     /** Prevent the window from being dragged off the left or right of the browser. */
     _applyHorizontalBounds(testX) {
@@ -477,7 +477,7 @@ class N2WindowDraggable extends N2Window {
      * Perform the dragging operation on either header or footer. The start of the event
      * also brings the window to the front.
      */
-    _doDrag(ribbonClass) {
+    _doDrag(e, ribbonClass) {
         const self = this;
         const dragDiv = self.window;
 
@@ -485,17 +485,17 @@ class N2WindowDraggable extends N2Window {
         dragDiv.style('cursor', 'grabbing')
             .select(ribbonClass).style('cursor', 'grabbing');
 
-        const dragStart = [d3.event.pageX, d3.event.pageY];
+        const dragStart = [e.pageX, e.pageY];
         let newTrans = [0, 0];
 
         const w = d3.select(window)
             .on("mousemove", e => {
-                const x = self._applyHorizontalBounds(d3.event.pageX),
-                    y = self._applyVerticalBounds(d3.event.pageY);
+                const x = self._applyHorizontalBounds(e.pageX),
+                    y = self._applyVerticalBounds(e.pageY);
                 newTrans = [x - dragStart[0], y - dragStart[1]];
                 dragDiv.style('transform', `translate(${newTrans[0]}px, ${newTrans[1]}px)`)
             })
-            .on("mouseup", e => {
+            .on("mouseup", () => {
                 // Convert the translate to style position
                 self._setPos(self._getPos());
 
@@ -508,7 +508,7 @@ class N2WindowDraggable extends N2Window {
                 w.on("mousemove", null).on("mouseup", null);
             });
 
-        d3.event.preventDefault();
+        e.preventDefault();
     }
 
     /** Listen for the mousedown event to begin dragging the window. */
@@ -614,7 +614,7 @@ class N2WindowResizable extends N2WindowDraggable {
                 .attr('class', `rsz-${name} rsz-${resizerClassNames[name]}`);
 
             const dirs = name.split('-'); // From class name, figure out which directions to handle
-            resizer.on('mousedown', function () {
+            resizer.on('mousedown', e => {
                 const startDims = self._getPos();
                 self.bringToFront();
 
@@ -622,16 +622,16 @@ class N2WindowResizable extends N2WindowDraggable {
                 self.modal(true, `background-color: none; opacity: 0; cursor: ${cursor};`)
                     ._lockCursor(cursor);
 
-                const dragStart = [d3.event.pageX, d3.event.pageY];
+                const dragStart = [e.pageX, e.pageY];
                 let newPos = [0, 0]; // Delta values of the current mouse position vs. start position
                 let newSize = {}; // Object to store newly computed positions in
 
                 const w = d3.select(window)
                     .on("mousemove", e => {
-                        d3.event.stopPropagation();
-                        d3.event.preventDefault();
+                        e.stopPropagation();
+                        e.preventDefault();
 
-                        newPos = [d3.event.pageX - dragStart[0], d3.event.pageY - dragStart[1]];
+                        newPos = [e.pageX - dragStart[0], e.pageY - dragStart[1]];
                         Object.assign(newSize, startDims)
 
                         for (let i in dirs) { // One iter for straight, two for diag
@@ -661,7 +661,7 @@ class N2WindowResizable extends N2WindowDraggable {
 
                         self._setPos(newSize);
                     })
-                    .on("mouseup", e => {
+                    .on("mouseup", () => {
                         w.on("mousemove", null).on("mouseup", null);
                         self.modal(false);
                         self._lockCursor(null);

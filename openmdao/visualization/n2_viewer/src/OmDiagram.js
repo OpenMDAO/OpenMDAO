@@ -40,21 +40,6 @@ class OmDiagram extends Diagram {
         this.dom.clips.solverTree = d3.select("#solverTreeClip > rect");
     }
 
-    /** Recalculate the scale and apply new dimensions to diagram objects. Adds solver handling. */
-    _updateScale() {
-        if (super._updateScale()) {
-            const innerDims = this.layout.newInnerDims();
-
-            const x = this.dims.size.partitionTree.width + innerDims.margin +
-                innerDims.height + innerDims.margin;
-            const y = innerDims.margin;
-
-            this.dom.pSolverTreeGroup
-                .attr("height", innerDims.height)
-                .attr("transform", `translate(${x},${y})`);
-        }
-    }
-
     /** Add SVG groups & contents coupled to the visible nodes in the trees. */
     _updateTreeCells() {
         super._updateTreeCells();
@@ -81,11 +66,13 @@ class OmDiagram extends Diagram {
      * @param {Object} selection The selected group of solver tree <g> elements.
      */
     _addNewSolverCells(selection) {
-        const self = this; // For callbacks that change "this". Alternative to using .bind().
+        const self = this; // For callbacks that change "this".
         const scale = this.layout.scales.solver.prev;
-        const transitCoords = this.layout.transitCoords.solver.prev;  
+        const prevSize = this.layout.treeSize.solver.prev;  
 
         // Create a <g> for each node in zoomedSolverNodes that doesn't already have one.
+        // Dimensions are obtained from the previous geometry so the new nodes can appear
+        // to transition to the new size together with the existing nodes.
         const enterSelection = selection.enter()
             .append("g")
             .attr("class", d => {
@@ -94,18 +81,18 @@ class OmDiagram extends Diagram {
                 return `${solver_class} solver_group ${self.style.getNodeClass(d)}`;
             })
             .attr("transform", d => {
-
-                const x = 1.0 - d.draw.solverDims.prev.x - d.draw.solverDims.prev.width;
                 // The magic for reversing the blocks on the right side
                 // The solver tree goes from the root on the right and expands to the left
+                const x = 1.0 - d.draw.solverDims.prev.x - d.draw.solverDims.prev.width;
+
                 return `translate(${scale.x(x)},${scale.y(d.draw.solverDims.prev.y)})`;
             });
 
         enterSelection // Add event handlers.
-            .on("click", function(d) {self.leftClickSelector(this, d)})
-            .on("contextmenu", function (d) { self.ui.rightClick(d, this)})
-            .on("mouseover", function(d) {
-                self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'), true)
+            .on("click", function(e,d) {self.leftClickSelector(this, d)})
+            .on("contextmenu", function (e,d) { self.ui.rightClick(d, this)})
+            .on("mouseover", function(e,d) {
+                self.ui.nodeInfoBox.update(e, d, d3.select(this).select('rect').style('fill'), true);
 
                 if (self.model.abs2prom != undefined) {
                     if (d.isInput()) {
@@ -118,35 +105,37 @@ class OmDiagram extends Diagram {
                     }
                 }
             })
-            .on("mouseleave", d => {
+            .on("mouseleave", () => {
                 self.ui.nodeInfoBox.clear();
 
                 if (self.model.abs2prom != undefined) {
                     self.dom.toolTip.style("visibility", "hidden");
                 }
             })
-            .on("mousemove", () => {
-                self.ui.nodeInfoBox.moveNearMouse(d3.event);
+            .on("mousemove", (e) => {
+                self.ui.nodeInfoBox.moveNearMouse(e);
 
                 if (self.model.abs2prom != undefined) {
-                    self.dom.toolTip.style("top", (d3.event.pageY - 30) + "px")
-                        .style("left", (d3.event.pageX + 5) + "px");
+                    self.dom.toolTip.style("top", (e.pageY - 30) + "px")
+                        .style("left", (e.pageX + 5) + "px");
                 }
             });
 
         enterSelection // Add the visible rectangle
             .append("rect")
-            .attr("width", d => d.draw.solverDims.prev.width * transitCoords.x)
-            .attr("height", d => d.draw.solverDims.prev.height * transitCoords.y)
-            .attr("id", d => d.absPathName.replace(/\./g, '_'));
+            .attr("width", d => d.draw.solverDims.prev.width * prevSize.width)
+            .attr("height", d => d.draw.solverDims.prev.height * prevSize.height)
+            .attr("id", d => d.absPathName.replace(/\./g, '_'))
+            .attr('rx', 12)
+            .attr('ry', 12);
 
         enterSelection // Add a label
             .append("text")
             .attr("dy", ".35em")
             .attr("transform", d => {
-                const anchorX = d.draw.solverDims.prev.width * transitCoords.x -
+                const anchorX = d.draw.solverDims.prev.width * prevSize.width -
                     self.layout.size.rightTextMargin;
-                return `translate(${anchorX},${d.draw.solverDims.prev.height*transitCoords.y / 2})`;
+                return `translate(${anchorX},${d.draw.solverDims.prev.height * prevSize.height / 2})`;
             })
             .style("opacity", d => (d.depth < self.zoomedElement.depth)? 0 : d.textOpacity)
             .text(self.layout.getSolverText.bind(self.layout));
@@ -162,47 +151,37 @@ class OmDiagram extends Diagram {
     _mergeSolverCells(selection, enterSelection) {
         const self = this; // For callbacks that change "this". Alternative to using .bind().
         const scale = this.layout.scales.solver;
-        const transitCoords = this.layout.transitCoords.solver;
+        const treeSize = this.layout.treeSize.solver;
 
         this.dom.clips.solverTree
             .transition(sharedTransition)
             .attr('height', this.dims.size.solverTree.height);
 
-        const mergedSelection = enterSelection.merge(selection).transition(sharedTransition);
-
-        mergedSelection
-            .attr("class", d => {
-                const solver_class = self.style.getSolverClass(self.showLinearSolverNames, {
-                    'linear': d.linear_solver,
-                    'nonLinear': d.nonlinear_solver
-                });
-                return `${solver_class} solver_group ${self.style.getNodeClass(d)}`;
-            })
+        // New location for each group
+        const mergedSelection = enterSelection.merge(selection)
+            .transition(sharedTransition)
             .attr("transform", d => {
-                const x = 1.0 - d.draw.solverDims.x - d.draw.solverDims.width;
                 // The magic for reversing the blocks on the right side
+                const x = 1.0 - d.draw.solverDims.x - d.draw.solverDims.width;
 
                 return `translate(${scale.x(x)},${scale.y(d.draw.solverDims.y)})`;
             });
 
+        // Resize each rectangle      
         mergedSelection
             .select("rect")
-            .attr("width", d => d.draw.solverDims.width * transitCoords.x)
-            .attr("height", d => d.draw.solverDims.height * transitCoords.y)
-            .attr('rx', 12)
-            .attr('ry', 12);
+            .attr("width", d => d.draw.solverDims.width * treeSize.width)
+            .attr("height", d => d.draw.solverDims.height * treeSize.height);
 
-        mergedSelection
+         // Move the text label
+         mergedSelection
             .select("text")
             .attr("transform", d => {
-                const anchorX = d.draw.solverDims.width * transitCoords.x -
+                const anchorX = d.draw.solverDims.width * treeSize.width -
                     self.layout.size.rightTextMargin;
-                return `translate(${anchorX},${d.draw.solverDims.height * transitCoords.y / 2})`;
+                return `translate(${anchorX},${d.draw.solverDims.height * treeSize.height / 2})`;
             })
-            .style("opacity", d => (d.depth < self.zoomedElement.depth)? 0 : d.textOpacity)
-            .text(self.layout.getSolverText.bind(self.layout));
-
-    }
+            .style("opacity", d => (d.depth < self.zoomedElement.depth)? 0 : d.textOpacity);    }
 
     /**
      * Remove <g> that no longer have displayable nodes associated with them, and
@@ -212,25 +191,24 @@ class OmDiagram extends Diagram {
     _removeOldSolverCells(selection) {
         const self = this; // For callbacks that change "this". Alternative to using .bind().
         const scale = this.layout.scales.solver; 
-        const transitCoords = this.layout.transitCoords.solver;
+        const treeSize = this.layout.treeSize.solver;
 
         // Transition exiting nodes to the parent's new position.
-        const exitSelection = selection.exit().transition(sharedTransition);
-
-        exitSelection
+        const exitSelection = selection.exit()
+            .transition(sharedTransition)
             .attr("transform", d =>
                 `translate(${scale.x(d.draw.solverDims.x)},${scale.y(d.draw.solverDims.y)})`)
             .remove();
 
         exitSelection.select("rect")
-            .attr("width", d => d.draw.solverDims.width * transitCoords.x)
-            .attr("height", d => d.draw.solverDims.height * transitCoords.y);
+            .attr("width", d => d.draw.solverDims.width * treeSize.width)
+            .attr("height", d => d.draw.solverDims.height * treeSize.height);
 
         exitSelection.select("text")
             .attr("transform", d => {
-                const anchorX = d.draw.solverDims.width * transitCoords.x -
+                const anchorX = d.draw.solverDims.width * treeSize.width -
                     self.layout.size.rightTextMargin;
-                return `translate(${anchorX},${d.draw.solverDims.height * transitCoords.y / 2})`;
+                return `translate(${anchorX},${d.draw.solverDims.height * treeSize.height / 2})`;
             })
             .style("opacity", 0);
     }
