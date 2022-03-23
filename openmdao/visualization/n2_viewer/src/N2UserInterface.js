@@ -239,7 +239,6 @@ class N2UserInterface {
         const body = d3.select('body');
 
         handle.on('mousedown', e => {
-            console.log(n2Diag.layout.gapSpace)
             box
                 .style('top', n2Diag.layout.gapSpace)
                 .style('bottom', n2Diag.layout.gapSpace);

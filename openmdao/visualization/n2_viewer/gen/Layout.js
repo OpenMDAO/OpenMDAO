@@ -299,7 +299,7 @@ class Layout {
             }
         }
 
-        node.preserveDims(false, leafCounter);
+        node.preserveDims(leafCounter);
         const workNode = (earliestMinimizedParent) ? earliestMinimizedParent : node;
         const dims = node.draw.dims;
 
@@ -390,8 +390,7 @@ class Layout {
         dom.n2InnerGroup
             .attr('height', innerDims.height)
             .attr('width', innerDims.height)
-            .attr('transform', `translate(${innerDims.margin},${innerDims.margin})`)
-//            .transition(sharedTransition);
+            .attr('transform', `translate(${innerDims.margin},${innerDims.margin})`);
 
         dom.n2BackgroundRect
             .attr('width', innerDims.height)
@@ -429,14 +428,15 @@ class Layout {
      * Update container element dimensions when a new layout is calculated,
      * and set up transitions.
      * @param {Object} dom References to HTML elements.
-     * @param {number} transitionStartDelay ms to wait before performing transition
+     * @param {Number} transitionStartDelay ms to wait before performing transition
+     * @param {Boolean} manuallyResized Have the diagram dimensions have been changed through UI
      */
     updateTransitionInfo(dom, transitionStartDelay, manuallyResized) {
-        sharedTransition = d3.transition()
+        sharedTransition = d3.transition('global')
             .duration(N2TransitionDefaults.duration)
             .delay(transitionStartDelay)
             // Hide the transition waiting animation when it ends:
-            .on('end', function () { dom.waiter.attr('class', 'no-show'); });
+            .on('end', () => dom.waiter.attr('class', 'no-show'));
 
         const outerDims = this.calcOuterDims();
         const u = outerDims.unit;

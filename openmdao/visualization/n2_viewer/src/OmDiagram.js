@@ -12,6 +12,7 @@ class OmDiagram extends Diagram {
         super(modelJSON);
     }
 
+    /** Override Diagram._newLayout() to create an OmLayout object. */
     _newLayout() {
         if (this.showLinearSolverNames === undefined)
             this.showLinearSolverNames = true;
@@ -52,45 +53,41 @@ class OmDiagram extends Diagram {
         no longer a displayable node for it, put it in the "exit" selection so
         it can be removed:
         */
-        const selection = this.dom.pSolverTreeGroup.selectAll("g.solver_group")
-            .data(this.layout.zoomedSolverNodes, d => d.id);
+        const self = this;
+        const scale = this.layout.scales.solver;
+        const treeSize = this.layout.treeSize.solver;
 
-        const enterSelection = this._addNewSolverCells(selection);
-        this._mergeSolverCells(selection, enterSelection);
-        this._removeOldSolverCells(selection);
+        this.dom.pSolverTreeGroup.selectAll("g.solver_group")
+            .data(this.layout.zoomedSolverNodes, d => d.id)
+            .join(
+                enter => self._addNewSolverCells(enter, scale, treeSize),
+                update => self._updateExistingSolverCells(update, scale, treeSize),
+                exit => self._removeOldSolverCells(exit, scale, treeSize)
+            )
     }
 
     /**
      * Using the visible nodes in the solver tree as data points, create SVG objects to
      * represent each one. Dimensions are obtained from the precalculated layout.
-     * @param {Object} selection The selected group of solver tree <g> elements.
+     * @param {Object} enter The selection to add <g> elements and children to.
+     * @param {Scale} scale Linear scales of the diagram width and height.
+     * @param {Dimensions} treeSize Actual width and height of the tree in pixels.
      */
-    _addNewSolverCells(selection) {
+    _addNewSolverCells(enter, scale, treeSize) {
         const self = this; // For callbacks that change "this".
-        const scale = this.layout.scales.solver.prev;
-        const prevSize = this.layout.treeSize.solver.prev;  
 
         // Create a <g> for each node in zoomedSolverNodes that doesn't already have one.
         // Dimensions are obtained from the previous geometry so the new nodes can appear
         // to transition to the new size together with the existing nodes.
-        const enterSelection = selection.enter()
+        const enterSelection = enter
             .append("g")
             .attr("class", d => {
                 const solver_class = self.style.getSolverClass(self.showLinearSolverNames,
                     { 'linear': d.linear_solver, 'nonLinear': d.nonlinear_solver });
                 return `${solver_class} solver_group ${self.style.getNodeClass(d)}`;
             })
-            .attr("transform", d => {
-                // The magic for reversing the blocks on the right side
-                // The solver tree goes from the root on the right and expands to the left
-                const x = 1.0 - d.draw.solverDims.prev.x - d.draw.solverDims.prev.width;
-
-                return `translate(${scale.x(x)},${scale.y(d.draw.solverDims.prev.y)})`;
-            });
-
-        enterSelection // Add event handlers.
-            .on("click", function(e,d) {self.leftClickSelector(this, d)})
-            .on("contextmenu", function (e,d) { self.ui.rightClick(d, this)})
+            .on("click", function(e,d) {self.leftClickSelector(e, this, d)})
+            .on("contextmenu", function (e,d) { self.ui.rightClick(e, d)})
             .on("mouseover", function(e,d) {
                 self.ui.nodeInfoBox.update(e, d, d3.select(this).select('rect').style('fill'), true);
 
@@ -121,44 +118,57 @@ class OmDiagram extends Diagram {
                 }
             });
 
+        enterSelection
+            .transition(sharedTransition)
+            .attr("transform", d => {
+                // The magic for reversing the blocks on the right side
+                // The solver tree goes from the root on the right and expands to the left
+                const x = 1.0 - d.draw.solverDims.x - d.draw.solverDims.width;
+
+                return `translate(${scale.x(x)},${scale.y(d.draw.solverDims.y)})`;
+            })
+
         enterSelection // Add the visible rectangle
             .append("rect")
-            .attr("width", d => d.draw.solverDims.prev.width * prevSize.width)
-            .attr("height", d => d.draw.solverDims.prev.height * prevSize.height)
+            .transition(sharedTransition)
+            .attr("width", d => d.draw.solverDims.width * treeSize.width)
+            .attr("height", d => d.draw.solverDims.height * treeSize.height)
             .attr("id", d => d.absPathName.replace(/\./g, '_'))
             .attr('rx', 12)
             .attr('ry', 12);
 
         enterSelection // Add a label
             .append("text")
+            .text(self.layout.getSolverText.bind(self.layout))
+            .style('visibility', 'hidden')
             .attr("dy", ".35em")
             .attr("transform", d => {
-                const anchorX = d.draw.solverDims.prev.width * prevSize.width -
+                const anchorX = d.draw.solverDims.width * treeSize.width -
                     self.layout.size.rightTextMargin;
-                return `translate(${anchorX},${d.draw.solverDims.prev.height * prevSize.height / 2})`;
+                return `translate(${anchorX},${d.draw.solverDims.height * treeSize.height / 2})`;
             })
             .style("opacity", d => (d.depth < self.zoomedElement.depth)? 0 : d.textOpacity)
-            .text(self.layout.getSolverText.bind(self.layout));
+            .transition(sharedTransition)
+            .on('end', function() { d3.select(this).style('visibility', 'visible'); } )
 
         return enterSelection;
     }
 
     /**
-     * Merge the existing <g> with the newly created nodes. Enable a transition from
-     * the old locations to the new ones.
-     * @param {Object} selection The selected group of solver tree <g> elements.
+     * Update the geometry for existing <g> with a transition.
+     * @param {Object} update The selected group of existing solver tree <g> elements.
+     * @param {Scale} scale Linear scales of the diagram width and height.
+     * @param {Dimensions} treeSize Actual width and height of the tree in pixels.
      */
-    _mergeSolverCells(selection, enterSelection) {
-        const self = this; // For callbacks that change "this". Alternative to using .bind().
-        const scale = this.layout.scales.solver;
-        const treeSize = this.layout.treeSize.solver;
+     _updateExistingSolverCells(update, scale, treeSize) {
+        const self = this; // For callbacks that change "this".
 
         this.dom.clips.solverTree
             .transition(sharedTransition)
             .attr('height', this.dims.size.solverTree.height);
 
         // New location for each group
-        const mergedSelection = enterSelection.merge(selection)
+        const mergedSelection = update
             .transition(sharedTransition)
             .attr("transform", d => {
                 // The magic for reversing the blocks on the right side
@@ -174,31 +184,32 @@ class OmDiagram extends Diagram {
             .attr("height", d => d.draw.solverDims.height * treeSize.height);
 
          // Move the text label
-         mergedSelection
+        mergedSelection
             .select("text")
             .attr("transform", d => {
                 const anchorX = d.draw.solverDims.width * treeSize.width -
                     self.layout.size.rightTextMargin;
                 return `translate(${anchorX},${d.draw.solverDims.height * treeSize.height / 2})`;
             })
-            .style("opacity", d => (d.depth < self.zoomedElement.depth)? 0 : d.textOpacity);    }
+            .style("opacity", d => (d.depth < self.zoomedElement.depth)? 0 : d.textOpacity);
+
+        return mergedSelection;
+    }
 
     /**
      * Remove <g> that no longer have displayable nodes associated with them, and
      * transition them away.
-     * @param {Object} selection The selected group of solver tree <g> elements.
+     * @param {Object} exit The selected group of solver tree <g> elements to remove.
+     * @param {Scale} scale Linear scales of the diagram width and height.
+     * @param {Dimensions} treeSize Actual width and height of the tree in pixels.
      */
-    _removeOldSolverCells(selection) {
-        const self = this; // For callbacks that change "this". Alternative to using .bind().
-        const scale = this.layout.scales.solver; 
-        const treeSize = this.layout.treeSize.solver;
+    _removeOldSolverCells(exit, scale, treeSize) {
+        const self = this; // For callbacks that change "this".
 
         // Transition exiting nodes to the parent's new position.
-        const exitSelection = selection.exit()
-            .transition(sharedTransition)
+        const exitSelection = exit.transition(sharedTransition)
             .attr("transform", d =>
                 `translate(${scale.x(d.draw.solverDims.x)},${scale.y(d.draw.solverDims.y)})`)
-            .remove();
 
         exitSelection.select("rect")
             .attr("width", d => d.draw.solverDims.width * treeSize.width)
@@ -211,6 +222,10 @@ class OmDiagram extends Diagram {
                 return `translate(${anchorX},${d.draw.solverDims.height * treeSize.height / 2})`;
             })
             .style("opacity", 0);
+
+        exitSelection.on('end', function() {d3.select(this).remove(); })
+
+        return exitSelection;
     }
 
     showDesignVars() {

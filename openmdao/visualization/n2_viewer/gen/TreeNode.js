@@ -17,9 +17,6 @@ class NodeDisplayData {
         this.dims = new Dimensions({ x: 1e-6, y: 1e-6, width: 1, height: 1 });
         this.dims.preserve();
     }
-
-    /** Copy the current dims to the previous ones */
-    preserveDims() { this.dims.preserve(); }
 }
 
 /**
@@ -79,7 +76,7 @@ class TreeNode {
      * @param {number} leafNum Identify this as the nth leaf of the tree
      */
     preserveDims(leafNum) {
-        this.draw.preserveDims();
+        this.draw.dims.preserve();
 
         if (this.rootIndex < 0) this.rootIndex = leafNum;
         this.prevRootIndex = this.rootIndex;

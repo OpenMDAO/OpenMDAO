@@ -206,54 +206,61 @@ class Diagram {
         no longer a displayable node for it, put it in the "exit" selection so
         it can be removed:
         */
-        const selection = this.dom.pTreeGroup.selectAll(".partition_group")
-            .data(this.layout.zoomedNodes, d => d.id);
-        
-        const enterSelection = this._addNewTreeCells(selection);
-        this._mergeTreeCells(selection, enterSelection);
-        this._removeOldTreeCells(selection);
+        const self = this;
+        const scale = this.layout.scales.model;
+        const treeSize = this.layout.treeSize.model;
+
+        this.dom.pTreeGroup.selectAll("g.partition_group")
+            .data(this.layout.zoomedNodes, d => d.id)
+            .join(
+                enter => self._addNewTreeCells(enter, scale, treeSize),
+                update => self._updateExistingTreeCells(update, scale, treeSize),
+                exit => self._removeOldTreeCells(exit, scale, treeSize)
+            )
     }
 
     /**
      * Using the visible nodes in the model tree as data points, create SVG objects to
      * represent each one. Dimensions are obtained from the precalculated layout.
-     * @param {Object} selection The selected group of model tree <g> elements.
+     * @param {Object} enter The selection to add <g> elements and children to.
+     * @param {Scale} scale Linear scales of the diagram width and height.
+     * @param {Dimensions} treeSize Actual width and height of the tree in pixels.
      */
-     _addNewTreeCells(selection) {
+     _addNewTreeCells(enter, scale, treeSize) {
         const self = this; // For callbacks that might change "this".
-        const prevScale = this.layout.scales.model.prev;
-        const prevSize = this.layout.treeSize.model.prev;        
-
+      
         // Create a <g> for each node in zoomedNodes that doesn't already have one. Dimensions
         // are obtained from the previous geometry so the new nodes can appear to transition
         // to the new size together with the existing nodes.
-        const enterSelection = selection.enter()
+        const enterSelection = enter
             .append("g")
             .attr("class", d => `partition_group ${self.style.getNodeClass(d)}`)
-            .attr("transform", d =>
-                `translate(${prevScale.x(d.draw.dims.prev.x)},${prevScale.y(d.draw.dims.prev.y)})`);
-
-        enterSelection // Add event handlers
             .on("click", function(e,d) { self.leftClickSelector(e, this, d); })
             .on("contextmenu", function(e,d) {
                 if (e.altKey) {
-                    self.ui.altRightClick(d, d3.select(this).select('rect').style('fill'));
+                    self.ui.altRightClick(e, d, d3.select(this).select('rect').style('fill'));
                 }
                 else {
-                    self.ui.rightClick(d, this);
+                    self.ui.rightClick(e, d);
                 }
             })
-            .on("mouseover", function(e,d) {
+            .on("mouseover", function(e, d) {
                 self.ui.nodeInfoBox.update(e, d, d3.select(this).select('rect').style('fill'))
             })
             .on("mouseleave", () => self.ui.nodeInfoBox.clear())
             .on("mousemove", e => self.ui.nodeInfoBox.moveNearMouse(e));
 
+        enterSelection
+            .transition(sharedTransition)
+            .attr("transform", d =>
+                `translate(${scale.x(d.draw.dims.x)},${scale.y(d.draw.dims.y)})`)
+
         // Add the rectangle that is the visible shape.
         enterSelection
             .append("rect")
-            .attr("width", d => d.draw.dims.prev.width * prevSize.width)
-            .attr("height", d => d.draw.dims.prev.height * prevSize.height)
+            .transition(sharedTransition)
+            .attr("width", d => d.draw.dims.width * treeSize.width)
+            .attr("height", d => d.draw.dims.height * treeSize.height)
             .attr("id", d => TreeNode.pathToId(d.path))
             .attr('rx', 12)
             .attr('ry', 12);
@@ -261,37 +268,39 @@ class Diagram {
         // Add a label
         enterSelection
             .append("text")
+            .text(self.layout.getText.bind(self.layout))
+            .style('visibility', 'hidden')
             .attr("dy", ".35em")
             .attr("transform", d => {
-                const anchorX = d.draw.dims.prev.width * prevSize.width -
+                const anchorX = d.draw.dims.width * treeSize.width -
                     self.layout.size.rightTextMargin;
-                return `translate(${anchorX}, ${(d.draw.dims.prev.height * prevSize.height / 2)})`;
+                return `translate(${anchorX}, ${(d.draw.dims.height * treeSize.height / 2)})`;
             })
             .style("opacity", d => (d.depth < self.zoomedElement.depth)? 0 : d.textOpacity)
-            .text(self.layout.getText.bind(self.layout));
+            .transition(sharedTransition)
+            .on('end', function() { d3.select(this).style('visibility', 'visible'); } )
 
         return enterSelection;
     }
 
     /**
-     * Merge the existing <g> with the newly created nodes. Enable a transition from
-     * the old locations to the new ones.
-     * @param {Object} selection The selected group of model tree <g> elements.
+     * Update the geometry for existing <g> with a transition.
+     * @param {Object} update The selected group of existing model tree <g> elements.
+     * @param {Scale} scale Linear scales of the diagram width and height.
+     * @param {Dimensions} treeSize Actual width and height of the tree in pixels.
      */
-     _mergeTreeCells(selection, enterSelection) {
+     _updateExistingTreeCells(update, scale, treeSize) {
         const self = this; // For callbacks that change "this".
-        const scale = this.layout.scales.model;
-        const treeSize = this.layout.treeSize.model;
 
         this.dom.clips.partitionTree
             .transition(sharedTransition)
             .attr('height', this.dims.size.partitionTree.height);
 
         // New location for each group
-        const mergedSelection = enterSelection.merge(selection)
+        const mergedSelection = update
             .transition(sharedTransition)
             .attr("transform", d => 
-                `translate(${scale.x(d.draw.dims.x)}, ${scale.y(d.draw.dims.y)})`);
+                `translate(${scale.x(d.draw.dims.x)} ${scale.y(d.draw.dims.y)})`);
 
         // Resize each rectangle
         mergedSelection
@@ -305,31 +314,31 @@ class Diagram {
             .attr("transform", d => {
                 const anchorX = d.draw.dims.width * treeSize.width -
                     self.layout.size.rightTextMargin;
-                return `translate(${anchorX}, ${(d.draw.dims.height * treeSize.height/2)})`;
+                return `translate(${anchorX} ${(d.draw.dims.height * treeSize.height/2)})`;
             })
             .style("opacity", d => (d.depth < self.zoomedElement.depth)? 0 : d.textOpacity);
+
+        return mergedSelection;
     }
 
     /**
      * Remove <g> that no longer have displayable nodes associated with them, and
      * transition them away.
-     * @param {Object} selection The selected group of model tree <g> elements.
+     * @param {Object} exit The selected group of model tree <g> elements to remove.
+     * @param {Scale} scale Linear scales of the diagram width and height.
+     * @param {Dimensions} treeSize Actual width and height of the tree in pixels.
      */
-    _removeOldTreeCells(selection) {
+    _removeOldTreeCells(exit, scale, treeSize) {
         const self = this; // For callbacks that change "this". Alternative to using .bind().
-        const scale = this.layout.scales.model; 
-        const treeSize = this.layout.treeSize.model;
 
         // Transition exiting nodes to the parent's new position.
-        const exitSelection = selection.exit()
-            .transition(sharedTransition)
+        const exitSelection = exit.transition(sharedTransition)
             .attr("transform", d => 
-                `translate(${scale.x(d.draw.dims.x)},${scale.y(d.draw.dims.y)})`)
-            .remove();
+                `translate(${scale.x(d.draw.dims.x)} ${scale.y(d.draw.dims.y)})`);
 
         exitSelection.select("rect")
             .attr("width", d => d.draw.dims.width * treeSize.width)
-            .attr("height", d => d.draw.dims.height * treeSize.height);
+            .attr("height", d => d.draw.dims.height * treeSize.height)
 
         exitSelection.select("text")
             .attr("transform", d => {
@@ -337,7 +346,11 @@ class Diagram {
                     self.layout.size.rightTextMargin;
                 return `translate(${anchorX}, ${(d.draw.dims.height * treeSize.height / 2)})`;
             })
-            .style("opacity", 0);
+            .style("opacity", 0)
+
+        exitSelection.on('end', function() {d3.select(this).remove(); })
+
+        return exitSelection;
     }
 
     /** Remove all rects in the highlight bar */

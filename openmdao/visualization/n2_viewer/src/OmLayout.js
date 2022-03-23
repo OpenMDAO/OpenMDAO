@@ -143,7 +143,7 @@ class OmLayout extends Layout {
             }
         }
 
-        node.preserveDims(true, leafCounter);
+        node.preserveSolverDims(leafCounter);
         const workNode = (earliestMinimizedParent) ? earliestMinimizedParent : node;
         const dims = node.draw.solverDims;
 

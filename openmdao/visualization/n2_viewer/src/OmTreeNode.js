@@ -11,15 +11,6 @@ class OmNodeDisplayData extends NodeDisplayData {
         this.solverDims = new Dimensions({ x: 1e-6, y: 1e-6, width: 1, height: 1 });
         this.solverDims.preserve();
     }
-
-    /**
-     * Copy the current model or solver dims to the previous ones.
-     * @param {Boolean} solver True if the solver dims should be copied.
-     */
-    preserveDims(solver) {
-        if (solver) this.solverDims.preserve();
-        else super.preserveDims();
-    }
 }
 
 /**
@@ -83,11 +74,10 @@ class OmTreeNode extends TreeNode {
 
     /**
      * Create a backup of our position and other info.
-     * @param {boolean} solver Whether to use .dims or .solverDims.
      * @param {number} leafNum Identify this as the nth leaf of the tree
      */
-     preserveDims(solver, leafNum) {
-        this.draw.preserveDims(solver);
+     preserveSolverDims(leafNum) {
+        this.draw.solverDims.preserve();
 
         if (this.rootIndex < 0) this.rootIndex = leafNum;
         this.prevRootIndex = this.rootIndex;
