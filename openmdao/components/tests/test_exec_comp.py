@@ -1412,6 +1412,32 @@ class TestExecComp(unittest.TestCase):
         assert_almost_equal(p.get_val('z'), 8.7, 1e-8)
         assert_almost_equal(p.get_val('y'), 3.0, 1e-8)
 
+    def test_val_type(self):
+        class ConfigGroup(om.Group):
+            def setup(self):
+                excomp = om.ExecComp('y=x',
+                                     x={'val': 3.0, 'units': 'mm'},
+                                     y={'shape': (1,), 'units': 'cm'})
+
+                self.add_subsystem('excomp', excomp, promotes=['*'])
+
+            def configure(self):
+                self.excomp.add_expr('z = 2.9*x',
+                                     z={'shape': (1,), 'units': 's'})
+
+        p = om.Problem()
+        p.model.add_subsystem('sub', ConfigGroup(), promotes=['*'])
+        p.setup()
+
+        # check that 'val' has been saved as a numpy array (see issue #2415)
+        abs2meta = p.model._var_abs2meta
+        for typ in ['input', 'output']:
+            for abs_name in abs2meta[typ]:
+                val = abs2meta[typ][abs_name]['val']
+                if not isinstance(val, np.ndarray):
+                    self.fail(f"The {typ} variable '{abs_name}' has a value of {val} "
+                              f"with type {type(val)}, but it should be a numpy array.")
+
 
 class TestFunctionRegistration(unittest.TestCase):
 

@@ -313,7 +313,7 @@ class ExecComp(ExplicitComponent):
         self._requires_fd = {}
 
         # find all of the variables and which ones are outputs
-        for i, (onames, names) in enumerate(exprs_info):
+        for onames, names in exprs_info:
             outs.update(onames)
             allvars.update(names[0])
             if _not_complex_safe.intersection(names[1]):
@@ -433,7 +433,9 @@ class ExecComp(ExplicitComponent):
 
                 new_val = kwargs[var].get('val')
                 if new_val is not None:
-                    current_meta['val'] = new_val
+                    # val is normally ensured to be a numpy array in add_input/add_output,
+                    # do the same here...
+                    current_meta['val'] = np.atleast_1d(new_val)
             else:
                 # new input and/or output.
                 if var in outs:
