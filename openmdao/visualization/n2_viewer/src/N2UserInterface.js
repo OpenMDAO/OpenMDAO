@@ -239,6 +239,7 @@ class N2UserInterface {
         const body = d3.select('body');
 
         handle.on('mousedown', e => {
+            console.log(n2Diag.layout.gapSpace)
             box
                 .style('top', n2Diag.layout.gapSpace)
                 .style('bottom', n2Diag.layout.gapSpace);
@@ -246,22 +247,21 @@ class N2UserInterface {
             handle.attr('class', 'active-resizer-handle');
             box.attr('class', 'active-resizer-box');
 
-            const startPos = {
-                'x': e.clientX,
-                'y': e.clientY
-            };
-            const startDims = {
-                'width': parseInt(box.style('width')),
-                'height': parseInt(box.style('height'))
-            };
-            const offset = {
-                'x': startPos.x - startDims.width,
-                'y': startPos.y - startDims.height
-            };
-            let newDims = {
-                'x': startDims.width,
-                'y': startDims.height
-            };
+            const startPos = new Dimensions({ x: e.clientX, y: e.clientY });
+            const startDims = new Dimensions({
+                width: parseInt(box.style('width')),
+                height: parseInt(box.style('height'))
+            });
+            const offset = new Dimensions({
+                x: startPos.x - startDims.width,
+                y: startPos.y - startDims.height
+            });
+
+            // Reassigned by mousemove:
+            let newDims = new Dimensions({
+                x: startDims.width,
+                y: startDims.height
+            });
 
             handle.html(Math.round(newDims.x) + ' x ' + newDims.y);
 
@@ -296,10 +296,7 @@ class N2UserInterface {
                 .on('mousemove', e => {
                     const newHeight = e.clientY - offset.y;
                     if (newHeight + n2Diag.layout.gapDist * 2 >= window.innerHeight * .5) {
-                        newDims = {
-                            'x': e.clientX - offset.x,
-                            'y': newHeight
-                        };
+                        newDims = new Dimensions({ x: e.clientX - offset.x, y: newHeight});
 
                         // Maintain the ratio by only resizing in the least moved direction
                         // and resizing the other direction by a fraction of that
@@ -310,10 +307,7 @@ class N2UserInterface {
                             newDims.x = n2Diag.layout.calcWidthBasedOnNewHeight(newDims.y);
                         }
 
-                        box
-                            .style('width', newDims.x + 'px')
-                            .style('height', newDims.y + 'px');
-
+                        box.style('width', newDims.x + 'px').style('height', newDims.y + 'px');
                         handle.html(Math.round(newDims.x) + ' x ' + newDims.y);
                     }
                 });

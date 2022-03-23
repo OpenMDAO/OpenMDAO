@@ -456,8 +456,11 @@ class Layout {
             .attr('width', `${outerDims.width}${u}`)
             .attr('height', `${outerDims.height}${u}`);
 
+        // These two properties are used when dragging the resizer box.
+        this.gapDist = (this.size.partitionTreeGap * this.ratio) - 3;
+        this.gapSpace = `${this.gapDist}${u}`;
         d3.select('#n2-resizer-box').transition(sharedTransition)
-            .style('bottom', `${(this.size.partitionTreeGap * this.ratio) - 3}${u}`);
+            .style('bottom', this.gapSpace);
 
         dom.pTreeGroup.transition(sharedTransition)
             .attr('height', innerDims.height)
