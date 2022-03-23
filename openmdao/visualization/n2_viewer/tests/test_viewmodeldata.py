@@ -481,27 +481,6 @@ class TestViewModelData(unittest.TestCase):
         self.assertTrue('OpenMDAO Model Hierarchy and N2 diagram: Bad Connection'
                         in open(self.conn_html_filename, 'r', encoding='utf-8').read())
 
-    def test_execcomp_config(self):
-        class ConfigGroup(om.Group):
-            def setup(self):
-                excomp = om.ExecComp('y=x',
-                                     x={'val': 3.0, 'units': 'mm'},
-                                     y={'shape': (1,), 'units': 'cm'})
-
-                self.add_subsystem('excomp', excomp, promotes=['*'])
-
-            def configure(self):
-                self.excomp.add_expr('z = 2.9*x',
-                                     z={'shape': (1,), 'units': 's'})
-
-        p = om.Problem()
-        p.model.add_subsystem('sub', ConfigGroup(), promotes=['*'])
-        p.setup()
-        p.run_model()
-
-        # check for bug fix (issue #2415), value for 'x' was not a numpy array
-        _get_viewer_data(p)
-
 
 @use_tempdirs
 class TestUnderMPI(unittest.TestCase):
