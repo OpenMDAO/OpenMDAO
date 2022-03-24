@@ -1,4 +1,6 @@
-import builtins
+"""
+Classes and functions for timing method calls.
+"""
 import pickle
 
 from time import perf_counter
@@ -15,6 +17,7 @@ from openmdao.core.parallel_group import ParallelGroup
 _timing_active = False
 _total_time = 0.
 _timing_managers = {}
+
 
 class _RestrictedUnpickler(pickle.Unpickler):
 
@@ -46,13 +49,38 @@ def _timing_file_iter(timing_file):
     with open(timing_file, 'rb') as f:
         yield from _timing_iter(_restricted_load(f))
 
+
 class FuncTimer(object):
     """
     Keep track of execution times for a function.
+
+    Parameters
+    ----------
+    name : str
+        Name of the instance whose methods will be wrapped.
+
+    Attributes
+    ----------
+    name : str
+        Name of the instance whose methods will be timed.
+    ncalls : int
+        Number of calls to the wrapped method.
+    start : float
+        The time that the function was called.
+    min : float
+        The minimum time of all timed method calls.
+    max : float
+        The maximum time of all timed method calls.
+    tot : float
+        The total time of all timed method calls.
     """
+
     __slots__ = ['name', 'ncalls', 'start', 'min', 'max', 'tot']
 
-    def __init__(self, name,):
+    def __init__(self, name):
+        """
+        Initialize data structures.
+        """
         self.name = name
         self.ncalls = 0
         self.start = 0
@@ -61,11 +89,17 @@ class FuncTimer(object):
         self.tot = 0
 
     def tick(self):
+        """
+        Record the method start time.
+        """
         global _timing_active
         if _timing_active:
             self.start = perf_counter()
 
     def tock(self):
+        """
+        Update ncalls, tot, min, and max.
+        """
         global _timing_active
         if _timing_active:
             dt = perf_counter() - self.start
@@ -77,6 +111,14 @@ class FuncTimer(object):
             self.ncalls += 1
 
     def avg(self):
+        """
+        Return the average elapsed time for a method call.
+
+        Returns
+        -------
+        float
+            The average elapsed time for a method call.
+        """
         if self.ncalls > 0:
             return self.tot / self.ncalls
         return 0.
@@ -92,6 +134,11 @@ def _timer_wrap(f, timer):
         The method being wrapped.
     timer : Timer
         Object to keep track of timing data.
+
+    Returns
+    -------
+    method
+        The wrapper for the give method f.
     """
     def do_timing(*args, **kwargs):
         timer.tick()
@@ -103,15 +150,49 @@ def _timer_wrap(f, timer):
 
 
 class TimingManager(object):
+    """
+    Keeps track of FuncTimer objects.
+
+    Attributes
+    ----------
+    _timers : dict
+        Mapping of instance name to FuncTimer lists.
+    """
+
     def __init__(self):
+        """
+        Initialize data structures.
+        """
         self._timers = {}
 
     def add_timings(self, name_obj_iter, method_names):
+        """
+        Add FuncTimers for all instances name_obj_iter and all methods in method_names.
+
+        Parameters
+        ----------
+        name_obj_iter : iterator
+            Yields (name, object) tuples.
+        method_names : list of str
+            List of names of methods to wrap.
+        """
         for name, obj in name_obj_iter:
             for method_name in method_names:
                 self.add_timing(name, obj, method_name)
 
     def add_timing(self, name, obj, method_name):
+        """
+        Add a FuncTimer for the given method of the given object.
+
+        Parameters
+        ----------
+        name : str
+            Instance name.
+        obj : object
+            The instance.
+        method_name : str
+            The name of the method to wrap.
+        """
         method = getattr(obj, method_name, None)
         if method is not None:
             if name not in self._timers:
@@ -129,7 +210,11 @@ def timing_context(active=True):
     Parameters
     ----------
     active : bool
-        Is timing active or inactive?
+        Indicates if timing is active or inactive.
+
+    Yields
+    ------
+    nothing
     """
     global _timing_active, _total_time
 

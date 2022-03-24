@@ -124,14 +124,15 @@ class ProcAllocator(object):
 
         min_sum = np.sum(min_procs)
 
-        if np.sum(max_procs) < nproc:
-            raise ProcAllocationError("too many MPI procs allocated. Comm is size %d but "
-                                      "can only use %d." % (nproc, np.sum(max_procs)))
-        if min_sum > nproc and np.any(min_procs > 1):
-            raise ProcAllocationError("can't meet min_procs required because the sum of the "
-                                      "min procs required exceeds the procs allocated and the "
-                                      "min procs required is > 1",
-                                      np.array(list(range(len(proc_info))))[min_procs > 1])
+        if self.parallel and nproc > 1:
+            if np.sum(max_procs) < nproc:
+                raise ProcAllocationError("too many MPI procs allocated. Comm is size %d but "
+                                          "can only use %d." % (nproc, np.sum(max_procs)))
+            if min_sum > nproc and np.any(min_procs > 1):
+                raise ProcAllocationError("can't meet min_procs required because the sum of the "
+                                          "min procs required exceeds the procs allocated and the "
+                                          "min procs required is > 1",
+                                          np.array(list(range(len(proc_info))))[min_procs > 1])
 
         gdict = {}
         for i, (_, _, _, g) in enumerate(proc_info):
