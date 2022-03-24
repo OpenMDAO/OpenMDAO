@@ -155,22 +155,25 @@ def _show_view(timing_file, options):
                       "['browser', 'text', 'none'].")
 
 
-def _postprocess(timing_file, options):
+def _postprocess(options):
     # this is called by atexit after all timing data has been collected
     # Note that this will not be called if the program exits via sys.exit() with a nonzero
     # exit code.
     timing_managers = timer_mod._timing_managers
+    timing_file = options.outfile
 
     if timing_file is None:
         timing_file = 'timings.pkl'
 
+    timing_data = (timing_managers, timer_mod._total_time)
+
     if MPI is not None:
         # need to consolidate the timing data from different procs
-        all_managers = MPI.COMM_WORLD.gather((timing_managers, timer_mod._total_time), root=0)
+        all_managers = MPI.COMM_WORLD.gather(timing_data, root=0)
         if MPI.COMM_WORLD.rank != 0:
             return
     else:
-        all_managers = [(timing_managers, timer_mod._total_time)]
+        all_managers = [timing_data]
 
     with open(timing_file, 'wb') as f:
         print(f"Saving timing data to '{timing_file}'.")
@@ -218,16 +221,11 @@ def _timing_cmd(options, user_args):
     if filename.endswith('.py'):
         hooks._register_hook('setup', 'Problem', pre=partial(_set_timer_setup_hook, options))
 
-        if options.outfile is not None and MPI:
-            outfile = f"{options.outfile}.{MPI.COMM_WORLD.rank}"
-        else:
-            outfile = options.outfile
-
         if not options.funcs:
             options.funcs = _default_timer_methods.copy()
 
         # register an atexit function to write out all of the timing data
-        atexit.register(partial(_postprocess, outfile, options))
+        atexit.register(partial(_postprocess, options))
 
         with timing_context(not options.use_context):
             _load_and_exec(options.file[0], user_args)

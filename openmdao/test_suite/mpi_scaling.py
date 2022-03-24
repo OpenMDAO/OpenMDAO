@@ -3,9 +3,11 @@ import time
 from itertools import repeat
 import numpy as np
 import openmdao.api as om
-from openmdao.utils.general_utils import shape2tuple
+from openmdao.utils.general_utils import shape2tuple, env_truthy
 from openmdao.utils.mpi import MPI
 
+
+debug = env_truthy('OM_DEBUG')
 
 class ExplicitSleepComp(om.ExplicitComponent):
     """
@@ -13,6 +15,9 @@ class ExplicitSleepComp(om.ExplicitComponent):
 
     Component does a simple passthrough, one variable at a time, so there will be some
     overhead for vector setitem/getitem calls.
+
+    If run under MPI, the sleep times will be divided by the number of procs in the comm in
+    order to simulate a component that splits up its work across its procs.
     """
     def __init__(self, nvars, compute_delay=0.001, compute_partials_delay=0.001,
                  var_default=1.0, add_var_kwargs=None, use_coloring=True, **kwargs):
@@ -55,8 +60,8 @@ class ExplicitSleepComp(om.ExplicitComponent):
                                   num_full_jacs=2, tol=1e-20)
 
     def compute(self, inputs, outputs):
-        print(f"running {self.pathname}")
-        time.sleep(self.compute_delay)
+        if debug: print(f"running {self.pathname}")
+        self.sleep(self.compute_delay)
         for iname, oname in zip(self.inames, self.onames):
             outputs[oname] = inputs[iname]
 
@@ -64,11 +69,14 @@ class ExplicitSleepComp(om.ExplicitComponent):
         """
         Jacobian for Sellar discipline 1.
         """
-        print(f"compute partials for {self.pathname}")
-        time.sleep(self.compute_partials_delay)
+        if debug: print(f"compute partials for {self.pathname}")
+        self.sleep(self.compute_partials_delay)
         val = np.eye(np.product(self.varshape, dtype=int))
         for iname, oname in zip(self.inames, self.onames):
             partials[oname, iname] = val
+
+    def sleep(self, delay):
+        time.sleep(delay / self.comm.size)
 
 
 # A few solver classes that will just run to whatever maxiter is set to
@@ -125,25 +133,6 @@ def inst_iter(class_iter, kwargs_iter):
         yield klass(**kwargs)
 
 
-def make_group(par, sysiter, nliters=1, liniters=1):
-    # return a group (ParallelGroup or Group based on 'par' arg) that contains
-    # system instances from sysiter.  The group
-    # will have block (jac/gs depending on 'par') linear and nl solvers with
-    # maxiters of 'liniters' and 'nliters' respectively.
-    g = om.ParallelGroup() if par and MPI is not None else om.Group()
-    for i, inst in enumerate(sysiter):
-        g.add_subsystem(f"C{i}", inst)
-
-    if par:
-        g.nonlinear_solver = FixedIterNLJac(maxiter=nliters)
-        g.linear_solver = FixedIterLinBlockJac(maxiter=nliters)
-    else:
-        g.nonlinear_solver = FixedIterNLBGS(maxiter=nliters)
-        g.linear_solver = FixedIterLinearBGS(maxiter=nliters)
-
-    return g
-
-
 def sys_var_path_iter(ncomps, nvars, path=''):
     # yield system_path, input_path, output_path for each input/output pair using
     # the default naming scheme (Component is 'C?', inputs are 'i?' and outputs are 'o?').
@@ -155,27 +144,84 @@ def sys_var_path_iter(ncomps, nvars, path=''):
             yield cpath, f"{cpath}.i{v}", f"{cpath}.o{v}"
 
 
+def group_from_iter(par, sysiter, proc_groups=None, max_procs=None, nliters=1, liniters=1):
+    # return a group (ParallelGroup or Group based on 'par' arg) that contains
+    # system instances from sysiter.  The group
+    # will have (block jac/gs depending on 'par') linear and nl solvers with
+    # maxiters of 'liniters' and 'nliters' respectively.
+    g = om.ParallelGroup() if par and MPI is not None else om.Group()
+    if proc_groups is None:
+        proc_groups = repeat(None)
+    if max_procs is None:
+        max_procs = repeat(None)
+    for i, (inst, pgrp, mx) in enumerate(zip(sysiter, proc_groups, max_procs)):
+        g.add_subsystem(f"C{i}", inst, proc_group=pgrp, max_procs=mx)
+
+    if par:
+        g.nonlinear_solver = FixedIterNLJac(maxiter=nliters)
+        g.linear_solver = FixedIterLinBlockJac(maxiter=liniters)
+    else:
+        g.nonlinear_solver = FixedIterNLBGS(maxiter=nliters)
+        g.linear_solver = FixedIterLinearBGS(maxiter=liniters)
+
+    return g
+
+
+def make_group(ncomps, nvars, delays, proc_groups, max_procs, nliters=2, liniters=1):
+    compiter = inst_iter(repeat(ExplicitSleepComp, ncomps),
+                         expand_kwargs(nvars=repeat(nvars, ncomps),
+                                       use_coloring=repeat(True, ncomps),
+                                       compute_delay=delays))
+    return group_from_iter(True, compiter, proc_groups=proc_groups, max_procs=max_procs,
+                           nliters=2, liniters=1)
+
+
 if __name__ == '__main__':
+    import sys
     from openmdao.utils.assert_utils import assert_check_totals
     from time import perf_counter
 
     start = perf_counter()
 
-    nruns = 5
     nvars = 10
     ncomps = 10
+    nruns = 1
+
+    if 'eq' in sys.argv:
+        delays=[.136]*ncomps
+        proc_groups=[None]*ncomps
+        max_procs=[None]*ncomps
+        print("Running equal runtime components under parallel group")
+    else:
+        delays=[.01]*6 + [.1,.1,.1, 1.]
+        proc_groups=['a']*9 + ['b']
+        max_procs=[1]*9 + [None]
+        print("Running mixed runtime components under parallel group")
 
     p = om.Problem()
-    compiter = inst_iter(repeat(ExplicitSleepComp, ncomps),
-                         expand_kwargs(nvars=repeat(nvars, ncomps),
-                                       use_coloring=repeat(True, ncomps),
-                                       compute_delay=[.01]*6 + [.1,.1,.1,1.]))
-    p.model.add_subsystem('par', make_group(True, compiter, nliters=2, liniters=1))
+    p.model.add_subsystem('par', make_group(ncomps, nvars,
+                                            delays=delays, proc_groups=proc_groups,
+                                            max_procs=max_procs))
+
     p.setup()
+
+    # from openmdao.devtools.debug import profiling
+    # if MPI:
+    #     profname = f"profile.out.{MPI.COMM_WORLD.rank}"
+    # else:
+    #     profname = 'profile.out'
+
+    # with om.timing_context():
+    #     with profiling(profname):
+    #         for i in range(nruns):
+    #             p.run_model()
+
 
     with om.timing_context():
         for i in range(nruns):
             p.run_model()
+
+    ## checking totals is quite slow...
 
     # ofs = []
     # wrts = []

@@ -1458,7 +1458,7 @@ class TestParallelDOE4Proc(unittest.TestCase):
         prob = om.Problem(FanInGrouped())
 
         # require 2 procs for the ParallelGroup
-        prob.model._proc_info['sub'] = (2, None, 1.0)
+        prob.model._proc_info['sub'] = (2, None, 1.0, None)
 
         # run cases on all procs
         prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
