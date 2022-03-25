@@ -30,6 +30,7 @@ class OmLayout extends Layout {
         this._init();
     }
 
+    /** Set up the solver tree layout. */
     _init() {
         super._init();
         if (this.showSolvers) {
@@ -104,7 +105,8 @@ class OmLayout extends Layout {
     }
 
 
-    /**TODO: _computeNormalizedPositions and _computeSolverNormalizedPositions do almost
+    /*
+     * TODO: _computeNormalizedPositions and _computeSolverNormalizedPositions do almost
      * identical things, just storing info in different variables, so they should be
      * merged as much as possible.
      */
@@ -184,7 +186,7 @@ class OmLayout extends Layout {
      */
      calcOuterDims() {
         const dims = super.calcOuterDims();
-        dims.width += this.size.solverTree.width;
+        if (this.showSolvers) dims.width += this.size.solverTree.width;
 
         return dims;
     }
@@ -195,11 +197,16 @@ class OmLayout extends Layout {
      */
     calcInnerDims() {
         const dims = super.calcInnerDims();
-        dims.width += this.size.solverTree.width;
+        if (this.showSolvers) dims.width += this.size.solverTree.width;
 
         return dims;
     }
 
+    /**
+     * Set the geometry of the main diagram elements for the first time, without
+     * using transition animations. Adds solver support to the superclass.
+     * @param {Object} dom Collection of D3 selections associated with the HTML elements.
+     */
     applyGeometryFirstRun(dom) {
         super.applyGeometryFirstRun(dom);
         const innerDims = this.calcInnerDims();
@@ -215,40 +222,63 @@ class OmLayout extends Layout {
 
     /**
      * Update container element dimensions when a new layout is calculated,
-     * and set up transitions.
+     * and set up transition animations. Adds solver support to the superclass.
      * @param {Object} dom References to HTML elements.
-     * @param {number} transitionStartDelay ms to wait before performing transition
+     * @param {Number} transitionStartDelay ms to wait before performing transition
+     * @param {Boolean} manuallyResized Have the diagram dimensions have been changed through UI
      */
      updateTransitionInfo(dom, transitionStartDelay, manuallyResized) {
-         super.updateTransitionInfo(dom, transitionStartDelay, manuallyResized);
-         const innerDims = this.calcInnerDims();
+        super.updateTransitionInfo(dom, transitionStartDelay, manuallyResized);
+        const innerDims = this.calcInnerDims();
+        const u = innerDims.unit;
 
-         dom.pSolverTreeGroup.transition(sharedTransition)
-            .attr('height', innerDims.height)
-            .attr('transform', `translate(${this.size.partitionTree.width +
+        dom.pSolverTreeGroup.transition(sharedTransition)
+            .style('height', innerDims.heightStyle)
+            .style('transform', `translate(${this.size.partitionTree.width +
                 innerDims.margin + innerDims.height +
-                innerDims.margin},${innerDims.margin})`);
+                innerDims.margin}${u},${innerDims.margin}${u})`);
      }
 
+    /**
+     * Since the matrix portion of the diagram is square, calculate the width
+     * based on the height of that, plus the model and solver trees, plus the margins.
+     * @param {Number} height Height of the diagram.
+     * @returns {Number} Calculated width of the diagram.
+     */
     calcWidthBasedOnNewHeight(height) {
-        return super.calcWidthBasedOnNewHeight(height) + this.size.solverTree.width;
+        let w = super.calcWidthBasedOnNewHeight(height);
+        if (this.showSolvers) w += this.size.solverTree.width;
+        return w;
     }
 
+    /**
+     * Since the matrix portion of the diagram is square, calculate the height
+     * based on the width of that, minus the model and solver trees and margins.
+     * @param {Number} width Width of the diagram.
+     * @returns {Number} Calculated height of the diagram.
+     */
     calcHeightBasedOnNewWidth(width) {
-        return super.calcHeightBasedOnNewWidth(width) - this.size.solverTree.width;
+        let h = super.calcHeightBasedOnNewWidth(width);
+        if (this.showSolvers) h += this.size.solverTree.width;
+        return h;
     }
 
     /**
      * Make a copy of the previous transit coordinates and linear scalers before
      * setting new ones.
      */
-     preservePreviousScaleValues() {
+    preservePreviousScaleValues() {
         super.preservePreviousScaleValues()
 
         this.treeSize.solver.preserve();
-        this.scales.solver.preserve();
+        if (this.showSolvers) this.scales.solver.preserve();
     }
 
+    /**
+     * Calculate the dimensions of the diagram in pixels as well as updating the linear
+     * scale. Preserve the previous values if there are any.
+     * Adds solver support to the superclass.
+     */
     updateGeometryValues() {
         super.updateGeometryValues();
         const elemDims = this.zoomedElement.draw.solverDims;
@@ -259,12 +289,14 @@ class OmLayout extends Layout {
 
         this.treeSize.solver.height = initSize.height / elemDims.height;
 
-        this.scales.solver.x
-            .domain([elemDims.x, 1])
-            .range([elemDims.x ? this.size.parentNodeWidth : 0, initSize.width]);
+        if (this.showSolvers) {
+            this.scales.solver.x
+                .domain([elemDims.x, 1])
+                .range([elemDims.x ? this.size.parentNodeWidth : 0, initSize.width]);
 
-        this.scales.solver.y
-            .domain([elemDims.y, elemDims.y + elemDims.height])
-            .range([0, initSize.height]);        
+            this.scales.solver.y
+                .domain([elemDims.y, elemDims.y + elemDims.height])
+                .range([0, initSize.height]);
+        }
     }
 }

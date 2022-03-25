@@ -475,7 +475,7 @@ class N2Toolbar {
             () => self.hidden, () => self.toggle());
 
         // The font size slider is a range input
-        this.toolbar.select('#text-slider').on('input', () => {
+        this.toolbar.select('#text-slider').on('input', function() {
             const fontSize = this.value;
             n2ui.n2Diag.fontSizeSelectChange(fontSize);
 
@@ -485,24 +485,21 @@ class N2Toolbar {
 
         // The model height slider is a range input
         this.toolbar.select('#model-slider')
-            .on('input', () => d3.select('#model-slider-label').html(`${this.value}%`))
-            .on('mouseup', () => {
+            .on('input', function() {
+                d3.select('#model-slider-label').html(`${this.value}%`);
+            })
+            .on('mouseup', function() {
                 n2ui.n2Diag.manuallyResized = true;
                 const modelHeight = window.innerHeight * (parseInt(this.value) / 100);
                 n2ui.n2Diag.verticalResize(modelHeight);
-                const gapSpace = (n2ui.n2Diag.dims.size.partitionTreeGap - 3) +
-                    n2ui.n2Diag.dims.size.unit;
             });
 
         this.toolbar.select('#model-slider-fit')
-            .on('click', () => {
+            .on('click', function() {
                 n2ui.n2Diag.manuallyResized = false;
                 d3.select('#model-slider').node().value = '95';
                 d3.select('#model-slider-label').html("95%")
                 n2ui.n2Diag.verticalResize(window.innerHeight * .95);
-
-                const gapSpace = (n2ui.n2Diag.dims.size.partitionTreeGap - 3) +
-                    n2ui.n2Diag.dims.size.unit;
             })
     }
 }

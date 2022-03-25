@@ -40,6 +40,10 @@ class Layout {
         if (callInit) this._init();
     }
 
+    /**
+     * Separate these calls from the constructor so that subclasses can
+     * set values before execution.
+     */
     _init() {
         this._computeLeaves();
         this._setupTextRenderer();
@@ -119,8 +123,8 @@ class Layout {
 
     /** Insert text into an off-screen SVG text object to determine the width.
      * Cache the result so repeat calls with the same text can just do a lookup.
-     * @param {string} text Text to render or find in cache.
-     * @return {number} The SVG-computed width of the rendered string.
+     * @param {String} text Text to render or find in cache.
+     * @return {Number} The SVG-computed width of the rendered string.
      */
     _getTextWidth(text) {
         let width = 0.0;
@@ -143,7 +147,7 @@ class Layout {
     /** Determine the text associated with the node. Normally its name,
      * but can be changed if promoted.
      * @param {OmTreeNode} node The item to operate on.
-     * @return {string} The selected text.
+     * @return {String} The selected text.
      */
     getText(node) {
         let retVal = node.name;
@@ -211,10 +215,10 @@ class Layout {
      * For visible nodes with children, choose a column width
      * large enough to accomodate the widest label in their column.
      * @param {OmTreeNode} node The item to operate on.
-     * @param {string} childrenProp Either 'children' or 'subsystem_children'.
+     * @param {String} childrenProp Either 'children' or 'subsystem_children'.
      * @param {Object[]} colArr The array of column info.
-     * @param {number[]} leafArr The array of leaf width info.
-     * @param {string} widthProp Either 'nameWidthPx' or 'nameSolverWidthPx'.
+     * @param {Number[]} leafArr The array of leaf width info.
+     * @param {String} widthProp Either 'nameWidthPx' or 'nameSolverWidthPx'.
      */
     _setColumnWidthsFromWidestText(node, childrenProp, colArr, leafArr, widthProp) {
         if (node.draw.hidden) return;
@@ -264,7 +268,11 @@ class Layout {
         this.cols[this.greatestDepth].width = lastColumnWidth;
     }
 
-    /** Set the location of the columns based on the width of the columns to the left. */
+    /**
+     * Set the location of the columns based on the width of the columns to the left.
+     * @param {Dimensions} obj Object containing a width property.
+     * @param {Object[]} cols Array of objects containing a width property.
+     */
     _setColumnLocations(obj, cols) {
         obj.width = 0;
 
@@ -357,6 +365,11 @@ class Layout {
         return new Dimensions({'width': width, 'height': height, 'margin': margin});
     }
 
+    /**
+     * Set the geometry of the main diagram elements for the first time, without
+     * using transition animations.
+     * @param {Object} dom Collection of D3 selections associated with the HTML elements.
+     */
     applyGeometryFirstRun(dom) {
         // Update svg dimensions before size changes
         const outerDims = this.calcOuterDims();
@@ -364,8 +377,13 @@ class Layout {
         const size = this.size;
 
         dom.svgDiv
-            .style('width', `${outerDims.width}${size.unit}`)
-            .style('height', `${outerDims.height}${size.unit}`);
+            .style('width', outerDims.widthStyle)
+            .style('height', outerDims.heightStyle);
+
+        // NOTE: Apparently first setting these values with .attr and updating
+        // them later with .style in .updateTransitionInfo() allows the diagram
+        // transition animation to execute as intended. Setting them in both
+        // places using the same method results in the transition not working.
 
         dom.svg
             .attr('width', outerDims.width)
@@ -409,7 +427,11 @@ class Layout {
             .attr('height', offgridHeight);
     }
 
-    /** Recalculate the scale and apply new dimensions to diagram objects. */
+    /**
+     * Recalculate the scale and apply new dimensions to diagram objects.
+     * @param {Object} dom Collection of D3 selections associated with the HTML elements.
+     * @return {Boolean} True if this was the first run.
+     */
     updateGeometry(dom) {
         this.updateGeometryValues();
 
@@ -426,7 +448,7 @@ class Layout {
 
     /**
      * Update container element dimensions when a new layout is calculated,
-     * and set up transitions.
+     * and set up transition animations.
      * @param {Object} dom References to HTML elements.
      * @param {Number} transitionStartDelay ms to wait before performing transition
      * @param {Boolean} manuallyResized Have the diagram dimensions have been changed through UI
@@ -453,8 +475,8 @@ class Layout {
 
         dom.svg.transition(sharedTransition)
             .style('transform', `scale(${this.ratio})`)
-            .attr('width', `${outerDims.width}${u}`)
-            .attr('height', `${outerDims.height}${u}`);
+            .style('width', outerDims.widthStyle)
+            .style('height', outerDims.heightStyle);
 
         // These two properties are used when dragging the resizer box.
         this.gapDist = (this.size.partitionTreeGap * this.ratio) - 3;
@@ -463,40 +485,57 @@ class Layout {
             .style('bottom', this.gapSpace);
 
         dom.pTreeGroup.transition(sharedTransition)
-            .attr('height', innerDims.height)
-            .attr('width', this.size.partitionTree.width)
-            .attr('transform', `translate(0,${innerDims.margin})`);
+            .style('height', innerDims.heightStyle)
+            .style('width', `${this.size.partitionTree.width}${u}`)
+            .style('transform', `translate(0,${innerDims.marginStyle})`);
 
         dom.highlightBar.transition(sharedTransition)
-            .attr('height', innerDims.height)
-            .attr('width', 8)
-            .attr('transform', `translate(${this.size.partitionTree.width + 1},${innerDims.margin})`);
+            .style('height', innerDims.heightStyle)
+            .style('width', '8px')
+            .style('transform',
+                `translate(${this.size.partitionTree.width + 1}${u},${innerDims.marginStyle})`);
 
         // Move n2 outer group to right of partition tree, spaced by the margin.
         dom.n2OuterGroup.transition(sharedTransition)
-            .attr('height', outerDims.height)
-            .attr('width', outerDims.height)
-            .attr('transform', `translate(${this.size.partitionTree.width},0)`);
+            .style('height', outerDims.heightStyle)
+            .style('width', outerDims.heightStyle)
+            .style('transform', `translate(${this.size.partitionTree.width}${u},0)`);
 
         dom.n2InnerGroup.transition(sharedTransition)
-            .attr('height', innerDims.height)
-            .attr('width', innerDims.height)
-            .attr('transform', `translate(${innerDims.margin},${innerDims.margin})`);
+            .style('height', innerDims.heightStyle)
+            .style('width', innerDims.heightStyle)
+            .style('transform', `translate(${innerDims.marginStyle},${innerDims.marginStyle})`);
 
         dom.n2BackgroundRect.transition(sharedTransition)
-            .attr('width', innerDims.height)
-            .attr('height', innerDims.height)
-            .attr('transform', 'translate(0,0)');
+            .style('width', innerDims.heightStyle)
+            .style('height', innerDims.heightStyle)
+            .style('transform', 'translate(0,0)');
     }
 
+    /**
+     * Since the matrix portion of the diagram is square, calculate the width
+     * based on the height of that, plus the model tree, plus the margins.
+     * @param {Number} height Height of the diagram.
+     * @returns {Number} Calculated width of the diagram.
+     */
     calcWidthBasedOnNewHeight(height) {
         return this.size.partitionTree.width + height + this.size.n2matrix.margin * 2;
     }
 
+    /**
+     * Since the matrix portion of the diagram is square, calculate the height
+     * based on the width of that, minus the model tree and margins.
+     * @param {Number} width Width of the diagram.
+     * @returns {Number} Calculated height of the diagram.
+     */
     calcHeightBasedOnNewWidth(width) {
         return width - this.size.partitionTree.width - this.size.n2matrix.margin * 2;
     }
 
+    /**
+     * Calculate dimensions of the diagram based on what will fit in the window.
+     * @returns {Dimensions} Object with computed width and height.
+     */
     calcFitDims() {
         let height = window.innerHeight * 0.95;
         let width = this.calcWidthBasedOnNewHeight(height);
@@ -505,19 +544,19 @@ class Layout {
             width = window.innerWidth - 200;
             height = this.calcHeightBasedOnNewWidth(width);
         }
-
-        return { 'width': width, 'height': height };
+        return new Dimensions ({ 'width': width, 'height': height });
     }
 
-    /**
-     * Make a copy of the previous transit coordinates and linear scalers before
-     * setting new ones.
-     */
+    /** Make a copy of the previous dimensions and linear scalers before setting new ones. */
     preservePreviousScaleValues() {
         this.treeSize.model.preserve();
         this.scales.model.preserve();
     }
 
+    /**
+     * Calculate the dimensions of the diagram in pixels as well as updating the linear
+     * scale. Preserve the previous values if there are any.
+     */
     updateGeometryValues() {
         if (!this.scales.firstRun) this.preservePreviousScaleValues();
 

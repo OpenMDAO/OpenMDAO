@@ -788,6 +788,7 @@ class N2UserInterface {
         this.n2Diag.update();
         d3.select('#n2-resizer-handle').attr('class', 'inactive-resizer-handle')
     }
+    
     hideSolvers() {
         n2Diag.showSolvers = false;
         this.n2Diag.update();

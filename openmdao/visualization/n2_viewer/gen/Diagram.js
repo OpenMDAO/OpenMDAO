@@ -21,17 +21,32 @@
  * @property {number} chosenCollapseDepth The selected depth from the drop-down.
  */
 class Diagram {
-    constructor(modelJSON) {
+    /**
+     * Set initial values.
+     * @param {Object} modelJSON The decompressed model structure.
+     * @param {Boolean} [callInit = true] Whether to run _init() now.
+     */
+    constructor(modelJSON, callInit = true) {
         this.modelData = modelJSON;
         this.model = new OmModelData(modelJSON);
         this.zoomedElement = this.zoomedElementPrev = this.model.root;
         this.manuallyResized = false; // If the diagram has been sized by the user
 
         // Assign this way because defaultDims is read-only.
-        this.dims = JSON.parse(JSON.stringify(defaultDims)); // TODO: Pull solver out of defaults
+        this.dims = structuredClone(defaultDims);
+
         this._referenceD3Elements();
         this.transitionStartDelay = N2TransitionDefaults.startDelay;
         this.chosenCollapseDepth = -1;
+
+        if (callInit) this._init();
+    }
+
+    /**
+     * Separate these calls from the constructor so that subclasses can
+     * set values before execution.
+     */
+    _init() {
         this.style = new N2Style(this.dom.svgStyle, this.dims.size.font);
         this.layout = this._newLayout();
 
@@ -258,12 +273,12 @@ class Diagram {
         // Add the rectangle that is the visible shape.
         enterSelection
             .append("rect")
-            .transition(sharedTransition)
-            .attr("width", d => d.draw.dims.width * treeSize.width)
-            .attr("height", d => d.draw.dims.height * treeSize.height)
             .attr("id", d => TreeNode.pathToId(d.path))
             .attr('rx', 12)
-            .attr('ry', 12);
+            .attr('ry', 12)
+            .transition(sharedTransition)
+            .attr("width", d => d.draw.dims.width * treeSize.width)
+            .attr("height", d => d.draw.dims.height * treeSize.height);
 
         // Add a label
         enterSelection
@@ -298,6 +313,7 @@ class Diagram {
 
         // New location for each group
         const mergedSelection = update
+            .attr("class", d => `partition_group ${self.style.getNodeClass(d)}`)
             .transition(sharedTransition)
             .attr("transform", d => 
                 `translate(${scale.x(d.draw.dims.x)} ${scale.y(d.draw.dims.y)})`);

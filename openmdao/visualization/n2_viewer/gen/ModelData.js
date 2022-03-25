@@ -344,7 +344,7 @@ class ModelData {
 
         if (node.hasChildren()) {
             for (const child of node.children) {
-                this._minimizeToDepth(child, chosenCollapseDepth);
+                this.minimizeToDepth(child, chosenCollapseDepth);
             }
         }
     }

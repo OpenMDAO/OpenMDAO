@@ -8,8 +8,17 @@
  * @typedef OmDiagram
  */
 class OmDiagram extends Diagram {
+    /**
+     * Set initial values.
+     * @param {Object} modelJSON The decompressed model structure.
+     */
     constructor(modelJSON) {
-        super(modelJSON);
+        super(modelJSON, false);
+
+        // Solver tree initial dimensions are the same as the model tree
+        this.dims.size.solverTree = structuredClone(this.dims.size.partitionTree);
+
+        this._init();
     }
 
     /** Override Diagram._newLayout() to create an OmLayout object. */
@@ -169,6 +178,11 @@ class OmDiagram extends Diagram {
 
         // New location for each group
         const mergedSelection = update
+            .attr("class", d => {
+                const solver_class = self.style.getSolverClass(self.showLinearSolverNames,
+                    { 'linear': d.linear_solver, 'nonLinear': d.nonlinear_solver });
+                return `${solver_class} solver_group ${self.style.getNodeClass(d)}`;
+            })
             .transition(sharedTransition)
             .attr("transform", d => {
                 // The magic for reversing the blocks on the right side
@@ -207,9 +221,12 @@ class OmDiagram extends Diagram {
         const self = this; // For callbacks that change "this".
 
         // Transition exiting nodes to the parent's new position.
-        const exitSelection = exit.transition(sharedTransition)
-            .attr("transform", d =>
+        const exitSelection = exit.transition(sharedTransition);
+
+        if (this.showSolvers) {
+            exitSelection.attr("transform", d =>
                 `translate(${scale.x(d.draw.solverDims.x)},${scale.y(d.draw.solverDims.y)})`)
+        }
 
         exitSelection.select("rect")
             .attr("width", d => d.draw.solverDims.width * treeSize.width)
@@ -228,6 +245,7 @@ class OmDiagram extends Diagram {
         return exitSelection;
     }
 
+    /** Add the opt-vars class to design variable elements to set the fill color */
     showDesignVars() {
         [Object.keys(modelData.design_vars), Object.keys(modelData.responses)].flat().forEach(
             item => d3.select("#" + item.replaceAll(".", "_")).classed('opt-vars', true)
@@ -235,6 +253,7 @@ class OmDiagram extends Diagram {
         d3.select('.partition_group #_auto_ivc').classed('opt-vars', true)
     }
 
+    /** Remove the opt-vars class from design variable elements to use the default fill color */
     hideDesignVars() {
         [Object.keys(modelData.design_vars), Object.keys(modelData.responses)].flat().forEach(
             item => d3.select("#" + item.replaceAll(".", "_")).classed('opt-vars', false)
