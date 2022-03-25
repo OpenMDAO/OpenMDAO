@@ -586,7 +586,7 @@ class Diagram {
      */
      restoreSavedState(oldState) {
         // Zoomed node (subsystem).
-        this.zoomedElement = this.nodeIds[oldState.zoomedElement];
+        this.zoomedElement = this.model.nodeIds[oldState.zoomedElement];
 
         // Expand/Collapse state of all nodes (subsystems) in model.
         this.setSubState(oldState.expandCollapse.reverse());
