@@ -49,8 +49,8 @@ class DifferentialEvolutionDriver(Driver):
         design variables.
     _ga : <DifferentialEvolution>
         Main genetic algorithm lies here.
-    _randomstate : np.random.RandomState, int
-         Random state (or seed-number) which controls the seed and random draws.
+    _randomstate : int
+        Seed-number which controls the random draws.
     """
 
     def __init__(self, **kwargs):
@@ -254,8 +254,6 @@ class DifferentialEvolutionDriver(Driver):
             lower_bound[i:j] = meta['lower']
             upper_bound[i:j] = meta['upper']
             x0[i:j] = desvar_vals[name]
-
-        abs2prom = model._var_abs2prom['output']
 
         # Automatic population size.
         if pop_size == 0:
@@ -499,8 +497,8 @@ class DifferentialEvolution(object):
             Number of points in the population.
         max_gen : int
             Number of generations to run the GA.
-        random_state : np.random.RandomState, int
-            Random state (or seed-number) which controls the seed and random draws.
+        random_state : int
+            Seed-number which controls the random draws.
         F : float
             Differential rate.
         Pc : float
@@ -524,7 +522,7 @@ class DifferentialEvolution(object):
             pop_size += 1
         self.npop = int(pop_size)
 
-        if self.comm:
+        if self.comm is not None and self.comm.size > 1:
             if random_state is None:
                 # if no random_state is given, generate one on rank 0 and broadcast it to all
                 # ranks.  Because we add the rank to the starting random state, no ranks will
@@ -539,7 +537,7 @@ class DifferentialEvolution(object):
             # add rank to ensure different seed in each MPI process
             seed = random_state + self.comm.rank
         else:
-            seed = None if random_state is None else random_state
+            seed = random_state
 
         rng = np.random.default_rng(seed)
 

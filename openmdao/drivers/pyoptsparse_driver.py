@@ -7,7 +7,6 @@ additional MPI capability.
 """
 
 import sys
-from collections import OrderedDict
 import json
 import signal
 from distutils.version import LooseVersion
@@ -29,6 +28,7 @@ import openmdao.utils.coloring as c_mod
 from openmdao.utils.class_util import WeakMethodWrapper
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
+from openmdao.utils.general_utils import _src_or_alias_name
 
 
 # names of optimizers that use gradients
@@ -332,11 +332,11 @@ class pyOptSparseDriver(Driver):
                                 comm=comm)
 
         # Add all design variables
-        input_meta = self._designvars
-        self._indep_list = indep_list = list(input_meta)
+        dv_meta = self._designvars
+        self._indep_list = indep_list = list(dv_meta)
         input_vals = self.get_design_var_values()
 
-        for name, meta in input_meta.items():
+        for name, meta in dv_meta.items():
             size = meta['global_size'] if meta['distributed'] else meta['size']
             opt_prob.addVarGroup(name, size, type='c',
                                  value=input_vals[name],
@@ -380,22 +380,24 @@ class pyOptSparseDriver(Driver):
                 continue
             size = meta['global_size'] if meta['distributed'] else meta['size']
             lower = upper = meta['equals']
+            path = meta['source'] if meta['alias'] is not None else name
             if fwd:
-                wrt = [v for v in indep_list if name in relevant[input_meta[v]['ivc_source']]]
+                wrt = [v for v in indep_list if path in relevant[dv_meta[v]['source']]]
             else:
-                rels = relevant[name]
-                wrt = [v for v in indep_list if input_meta[v]['ivc_source'] in rels]
+                rels = relevant[path]
+                wrt = [v for v in indep_list if dv_meta[v]['source'] in rels]
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
                 opt_prob.addConGroup(name, size, lower=lower, upper=upper,
                                      linear=True, wrt=wrt, jac=jac)
             else:
-                if name in self._res_jacs:
-                    resjac = self._res_jacs[name]
-                    jac = {n: resjac[input_meta[n]['ivc_source']] for n in wrt}
+                if name in self._res_subjacs:
+                    resjac = self._res_subjacs[name]
+                    jac = {n: resjac[dv_meta[n]['source']] for n in wrt}
                 else:
                     jac = None
+
                 opt_prob.addConGroup(name, size, lower=lower, upper=upper, wrt=wrt, jac=jac)
                 self._quantities.append(name)
 
@@ -409,20 +411,22 @@ class pyOptSparseDriver(Driver):
             lower = meta['lower']
             upper = meta['upper']
 
+            path = meta['source'] if meta['alias'] is not None else name
+
             if fwd:
-                wrt = [v for v in indep_list if name in relevant[input_meta[v]['ivc_source']]]
+                wrt = [v for v in indep_list if path in relevant[dv_meta[v]['source']]]
             else:
-                rels = relevant[name]
-                wrt = [v for v in indep_list if input_meta[v]['ivc_source'] in rels]
+                rels = relevant[path]
+                wrt = [v for v in indep_list if dv_meta[v]['source'] in rels]
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
                 opt_prob.addConGroup(name, size, upper=upper, lower=lower,
                                      linear=True, wrt=wrt, jac=jac)
             else:
-                if name in self._res_jacs:
-                    resjac = self._res_jacs[name]
-                    jac = {n: resjac[input_meta[n]['ivc_source']] for n in wrt}
+                if name in self._res_subjacs:
+                    resjac = self._res_subjacs[name]
+                    jac = {n: resjac[dv_meta[n]['source']] for n in wrt}
                 else:
                     jac = None
                 opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt, jac=jac)
@@ -481,7 +485,7 @@ class pyOptSparseDriver(Driver):
                 sol = opt(opt_prob, sens=WeakMethodWrapper(self, '_gradfunc'),
                           storeHistory=self.hist_file, hotStart=self.hotstart_file)
 
-        except Exception as _:
+        except Exception as c:
             if not self._exc_info:
                 raise
 
@@ -627,9 +631,10 @@ class pyOptSparseDriver(Driver):
         Parameters
         ----------
         dv_dict : dict
-            Dictionary of design variable values.
+            Dictionary of design variable values. All keys are sources.
         func_dict : dict
-            Dictionary of all functional variables evaluated at design point.
+            Dictionary of all functional variables evaluated at design point. Keys are
+            sources and aliases.
 
         Returns
         -------
@@ -676,16 +681,16 @@ class pyOptSparseDriver(Driver):
                 # if we don't convert to 'coo' here, pyoptsparse will do a
                 # conversion of our dense array into a fully dense 'coo', which is bad.
                 # TODO: look into getting rid of all of these conversions!
-                new_sens = OrderedDict()
-                res_jacs = self._res_jacs
+                new_sens = {}
+                res_subjacs = self._res_subjacs
                 for okey in func_dict:
-                    new_sens[okey] = newdv = OrderedDict()
-                    okey_src = self._responses[okey]['ivc_source']
+                    new_sens[okey] = newdv = {}
+                    osrc_or_alias = _src_or_alias_name(self._responses[okey])
                     for ikey in dv_dict:
-                        ikey_src = self._designvars[ikey]['ivc_source']
-                        if okey_src in res_jacs and ikey_src in res_jacs[okey_src]:
+                        ikey_src = self._designvars[ikey]['source']
+                        if osrc_or_alias in res_subjacs and ikey_src in res_subjacs[osrc_or_alias]:
                             arr = sens_dict[okey][ikey]
-                            coo = res_jacs[okey_src][ikey_src]
+                            coo = res_subjacs[osrc_or_alias][ikey_src]
                             row, col, data = coo['coo']
                             coo['coo'][2] = arr[row, col].flatten()
                             newdv[ikey] = coo
@@ -697,9 +702,9 @@ class pyOptSparseDriver(Driver):
                 # We need to cobble together a sens_dict of the correct size.
                 # Best we can do is return zeros.
 
-                sens_dict = OrderedDict()
+                sens_dict = {}
                 for okey, oval in func_dict.items():
-                    sens_dict[okey] = OrderedDict()
+                    sens_dict[okey] = {}
                     osize = len(oval)
                     for ikey, ival in dv_dict.items():
                         isize = len(ival)
@@ -762,7 +767,7 @@ class pyOptSparseDriver(Driver):
             Current coloring.
         """
         total_sparsity = None
-        self._res_jacs = {}
+        self._res_subjacs = {}
         coloring = coloring if coloring is not None else self._get_static_coloring()
         if coloring is not None:
             total_sparsity = coloring.get_subjac_sparsity()
@@ -778,15 +783,18 @@ class pyOptSparseDriver(Driver):
         if total_sparsity is None:
             return
 
+        model = self._problem().model
         for res, resdict in total_sparsity.items():
+            if res in self._responses and self._responses[res]['alias'] is not None:
+                res = self._responses[res]['source']
             if res in self._objs:  # skip objectives
                 continue
-            self._res_jacs[res] = {}
+            self._res_subjacs[res] = {}
             for dv, (rows, cols, shape) in resdict.items():
                 rows = np.array(rows, dtype=INT_DTYPE)
                 cols = np.array(cols, dtype=INT_DTYPE)
 
-                self._res_jacs[res][dv] = {
+                self._res_subjacs[res][dv] = {
                     'coo': [rows, cols, np.zeros(rows.size)],
                     'shape': shape,
                 }

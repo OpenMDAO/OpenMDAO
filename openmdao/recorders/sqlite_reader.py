@@ -222,13 +222,13 @@ class SqliteCaseReader(BaseCaseReader):
                 self._abs2meta = json_loads(row['abs2meta'])
 
             # need to convert bounds to numpy arrays
-            for name, meta in self._abs2meta.items():
+            for meta in self._abs2meta.values():
                 if 'lower' in meta and meta['lower'] is not None:
                     meta['lower'] = np.resize(np.array(meta['lower']), meta['shape'])
                 if 'upper' in meta and meta['upper'] is not None:
                     meta['upper'] = np.resize(np.array(meta['upper']), meta['shape'])
 
-            # Map ivc_source names to input display text.
+            # Map source names to input display text.
             if version >= 11:
                 self._auto_ivc_map = auto_ivc_map = {}
                 abs2prom_in = self._abs2prom['input']

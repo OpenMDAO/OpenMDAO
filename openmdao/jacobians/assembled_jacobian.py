@@ -1,6 +1,6 @@
 """Define the AssembledJacobian class."""
 import sys
-from collections import defaultdict, OrderedDict
+from collections import defaultdict
 
 import numpy as np
 
@@ -78,10 +78,10 @@ class AssembledJacobian(Jacobian):
 
         Returns
         -------
-        OrderedDict
+        dict
             Tuples of the form (start, end) keyed on variable name.
         """
-        ranges = OrderedDict()
+        ranges = {}
         start = end = 0
         for name, meta in system._var_abs2meta[vtype].items():
             end += meta['size']
@@ -338,7 +338,7 @@ class AssembledJacobian(Jacobian):
         if ext_mtx is not None:
             ext_mtx._pre_update()
 
-        if self._randomize:
+        if self._randgen:
             for key in iters:
                 int_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['val'], key))
 

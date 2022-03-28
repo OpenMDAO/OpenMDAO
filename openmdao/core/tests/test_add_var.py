@@ -10,7 +10,7 @@ from openmdao.utils.om_warnings import OMDeprecationWarning
 
 class CompAddWithDefault(om.ExplicitComponent):
     """Component for tests for declaring only default value."""
-
+    
     def setup(self):
         self.add_input('x_a')
         self.add_input('x_b', val=3.)
@@ -143,6 +143,7 @@ class TestAddVar(unittest.TestCase):
         assert_near_equal(p.get_val('x_e'), np.ones((3,2)))
 
     def test_shape_and_indices(self):
+
         """Test declaring shape and indices."""
         p = om.Problem(model=CompAddWithShapeAndIndices())
         p.setup()

@@ -5,7 +5,7 @@ import hashlib
 import time
 
 from contextlib import contextmanager
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from itertools import chain
 from enum import IntEnum
 
@@ -209,7 +209,7 @@ class System(object):
         MPI communicator object used when System's comm is split for parallel FD.
     _solver_print_cache : list
         Allows solver iprints to be set to requested values after setup calls.
-    _subsystems_allprocs : OrderedDict
+    _subsystems_allprocs : dict
         Dict mapping subsystem name to SysInfo(system, index) for children of this system.
     _subsystems_myproc : [<System>, ...]
         List of local subsystems that exist on this proc.
@@ -273,7 +273,7 @@ class System(object):
         Nonlinear solver to be used for solve_nonlinear.
     _linear_solver : <LinearSolver>
         Linear solver to be used for solve_linear; not the Newton system.
-    _approx_schemes : OrderedDict
+    _approx_schemes : dict
         A mapping of approximation types to the associated ApproximationScheme.
     _jacobian : <Jacobian>
         <Jacobian> object to be used in apply_linear.
@@ -310,7 +310,7 @@ class System(object):
         dict of all driver responses added to the system.
     _rec_mgr : <RecordingManager>
         object that manages all recorders added to this system.
-    _static_subsystems_allprocs : OrderedDict
+    _static_subsystems_allprocs : dict
         Dict of SysInfo(subsys, index) that stores all subsystems added outside of setup.
     _static_design_vars : dict of dict
         Driver design variables added outside of setup.
@@ -470,7 +470,7 @@ class System(object):
         self._linear_solver = None
 
         self._jacobian = None
-        self._approx_schemes = OrderedDict()
+        self._approx_schemes = {}
         self._subjacs_info = {}
         self._approx_subjac_keys = None
         self.matrix_free = False
@@ -486,15 +486,15 @@ class System(object):
         self.under_complex_step = False
         self.under_finite_difference = False
 
-        self._design_vars = OrderedDict()
-        self._responses = OrderedDict()
+        self._design_vars = {}
+        self._responses = {}
         self._rec_mgr = RecordingManager()
 
         self._conn_global_abs_in2out = {}
 
         self._static_subsystems_allprocs = {}
-        self._static_design_vars = OrderedDict()
-        self._static_responses = OrderedDict()
+        self._static_design_vars = {}
+        self._static_responses = {}
 
         self._mode = None
 
@@ -705,9 +705,7 @@ class System(object):
         """
         # save root vecs as an attribute so that we can reuse the nonlinear scaling vecs in the
         # linear root vec
-        self._root_vecs = root_vectors = {'input': OrderedDict(),
-                                          'output': OrderedDict(),
-                                          'residual': OrderedDict()}
+        self._root_vecs = root_vectors = {'input': {}, 'output': {}, 'residual': {}}
 
         force_alloc_complex = self._problem_meta['force_alloc_complex']
 
@@ -861,10 +859,11 @@ class System(object):
 
         self._top_level_post_connections(mode)
 
-        self._problem_meta['relevant'] = self._init_relevance(mode)
         self._setup_var_sizes()
 
         self._top_level_post_sizes()
+
+        self._problem_meta['relevant'] = self._init_relevance(mode)
 
         # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
@@ -1536,8 +1535,8 @@ class System(object):
         self.options._parent_name = self.msginfo
         self.recording_options._parent_name = self.msginfo
         self._mode = mode
-        self._design_vars = OrderedDict()
-        self._responses = OrderedDict()
+        self._design_vars = {}
+        self._responses = {}
         self._design_vars.update(self._static_design_vars)
         self._responses.update(self._static_responses)
 
@@ -1546,7 +1545,7 @@ class System(object):
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
         """
         self._var_prom2inds = {}
-        self._var_allprocs_prom2abs_list = {'input': OrderedDict(), 'output': OrderedDict()}
+        self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
@@ -1624,9 +1623,70 @@ class System(object):
         if self._use_derivatives:
             desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
             responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
+
+            responses = self._check_alias_overlaps(responses)
+
             return self.get_relevant_vars(desvars, responses, mode)
 
         return {'@all': ({'input': ContainsAll(), 'output': ContainsAll()}, ContainsAll())}
+
+    def _check_alias_overlaps(self, responses):
+        # If you have response aliases, check for overlapping indices.  Also adds aliased
+        # sources to responses if they're not already there so relevance will work properly.
+        aliases = set()
+        aliased_srcs = {}
+        to_add = {}
+        discrete = self._var_allprocs_discrete
+
+        # group all aliases by source so we can compute overlaps for each source individually
+        for name, meta in responses.items():
+            if meta['alias'] and not (name in discrete['input'] or name in discrete['output']):
+                aliases.add(name)  # name is the same as meta['alias'] here
+                src = meta['source']
+                if src in aliased_srcs:
+                    aliased_srcs[src].append(meta)
+                else:
+                    aliased_srcs[src] = [meta]
+
+                    if src in responses:
+                        # source itself is also a constraint, so need to know indices
+                        aliased_srcs[src].append(responses[src])
+                    else:
+                        # If an alias is in responses, but the src isn't, then we need to
+                        # make sure the src is present for the relevance calculation.
+                        # This is allowed here because this responses dict is not used beyond
+                        # the relevance calculation.
+                        to_add[src] = meta
+
+        for src, metalist in aliased_srcs.items():
+            if len(metalist) == 1:
+                continue
+
+            size = self._var_allprocs_abs2meta['output'][src]['global_size']
+            shape = self._var_allprocs_abs2meta['output'][src]['global_shape']
+            mat = np.zeros(size, dtype=np.ushort)
+
+            for meta in metalist:
+                indices = meta['indices']
+                if indices is None:
+                    mat[:] += 1
+                else:
+                    indices.set_src_shape(shape)
+                    mat[indices.flat()] += 1
+
+            if np.any(mat > 1):
+                matching_aliases = sorted(m['alias'] for m in metalist if m['alias'])
+                raise RuntimeError(f"{self.msginfo}: Indices for aliases {matching_aliases} are "
+                                   f"overlapping constraint/objective '{src}'.")
+
+        if aliases:
+            # now remove alias entries from the response dict because we don't need them in the
+            # relevance calculation. This reponse dict is used only for relevance and is *not*
+            # used by the driver.
+            responses.update(to_add)
+            responses = {r: meta for r, meta in responses.items() if r not in aliases}
+
+        return responses
 
     def _setup_driver_units(self):
         """
@@ -1644,10 +1704,10 @@ class System(object):
             dv[name]['total_scaler'] = dv[name]['scaler']
 
             if units is not None:
-                # If derivatives are not being calculated, then you reach here before ivc_source
+                # If derivatives are not being calculated, then you reach here before source
                 # is placed in the meta.
                 try:
-                    units_src = meta['ivc_source']
+                    units_src = meta['source']
                 except KeyError:
                     units_src = self.get_source(name)
 
@@ -1683,10 +1743,10 @@ class System(object):
             resp[name]['total_adder'] = resp[name]['adder']
 
             if units is not None:
-                # If derivatives are not being calculated, then you reach here before ivc_source
+                # If derivatives are not being calculated, then you reach here before source
                 # is placed in the meta.
                 try:
-                    units_src = meta['ivc_source']
+                    units_src = meta['source']
                 except KeyError:
                     units_src = self.get_source(name)
 
@@ -1733,9 +1793,7 @@ class System(object):
         root_vectors : dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         """
-        self._vectors = vectors = {'input': OrderedDict(),
-                                   'output': OrderedDict(),
-                                   'residual': OrderedDict()}
+        self._vectors = vectors = {'input': {}, 'output': {}, 'residual': {}}
 
         # Allocate complex if root vector was allocated complex.
         alloc_complex = root_vectors['output']['nonlinear']._alloc_complex
@@ -2490,11 +2548,6 @@ class System(object):
         int or None
             The size of the indices, if known.
         """
-        if not (indices is None or _is_slicer_op(indices)):
-            arr = np.asarray(indices)
-            if arr.dtype.kind not in ('i', 'u') or len(arr.shape) == 0:
-                raise ValueError(f"{self.msginfo}: If specified, {typename} '{vname}' indices "
-                                 "must be a sequence of integers.")
         try:
             idxer = indexer(indices, flat_src=flat_src)
         except Exception as err:
@@ -2511,8 +2564,8 @@ class System(object):
         return idxer, size
 
     def add_design_var(self, name, lower=None, upper=None, ref=None, ref0=None, indices=None,
-                       adder=None, scaler=None, units=None,
-                       parallel_deriv_color=None, cache_linear_solution=False, flat_indices=False):
+                       adder=None, scaler=None, units=None, parallel_deriv_color=None,
+                       cache_linear_solution=False, flat_indices=False):
         r"""
         Add a design variable to this system.
 
@@ -2576,6 +2629,8 @@ class System(object):
             except ValueError as e:
                 raise(ValueError(f"{str(e)[:-1]} for design_var '{name}'."))
 
+        dv = {}
+
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
         ref0 = format_as_float_or_array('ref0', ref0, val_if_none=None, flatten=True)
@@ -2605,8 +2660,6 @@ class System(object):
             design_vars = self._static_design_vars
         else:
             design_vars = self._design_vars
-
-        dv = OrderedDict()
 
         if isinstance(scaler, np.ndarray):
             if np.all(scaler == 1.0):
@@ -2644,7 +2697,7 @@ class System(object):
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, index=None, units=None,
                      adder=None, scaler=None, linear=False, parallel_deriv_color=None,
-                     cache_linear_solution=False, flat_indices=None):
+                     cache_linear_solution=False, flat_indices=None, alias=None):
         r"""
         Add a response variable to this system.
 
@@ -2695,6 +2748,9 @@ class System(object):
             solution from the previous linear solve.
         flat_indices : bool
             If True, interpret specified indices as being indices into a flat source array.
+        alias : str
+            Alias for this response. Necessary when adding multiple responses on different
+            indices or slices of a single variable.
         """
         # Name must be a string
         if not isinstance(name, str):
@@ -2717,10 +2773,18 @@ class System(object):
             except ValueError as e:
                 raise(ValueError(f"{str(e)[:-1]} for response '{name}'."))
 
+        resp = {}
+
         typemap = {'con': 'Constraint', 'obj': 'Objective'}
-        if name in self._responses or name in self._static_responses:
-            msg = "{}: {} '{}' already exists.".format(self.msginfo, typemap[type_], name)
+        if (name in self._responses or name in self._static_responses) and alias is None:
+            msg = ("{}: {} '{}' already exists. Use the 'alias' argument to apply a second "
+                   "constraint".format(self.msginfo, typemap[type_], name))
             raise RuntimeError(msg.format(name))
+
+        resp['name'] = name
+        resp['alias'] = alias
+        if alias is not None:
+            name = alias
 
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
@@ -2738,8 +2802,6 @@ class System(object):
             responses = self._static_responses
         else:
             responses = self._responses
-
-        resp = OrderedDict()
 
         if type_ == 'con':
 
@@ -2811,7 +2873,6 @@ class System(object):
             adder = None
         resp['adder'] = adder
 
-        resp['name'] = name
         resp['ref'] = ref
         resp['ref0'] = ref0
         resp['type'] = type_
@@ -2820,12 +2881,16 @@ class System(object):
         resp['parallel_deriv_color'] = parallel_deriv_color
         resp['flat_indices'] = flat_indices
 
+        if alias in responses:
+            raise TypeError(f"Constraint alias '{alias}' is a duplicate of an existing alias or "
+                            "variable name.")
+
         responses[name] = resp
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None, units=None,
                        indices=None, linear=False, parallel_deriv_color=None,
-                       cache_linear_solution=False, flat_indices=False):
+                       cache_linear_solution=False, flat_indices=False, alias=None):
         r"""
         Add a constraint variable to this system.
 
@@ -2868,6 +2933,9 @@ class System(object):
             solution from the previous linear solve.
         flat_indices : bool
             If True, interpret specified indices as being indices into a flat source array.
+        alias : str
+            Alias for this response. Necessary when adding multiple constraints on different
+            indices or slices of a single variable.
 
         Notes
         -----
@@ -2882,11 +2950,11 @@ class System(object):
                           ref0=ref0, indices=indices, linear=linear, units=units,
                           parallel_deriv_color=parallel_deriv_color,
                           cache_linear_solution=cache_linear_solution,
-                          flat_indices=flat_indices)
+                          flat_indices=flat_indices, alias=alias)
 
     def add_objective(self, name, ref=None, ref0=None, index=None, units=None,
                       adder=None, scaler=None, parallel_deriv_color=None,
-                      cache_linear_solution=False, flat_indices=False):
+                      cache_linear_solution=False, flat_indices=False, alias=None):
         r"""
         Add a response variable to this system.
 
@@ -2921,6 +2989,9 @@ class System(object):
             solution from the previous linear solve.
         flat_indices : bool
             If True, interpret specified indices as being indices into a flat source array.
+        alias : str
+            Alias for this response. Necessary when adding multiple objectives on different
+            indices or slices of a single variable.
 
         Notes
         -----
@@ -2954,7 +3025,7 @@ class System(object):
                           ref=ref, ref0=ref0, index=index, units=units,
                           parallel_deriv_color=parallel_deriv_color,
                           cache_linear_solution=cache_linear_solution,
-                          flat_indices=flat_indices)
+                          flat_indices=flat_indices, alias=alias)
 
     def _check_voi_meta_sizes(self, typename, meta, names):
         """
@@ -3008,7 +3079,7 @@ class System(object):
         abs2meta_out = model._var_allprocs_abs2meta['output']
 
         # Human readable error message during Driver setup.
-        out = OrderedDict()
+        out = {}
         try:
             for name, data in self._design_vars.items():
                 if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
@@ -3019,7 +3090,7 @@ class System(object):
                     # This is an output name, most likely a manual indepvarcomp.
                     abs_name = pro2abs_out[name][0]
                     out[abs_name] = data
-                    out[abs_name]['ivc_source'] = abs_name
+                    out[abs_name]['source'] = abs_name
                     out[abs_name]['distributed'] = \
                         abs_name in abs2meta_out and abs2meta_out[abs_name]['distributed']
 
@@ -3031,11 +3102,11 @@ class System(object):
                     distrib = ivc_path in abs2meta_out and abs2meta_out[ivc_path]['distributed']
                     if use_prom_ivc:
                         out[name] = data
-                        out[name]['ivc_source'] = ivc_path
+                        out[name]['source'] = ivc_path
                         out[name]['distributed'] = distrib
                     else:
                         out[ivc_path] = data
-                        out[ivc_path]['ivc_source'] = ivc_path
+                        out[ivc_path]['source'] = ivc_path
                         out[ivc_path]['distributed'] = distrib
 
         except KeyError as err:
@@ -3050,9 +3121,7 @@ class System(object):
 
             for name, meta in out.items():
 
-                src_name = name
-                if meta['ivc_source'] is not None:
-                    src_name = meta['ivc_source']
+                src_name = meta['source']
 
                 if 'size' not in meta:
                     if src_name in abs2idx:
@@ -3125,7 +3194,9 @@ class System(object):
         Get the response variable settings from this system.
 
         Retrieve all response variable settings from the system as a dict,
-        keyed by variable name.
+        keyed by either absolute variable name, promoted name, or alias name,
+        depending on the value of use_prom_ivc and whether the original key was
+        a promoted output, promoted input, or an alias.
 
         Parameters
         ----------
@@ -3156,27 +3227,42 @@ class System(object):
                 if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
                     self._problem_meta['using_par_deriv_color'] = True
 
+                alias = data['alias']  # may be None
+                prom = data['name']  # always a promoted var name
                 if name in prom2abs_out:
+                    # Constraint alias should never be the same as any openmdao output.
+                    if alias is not None:
+                        path = prom2abs_out[prom][0] if prom in prom2abs_out else prom
+                        raise RuntimeError(f"Constraint alias '{alias}' on '{path}' "
+                                           "is the same name as an existing variable.")
                     abs_name = prom2abs_out[name][0]
                     out[abs_name] = data
-                    out[abs_name]['ivc_source'] = abs_name
+                    out[abs_name]['source'] = abs_name
                     out[abs_name]['distributed'] = \
                         abs_name in abs2meta_out and abs2meta_out[abs_name]['distributed']
 
                 else:
-                    # A constraint can be on an auto_ivc input, so use connected
-                    # output name.
-                    in_abs = prom2abs_in[name][0]
-                    ivc_path = conns[in_abs]
-                    distrib = ivc_path in abs2meta_out and abs2meta_out[ivc_path]['distributed']
+                    if alias is None:
+                        # A constraint can be on an input, so use connected output name.
+                        key = in_abs = prom2abs_in[name][0]
+                        src_path = conns[in_abs]
+                    else:  # name is an alias
+                        if prom in prom2abs_out:
+                            src_path = prom2abs_out[prom][0]
+                        else:
+                            src_path = conns[prom2abs_in[prom][0]]
+
+                        key = alias
+
+                    distrib = src_path in abs2meta_out and abs2meta_out[src_path]['distributed']
                     if use_prom_ivc:
                         out[name] = data
-                        out[name]['ivc_source'] = ivc_path
+                        out[name]['source'] = src_path
                         out[name]['distributed'] = distrib
                     else:
-                        out[ivc_path] = data
-                        out[ivc_path]['ivc_source'] = ivc_path
-                        out[ivc_path]['distributed'] = distrib
+                        out[key] = data
+                        out[key]['source'] = src_path
+                        out[key]['distributed'] = distrib
 
         except KeyError as err:
             msg = "{}: Output not found for response {}."
@@ -3188,7 +3274,7 @@ class System(object):
             abs2idx = model._var_allprocs_abs2idx
             owning_rank = model._owning_rank
             for response in out.values():
-                name = response['ivc_source']
+                name = response['source']
 
                 # Discrete vars
                 if name not in abs2idx:
@@ -3231,7 +3317,7 @@ class System(object):
                     self._mpi_proc_allocator.parallel):
                 all_outs = self.comm.allgather(out)
                 out = {}
-                for rank, all_out in enumerate(all_outs):
+                for all_out in all_outs:
                     out.update(all_out)
 
         return out
@@ -3254,9 +3340,8 @@ class System(object):
         dict
             The constraints defined in the current system.
         """
-        return OrderedDict((key, response) for (key, response) in
-                           self.get_responses(recurse=recurse).items()
-                           if response['type'] == 'con')
+        return {key: response for key, response in self.get_responses(recurse=recurse).items()
+                if response['type'] == 'con'}
 
     def get_objectives(self, recurse=True):
         """
@@ -3276,9 +3361,8 @@ class System(object):
         dict
             The objectives defined in the current system.
         """
-        return OrderedDict((key, response) for (key, response) in
-                           self.get_responses(recurse=recurse).items()
-                           if response['type'] == 'obj')
+        return {key: response for key, response in self.get_responses(recurse=recurse).items()
+                if response['type'] == 'obj'}
 
     def run_apply_nonlinear(self):
         """
@@ -4771,6 +4855,8 @@ class System(object):
                                 vdict[ivc_path] = discrete_vec[ivc_path[offset:]]['val']
                 else:
                     for name in variables:
+                        if name in self._responses and self._responses[name]['alias'] is not None:
+                            name = self._responses[name]['source']
                         if vec._contains_abs(name):
                             vdict[name] = get(name, False)
                         else:
@@ -4781,6 +4867,8 @@ class System(object):
                 vdict = {}
                 if discrete_vec:
                     for name in variables:
+                        if name in self._responses and self._responses[name]['alias'] is not None:
+                            name = self._responses[name]['source']
                         if vec._contains_abs(name):
                             vdict[name] = get(name, get_remote=True, rank=0,
                                               vec_name=vec_name, kind=kind)
