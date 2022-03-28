@@ -1,4 +1,5 @@
 // <<hpp_insert gen/Layout.js>>
+// <<hpp_insert gen/ClickHandler.js>>
 
 /**
  * Manage all pieces of the application. The model data, the CSS styles, the
@@ -196,13 +197,13 @@ class Diagram {
      */
     leftClickSelector(e, obj, node) {
         switch (this.ui.click.clickEffect) {
-            case N2Click.ClickEffect.NodeInfo:
+            case ClickHandler.ClickEffect.NodeInfo:
                 this.ui.nodeInfoBox.pin();
                 break;
-            case N2Click.ClickEffect.Collapse:
+            case ClickHandler.ClickEffect.Collapse:
                 this.ui.rightClick(e, node, obj);
                 break;
-            case N2Click.ClickEffect.Filter:
+            case ClickHandler.ClickEffect.Filter:
                 const color = d3.select(obj).select('rect').style('fill');
                 this.ui.altRightClick(e, node, color);
                 break;

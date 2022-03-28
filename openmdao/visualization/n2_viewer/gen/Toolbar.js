@@ -1,180 +1,18 @@
-/**
- * Base class for toolbar button events. Show, hide, or
- * move the tool tip box.
- * @typedef N2ToolbarButtonNoClick
- * @property {Object} tooltipBox A reference to the tool-tip element.
- * @property {Array} tooltips One or two tooltips to display.
- * @property {Object} toolbarButton A reference to the toolbar button.
- */
-class N2ToolbarButtonNoClick {
-    /**
-     * Set up the event handlers.
-     * @param {String} id A selector for the button element.
-     * @param {Object} tooltipBox A reference to the tool-tip element.
-     * @param {String} tooptipText Content to fill the tool-tip box with.
-     */
-    constructor(id, tooltipBox, tooltipText) {
-        this.tooltips = [tooltipText];
-
-        this.id = id;
-        this.toolbarButton = d3.select(id);
-        this.tooltipBox = tooltipBox;
-        this.help = null;
-
-        this.toolbarButton
-            .on("mouseover", this.mouseOver.bind(this))
-            .on("mouseleave", this.mouseLeave.bind(this))
-            .on("mousemove", this.mouseMove.bind(this));
-    }
-
-    /** When the mouse enters the element, show the tool tip */
-    mouseOver(e) {
-        this.tooltipBox
-            .text(this.tooltips[0])
-            .style("visibility", "visible");
-    }
-
-    /** When the mouse leaves the element, hide the tool tip */
-    mouseLeave(e) {
-        this.tooltipBox.style("visibility", "hidden");
-    }
-
-    /** Keep the tool-tip near the mouse */
-    mouseMove(e) {
-        this.tooltipBox.style("top", (e.pageY - 30) + "px")
-            .style("left", (e.pageX + 5) + "px");
-    }
-
-    /**
-     * Use when the info displayed on the help screen is different than the tooltip.
-     * @param {String} helpText The info to display on the help screen for this button.
-     * @returns {N2ToolbarButtonNoClick} Reference to this.
-     */
-    setHelpInfo(helpText) {
-        this.help = helpText;
-        return this;
-    }
-
-    /**
-     * Grab all the info about the button that will help with generating the help screen.
-     */
-    getHelpInfo() {
-        const parent = d3.select(this.toolbarButton.node().parentNode);
-        let primaryGrpBtnId = null;
-        const expansionItem = parent.classed('toolbar-group-expandable');
-
-        if (expansionItem) {
-            const grandparent = d3.select(parent.node().parentNode);
-            primaryGrpBtnId = grandparent.select(':first-child').attr('id');
-        }
-
-        return {
-            'id': this.id.replace('#', ''),
-            'desc': this.help ? this.help : this.tooltips[0],
-            'bbox': this.toolbarButton.node().getBoundingClientRect(),
-            'expansionItem': expansionItem,
-            'primaryGrpBtnId': primaryGrpBtnId
-        };
-    }
-}
-
-/**
- * Manage clickable toolbar buttons
- * @typedef N2ToolbarButtonClick
- * @property {Object} tooltipBox A reference to the tool-tip element.
- * @property {Array} tooltips One or two tooltips to display.
- * @property {Object} toolbarButton A reference to the toolbar button.
- * @property {Function} clickFn The function to call when clicked.
- */
-class N2ToolbarButtonClick extends N2ToolbarButtonNoClick {
-    /**
-     * Set up the event handlers.
-     * @param {String} id A selector for the button element.
-     * @param {Object} tooltipBox A reference to the tool-tip element.
-     * @param {String} tooptipText Content to fill the tool-tip box with.
-     * @param {Function} clickFn The function to call when clicked.
-     */
-    constructor(id, tooltipBox, tooltipText, clickFn) {
-        super(id, tooltipBox, tooltipText);
-        this.clickFn = clickFn;
-
-        let self = this;
-
-        this.toolbarButton.on('click', function (e) { self.click(e, this); });
-    }
-
-    /**
-     * Defined separately so the derived class can override
-     * @param {Object} target Reference to the HTML element that was clicked
-     */
-    click(e, target) {
-        this.clickFn(e, target);
-    }
-}
-
-/**
- * Manage toolbar buttons that alternate states when clicked.
- * @typedef N2ToolbarButtonToggle
- * @property {Object} tooltipBox A reference to the tool-tip element.
- * @property {Array} tooltips One or two tooltips to display.
- * @property {Object} toolbarButton A reference to the toolbar button.
- * @property {Function} clickFn The function to call when clicked.
- * @property {Function} predicateFn Function returning a boolean representing the state.
- */
-class N2ToolbarButtonToggle extends N2ToolbarButtonClick {
-    /**
-     * Set up the event handlers.
-     * @param {String} id A selector for the button element.
-     * @param {Object} tooltipBox A reference to the tool-tip element.
-     * @param {String} tooptipTextArr A pair of tooltips for alternate states.
-     * @param {Function} predicateFn Function returning a boolean representing the state.
-     * @param {Function} clickFn The function to call when clicked.
-     */
-    constructor(id, tooltipBox, tooltipTextArr, predicateFn, clickFn) {
-        super(id, tooltipBox, tooltipTextArr[0], clickFn);
-        this.tooltips.push(tooltipTextArr[1]);
-        this.predicateFn = predicateFn;
-    }
-
-    /**
-     * When the mouse enters the element, show a tool tip based
-     * on the result of the predicate function.
-     */
-    mouseOver() {
-        this.tooltipBox
-            .text(this.predicateFn() ? this.tooltips[0] : this.tooltips[1])
-            .style("visibility", "visible");
-    }
-
-    /**
-     * When clicked, perform the associated function, then change the tool tip
-     * based on the result of the predicate function.
-     * @param {Object} target Reference to the HTML element that was clicked
-     */
-    click(e, target) {
-        this.clickFn(e, target);
-
-        this.tooltipBox
-            .text(this.predicateFn() ? this.tooltips[0] : this.tooltips[1])
-            .style("visibility", "visible");
-
-    }
-}
+// <<hpp_insert gen/ToolbarButtonClick.js>>
+// <<hpp_insert gen/ToolbarButtonToggle.js>>
+// <<hpp_insert gen/ClickHandler.js>>
 
 /**
  * Manage the set of buttons and tools at the left of the diagram.
- * @typedef N2Toolbar
+ * @typedef Toolbar
  * @property {Boolean} hidden Whether the toolbar is visible or not.
  */
-class N2Toolbar {
+class Toolbar {
     /**
      * Set up the event handlers for mouse hovering and clicking.
      * @param {N2UserInterface} n2ui Reference to the main interface object
-     * @param {Number} sliderHeight The maximum height of the n2
      */
-    constructor(n2ui, sliderHeight = window.innerHeight * .95) {
-        const self = this;
-
+    constructor(n2ui) {
         this.toolbarContainer = d3.select('#toolbarLoc');
         this.toolbar = d3.select('#true-toolbar');
         this.hideToolbarButton = d3.select('.toolbar-hide-container');
@@ -200,7 +38,7 @@ class N2Toolbar {
 
     /**
      * Generate the data structure that describes all of the toolbar buttons. Nothing
-     * is actually rendered here (that is done in the N2Help constructor.)
+     * is actually rendered here (that is done in the Help constructor.)
      */
     _setupHelp() {
         const toolbarBRect = this.toolbarContainer.node().getBoundingClientRect();
@@ -231,7 +69,7 @@ class N2Toolbar {
 
     /** Either create the help window the first time or redisplay it */
     _showHelp() {
-        if (!this._helpWindow) this._helpWindow = new N2Help(this.helpInfo);
+        if (!this._helpWindow) this._helpWindow = new Help(this.helpInfo);
         else this._helpWindow.show().modal(true);
     }
 
@@ -298,9 +136,9 @@ class N2Toolbar {
         const self = this; // For callbacks that change "this". Alternative to using .bind().
         const tooltipBox = d3.select(".tool-tip");
 
-        this._addButton(new N2ToolbarButtonClick('#searchButtonId', tooltipBox,
+        this._addButton(new ToolbarButtonClick('#searchButtonId', tooltipBox,
             "Collapse model to variables matching search term",
-            e => {
+            () => {
                 if (self.searchBar.node().value == '') {
                     self.searchCount.html('0 matches');
                 }
@@ -321,53 +159,53 @@ class N2Toolbar {
             })
         );
 
-        this._addButton(new N2ToolbarButtonClick('#reset-graph', tooltipBox,
+        this._addButton(new ToolbarButtonClick('#reset-graph', tooltipBox,
             "View entire model starting from root", () => n2ui.homeButtonClick()));
 
-        this._addButton(new N2ToolbarButtonClick('#undo-graph', tooltipBox,
+        this._addButton(new ToolbarButtonClick('#undo-graph', tooltipBox,
             "Move back in view history", () => n2ui.backButtonPressed()));
 
-        this._addButton(new N2ToolbarButtonClick('#redo-graph', tooltipBox,
+        this._addButton(new ToolbarButtonClick('#redo-graph', tooltipBox,
             "Move forward in view history", () => n2ui.forwardButtonPressed()));
 
-        this._addButton(new N2ToolbarButtonClick('#collapse-element', tooltipBox,
+        this._addButton(new ToolbarButtonClick('#collapse-element', tooltipBox,
             "Control variable collapsing",
             () => n2ui.collapseAll(n2ui.n2Diag.zoomedElement)));
 
-        this._addButton(new N2ToolbarButtonClick('#collapse-element-2', tooltipBox,
+        this._addButton(new ToolbarButtonClick('#collapse-element-2', tooltipBox,
             "Collapse only variables in current view",
             (e, target) => {
                 n2ui.collapseAll(n2ui.n2Diag.zoomedElement);
                 self._setRootButton(target);
             }));
 
-        this._addButton(new N2ToolbarButtonClick('#collapse-all', tooltipBox,
+        this._addButton(new ToolbarButtonClick('#collapse-all', tooltipBox,
             "Collapse all variables in entire model",
             (e, target) => {
                 n2ui.collapseAll(n2ui.n2Diag.model.root);
                 self._setRootButton(target);
             }));
 
-        this._addButton(new N2ToolbarButtonClick('#expand-element', tooltipBox,
+        this._addButton(new ToolbarButtonClick('#expand-element', tooltipBox,
             "Expand only variables in current view",
             (e, target) => { 
                 n2ui.expandAll(n2ui.n2Diag.zoomedElement);
                 self._setRootButton(target);
             }));
 
-        this._addButton(new N2ToolbarButtonClick('#expand-all', tooltipBox,
+        this._addButton(new ToolbarButtonClick('#expand-all', tooltipBox,
             "Expand all variables in entire model",
             (e, target) => {
                 n2ui.expandAll(n2ui.n2Diag.model.root);
                 self._setRootButton(target);
             }));
 
-        this._addButton(new N2ToolbarButtonToggle('#info-button', tooltipBox,
+        this._addButton(new ToolbarButtonToggle('#info-button', tooltipBox,
             ["Hide detailed node information", "Show detailed node information"],
             () => { return n2ui.nodeInfoBox.active; },
             () => { n2ui.click.toggle('nodeinfo'); })).setHelpInfo("Select left-click action");
 
-        this._addButton(new N2ToolbarButtonToggle('#info-button-2', tooltipBox,
+        this._addButton(new ToolbarButtonToggle('#info-button-2', tooltipBox,
             ["Hide detailed node information", "Show detailed node information"],
             () => { return n2ui.nodeInfoBox.active; },
             (e, target) => {
@@ -375,102 +213,70 @@ class N2Toolbar {
                 self._setRootButton(target);
             })).setHelpInfo("Toggle detailed node info mode");
 
-        this._addButton(new N2ToolbarButtonToggle('#collapse-target', tooltipBox,
+        this._addButton(new ToolbarButtonToggle('#collapse-target', tooltipBox,
             ["Exit collapse/expand mode", "Enter collapse/expand mode"],
-            () => { return n2ui.click.clickEffect == N2Click.ClickEffect.Collapse; },
+            () => { return n2ui.click.clickEffect == ClickHandler.ClickEffect.Collapse; },
             (e, target) => {
                 n2ui.click.toggle('collapse');
                 self._setRootButton(target);
             })).setHelpInfo("Toggle collapse/expand mode");
 
-        this._addButton(new N2ToolbarButtonToggle('#filter-target', tooltipBox,
+        this._addButton(new ToolbarButtonToggle('#filter-target', tooltipBox,
             ["Exit variable filtering mode", "Enter variable filtering mode"],
-            () => { return n2ui.click.clickEffect == N2Click.ClickEffect.Filter; },
+            () => { return n2ui.click.clickEffect == ClickHandler.ClickEffect.Filter; },
             (e, target) => {
                 n2ui.click.toggle('filter');
                 self._setRootButton(target);
             })).setHelpInfo("Toggle variable filtering mode");
 
-        this._addButton(new N2ToolbarButtonClick('#hide-connections', tooltipBox,
+        this._addButton(new ToolbarButtonClick('#hide-connections', tooltipBox,
             "Set connections visibility",
             () => n2ui.n2Diag.clearArrows()));
 
-        this._addButton(new N2ToolbarButtonClick('#hide-connections-2', tooltipBox,
+        this._addButton(new ToolbarButtonClick('#hide-connections-2', tooltipBox,
             "Remove all connection arrows",
             (e, target) => { n2ui.n2Diag.clearArrows(); self._setRootButton(target); }));
 
-        this._addButton(new N2ToolbarButtonClick('#show-all-connections', tooltipBox,
+        this._addButton(new ToolbarButtonClick('#show-all-connections', tooltipBox,
             "Show all connections in view",
             (e, target) => { n2ui.n2Diag.showAllArrows(); self._setRootButton(target); }));
 
-        this._addButton(new N2ToolbarButtonClick('#linear-solver-button', tooltipBox,
-            "Control solver tree display",
-            () => { n2ui.setSolvers(true); n2ui.showSolvers(); }));
-
-        this._addButton(new N2ToolbarButtonClick('#linear-solver-button-2', tooltipBox,
-            "Show linear solvers",
-            (e, target) => {
-                n2ui.setSolvers(true);
-                n2ui.showSolvers();
-                self._setRootButton(target);
-            }));
-
-        this._addButton(new N2ToolbarButtonClick('#non-linear-solver-button', tooltipBox,
-            "Show non-linear solvers",
-            (e, target) => {
-                n2ui.setSolvers(false);
-                n2ui.showSolvers();
-                self._setRootButton(target);
-            }));
-
-        this._addButton(new N2ToolbarButtonClick('#no-solver-button', tooltipBox,
-            "Hide solvers",
-            (e, target) => {
-                n2ui.hideSolvers();
-                self._setRootButton(target);
-            }));
-
-        this._addButton(new N2ToolbarButtonToggle('#desvars-button', tooltipBox,
-            ["Show optimization variables", "Hide optimization variables"],
-            () => n2ui.desVars, () => n2ui.toggleDesVars()))
-            .setHelpInfo("Toggle optimization variables");
-
-        this._addButton(new N2ToolbarButtonNoClick('#text-slider-button', tooltipBox,
+        this._addButton(new ToolbarButtonNoClick('#text-slider-button', tooltipBox,
             "Set text height"));
-        this._addButton(new N2ToolbarButtonNoClick('#depth-slider-button', tooltipBox,
+        this._addButton(new ToolbarButtonNoClick('#depth-slider-button', tooltipBox,
             "Set collapse depth"));
-        this._addButton(new N2ToolbarButtonNoClick('#model-slider-button', tooltipBox,
+        this._addButton(new ToolbarButtonNoClick('#model-slider-button', tooltipBox,
             "Set model height"));
 
-        this._addButton(new N2ToolbarButtonNoClick('#save-load-button', tooltipBox,
+        this._addButton(new ToolbarButtonNoClick('#save-load-button', tooltipBox,
             "Save or load an image or view"));
 
-        this._addButton(new N2ToolbarButtonClick('#save-button', tooltipBox,
+        this._addButton(new ToolbarButtonClick('#save-button', tooltipBox,
             "Save to SVG", () => n2ui.n2Diag.saveSvg() ));
 
-        this._addButton(new N2ToolbarButtonClick('#save-state-button', tooltipBox,
+        this._addButton(new ToolbarButtonClick('#save-state-button', tooltipBox,
             "Save View", () => n2ui.saveState() ));
 
-        this._addButton(new N2ToolbarButtonClick('#load-state-button', tooltipBox,
+        this._addButton(new ToolbarButtonClick('#load-state-button', tooltipBox,
             "Load View", () => n2ui.loadState() ));
 
-        this._addButton(new N2ToolbarButtonToggle('#legend-button', tooltipBox,
+        this._addButton(new ToolbarButtonToggle('#legend-button', tooltipBox,
             ["Show legend", "Hide legend"],
             () => n2ui.legend.hidden,
             (e, target) => { n2ui.toggleLegend(); self._setRootButton(target); }))
             .setHelpInfo("Toggle legend");
 
-        this._addButton(new N2ToolbarButtonClick('#question-button', tooltipBox,
+        this._addButton(new ToolbarButtonClick('#question-button', tooltipBox,
             "Show N2 diagram help",
             (e, target) => { self._showHelp(); self._setRootButton(target); }));
 
-        this._addButton(new N2ToolbarButtonClick('#question-button-2', tooltipBox,
+        this._addButton(new ToolbarButtonClick('#question-button-2', tooltipBox,
             "Show N2 diagram help",
             (e, target) => { self._showHelp(); self._setRootButton(target); }));
 
         // Don't add this to the array of tracked buttons because it confuses
         // the help screen generation
-        new N2ToolbarButtonToggle('#hide-toolbar', tooltipBox,
+        new ToolbarButtonToggle('#hide-toolbar', tooltipBox,
             ["Show toolbar", "Hide toolbar"],
             () => self.hidden, () => self.toggle());
 
