@@ -1,5 +1,6 @@
 // <<hpp_insert gen/Diagram.js>>
 // <<hpp_insert src/OmLayout.js>>
+// <<hpp_insert src/OmStyle.js>>
 
 /**
  * Manage all components of the application. The model data, the CSS styles, the
@@ -19,6 +20,24 @@ class OmDiagram extends Diagram {
         this.dims.size.solverTree = structuredClone(this.dims.size.partitionTree);
 
         this._init();
+    }
+
+
+    /**
+     * Separate these calls from the constructor so that subclasses can
+     * set values before execution.
+     */
+     _init() {
+        this.style = new OmStyle(this.dom.svgStyle, this.dims.size.font);
+        this.layout = this._newLayout();
+
+        this.search = new N2Search(this.zoomedElement, this.model.root);
+        this.ui = new N2UserInterface(this);
+
+        // Keep track of arrows to show and hide them
+        this.arrowMgr = new N2ArrowManager(this.dom.n2Groups);
+        this.matrix = new N2Matrix(this.model, this.layout, this.dom.n2Groups,
+            this.arrowMgr, true, this.ui.findRootOfChangeFunction);
     }
 
     /** Override Diagram._newLayout() to create an OmLayout object. */

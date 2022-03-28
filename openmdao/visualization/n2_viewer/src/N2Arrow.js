@@ -183,7 +183,7 @@ class N2BentArrow extends N2Arrow {
             .attr("r", this.width * 1.0)
             .style("stroke-width", 0)
             .style("fill-opacity", 1)
-            .style("fill", N2Style.color.connection);
+            .style("fill", OmStyle.color.connection);
 
         this.topCircle
             .attr("cx", this.pts.mid.x)
@@ -315,7 +315,7 @@ class N2OffGridUpArrow extends N2OffGridArrow {
             'end': { 'id': attribs.cell.tgtId },
             'direction': 'up',
             'cellId': attribs.cellId,
-            'color': attribs.color ? attribs.color : N2Style.color.inputArrow
+            'color': attribs.color ? attribs.color : OmStyle.color.inputArrow
         }), n2Groups, nodeSize);
 
         this.label.ref = d3.select("div#left.offgrid");
@@ -360,7 +360,7 @@ class N2OffGridDownArrow extends N2OffGridArrow {
             'end': { 'id': attribs.cell.tgtId },
             'direction': 'down',
             'cellId': attribs.cellId,
-            'color': attribs.color ? attribs.color : N2Style.color.inputArrow
+            'color': attribs.color ? attribs.color : OmStyle.color.inputArrow
         }), n2Groups, nodeSize);
 
         this.label.ref = d3.select("div#bottom.offgrid");
@@ -404,7 +404,7 @@ class N2OffGridLeftArrow extends N2OffGridArrow {
             'end': { 'id': attribs.offscreenId },
             'direction': 'left',
             'cellId': attribs.cellId,
-            'color': attribs.color ? attribs.color : N2Style.color.outputArrow
+            'color': attribs.color ? attribs.color : OmStyle.color.outputArrow
         }), n2Groups, nodeSize);
 
         this.label.ref = d3.select("div#bottom.offgrid");
@@ -449,7 +449,7 @@ class N2OffGridRightArrow extends N2OffGridArrow {
             'end': { 'id': attribs.offscreenId },
             'direction': 'right',
             'cellId': attribs.cellId,
-            'color': attribs.color ? attribs.color : N2Style.color.outputArrow
+            'color': attribs.color ? attribs.color : OmStyle.color.outputArrow
         }), n2Groups, nodeSize);
 
         this.label.ref = d3.select("div#right.offgrid");

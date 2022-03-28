@@ -1,12 +1,12 @@
 // <<hpp_insert gen/Layout.js>>
 
 /**
- * Manage all components of the application. The model data, the CSS styles, the
+ * Manage all pieces of the application. The model data, the CSS styles, the
  * user interface, the layout of the matrix, and the matrix grid itself are
  * all member objects.
  * @typedef Diagram
  * @property {ModelData} model Processed model data received from Python.
- * @property {N2Style} style Manages N2-related styles and functions.
+ * @property {OmStyle} style Manages N2-related styles and functions.
  * @property {N2Layout} layout Sizes and positions of visible elements.
  * @property {N2Matrix} matrix Manages the grid of visible model parameters.
  * @property {TreeNode} zoomedElement The element the diagram is currently based on.
@@ -47,7 +47,7 @@ class Diagram {
      * set values before execution.
      */
     _init() {
-        this.style = new N2Style(this.dom.svgStyle, this.dims.size.font);
+        this.style = new Style(this.dom.svgStyle, this.dims.size.font);
         this.layout = this._newLayout();
 
         this.search = new N2Search(this.zoomedElement, this.model.root);
