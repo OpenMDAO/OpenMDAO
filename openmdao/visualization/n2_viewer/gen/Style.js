@@ -3,7 +3,7 @@
  * @typedef Style
  */
 class Style {
-    // From Isaias Reyes
+    /** Define colors for each element type. Selected by Isaias Reyes */
     static color = {
         'connection': 'gray',
         'background': '#eee',
@@ -22,6 +22,11 @@ class Style {
         'variableBox': '#555',
     };
 
+    /**
+     * Initialize the Style object.
+     * @param {Object} svgStyle A reference to the SVG style section, which will be rewritten.
+     * @param {Number} fontSize The font size to apply to text styles.
+     */
     constructor(svgStyle, fontSize) {
         this.svgStyle = svgStyle;
 
@@ -32,6 +37,12 @@ class Style {
     /** A stub for subclasses to perform initialization. */
     _init() { }
 
+    /**
+     * Associate selectors with various style attributes.
+     * @param {Number} fontSize The font size to apply to text styles.
+     * @returns {Object} An object with selectors as keys, and values that are also objects,
+     *     with style attributes as keys and values as their settings.
+     */
     _createStyleObj(fontSize) {
         const newCssJson = {
             'rect': {
@@ -98,7 +109,7 @@ class Style {
                 'font-style': 'italic'
             },
             'g.variable_box > rect': {
-                'stroke': OmStyle.color.variableBox,
+                'stroke': Style.color.variableBox,
                 'stroke-width': '2',
                 'fill': 'none',
             }

@@ -5,7 +5,7 @@
  * @typedef OmStyle
  */
 class OmStyle extends Style {
-    // From Isaias Reyes
+    // Define colors for each element type. Selected by Isaias Reyes
     static color = {
         ...Style.color,
         'outputImplicit': '#C7D06D',
@@ -53,8 +53,14 @@ class OmStyle extends Style {
         ['other',           'other',           '#ffed6f'],
     ];
 
+    /** The solverStyleData array is split into objects with keys 'ln', 'nl', and 'color' */
     static solverStyleObject = [];
 
+    /**
+     * Initialize the OmStyle object.
+     * @param {Object} svgStyle A reference to the SVG style section, which will be rewritten.
+     * @param {Number} fontSize The font size to apply to text styles.
+     */
     constructor(svgStyle, fontSize) {
         super(svgStyle, fontSize);
     }
@@ -86,6 +92,13 @@ class OmStyle extends Style {
         }
     }
 
+    /**
+     * Associate selectors with various style attributes. Adds support for OM components,
+     * subsystems, implicit/explicit outputs, solvers, and Auto-IVC inputs.
+     * @param {Number} fontSize The font size to apply to text styles.
+     * @returns {Object} An object with selectors as keys, and values that are also objects,
+     *     with style attributes as keys and values as their settings.
+     */
     _createStyleObj(fontSize) {
         const newCssJson = super._createStyleObj(fontSize);
 
@@ -131,24 +144,24 @@ class OmStyle extends Style {
     }
 
     /**
-       * Determine the name of the CSS class based on the name of the solver.
-       * @param {boolean} showLinearSolverNames Whether to use the linear or non-linear solver name.
-       * @param {Object} solverNames
-       * @param {string} solverNames.linear The linear solver name.
-       * @param {string} solverNames.nonLinear The non-linear solver name.
-       * @return {string} The CSS class of the solver, or for "other" if not found.
-       */
+     * Determine the name of the CSS class based on the name of the solver.
+     * @param {boolean} showLinearSolverNames Whether to use the linear or non-linear solver name.
+     * @param {Object} solverNames
+     * @param {string} solverNames.linear The linear solver name.
+     * @param {string} solverNames.nonLinear The non-linear solver name.
+     * @return {string} The CSS class of the solver, or for "other" if not found.
+     */
     getSolverClass(showLinearSolverNames, solverNames) {
         const solverName = showLinearSolverNames? solverNames.linear : solverNames.nonLinear;
         return this.solvers[solverName]? this.solvers[solverName].class : this.solvers.other.class;
     }
 
     /**
-       * Based on the element's type and conditionally other info, determine
-       * what CSS style is associated.
-       * @param {OmTreeNode} node The item to check.
-       * @return {string} The name of an existing CSS class.
-       */
+     * Based on the element's type and conditionally other info, determine
+     * what CSS style is associated.
+     * @param {OmTreeNode} node The item to check.
+     * @return {string} The name of an existing CSS class.
+     */
     getNodeClass(node) {
         if (node.draw.minimized) return 'minimized';
 
@@ -185,6 +198,7 @@ class OmStyle extends Style {
     }
 }
 
+// Load solverStyleObject with values from solverStyleData
 for (const solver of OmStyle.solverStyleData) {
     OmStyle.solverStyleObject.push({ ln: solver[0], nl: solver[1], color: solver[2] });
 }
