@@ -15,12 +15,12 @@ def make_hook(name):
 def hooks_active(f):
     # turn hooks on and off around a hooks test
     def _wrapper(*args, **kwargs):
+        hooks._reset_all_hooks()
         hooks.use_hooks = True
         try:
             f(*args, **kwargs)
         finally:
             hooks.use_hooks = False
-            hooks._reset_all_hooks()
     return _wrapper
 
 
@@ -160,6 +160,26 @@ class HooksTestCase(unittest.TestCase):
         self.assertEqual(prob.calls, [])
         self.assertEqual(len(hooks._hooks), 0)  # should be no hooks left
 
+    @hooks_active
+    def test_problem_hooks_kwargs(self):
+
+        x0 = 33.0
+        y0 = 44.0
+
+        def set_prob_vars_hook_func(prob, **kwargs):
+            if 'x0' in kwargs:
+                prob['p1.x'] = kwargs['x0']
+            if 'y0' in kwargs:
+                prob['p2.y'] = kwargs['y0']
+
+        hooks._register_hook('final_setup', 'Problem', pre=set_prob_vars_hook_func, x0=x0, y0=y0)
+
+        prob = self.build_model()
+
+        prob.run_model()
+
+        self.assertEqual(prob['comp.x'], x0)
+        self.assertEqual(prob['comp.y'], y0)
 
 if __name__ == '__main__':
     unittest.main()

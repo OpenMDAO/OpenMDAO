@@ -15,6 +15,7 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 import openmdao.utils.hooks as hooks
 from openmdao.utils.units import convert_units
 from openmdao.utils.om_warnings import DerivativesWarning
+from openmdao.utils.tests.test_hooks import hooks_active
 
 try:
     from parameterized import parameterized
@@ -1826,11 +1827,11 @@ class TestProblem(unittest.TestCase):
         self.assertTrue(isinstance(top.model.sub.nonlinear_solver, om.NewtonSolver))
         self.assertTrue(isinstance(top.model.sub.linear_solver, om.ScipyKrylov))
 
+    @hooks_active
     def test_post_final_setup_hook(self):
         def hook_func(prob):
             prob['p2.y'] = 5.0
 
-        hooks.use_hooks = True
         hooks._register_hook('final_setup', class_name='Problem', post=hook_func)
         try:
             prob = om.Problem()
@@ -1882,9 +1883,9 @@ class TestProblem(unittest.TestCase):
         self.assertEquals(output[1], r'Design Variables')
         self.assertRegex(output[5], r'^z +\|[0-9. e+-]+\| +2')
         self.assertEquals(output[9], r'Constraints')
-        self.assertRegex(output[14], r'^con_cmp2.con2 +\[[0-9. e+-]+\] +1')
+        self.assertRegex(output[14], r'^con2 +\[[0-9. e+-]+\] +1')
         self.assertEquals(output[17], r'Objectives')
-        self.assertRegex(output[21], r'^obj_cmp.obj +\[[0-9. e+-]+\] +1')
+        self.assertRegex(output[21], r'^obj +\[[0-9. e+-]+\] +1')
 
         # With show_promoted_name=False
         stdout = sys.stdout
@@ -1896,8 +1897,8 @@ class TestProblem(unittest.TestCase):
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
         self.assertRegex(output[5], r'^z +\|[0-9. e+-]+\| +2')
-        self.assertRegex(output[14], r'^con2 +\[[0-9. e+-]+\] +1')
-        self.assertRegex(output[21], r'^obj +\[[0-9. e+-]+\] +1')
+        self.assertRegex(output[14], r'^con_cmp2.con2 +\[[0-9. e+-]+\] +1')
+        self.assertRegex(output[21], r'^obj_cmp.obj +\[[0-9. e+-]+\] +1')
 
         # With all the optional columns
         stdout = sys.stdout
@@ -1957,6 +1958,109 @@ class TestProblem(unittest.TestCase):
         self.assertRegex(output[10], r'^\s+array+\(+\[[0-9., e+-]+\]+\)')
         self.assertRegex(output[12], r'^\s+upper:')
         self.assertRegex(output[13], r'^\s+array+\(+\[[0-9., e+-]+\]+\)')
+
+    def test_list_problem_w_multi_constraints(self):
+        p = om.Problem()
+
+        exec = om.ExecComp(['y = x**2',
+                            'z = a + x**2'],
+                        a={'shape': (1,)},
+                        y={'shape': (101,)},
+                        x={'shape': (101,)},
+                        z={'shape': (101,)})
+
+        p.model.add_subsystem('exec', exec)
+
+        p.model.add_design_var('exec.a', lower=-1000, upper=1000)
+        p.model.add_objective('exec.y', index=50)
+        p.model.add_constraint('exec.z', indices=[0], equals=25)
+        p.model.add_constraint('exec.z', indices=[-1], lower=20, alias="ALIAS_TEST")
+
+        p.driver = om.ScipyOptimizeDriver()
+
+        p.setup()
+
+        p.set_val('exec.x', np.linspace(-10, 10, 101))
+
+        p.run_driver()
+
+        # First, with no options
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            p.list_problem_vars()
+        finally:
+            sys.stdout = stdout
+
+        output = strout.getvalue().split('\n')
+        self.assertTrue("ALIAS_TEST" in output[13])
+
+    def test_constraint_alias_duplicate_errors(self):
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp1', om.ExecComp('f = x',
+                                                f=np.ones((size, )),
+                                                x=np.ones((size, ))),
+                            promotes=['*'])
+        model.add_subsystem('comp2', om.ExecComp('g = x',
+                                                g=np.ones((size, )),
+                                                x=np.ones((size, ))),
+                            promotes=['*'])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+
+        model.add_constraint('f', indices=[1], flat_indices=True, lower=10.0)
+        model.add_constraint('f', indices=[5], flat_indices=True, alias='g', lower=0.5)
+
+        msg = "Constraint alias 'f' is a duplicate of an existing alias or variable name."
+        with self.assertRaises(TypeError) as cm:
+            model.add_constraint('f', indices=[3], flat_indices=True, alias='f', lower=0.5)
+
+        self.assertEqual(str(cm.exception), msg)
+
+        msg = "Constraint alias 'g' on 'comp1.f' is the same name as an existing variable."
+        with self.assertRaises(RuntimeError) as cm:
+            prob.setup()
+
+        self.assertEqual(str(cm.exception), msg)
+
+    def test_constraint_ellipses_slice_as_indices(self):
+        # this passes as long as no exceptions are raised
+        p = om.Problem()
+
+        exec_comp = p.model.add_subsystem('exec', om.ExecComp())
+
+        exec_comp.add_expr('y = x**2', y={'shape': (10, 3)}, x={'shape': (10, 3)})
+
+        p.model.add_constraint('exec.y', alias='y0', indices=om.slicer[0, ...], equals=0)
+        p.model.add_constraint('exec.y', alias='yf', indices=om.slicer[1, ...], equals=0)
+
+        p.setup()
+
+        p.set_val('exec.x', np.random.random((10, 3)))
+
+        p.run_model()
+
+    def test_constraint_slice_with_negative_as_indices(self):
+        # this passes as long as no exceptions are raised
+        p = om.Problem()
+
+        exec_comp = p.model.add_subsystem('exec', om.ExecComp())
+
+        exec_comp.add_expr('y = x**2', y={'shape': (10, 3)}, x={'shape': (10, 3)})
+
+        p.model.add_constraint('exec.y', alias='y0', indices=om.slicer[0, -1], equals=0)
+        p.model.add_constraint('exec.y', alias='yf', indices=om.slicer[-1, 0], equals=0)
+
+        p.setup()
+
+        p.set_val('exec.x', np.random.random((10, 3)))
+
+        p.run_model()
 
     def test_list_problem_vars_driver_scaling(self):
         model = SellarDerivatives()

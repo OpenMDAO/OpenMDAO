@@ -231,10 +231,7 @@ def dict_to_structured_array(values):
         Numpy structured array containing the same names and values as the input values dict.
     """
     if values:
-        dtype_tuples = []
-        for name, value in values.items():
-            tple = (str(name), '{}f8'.format(value.shape))
-            dtype_tuples.append(tple)
+        dtype_tuples = [(str(name), f'{value.shape}f8') for name, value in values.items()]
 
         array = np.zeros((1,), dtype=dtype_tuples)
 

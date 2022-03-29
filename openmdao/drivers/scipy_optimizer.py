@@ -3,7 +3,6 @@ OpenMDAO Wrapper for the scipy.optimize.minimize family of local optimizers.
 """
 
 import sys
-from collections import OrderedDict
 from distutils.version import LooseVersion
 
 import numpy as np
@@ -102,7 +101,7 @@ class ScipyOptimizeDriver(Driver):
         Cached result of constraint evaluations because scipy asks for them in a separate function.
     _con_idx : dict
         Used for constraint bookkeeping in the presence of 2-sided constraints.
-    _grad_cache : OrderedDict
+    _grad_cache : {}
         Cached result of nonlinear constraint derivatives because scipy asks for them in a separate
         function.
     _exc_info : 3 item tuple
@@ -137,7 +136,7 @@ class ScipyOptimizeDriver(Driver):
         self.supports._read_only = True
 
         # The user places optimizer-specific settings in here.
-        self.opt_settings = OrderedDict()
+        self.opt_settings = {}
 
         self.result = None
         self._grad_cache = None

@@ -288,7 +288,8 @@ class TestDriver(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             prob.driver.options['debug_print'] = ['bad_option']
         self.assertEqual(str(context.exception),
-                         "Option 'debug_print' contains value 'bad_option' which is not one of ['desvars', 'nl_cons', 'ln_cons', 'objs', 'totals'].")
+                         "Driver: Value (['bad_option']) of option 'debug_print' is not one of "
+                         "['desvars', 'nl_cons', 'ln_cons', 'objs', 'totals'].")
 
     def test_debug_print_approx(self):
 
