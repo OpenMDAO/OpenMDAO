@@ -112,7 +112,8 @@ from openmdao.utils.om_warnings import issue_warning, reset_warnings, OpenMDAOWa
     OMInvalidCheckDerivativesOptionsWarning
 
 # Reports System
-from openmdao.utils.reports_system import register_report, get_reports_dir, list_reports
+from openmdao.utils.reports_system import register_report, get_reports_dir, list_reports, \
+    clear_reports
 
 import os
 import builtins
