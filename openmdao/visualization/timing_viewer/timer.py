@@ -38,11 +38,11 @@ def _timing_iter(all_timing_managers):
     for rank, (timing_managers, tot_time) in enumerate(all_timing_managers):
         for probname, tmanager in timing_managers.items():
             for sysname, timers in tmanager._timers.items():
-                for t, parallel in timers:
+                for t, parallel, nprocs in timers:
                     if t.ncalls > 0:
                         level = len(sysname.split('.')) if sysname else 0
-                        yield rank, probname, sysname, level, parallel, t.name, t.ncalls, t.avg(),\
-                            t.min, t.max, t.tot, tot_time
+                        yield rank, probname, sysname, level, parallel, nprocs, t.name, t.ncalls, \
+                            t.avg(), t.min, t.max, t.tot, tot_time
 
 
 def _timing_file_iter(timing_file):
@@ -165,22 +165,22 @@ class TimingManager(object):
         """
         self._timers = {}
 
-    def add_timings(self, name_obj_iter, method_names):
+    def add_timings(self, name_obj_proc_iter, method_names):
         """
         Add FuncTimers for all instances name_obj_iter and all methods in method_names.
 
         Parameters
         ----------
-        name_obj_iter : iterator
-            Yields (name, object) tuples.
+        name_obj_proc_iter : iterator
+            Yields (name, object, nprocs) tuples.
         method_names : list of str
             List of names of methods to wrap.
         """
-        for name, obj in name_obj_iter:
+        for name, obj, nprocs in name_obj_proc_iter:
             for method_name in method_names:
-                self.add_timing(name, obj, method_name)
+                self.add_timing(name, obj, nprocs, method_name)
 
-    def add_timing(self, name, obj, method_name):
+    def add_timing(self, name, obj, nprocs, method_name):
         """
         Add a FuncTimer for the given method of the given object.
 
@@ -190,6 +190,8 @@ class TimingManager(object):
             Instance name.
         obj : object
             The instance.
+        nprocs : int
+            Number of MPI procs given to the object.
         method_name : str
             The name of the method to wrap.
         """
@@ -198,7 +200,7 @@ class TimingManager(object):
             if name not in self._timers:
                 self._timers[name] = []
             timer = FuncTimer(method_name)
-            self._timers[name].append((timer, isinstance(obj, ParallelGroup)))
+            self._timers[name].append((timer, isinstance(obj, ParallelGroup), nprocs))
             setattr(obj, method_name, _timer_wrap(method, timer))
 
 
@@ -244,8 +246,9 @@ def _setup_sys_timers(system, method_names):
     if probname not in _timing_managers:
         _timing_managers[probname] = TimingManager()
     tmanager = _timing_managers[probname]
-    name_sys = ((s.pathname, s) for s in system.system_iter(include_self=True, recurse=True))
-    tmanager.add_timings(name_sys, method_names)
+    name_sys_procs = ((s.pathname, s, s.comm.size) for s in system.system_iter(include_self=True, 
+                                                                               recurse=True))
+    tmanager.add_timings(name_sys_procs, method_names)
 
 
 def _setup_timers(options, system):

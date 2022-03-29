@@ -39,11 +39,11 @@ def view_timing_text(timing_file, out_stream=_DEFAULT_OUT_STREAM):
     elif out_stream is _DEFAULT_OUT_STREAM:
         out_stream = sys.stdout
 
-    for (rank, probname, sysname, _, parallel, method, ncalls,
+    for (rank, probname, sysname, _, parallel, nprocs, method, ncalls,
          avg, min, max, tot, global_tot) in _timing_file_iter(timing_file):
         parallel = '(parallel)' if parallel else ''
         pct = tot / global_tot * 100.
-        print(f"{rank:4} (rank) {ncalls:7} (calls) {min:12.6f} (min) "
+        print(f"{rank:4} (rank) {nprocs:4} (nprocs) {ncalls:7} (calls) {min:12.6f} (min) "
               f"{max:12.6f} (max) {avg:12.6f} (avg) {tot:12.6f} "
               f"(tot) {pct:6.2f} % {parallel} {probname} {sysname}:{method}", file=out_stream)
 
@@ -76,8 +76,8 @@ def view_timing(timing_file, outfile='timing_report.html', show_browser=True):
     tot_by_rank = {}
 
     # set up timing table data
-    for rank, pname, sname, level, parallel, method, ncalls, avgtime, mintime, maxtime, tottime, \
-            globaltot in _timing_file_iter(timing_file):
+    for rank, pname, sname, level, parallel, nprocs, method, ncalls, avgtime, mintime, maxtime, \
+            tottime, globaltot in _timing_file_iter(timing_file):
 
         dct = {
             'id': idx,
@@ -86,6 +86,7 @@ def view_timing(timing_file, outfile='timing_report.html', show_browser=True):
             'sysname': sname,
             'level': level,
             'parallel': parallel,
+            'nprocs': nprocs, 
             'method': method,
             'ncalls': ncalls,
             'avgtime': avgtime,
