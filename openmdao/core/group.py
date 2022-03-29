@@ -412,7 +412,7 @@ class Group(System):
                 src_indices = meta_in['src_indices']
 
                 if src_indices is not None:
-                    if not (np.isscalar(ref) and np.isscalar(ref0)):
+                    if not (np.ndim(ref) == 0 and np.ndim(ref0) == 0):
                         # TODO: if either ref or ref0 are not scalar and the output is
                         # distributed, we need to do a scatter
                         # to obtain the values needed due to global src_indices
@@ -3334,7 +3334,7 @@ class Group(System):
             else:
                 if val is None:
                     val = value
-                elif np.isscalar(value):
+                elif np.ndim(value) == 0:
                     if val.size > 1:
                         raise ValueError(f"Shape of input '{tgt}', (), doesn't match shape "
                                          f"{val.shape}.")

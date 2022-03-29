@@ -246,7 +246,7 @@ def _setup_sys_timers(system, method_names):
     if probname not in _timing_managers:
         _timing_managers[probname] = TimingManager()
     tmanager = _timing_managers[probname]
-    name_sys_procs = ((s.pathname, s, s.comm.size) for s in system.system_iter(include_self=True, 
+    name_sys_procs = ((s.pathname, s, s.comm.size) for s in system.system_iter(include_self=True,
                                                                                recurse=True))
     tmanager.add_timings(name_sys_procs, method_names)
 

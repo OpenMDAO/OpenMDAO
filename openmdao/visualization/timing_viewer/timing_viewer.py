@@ -86,7 +86,7 @@ def view_timing(timing_file, outfile='timing_report.html', show_browser=True):
             'sysname': sname,
             'level': level,
             'parallel': parallel,
-            'nprocs': nprocs, 
+            'nprocs': nprocs,
             'method': method,
             'ncalls': ncalls,
             'avgtime': avgtime,
