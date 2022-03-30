@@ -423,3 +423,4 @@ jobs:
         workflow: Dymos Tests
         repo: swryan/dymos
         token: ${{ secrets.ACCESS_TOKEN }}
+      if: github.event_name == 'push'
