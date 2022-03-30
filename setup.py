@@ -140,6 +140,9 @@ setup(
         'openmdao.visualization.connection_viewer': [
             '*.html',
         ],
+        'openmdao.visualization.timing_viewer': [
+            '*.html',
+        ],
         'openmdao.visualization.scaling_viewer': [
             '*.html',
         ],
