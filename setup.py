@@ -20,7 +20,8 @@ optional_dependencies = {
         'Jinja2<3.1.0',
         'jupyter-book',
         'jupyter-sphinx==0.3.1',
-        'sphinx-sitemap'
+        'sphinx-sitemap',
+	'jinja2<3.1'
     ],
     'notebooks': [
         'notebook',
@@ -42,7 +43,7 @@ optional_dependencies = {
         'testflo>=1.3.6'
         'websockets>8',
         'aiounittest',
-        'playwright<1.15'
+        'playwright>=1.20'
     ]
 }
 
