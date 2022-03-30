@@ -990,7 +990,8 @@ class ShapedMultiIndexer(Indexer):
         if self._src_shape is None:
             raise ValueError(f"Can't determine extent of array because source shape is not known.")
 
-        idxs = np.arange(np.product(self._src_shape, dtype=int), dtype=np.int32).reshape(self._src_shape)
+        idxs = np.arange(np.product(self._src_shape, dtype=int),
+                         dtype=np.int32).reshape(self._src_shape)
 
         if flat:
             return idxs[self()].ravel()
