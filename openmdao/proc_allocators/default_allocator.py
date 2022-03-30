@@ -68,10 +68,8 @@ class DefaultAllocator(ProcAllocator):
                 return sorted(isubs_list[iproc]), sub_comm, [comm.rank, comm.rank + sub_comm.size]
             else:  # must map indices back based on reduced isubs_list
                 isubs = []
-                # print("ISUBS_LIST:", isubs_list[iproc])
                 for ris in isubs_list[iproc]:
                     isubs.extend(rind_map[ris])
-                # print("ISUBS:", sorted(isubs))
                 return sorted(isubs), sub_comm, [comm.rank, comm.rank + sub_comm.size]
 
         num_procs = min_procs.copy()
@@ -130,8 +128,6 @@ class DefaultAllocator(ProcAllocator):
 
         isub = color[iproc]
 
-        # print("ISUB:", isub)
-
         # Result
         if rind_map is None:
             isubs = [isub]
@@ -141,7 +137,5 @@ class DefaultAllocator(ProcAllocator):
         sub_comm = comm.Split(isub)
         start = list(color).index(isub)  # find lowest matching color
         sub_proc_range = [start, start + sub_comm.size]
-
-        # print("ISUBS:", isubs)
 
         return isubs, sub_comm, sub_proc_range
