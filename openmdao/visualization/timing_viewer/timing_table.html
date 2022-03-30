@@ -97,6 +97,7 @@
     <script type="text/javascript">
 
 var timing_tabledata = data.timing_table;
+var is_par = data.tot_procs > 1;
 
 document.getElementById("timing_title").innerHTML = data.title
 
@@ -147,10 +148,10 @@ var timingtable = new Tabulator("#timing-table", {
     layout:"fitDataFill", //"fitColumns", "fitDataFill",
     groupBy: "probname",
     columns:[ //Define Table Columns
-        {title: "Rank", field:"rank", hozAlign:"center", headerFilter:true, visible:true,},
-        {title: "Num Procs", field:"nprocs", hozAlign:"center", headerFilter:true, visible:true,},
+        {title: "Rank", field:"rank", hozAlign:"center", headerFilter:true, visible:is_par,},
+        {title: "Num Procs", field:"nprocs", hozAlign:"center", headerFilter:true, visible:is_par,},
         {title: "Tree Level", field:"level", hozAlign:"center", headerFilter:true, visible:true,},
-        {title: "Parallel", field:"parallel", hozAlign:"center", visible: true,
+        {title: "Parallel", field:"parallel", hozAlign:"center", visible: is_par,
          headerFilter: "tickCross",
          headerFilterParams:{"tristate": true}, // need 3 filter states (checked/unchecked/mixed)
          headerFilterEmptyCheck: function(value){return value === null},

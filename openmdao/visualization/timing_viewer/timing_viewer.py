@@ -74,10 +74,14 @@ def view_timing(timing_file, outfile='timing_report.html', show_browser=True):
     idx = 1  # unique ID for use by Tabulator
 
     tot_by_rank = {}
+    max_rank = 0
 
     # set up timing table data
     for rank, pname, sname, level, parallel, nprocs, method, ncalls, avgtime, mintime, maxtime, \
             tottime, globaltot in _timing_file_iter(timing_file):
+
+        if rank > max_rank:
+            max_rank = rank
 
         dct = {
             'id': idx,
@@ -104,6 +108,7 @@ def view_timing(timing_file, outfile='timing_report.html', show_browser=True):
     data = {
         'title': f"Total time: {max(tot_by_rank.values()):12.6f} sec",
         'timing_table': timing_table,
+        'tot_procs': max_rank + 1,
     }
 
     if MPI is None or MPI.COMM_WORLD.rank == 0:

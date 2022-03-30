@@ -38,9 +38,9 @@ def _timing_iter(all_timing_managers):
     for rank, (timing_managers, tot_time) in enumerate(all_timing_managers):
         for probname, tmanager in timing_managers.items():
             for sysname, timers in tmanager._timers.items():
+                level = len(sysname.split('.')) if sysname else 0
                 for t, parallel, nprocs in timers:
                     if t.ncalls > 0:
-                        level = len(sysname.split('.')) if sysname else 0
                         yield rank, probname, sysname, level, parallel, nprocs, t.name, t.ncalls, \
                             t.avg(), t.min, t.max, t.tot, tot_time
 
