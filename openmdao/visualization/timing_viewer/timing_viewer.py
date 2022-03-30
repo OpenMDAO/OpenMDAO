@@ -192,7 +192,8 @@ def _timing_setup_parser(parser):
     parser : argparse subparser
         The parser we're adding options to.
     """
-    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('file', nargs=1, help='Python file containing the model, or pickle file '
+                        'containing previously recorded timing data.')
     parser.add_argument('-o', default=None, action='store', dest='outfile',
                         help='Name of output file where timing data will be stored. By default it '
                         'goes to "timings.pkl".')
