@@ -17,11 +17,10 @@ optional_dependencies = {
         'ipyparallel',
         'numpydoc>=1.1',
         'tabulate',
-        'Jinja2<3.1.0',
         'jupyter-book',
         'jupyter-sphinx==0.3.1',
         'sphinx-sitemap',
-	'jinja2<3.1'
+        'jinja2<3.1'
     ],
     'notebooks': [
         'notebook',
