@@ -1,3 +1,5 @@
+// <<hpp_insert gen/Dimensions.js>>
+
 /**
  * Manage display info associated with the node.
  * @typedef NodeDisplayData
@@ -12,16 +14,8 @@ class NodeDisplayData {
         this.filterParent = null; // When filtered, reference to N2FilterNode container
         this.manuallyExpanded = false; // Node was pre-collapsed but expanded by user
 
-        this.dims = { x: 1e-6, y: 1e-6, width: 1, height: 1 };
-        this.prevDims = { x: 1e-6, y: 1e-6, width: 1e-6, height: 1e-6 };
-    }
-
-    /** Copy the current dims to the previous ones */
-    preserveDims() {
-        this.prevDims = {};
-        for (const prop in this.dims) {
-            this.prevDims[prop] = this.dims[prop];
-        }
+        this.dims = new Dimensions({ x: 1e-6, y: 1e-6, width: 1, height: 1 });
+        this.dims.preserve();
     }
 }
 
@@ -82,7 +76,7 @@ class TreeNode {
      * @param {number} leafNum Identify this as the nth leaf of the tree
      */
     preserveDims(leafNum) {
-        this.draw.preserveDims();
+        this.draw.dims.preserve();
 
         if (this.rootIndex < 0) this.rootIndex = leafNum;
         this.prevRootIndex = this.rootIndex;

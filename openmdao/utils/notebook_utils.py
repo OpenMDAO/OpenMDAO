@@ -118,11 +118,25 @@ def show_options_table(reference, recording_options=False):
 
     if ipy:
         if not hasattr(obj, "options"):
-            return display(HTML(obj.to_table(fmt='html')))
+            html = obj.to_table(fmt='html')
         elif not recording_options:
-            return display(HTML(obj.options.to_table(fmt='html')))
+            html = obj.options.to_table(fmt='html')
         else:
-            return display(HTML(obj.recording_options.to_table(fmt='html')))
+            html = obj.recording_options.to_table(fmt='html')
+
+        # Jupyter notebook imposes right justification, so we have to enforce what we want:
+        # - Center table headers
+        # - Left justify table columns
+        # - Limit column width so there is adequate width left for the deprecation message
+        style = '<{tag} style="text-align:{align}; max-width:{width}; overflow-wrap:break-word;">'
+
+        cols = html.count('<th>')                 # there could be 5 or 6 columns
+        width = '300px' if cols > 5 else '600px'  # limit width depending on number of columns
+
+        html = html.replace('<th>', style.format(tag='th', align='center', width=width))
+        html = html.replace('<td>', style.format(tag='td', align='left', width=width))
+
+        return display(HTML(html))
     else:
         simple_warning("IPython is not installed. Run `pip install openmdao[notebooks]` or "
                        "`pip install openmdao[docs]` to upgrade.")

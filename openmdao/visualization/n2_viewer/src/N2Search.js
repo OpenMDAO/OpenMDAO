@@ -95,8 +95,8 @@ class N2Search {
     _addEventListeners() {
         const self = this;
 
-        d3.select('#awesompleteId').on('awesomplete-selectcomplete', function () {
-            self.searchInputEventListener();
+        d3.select('#awesompleteId').on('awesomplete-selectcomplete', e => {
+            self.searchInputEventListener(e);
             self.searchAwesomplete.evaluate();
         });
 
@@ -196,10 +196,10 @@ class N2Search {
      * React to each value entered into the search input box.
      * @param {Event} e The object describing the keypress event.
      */
-    searchInputEventListener() {
+    searchInputEventListener(e) {
         testThis(this, 'N2Search', 'searchInputEventListener');
 
-        const target = d3.event.target;
+        const target = e.target;
 
         //valid characters AlphaNumeric : _ ? * space .
         const newVal = target.value.replace(/([^a-zA-Z0-9:_\?\*\s\.])/g, "");
