@@ -7,7 +7,6 @@ from openmdao.core.tests.test_scaling_report import TestDriverScalingReport
 
 class TestDriverScalingReportMPI(TestDriverScalingReport):
     N_PROCS = 2
-    ISOLATED = True
 
 
 if __name__ == '__main__':
