@@ -421,6 +421,6 @@ jobs:
     - uses: benc-uk/workflow-dispatch@v1
       with:
         workflow: Dymos Tests
-        repo: ${GITHUB_REPOSITORY_OWNER}/dymos
+        repo: ${{ github.repository_owner }}/dymos
         token: ${{ secrets.ACCESS_TOKEN }}
       if: github.event_name == 'push'
