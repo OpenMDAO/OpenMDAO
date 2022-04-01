@@ -1,4 +1,6 @@
-// Constants and default valus
+// <<hpp_insert gen/Dimensions.js>>
+
+// Constants and default values
 const EMBEDDED = (d3.selectAll("#all_pt_n2_content_div").classed("embedded-n2"));
 const _DEFAULT_N2_DIAGRAM_UNIT = 'px';
 const _DEFAULT_N2_DIAGRAM_HEIGHT = window.innerHeight * .95;
@@ -8,16 +10,14 @@ const _DEFAULT_GAP_SIZE = _DEFAULT_FONT_SIZE + 4;
 defaultDims = {
     'size': {
         'unit': _DEFAULT_N2_DIAGRAM_UNIT,
-        'n2matrix': { // Dimensions of N2 matrix diagram
+        'n2matrix': {
+            // Dimensions of N2 matrix diagram
             'height': _DEFAULT_N2_DIAGRAM_HEIGHT,
             'width': _DEFAULT_N2_DIAGRAM_HEIGHT,
             'margin': _DEFAULT_GAP_SIZE
         },
-        'partitionTree': { // Dimensions of the tree on the left side of the diagram
-            'width': 0,
-            'height': _DEFAULT_N2_DIAGRAM_HEIGHT,
-        },
-        'solverTree': { // Dimensions of the tree on the right side of the diagram
+        'partitionTree': {
+            // Dimensions of the tree on the left side of the diagram
             'width': 0,
             'height': _DEFAULT_N2_DIAGRAM_HEIGHT,
         },
