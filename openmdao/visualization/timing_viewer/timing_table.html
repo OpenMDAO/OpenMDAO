@@ -151,7 +151,7 @@ var timingtable = new Tabulator("#timing-table", {
         {title: "Rank", field:"rank", hozAlign:"center", headerFilter:true, visible:is_par,},
         {title: "Num Procs", field:"nprocs", hozAlign:"center", headerFilter:true, visible:is_par,},
         {title: "Tree Level", field:"level", hozAlign:"center", headerFilter:true, visible:true,},
-        {title: "Parallel", field:"parallel", hozAlign:"center", visible: is_par,
+        {title: "Parallel Child", field:"parallel", hozAlign:"center", visible: is_par,
          headerFilter: "tickCross",
          headerFilterParams:{"tristate": true}, // need 3 filter states (checked/unchecked/mixed)
          headerFilterEmptyCheck: function(value){return value === null},
@@ -159,12 +159,22 @@ var timingtable = new Tabulator("#timing-table", {
          formatterParams: {
             crossElement: false,  // gets rid of 'x' elements so only check marks show
          }},
-        {title: "Problem", field:"probname", hozAlign:"left", headerFilter:true, visible:true,},
-        {title: "System", field:"sysname", hozAlign:"left", headerFilter:true, visible:true,},
+        {title: "Problem", field:"probname", hozAlign:"left", headerFilter:true, visible:false,},
+        {title: "System", field:"sysname", hozAlign:"left", headerFilter:true, visible:true,
+          tooltip:function(cell){
+            return  cell.getRow().getData()["classname"]; //return cells "field - value";
+          },
+
+        },
         {title: "Method", field:"method", hozAlign:"left", headerFilter:true, visible:true,},
         {title: "Calls", field:"ncalls", hozAlign:"center", headerFilter:false, visible:true,},
         numcol("Total Time", "tottime"),
-        numcol("Pct of Total", "pct"),
+        {title:"Pct of Total", field:"pct", formatter:"progress", tooltip: true,
+          sorter:"number", width:100
+        },
+        {title:"Pct of Parent", field:"pct_of_parent", formatter:"progress",
+          formatterParams:{ color:["rgb(255,0,0)"] }, sorter:"number", width:100, tooltip: true,
+        },
         numcol("Avg Time", "avgtime"),
         numcol("Min Time", "mintime"),
         numcol("Max Time", "maxtime"),

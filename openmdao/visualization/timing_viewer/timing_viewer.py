@@ -19,8 +19,7 @@ from openmdao.utils.om_warnings import issue_warning
 from openmdao.core.constants import _DEFAULT_OUT_STREAM
 
 
-_default_timer_methods = sorted(['_solve_nonlinear', '_apply_nonlinear', '_solve_linear',
-                                 '_apply_linear', '_linearize'])
+_default_timer_methods = sorted(['_solve_nonlinear', '_apply_linear'])
 
 
 def view_timing_text(timing_file, out_stream=_DEFAULT_OUT_STREAM):
@@ -39,7 +38,7 @@ def view_timing_text(timing_file, out_stream=_DEFAULT_OUT_STREAM):
     elif out_stream is _DEFAULT_OUT_STREAM:
         out_stream = sys.stdout
 
-    for (rank, probname, sysname, _, parallel, nprocs, method, ncalls,
+    for (rank, probname, classname, sysname, _, parallel, nprocs, method, ncalls,
          avg, min, max, tot, global_tot) in _timing_file_iter(timing_file):
         parallel = '(parallel)' if parallel else ''
         pct = tot / global_tot * 100.
@@ -71,22 +70,23 @@ def view_timing(timing_file, outfile='timing_report.html', show_browser=True):
     """
     timing_table = []
 
-    idx = 1  # unique ID for use by Tabulator
-
     tot_by_rank = {}
     max_rank = 0
 
+    parent_dict = {}  # used for computing pct of parent timing
+
     # set up timing table data
-    for rank, pname, sname, level, parallel, nprocs, method, ncalls, avgtime, mintime, maxtime, \
-            tottime, globaltot in _timing_file_iter(timing_file):
+    for rank, probname, cname, sname, level, parallel, nprocs, method, ncalls, avgtime, mintime, \
+            maxtime, tottime, globaltot in _timing_file_iter(timing_file):
 
         if rank > max_rank:
             max_rank = rank
 
         dct = {
-            'id': idx,
+            'id': len(timing_table) + 1,  # unique ID for use by Tabulator
             'rank': rank,
-            'probname': pname,
+            'probname': probname,
+            'classname': cname,
             'sysname': sname,
             'level': level,
             'parallel': parallel,
@@ -97,13 +97,24 @@ def view_timing(timing_file, outfile='timing_report.html', show_browser=True):
             'mintime': mintime,
             'maxtime': maxtime,
             'tottime': tottime,
-            'pct': tottime / globaltot * 100.
+            'pct': tottime / globaltot * 100.,
+            'pct_of_parent': 0.,
         }
 
         timing_table.append(dct)
         tot_by_rank[rank] = globaltot
 
-        idx += 1
+        if sname:
+            parent_tup = (rank, probname, sname.rpartition('.')[0], method)
+            try:
+                parent_meta = parent_dict[parent_tup]
+            except KeyError:
+                pass
+            else:
+                dct['pct_of_parent'] = tottime / parent_meta['tottime'] * 100.
+
+        parent_dict[(rank, probname, sname, method)] = dct
+
 
     data = {
         'title': f"Total time: {max(tot_by_rank.values()):12.6f} sec",
