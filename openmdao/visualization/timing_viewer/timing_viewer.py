@@ -14,7 +14,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.file_utils import _load_and_exec, _to_filename
 import openmdao.visualization.timing_viewer.timer as timer_mod
 from openmdao.visualization.timing_viewer.timer import timing_context, _set_timer_setup_hook, \
-    _timing_file_iter, _total_time
+    _timing_file_iter, _get_par_child_info
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.core.constants import _DEFAULT_OUT_STREAM
 
@@ -22,9 +22,9 @@ from openmdao.core.constants import _DEFAULT_OUT_STREAM
 _default_timer_methods = sorted(['_solve_nonlinear', '_apply_linear'])
 
 
-def view_timing_text(timing_file, out_stream=_DEFAULT_OUT_STREAM):
+def view_timing_dump(timing_file, out_stream=_DEFAULT_OUT_STREAM):
     """
-    Print timing data to a file or to stdout.
+    Print a timing dump to a file or to stdout.
 
     Parameters
     ----------
@@ -45,6 +45,45 @@ def view_timing_text(timing_file, out_stream=_DEFAULT_OUT_STREAM):
         print(f"{rank:4} (rank) {nprocs:4} (nprocs) {ncalls:7} (calls) {min:12.6f} (min) "
               f"{max:12.6f} (max) {avg:12.6f} (avg) {tot:12.6f} "
               f"(tot) {pct:6.2f} % {parallel} {probname} {sysname}:{method}", file=out_stream)
+
+
+def view_text_parallel(timing_file, method='_solve_nonlinear', out_stream=_DEFAULT_OUT_STREAM):
+    """
+    Print timings of children of ParallelGroups to a file or to stdout.
+
+    Parameters
+    ----------
+    timing_file : str
+        The name of the pickle file contining the timing data.
+    method : str
+        Name of method to show timings for. Default is _solve_nonlinear.
+    out_stream : file-like or None
+        Where the output will be printed. If None, generate no output.
+    """
+    if out_stream is None:
+        return
+    elif out_stream is _DEFAULT_OUT_STREAM:
+        out_stream = sys.stdout
+
+    seen = set()
+    parinfo = _get_par_child_info(_timing_file_iter(timing_file), method)
+    cols = ['System',  'Rank', 'Calls', 'Avg Time', 'Min Time', 'Max_time', 'Total Time']
+    colspc = ['-' * len(s) for s in cols]
+    for key, sdict in parinfo.items():
+        probname, parentsys = key
+        if probname not in seen:
+            print(f"\n\nProblem: {probname}   method: {method}", file=out_stream)
+            seen.add(probname)
+        print(f"\n  Parent parallel group: {parentsys}", file=out_stream)
+        print(f"  {cols[0]:20}  {cols[1]:>5}  {cols[2]:>7} {cols[3]:>12} {cols[4]:>12} "
+              f"{cols[5]:>12} {cols[6]:>12}", file=out_stream)
+        print(f"  {colspc[0]:20}  {colspc[1]:>5}  {colspc[2]:>7} {colspc[3]:>12} {colspc[4]:>12} "
+              f"{colspc[5]:>12} {colspc[6]:>12}", file=out_stream)
+        for sysname, dlist in sdict.items():
+            relname = sysname.rpartition('.')[2]
+            for (rank, ncalls, avg, tmin, tmax, ttot) in dlist:
+                print(f"  {relname:20}  {rank:>5}  {ncalls:>7} {avg:12.4f} {tmin:12.4f}"
+                      f" {tmax:12.4f} {ttot:12.4f}", file=out_stream)
 
 
 def view_timing(timing_file, outfile='timing_report.html', show_browser=True):
@@ -163,13 +202,15 @@ def _show_view(timing_file, options):
 
     if view == 'browser':
         view_timing(timing_file, outfile='timing_report.html', show_browser=True)
-    elif view == 'text':
-        view_timing_text(timing_file, sys.stdout)
+    elif view == 'dump':
+        view_timing_dump(timing_file, out_stream=sys.stdout)
+    elif view == 'text_parallel':
+        view_text_parallel(timing_file, out_stream=sys.stdout)
     elif view == 'none':
         pass
     else:
         issue_warning(f"Viewing option '{view}' ignored. Valid options are "
-                      "['browser', 'text', 'none'].")
+                      "['browser', 'dump', 'none'].")
 
 
 def _postprocess(options):

@@ -148,6 +148,13 @@ var timingtable = new Tabulator("#timing-table", {
     layout:"fitDataFill", //"fitColumns", "fitDataFill",
     groupBy: "probname",
     columns:[ //Define Table Columns
+        {title: "Problem", field:"probname", hozAlign:"left", headerFilter:true, visible:false,},
+           {title: "System", field:"sysname", hozAlign:"left", headerFilter:true, visible:true,
+              tooltip:function(cell){
+                 return  cell.getRow().getData()["classname"];
+              },
+        },
+        {title: "Method", field:"method", hozAlign:"left", headerFilter:true, visible:true,},
         {title: "Rank", field:"rank", hozAlign:"center", headerFilter:true, visible:is_par,},
         {title: "Num Procs", field:"nprocs", hozAlign:"center", headerFilter:true, visible:is_par,},
         {title: "Tree Level", field:"level", hozAlign:"center", headerFilter:true, visible:true,},
@@ -159,14 +166,6 @@ var timingtable = new Tabulator("#timing-table", {
          formatterParams: {
             crossElement: false,  // gets rid of 'x' elements so only check marks show
          }},
-        {title: "Problem", field:"probname", hozAlign:"left", headerFilter:true, visible:false,},
-        {title: "System", field:"sysname", hozAlign:"left", headerFilter:true, visible:true,
-          tooltip:function(cell){
-            return  cell.getRow().getData()["classname"]; //return cells "field - value";
-          },
-
-        },
-        {title: "Method", field:"method", hozAlign:"left", headerFilter:true, visible:true,},
         {title: "Calls", field:"ncalls", hozAlign:"center", headerFilter:false, visible:true,},
         numcol("Total Time", "tottime"),
         {title:"Pct of Total", field:"pct", formatter:"progress", tooltip: true,
