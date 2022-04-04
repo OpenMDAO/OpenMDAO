@@ -208,6 +208,7 @@ _view_options = [
     'none'
 ]
 
+
 def _show_view(timing_file, options):
     # given a timing file, display based on options.view
     view = options.view.lower()

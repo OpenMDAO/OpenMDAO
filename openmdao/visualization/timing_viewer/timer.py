@@ -187,6 +187,8 @@ class TimingManager(object):
         Mapping of instance name to FuncTimer lists.
     _par_groups : set
         Set of pathnames of ParallelGroups.
+    _par_only : bool
+        If True, only instrument direct children of ParallelGroups.
     """
 
     def __init__(self, options=None):
