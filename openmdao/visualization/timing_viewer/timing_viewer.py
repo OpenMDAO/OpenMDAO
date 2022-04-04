@@ -74,15 +74,20 @@ def view_MPI_timing(timing_file, method='_solve_nonlinear', out_stream=_DEFAULT_
         if probname not in seen:
             print(f"\n\nProblem: {probname}   method: {method}", file=out_stream)
             seen.add(probname)
-        print(f"\n  Parent parallel group: {parentsys}", file=out_stream)
-        print(f"  {cols[0]:20}  {cols[1]:>5}  {cols[2]:>7} {cols[3]:>12} {cols[4]:>12} "
+
+        slist = list(sdict.items())
+        # get ncalls from a subsystem (ncalls will be same for all and for the parent)
+        ncalls = slist[0][1][0][1]
+
+        print(f"\n  Parallel group: {parentsys} (ncalls = {ncalls})\n", file=out_stream)
+        print(f"  {cols[0]:20}  {cols[1]:>5}  {cols[3]:>12} {cols[4]:>12} "
               f"{cols[5]:>12} {cols[6]:>12}", file=out_stream)
-        print(f"  {colspc[0]:20}  {colspc[1]:>5}  {colspc[2]:>7} {colspc[3]:>12} {colspc[4]:>12} "
+        print(f"  {colspc[0]:20}  {colspc[1]:>5}  {colspc[3]:>12} {colspc[4]:>12} "
               f"{colspc[5]:>12} {colspc[6]:>12}", file=out_stream)
-        for sysname, dlist in sdict.items():
+        for sysname, dlist in slist:
             relname = sysname.rpartition('.')[2]
             for (rank, ncalls, avg, tmin, tmax, ttot) in dlist:
-                print(f"  {relname:20}  {rank:>5}  {ncalls:>7} {avg:12.4f} {tmin:12.4f}"
+                print(f"  {relname:20}  {rank:>5}  {avg:12.4f} {tmin:12.4f}"
                       f" {tmax:12.4f} {ttot:12.4f}", file=out_stream)
 
 
@@ -197,7 +202,8 @@ def _show_view(timing_file, options):
     view = options.view.lower()
 
     if view == 'text':
-        view_MPI_timing(timing_file, out_stream=sys.stdout)
+        for f in options.funcs:
+            view_MPI_timing(timing_file, method=f, out_stream=sys.stdout)
     elif view == 'browser':
         view_timing(timing_file, outfile='timing_report.html', show_browser=True)
     elif view == 'dump':
@@ -273,12 +279,12 @@ def _timing_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
+    if not options.funcs:
+        options.funcs = _default_timer_methods.copy()
+
     filename = _to_filename(options.file[0])
     if filename.endswith('.py'):
         hooks._register_hook('setup', 'Problem', pre=partial(_set_timer_setup_hook, options))
-
-        if not options.funcs:
-            options.funcs = _default_timer_methods.copy()
 
         # register an atexit function to write out all of the timing data
         atexit.register(partial(_postprocess, options))

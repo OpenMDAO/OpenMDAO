@@ -95,7 +95,7 @@ from openmdao.visualization.connection_viewer.viewconns import view_connections
 from openmdao.visualization.partial_deriv_plot import partial_deriv_plot
 from openmdao.visualization.timing_viewer.timer import timing_context
 from openmdao.visualization.timing_viewer.timing_viewer import view_timing, view_timing_dump, \
-    view_text_parallel
+    view_MPI_timing
 from openmdao.visualization.options_widget import OptionsWidget
 from openmdao.visualization.case_viewer.case_viewer import CaseViewer
 
