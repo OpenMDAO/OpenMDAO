@@ -171,9 +171,6 @@ var timingtable = new Tabulator("#timing-table", {
         {title:"Pct of Total", field:"pct", formatter:"progress", tooltip: true,
           sorter:"number", width:100
         },
-        {title:"Pct of Parent", field:"pct_of_parent", formatter:"progress",
-          formatterParams:{ color:["rgb(255,0,0)"] }, sorter:"number", width:100, tooltip: true,
-        },
         numcol("Avg Time", "avgtime"),
         numcol("Min Time", "mintime"),
         numcol("Max Time", "maxtime"),

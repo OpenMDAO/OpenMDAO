@@ -137,20 +137,10 @@ def view_timing(timing_file, outfile='timing_report.html', show_browser=True):
             'maxtime': maxtime,
             'tottime': tottime,
             'pct': tottime / globaltot * 100.,
-            'pct_of_parent': 0.,
         }
 
         timing_table.append(dct)
         tot_by_rank[rank] = globaltot
-
-        if sname:
-            parent_tup = (rank, probname, sname.rpartition('.')[0], method)
-            try:
-                parent_meta = parent_dict[parent_tup]
-            except KeyError:
-                pass
-            else:
-                dct['pct_of_parent'] = tottime / parent_meta['tottime'] * 100.
 
         parent_dict[(rank, probname, sname, method)] = dct
 
