@@ -47,9 +47,9 @@ def view_timing_dump(timing_file, out_stream=_DEFAULT_OUT_STREAM):
               f"(tot) {pct:6.2f} % {parallel} {probname} {sysname}:{method}", file=out_stream)
 
 
-def view_text_parallel(timing_file, method='_solve_nonlinear', out_stream=_DEFAULT_OUT_STREAM):
+def view_MPI_timing(timing_file, method='_solve_nonlinear', out_stream=_DEFAULT_OUT_STREAM):
     """
-    Print timings of children of ParallelGroups to a file or to stdout.
+    Print timings of direct children of ParallelGroups to a file or to stdout.
 
     Parameters
     ----------
@@ -67,7 +67,7 @@ def view_text_parallel(timing_file, method='_solve_nonlinear', out_stream=_DEFAU
 
     seen = set()
     parinfo = _get_par_child_info(_timing_file_iter(timing_file), method)
-    cols = ['System',  'Rank', 'Calls', 'Avg Time', 'Min Time', 'Max_time', 'Total Time']
+    cols = ['System', 'Rank', 'Calls', 'Avg Time', 'Min Time', 'Max_time', 'Total Time']
     colspc = ['-' * len(s) for s in cols]
     for key, sdict in parinfo.items():
         probname, parentsys = key
@@ -88,7 +88,7 @@ def view_text_parallel(timing_file, method='_solve_nonlinear', out_stream=_DEFAU
 
 def view_timing(timing_file, outfile='timing_report.html', show_browser=True):
     """
-    Generate a self-contained html file containing a table of timing data.
+    Generate a self-contained html file containing an interactive table of timing data.
 
     Optionally pops up a web browser to view the file.
 
@@ -154,7 +154,6 @@ def view_timing(timing_file, outfile='timing_report.html', show_browser=True):
 
         parent_dict[(rank, probname, sname, method)] = dct
 
-
     data = {
         'title': f"Total time: {max(tot_by_rank.values()):12.6f} sec",
         'timing_table': timing_table,
@@ -196,21 +195,28 @@ def view_timing(timing_file, outfile='timing_report.html', show_browser=True):
     return data
 
 
+_view_options = [
+    'text',
+    'browser',
+    'dump',
+    'none'
+]
+
 def _show_view(timing_file, options):
     # given a timing file, display based on options.view
     view = options.view.lower()
 
-    if view == 'browser':
+    if view == 'text':
+        view_MPI_timing(timing_file, out_stream=sys.stdout)
+    elif view == 'browser':
         view_timing(timing_file, outfile='timing_report.html', show_browser=True)
     elif view == 'dump':
         view_timing_dump(timing_file, out_stream=sys.stdout)
-    elif view == 'text_parallel':
-        view_text_parallel(timing_file, out_stream=sys.stdout)
     elif view == 'none':
         pass
     else:
         issue_warning(f"Viewing option '{view}' ignored. Valid options are "
-                      "['browser', 'dump', 'none'].")
+                      f"{_view_options}.")
 
 
 def _postprocess(options):
@@ -258,9 +264,10 @@ def _timing_setup_parser(parser):
                         dest='funcs', help='Time a specified function. Can be applied multiple '
                         'times to specify multiple functions. '
                         f'Default methods are {_default_timer_methods}.')
-    parser.add_argument('-v', '--view', action='store', dest='view', default='browser',
-                        help='View the output.  Default view is "browser".  Other options are '
-                        '"text" for ascii output or "none" for no output.')
+    parser.add_argument('-v', '--view', action='store', dest='view', default='text',
+                        help="View of the output.  Default view is 'text', which shows timing for "
+                        "each direct child of a parallel group across all ranks. Other options are "
+                        f"{_view_options[1:]}.")
     parser.add_argument('--use_context', action='store_true', dest='use_context',
                         help="If set, timing will only be active within a timing_context.")
 

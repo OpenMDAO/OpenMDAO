@@ -7,7 +7,6 @@ from time import perf_counter
 from contextlib import contextmanager
 
 from functools import wraps, partial
-import numpy as np
 
 import openmdao.utils.hooks as hooks
 from openmdao.utils.om_warnings import issue_warning
@@ -69,73 +68,6 @@ def _get_par_child_info(timing_iter, method):
         parents[key][sysname].append((rank, ncalls, avg, tmin, tmax, ttot))
 
     return parents
-
-
-def plot_children(key, parents):
-    import matplotlib.pyplot as plt
-
-    prob_name, parent_sys = key
-
-    try:
-        child_info = parents[key]
-    except KeyError:
-        issue_warning(f"No parallel child info found for key {key}.")
-        return
-
-    import pprint
-    pprint.pprint(child_info)
-
-    plt.rcdefaults()
-
-    fig, ax = plt.subplots()
-
-    # Example data
-    labels = []
-    times = []
-    time_mins = []
-    time_maxs = []
-
-    for sname, dlist in child_info.items():
-        labels.append(sname)
-
-        avgmax = 0.
-        minmin = 1e99
-        maxmax = 0.
-        for rank, ncalls, avg, tmin, tmax, ttot in dlist:
-            # figure out min/max/avg across all procs for this method
-            if avg > avgmax:
-                avgmax = avg
-            if tmax > maxmax:
-                maxmax = tmax
-            if tmin < minmin:
-                minmin = tmin
-
-        times.append(avgmax)
-        time_mins.append(minmin)
-        time_maxs.append(maxmax)
-
-    times = np.array(times)
-    time_mins = np.array(time_mins)
-    time_maxs = np.array(time_maxs)
-
-    overall_min = np.min(time_mins)
-    overall_max = np.max(time_maxs)
-
-    y = np.arange(len(labels))
-    height = .25
-
-    ax.barh(y, time_mins, align='center', height=height, color='b', label='Min')
-    ax.barh(y+height, times, align='center', height=height, color='r', label='Avg')
-    ax.barh(y+2*height, time_maxs, align='center', height=height, color='g', label='Max')
-    ax.set_xlim([overall_min, overall_max])
-    ax.set_yticks(y + height)
-    ax.set_yticklabels(labels)
-    ax.set_xlabel('Time (s)')
-    ax.set_title(f"Timing of children in ParallelGroup {parent_sys} (problem={prob_name})")
-    ax.legend()
-
-
-    plt.show()
 
 
 class FuncTimer(object):
@@ -367,14 +299,3 @@ def _set_timer_setup_hook(options, problem):
         hooks._register_hook('_setup_procs', 'System', inst_id='',
                              post=partial(_setup_timers, options))
         hooks._setup_hooks(problem.model)
-
-
-if __name__ == '__main__':
-    import sys
-
-    it = _timing_file_iter(sys.argv[1])
-    parinfo = _get_par_child_info(it, '_solve_nonlinear')
-
-
-    for key in parinfo:
-        plot_children(key, parinfo)
