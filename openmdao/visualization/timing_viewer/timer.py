@@ -30,11 +30,12 @@ class _RestrictedUnpickler(pickle.Unpickler):
 
 
 def _restricted_load(f):
-    """Like pickle.load() but restricted to a specific set of classes."""
+    # Like pickle.load() but restricted to a specific set of classes.
     return _RestrictedUnpickler(f).load()
 
 
 def _timing_iter(all_timing_managers):
+    # iterates over all of the timing managers and yields all timing info
     for rank, (timing_managers, tot_time) in enumerate(all_timing_managers):
         for probname, tmanager in timing_managers.items():
             for sysname, timers in tmanager._timers.items():
@@ -46,11 +47,13 @@ def _timing_iter(all_timing_managers):
 
 
 def _timing_file_iter(timing_file):
+    # iterates over the given timing file
     with open(timing_file, 'rb') as f:
         yield from _timing_iter(_restricted_load(f))
 
 
 def _get_par_child_info(timing_iter, method):
+    # puts timing info for direct children of parallel groups into a dict.
     parents = {}
     for rank, probname, classname, sysname, level, parallel, nprocs, func, ncalls, avg, tmin, tmax,\
             ttot, tot_time in timing_iter:
@@ -108,7 +111,7 @@ class FuncTimer(object):
         self.max = 0
         self.tot = 0
 
-    def tick(self):
+    def pre(self):
         """
         Record the method start time.
         """
@@ -116,7 +119,7 @@ class FuncTimer(object):
         if _timing_active:
             self.start = perf_counter()
 
-    def tock(self):
+    def post(self):
         """
         Update ncalls, tot, min, and max.
         """
@@ -161,9 +164,9 @@ def _timer_wrap(f, timer):
         The wrapper for the give method f.
     """
     def do_timing(*args, **kwargs):
-        timer.tick()
+        timer.pre()
         ret = f(*args, **kwargs)
-        timer.tock()
+        timer.post()
         return ret
 
     return wraps(f)(do_timing)
@@ -173,6 +176,11 @@ class TimingManager(object):
     """
     Keeps track of FuncTimer objects.
 
+    Parameters
+    ----------
+    options : argparse options or None
+        Command line options.
+
     Attributes
     ----------
     _timers : dict
@@ -181,12 +189,13 @@ class TimingManager(object):
         Set of pathnames of ParallelGroups.
     """
 
-    def __init__(self):
+    def __init__(self, options=None):
         """
         Initialize data structures.
         """
         self._timers = {}
         self._par_groups = set()
+        self._par_only = options is None or options.view.lower() == 'text'
 
     def add_timings(self, name_obj_proc_iter, method_names):
         """
@@ -220,15 +229,16 @@ class TimingManager(object):
         """
         method = getattr(obj, method_name, None)
         if method is not None:
-            if name not in self._timers:
-                self._timers[name] = []
             timer = FuncTimer(method_name)
             if isinstance(obj, ParallelGroup):
                 self._par_groups.add(obj.pathname)
             parent = obj.pathname.rpartition('.')[0]
             is_par_child = parent in self._par_groups
-            self._timers[name].append((timer, is_par_child, nprocs, type(obj).__name__))
-            setattr(obj, method_name, _timer_wrap(method, timer))
+            if is_par_child or not self._par_only:
+                if name not in self._timers:
+                    self._timers[name] = []
+                self._timers[name].append((timer, is_par_child, nprocs, type(obj).__name__))
+                setattr(obj, method_name, _timer_wrap(method, timer))
 
 
 @contextmanager
@@ -265,13 +275,13 @@ def timing_context(active=True):
             _total_time += perf_counter() - start_time
 
 
-def _setup_sys_timers(system, method_names):
+def _setup_sys_timers(options, system, method_names):
     # decorate all specified System methods
     global _timing_managers
 
     probname = system._problem_meta['name']
     if probname not in _timing_managers:
-        _timing_managers[probname] = TimingManager()
+        _timing_managers[probname] = TimingManager(options)
     tmanager = _timing_managers[probname]
     name_sys_procs = ((s.pathname, s, s.comm.size) for s in system.system_iter(include_self=True,
                                                                                recurse=True))
@@ -286,7 +296,7 @@ def _setup_timers(options, system):
 
     tmanager = _timing_managers.get(system._problem_meta['name'])
     if tmanager is not None and not tmanager._timers:
-        _setup_sys_timers(system, method_names=timer_methods)
+        _setup_sys_timers(options, system, method_names=timer_methods)
 
 
 def _set_timer_setup_hook(options, problem):
@@ -295,7 +305,7 @@ def _set_timer_setup_hook(options, problem):
 
     inst_id = problem._get_inst_id()
     if inst_id not in _timing_managers:
-        _timing_managers[inst_id] = TimingManager()
+        _timing_managers[inst_id] = TimingManager(options)
         hooks._register_hook('_setup_procs', 'System', inst_id='',
                              post=partial(_setup_timers, options))
         hooks._setup_hooks(problem.model)

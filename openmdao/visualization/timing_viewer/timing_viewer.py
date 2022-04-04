@@ -59,6 +59,11 @@ def view_MPI_timing(timing_file, method='_solve_nonlinear', out_stream=_DEFAULT_
         Name of method to show timings for. Default is _solve_nonlinear.
     out_stream : file-like or None
         Where the output will be printed. If None, generate no output.
+
+    Returns
+    -------
+    dict or None
+        Timing info dict or None.
     """
     if out_stream is None:
         return
@@ -67,6 +72,10 @@ def view_MPI_timing(timing_file, method='_solve_nonlinear', out_stream=_DEFAULT_
 
     seen = set()
     parinfo = _get_par_child_info(_timing_file_iter(timing_file), method)
+
+    if not parinfo:
+        return
+
     cols = ['System', 'Rank', 'Calls', 'Avg Time', 'Min Time', 'Max_time', 'Total Time']
     colspc = ['-' * len(s) for s in cols]
     for key, sdict in parinfo.items():
@@ -89,6 +98,8 @@ def view_MPI_timing(timing_file, method='_solve_nonlinear', out_stream=_DEFAULT_
             for (rank, ncalls, avg, tmin, tmax, ttot) in dlist:
                 print(f"  {relname:20}  {rank:>5}  {avg:12.4f} {tmin:12.4f}"
                       f" {tmax:12.4f} {ttot:12.4f}", file=out_stream)
+
+    return parinfo
 
 
 def view_timing(timing_file, outfile='timing_report.html', show_browser=True):
@@ -203,7 +214,10 @@ def _show_view(timing_file, options):
 
     if view == 'text':
         for f in options.funcs:
-            view_MPI_timing(timing_file, method=f, out_stream=sys.stdout)
+            ret = view_MPI_timing(timing_file, method=f, out_stream=sys.stdout)
+            if ret is None:
+                issue_warning("No ParallelGroups found.")
+                break
     elif view == 'browser':
         view_timing(timing_file, outfile='timing_report.html', show_browser=True)
     elif view == 'dump':
