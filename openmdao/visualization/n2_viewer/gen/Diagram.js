@@ -1,5 +1,6 @@
 // <<hpp_insert gen/Layout.js>>
 // <<hpp_insert gen/ClickHandler.js>>
+// <<hpp_insert gen/UserInterface.js>>
 
 /**
  * Manage all pieces of the application. The model data, the CSS styles, the
@@ -52,7 +53,7 @@ class Diagram {
         this.layout = this._newLayout();
 
         this.search = new N2Search(this.zoomedElement, this.model.root);
-        this.ui = new N2UserInterface(this);
+        this.ui = new UserInterface(this);
 
         // Keep track of arrows to show and hide them
         this.arrowMgr = new N2ArrowManager(this.dom.n2Groups);

@@ -1,6 +1,7 @@
 // <<hpp_insert gen/Diagram.js>>
 // <<hpp_insert src/OmLayout.js>>
 // <<hpp_insert src/OmStyle.js>>
+// <<hpp_insert src/OmUserInterface.js>>
 
 /**
  * Manage all components of the application. The model data, the CSS styles, the
@@ -32,7 +33,7 @@ class OmDiagram extends Diagram {
         this.layout = this._newLayout();
 
         this.search = new N2Search(this.zoomedElement, this.model.root);
-        this.ui = new N2UserInterface(this);
+        this.ui = new OmUserInterface(this);
 
         // Keep track of arrows to show and hide them
         this.arrowMgr = new N2ArrowManager(this.dom.n2Groups);

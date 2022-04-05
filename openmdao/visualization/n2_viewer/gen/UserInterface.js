@@ -1,10 +1,11 @@
 // <<hpp_insert gen/ClickHandler.js>>
 // <<hpp_insert src/OmToolbar.js>>
+// <<hpp_insert gen/ChildSelectDialog.js>>
 
 /**
  * Handle input events for the matrix and toolbar.
- * @typedef N2UserInterface
- * @property {N2Diagram} n2Diag Reference to the main diagram.
+ * @typedef UserInterface
+ * @property {Diagram} diag Reference to the main diagram.
  * @property {OmTreeNode} leftClickedNode The last node that was left-clicked.
  * @property {OmTreeNode} rightClickedNode The last node that was right-clicked, if any.
  * @property {Boolean} lastClickWasLeft True is last mouse click was left, false if right.
@@ -14,14 +15,14 @@
  * @property {Array} forwardButtonHistory The stack of backward-navigation zoomed elements.
  */
 
-class N2UserInterface {
+class UserInterface {
     /**
      * Initialize properties, set up the collapse-depth menu, and set up other
      * elements of the toolbar.
-     * @param {N2Diagram} n2Diag A reference to the main diagram.
+     * @param {Diagram} diag A reference to the main diagram.
      */
-    constructor(n2Diag) {
-        this.n2Diag = n2Diag;
+    constructor(diag) {
+        this.diag = diag;
 
         this.leftClickedNode = document.getElementById('ptN2ContentDivId');
         this.rightClickedNode = null;
@@ -40,43 +41,47 @@ class N2UserInterface {
         this._setupResizerDrag();
         this._setupWindowResizer();
 
-        this.legend = new N2Legend(this.n2Diag.modelData);
+        this.legend = new N2Legend(this.diag.modelData);
         this.nodeInfoBox = new NodeInfo(this);
         this.click = new ClickHandler(this.nodeInfoBox);
         this.toolbar = new OmToolbar(this);
 
         // Add listener for reading in a saved view.
         const self = this;
-        document.getElementById('state-file-input').addEventListener('change', function () {
-            const fr = new FileReader();
+        d3.select('#state-file-input').on('change', function(e) { self.loadView(e, self); });
+    }
 
-            fr.onload = function () {
-                let dataDict = false;
+    loadView(e, ui) {
+        const fr = new FileReader();
+        const fileInput = e.currentTarget;
 
-                try {
-                    dataDict = JSON.parse(fr.result);
-                }
-                catch (error) {
-                    alert("Cannot load view. The file does not appear to be a valid view file.");
-                    return;
-                }
+        fr.onload = function () {
+            let dataDict = false;
 
-                if (!dataDict.md5_hash) {
-                    alert("Cannot load view. The file does not appear to be a valid view file.");
-                    return;
-                }
-
-                // Make sure model didn't change.
-                if (dataDict.md5_hash != n2Diag.model.md5_hash) {
-                    alert("Cannot load view. Current model structure is different than in saved view.")
-                    return;
-                }
-
-                self.addBackButtonHistory();
-                self.n2Diag.restoreSavedState(dataDict);
+            try {
+                dataDict = JSON.parse(fr.result);
             }
-            fr.readAsText(this.files[0]);
-        })
+            catch (error) {
+                alert("Cannot load view. The file does not appear to be a valid view file.");
+                return;
+            }
+
+            if (!dataDict.md5_hash) {
+                alert("Cannot load view. The file does not appear to be a valid view file.");
+                return;
+            }
+
+            // Make sure model didn't change.
+            if (dataDict.md5_hash != ui.diag.model.md5_hash) {
+                alert("Cannot load view. Current model structure is different than in saved view.")
+                return;
+            }
+
+            ui.addBackButtonHistory();
+            ui.diag.restoreSavedState(dataDict);
+        }
+
+        fr.readAsText(fileInput.files[0]);
     }
 
     /**
@@ -87,7 +92,7 @@ class N2UserInterface {
      */
     setCollapseDepthSlider(opts = {}) {
         const min = opts.min ? opts.min : 2;
-        const max = opts.max ? opts.max : this.n2Diag.model.maxDepth;
+        const max = opts.max ? opts.max : this.diag.model.maxDepth;
         const val = opts.val ? opts.val : max;
 
         this.collapseDepthSlider
@@ -104,8 +109,8 @@ class N2UserInterface {
     _setupCollapseDepthSlider() {
         const self = this;
 
-        this.collapseDepthSlider = d3.select('input#depth-slider'),
-            this.collapseDepthLabel = d3.select('p#depth-slider-label');
+        this.collapseDepthSlider = d3.select('input#depth-slider');
+        this.collapseDepthLabel = d3.select('p#depth-slider-label');
 
         this.setCollapseDepthSlider();
 
@@ -119,16 +124,22 @@ class N2UserInterface {
             });
     }
 
+    /** Determine the style of the inactive handle (override with subclass) */
+    _inactiveResizerHandlerStyle() {
+        return 'inactive-resizer-handle';
+    }
+
     /** Set up event handlers for grabbing the bottom corner and dragging */
     _setupResizerDrag() {
         const handle = d3.select('#n2-resizer-handle');
         const box = d3.select('#n2-resizer-box');
         const body = d3.select('body');
+        const self = this;
 
         handle.on('mousedown', e => {
             box
-                .style('top', n2Diag.layout.gapSpace)
-                .style('bottom', n2Diag.layout.gapSpace);
+                .style('top', self.diag.layout.gapSpace)
+                .style('bottom', self.diag.layout.gapSpace);
 
             handle.attr('class', 'active-resizer-handle');
             box.attr('class', 'active-resizer-box');
@@ -152,8 +163,8 @@ class N2UserInterface {
             handle.html(Math.round(newDims.x) + ' x ' + newDims.y);
 
             body.style('cursor', 'nwse-resize')
-                .on('mouseup', e => {
-                    n2Diag.manuallyResized = true;
+                .on('mouseup', () => {
+                    diag.manuallyResized = true;
 
                     // Update the slider value and display
                     const defaultHeight = window.innerHeight * .95;
@@ -162,16 +173,12 @@ class N2UserInterface {
                     d3.select('#model-slider-label').html(newPercent + "%");
 
                     // Perform the actual resize
-                    n2Diag.verticalResize(newDims.y);
+                    self.diag.verticalResize(newDims.y);
 
                     box.style('width', null).style('height', null);
 
                     // Turn off the resizing box border and handle
-                    if (n2Diag.showSolvers) {
-                        handle.attr('class', 'inactive-resizer-handle');
-                    } else {
-                        handle.attr('class', 'inactive-resizer-handle-without-solvers');
-                    }
+                    handle.attr('class', self._inactiveResizerHandlerStyle())
                     box.attr('class', 'inactive-resizer-box');
 
                     // Get rid of the drag event handlers
@@ -181,16 +188,16 @@ class N2UserInterface {
                 })
                 .on('mousemove', e => {
                     const newHeight = e.clientY - offset.y;
-                    if (newHeight + n2Diag.layout.gapDist * 2 >= window.innerHeight * .5) {
+                    if (newHeight + self.diag.layout.gapDist * 2 >= window.innerHeight * .5) {
                         newDims = new Dimensions({ x: e.clientX - offset.x, y: newHeight});
 
                         // Maintain the ratio by only resizing in the least moved direction
                         // and resizing the other direction by a fraction of that
                         if (newDims.x < newDims.y) {
-                            newDims.y = n2Diag.layout.calcHeightBasedOnNewWidth(newDims.x);
+                            newDims.y = self.diag.layout.calcHeightBasedOnNewWidth(newDims.x);
                         }
                         else {
-                            newDims.x = n2Diag.layout.calcWidthBasedOnNewHeight(newDims.y);
+                            newDims.x = self.diag.layout.calcWidthBasedOnNewHeight(newDims.y);
                         }
 
                         box.style('width', newDims.x + 'px').style('height', newDims.y + 'px');
@@ -206,7 +213,7 @@ class N2UserInterface {
     /** Respond to window resize events if the diagram hasn't been manually sized */
     _setupWindowResizer() {
         const self = this;
-        const n2Diag = self.n2Diag;
+        const diag = self.diag;
         this.pixelRatio = window.devicePixelRatio;
 
         self.resizeTimeout = null;
@@ -219,11 +226,11 @@ class N2UserInterface {
                 return;
             }
 
-            if (!n2Diag.manuallyResized) {
+            if (!diag.manuallyResized) {
                 clearTimeout(self.resizeTimeout);
                 self.resizeTimeout =
                     setTimeout(function () {
-                        n2Diag.verticalResize(window.innerHeight * .95);
+                        diag.verticalResize(window.innerHeight * .95);
                     }, 200);
             }
         })
@@ -235,7 +242,7 @@ class N2UserInterface {
      * @param {OmTreeNode} node The right-clicked node to check.
      */
     isCollapsible(node) {
-        return (node.depth > this.n2Diag.zoomedElement.depth &&
+        return (node.depth > this.diag.zoomedElement.depth &&
             node.type !== 'root' && node.hasChildren());
     }
 
@@ -244,9 +251,7 @@ class N2UserInterface {
      * it's allowed, then set the node as minimized and update the diagram drawing.
      */
     collapse() {
-        testThis(this, 'N2UserInterface', 'collapse');
-
-        let node = this.rightClickedNode;
+        const node = this.rightClickedNode;
 
         if (this.isCollapsible(node)) {
 
@@ -261,7 +266,7 @@ class N2UserInterface {
             N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
             this.lastClickWasLeft = false;
             node.minimize();
-            this.n2Diag.update();
+            this.diag.update();
         }
     }
 
@@ -270,8 +275,6 @@ class N2UserInterface {
      * @param {OmTreeNode} node The node that was right-clicked.
      */
     rightClick(e, node) {
-        testThis(this, 'N2UserInterface', 'rightClick');
-
         e.preventDefault();
         e.stopPropagation();
 
@@ -280,7 +283,7 @@ class N2UserInterface {
             this.addBackButtonHistory();
             node.draw.manuallyExpanded = true;
             this._uncollapse(node);
-            this.n2Diag.update();
+            this.diag.update();
         }
         else if (this.isCollapsible(node)) {
             this.rightClickedNode = node;
@@ -299,7 +302,6 @@ class N2UserInterface {
      * @param {String} color The color of the clicked node, to use for the dialog ribbons.
      */
     altRightClick(e, node, color) {
-        testThis(this, 'N2UserInterface', 'altRightClick');
         e.preventDefault();
         e.stopPropagation();
         window.getSelection().empty();
@@ -307,7 +309,7 @@ class N2UserInterface {
         // Make sure node is collapsible and window doesn't exist yet.
         if (this.isCollapsible(node) && !node.isFilter() && 
             d3.select('#childSelect-' + node.toId()).empty()) {
-            new ChildSelectDialog(e, node, color); // Create the modal dialog
+            new ChildSelectDialog(e, node, color, this.diag); // Create the modal dialog
         }
     }
 
@@ -319,13 +321,13 @@ class N2UserInterface {
     _setupLeftClick(node) {
         this.leftClickedNode = node;
         this.lastClickWasLeft = true;
-        if (this.leftClickedNode.depth > this.n2Diag.zoomedElement.depth) {
+        if (this.leftClickedNode.depth > this.diag.zoomedElement.depth) {
             this.leftClickIsForward = true; // forward
         }
-        else if (this.leftClickedNode.depth < this.n2Diag.zoomedElement.depth) {
+        else if (this.leftClickedNode.depth < this.diag.zoomedElement.depth) {
             this.leftClickIsForward = false; // backwards
         }
-        this.n2Diag.updateZoomedElement(node);
+        this.diag.updateZoomedElement(node);
         N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
     }
 
@@ -335,9 +337,8 @@ class N2UserInterface {
      */
     leftClick(e, node) {
         // Don't do it if the node is already zoomed
-        if (node === this.n2Diag.zoomedElement) return;
+        if (node === this.diag.zoomedElement) return;
 
-        testThis(this, 'N2UserInterface', 'leftClick');
         e.preventDefault();
         e.stopPropagation();
 
@@ -348,7 +349,7 @@ class N2UserInterface {
         node.draw.manuallyExpanded = true;
         this._setupLeftClick(node);
 
-        this.n2Diag.update();
+        this.diag.update();
     }
 
     /**
@@ -362,10 +363,10 @@ class N2UserInterface {
                 this.leftClickedNode.rootIndex;
 
             if (this.leftClickIsForward) {
-                exitIndex = lcRootIndex - this.n2Diag.zoomedElementPrev.rootIndex;
+                exitIndex = lcRootIndex - this.diag.zoomedElementPrev.rootIndex;
             }
             else {
-                enterIndex = this.n2Diag.zoomedElementPrev.rootIndex - lcRootIndex;
+                enterIndex = this.diag.zoomedElementPrev.rootIndex - lcRootIndex;
             }
         }
     }
@@ -376,10 +377,10 @@ class N2UserInterface {
      */
     addBackButtonHistory(clearForward = true) {
         let formerHidden = [];
-        this.n2Diag.model.findAllHidden(formerHidden, false);
+        this.diag.model.findAllHidden(formerHidden, false);
 
         this.backButtonHistory.push({
-            'node': this.n2Diag.zoomedElement,
+            'node': this.diag.zoomedElement,
             'hidden': formerHidden,
             'search': this.toolbar.getSearchState(),
             'collapseDepth': this.currentCollapseDepth
@@ -395,7 +396,7 @@ class N2UserInterface {
      */
     addForwardButtonHistory(node) {
         let formerHidden = [];
-        this.n2Diag.model.findAllHidden(formerHidden, true);
+        this.diag.model.findAllHidden(formerHidden, true);
 
         this.forwardButtonHistory.push({
             'node': node,
@@ -412,8 +413,6 @@ class N2UserInterface {
      * Add the previous zoomed node to the forward history stack.
      */
     backButtonPressed() {
-        testThis(this, 'N2UserInterface', 'backButtonPressed');
-
         if (this.backButtonHistory.length == 0) {
             debugInfo("backButtonPressed(): no items in history");
             return;
@@ -440,12 +439,12 @@ class N2UserInterface {
                 if (obj.draw.minimized) return;
             }
 
-            this.addForwardButtonHistory(this.n2Diag.zoomedElement);
+            this.addForwardButtonHistory(this.diag.zoomedElement);
             this._setupLeftClick(oldZoomedElement);
         }
 
-        this.n2Diag.model.resetAllHidden(history.hidden);
-        this.n2Diag.update();
+        this.diag.model.resetAllHidden(history.hidden);
+        this.diag.update();
     }
 
     /**
@@ -455,8 +454,6 @@ class N2UserInterface {
      * Add the previous zoomed node to the back history stack.
      */
     forwardButtonPressed() {
-        testThis(this, 'N2UserInterface', 'forwardButtonPressed');
-
         if (this.forwardButtonHistory.length == 0) {
             debugInfo("forwardButtonPressed(): no items in history");
             return;
@@ -482,8 +479,8 @@ class N2UserInterface {
         this.addBackButtonHistory(false);
         this._setupLeftClick(node);
 
-        this.n2Diag.model.resetAllHidden(history.hidden);
-        this.n2Diag.update();
+        this.diag.model.resetAllHidden(history.hidden);
+        this.diag.update();
     }
 
     /**
@@ -504,7 +501,7 @@ class N2UserInterface {
     findRootOfChangeForCollapseDepth(node) {
         for (let obj = node; obj != null; obj = obj.parent) {
             //make sure history item is not minimized
-            if (obj.depth == this.n2Diag.chosenCollapseDepth) return obj;
+            if (obj.depth == this.diag.chosenCollapseDepth) return obj;
         }
         return node;
     }
@@ -526,16 +523,14 @@ class N2UserInterface {
      * to the root node.
      */
     homeButtonClick() {
-        testThis(this, 'N2UserInterface', 'homeButtonClick');
-
-        this.leftClickedNode = this.n2Diag.model.root;
+        this.leftClickedNode = this.diag.model.root;
         this.lastClickWasLeft = true;
         this.leftClickIsForward = false;
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
         this.addBackButtonHistory();
         this.setCollapseDepthSlider();
 
-        this.n2Diag.reset();
+        this.diag.reset();
     }
 
     /**
@@ -558,14 +553,12 @@ class N2UserInterface {
      * @param {OmTreeNode} node The initial node, usually the currently zoomed element.
      */
     collapseOutputsButtonClick(startNode) {
-        testThis(this, 'N2UserInterface', 'collapseOutputsButtonClick');
-
         this.addBackButtonHistory();
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
         N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
         this._collapseOutputs(startNode);
-        this.n2Diag.update();
+        this.diag.update();
     }
 
     /**
@@ -590,43 +583,37 @@ class N2UserInterface {
      * @param {OmTreeNode} startNode The initial node.
      */
     uncollapseButtonClick(startNode) {
-        testThis(this, 'N2UserInterface', 'uncollapseButtonClick');
-
         this.addBackButtonHistory();
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
         N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
         this._uncollapse(startNode);
         startNode.draw.manuallyExpanded = true;
-        this.n2Diag.update();
+        this.diag.update();
     }
 
     /** Any collapsed nodes are expanded, starting with the specified node. */
     expandAll(startNode) {
-        testThis(this, 'N2UserInterface', 'expandAll');
-
-        this.n2Diag.showWaiter();
+        this.diag.showWaiter();
 
         this.addBackButtonHistory();
-        this.n2Diag.manuallyExpandAll(startNode);
+        this.diag.manuallyExpandAll(startNode);
 
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
         N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
-        this.n2Diag.update();
+        this.diag.update();
     }
 
     /** All nodes are collapsed, starting with the specified node. */
     collapseAll(startNode) {
-        testThis(this, 'N2UserInterface', 'collapseAll');
-
         this.addBackButtonHistory();
-        this.n2Diag.minimizeAll(startNode);
+        this.diag.minimizeAll(startNode);
 
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
         N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
-        this.n2Diag.update();
+        this.diag.update();
     }
 
     /**
@@ -634,82 +621,26 @@ class N2UserInterface {
      * @param {Number} depth Selected depth to collapse to.
      */
     collapseToDepth(depth) {
-        testThis(this, 'N2UserInterface', 'collapseToDepth');
-
         this.addBackButtonHistory();
-        this.n2Diag.minimizeToDepth(depth);
+        this.diag.minimizeToDepth(depth);
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseDepth.bind(
             this
         );
         N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
-        this.n2Diag.update();
-    }
-
-    /**
-     * Wipe the current solvers legend area and populate with the other type.
-     * @param {Boolean} linear True to use linear solvers, false for non-linear.
-     */
-    setSolvers(linear) {
-
-        // Update the diagram
-        this.n2Diag.showLinearSolverNames = linear;
-
-        // update the legend
-        this.legend.toggleSolvers(this.n2Diag.showLinearSolverNames);
-
-        if (this.legend.shown)
-            this.legend.show(
-                this.n2Diag.showLinearSolverNames,
-                this.n2Diag.style.solvers
-            );
-        this.n2Diag.update();
-    }
-
-    /**
-     * React to the toggle-solver-name button press and show non-linear if linear
-     * is currently shown, and vice-versa.
-     */
-    showSolvers() {
-        n2Diag.showSolvers = true;
-        this.n2Diag.update();
-        d3.select('#n2-resizer-handle').attr('class', 'inactive-resizer-handle')
-    }
-    
-    hideSolvers() {
-        n2Diag.showSolvers = false;
-        this.n2Diag.update();
-        d3.select('#n2-resizer-handle').attr('class', 'inactive-resizer-handle-without-solvers')
+        this.diag.update();
     }
 
     /** React to the toggle legend button, and show or hide the legend below the N2. */
     toggleLegend() {
-        testThis(this, 'N2UserInterface', 'toggleLegend');
         this.legend.toggle();
 
         d3.selectAll('i.icon-key').attr('class',
             this.legend.hidden ? 'fas icon-key' : 'fas icon-key active-tab-icon');
     }
 
-    toggleDesVars() {
-        testThis(this, 'N2UserInterface', 'toggleDesVars');
-
-        if (this.desVars) {
-            this.n2Diag.showDesignVars();
-            this.desVars = false;
-        } else {
-            this.n2Diag.hideDesignVars();
-            this.desVars = true;
-        }
-
-        d3.select('#desvars-button').attr('class',
-            this.desVars ? 'fas icon-fx-2' : 'fas icon-fx-2 active-tab-icon');
-    }
-
     /** Show or hide the node info panel button */
     toggleNodeData() {
-        testThis(this, 'N2UserInterface', 'toggleNodeData');
-
         const infoButton = d3.select('#info-button');
         const nodeData = d3.select('#node-info-table');
 
@@ -724,7 +655,7 @@ class N2UserInterface {
     }
 
     _setupSearch() {
-        let self = this; // For callbacks that change "this". Alternative to using .bind().
+        const self = this; // For callbacks that change "this".
 
         // Keyup so it will be after the input and awesomplete-selectcomplete event listeners
         window.addEventListener(
@@ -743,8 +674,6 @@ class N2UserInterface {
 
     /** Make sure UI controls reflect history and current reality. */
     update() {
-        testThis(this, 'N2UserInterface', 'update');
-
         this.currentCollapseDepth = this.collapseDepthSliderVal;
 
         d3.select('#undo-graph').classed('disabled-button',
@@ -755,40 +684,40 @@ class N2UserInterface {
 
     /** Called when the search button is actually or effectively clicked to start a search. */
     searchButtonClicked() {
-        testThis(this, 'N2UserInterface', 'searchButtonClicked');
         this.addBackButtonHistory();
-        this.n2Diag.search.performSearch();
+        this.diag.search.performSearch();
 
-        this.findRootOfChangeFunction = this.n2Diag.search.findRootOfChangeForSearch;
+        this.findRootOfChangeFunction = this.diag.search.findRootOfChangeForSearch;
         N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
-        this.n2Diag.search.updateRecomputesAutoComplete = false;
-        this.n2Diag.update();
+        this.diag.search.updateRecomputesAutoComplete = false;
+        this.diag.update();
     }
 
     /**
-     * Called when the enter key is pressed in the search input box.
+     * Called when the enter key is pressed down in the search input box.
      * @param {Event} e Object with information about the event.
      */
     searchEnterKeyDownEventListener(e) {
-        testThis(this, 'N2UserInterface', 'searchEnterKeyDownEventListener');
 
-        let target = e.target;
+        const target = e.target;
         if (target.id == 'awesompleteId') {
-            let key = e.which || e.keyCode;
-            if (key === 13) {
+            const key = e.which || e.keyCode;
+            if (key == 13) {
                 // 13 is enter
                 this.callSearchFromEnterKeyPressed = true;
             }
         }
     }
 
+    /**
+     * Called when the enter key is released in the search input box.
+     * @param {Event} e Object with information about the event.
+     */
     searchEnterKeyUpEventListener(e) {
-        testThis(this, 'N2UserInterface', 'searchEnterKeyUpEventListener');
-
-        let target = e.target;
+        const target = e.target;
         if (target.id == 'awesompleteId') {
-            let key = e.which || e.keyCode;
+            const key = e.which || e.keyCode;
             if (key == 13) {
                 // 13 is enter
                 if (this.callSearchFromEnterKeyPressed) {
@@ -803,18 +732,18 @@ class N2UserInterface {
         const stateFileName = prompt("Filename to save view state as", 'saved.n2view');
 
         // Solver toggle state.
-        const showLinearSolverNames = this.n2Diag.showLinearSolverNames;
-        const showSolvers = this.n2Diag.showSolvers;
+        const showLinearSolverNames = this.diag.showLinearSolverNames;
+        const showSolvers = this.diag.showSolvers;
 
         // Zoomed node (subsystem).
-        const zoomedElement = this.n2Diag.zoomedElement.id;
+        const zoomedElement = this.diag.zoomedElement.id;
 
         // Expand/Collapse state of all nodes (subsystems) in model.
         const expandCollapse = Array();
-        this.n2Diag.getSubState(expandCollapse);
+        this.diag.getSubState(expandCollapse);
 
         // Arrow State
-        const arrowState = this.n2Diag.arrowMgr.savePinnedArrows();
+        const arrowState = this.diag.arrowMgr.savePinnedArrows();
 
         const dataDict = {
             'showLinearSolverNames': showLinearSolverNames,
@@ -822,13 +751,12 @@ class N2UserInterface {
             'zoomedElement': zoomedElement,
             'expandCollapse': expandCollapse,
             'arrowState': arrowState,
-            'md5_hash': this.n2Diag.model.md5_hash,
+            'md5_hash': this.diag.model.md5_hash,
         };
 
         const link = document.createElement('a');
         link.setAttribute('download', stateFileName);
-        const data_blob = new Blob([JSON.stringify(dataDict)],
-            { type: 'text/plain' });
+        const data_blob = new Blob([JSON.stringify(dataDict)], { type: 'text/plain' });
 
         // If we are replacing a previously generated file we need to
         // manually revoke the object URL to avoid memory leaks.
@@ -850,329 +778,5 @@ class N2UserInterface {
     /** Load the model state to a file. */
     loadState() {
         document.getElementById('state-file-input').click();
-    }
-}
-
-/**
- * Manage a window that allows the user to select which variables to display.
- * TODO: Make column headers sticky, improve autosizing
- * without using sizeToContent(3,30)
- * @typedef ChildSelectDialog
- */
-class ChildSelectDialog extends N2WindowDraggable {
-    /**
-     * Setup the basic structure of the variable selection dialog.
-     * @param {OmTreeNode} node The node to examine the variables of.
-     * @param {String} color The color to make the window header/footer ribbons.
-     */
-     constructor(e, node, color) {
-        super('childSelect-' + node.toId());
-        this.node = node;
-        this.nodeColor = color;
-        this.scrollbarWidth = 14;
-        this.searchTerm = ('searchTerm' in node)? node.searchTerm : null;
-
-        this.ribbonColor(this.nodeColor);
-        
-        // Don't do anything else if the node has no variables
-        if ( ! this._fetchVarNames() ) { this.close(); }
-        else { this._initialSetup(e); }
-    }
-    
-    /**
-     * Find all the children of the node that are variables.
-     * @returns {Boolean} True if any variables were found, otherwise false.
-     */
-    _fetchVarNames() {
-        // Only add children that are variables.
-        let foundVariables = false;
-
-        this.varNames = {};
-        this.varNameArr = []; // For sorting purposes
-
-        for (const child of this.node.children) {
-            if (!child.isInputOrOutput()) { continue; }
-            foundVariables = true;
-
-            // Use N2Layout.getText() because Auto-IVC variable names are not usually descriptive.
-            const varName = n2Diag.layout.getText(child);
-            this.varNames[varName] = child;
-            this.varNameArr.push(varName)
-
-        }
-
-        return foundVariables;
-    }
-
-    /**
-     * Configure the window structure, then call repopulate() to list the variable names.
-     */
-    _initialSetup(e) {
-        const self = this;
-
-        this.minWidth = 300;
-        this.minHeight = 100;
-        this.theme('child-select');
-        this.title(this.node.name);
-        this.copyBody('#variable-selection-body');
-
-        this.headerTable = this.body.select('table.header');
-        const topRow = this.headerTable.select('tr');
-        const childName = topRow.select('th:first-child');
-
-        childName.select('span.sort-up') // Up arrow
-            .on('click', e => {
-                self.varNameArr.sort();
-                self.repopulate();
-            });
-
-        childName.select('span.sort-down') // Down arrow
-            .on('click', e => {
-                self.varNameArr.sort();
-                self.varNameArr.reverse();
-                self.repopulate();
-            });
-
-        this.tableContainer = this.body.select('div.table-container');
-        this.table = this.tableContainer.select('table.variables');
-        const UA = navigator.userAgent;
-        if (! /Chrom/.test(UA)) {          
-            // Chrome puts the scrollbar outside the element, other browsers inside
-            this.table.style('margin-right', `${this.scrollbarWidth}px`);
-        }
-
-        this.tbody = this.table.select('tbody');
-
-        // Search
-        this.searchContainer = this.body.select('div.search-container');
-        this.searchBox = this.searchContainer.select('input');
-        if (this.searchTerm) { this.searchBox.property('value', this.searchTerm); }
-        this.searchBox.on('keyup', self.updateSearch.bind(self));
-
-        // Clear the search box and repopulate the variable list by clicking on the X button
-        this.searchContainer.select('.search-clear').on('click', e => {
-            self.searchTerm = '';
-            self.searchBox.property('value', '');
-            self.updateSearch(e, true);
-        });
-
-        // Execute the search by clicking on the arrow button
-        this.searchContainer.select('.search-perform').on('click', e => {
-            self.updateSearch(e, true);
-        });
-
-        this.buttonContainer = this.body.select('div.button-container');
-
-        // Apply button
-        this.buttonContainer.select('button.select-all-variables')
-            .on('click', self.selectAll.bind(self));
-
-        // Select None button
-        this.buttonContainer.select('button.select-no-variables')
-            .on('click', self.selectNone.bind(self));
-
-        // Select All button
-        this.buttonContainer.select('button.apply-variable-selection')
-            .on('click', self.apply.bind(self));
-
-        this.scrollbarSpacer = topRow.select('th.scrollbar-spacer');
-        this.repopulate();
-        this.resize();
-        this.modal(true)
-            .moveNearMouse(e)
-            .show();
-    }
-
-    /** Reset the array of hidden vars from the node's array if it exists. */
-    _initHiddenVars() {
-        this.hiddenVars = [];
-        this.existingHiddenVars = false;
-
-        for (const iotype of ['inputs', 'outputs']) {
-            if (this.node.filter[iotype].count > 0) {
-                for (const child of this.node.filter[iotype].children) {
-                    this.hiddenVars.push(child);
-                };
-                this.existingHiddenVars = true;
-            }
-        }
-    }
-
-    /** Add all the variables, their display status, and the control buttons. */
-    repopulate() {
-        const self = this;
-        this.tbody.html('');
-        
-        // If a search term was used, treat it as a regular expression.
-        const matchRe = this.searchTerm? new RegExp(this.searchTerm, 'i') : null;
-        this._initHiddenVars();
-        this.foundSearchVars = [];
-
-        let isEven = true;
-        this.varCount = 0;
-        for (const varName of this.varNameArr) {
-            const child = this.varNames[varName];
-
-            if (matchRe) {
-                // Variable names not matching the regexp are hidden.
-                if (! matchRe.test(varName)) { 
-                    this.hiddenVars.push(child);
-                    continue;
-                }
-                // Matching variable names are remembered.
-                else {
-                    this.foundSearchVars.push(child);
-                }
-            }
-            
-            this.varCount++;
-
-            // Alternate row colors:
-            const row = this.tbody.append('tr').attr('class', isEven? 'even' : 'odd');
-            isEven = !isEven;
-
-            row.append('td').attr('class', 'varname').text(varName);
-            const checkId = `${child.toId()}-visible-check`;
-            if (child.isFilteredVariable() && ! this.existingHiddenVars) { this.hiddenVars.push(child); }
-
-            // Add a checkbox. When checked, the variable will be displayed.
-            row.append('td').attr('class', 'varvis')
-                .append('input')
-                .attr('type', 'checkbox')
-                .property('checked', !child.isFilteredVariable())
-                .attr('id', checkId)
-                .on('change', e => {
-                    const isVisible = d3.select(`#${checkId}`).property('checked');
-                    if (!isVisible) { this.hiddenVars.push(child); }
-                    else { 
-                        const idx = this.hiddenVars.indexOf(child);
-                        if (idx > -1 ) { this.hiddenVars.splice(idx, 1); }
-                        else { console.warn('Could not find child in hiddenVars array.', child); }
-                    }
-                })
-        }
-
-        if (this.varCount == 0) {
-            this.tbody.append('tr')
-                .append('td')
-                .style('text-align', 'center')
-                .attr('colspan','2')
-                .text('No matching variables found.')
-        }
-
-        return this;
-    }
-
-    /**
-     * If the container scroll height is larger than the visible height the scrollbar is there.
-     * @returns {Boolean} True if the scrollbar is visible, false otherwise.
-     */
-    scrollbarIsVisible() {
-        return (this.tableContainer.node().scrollHeight > this.tableContainer.node().clientHeight);
-    }
-
-    /** Clicking Apply closes the dialog and updates the diagram. */
-    apply() {
-        if (this.hiddenVars.length == this.node.children.length || this.varCount == 0) {
-            // If every variable was hidden, just collapse the node if it's expanded
-            if (! this.node.draw.minimized) { n2Diag.ui.rightClick(this.node); }
-        }
-        else {
-            n2Diag.ui.rightClickedNode = this.node;
-            n2Diag.ui.addBackButtonHistory();
-
-            this.node.searchTerm = this.searchTerm;
-            this.node.filter.inputs.wipe();
-            this.node.filter.outputs.wipe();
-
-            for (const child of this.hiddenVars) {
-                if (child.isInput()) { this.node.filter.inputs.add(child); }
-                else { this.node.filter.outputs.add(child); }
-            }
-            
-            if (this.node.draw.minimized) {
-                // If node itself is collapsed, expand it
-                this.node.draw.manuallyExpanded = true;
-                this.node.expand();
-            }
-            n2Diag.update();
-        }
-        this.close();
-    }
-
-    /**
-     * Make all variable names visible. If a search term is active, make all
-     * matching variable names visible.
-     */
-    selectAll() {
-        d3.selectAll('.window-theme-child-select input[type="checkbox"]')
-            .property('checked', true);
-        this.hiddenVars = [];
-
-        if (this.foundSearchVars.length > 0) {
-            // Select variables not found by search
-            for (const child of this.node.children) {
-                if (child.isFilter()) continue;
-                if (this.foundSearchVars.indexOf(child) < 0) {
-                    this.hiddenVars.push(child);
-                }
-            }
-        }
-    }
-
-    /** Hide all variable names */
-    selectNone() {
-        d3.selectAll('.window-theme-child-select input[type="checkbox"]')
-            .property('checked', false);
-        this.hiddenVars = [];
-
-        for (const child of this.node.children) {
-            if (child.isFilter()) continue;
-            this.hiddenVars.push(child);
-        }
-
-    }
-
-    /** Adjust the size of the window body object based on the size of their contents. */
-    resize() {
-        const headerTableNode = this.headerTable.node(),
-            searchConNode = this.searchContainer.node(),
-            newHeight =
-                `${headerTableNode.scrollHeight +
-                this.tableContainer.node().clientHeight +
-                searchConNode.scrollHeight +
-                this.buttonContainer.node().scrollHeight + 7}px`,
-            newWidth = `${this.table.node().scrollWidth + this.scrollbarWidth}px`;
-
-        this.body.style('height', newHeight).style('width', newWidth);
-        this.tableContainer.style('width', newWidth);
-        this.headerTable.style('width', newWidth);
-
-        if (this.varCount > 0) {
-            this.headerTable.select('th.varname')
-                .style('width', this.table.select('td.varname').style('width'));
-            this.headerTable.select('th.varvis')
-                .style('width', this.table.select('td.varvis').style('width'));
-        }
-
-        this.searchContainer.style('width', newWidth);
-
-        const displayScrollbar = this.scrollbarIsVisible()? null : 'none';
-        this.scrollbarSpacer.style('display', displayScrollbar);
-        
-        this.sizeToContent(3,4);
-
-        return this;
-    }
-
-    /** Update the variable list based on the provided search term. */
-    updateSearch(e, clicked = false) {
-        if (e.keyCode == 13 || clicked) {
-                this.searchTerm = this.searchBox.property('value');
-                this.repopulate();
-                this.resize();
-        }
-
-        return this;
     }
 }

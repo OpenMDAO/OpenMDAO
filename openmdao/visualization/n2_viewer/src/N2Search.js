@@ -90,7 +90,7 @@ class N2Search {
 
     /**
      * Add a couple of event listeners that are easier to do from here
-     * than in N2UserInterface.
+     * than in UserInterface.
      */
     _addEventListeners() {
         const self = this;
