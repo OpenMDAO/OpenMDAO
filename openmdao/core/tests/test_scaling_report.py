@@ -286,9 +286,5 @@ class TestDiscreteScalingReport(unittest.TestCase):
         prob.driver.scaling_report(show_browser=False)
 
 
-class TestDriverScalingReportMPI(TestDriverScalingReport):
-    N_PROCS=2
-
-
 if __name__ == '__main__':
     unittest.main()

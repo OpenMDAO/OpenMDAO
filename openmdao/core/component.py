@@ -117,9 +117,9 @@ class Component(System):
                                          "inputs and outputs should be set as distributed instead,"
                                          " using calls to add_input() or add_output().")
         self.options.declare('run_root_only', types=bool, default=False,
-                             desc='If True, call compute/compute_partials/linearize/apply_linear/'
-                                  'apply_nonlinear/compute_jacvec_product only on '
-                                  'rank 0 and broadcast the results to the other ranks.')
+                             desc='If True, call compute, compute_partials, linearize, '
+                                  'apply_linear, apply_nonlinear, and compute_jacvec_product '
+                                  'only on rank 0 and broadcast the results to the other ranks.')
 
     def setup(self):
         """

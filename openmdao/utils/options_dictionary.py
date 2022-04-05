@@ -144,44 +144,51 @@ class OptionsDictionary(object):
             from tabulate import tabulate
         except ImportError as e:
             msg = "'to_table' requires the tabulate package but it is not currently installed." \
-                  " Use `pip install tablulate` or install openmdao with" \
+                  " Use `pip install tabulate` or install openmdao with" \
                   " `pip install openmdao[notebooks]`."
             raise ImportError(msg)
 
-        tlist = [['Option', 'Default', 'Acceptable Values', 'Acceptable Types', 'Description',
-                  'Deprecation']]
+        hdrs = ['Option', 'Default', 'Acceptable Values', 'Acceptable Types', 'Description']
+        rows = []
+
         for key in sorted(self._dict.keys()):
-            options = self._dict[key]
-            default = options['val'] if options['val'] is not _UNDEFINED else '**Required**'
-            # if the default is an object instance, replace with the (unqualified) object type
+            option = self._dict[key]
+            deprecations = False
+
+            default = option['val'] if option['val'] is not _UNDEFINED else '**Required**'
             default_str = str(default)
+
+            # if the default is an object instance, replace with the (unqualified) object type
             idx = default_str.find(' object at ')
             if idx >= 0 and default_str[0] == '<':
                 parts = default_str[:idx].split('.')
                 default = parts[-1]
 
-            acceptable_values = options['values']
+            acceptable_values = option['values']
             if acceptable_values is not None:
                 if not isinstance(acceptable_values, (set, tuple, list)):
                     acceptable_values = (acceptable_values,)
                 acceptable_values = [value for value in acceptable_values]
 
-            acceptable_types = options['types']
+            acceptable_types = option['types']
             if acceptable_types is not None:
                 if not isinstance(acceptable_types, (set, tuple, list)):
                     acceptable_types = (acceptable_types,)
                 acceptable_types = [type_.__name__ for type_ in acceptable_types]
 
-            desc = options['desc']
+            desc = option['desc']
 
-            deprecation = options['deprecation']
+            deprecation = option['deprecation']
             if deprecation is not None:
-                tlist.append([key, default, acceptable_values, acceptable_types, desc,
-                              deprecation[0]])
+                if not deprecations:
+                    hdrs.append('Deprecation')
+                    deprecations = True
+                rows.append([key, default, acceptable_values, acceptable_types, desc,
+                             deprecation[0]])
             else:
-                tlist.append([key, default, acceptable_values, acceptable_types, desc])
+                rows.append([key, default, acceptable_values, acceptable_types, desc])
 
-        return tabulate(tlist, headers='firstrow', tablefmt=fmt, missingval=missingval)
+        return tabulate(rows, headers=hdrs, tablefmt=fmt, missingval=missingval)
 
     def __str__(self, width=100):
         """
