@@ -1,3 +1,5 @@
+// <<hpp_insert src/OmSymbolType.js>>
+
 /** Base class for all cell renderers */
 class N2CellRenderer {
     /**
@@ -440,7 +442,8 @@ class N2FilterCell extends N2VectorBase {
  * @property {OmTreeNode} srcObj The node in the model tree this cell is associated with.
  * @property {OmTreeNode} tgtObj The model tree node that this outputs to.
  * @property {string} id The srcObj id appended with the tgtObj id.
- * @property {SymbolType} symbolType Info about the type of symbol represented by the node.
+ * @property {OmSymbolType} symbolType Info about the type of symbol represented by the node.
+ * @property {N2CellRenderer} renderer The object that draws the cell.
  */
 class N2MatrixCell {
     /**
@@ -450,7 +453,6 @@ class N2MatrixCell {
      * @param {OmTreeNode} srcObj The node in the model tree this node is associated with.
      * @param {OmTreeNode} tgtObj The model tree node that this outputs to.
      * @param {ModelData} model Reference to the model to get some info from it.
-     * @param {N2CellRenderer} renderer The object that draws the cell.
      */
     constructor(row, col, srcObj, tgtObj, model) {
         this.row = row;
@@ -459,7 +461,7 @@ class N2MatrixCell {
         this.tgtObj = tgtObj;
         this.id = N2MatrixCell.makeId(srcObj.id, tgtObj.id);
 
-        this.symbolType = new SymbolType(this, model);
+        this.symbolType = new OmSymbolType(this, model);
         this.renderer = this._newRenderer();
 
         this.offScreen = {
