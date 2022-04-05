@@ -248,6 +248,10 @@ def timing_context(active=True):
     """
     Context manager to set whether timing is active or not.
 
+    Note that this will only work if the --use_context arg is passed to the `openmdao timing`
+    command line tool.  Otherwise it will be ignored and the entire python script will be
+    timed.
+
     Parameters
     ----------
     active : bool

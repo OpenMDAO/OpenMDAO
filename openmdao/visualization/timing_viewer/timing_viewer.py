@@ -19,7 +19,7 @@ from openmdao.utils.om_warnings import issue_warning
 from openmdao.core.constants import _DEFAULT_OUT_STREAM
 
 
-_default_timer_methods = sorted(['_solve_nonlinear', '_apply_linear'])
+_default_timer_methods = sorted(['_solve_nonlinear'])
 
 
 def view_timing_dump(timing_file, out_stream=_DEFAULT_OUT_STREAM):
