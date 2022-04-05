@@ -212,7 +212,7 @@ class pyOptSparseDriver(Driver):
                              desc='Name of optimizers to use')
         self.options.declare('title', default='Optimization using pyOpt_sparse',
                              desc='Title of this optimization run')
-        self.options.declare('print_opt_prob', types=bool, default=True,
+        self.options.declare('print_opt_prob', types=bool, default=False,
                              desc='Print the opt problem summary before running the optimization')
         self.options.declare('print_results', types=bool, default=True,
                              desc='Print pyOpt results if True')
@@ -457,7 +457,7 @@ class pyOptSparseDriver(Driver):
             opt.setOption(option, value)
 
         # Print the pyoptsparse optimization problem summary before running the optimization.
-        # This allows users to confirm their optization setup.
+        # This allows users to confirm their optimization setup.
         if self.options['print_opt_prob']:
             if not MPI or model.comm.rank == 0:
                 print(opt_prob)
