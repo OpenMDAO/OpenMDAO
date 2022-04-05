@@ -14,7 +14,7 @@ class OmSymbolType extends SymbolType {
      * @param {OmModelData} model Reference to the model to get some info from it.
      */
     constructor(cell, model) {
-        this.super(cell, model);
+        super(cell, model);
     }
 
     _init() {
