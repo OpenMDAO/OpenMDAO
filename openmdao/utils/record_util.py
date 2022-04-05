@@ -68,11 +68,11 @@ def format_iteration_coordinate(coord, prefix=None):
     return ':'.join([prefix, separator.join(iteration_coordinate)])
 
 
-# regular expression used to determine if a node in an iteration coordinate represents a system
-_coord_system_re = re.compile('(_solve_nonlinear|_apply_nonlinear)$')
-
 # Regular expression used for splitting iteration coordinates, removes separator and iter counts
 _coord_split_re = re.compile('\\|\\d+\\|*')
+
+# regular expression used to determine if a node in an iteration coordinate represents a system
+_coord_system_re = re.compile('(\\._solve_nonlinear|\\._apply_nonlinear)$')
 
 
 def get_source_system(iteration_coordinate):
@@ -89,17 +89,20 @@ def get_source_system(iteration_coordinate):
     str
         The pathname of the system that is the source of the iteration.
     """
-    path = []
+    # find the last part of the coordinate that contains a solve/apply nonlinear call
     parts = _coord_split_re.split(iteration_coordinate)
-    for part in parts:
-        if (_coord_system_re.search(part) is not None):
+    for part in reversed(parts):
+        match = _coord_system_re.search(part)
+        if (match):
+            # take the part up to "._solve_nonlinear" or "._apply_nonlinear"
+            part = part[:match.span()[0]]
+            # get rid of 'rank#:'
             if ':' in part:
-                # get rid of 'rank#:'
                 part = part.split(':')[1]
-            path.append(part.split('.')[0])
+            # system pathname must always start with "root"
+            return part if part == 'root' or part.startswith('root.') else f'root.{part}'
 
-    # return pathname of the system
-    return '.'.join(path)
+    return 'root'
 
 
 def check_valid_sqlite3_db(filename):
@@ -228,10 +231,7 @@ def dict_to_structured_array(values):
         Numpy structured array containing the same names and values as the input values dict.
     """
     if values:
-        dtype_tuples = []
-        for name, value in values.items():
-            tple = (str(name), '{}f8'.format(value.shape))
-            dtype_tuples.append(tple)
+        dtype_tuples = [(str(name), f'{value.shape}f8') for name, value in values.items()]
 
         array = np.zeros((1,), dtype=dtype_tuples)
 

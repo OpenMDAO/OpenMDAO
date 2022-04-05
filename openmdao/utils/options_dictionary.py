@@ -3,6 +3,8 @@
 import re
 
 from openmdao.utils.om_warnings import warn_deprecation
+from openmdao.utils.notebook_utils import notebook_mode
+
 from openmdao.core.constants import _UNDEFINED
 
 
@@ -59,6 +61,8 @@ class OptionsDictionary(object):
         If True, no options can be set after declaration.
     _all_recordable : bool
         Flag to determine if all options in UserOptions are recordable.
+    _widget : OptionsWidget
+        If running in a Jupyter notebook, a widget for viewing/setting options.
     """
 
     def __init__(self, parent_name=None, read_only=False):
@@ -97,6 +101,15 @@ class OptionsDictionary(object):
         """
         return self._dict.__repr__()
 
+    def _repr_pretty_(self, p, cycle):
+        if not cycle and notebook_mode():
+            try:
+                from openmdao.visualization.options_widget import OptionsWidget
+                return OptionsWidget(self)
+            except Exception:
+                pass
+        return repr(self)
+
     def __rst__(self):
         """
         Generate reStructuredText view of the options table.
@@ -131,44 +144,51 @@ class OptionsDictionary(object):
             from tabulate import tabulate
         except ImportError as e:
             msg = "'to_table' requires the tabulate package but it is not currently installed." \
-                  " Use `pip install tablulate` or install openmdao with" \
+                  " Use `pip install tabulate` or install openmdao with" \
                   " `pip install openmdao[notebooks]`."
             raise ImportError(msg)
 
-        tlist = [['Option', 'Default', 'Acceptable Values', 'Acceptable Types', 'Description',
-                  'Deprecation']]
+        hdrs = ['Option', 'Default', 'Acceptable Values', 'Acceptable Types', 'Description']
+        rows = []
+
         for key in sorted(self._dict.keys()):
-            options = self._dict[key]
-            default = options['val'] if options['val'] is not _UNDEFINED else '**Required**'
-            # if the default is an object instance, replace with the (unqualified) object type
+            option = self._dict[key]
+            deprecations = False
+
+            default = option['val'] if option['val'] is not _UNDEFINED else '**Required**'
             default_str = str(default)
+
+            # if the default is an object instance, replace with the (unqualified) object type
             idx = default_str.find(' object at ')
             if idx >= 0 and default_str[0] == '<':
                 parts = default_str[:idx].split('.')
                 default = parts[-1]
 
-            acceptable_values = options['values']
+            acceptable_values = option['values']
             if acceptable_values is not None:
                 if not isinstance(acceptable_values, (set, tuple, list)):
                     acceptable_values = (acceptable_values,)
                 acceptable_values = [value for value in acceptable_values]
 
-            acceptable_types = options['types']
+            acceptable_types = option['types']
             if acceptable_types is not None:
                 if not isinstance(acceptable_types, (set, tuple, list)):
                     acceptable_types = (acceptable_types,)
                 acceptable_types = [type_.__name__ for type_ in acceptable_types]
 
-            desc = options['desc']
+            desc = option['desc']
 
-            deprecation = options['deprecation']
+            deprecation = option['deprecation']
             if deprecation is not None:
-                tlist.append([key, default, acceptable_values, acceptable_types, desc,
-                              deprecation[0]])
+                if not deprecations:
+                    hdrs.append('Deprecation')
+                    deprecations = True
+                rows.append([key, default, acceptable_values, acceptable_types, desc,
+                             deprecation[0]])
             else:
-                tlist.append([key, default, acceptable_values, acceptable_types, desc])
+                rows.append([key, default, acceptable_values, acceptable_types, desc])
 
-        return tabulate(tlist, headers='firstrow', tablefmt=fmt, missingval=missingval)
+        return tabulate(rows, headers=hdrs, tablefmt=fmt, missingval=missingval)
 
     def __str__(self, width=100):
         """
@@ -248,12 +268,14 @@ class OptionsDictionary(object):
         if not (value is None and meta['allow_none']):
             # If only values is declared
             if values is not None:
-                if value not in values:
-                    if isinstance(value, str):
-                        value = "'{}'".format(value)
-                    self._raise("Value ({}) of option '{}' is not one of {}.".format(value, name,
-                                                                                     values),
-                                ValueError)
+                check_vals = [value] if types is not list else value
+                for val in check_vals:
+                    if val not in values:
+                        if isinstance(value, str):
+                            value = f"'{value}'"
+                        self._raise(f"Value ({value}) of option '{name}' is not one of {values}.",
+                                    ValueError)
+
             # If only types is declared
             elif types is not None:
                 if not isinstance(value, types):
@@ -342,7 +364,7 @@ class OptionsDictionary(object):
             self._raise(f"In declaration of option '{name}', the 'types' arg must be None, a type "
                         f"or a tuple - not {types}.", exc_type=TypeError)
 
-        if types is not None and values is not None:
+        if types is not None and types is not list and values is not None:
             self._raise(f"'types' and 'values' were both specified for option '{name}'.")
 
         if types is bool:

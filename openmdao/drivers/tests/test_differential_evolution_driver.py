@@ -10,8 +10,9 @@ from openmdao.test_suite.components.branin import Branin
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.components.sellar_feature import SellarMDA
-from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
 
+from openmdao.utils.general_utils import run_driver
+from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI
 
@@ -28,6 +29,9 @@ class TestDifferentialEvolution(unittest.TestCase):
     def setUp(self):
         import os  # import needed in setup for tests in documentation
         os.environ['DifferentialEvolutionDriver_seed'] = '11'  # make RNG repeatable
+
+    def tearDown(self):
+        del os.environ['DifferentialEvolutionDriver_seed']  # clean up environment
 
     def test_basic_with_assert(self):
         prob = om.Problem()
@@ -285,6 +289,9 @@ class TestDriverOptionsDifferentialEvolution(unittest.TestCase):
     def setUp(self):
         os.environ['DifferentialEvolutionDriver_seed'] = '11'
 
+    def tearDown(self):
+        del os.environ['DifferentialEvolutionDriver_seed']  # clean up environment
+
     def test_driver_options(self):
         """Tests if F and Pc options can be set."""
         prob = om.Problem()
@@ -313,6 +320,9 @@ class TestMultiObjectiveDifferentialEvolution(unittest.TestCase):
 
     def setUp(self):
         os.environ['DifferentialEvolutionDriver_seed'] = '11'
+
+    def tearDown(self):
+        del os.environ['DifferentialEvolutionDriver_seed']  # clean up environment
 
     def test_multi_obj(self):
         class Box(om.ExplicitComponent):
@@ -421,7 +431,16 @@ class TestMultiObjectiveDifferentialEvolution(unittest.TestCase):
 class TestConstrainedDifferentialEvolution(unittest.TestCase):
 
     def setUp(self):
-        os.environ['DifferentialEvolutionDriver_seed'] = '11'
+        # This env var was changed from '11' to '0' to avoid having to change test results.
+        # The old implementation of the seed calculation erroneously set the seed to 0
+        # regardless of the value of the random_state passed in (in the non-MPI case only).
+        os.environ['DifferentialEvolutionDriver_seed'] = '0'
+
+    def tearDown(self):
+        del os.environ['DifferentialEvolutionDriver_seed']  # clean up environment
+
+    def tearDown(self):
+        del os.environ['DifferentialEvolutionDriver_seed']  # clean up environment
 
     def test_constrained_with_penalty(self):
         class Cylinder(om.ExplicitComponent):
@@ -591,6 +610,63 @@ class TestConstrainedDifferentialEvolution(unittest.TestCase):
         self.assertAlmostEqual(prob['radius'], 0.5, 1)  # it is going to the unconstrained optimum
         self.assertAlmostEqual(prob['height'], 0.5, 1)  # it is going to the unconstrained optimum
 
+    def test_multiple_constraints(self):
+
+        p = om.Problem()
+
+        exec = om.ExecComp(['y = x**2',
+                            'z = a + x**2'],
+                            a={'shape': (1,)},
+                            y={'shape': (101,)},
+                            x={'shape': (101,)},
+                            z={'shape': (101,)})
+
+        p.model.add_subsystem('exec', exec)
+
+        p.model.add_design_var('exec.a', lower=-1000, upper=1000)
+        p.model.add_objective('exec.y', index=50)
+        p.model.add_constraint('exec.z', indices=[-1], lower=0)
+        p.model.add_constraint('exec.z', indices=[0], upper=300, alias="ALIAS_TEST")
+
+        p.driver = om.DifferentialEvolutionDriver()
+
+        p.setup()
+
+        p.set_val('exec.x', np.linspace(-10, 10, 101))
+
+        p.run_driver()
+
+        assert_near_equal(p.get_val('exec.z')[0], 187.24998293, tolerance=1e-6)
+        assert_near_equal(p.get_val('exec.z')[-1], 187.24998293, tolerance=1e-6)
+
+    def test_same_cons_and_obj(self):
+
+        p = om.Problem()
+
+        exec = om.ExecComp(['y = x**2',
+                            'z = a + x**2'],
+                            a={'shape': (1,)},
+                            y={'shape': (101,)},
+                            x={'shape': (101,)},
+                            z={'shape': (101,)})
+
+        p.model.add_subsystem('exec', exec)
+
+        p.model.add_design_var('exec.a', lower=-1000, upper=1000)
+        p.model.add_objective('exec.z', index=50)
+        p.model.add_constraint('exec.z', indices=[0], upper=300, alias="ALIAS_TEST")
+
+        p.driver = om.DifferentialEvolutionDriver()
+
+        p.setup()
+
+        p.set_val('exec.x', np.linspace(-10, 10, 101))
+
+        p.run_driver()
+
+        assert_near_equal(p.get_val('exec.z')[0], -900)
+        assert_near_equal(p.get_val('exec.z')[50], -1000)
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITestDifferentialEvolution(unittest.TestCase):
@@ -598,6 +674,9 @@ class MPITestDifferentialEvolution(unittest.TestCase):
 
     def setUp(self):
         os.environ['DifferentialEvolutionDriver_seed'] = '11'
+
+    def tearDown(self):
+        del os.environ['DifferentialEvolutionDriver_seed']  # clean up environment
 
     def test_mpi_bug_solver(self):
         # This test verifies that mpi doesn't hang due to collective calls in the solver.
@@ -617,6 +696,47 @@ class MPITestDifferentialEvolution(unittest.TestCase):
         prob.setup()
         prob.set_solver_print(level=0)
 
+        prob.run_driver()
+
+    def test_random_state_bug(self):
+        # this test passes if it raises no exceptions
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', Branin(), promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
+
+        model.add_design_var('xI', lower=-5.0, upper=10.0)
+        model.add_design_var('xC', lower=0.0, upper=15.0)
+        model.add_objective('comp.f')
+
+        prob.driver = om.DifferentialEvolutionDriver()
+        prob.driver.options['max_gen'] = 5
+        prob.driver.options['run_parallel'] = True
+
+        prob.setup()
+        prob.run_driver()
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class MPITestDifferentialEvolutionNoSetSeed(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_random_state_bug(self):
+        # this test passes if it raises no exceptions
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', Branin(), promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
+
+        model.add_design_var('xI', lower=-5.0, upper=10.0)
+        model.add_design_var('xC', lower=0.0, upper=15.0)
+        model.add_objective('comp.f')
+
+        prob.driver = om.DifferentialEvolutionDriver()
+        prob.driver.options['max_gen'] = 5
+        prob.driver.options['run_parallel'] = True
+
+        prob.setup()
         prob.run_driver()
 
 
@@ -706,11 +826,15 @@ class Summer(om.ExplicitComponent):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@use_tempdirs
 class MPITestDifferentialEvolution4Procs(unittest.TestCase):
     N_PROCS = 4
 
     def setUp(self):
         os.environ['DifferentialEvolutionDriver_seed'] = '11'
+
+    def tearDown(self):
+        del os.environ['DifferentialEvolutionDriver_seed']  # clean up environment
 
     def test_indivisible_error(self):
         prob = om.Problem()
@@ -780,15 +904,43 @@ class MPITestDifferentialEvolution4Procs(unittest.TestCase):
         model.add_objective('obj')
 
         driver = prob.driver = om.DifferentialEvolutionDriver()
-        prob.driver.options['pop_size'] = 4
-        prob.driver.options['max_gen'] = 3
-        prob.driver.options['run_parallel'] = True
-        prob.driver.options['procs_per_model'] = 2
+        driver.options['pop_size'] = 4
+        driver.options['max_gen'] = 3
+        driver.options['run_parallel'] = True
+        driver.options['procs_per_model'] = 2
+
+        # also check that parallel recording works
+        driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.setup()
         prob.set_solver_print(level=0)
 
-        prob.run_driver()
+        failed, output = run_driver(prob)
+
+        self.assertFalse(failed)
+
+        # we will have run 2 models in parallel on our 4 procs
+        num_models = prob.comm.size // driver.options['procs_per_model']
+        self.assertEqual(num_models, 2)
+
+        # a separate case file should have been written by rank 0 of each parallel model
+        # (the top two global ranks)
+        rank = prob.comm.rank
+        filename = "cases.sql_%d" % rank
+
+        if rank < num_models:
+            expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
+            self.assertTrue(expect_msg in output)
+
+            cr = om.CaseReader(filename)
+            cases = cr.list_cases('driver')
+
+            # check that cases were recorded on this proc
+            num_cases = len(cases)
+            self.assertTrue(num_cases > 0)
+        else:
+            self.assertFalse("Cases from rank %d are being written" % rank in output)
+            self.assertFalse(os.path.exists(filename))
 
     def test_distributed_obj(self):
         size = 3

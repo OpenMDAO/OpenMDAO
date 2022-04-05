@@ -143,7 +143,7 @@ body {
 
 @font-face {
     font-family: 'N2ToolbarIcons';
-    src: url('data:application/font-woff;charset=utf-8;base64,{{n2toolbar-icons}}') format('woff');
+    src: url('data:application/font-woff;charset=utf-8;base64,<<hpp_bin2b64 style/n2toolbar-icons-font.woff>>') format('woff');
 }
 
 .context-menu {

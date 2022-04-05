@@ -72,8 +72,10 @@ def conditional_error(msg, exc=RuntimeError, category=UserWarning, err=None):
     ----------
     msg : str
         The error/warning message.
-    exc : Exception class
-        This exception class is used to create the exception to be raised.
+    exc : Exception class or exception info tuple (exception class, exception instance, traceback)
+        This exception class is used to create the exception to be raised, or an exception info
+        tuple from a previously raised exception that is to be re-raised, contingent on the value
+        of 'err'.
     category : warning class
         This category is the class of warning to be issued.
     err : bool
@@ -83,7 +85,10 @@ def conditional_error(msg, exc=RuntimeError, category=UserWarning, err=None):
     if (err is None and ignore_errors()) or err is False:
         issue_warning(msg, category=category)
     else:
-        raise exc(msg)
+        if isinstance(exc, tuple):
+            raise exc[0](msg).with_traceback(exc[2])
+        else:
+            raise exc(msg)
 
 
 @contextmanager
@@ -450,6 +455,28 @@ def find_matches(pattern, var_list):
     elif pattern in var_list:
         return [pattern]
     return [name for name in var_list if fnmatchcase(name, pattern)]
+
+
+def _find_dict_meta(dct, key):
+    """
+    Return True if the given key is found in any metadata values in the given dict.
+
+    Parameters
+    ----------
+    dct : dict
+        The metadata dictionary (a dict of dicts).
+    key : str
+        The metadata key being searched for.
+
+    Returns
+    -------
+    bool
+        True if non-None metadata at the given key was found.
+    """
+    for meta in dct.values():
+        if key in meta and meta[key] is not None:
+            return True
+    return False
 
 
 def pad_name(name, pad_num=10, quotes=False):
@@ -964,53 +991,58 @@ def _is_slicer_op(indices):
     return isinstance(indices, slice)
 
 
-def _prom2ivc_src_name_iter(prom_dict):
+def _src_name_iter(proms):
     """
-    Yield keys from prom_dict with promoted input names converted to ivc source names.
+    Yield keys from proms with promoted input names converted to source names.
 
     Parameters
     ----------
-    prom_dict : dict
+    proms : dict
         Original dict with some promoted paths.
 
     Yields
     ------
     str
-        name
+        source pathname name
     """
-    for name, meta in prom_dict.items():
-        if meta['ivc_source'] is not None:
-            yield meta['ivc_source']
-        else:
-            yield name
+    for meta in proms.values():
+        yield meta['source']
 
 
-def _prom2ivc_src_item_iter(prom_dict):
+def _src_or_alias_name(meta):
+    if 'alias' in meta:
+        alias = meta['alias']
+        if alias:
+            return alias
+    return meta['source']
+
+
+def _src_or_alias_item_iter(proms):
     """
-    Yield items from prom_dict with promoted input names converted to ivc source names.
-
-    The result is that all names are absolute.
+    Yield items from proms with promoted input names converted to source or alias names.
 
     Parameters
     ----------
-    prom_dict : dict
+    proms : dict
         Original dict with some promoted paths.
 
     Yields
     ------
     tuple
-        name, metadata
+        src_or_alias_name, metadata
     """
-    for name, meta in prom_dict.items():
-        if meta['ivc_source'] is not None:
-            yield meta['ivc_source'], meta
+    for name, meta in proms.items():
+        if 'alias' in meta and meta['alias'] is not None:
+            yield meta['alias'], meta
+        elif meta['source'] is not None:
+            yield meta['source'], meta
         else:
             yield name, meta
 
 
-def _prom2ivc_src_dict(prom_dict):
+def _src_or_alias_dict(prom_dict):
     """
-    Convert a dictionary with promoted input names into one with ivc source names.
+    Convert a dict with promoted input names into one with source or alias names.
 
     Parameters
     ----------
@@ -1020,9 +1052,9 @@ def _prom2ivc_src_dict(prom_dict):
     Returns
     -------
     dict
-        New dict with ivc source pathnames.
+        New dict with source pathnames or alias names.
     """
-    return {name: meta for name, meta in _prom2ivc_src_item_iter(prom_dict)}
+    return {name: meta for name, meta in _src_or_alias_item_iter(prom_dict)}
 
 
 def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shape):
@@ -1093,7 +1125,7 @@ def get_connection_owner(system, tgt):
     Returns
     -------
     tuple
-        (wning group, promoted source name, promoted target name).
+        (owning group, promoted source name, promoted target name).
     """
     from openmdao.core.group import Group
 
@@ -1108,9 +1140,9 @@ def get_connection_owner(system, tgt):
                 if g._manual_connections:
                     tprom = g._var_allprocs_abs2prom['input'][tgt]
                     if tprom in g._manual_connections:
-                        return g.pathname, g._var_allprocs_abs2prom['output'][src], tprom
+                        return g, g._var_allprocs_abs2prom['output'][src], tprom
 
-    return None, None, None
+    return system, src, tgt
 
 
 def wing_dbg():

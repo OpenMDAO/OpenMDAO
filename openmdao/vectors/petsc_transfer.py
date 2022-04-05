@@ -21,8 +21,6 @@ else:
     from openmdao.vectors.default_transfer import DefaultTransfer, _merge
     from openmdao.core.constants import INT_DTYPE
 
-    _empty_idx_array = np.array([], dtype=INT_DTYPE)
-
     class PETScTransfer(DefaultTransfer):
         """
         PETSc Transfer implementation for running in parallel.

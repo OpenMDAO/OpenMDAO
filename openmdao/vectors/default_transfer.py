@@ -6,7 +6,7 @@ import numpy as np
 
 from openmdao.core.constants import INT_DTYPE
 from openmdao.vectors.transfer import Transfer
-from openmdao.utils.array_utils import convert_neg, _global2local_offsets
+from openmdao.utils.array_utils import _global2local_offsets
 from openmdao.utils.mpi import MPI
 
 _empty_idx_array = np.array([], dtype=INT_DTYPE)
@@ -54,12 +54,10 @@ class DefaultTransfer(Transfer):
             subsys._setup_transfers()
 
         abs2meta = group._var_abs2meta
-        allprocs_abs2meta_out = group._var_allprocs_abs2meta['output']
 
         group._transfers = transfers = {}
         vectors = group._vectors
         offsets = _global2local_offsets(group._get_var_offsets())
-        allsubs = group._subsystems_allprocs
         mypathlen = len(group.pathname + '.' if group.pathname else '')
 
         # Initialize empty lists for the transfer indices
@@ -89,7 +87,6 @@ class DefaultTransfer(Transfer):
                 indices = None
                 # Get meta
                 meta_in = abs2meta['input'][abs_in]
-                meta_out = allprocs_abs2meta_out[abs_out]
 
                 idx_in = allprocs_abs2idx[abs_in]
                 idx_out = allprocs_abs2idx[abs_out]

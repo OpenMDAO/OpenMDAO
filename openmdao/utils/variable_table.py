@@ -214,6 +214,10 @@ def write_source_table(source_dicts, out_stream):
     elif not isinstance(out_stream, TextIOBase):
         raise TypeError("Invalid output stream specified for 'out_stream'.")
 
+    if not source_dicts:
+        out_stream.write('No data found.\n')
+        return
+
     if not isinstance(source_dicts, list):
         source_dicts = [source_dicts]
 

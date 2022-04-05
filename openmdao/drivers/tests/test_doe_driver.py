@@ -1380,6 +1380,103 @@ class TestDOEDriver(unittest.TestCase):
         for name in ('x', 'y', 'z'):
             assert_near_equal(outputs[name], prob[name])
 
+    def test_multi_constraint_doe(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', om.ExecComp('y=x**2 + b',
+                                                x=np.array([1., 2., 3.]),
+                                                b=np.array([1., 2., 3.]),
+                                                y=np.zeros(3)), promotes=['*'])
+
+        prob.model.add_design_var('x', lower=7.0, upper=11.0, indices=[0])
+        prob.model.add_constraint('b', lower=7., indices=[0])
+        prob.model.add_constraint('b', upper=11., indices=[-1], alias='TEST')
+        prob.model.add_objective('y', index=0)
+
+        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.setup()
+        prob.run_driver()
+
+        cr = om.CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
+
+        for case in cases:
+            outputs = cr.get_case(case).outputs
+            assert_near_equal(outputs['b'], np.array([1., 2, 3]))
+
+
+@use_tempdirs
+class TestDOEDriverListVars(unittest.TestCase):
+    def test_list_problem_vars(self):
+        # this passes if no exception is raised
+
+        prob = om.Problem()
+        model = prob.model
+
+        # Add independent variables
+        indeps = model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        indeps.add_discrete_output('x', 4)
+        indeps.add_discrete_output('y', 3)
+
+        # Add components
+        model.add_subsystem('parab', ParaboloidDiscrete(), promotes=['*'])
+
+        # Specify design variable range and objective
+        model.add_design_var('x')
+        model.add_design_var('y')
+        model.add_objective('f_xy')
+
+        samples = [[('x', 5), ('y', 1)],
+                    [('x', 3), ('y', 6)],
+                    [('x', -1), ('y', 3)],
+        ]
+
+        # Setup driver for 3 cases at a time
+        prob.driver = om.DOEDriver(om.ListGenerator(samples))
+
+        prob.setup(derivatives=False)
+        prob.run_driver()
+        prob.cleanup()
+
+        prob.list_problem_vars()
+
+
+@use_tempdirs
+class TestDOEDriverListVars(unittest.TestCase):
+    def test_list_problem_vars(self):
+        # this passes if no exception is raised
+
+        prob = om.Problem()
+        model = prob.model
+
+        # Add independent variables
+        indeps = model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        indeps.add_discrete_output('x', 4)
+        indeps.add_discrete_output('y', 3)
+
+        # Add components
+        model.add_subsystem('parab', ParaboloidDiscrete(), promotes=['*'])
+
+        # Specify design variable range and objective
+        model.add_design_var('x')
+        model.add_design_var('y')
+        model.add_objective('f_xy')
+
+        samples = [[('x', 5), ('y', 1)],
+                    [('x', 3), ('y', 6)],
+                    [('x', -1), ('y', 3)],
+        ]
+
+        # Setup driver for 3 cases at a time
+        prob.driver = om.DOEDriver(om.ListGenerator(samples))
+
+        prob.setup(derivatives=False)
+        prob.run_driver()
+        prob.cleanup()
+
+        prob.list_problem_vars()
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 @use_tempdirs

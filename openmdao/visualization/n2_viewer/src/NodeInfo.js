@@ -40,7 +40,7 @@ class InfoPropDefault {
      * If the object contains a non-empty property with our key, create
      * a new row with it in the supplied table body.
      * @param {Object} tbody D3 reference to an existing table body.
-     * @param {N2TreeNode} node Reference to the node that may have the property.
+     * @param {OmTreeNode} node Reference to the node that may have the property.
      */
     addRow(tbody, node) {
         if (this.canShow(node)) {
@@ -109,7 +109,7 @@ class InfoPropOptions extends InfoPropDefault {
     /**
      * There may be a list of options, so create a subsection in the table for them.
      * @param {Object} tbody D3 reference to an existing table body.
-     * @param {N2TreeNode} node Reference to the node that may have the property.
+     * @param {OmTreeNode} node Reference to the node that may have the property.
      */
     addRow(tbody, node) {
         if (!this.canShow(node)) return;
@@ -143,7 +143,7 @@ class InfoPropExpr extends InfoPropDefault {
     /**
      * There may be a list of expressions, so create a subsection in the table for them.
      * @param {Object} tbody D3 reference to an existing table body.
-     * @param {N2TreeNode} node Reference to the node that may have the property.
+     * @param {OmTreeNode} node Reference to the node that may have the property.
      */
     addRow(tbody, node) {
         if (!this.canShow(node)) return;
@@ -395,9 +395,9 @@ class ValueInfo extends N2WindowResizable {
     }
 
     /** Remove our name from the list of existing windows before closing. */
-    close() {
+    close(e) {
         ValueInfo.del(this.name);
-        super.close();
+        super.close(e);
     }
 }
 
@@ -527,7 +527,7 @@ class NodeInfo extends N2Window {
      * Iterate over the list of known properties and display them
      * if the specified object contains them.
      * @param {Object} event The related event so we can get position.
-     * @param {N2TreeNode} node The node to examine.
+     * @param {OmTreeNode} node The node to examine.
      * @param {String} color Match the color of the node for the header/footer.
      * @param {Boolean} [isSolver = false] Whether to use solver properties or not.
      */
@@ -566,7 +566,7 @@ class NodeInfo extends N2Window {
 class PersistentNodeInfo extends N2WindowDraggable {
     constructor(nodeInfo) {
         super('persistentNodeInfo-' + uuidv4(), '#' + nodeInfo.window.attr('id'));
-        console.log(nodeInfo.window.attr('id'))
+
         // Avoid just copying the reference because nodeInfo.values will be wiped:
         this.values = JSON.parse(JSON.stringify(nodeInfo.values));
         this.ui = nodeInfo.ui;
@@ -596,9 +596,9 @@ class PersistentNodeInfo extends N2WindowDraggable {
     }
 
     /** Keep the tool-tip near the mouse */
-    mouseMove() {
-        this.tooltipBox.style("top", (d3.event.pageY - 30) + "px")
-            .style("left", (d3.event.pageX + 5) + "px");
+    mouseMove(e) {
+        this.tooltipBox.style("top", (e.pageY - 30) + "px")
+            .style("left", (e.pageX + 5) + "px");
     }
 
     /** Set up event handlers for any "Show More" buttons in the panel */
@@ -635,11 +635,11 @@ class PersistentNodeInfo extends N2WindowDraggable {
     }
 
     /** Override so that shift-click closes all PersistentNodeInfo windows. */
-    close() {
+    close(e) {
         this.tooltipBox.style("visibility", "hidden");
         window.getSelection().empty(); // Shift-clicking also selects text, so unselect it
 
-        if (d3.event.shiftKey) {
+        if (e.shiftKey) {
             const allPNIWin = d3.selectAll('[id^="persistentNodeInfo-"]');
 
             allPNIWin.select('.window-close-button')
@@ -654,7 +654,7 @@ class PersistentNodeInfo extends N2WindowDraggable {
                 .on("mouseover", null)
                 .on("mouseleave", null)
                 .on("mousemove", null);
-            super.close();
+            super.close(e);
         }
     }
 }

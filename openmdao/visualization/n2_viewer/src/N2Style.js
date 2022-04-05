@@ -190,7 +190,7 @@ class N2Style {
     /**
        * Based on the element's type and conditionally other info, determine
        * what CSS style is associated.
-       * @param {N2TreeNode} node The item to check.
+       * @param {OmTreeNode} node The item to check.
        * @return {string} The name of an existing CSS class.
        */
     getNodeClass(node) {

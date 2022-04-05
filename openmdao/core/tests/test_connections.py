@@ -517,8 +517,8 @@ class TestMultiConns(unittest.TestCase):
                 self.options.declare('src_idx', [0, 1])
 
             def setup(self):
-                src = self.options['src_idx']
-                self.add_input('x', shape=2, src_indices=src, val=-2038.0)
+                src_inds = self.options['src_idx']
+                self.add_input('x', shape=2, src_indices=src_inds, val=-2038.0)
                 self.add_output('y', shape=2)
                 self.declare_partials('y', 'x')
 
@@ -537,8 +537,11 @@ class TestMultiConns(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.setup()
 
-        msg = "The following inputs ['c1.x', 'c2.x'] are defined using src_indices but the total source "
-        msg += "size is undetermined.  You can specify the src size by setting 'val' or 'src_shape' in a call to set_input_defaults, or by adding an IndepVarComp as the source."
+        msg = ("Attaching src_indices to inputs requires that the shape of the "
+               "source variable is known, but the source shape for inputs "
+               "['c1.x', 'c2.x'] is unknown. You can specify the src shape for "
+               "these inputs by setting 'val' or 'src_shape' in a call to "
+               "set_input_defaults, or by adding an IndepVarComp as the source.")
 
         err_msg = str(context.exception).split(':')[-1]
         self.assertEqual(err_msg, msg)
@@ -570,7 +573,7 @@ class TestConnectionsDistrib(unittest.TestCase):
         model.add_subsystem('c3', TestComp())
         model.connect("p1.x", "c3.x")
 
-        expected = f"Exception raised on rank 0: <model> <class Group>: When connecting 'p1.x' to 'c3.x': index 2 is out of bounds for source dimension of size 2."
+        expected = f"Exception raised on rank 0: When accessing 'p1.x' with src_shape (2,) from 'c3.x' using src_indices [1 2]: index 2 is out of bounds for source dimension of size 2."
         try:
             prob.setup()
         except Exception as err:
@@ -599,7 +602,7 @@ class TestConnectionsDistrib(unittest.TestCase):
         model.add_subsystem('c3', TestComp())
         model.connect("p1.x", "c3.x")
 
-        expected = f"Exception raised on rank 0: <model> <class Group>: When connecting 'p1.x' to 'c3.x': index 2 is out of bounds for source dimension of size 2."
+        expected = f"Exception raised on rank 0: When accessing 'p1.x' with src_shape (2,) from 'c3.x' using src_indices [1 2]: index 2 is out of bounds for source dimension of size 2."
 
         try:
             prob.setup()
@@ -656,7 +659,7 @@ class TestConnectionsError(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup(check=False, mode='fwd')
         self.assertEqual(str(context.exception),
-                         "Exception raised on rank 0: <model> <class Group>: When connecting 'p1.x' to 'c3.x': index 2 is out of bounds for source dimension of size 2.")
+                         "Exception raised on rank 0: When accessing 'p1.x' with src_shape (2,) from 'c3.x' using src_indices [1 2]: index 2 is out of bounds for source dimension of size 2.")
 
 
 @unittest.skipUnless(MPI, "MPI is required.")

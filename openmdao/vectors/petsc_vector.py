@@ -18,7 +18,7 @@ else:
 
     from petsc4py import PETSc
     from openmdao.core.constants import INT_DTYPE
-    from openmdao.vectors.default_vector import DefaultVector, _full_slice
+    from openmdao.vectors.default_vector import DefaultVector
     from openmdao.vectors.petsc_transfer import PETScTransfer
 
     class PETScVector(DefaultVector):

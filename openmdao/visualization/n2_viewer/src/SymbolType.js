@@ -27,7 +27,7 @@ class SymbolType {
     /**
      * For symbols types that CAN be a declared partial, check whether they're
      * part of the same component and that they're in the declared partial list.
-     * @param {N2TreeNode} cell The cell to operate on.
+     * @param {OmTreeNode} cell The cell to operate on.
      * @param {ModelData} model Reference to the entire model.
      */
     _setDeclaredPartialInfo(cell, model) {

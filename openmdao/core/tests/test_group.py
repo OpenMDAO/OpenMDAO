@@ -1431,9 +1431,12 @@ class TestGroup(unittest.TestCase):
 
         p.model.set_input_defaults('G.test_param', val=7.0)
 
-        msg = "Input 'G.foo.test_param': could not broadcast input array from shape \(5.*\) into shape \(1.*\)"
-        with self.assertRaisesRegex(ValueError, msg) as cm:
+        msg = "<model> <class Group>: The source and target shapes do not match or are ambiguous for the connection '_auto_ivc.v0' to 'G.foo.test_param'. The source shape is (1,) but the target shape is (5,)."
+        with self.assertRaises(ValueError) as cm:
             p.setup()
+
+        self.assertEqual(cm.exception.args[0], msg)
+
 
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestGroupMPISlice(unittest.TestCase):
@@ -2065,7 +2068,7 @@ class TestGroupPromotes(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(cm.exception),
-            "In connection from 'ind.a' to 'sub.comp.a', input 'sub.a' src_indices are [0 1 2] and indexing into those failed using src_indices [0 2 4] from input 'sub.comp.a'. Error was: index 4 is out of bounds for axis 0 with size 3.")
+            "In connection from 'ind.a' to 'sub.comp.a', input 'sub.a' src_indices are [0 1 2] and indexing into those failed using src_indices [0 2 4] from input 'sub.comp.a'. Error was: index 4 is out of bounds for source dimension of size 3.")
 
     def test_promotes_list_order(self):
         # This test verifies that the order we promote in the arguments to add_subsystem doesn't
@@ -2444,7 +2447,7 @@ class TestConnect(unittest.TestCase):
         self.sub.connect('src.x', 'arr.x', src_indices=[[2,2],[-1,2],[2,2]],
                          flat_src_indices=False)
 
-        msg = "'sub' <class Group>: When connecting 'src.x' to 'arr.x': Can't set source shape to (5, 3) because indexer ([2, 2], [-1, 2], [2, 2]) expects 3 dimensions."
+        msg = "<model> <class Group>: When connecting 'sub.src.x' to 'sub.arr.x': Can't set source shape to (5, 3) because indexer ([2, 2], [-1, 2], [2, 2]) expects 3 dimensions."
         try:
             self.prob.setup()
         except ValueError as err:
@@ -2453,6 +2456,7 @@ class TestConnect(unittest.TestCase):
             self.fail('Exception expected.')
 
         self.prob.model._raise_connection_errors = False
+        self.prob.model._set_subsys_connection_errors(False)
 
         with assert_warning(UserWarning, msg):
             self.prob.setup()
@@ -2462,7 +2466,7 @@ class TestConnect(unittest.TestCase):
         self.sub.connect('src.x', 'arr.x', src_indices=[[2, 4],[-1, 4]],
                          flat_src_indices=False)
 
-        msg = "'sub' <class Group>: When connecting 'src.x' to 'arr.x': index 4 is out of bounds for source dimension of size 3."
+        msg = "<model> <class Group>: When connecting 'sub.src.x' to 'sub.arr.x': index 4 is out of bounds for source dimension of size 3."
 
         try:
             self.prob.setup()
@@ -2492,8 +2496,7 @@ class TestSrcIndices(unittest.TestCase):
             prob.model.connect('indeps.x', 'C1.x', src_indices=src_indices,
                                flat_src_indices=flat_src_indices)
 
-        if not raise_connection_errors:
-            prob.model._raise_connection_errors = False
+        prob.model._raise_connection_errors = raise_connection_errors
 
         prob.setup()
 
@@ -2521,7 +2524,7 @@ class TestSrcIndices(unittest.TestCase):
                                 raise_connection_errors=False)
 
     def test_src_indices_shape_bad_idx_flat_promotes(self):
-        msg = "<model> <class Group>: When connecting 'indeps.x' to 'C1.x': index 9 is out of bounds for source dimension of size 9."
+        msg = "When accessing 'indeps.x' with src_shape (3, 3) from 'x' using src_indices [4 5 7 9]: index 9 is out of bounds for source dimension of size 9."
         try:
             self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
                                 src_indices=[4, 5, 7, 9],
@@ -2531,6 +2534,7 @@ class TestSrcIndices(unittest.TestCase):
         else:
             self.fail("Exception expected.")
 
+        msg = "When accessing 'indeps.x' with src_shape (3, 3) from 'C1.x' using src_indices [4 5 7 9]: index 9 is out of bounds for source dimension of size 9."
         with assert_warning(UserWarning, msg):
             self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
                                 src_indices=[4, 5, 7, 9],
@@ -2663,7 +2667,7 @@ class TestGroupAddInput(unittest.TestCase):
         par.add_subsystem('C2', om.ExecComp('y = 5. * x', x=1.1), promotes_inputs=['x'])
 
         with self.assertRaises(Exception) as cm:
-           p.setup()
+            p.setup()
 
         self.assertEqual(cm.exception.args[0],
                          "<model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['val'] differ. Call <group>.set_input_defaults('x', val=?), where <group> is the Group named 'par' to remove the ambiguity.")
@@ -3155,6 +3159,7 @@ class Test3Deep(unittest.TestCase):
     def test_add_output_to_child(self):
         p = self.build_model()
         p.model.cfg.sub.add_var_output('C3.ovar0', 3.0, units='ft')
+
         p.setup()
 
         names = self.get_matching_var_setup_counts(p, 1)

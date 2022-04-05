@@ -4,7 +4,6 @@ Class definition for SqliteRecorder, which provides dictionary backed by SQLite.
 
 from copy import deepcopy
 from io import BytesIO
-from collections import OrderedDict
 
 import os
 import gc
@@ -157,8 +156,6 @@ class SqliteRecorder(CaseRecorder):
         Flag indicating whether or not the database has been initialized.
     _started : set
         set of recording requesters for which this recorder has been started.
-    _record_on_proc : bool
-        Flag indicating whether to record on this processor when running in parallel.
     """
 
     def __init__(self, filepath, append=False, pickle_version=PICKLE_VER, record_viewer_data=True):
@@ -181,40 +178,47 @@ class SqliteRecorder(CaseRecorder):
         self._database_initialized = False
         self._started = set()
 
-        # default to record on all procs when running in parallel
-        self._record_on_proc = True
-
         super().__init__(record_viewer_data)
 
-    def _initialize_database(self):
+    def _initialize_database(self, comm):
         """
         Initialize the database.
+
+        Parameters
+        ----------
+        comm : MPI.Comm or <FakeComm> or None
+            The communicator for the recorder (should be the comm for the Problem).
         """
-        if MPI:
-            rank = MPI.COMM_WORLD.rank
-            if self._parallel and self._record_on_proc:
-                filepath = '%s_%d' % (self._filepath, rank)
-                print("Note: SqliteRecorder is running on multiple processors. "
-                      "Cases from rank %d are being written to %s." %
-                      (rank, filepath))
-                if rank == 0:
-                    metadata_filepath = f'{self._filepath}_meta'
-                    print(f"Note: Metadata is being recorded separately as {metadata_filepath}.")
-                    try:
-                        os.remove(metadata_filepath)
-                        issue_warning('The existing case recorder metadata file, '
-                                      f'{metadata_filepath}, is being overwritten.',
-                                      category=UserWarning)
-                    except OSError:
-                        pass
-                    self.metadata_connection = sqlite3.connect(metadata_filepath)
+        filepath = None
+
+        if MPI and comm and comm.size > 1:
+            if self._record_on_proc:
+                if not self._parallel:
+                    # recording only on this proc
+                    filepath = self._filepath
                 else:
-                    self._record_metadata = False
-            elif rank == 0:
-                filepath = self._filepath
-            else:
-                filepath = None
+                    # recording on multiple procs, so a separate file for each recording proc
+                    # plus a file for the common metadata, written by the lowest recording rank
+                    rank = comm.rank
+                    filepath = f"{self._filepath}_{rank}"
+                    print("Note: SqliteRecorder is running on multiple processors. "
+                          f"Cases from rank {rank} are being written to {filepath}.")
+                    if rank == min(self._recording_ranks):
+                        metadata_filepath = f'{self._filepath}_meta'
+                        print("Note: Metadata is being recorded separately as "
+                              f"{metadata_filepath}.")
+                        try:
+                            rc = os.remove(metadata_filepath)
+                            issue_warning("The existing case recorder metadata file, "
+                                          f"{metadata_filepath}, is being overwritten.",
+                                          category=UserWarning)
+                        except OSError:
+                            pass
+                        self.metadata_connection = sqlite3.connect(metadata_filepath)
+                    else:
+                        self._record_metadata = False
         else:
+            # no MPI or comm size == 1
             filepath = self._filepath
 
         if filepath:
@@ -275,8 +279,8 @@ class SqliteRecorder(CaseRecorder):
                               "solver_options BLOB, solver_class TEXT)")
 
         self._database_initialized = True
-        if MPI is not None:
-            MPI.COMM_WORLD.barrier()
+        if MPI and comm and comm.size > 1:
+            comm.barrier()
 
     def _cleanup_abs2meta(self):
         """
@@ -307,7 +311,7 @@ class SqliteRecorder(CaseRecorder):
                 var_settings[name][prop] = make_serializable(var_settings[name][prop])
         return var_settings
 
-    def startup(self, recording_requester):
+    def startup(self, recording_requester, comm=None):
         """
         Prepare for a new run and create/update the abs2prom and prom2abs variables.
 
@@ -315,15 +319,17 @@ class SqliteRecorder(CaseRecorder):
         ----------
         recording_requester : object
             Object to which this recorder is attached.
+        comm : MPI.Comm or <FakeComm> or None
+            The MPI communicator for the recorder (should be the comm for the Problem).
         """
         # we only want to set up recording once for each recording_requester
         if recording_requester in self._started:
             return
 
-        super().startup(recording_requester)
+        super().startup(recording_requester, comm)
 
         if not self._database_initialized:
-            self._initialize_database()
+            self._initialize_database(comm)
 
         # grab the system and driver
         if isinstance(recording_requester, Driver):
@@ -349,8 +355,8 @@ class SqliteRecorder(CaseRecorder):
             if driver is None:
                 desvars = system.get_design_vars(True, get_sizes=False, use_prom_ivc=False)
                 responses = system.get_responses(True, get_sizes=False)
-                constraints = OrderedDict()
-                objectives = OrderedDict()
+                constraints = {}
+                objectives = {}
                 for name, data in responses.items():
                     if data['type'] == 'con':
                         constraints[name] = data
@@ -397,18 +403,26 @@ class SqliteRecorder(CaseRecorder):
 
                     # Design variables, constraints and objectives can be requested by input name.
                     if var_type != 'output':
-                        name = var_set[name]['ivc_source']
+                        srcname = var_set[name]['source']
+                    else:
+                        srcname = name
 
-                    if name not in self._abs2meta:
-                        try:
-                            self._abs2meta[name] = real_meta_out[name].copy()
-                        except KeyError:
-                            self._abs2meta[name] = disc_meta_out[name].copy()
-                        self._abs2meta[name]['type'] = []
-                        self._abs2meta[name]['explicit'] = name not in states
+                    if srcname not in self._abs2meta:
+                        if srcname in real_meta_out:
+                            self._abs2meta[srcname] = real_meta_out[srcname].copy()
+                        elif srcname in disc_meta_out:
+                            self._abs2meta[srcname] = disc_meta_out[srcname].copy()
+                        elif name in system._responses:
+                            for io in self._prom2abs:
+                                if srcname in self._prom2abs[io]:
+                                    abs_in = self._prom2abs[io][srcname][0]
+                                    self._abs2meta[srcname] = real_meta_in[abs_in].copy()
+                                    break
+                        self._abs2meta[srcname]['type'] = []
+                        self._abs2meta[srcname]['explicit'] = srcname not in states
 
-                    if var_type not in self._abs2meta[name]['type']:
-                        self._abs2meta[name]['type'].append(var_type)
+                    if var_type not in self._abs2meta[srcname]['type']:
+                        self._abs2meta[srcname]['type'].append(var_type)
 
             for name in inputs:
                 try:
@@ -528,7 +542,7 @@ class SqliteRecorder(CaseRecorder):
                driver._designvars and driver._responses:
                 totals = data['totals']
             else:
-                totals = OrderedDict([])
+                totals = {}
             totals_array = dict_to_structured_array(totals)
             totals_blob = array_to_blob(totals_array)
 

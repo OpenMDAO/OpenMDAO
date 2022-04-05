@@ -16,6 +16,8 @@ from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import ignore_errors, default_noraise
 from openmdao.utils.file_utils import _load_and_exec
 
+_default_scaling_filename = 'driver_scaling_report.html'
+
 
 def _unscale(val, scaler, adder, default=''):
     if val is None:
@@ -166,7 +168,7 @@ def _compute_jac_view_info(totals, data, dv_vals, response_vals, coloring):
     data['var_mat_list'] = varmatlist
 
 
-def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_browser=True,
+def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=True,
                         title=None, jac=True):
     """
     Generate a self-contained html file containing a table of scaling data.
@@ -192,9 +194,6 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
     dict
         Data to used to generate html file.
     """
-    if MPI and MPI.COMM_WORLD.rank != 0:
-        return
-
     dv_table = []
     con_table = []
     obj_table = []
@@ -203,7 +202,12 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
     obj_vals = driver.get_objective_values(driver_scaling=True)
     con_vals = driver.get_constraint_values(driver_scaling=True)
 
-    mod_meta = driver._problem().model._var_allprocs_abs2meta['output']
+    model = driver._problem().model
+
+    mod_meta = model._var_allprocs_abs2meta['output']
+    mod_meta.update(model._var_allprocs_discrete['output'])
+
+    discretes = {'dvs': [], 'con': [], 'obj': []}
 
     if driver._problem()._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
         raise RuntimeError("Driver scaling report cannot be generated before calling final_setup "
@@ -229,6 +233,10 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         ref0 = meta.get('ref0')
         lower = meta.get('lower')
         upper = meta.get('upper')
+        src_name = meta.get('source')
+
+        if src_name in model._discrete_outputs:
+            discretes['dvs'].append(name)
 
         dval = dv_vals[name]
         mval = _unscale(dval, scaler, adder, default)
@@ -242,7 +250,7 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
             'driver_val': _get_val_and_size(dval),
             'driver_units': _getdef(meta['units'], default),
             'model_val': _get_val_and_size(mval),
-            'model_units': _getdef(mod_meta[meta['ivc_source']]['units'], default),
+            'model_units': _getdef(mod_meta[src_name].get('units'), default),
             'ref': _get_val_and_size(ref, default),
             'ref0': _get_val_and_size(ref0, default),
             'scaler': _get_val_and_size(scaler, default),
@@ -267,21 +275,30 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         lower = meta.get('lower')
         upper = meta.get('upper')
         equals = meta.get('equals')
+        alias = meta.get('alias', '')
+        src_name = meta.get('source')
+
+        if src_name in model._discrete_outputs:
+            discretes['con'].append(name)
 
         dval = con_vals[name]
         mval = _unscale(dval, scaler, adder, default)
 
         index, inds = get_inds(dval, meta)
 
+        if alias:
+            name = meta['name']
+
         dct = {
             'id': idx,
             'name': name,
+            'alias': alias,
             'size': meta['size'],
             'index': index,
             'driver_val': _get_val_and_size(dval),
             'driver_units': _getdef(meta.get('units'), default),
             'model_val': _get_val_and_size(mval),
-            'model_units': _getdef(mod_meta[meta['ivc_source']]['units'], default),
+            'model_units': _getdef(mod_meta[src_name].get('units'), default),
             'ref': _get_val_and_size(ref, default),
             'ref0': _get_val_and_size(ref0, default),
             'scaler': _get_val_and_size(scaler, default),
@@ -304,21 +321,30 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         adder = meta['total_adder']
         ref = meta.get('ref')
         ref0 = meta.get('ref0')
+        alias = meta.get('alias', '')
+        src_name = meta.get('source')
+
+        if src_name in model._discrete_outputs:
+            discretes['obj'].append(name)
 
         dval = obj_vals[name]
         mval = _unscale(dval, scaler, adder, default)
 
         index, inds = get_inds(dval, meta)
 
+        if alias:
+            name = meta['name']
+
         dct = {
             'id': idx,
             'name': name,
+            'alias': alias,
             'size': meta['size'],
             'index': index,
             'driver_val': _get_val_and_size(dval),
             'driver_units': _getdef(meta.get('units'), default),
             'model_val': _get_val_and_size(mval),
-            'model_units': _getdef(mod_meta[meta['ivc_source']]['units'], default),
+            'model_units': _getdef(mod_meta[src_name].get('units'), default),
             'ref': _get_val_and_size(meta.get('ref'), default),
             'ref0': _get_val_and_size(meta.get('ref0'), default),
             'scaler': _get_val_and_size(scaler, default),
@@ -346,6 +372,16 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
 
     if jac and not driver._problem().model._use_derivatives:
         print("\nCan't display jacobian because derivatives are turned off.\n")
+        jac = False
+
+    elif jac and (discretes['dvs'] or discretes['con'] or discretes['obj']):
+        print("\nCan't display jacobian because the following variables are discrete:")
+        if discretes['dvs']:
+            print(f"  Design Vars: {discretes['dvs']}")
+        if discretes['con']:
+            print(f"  Constraints: {discretes['con']}")
+        if discretes['obj']:
+            print(f"  Objectives: {discretes['obj']}")
         jac = False
 
     if jac:
@@ -444,7 +480,7 @@ def _scaling_setup_parser(parser):
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
-    parser.add_argument('-o', default='driver_scaling_report.html', action='store', dest='outfile',
+    parser.add_argument('-o', default=_default_scaling_filename, action='store', dest='outfile',
                         help='html output file.')
     parser.add_argument('-t', '--title', action='store', dest='title',
                         help='title of web page.')

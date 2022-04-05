@@ -14,20 +14,24 @@ optional_dependencies = {
         'jupyter',
         'nbconvert',
         'testflo',
-        'ipyparallel<7',
+        'ipyparallel',
         'numpydoc>=1.1',
         'tabulate',
         'jupyter-book',
         'jupyter-sphinx==0.3.1',
-        'sphinx-sitemap'
+        'sphinx-sitemap',
+        'jinja2<3.1'
     ],
     'notebooks': [
         'notebook',
         'tabulate',
-        'ipython'
+        'ipython',
+        'ipywidgets>=7.6.5',
+        'ipympl'
     ],
     'visualization': [
         'bokeh>=1.3.4',
+        'matplotlib',
         'colorama'
     ],
     'test': [
@@ -38,7 +42,7 @@ optional_dependencies = {
         'testflo>=1.3.6'
         'websockets>8',
         'aiounittest',
-        'playwright<1.15'
+        'playwright>=1.20'
     ]
 }
 
@@ -111,6 +115,7 @@ setup(
         'openmdao.utils',
         'openmdao.vectors',
         'openmdao.visualization',
+        'openmdao.visualization.case_viewer',
         'openmdao.visualization.connection_viewer',
         'openmdao.visualization.scaling_viewer',
         'openmdao.visualization.n2_viewer',
@@ -126,6 +131,7 @@ setup(
             'assets/*png*',
             'libs/*.js',
             'src/*.js',
+            'gen/*.js',
             'style/*',
             'tests/*.js',
             'tests/*.json',

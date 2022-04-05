@@ -118,8 +118,8 @@ class N2Click {
  * Handle input events for the matrix and toolbar.
  * @typedef N2UserInterface
  * @property {N2Diagram} n2Diag Reference to the main diagram.
- * @property {N2TreeNode} leftClickedNode The last node that was left-clicked.
- * @property {N2TreeNode} rightClickedNode The last node that was right-clicked, if any.
+ * @property {OmTreeNode} leftClickedNode The last node that was left-clicked.
+ * @property {OmTreeNode} rightClickedNode The last node that was right-clicked, if any.
  * @property {Boolean} lastClickWasLeft True is last mouse click was left, false if right.
  * @property {Boolean} leftClickIsForward True if the last node clicked has a greater depth
  *  than the current zoomed element.
@@ -246,22 +246,21 @@ class N2UserInterface {
             handle.attr('class', 'active-resizer-handle');
             box.attr('class', 'active-resizer-box');
 
-            const startPos = {
-                'x': d3.event.clientX,
-                'y': d3.event.clientY
-            };
-            const startDims = {
-                'width': parseInt(box.style('width')),
-                'height': parseInt(box.style('height'))
-            };
-            const offset = {
-                'x': startPos.x - startDims.width,
-                'y': startPos.y - startDims.height
-            };
-            let newDims = {
-                'x': startDims.width,
-                'y': startDims.height
-            };
+            const startPos = new Dimensions({ x: e.clientX, y: e.clientY });
+            const startDims = new Dimensions({
+                width: parseInt(box.style('width')),
+                height: parseInt(box.style('height'))
+            });
+            const offset = new Dimensions({
+                x: startPos.x - startDims.width,
+                y: startPos.y - startDims.height
+            });
+
+            // Reassigned by mousemove:
+            let newDims = new Dimensions({
+                x: startDims.width,
+                y: startDims.height
+            });
 
             handle.html(Math.round(newDims.x) + ' x ' + newDims.y);
 
@@ -294,12 +293,9 @@ class N2UserInterface {
                         .on('mouseup', null);
                 })
                 .on('mousemove', e => {
-                    const newHeight = d3.event.clientY - offset.y;
+                    const newHeight = e.clientY - offset.y;
                     if (newHeight + n2Diag.layout.gapDist * 2 >= window.innerHeight * .5) {
-                        newDims = {
-                            'x': d3.event.clientX - offset.x,
-                            'y': newHeight
-                        };
+                        newDims = new Dimensions({ x: e.clientX - offset.x, y: newHeight});
 
                         // Maintain the ratio by only resizing in the least moved direction
                         // and resizing the other direction by a fraction of that
@@ -310,15 +306,12 @@ class N2UserInterface {
                             newDims.x = n2Diag.layout.calcWidthBasedOnNewHeight(newDims.y);
                         }
 
-                        box
-                            .style('width', newDims.x + 'px')
-                            .style('height', newDims.y + 'px');
-
+                        box.style('width', newDims.x + 'px').style('height', newDims.y + 'px');
                         handle.html(Math.round(newDims.x) + ' x ' + newDims.y);
                     }
                 });
 
-            d3.event.preventDefault();
+            e.preventDefault();
         });
 
     }
@@ -352,7 +345,7 @@ class N2UserInterface {
     /**
      * Make sure the clicked node is deeper than the zoomed node, that
      * it's not the root node, and that it actually has children.
-     * @param {N2TreeNode} node The right-clicked node to check.
+     * @param {OmTreeNode} node The right-clicked node to check.
      */
     isCollapsible(node) {
         return (node.depth > this.n2Diag.zoomedElement.depth &&
@@ -387,13 +380,13 @@ class N2UserInterface {
 
     /**
      * When a node is right-clicked, collapse it if it's allowed.
-     * @param {N2TreeNode} node The node that was right-clicked.
+     * @param {OmTreeNode} node The node that was right-clicked.
      */
-    rightClick(node) {
+    rightClick(e, node) {
         testThis(this, 'N2UserInterface', 'rightClick');
 
-        d3.event.preventDefault();
-        d3.event.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
 
         if (node.draw.minimized) {
             this.rightClickedNode = node;
@@ -415,26 +408,26 @@ class N2UserInterface {
     /**
      * When a node with variables is alt-right-clicked, present a dialog with the
      * list of variables and allow the user to select which ones should be displayed.
-     * @param {N2TreeNode} node The node that was alt-right-clicked.
+     * @param {OmTreeNode} node The node that was alt-right-clicked.
      * @param {String} color The color of the clicked node, to use for the dialog ribbons.
      */
-    altRightClick(node, color) {
+    altRightClick(e, node, color) {
         testThis(this, 'N2UserInterface', 'altRightClick');
-        d3.event.preventDefault();
-        d3.event.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
         window.getSelection().empty();
 
         // Make sure node is collapsible and window doesn't exist yet.
         if (this.isCollapsible(node) && !node.isFilter() && 
             d3.select('#childSelect-' + node.toId()).empty()) {
-            new ChildSelectDialog(node, color); // Create the modal dialog
+            new ChildSelectDialog(e, node, color); // Create the modal dialog
         }
     }
 
     /**
      * Update states as if a left-click was performed, which may or may not have
      * actually happened.
-     * @param {N2TreeNode} node The node that was targetted.
+     * @param {OmTreeNode} node The node that was targetted.
      */
     _setupLeftClick(node) {
         this.leftClickedNode = node;
@@ -451,18 +444,18 @@ class N2UserInterface {
 
     /**
      * React to a left-clicked node by zooming in on it.
-     * @param {N2TreeNode} node The targetted node.
+     * @param {OmTreeNode} node The targetted node.
      */
-    leftClick(node) {
+    leftClick(e, node) {
         // Don't do it if the node is already zoomed
         if (node === this.n2Diag.zoomedElement) return;
 
         testThis(this, 'N2UserInterface', 'leftClick');
-        d3.event.preventDefault();
-        d3.event.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
 
         if (!node.hasChildren() || node.isInput()) return;
-        if (d3.event.button != 0) return;
+        if (e.button != 0) return;
         this.addBackButtonHistory();
         node.expand();
         node.draw.manuallyExpanded = true;
@@ -496,7 +489,7 @@ class N2UserInterface {
      */
     addBackButtonHistory(clearForward = true) {
         let formerHidden = [];
-        this.n2Diag.findAllHidden(formerHidden, false);
+        this.n2Diag.model.findAllHidden(formerHidden, false);
 
         this.backButtonHistory.push({
             'node': this.n2Diag.zoomedElement,
@@ -511,11 +504,11 @@ class N2UserInterface {
     /**
      * Preserve the specified node as the zoomed element,
      * and remember the state of all hidden elements.
-     * @param {N2TreeNode} node The node to preserve as the zoomed element.
+     * @param {OmTreeNode} node The node to preserve as the zoomed element.
      */
     addForwardButtonHistory(node) {
         let formerHidden = [];
-        this.n2Diag.findAllHidden(formerHidden, true);
+        this.n2Diag.model.findAllHidden(formerHidden, true);
 
         this.forwardButtonHistory.push({
             'node': node,
@@ -564,7 +557,7 @@ class N2UserInterface {
             this._setupLeftClick(oldZoomedElement);
         }
 
-        this.n2Diag.resetAllHidden(history.hidden);
+        this.n2Diag.model.resetAllHidden(history.hidden);
         this.n2Diag.update();
     }
 
@@ -602,7 +595,7 @@ class N2UserInterface {
         this.addBackButtonHistory(false);
         this._setupLeftClick(node);
 
-        this.n2Diag.resetAllHidden(history.hidden);
+        this.n2Diag.model.resetAllHidden(history.hidden);
         this.n2Diag.update();
     }
 
@@ -660,7 +653,7 @@ class N2UserInterface {
 
     /**
      * Minimize the specified node and recursively minimize its children.
-     * @param {N2TreeNode} node The current node to operate on.
+     * @param {OmTreeNode} node The current node to operate on.
      */
     _collapseOutputs(node) {
         if (node.subsystem_type && node.subsystem_type == 'component') {
@@ -675,7 +668,7 @@ class N2UserInterface {
 
     /**
      * React to a button click and collapse all outputs of the specified node.
-     * @param {N2TreeNode} node The initial node, usually the currently zoomed element.
+     * @param {OmTreeNode} node The initial node, usually the currently zoomed element.
      */
     collapseOutputsButtonClick(startNode) {
         testThis(this, 'N2UserInterface', 'collapseOutputsButtonClick');
@@ -690,7 +683,7 @@ class N2UserInterface {
 
     /**
      * Mark this node and all of its children as unminimized/unhidden
-     * @param {N2TreeNode} node The node to operate on.
+     * @param {OmTreeNode} node The node to operate on.
      */
     _uncollapse(node) {
         node.expand().show();
@@ -707,7 +700,7 @@ class N2UserInterface {
 
     /**
      * React to a button click and uncollapse the specified node.
-     * @param {N2TreeNode} startNode The initial node.
+     * @param {OmTreeNode} startNode The initial node.
      */
     uncollapseButtonClick(startNode) {
         testThis(this, 'N2UserInterface', 'uncollapseButtonClick');
@@ -795,6 +788,7 @@ class N2UserInterface {
         this.n2Diag.update();
         d3.select('#n2-resizer-handle').attr('class', 'inactive-resizer-handle')
     }
+    
     hideSolvers() {
         n2Diag.showSolvers = false;
         this.n2Diag.update();
@@ -981,10 +975,10 @@ class N2UserInterface {
 class ChildSelectDialog extends N2WindowDraggable {
     /**
      * Setup the basic structure of the variable selection dialog.
-     * @param {N2TreeNode} node The node to examine the variables of.
+     * @param {OmTreeNode} node The node to examine the variables of.
      * @param {String} color The color to make the window header/footer ribbons.
      */
-     constructor(node, color) {
+     constructor(e, node, color) {
         super('childSelect-' + node.toId());
         this.node = node;
         this.nodeColor = color;
@@ -995,7 +989,7 @@ class ChildSelectDialog extends N2WindowDraggable {
         
         // Don't do anything else if the node has no variables
         if ( ! this._fetchVarNames() ) { this.close(); }
-        else { this._initialSetup(); }
+        else { this._initialSetup(e); }
     }
     
     /**
@@ -1026,7 +1020,7 @@ class ChildSelectDialog extends N2WindowDraggable {
     /**
      * Configure the window structure, then call repopulate() to list the variable names.
      */
-    _initialSetup() {
+    _initialSetup(e) {
         const self = this;
 
         this.minWidth = 300;
@@ -1072,12 +1066,12 @@ class ChildSelectDialog extends N2WindowDraggable {
         this.searchContainer.select('.search-clear').on('click', e => {
             self.searchTerm = '';
             self.searchBox.property('value', '');
-            self.updateSearch(true);
+            self.updateSearch(e, true);
         });
 
         // Execute the search by clicking on the arrow button
         this.searchContainer.select('.search-perform').on('click', e => {
-            self.updateSearch(true);
+            self.updateSearch(e, true);
         });
 
         this.buttonContainer = this.body.select('div.button-container');
@@ -1098,7 +1092,7 @@ class ChildSelectDialog extends N2WindowDraggable {
         this.repopulate();
         this.resize();
         this.modal(true)
-            .moveNearMouse(d3.event)
+            .moveNearMouse(e)
             .show();
     }
 
@@ -1285,8 +1279,8 @@ class ChildSelectDialog extends N2WindowDraggable {
     }
 
     /** Update the variable list based on the provided search term. */
-    updateSearch(clicked = false) {
-        if (d3.event.keyCode == 13 || clicked) {
+    updateSearch(e, clicked = false) {
+        if (e.keyCode == 13 || clicked) {
                 this.searchTerm = this.searchBox.property('value');
                 this.repopulate();
                 this.resize();
