@@ -51,39 +51,6 @@ class UserInterface {
         d3.select('#state-file-input').on('change', function(e) { self.loadView(e, self); });
     }
 
-    loadView(e, ui) {
-        const fr = new FileReader();
-        const fileInput = e.currentTarget;
-
-        fr.onload = function () {
-            let dataDict = false;
-
-            try {
-                dataDict = JSON.parse(fr.result);
-            }
-            catch (error) {
-                alert("Cannot load view. The file does not appear to be a valid view file.");
-                return;
-            }
-
-            if (!dataDict.md5_hash) {
-                alert("Cannot load view. The file does not appear to be a valid view file.");
-                return;
-            }
-
-            // Make sure model didn't change.
-            if (dataDict.md5_hash != ui.diag.model.md5_hash) {
-                alert("Cannot load view. Current model structure is different than in saved view.")
-                return;
-            }
-
-            ui.addBackButtonHistory();
-            ui.diag.restoreSavedState(dataDict);
-        }
-
-        fr.readAsText(fileInput.files[0]);
-    }
-
     /**
      * Set the range and current value of the collapse depth slider.
      * @param {Number} opts.min The shallowest elements to allow to collapse via slider.
@@ -597,7 +564,7 @@ class UserInterface {
         this.diag.showWaiter();
 
         this.addBackButtonHistory();
-        this.diag.manuallyExpandAll(startNode);
+        this.diag.model.manuallyExpandAll(startNode);
 
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
         N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
@@ -608,7 +575,7 @@ class UserInterface {
     /** All nodes are collapsed, starting with the specified node. */
     collapseAll(startNode) {
         this.addBackButtonHistory();
-        this.diag.minimizeAll(startNode);
+        this.diag.model.minimizeAll(startNode);
 
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
         N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
@@ -773,6 +740,45 @@ class UserInterface {
             link.dispatchEvent(event);
             document.body.removeChild(link);
         })
+    }
+
+    /**
+     * Preset a file open dialog, read in the selected file, validate the contents,
+     * and update the diagram to the saved state.
+     * @param {Event} e The event that initiated the dialog.
+     * @param {UserInterface} ui Reference to the UserInterface object.
+     */
+    loadView(e, ui) {
+        const fr = new FileReader();
+        const fileInput = e.currentTarget;
+
+        fr.onload = function () {
+            let dataDict = false;
+
+            try {
+                dataDict = JSON.parse(fr.result);
+            }
+            catch (error) {
+                alert("Cannot load view. The file does not appear to be a valid view file.");
+                return;
+            }
+
+            if (!dataDict.md5_hash) {
+                alert("Cannot load view. The file does not appear to be a valid view file.");
+                return;
+            }
+
+            // Make sure model didn't change.
+            if (dataDict.md5_hash != ui.diag.model.md5_hash) {
+                alert("Cannot load view. Current model structure is different than in saved view.")
+                return;
+            }
+
+            ui.addBackButtonHistory();
+            ui.diag.restoreSavedState(dataDict);
+        }
+
+        fr.readAsText(fileInput.files[0]);
     }
 
     /** Load the model state to a file. */
