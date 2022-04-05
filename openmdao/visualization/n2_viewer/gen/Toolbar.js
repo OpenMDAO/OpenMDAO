@@ -69,7 +69,7 @@ class Toolbar {
 
     /** Either create the help window the first time or redisplay it */
     _showHelp() {
-        if (!this._helpWindow) this._helpWindow = new Help(this.helpInfo);
+        if (!this._helpWindow) this._helpWindow = new N2Help(this.helpInfo);
         else this._helpWindow.show().modal(true);
     }
 
