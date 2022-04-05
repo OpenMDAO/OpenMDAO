@@ -61,18 +61,21 @@ def _setup_hooks(obj):
         # any object where we register hooks must define the '_get_inst_id' method.
         ident = obj._get_inst_id()
 
+        instmetas = []
+
         if ident in classmeta:
-            instmeta = classmeta[ident]
-        elif None in classmeta:  # ident of None applies to all instances of a class
-            instmeta = classmeta[None]
-        else:
+            instmetas.append(classmeta[ident])
+        if None in classmeta:  # ident of None applies to all instances of a class
+            instmetas.append(classmeta[None])
+
+        if not instmetas:
             return
 
-        for funcname in instmeta:
-            method = getattr(obj, funcname, None)
-            if method is not None:
+        for instmeta in instmetas:
+            for funcname in instmeta:
+                method = getattr(obj, funcname, None)
                 # if _hook_ attr is present, we've already wrapped this method
-                if not hasattr(method, '_hook_'):
+                if method is not None and not hasattr(method, '_hook_'):
                     setattr(obj, funcname, _hook_decorator(method, obj, instmeta[funcname]))
 
 
@@ -124,9 +127,13 @@ def _hook_decorator(f, inst, hookmeta):
     return wraps(f)(execute_hooks)
 
 
-def _get_hook_lists(class_name, inst_id, fname):
+def _get_hook_list_iters(class_name, inst_id, fname):
     """
-    Retrieve the pre and post hook lists for the given class, instance, and function name.
+    Retrieve the pre and post hook list iterators for the given class, instance, and function name.
+
+    They are iterators of lists because under some circumstances, e.g., when adding a 'None'
+    hook after non-None instance hooks were already added, the 'None' hook will need to be added
+    to *all* of the existing non-None instance hook lists.
 
     Parameters
     ----------
@@ -136,19 +143,44 @@ def _get_hook_lists(class_name, inst_id, fname):
         The name of the instance owning the method where the hook will be applied.
     fname : str
         The name of the function where the pre and/or post hook will be applied.
+
+    Yields
+    ------
+    tuple of (list, list)
+        Pre and post hook lists.
     """
     global _hooks
     if class_name in _hooks:
         cmeta = _hooks[class_name]
     else:
         _hooks[class_name] = cmeta = {}
+
     if inst_id in cmeta:
         imeta = cmeta[inst_id]
     else:
         cmeta[inst_id] = imeta = {}
+
     if fname not in imeta:
-        imeta[fname] = [[], []]
-    return imeta[fname]
+        # check for any existing None hooks because we need to add those first
+        nonehooks = None
+        if None in cmeta:
+            nonemeta = cmeta[None]
+            if fname in nonemeta:
+                nonehooks = nonemeta[fname]
+
+        if nonehooks is None:
+            imeta[fname] = ([], [])
+        else:
+            imeta[fname] = (nonehooks[0].copy(), nonehooks[1].copy())
+    elif inst_id is None:
+        # special case where we have to add the None hook to all existing non-None hook lists
+        # that match the fname
+        for n, meta in cmeta.items():
+            if fname in meta:
+                yield meta[fname]
+        return
+
+    yield imeta[fname]
 
 
 def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=None, exit=False,
@@ -182,11 +214,11 @@ def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=
     if pre is None and post is None:
         raise RuntimeError("In _register_hook you must specify pre or post.")
 
-    pre_hooks, post_hooks = _get_hook_lists(class_name, inst_id, fname)
-    if pre is not None and (ncalls is None or ncalls > 0):
-        pre_hooks.append((pre, ncalls, exit and post is None, kwargs))
-    if post is not None and (ncalls is None or ncalls > 0):
-        post_hooks.append((post, ncalls, exit, kwargs))
+    for pre_hooks, post_hooks in _get_hook_list_iters(class_name, inst_id, fname):
+        if pre is not None and (ncalls is None or ncalls > 0):
+            pre_hooks.append((pre, ncalls, exit and post is None, kwargs))
+        if post is not None and (ncalls is None or ncalls > 0):
+            post_hooks.append((post, ncalls, exit, kwargs))
 
 
 def _remove_hook(to_remove, hooks, class_name, fname, hook_loc):

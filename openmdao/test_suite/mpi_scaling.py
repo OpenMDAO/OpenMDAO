@@ -149,7 +149,7 @@ def group_from_iter(par, sysiter, proc_groups=None, max_procs=None, nliters=1, l
     # system instances from sysiter.  The group
     # will have (block jac/gs depending on 'par') linear and nl solvers with
     # maxiters of 'liniters' and 'nliters' respectively.
-    g = om.ParallelGroup() if par and MPI is not None else om.Group()
+    g = om.ParallelGroup() if par else om.Group()
     if proc_groups is None:
         proc_groups = repeat(None)
     if max_procs is None:

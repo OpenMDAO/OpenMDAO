@@ -302,7 +302,8 @@ def _setup_timers(options, system):
 
 
 def _set_timer_setup_hook(options, problem):
-    # this just sets a hook into the top level system of the model after we know it exists.
+    # This just sets a hook into the top level system of the model after we know it exists.
+    # Note that this means that no timings can happen until AFTER _setup_procs is done.
     global _timing_managers
 
     inst_id = problem._get_inst_id()
