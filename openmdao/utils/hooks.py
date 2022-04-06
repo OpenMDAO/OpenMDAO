@@ -21,22 +21,16 @@ _hooks = {}
 # classes found here are known to contain no hooks within themselves or their ancestors
 _hook_skip_classes = set()
 
-# classes having instance specific hooks, which must be handled, in the case of Systems for
-# example, after the pathname of the System has been set.  This situation in the case of
-# Systems should be relatively rare.
-_instance_hook_classes = set()
-
 # global switch that turns hook machinery on/off. Need it on in general for the default
 # reporting system
 use_hooks = True
 
 
 def _reset_all_hooks():
-    global _hooks, _hook_skip_classes, _instance_hook_classes
+    global _hooks, _hook_skip_classes
 
     _hooks = {}
     _hook_skip_classes = set()
-    _instance_hook_classes = set()
 
 
 def _setup_hooks(obj):
@@ -224,13 +218,8 @@ def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=
     **kwargs : dict of keyword arguments
         Keyword arguments that will be passed to the hook function.
     """
-    global _instance_hook_classes
-
     if pre is None and post is None:
         raise RuntimeError("In _register_hook you must specify pre or post.")
-
-    if inst_id is not None:
-        _instance_hook_classes.add(class_name)
 
     for pre_hooks, post_hooks in _get_hook_list_iters(class_name, inst_id, fname):
         if pre is not None and (ncalls is None or ncalls > 0):
@@ -320,7 +309,7 @@ def _unregister_hook(fname, class_name, inst_id=None, pre=True, post=True):
         else:
             warnings.warn(f"No hook found for method '{fname}' for class '{class_name}' and "
                           f"instance '{inst_id}'.")
-            
+
     if todel:
         for name in todel:
             del classhooks[name]
