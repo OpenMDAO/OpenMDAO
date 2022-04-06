@@ -32,7 +32,7 @@ class OmDiagram extends Diagram {
         this.style = new OmStyle(this.dom.svgStyle, this.dims.size.font);
         this.layout = this._newLayout();
 
-        this.search = new N2Search(this.zoomedElement, this.model.root);
+        this.search = new Search(this.zoomedElement, this.model.root);
         this.ui = new OmUserInterface(this);
 
         // Keep track of arrows to show and hide them

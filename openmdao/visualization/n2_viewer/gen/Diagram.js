@@ -1,6 +1,8 @@
 // <<hpp_insert gen/Layout.js>>
 // <<hpp_insert gen/ClickHandler.js>>
 // <<hpp_insert gen/UserInterface.js>>
+// <<hpp_insert gen/ArrowManager.js>>
+// <<hpp_insert gen/Search.js>>
 
 /**
  * Manage all pieces of the application. The model data, the CSS styles, the
@@ -9,7 +11,7 @@
  * @typedef Diagram
  * @property {ModelData} model Processed model data received from Python.
  * @property {OmStyle} style Manages N2-related styles and functions.
- * @property {N2Layout} layout Sizes and positions of visible elements.
+ * @property {Layout} layout Sizes and positions of visible elements.
  * @property {N2Matrix} matrix Manages the grid of visible model parameters.
  * @property {TreeNode} zoomedElement The element the diagram is currently based on.
  * @property {TreeNode} zoomedElementPrev Reference to last zoomedElement.
@@ -52,7 +54,7 @@ class Diagram {
         this.style = new Style(this.dom.svgStyle, this.dims.size.font);
         this.layout = this._newLayout();
 
-        this.search = new N2Search(this.zoomedElement, this.model.root);
+        this.search = new Search(this.zoomedElement, this.model.root);
         this.ui = new UserInterface(this);
 
         // Keep track of arrows to show and hide them
