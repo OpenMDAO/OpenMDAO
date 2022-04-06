@@ -11,7 +11,7 @@ on:
 jobs:
 
   ubuntu_tests:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
 
     timeout-minutes: 110
 
@@ -412,3 +412,15 @@ jobs:
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         parallel-finished: true
+
+  dymos_tests:
+    name: Run Dymos Tests
+    needs: [ubuntu_tests, windows_tests]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: benc-uk/workflow-dispatch@v1
+      with:
+        workflow: Dymos Tests
+        repo: ${{ github.repository_owner }}/dymos
+        token: ${{ secrets.ACCESS_TOKEN }}
+      if: github.event_name == 'push'
