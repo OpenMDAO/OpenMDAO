@@ -56,7 +56,7 @@ class Diagram {
         this.ui = new UserInterface(this);
 
         // Keep track of arrows to show and hide them
-        this.arrowMgr = new N2ArrowManager(this.dom.n2Groups);
+        this.arrowMgr = new ArrowManager(this.dom.n2Groups);
         this.matrix = new N2Matrix(this.model, this.layout, this.dom.n2Groups,
             this.arrowMgr, true, this.ui.findRootOfChangeFunction);
     }

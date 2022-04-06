@@ -19,7 +19,7 @@ class N2Matrix {
      * @param {ModelData} model The pre-processed model data.
      * @param {N2Layout} layout Pre-computed layout of the diagram.
      * @param {Object} n2Groups References to <g> SVG elements created by N2Diagram.
-     * @param {N2ArrowManager} arrowMgr Object to create and manage conn. arrows.
+     * @param {ArrowManager} arrowMgr Object to create and manage conn. arrows.
      * @param {Boolean} lastClickWasLeft
      * @param {function} findRootOfChangeFunction
      */
