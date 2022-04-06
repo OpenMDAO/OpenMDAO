@@ -3,6 +3,7 @@ OpenMDAO Wrapper for the scipy.optimize.minimize family of local optimizers.
 """
 
 import sys
+import time
 from distutils.version import LooseVersion
 
 import numpy as np
@@ -225,6 +226,11 @@ class ScipyOptimizeDriver(Driver):
                     self._cons[name]['equals'] = None
                     self._cons[name]['linear'] = True
 
+    def _post_run(self):
+        super()._post_run()
+        self.opt_result['exit_status'] = 'FAIL' if self.fail else 'SUCCESS'
+
+
     def run(self):
         """
         Optimize the problem using selected Scipy optimizer.
@@ -234,6 +240,9 @@ class ScipyOptimizeDriver(Driver):
         bool
             Failure flag; True if failed to converge, False is successful.
         """
+
+
+
         problem = self._problem()
         opt = self.options['optimizer']
         model = problem.model
@@ -551,6 +560,7 @@ class ScipyOptimizeDriver(Driver):
                 print('Optimization Complete (success not known)')
                 print(result.message)
                 print('-' * 35)
+
 
         return self.fail
 

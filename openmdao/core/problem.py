@@ -750,7 +750,12 @@ class Problem(object):
         record_model_options(self, self._run_counter)
 
         self.model._clear_iprint()
-        return self.driver.run()
+        self.driver._pre_run()  # for keeping track of data for reporting
+        driver_run_result = self.driver.run()
+        self.driver._post_run()  # for keeping track of data for reporting
+
+        return driver_run_result
+        # return self.driver.run()
 
     def compute_jacvec_product(self, of, wrt, mode, seed):
         """

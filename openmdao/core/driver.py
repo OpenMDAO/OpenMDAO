@@ -3,6 +3,7 @@ from itertools import chain
 import pprint
 import sys
 import os
+import time
 import weakref
 
 import numpy as np
@@ -173,6 +174,13 @@ class Driver(object):
 
         self._declare_options()
         self.options.update(kwargs)
+
+
+        self.opt_result = {
+            'runtime': 0.0,
+            'exit_status': 'NOTRUN'
+        }
+
 
         # Want to allow the setting of hooks on Drivers
         _setup_hooks(self)
@@ -805,6 +813,12 @@ class Driver(object):
 
         return response_size, desvar_size
 
+    def _pre_run(self):
+        self._start_time = time.time()
+
+    def _post_run(self):
+        self.opt_result['runtime'] = time.time() - self._start_time
+
     def run(self):
         """
         Execute this driver.
@@ -819,6 +833,10 @@ class Driver(object):
         """
         with RecordingDebugging(self._get_name(), self.iter_count, self):
             self._problem().model.run_solve_nonlinear()
+
+        end_time = time.time()
+        self.opt_result['runtime'] = end_time - start_time
+        self.opt_result['exit_status'] = 'SUCCESS'
 
         self.iter_count += 1
         return False

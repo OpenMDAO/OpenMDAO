@@ -240,6 +240,10 @@ class SimpleGADriver(Driver):
         """
         return "SimpleGA"
 
+    def _post_run(self):
+        super()._post_run()
+        self.opt_result['exit_status'] = 'SUCCESS'
+
     def run(self):
         """
         Execute the genetic algorithm.

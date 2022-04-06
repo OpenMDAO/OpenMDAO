@@ -223,7 +223,7 @@ class pyOptSparseDriver(Driver):
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},
                              desc='Finite difference implementation to use')
         self.options.declare('user_terminate_signal', default=DEFAULT_SIGNAL, allow_none=True,
-                             desc='OS signal that triggers a clean user-termination. Only SNOPT'
+                             desc='OS signal that triggers a clean user-termination. Only SNOPT '
                              'supports this option.')
         self.options.declare('singular_jac_behavior', default='warn',
                              values=['error', 'warn', 'ignore'],
@@ -237,7 +237,7 @@ class pyOptSparseDriver(Driver):
 
         # Deprecated option
         self.options.declare('user_teriminate_signal', default=None, allow_none=True,
-                             desc='OS signal that triggers a clean user-termination. Only SNOPT'
+                             desc='OS signal that triggers a clean user-termination. Only SNOPT '
                              'supports this option.',
                              deprecation=("The option 'user_teriminate_signal' was misspelled and "
                                           "will be deprecated. Please use 'user_terminate_signal' "
@@ -271,6 +271,10 @@ class pyOptSparseDriver(Driver):
         if self.options._dict['user_teriminate_signal']['val'] is not None:
             self.options['user_terminate_signal'] = \
                 self.options._dict['user_teriminate_signal']['val']
+
+    def _post_run(self):
+        super()._post_run()
+        self.opt_result['exit_status'] = 'FAIL' if self.fail else 'SUCCESS'
 
     def run(self):
         """
@@ -537,6 +541,7 @@ class pyOptSparseDriver(Driver):
         if sigusr is not None:
             signal.signal(sigusr, self._signal_cache)
             self._signal_cache = None   # to prevent memory leak test from failing
+
 
         return self.fail
 
