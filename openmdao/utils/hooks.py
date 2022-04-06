@@ -102,8 +102,7 @@ def _run_hooks(hooks, inst):
             if ex:
                 sys.exit()
             if ncalls is not None:
-                ncalls -= 1
-                hooks[i] = (hook, ncalls, ex, kwargs, inst_id)
+                hooks[i][1] -= 1
 
 
 def _hook_decorator(f, inst, hookmeta):
@@ -177,7 +176,7 @@ def _get_hook_list_iters(class_name, inst_id, fname):
         if nonehooks is None:
             imeta[fname] = ([], [])
         else:
-            imeta[fname] = (nonehooks[0].copy(), nonehooks[1].copy())
+            imeta[fname] = ([h.copy() for h in nonehooks[0]], [h.copy() for h in nonehooks[1]])
 
     if inst_id is None:
         # special case where we have to add the None hook to all existing non-None hook lists
@@ -223,9 +222,9 @@ def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=
 
     for pre_hooks, post_hooks in _get_hook_list_iters(class_name, inst_id, fname):
         if pre is not None and (ncalls is None or ncalls > 0):
-            pre_hooks.append((pre, ncalls, exit and post is None, kwargs, inst_id))
+            pre_hooks.append([pre, ncalls, exit and post is None, kwargs, inst_id])
         if post is not None and (ncalls is None or ncalls > 0):
-            post_hooks.append((post, ncalls, exit, kwargs, inst_id))
+            post_hooks.append([post, ncalls, exit, kwargs, inst_id])
 
 
 def _remove_hook(to_remove, hooks, class_name, fname, hook_loc, inst_id):

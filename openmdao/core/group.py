@@ -1599,14 +1599,13 @@ class Group(System):
         conn_list.extend(abs_in2out.items())
         global_abs_in2out.update(abs_in2out)
 
-        for subsys in self._subsystems_myproc:
-            if isinstance(subsys, Group):
-                if subsys.name in new_conns:
-                    subsys._setup_global_connections(conns=new_conns[subsys.name])
-                else:
-                    subsys._setup_global_connections()
-                global_abs_in2out.update(subsys._conn_global_abs_in2out)
-                conn_list.extend(subsys._conn_global_abs_in2out.items())
+        for subgroup in self._subgroups_myproc:
+            if subgroup.name in new_conns:
+                subgroup._setup_global_connections(conns=new_conns[subgroup.name])
+            else:
+                subgroup._setup_global_connections()
+            global_abs_in2out.update(subgroup._conn_global_abs_in2out)
+            conn_list.extend(subgroup._conn_global_abs_in2out.items())
 
         if len(conn_list) > len(global_abs_in2out):
             dupes = [n for n, val in Counter(tgt for tgt, src in conn_list).items() if val > 1]
