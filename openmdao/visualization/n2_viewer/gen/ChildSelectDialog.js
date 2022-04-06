@@ -1,4 +1,4 @@
-// <<hpp_insert src/N2Window.js>>
+// <<hpp_insert gen/WindowDraggable.js>>
 
 /**
  * Manage a window that allows the user to select which variables to display.
@@ -6,7 +6,7 @@
  * without using sizeToContent(3,30)
  * @typedef ChildSelectDialog
  */
-class ChildSelectDialog extends N2WindowDraggable {
+class ChildSelectDialog extends WindowDraggable {
     /**
      * Setup the basic structure of the variable selection dialog.
      * @param {OmTreeNode} node The node to examine the variables of.
