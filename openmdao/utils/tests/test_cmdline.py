@@ -56,6 +56,7 @@ cmd_tests = [
     ('openmdao scaffold -b ImplicitComponent -c Foo', {}),
     ('openmdao scaffold -p blahpkg --cmd=hello', {}),
     ('openmdao summary {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
+    ('mpirun -n 2 openmdao timing {}'.format(os.path.join(scriptdir, 'multipoint_beam_opt.py')), {}),
     ('openmdao total_coloring {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao trace {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao tree -c {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
@@ -131,7 +132,7 @@ class CmdlineTestErrTestCase(unittest.TestCase):
     @parameterized.expand(test_cmd_err, name_func=_test_func_name)
     def test_cmd(self, cmd):
         proc = subprocess.run(cmd.split(),   # nosec: trusted input
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                               encoding='UTF-8')
         if 'argument : invalid choice:' not in proc.stderr:
             self.fail(f"Command '{cmd}' didn't fail in the expected way.\n"

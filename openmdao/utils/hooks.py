@@ -2,7 +2,6 @@
 Functions for handling runtime function hooks.
 """
 
-from collections import defaultdict
 from functools import wraps
 import inspect
 import warnings
@@ -79,7 +78,7 @@ def _setup_hooks(obj):
             for funcname, fmeta in instmeta.items():
                 method = getattr(obj, funcname, None)
                 # if _hook_ attr is present, we've already wrapped this method.  We don't need
-                # to combine pre/post hook data for instance and None hooks here because it has
+                # to combine pre/post hook data for inst and None hooks here because it has
                 # already been done earlier (in register_hook/_get_hook_list_iters).
                 if method is not None and not hasattr(method, '_hook_'):
                     setattr(obj, funcname, _hook_decorator(method, obj, fmeta))
@@ -96,13 +95,14 @@ def _run_hooks(hooks, inst):
     inst : object
         Object instance to pass to hook functions.
     """
-    for i, (hook, ncalls, ex, kwargs, inst_id) in enumerate(hooks):
+    for hookmeta in hooks:
+        hook, ncalls, ex, kwargs, _ = hookmeta
         if ncalls is None or ncalls > 0:
             hook(inst, **kwargs)
             if ex:
                 sys.exit()
             if ncalls is not None:
-                hooks[i][1] -= 1
+                hookmeta[1] -= 1
 
 
 def _hook_decorator(f, inst, hookmeta):
