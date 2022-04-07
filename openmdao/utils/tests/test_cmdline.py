@@ -56,7 +56,7 @@ cmd_tests = [
     ('openmdao scaffold -b ImplicitComponent -c Foo', {}),
     ('openmdao scaffold -p blahpkg --cmd=hello', {}),
     ('openmdao summary {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
-    ('mpirun -n 2 openmdao timing {}'.format(os.path.join(scriptdir, 'multipoint_beam_opt.py')), {}),
+    ('openmdao timing {}'.format(os.path.join(scriptdir, 'multipoint_beam_opt.py')), {}),
     ('openmdao total_coloring {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao trace {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao tree -c {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
