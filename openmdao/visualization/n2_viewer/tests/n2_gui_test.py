@@ -895,7 +895,7 @@ class n2_gui_test_case(_GuiTestCase):
 
     async def resize_window(self, options):
         """
-        Drag an edge/corner of an N2WindowResizable and check that the size changed
+        Drag an edge/corner of a WindowResizable obj and check that the size changed
         or didn't change as expected.
         """
         self.log_test(options['desc'] if 'desc' in options else

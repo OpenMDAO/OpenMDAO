@@ -1,7 +1,7 @@
 window.addEventListener("error", handleError, true);
 function handleError(evt) {
 
-    // Cannot define this color in N2Style since hasn't been loaded yet
+    // Cannot define this color in OmStyle since hasn't been loaded yet
     // Cannot call anything in any of the N2 JavaScript code because nothing has been loaded
     document.body.style.background = '#db9f9f';
     document.getElementById("show-error-button-container").style.visibility = 'visible';

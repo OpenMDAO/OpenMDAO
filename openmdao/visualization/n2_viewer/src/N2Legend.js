@@ -1,9 +1,11 @@
+// <<hpp_insert gen/WindowDraggable.js>>
+
 /**
  * Draw a symbol describing each of the element types.
  * @typedef N2Legend
  * @property {Boolean} shown Whether the legend is currently drawn or not.
  */
-class N2Legend extends N2WindowDraggable {
+class N2Legend extends WindowDraggable {
     /**
      * Initializes the legend object.
      * @param {ModelData} modelData Symbols are only displayed if they're in the model
@@ -35,16 +37,16 @@ class N2Legend extends N2WindowDraggable {
         };
 
         this.sysAndVar = [
-            { 'name': "Connection", 'color': N2Style.color.connection },
-            { 'name': "Collapsed", 'color': N2Style.color.collapsed },
-            { 'name': "Declared Partial", 'color': N2Style.color.declaredPartial }
+            { 'name': "Connection", 'color': OmStyle.color.connection },
+            { 'name': "Collapsed", 'color': OmStyle.color.collapsed },
+            { 'name': "Declared Partial", 'color': OmStyle.color.declaredPartial }
         ];
 
         this.n2Symbols = [];
         const rootLinearSolver =
-            N2Style.solverStyleObject.find(x => x.ln === modelData.tree.linear_solver);
+            OmStyle.solverStyleObject.find(x => x.ln === modelData.tree.linear_solver);
         const rootNonLinearSolver =
-            N2Style.solverStyleObject.find(x => x.nl === modelData.tree.nonlinear_solver);
+            OmStyle.solverStyleObject.find(x => x.nl === modelData.tree.nonlinear_solver);
         this.linearSolvers = [
             { 'name': modelData.tree.linear_solver, 'color': rootLinearSolver.color }
         ];
@@ -66,7 +68,7 @@ class N2Legend extends N2WindowDraggable {
         this.move(50, -10);
     }
 
-    /** Override N2Window::close() to just hide the legend. */
+    /** Override Window::close() to just hide the legend. */
     close() {
         d3.select('#legend-button').attr('class', 'fas icon-key');
         this.hide();
@@ -102,7 +104,7 @@ class N2Legend extends N2WindowDraggable {
                 this.nonLinearSolvers.indexOf(this.nonLinearSolvers.find(x => x.name === nonLinearSolver));
 
             if (linearSolverIndex < 0 && linearSolver !== undefined) {
-                let solverStyle = N2Style.solverStyleObject.find(x => x.ln === linearSolver);
+                let solverStyle = OmStyle.solverStyleObject.find(x => x.ln === linearSolver);
                 this.linearSolvers.push({
                     'name': solverStyle.ln,
                     'color': solverStyle.color
@@ -110,7 +112,7 @@ class N2Legend extends N2WindowDraggable {
             }
 
             if (nonLinearSolverIndex < 0 && nonLinearSolver !== undefined) {
-                let solverStyle = N2Style.solverStyleObject.find(x => x.nl === nonLinearSolver);
+                let solverStyle = OmStyle.solverStyleObject.find(x => x.nl === nonLinearSolver);
                 this.nonLinearSolvers.push({
                     'name': solverStyle.nl,
                     'color': solverStyle.color
@@ -122,14 +124,14 @@ class N2Legend extends N2WindowDraggable {
                     this.showSysVar.group = true;
                     this.sysAndVar.push({
                         'name': 'Group',
-                        'color': N2Style.color.group
+                        'color': OmStyle.color.group
                     })
                 }
                 else if (!this.showSysVar.component && node.isComponent()) {
                     this.showSysVar.component = true;
                     this.sysAndVar.push({
                         'name': 'Component',
-                        'color': N2Style.color.component
+                        'color': OmStyle.color.component
                     })
                 }
                 this._setDisplayBooleans(node.children);
@@ -139,42 +141,42 @@ class N2Legend extends N2WindowDraggable {
                     this.showSysVar.input = true;
                     this.sysAndVar.push({
                         'name': 'Input',
-                        'color': N2Style.color.input
+                        'color': OmStyle.color.input
                     })
                 }
                 else if (!this.showSysVar.outputExplicit && node.isExplicitOutput()) {
                     this.showSysVar.outputExplicit = true;
                     this.sysAndVar.push({
                         'name': 'Explicit Output',
-                        'color': N2Style.color.outputExplicit
+                        'color': OmStyle.color.outputExplicit
                     })
                 }
                 else if (!this.showSysVar.outputImplicit && node.isImplicitOutput()) {
                     this.showSysVar.outputImplicit = true;
                     this.sysAndVar.push({
                         'name': 'Implicit Output',
-                        'color': N2Style.color.outputImplicit
+                        'color': OmStyle.color.outputImplicit
                     })
                 }
                 else if (!this.showSysVar.autoivcInput && node.isAutoIvcInput()) {
                     this.showSysVar.autoivcInput = true;
                     this.sysAndVar.push({
                         'name': 'Auto-IVC Input',
-                        'color': N2Style.color.autoivcInput
+                        'color': OmStyle.color.autoivcInput
                     })
                 }
                 else if (!this.showSysVar.unconnectedInput && node.isUnconnectedInput()) {
                     this.showSysVar.unconnectedInput = true;
                     this.sysAndVar.push({
                         'name': 'Unconnected Input',
-                        'color': N2Style.color.unconnectedInput
+                        'color': OmStyle.color.unconnectedInput
                     })
                 }
                 else if (!this.showSysVar.desvar) {
                     this.showSysVar.desvar = true;
                     this.sysAndVar.push({
                         'name': 'Optimization Variables',
-                        'color': N2Style.color.desvar
+                        'color': OmStyle.color.desvar
                     })
                 }
             }
@@ -235,7 +237,7 @@ class N2Legend extends N2WindowDraggable {
  * Display a modal window with helpful information.
  * @typedef N2Help
  */
-class N2Help extends N2Window {
+class N2Help extends Window {
     /**
      * Using data generated by N2Toolbar, document each of the buttons.
      * @param {Object} helpInfo Data structure containing N2Toolbar button info.
@@ -260,7 +262,7 @@ class N2Help extends N2Window {
         this.show().modal(true);
     }
 
-    /** Override N2Window::close() to just hide the help window. */
+    /** Override Window::close() to just hide the help window. */
     close() {
         this.modal(false);
         this.hide();

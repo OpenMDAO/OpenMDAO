@@ -1,3 +1,5 @@
+// <<hpp_insert src/OmSymbolType.js>>
+
 /** Base class for all cell renderers */
 class N2CellRenderer {
     /**
@@ -440,7 +442,8 @@ class N2FilterCell extends N2VectorBase {
  * @property {OmTreeNode} srcObj The node in the model tree this cell is associated with.
  * @property {OmTreeNode} tgtObj The model tree node that this outputs to.
  * @property {string} id The srcObj id appended with the tgtObj id.
- * @property {SymbolType} symbolType Info about the type of symbol represented by the node.
+ * @property {OmSymbolType} symbolType Info about the type of symbol represented by the node.
+ * @property {N2CellRenderer} renderer The object that draws the cell.
  */
 class N2MatrixCell {
     /**
@@ -450,7 +453,6 @@ class N2MatrixCell {
      * @param {OmTreeNode} srcObj The node in the model tree this node is associated with.
      * @param {OmTreeNode} tgtObj The model tree node that this outputs to.
      * @param {ModelData} model Reference to the model to get some info from it.
-     * @param {N2CellRenderer} renderer The object that draws the cell.
      */
     constructor(row, col, srcObj, tgtObj, model) {
         this.row = row;
@@ -459,7 +461,7 @@ class N2MatrixCell {
         this.tgtObj = tgtObj;
         this.id = N2MatrixCell.makeId(srcObj.id, tgtObj.id);
 
-        this.symbolType = new SymbolType(this, model);
+        this.symbolType = new OmSymbolType(this, model);
         this.renderer = this._newRenderer();
 
         this.offScreen = {
@@ -527,19 +529,19 @@ class N2MatrixCell {
      */
     color() {
         if (this.symbolType.potentialDeclaredPartial &&
-            this.symbolType.declaredPartial) return N2Style.color.declaredPartial;
+            this.symbolType.declaredPartial) return OmStyle.color.declaredPartial;
 
         if (this.onDiagonal()) {
-            if (this.obj.draw.minimized) return N2Style.color.collapsed;
-            if (this.obj.isAutoIvcInput()) return N2Style.color.autoivcInput;
-            if (this.obj.isConnectedInput()) return N2Style.color.input;
-            if (this.obj.isUnconnectedInput()) return N2Style.color.unconnectedInput;
+            if (this.obj.draw.minimized) return OmStyle.color.collapsed;
+            if (this.obj.isAutoIvcInput()) return OmStyle.color.autoivcInput;
+            if (this.obj.isConnectedInput()) return OmStyle.color.input;
+            if (this.obj.isUnconnectedInput()) return OmStyle.color.unconnectedInput;
             return (this.obj.implicit) ?
-                N2Style.color.outputImplicit :
-                N2Style.color.outputExplicit;
+                OmStyle.color.outputImplicit :
+                OmStyle.color.outputExplicit;
         }
 
-        return N2Style.color.connection;
+        return OmStyle.color.connection;
     }
 
 
@@ -574,7 +576,7 @@ class N2MatrixCell {
 
     /** Choose a renderer based on our SymbolType. */
     _newRenderer() {
-        if (this.color() == N2Style.color.connection) {
+        if (this.color() == OmStyle.color.connection) {
             if (this.inUpperTriangle()) return new N2ConnectorUpper(this.color(), this.id);
 
             return new N2ConnectorLower(this.color(), this.id)
@@ -629,8 +631,8 @@ class N2MatrixCell {
         const treeNode = d3.select('rect#' + treeId);
 
         let fill = treeNode.style('fill');
-        if (direction == 'input') fill = N2Style.color.inputArrow;
-        else if (direction == 'output') fill = N2Style.color.outputArrow;
+        if (direction == 'input') fill = OmStyle.color.inputArrow;
+        else if (direction == 'output') fill = OmStyle.color.outputArrow;
 
         d3.select('#highlight-bar').append('rect')
             .attr('x', 0)
@@ -639,7 +641,7 @@ class N2MatrixCell {
             .attr('ry', 4)
             .attr('width', 8)
             .attr('height', treeNode.attr('height'))
-            .attr('stroke', N2Style.color.treeStroke)
+            .attr('stroke', OmStyle.color.treeStroke)
             .attr('fill', fill);
     }
 }
