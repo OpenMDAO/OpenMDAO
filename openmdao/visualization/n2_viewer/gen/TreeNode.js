@@ -225,7 +225,7 @@ class TreeNode {
                 this.numDescendants > Precollapse.threshold &&
                 this.children.length > Precollapse.children - this.depth &&
                 depthCount > Precollapse.depthLimit)) {
-            debugInfo(`Precollapsing node ${this.absPathName}`)
+            debugInfo(`Precollapsing node ${this.path}`)
             this.minimize();
             return true;
         }
@@ -365,7 +365,7 @@ class N2FilterNode extends TreeNode {
     add(node) {
         if (!this.hasChildren()) { this.children = []; }
         this.children.push(node);
-        this.childNames.add(node.absPathName);
+        this.childNames.add(node.path);
         this.numDescendants += 1;
         node.doFilter(this);
         this.show();
@@ -403,7 +403,7 @@ class N2FilterNode extends TreeNode {
 
             this.numDescendants = 0;
             this.childNames.clear();
-            this.childNames.add(this.absPathName);
+            this.childNames.add(this.path);
             this.hide();
         }
     }

@@ -122,11 +122,11 @@ class OmDiagram extends Diagram {
 
                 if (self.model.abs2prom != undefined) {
                     if (d.isInput()) {
-                        return self.dom.toolTip.text(self.model.abs2prom.input[d.absPathName])
+                        return self.dom.toolTip.text(self.model.abs2prom.input[d.path])
                             .style("visibility", "visible");
                     }
                     if (d.isOutput()) {
-                        return self.dom.toolTip.text(self.model.abs2prom.output[d.absPathName])
+                        return self.dom.toolTip.text(self.model.abs2prom.output[d.path])
                             .style("visibility", "visible");
                     }
                 }
@@ -162,7 +162,7 @@ class OmDiagram extends Diagram {
             .transition(sharedTransition)
             .attr("width", d => d.draw.solverDims.width * treeSize.width)
             .attr("height", d => d.draw.solverDims.height * treeSize.height)
-            .attr("id", d => d.absPathName.replace(/\./g, '_'))
+            .attr("id", d => d.path.replace(/\./g, '_'))
             .attr('rx', 12)
             .attr('ry', 12);
 

@@ -28,7 +28,7 @@ class NodeInfo extends Window {
         // Potential properties
         if (addDefaultProps) {
             this.propList = [
-                new InfoPropDefault('absPathName', 'Absolute Name'),
+                new InfoPropDefault('path', 'Absolute Name'),
                 new InfoPropDefault('class', 'Class'),
                 new InfoPropDefault('type', 'Type', true),
                 new InfoPropArray('val', 'Val', this.values),
@@ -111,7 +111,7 @@ class NodeInfo extends Window {
 
         this.clear();
 
-        this.name = node.absPathName;
+        this.name = node.path;
         this.ribbonColor(color);
 
         if (DebugFlags.info && node.hasChildren()) {

@@ -150,7 +150,7 @@ class OmModelData extends ModelData {
      * @return {Boolean} True if the string was found.
      */
     isDeclaredPartial(srcObj, tgtObj) {
-        let partialsStr = tgtObj.absPathName + " > " + srcObj.absPathName;
+        let partialsStr = tgtObj.path + " > " + srcObj.path;
 
         return this.declarePartialsList.includes(partialsStr);
     }
@@ -168,7 +168,7 @@ class OmModelData extends ModelData {
         if (aivc !== undefined && aivc.hasChildren()) {
             for (const ivc of aivc.children) {
                 if (!ivc.isFilter()) {
-                    const tgtPath = this.getAutoIvcTgt(ivc.absPathName);
+                    const tgtPath = this.getAutoIvcTgt(ivc.path);
 
                     if (tgtPath !== undefined) {
                         ivc.promotedName = this.nodePaths[tgtPath].promotedName;

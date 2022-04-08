@@ -16,7 +16,7 @@ class OmNodeInfo extends NodeInfo {
 
         // Add potential properties to super class listing
         const newPropList = [
-            this.propList[0], // absPathName
+            this.propList[0], // path
             new InfoPropDefault('promotedName', 'Promoted Name'),
             this.propList[1], // class
             new InfoPropDefault('surrogate_name', 'Surrogate'),
@@ -64,7 +64,7 @@ class OmNodeInfo extends NodeInfo {
 
         // Potential solver properties
         this.propList = [
-            new InfoPropDefault('absPathName', 'Absolute Name'),
+            new InfoPropDefault('path', 'Absolute Name'),
             new InfoPropOptions('linear_solver_options', 'Linear Solver Options', 'linear'),
             new InfoPropOptions('nonlinear_solver_options', 'Non-Linear Solver Options', 'nonlinear'),
         ];

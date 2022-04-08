@@ -152,7 +152,7 @@
             'cellId': arrow.cellId,
             'matrixSize': matrix.diagNodes.length,
             'offscreenId': arrow.attribs.end.id,
-            'label': matrix.model.nodeIds[arrow.attribs.end.id].absPathName,
+            'label': matrix.model.nodeIds[arrow.attribs.end.id].path,
             'color': arrow.attribs.color
         }
         this.pinnedArrows.arrows[arrow.id] =
@@ -182,7 +182,7 @@
             'cellId': arrow.cellId,
             'matrixSize': matrix.diagNodes.length,
             'offscreenId': arrow.attribs.start.id,
-            'label': matrix.model.nodeIds[arrow.attribs.start.id].absPathName,
+            'label': matrix.model.nodeIds[arrow.attribs.start.id].path,
             'color': arrow.attribs.color
         }
         this.pinnedArrows.arrows[arrow.id] =
