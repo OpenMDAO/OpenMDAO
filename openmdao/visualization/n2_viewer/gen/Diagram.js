@@ -198,16 +198,16 @@ class Diagram {
      * @param {Object} obj The HTML element that was clicked on.
      * @param {TreeNode} node The node associated with the element.
      */
-    leftClickSelector(e, obj, node) {
+    leftClickSelector(e, node) {
         switch (this.ui.click.clickEffect) {
             case ClickHandler.ClickEffect.NodeInfo:
-                this.ui.nodeInfoBox.pin();
+                this.ui.pinInfoBox();
                 break;
             case ClickHandler.ClickEffect.Collapse:
-                this.ui.rightClick(e, node, obj);
+                this.ui.rightClick(e, node, e.currentTarget);
                 break;
             case ClickHandler.ClickEffect.Filter:
-                const color = d3.select(obj).select('rect').style('fill');
+                const color = d3.select(e.currentTarget).select('rect').style('fill');
                 this.ui.altRightClick(e, node, color);
                 break;
             default:
@@ -254,20 +254,18 @@ class Diagram {
         const enterSelection = enter
             .append("g")
             .attr("class", d => `partition_group ${self.style.getNodeClass(d)}`)
-            .on("click", function(e,d) { self.leftClickSelector(e, this, d); })
-            .on("contextmenu", function(e,d) {
+            .on("click", (e,d) => self.leftClickSelector(e, d))
+            .on("contextmenu", (e,d) => {
                 if (e.altKey) {
-                    self.ui.altRightClick(e, d, d3.select(this).select('rect').style('fill'));
+                    self.ui.altRightClick(e, d, d3.select(e.target).select('rect').style('fill'));
                 }
                 else {
                     self.ui.rightClick(e, d);
                 }
             })
-            .on("mouseover", function(e, d) {
-                self.ui.nodeInfoBox.update(e, d, d3.select(this).select('rect').style('fill'))
-            })
-            .on("mouseleave", () => self.ui.nodeInfoBox.clear())
-            .on("mousemove", e => self.ui.nodeInfoBox.moveNearMouse(e));
+            .on("mouseover", (e,d) => self.ui.showInfoBox(e, d))
+            .on("mouseleave", () => self.ui.removeInfoBox())
+            .on("mousemove", e => self.ui.moveInfoBox(e));
 
         enterSelection
             .transition(sharedTransition)
@@ -498,7 +496,7 @@ class Diagram {
     mouseOverOnDiagonal(e, cell) {
         if (this.matrix.cellExists(cell)) {
             this.matrix.mouseOverOnDiagonal(cell);
-            this.ui.nodeInfoBox.update(e, cell.obj, cell.color());
+            this.ui.showInfoBox(e, cell.obj, cell.color());
         }
     }
 
@@ -508,7 +506,7 @@ class Diagram {
      */
     mouseMoveOnDiagonal(e, cell) {
         if (this.matrix.cellExists(cell)) {
-            this.ui.nodeInfoBox.moveNearMouse(e);
+            this.ui.moveInfoBox(e);
         }
     }
 
@@ -528,7 +526,7 @@ class Diagram {
         this.clearHighlights();
         d3.selectAll("div.offgrid").style("visibility", "hidden").html('');
 
-        this.ui.nodeInfoBox.clear();
+        this.ui.removeInfoBox();
     }
 
     /**
@@ -542,7 +540,7 @@ class Diagram {
             this.arrowMgr.togglePin(cell.id);
         }
         else { // Make a persistent info panel
-            this.ui.nodeInfoBox.pin();
+            this.ui.pinInfoBox();
         }
     }
 

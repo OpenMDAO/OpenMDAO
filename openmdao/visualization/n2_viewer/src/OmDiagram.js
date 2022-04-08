@@ -115,10 +115,10 @@ class OmDiagram extends Diagram {
                     { 'linear': d.linear_solver, 'nonLinear': d.nonlinear_solver });
                 return `${solver_class} solver_group ${self.style.getNodeClass(d)}`;
             })
-            .on("click", function(e,d) {self.leftClickSelector(e, this, d)})
-            .on("contextmenu", function (e,d) { self.ui.rightClick(e, d)})
-            .on("mouseover", function(e,d) {
-                self.ui.nodeInfoBox.update(e, d, d3.select(this).select('rect').style('fill'), true);
+            .on("click", (e,d) => self.leftClickSelector(e, d))
+            .on("contextmenu", (e,d) => self.ui.rightClick(e, d))
+            .on("mouseover", (e,d) => {
+                self.ui.showInfoBox(e, d);
 
                 if (self.model.abs2prom != undefined) {
                     if (d.isInput()) {
@@ -132,14 +132,14 @@ class OmDiagram extends Diagram {
                 }
             })
             .on("mouseleave", () => {
-                self.ui.nodeInfoBox.clear();
+                self.ui.removeInfoBox();
 
                 if (self.model.abs2prom != undefined) {
                     self.dom.toolTip.style("visibility", "hidden");
                 }
             })
-            .on("mousemove", (e) => {
-                self.ui.nodeInfoBox.moveNearMouse(e);
+            .on("mousemove", e => {
+                self.ui.moveInfoBox(e);
 
                 if (self.model.abs2prom != undefined) {
                     self.dom.toolTip.style("top", (e.pageY - 30) + "px")

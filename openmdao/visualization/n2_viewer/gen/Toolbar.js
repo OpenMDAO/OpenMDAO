@@ -202,12 +202,12 @@ class Toolbar {
 
         this._addButton(new ToolbarButtonToggle('#info-button', tooltipBox,
             ["Hide detailed node information", "Show detailed node information"],
-            () => { return ui.nodeInfoBox.active; },
+            () => { return ui.click.isNodeInfo; },
             () => { ui.click.toggle('nodeinfo'); })).setHelpInfo("Select left-click action");
 
         this._addButton(new ToolbarButtonToggle('#info-button-2', tooltipBox,
             ["Hide detailed node information", "Show detailed node information"],
-            () => { return ui.nodeInfoBox.active; },
+            () => { return ui.click.isNodeInfo; },
             (e, target) => {
                 ui.click.toggle('nodeinfo');
                 self._setRootButton(target);

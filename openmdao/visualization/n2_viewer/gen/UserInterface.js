@@ -1,6 +1,7 @@
 // <<hpp_insert gen/ClickHandler.js>>
-// <<hpp_insert src/OmToolbar.js>>
+// <<hpp_insert gen/Toolbar.js>>
 // <<hpp_insert gen/ChildSelectDialog.js>>
+// <<hpp_insert gen/NodeInfo.js>>
 
 /**
  * Handle input events for the matrix and toolbar.
@@ -30,25 +31,77 @@ class UserInterface {
         this.leftClickIsForward = true;
         this.findRootOfChangeFunction = null;
         this.callSearchFromEnterKeyPressed = false;
-        this.desVars = true;
+        this.nodeInfoBox = null;
 
         this.backButtonHistory = [];
         this.forwardButtonHistory = [];
 
+        this._init();
         this._setupCollapseDepthSlider();
         this.updateClickedIndices();
         this._setupSearch();
         this._setupResizerDrag();
         this._setupWindowResizer();
+        this.click = new ClickHandler();
 
         this.legend = new N2Legend(this.diag.modelData);
-        this.nodeInfoBox = new NodeInfo(this);
-        this.click = new ClickHandler(this.nodeInfoBox);
-        this.toolbar = new OmToolbar(this);
 
         // Add listener for reading in a saved view.
         const self = this;
         d3.select('#state-file-input').on('change', function(e) { self.loadView(e, self); });
+    }
+
+    /**
+     * Separate these calls from the constructor so that subclasses can
+     * set values before execution.
+     */
+    _init() {
+        this.toolbar = new Toolbar(this);
+    }
+
+    /**
+     * Create a new node info window.
+     * @param {Selection} svgNodeGroup Placeholder for subclasses.
+     */
+    _newInfoBox(svgNodeGroup) { 
+        this.nodeInfoBox = new NodeInfo(this);
+    }
+
+    /**
+     * If node info mode is active, create a new node info window, populate, and display it.
+     * @param {Event} event The Event object created by the trigger.
+     * @param {TreeNode} node The node associated with the HTML object.
+     * @param {String} [color = null] The color of the titlebard. Autoselected if null.
+     */
+    showInfoBox(event, node, color = null) {
+        if (this.click.isNodeInfo) {
+            const svgNodeGroup = d3.select(event.currentTarget);
+            if (!color) color = svgNodeGroup.select('rect').style('fill');
+
+            this._newInfoBox(svgNodeGroup);
+            this.nodeInfoBox.activate();
+            this.click.update(this.nodeInfoBox);
+            this.nodeInfoBox.update(event, node, color);
+        }
+    }
+
+    /** Hide and destroy the node info window */
+    removeInfoBox() {
+        if (this.nodeInfoBox) {
+            this.nodeInfoBox.clear();
+            delete this.nodeInfoBox;
+            this.nodeInfoBox = null;
+        }
+    }
+
+    /** Move the node info window near the mouse if node info mode is active */
+    moveInfoBox(e) {
+        if (this.nodeInfoBox) { this.nodeInfoBox.moveNearMouse(e); }        
+    }
+
+    /** Create a persistent node info window if node info mode is active */
+    pinInfoBox() {
+        if (this.nodeInfoBox) { this.nodeInfoBox.pin(); }
     }
 
     /**
