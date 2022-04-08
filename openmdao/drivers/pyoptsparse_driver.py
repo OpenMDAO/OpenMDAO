@@ -29,6 +29,7 @@ from openmdao.utils.class_util import WeakMethodWrapper
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 from openmdao.utils.general_utils import _src_or_alias_name
+from openmdao.utils.mpi import MPI
 
 
 # names of optimizers that use gradients
@@ -211,6 +212,8 @@ class pyOptSparseDriver(Driver):
                              desc='Name of optimizers to use')
         self.options.declare('title', default='Optimization using pyOpt_sparse',
                              desc='Title of this optimization run')
+        self.options.declare('print_opt_prob', types=bool, default=False,
+                             desc='Print the opt problem summary before running the optimization')
         self.options.declare('print_results', types=bool, default=True,
                              desc='Print pyOpt results if True')
         self.options.declare('gradient method', default='openmdao',
@@ -453,6 +456,12 @@ class pyOptSparseDriver(Driver):
         for option, value in self.opt_settings.items():
             opt.setOption(option, value)
 
+        # Print the pyoptsparse optimization problem summary before running the optimization.
+        # This allows users to confirm their optimization setup.
+        if self.options['print_opt_prob']:
+            if not MPI or model.comm.rank == 0:
+                print(opt_prob)
+
         self._exc_info = None
         try:
 
@@ -496,7 +505,8 @@ class pyOptSparseDriver(Driver):
 
         # Print results
         if self.options['print_results']:
-            print(sol)
+            if not MPI or model.comm.rank == 0:
+                print(sol)
 
         # Pull optimal parameters back into framework and re-run, so that
         # framework is left in the right final state

@@ -1,11 +1,9 @@
 /**
  * Create a clone of the #window-template defined in index.html and provide
  * management functions such as setting size, position, ribbon color, etc.
- * @typedef N2Window
+ * @typedef Window
  */
-class N2Window {
-
-
+class Window {
     /**
      * Clone the template window defined in index.html, setup some
      * references to various elements.
@@ -19,8 +17,8 @@ class N2Window {
             .clone(true)
             .attr('id', newId ? newId : 'n2win' + uuidv4());
 
-        if (!N2Window.container) {
-            N2Window.container = d3.select('#n2-windows');
+        if (!Window.container) {
+            Window.container = d3.select('#n2-windows');
         }
 
         this._main = this._window.select('.main-window'); // Not referenced very often
@@ -49,10 +47,10 @@ class N2Window {
     /**
      * Compute the position of all four sides of the window relative to the container.
      * CAUTION: This only works correctly for a displayed element.
-     * @param {Object} [container = N2Window.container.node()] HTML element containing window.
+     * @param {Object} [container = Window.container.node()] HTML element containing window.
      * @returns {Object} Each key represents the position in pixels.
      */
-    _getPos(container = N2Window.container.node()) {
+    _getPos(container = Window.container.node()) {
         const parentPos = container.getBoundingClientRect(),
             childPos = this.window.node().getBoundingClientRect();
 
@@ -86,7 +84,7 @@ class N2Window {
     /**
      * Update the window geometry with new info.
      * @param {Object} newPos Contains the bounding box data.
-     * @returns {N2Window} Reference to this.
+     * @returns {Window} Reference to this.
      */
     _setPos(newPos) {
         // All of the values need to be set because some may have started as "auto"
@@ -113,12 +111,12 @@ class N2Window {
      * Make the window the highest z-index we know of, and increment that afterwards.
      * @param {Boolean} force Do it even if the current z-index is already highest.
      * @param {Number} [inc = 1] The amount to increase z-index by.
-     * @returns {N2Window} Reference to this.
+     * @returns {Window} Reference to this.
      */
     bringToFront(force = false, inc = 1) {
-        if (force || this.window.style('z-index') < N2Window.zIndex) {
-            N2Window.zIndex += inc;
-            this.window.style('z-index', N2Window.zIndex);
+        if (force || this.window.style('z-index') < Window.zIndex) {
+            Window.zIndex += inc;
+            this.window.style('z-index', Window.zIndex);
         }
 
         return this;
@@ -126,7 +124,7 @@ class N2Window {
 
     /**
      * Make the window visible.
-     * @returns {N2Window} Reference to this.
+     * @returns {Window} Reference to this.
      */
     show() {
         this.hidden = false;
@@ -135,7 +133,7 @@ class N2Window {
 
     /**
      * Make the window invisible.
-     * @returns {N2Window} Reference to this.
+     * @returns {Window} Reference to this.
      */
     hide() {
         this.hidden = true;
@@ -144,7 +142,7 @@ class N2Window {
 
     /**
      * If window is visible, hide it; if it's hidden, show it.
-     * @returns {N2Window} Reference to this.
+     * @returns {Window} Reference to this.
      */
     toggle() {
         if (this.hidden) this.show();
@@ -194,7 +192,7 @@ class N2Window {
      * properties: title, theme.
      * @param {String} opt The name of the style/property to set
      * @param {String} val The value to set it to.
-     * @returns {N2Window} Reference to this.
+     * @returns {Window} Reference to this.
      */
     set(opt, val) {
         switch (opt) {
@@ -214,7 +212,7 @@ class N2Window {
     /**
      * Iterate over a list of styles/properties w/values and set them.
      * @param {Object} options Dictionary of style/value pairs.
-     * @returns {N2Window} Reference to this.
+     * @returns {Window} Reference to this.
      */
     setList(options) {
         for (const optName in options) {
@@ -233,7 +231,7 @@ class N2Window {
 
     /**
      * Make the close button invisibile.
-     * @returns {N2Window} Reference to this.
+     * @returns {Window} Reference to this.
      */
     hideCloseButton() {
         this.closeButton.classed('window-inactive', true);
@@ -242,7 +240,7 @@ class N2Window {
 
     /**
      * Make the close button visibile.
-     * @returns {N2Window} Reference to this.
+     * @returns {Window} Reference to this.
      */
     showCloseButton() {
         this.closeButton.classed('window-inactive', false);
@@ -251,7 +249,7 @@ class N2Window {
 
     /** Set the text in the footer ribbon.
      * @param {String} [footerText = null] If not empty, set the text in the footer.
-     * @returns {N2Window} Reference to this.
+     * @returns {Window} Reference to this.
      */
     footerText(newText = null) {
         this.footer.select('span').text(newText);
@@ -266,7 +264,7 @@ class N2Window {
     /**
      * Change the color of both the header and footer
      * @param {String} color An HTML-compatible color value
-     * @returns {N2Window} Reference to this.
+     * @returns {Window} Reference to this.
      */
     ribbonColor(color) {
         this.header.style('background-color', color);
@@ -281,7 +279,7 @@ class N2Window {
      *   the right. If negative, set the right property to this and adjust left.
      * @param {Number} y If positive, set the top property to this and adjust
      *   the bottom. If negative, set the bottom property to this and adjust top.
-     * @returns {N2Window} Reference to this.
+     * @returns {Window} Reference to this.
      */
     move(x, y) {
         let pos = this._getPos(d3.select('body').node());
@@ -312,7 +310,7 @@ class N2Window {
      * Relocate the window to a position near the mouse
      * @param {Object} event The triggering event containing the position.
      * @param {Number} [offset = 15] Distance from mouse to place window.
-     * @returns {N2Window} Reference to this.
+     * @returns {Window} Reference to this.
      */
     moveNearMouse(event, offset = 15) {
         let pos = this._getPos();
@@ -349,7 +347,7 @@ class N2Window {
      * This should be called anytime content is added and the size is expected to change.
      * TODO: Create a flag and event handler to do this automatically, maybe via
      * MutationObserver.
-     * @returns {N2Window} Reference to this.
+     * @returns {Window} Reference to this.
      */
     sizeToContent(extraWidth = 0, extraHeight = 2) {
         let contentWidth = this.body.node().scrollWidth + extraWidth,
@@ -381,7 +379,7 @@ class N2Window {
         if (enable) {
             this.bringToFront(true, 2);
             modalDiv.attr('style', style)
-                .style('z-index', N2Window.zIndex - 1)
+                .style('z-index', Window.zIndex - 1)
                 
         }
         else {
@@ -433,264 +431,5 @@ class N2Window {
  * above 100, and even extreme cases (e.g. a diagram that's been in use
  * for weeks with lots of windows) shouldn't get above a few thousand.
  */
-N2Window.zIndex = 1000;
-N2Window.container = null;
-
-/**
- * Extends N2Window by allowing the window to be dragged with a mousedown on the header/title.
- * @typedef N2WindowDraggable
- */
-class N2WindowDraggable extends N2Window {
-    /** Execute the base class constructor and set up drag event handler */
-    constructor(newId = null, cloneId = null) {
-        super(newId, cloneId);
-        this.boundaryMargin = 10;
-        this._setupDrag();
-    }
-
-    /** Remove the mousedown event handler and call the superclass close() */
-    close(e) {
-        this.header.on('mousedown', null);
-        super.close(e);
-    }
-
-    _doDragHeader(e) { this._doDrag(e, '.window-header'); }
-    _doDragFooter(e) { this._doDrag(e, '.window-footer'); }
-
-    /** Prevent the window from being dragged off the left or right of the browser. */
-    _applyHorizontalBounds(testX) {
-        return (testX < this.boundaryMargin ?
-            this.boundaryMargin : 
-                    (testX > window.innerWidth - this.boundaryMargin?
-                        window.innerWidth - this.boundaryMargin : testX));
-    }
-
-    /** Prevent the window from being dragged off the top or bottom of the browser. */
-    _applyVerticalBounds(testY) {
-        return (testY < this.boundaryMargin ?
-            this.boundaryMargin : 
-                    (testY > window.innerHeight - this.boundaryMargin?
-                        window.innerHeight - this.boundaryMargin : testY));
-    }
-
-    /** 
-     * Perform the dragging operation on either header or footer. The start of the event
-     * also brings the window to the front.
-     */
-    _doDrag(e, ribbonClass) {
-        const self = this;
-        const dragDiv = self.window;
-
-        self.bringToFront();
-        dragDiv.style('cursor', 'grabbing')
-            .select(ribbonClass).style('cursor', 'grabbing');
-
-        const dragStart = [e.pageX, e.pageY];
-        let newTrans = [0, 0];
-
-        const w = d3.select(window)
-            .on("mousemove", e => {
-                const x = self._applyHorizontalBounds(e.pageX),
-                    y = self._applyVerticalBounds(e.pageY);
-                newTrans = [x - dragStart[0], y - dragStart[1]];
-                dragDiv.style('transform', `translate(${newTrans[0]}px, ${newTrans[1]}px)`)
-            })
-            .on("mouseup", () => {
-                // Convert the translate to style position
-                self._setPos(self._getPos());
-
-                dragDiv.style('cursor', 'auto')
-                    .style('transform', null)
-                    .select(ribbonClass)
-                    .style('cursor', 'grab');
-
-                // Remove event listeners
-                w.on("mousemove", null).on("mouseup", null);
-            });
-
-        e.preventDefault();
-    }
-
-    /** Listen for the mousedown event to begin dragging the window. */
-    _setupDrag() {
-        const self = this;
-
-        this.header
-            .classed('window-draggable-ribbon', true)
-            .on('mousedown', self._doDragHeader.bind(self));
-
-        this.footer
-            .classed('window-draggable-ribbon', true)
-            .on('mousedown', self._doDragFooter.bind(self));
-    }
-}
-
-/**
- * Extends N2WindowDraggable by setting up 8 divs around the perimeter of the window
- * that change the cursor with mouseover, and allow resizing with mousedown.
- * @typedef N2WindowDraggable
- */
-class N2WindowResizable extends N2WindowDraggable {
-    constructor(newId = null, cloneId = null, sizeOpts = {}) {
-        super(newId, cloneId);
-
-        this.min = {
-            width: exists(sizeOpts.minWidth) ? sizeOpts.minWidth : 200,
-            height: exists(sizeOpts.minHeight) ? sizeOpts.minHeight : 200
-        };
-
-        this.max = {
-            width: exists(sizeOpts.maxWidth) ? sizeOpts.maxWidth : window.innerWidth,
-            height: exists(sizeOpts.maxHeight) ? sizeOpts.maxHeight : window.innerHeight
-        };
-
-        this._setupResizers();
-    }
-
-    // Read-only getters
-    get minWidth() { return this.min.width; }
-    get minHeight() { return this.min.height; }
-    get maxWidth() { return this.max.width; }
-    get maxHeight() { return this.max.height; }
-
-    // Write-only setters
-    set minWidth(val) { this.min.width = val; }
-    set minHeight(val) { this.min.height = val; }
-    set maxWidth(val) { this.max.width = val; }
-    set maxHeight(val) { this.max.height = val; }
-
-    /**
-     * Set the cursor for all elements to the specified value, for the purpose
-     * of resizing the window and not having the cursor change every time another
-     * element is hovered.
-     * @param {String} cursor The new value of the cursor.
-     */
-    _lockCursor(cursor) {
-        this.header.style('cursor', cursor);
-        this.window.style('cursor', cursor);
-        this.window.select('.window-close-button').style('cursor', cursor);
-        this.resizerDiv.selectAll('div').style('cursor', cursor);        
-
-        return this;
-    }
-
-    /**
-     * Add event handlers for each of the 8 resizer elements surrounding the window.
-     */
-    _setupResizers() {
-        const self = this;
-
-        const resizerClassNames = {
-            'top': 'horizontal',
-            'top-right': 'corner',
-            'right': 'vertical',
-            'bottom-right': 'corner',
-            'bottom': 'horizontal',
-            'bottom-left': 'corner',
-            'left': 'vertical',
-            'top-left': 'corner'
-        }
-
-        // Add div to contain the 8 resizer elements
-        this.resizerDiv = this.window.select('.main-window')
-            .append('div')
-            .attr('class', 'resize');
-
-        // For each side, 'mult' refers to whether a coordinate is to be added or subtracted.
-        // 'idx' refers to the index of the delta x or y value of the new mouse position.
-        // 'dir' is the direction name to check for the min/max size.
-        const dirVals = {
-            top: { mult: 1, idx: 1, dir: 'height' },
-            right: { mult: -1, idx: 0, dir: 'width' },
-            bottom: { mult: -1, idx: 1, dir: 'height' },
-            left: { mult: 1, idx: 0, dir: 'width' }
-        }
-
-        // Set up a mousedown event listener for each of the 8 elements.
-        for (const name in resizerClassNames) {
-            // Add the div that the resizer mouse event handler will be on
-            const resizer = this.resizerDiv.append('div')
-                // Class style settings determine where each div is positioned
-                .attr('class', `rsz-${name} rsz-${resizerClassNames[name]}`);
-
-            const dirs = name.split('-'); // From class name, figure out which directions to handle
-            resizer.on('mousedown', e => {
-                const startDims = self._getPos();
-                self.bringToFront();
-
-                const cursor = resizer.style('cursor');
-                self.modal(true, `background-color: none; opacity: 0; cursor: ${cursor};`)
-                    ._lockCursor(cursor);
-
-                const dragStart = [e.pageX, e.pageY];
-                let newPos = [0, 0]; // Delta values of the current mouse position vs. start position
-                let newSize = {}; // Object to store newly computed positions in
-
-                const w = d3.select(window)
-                    .on("mousemove", e => {
-                        e.stopPropagation();
-                        e.preventDefault();
-
-                        newPos = [e.pageX - dragStart[0], e.pageY - dragStart[1]];
-                        Object.assign(newSize, startDims)
-
-                        for (let i in dirs) { // One iter for straight, two for diag
-                            const dv = dirVals[dirs[i]],
-                                startPos = startDims[dirs[i]],
-                                startSize = startDims[dv.dir];
-
-                            // Calculate the amount the dimension can change to without
-                            // violating the set width or height limits of the window.
-                            const dimMin = Math.max(0, startPos + startSize - self.min[dv.dir]),
-                                dimMax = Math.max(0, startPos + startSize - self.max[dv.dir]);
-
-                            // Calculate the new potential position of the edge from the
-                            // original position and the current position of the mouse.
-                            const newVal = startPos + (newPos[dv.idx] * dv.mult);
-
-                            // Make sure the edge won't move beyond its limits.
-                            if (newVal > startPos) { // Decreasing size (farther from window edge)
-                                newSize[dirs[i]] = newVal > dimMin ? dimMin : newVal;
-                            }
-                            else { // Increasing size (closer to window edge)
-                                newSize[dirs[i]] = newVal < dimMax ? dimMax : newVal;
-                            }
-                        }
-                        newSize.width = startDims.parentWidth - (newSize.right + newSize.left);
-                        newSize.height = startDims.parentHeight - (newSize.top + newSize.bottom);
-
-                        self._setPos(newSize);
-                    })
-                    .on("mouseup", () => {
-                        w.on("mousemove", null).on("mouseup", null);
-                        self.modal(false);
-                        self._lockCursor(null);
-                    });
-
-            });
-        }
-    }
-}
-
-function wintest() {
-    const content = '<p style="margin: 10px; padding: 10px; border: 25px solid red; ">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed justo mauris, porttitor sed nibh non, interdum aliquet tellus. Duis eget est lectus. In ultrices finibus semper. Nullam dictum, tortor non placerat convallis, nibh diam sagittis risus, non ultricies diam nisi nec neque. Phasellus dapibus convallis metus. Proin cursus, metus quis ullamcorper suscipit, neque mauris dictum ex, a mattis velit lorem ac erat. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Praesent a ligula ut arcu rutrum venenatis. Morbi nec sapien turpis. Nunc tincidunt maximus venenatis. Phasellus facilisis imperdiet velit, nec cursus elit tincidunt pretium. Duis ligula metus, rutrum nec ullamcorper a, pretium eu massa. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam condimentum, urna in congue dignissim, mi risus maximus lectus, interdum cursus neque turpis sed libero. Cras iaculis ornare accumsan. Sed tempor pretium est, eget aliquam purus feugiat ac.</p>';
-    myWin = new N2Window();
-    myWin.setList({ width: '300px', height: '300px', title: 'This is a very, very, very, very long title indeed', top: '100px', left: '10px' });
-    myWin.show();
-    myWin.body.html(content);
-    myWin.sizeToContent();
-
-    myWin2 = new N2WindowDraggable();
-    myWin2.setList({ width: '300px', height: '300px', title: 'Draggable Window', top: '100px', left: '350px' });
-    myWin2.show();
-    myWin2.body.html(content);
-    myWin2.sizeToContent();
-
-    myWin3 = new N2WindowResizable(null, null, { maxWidth: 500, maxHeight: 1000 });
-    myWin3.theme('value-info');
-    myWin3.setList({ width: '300px', height: '300px', title: 'Resizable Window', top: '100px', left: '700px' });
-    myWin3.show();
-    myWin3.body.html(content);
-    myWin3.sizeToContent();
-
-}
+Window.zIndex = 1000;
+Window.container = null;

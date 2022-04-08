@@ -1,11 +1,11 @@
 /**
- * Manage the search functions for N2, which uses the Awesomplete widget from
+ * Manage the search functions for the diagram, which uses the Awesomplete widget from
  * https://leaverou.github.io/awesomplete/
- * @typedef N2Search
+ * @typedef Search
  */
-class N2Search {
+class Search {
     /**
-     * Initialize N2Search object properties and Awesomeplete.
+     * Initialize Search object properties and Awesomeplete.
      * @param {OmTreeNode} zoomedElement The selected node in the model tree.
      * @param {OmTreeNode} root The base element of the model tree.
      */
@@ -90,7 +90,7 @@ class N2Search {
 
     /**
      * Add a couple of event listeners that are easier to do from here
-     * than in N2UserInterface.
+     * than in UserInterface.
      */
     _addEventListeners() {
         const self = this;
@@ -197,7 +197,7 @@ class N2Search {
      * @param {Event} e The object describing the keypress event.
      */
     searchInputEventListener(e) {
-        testThis(this, 'N2Search', 'searchInputEventListener');
+        testThis(this, 'Search', 'searchInputEventListener');
 
         const target = e.target;
 
