@@ -285,6 +285,48 @@ class TestDiscreteScalingReport(unittest.TestCase):
         # generate scaling report
         prob.driver.scaling_report(show_browser=False)
 
+    def test_bug_2494(self):
+        # see Issue #2494, bug in scaling_report was causing damaging side effect
+        class OMGroup(om.Group):
+            def setup(self):
+                ivc = self.add_subsystem("indep_vars", om.IndepVarComp(), promotes=["*"])
+                ivc.add_output("length", val=0.0, desc="Length")
+                ivc.add_output("width",val=0.0, desc="Width")
+
+                self.add_subsystem("comp",OMComponent(),  promotes=["*"])
+
+        class OMComponent(om.ExplicitComponent):
+            def setup(self):
+                self.add_discrete_input("definition", val=1, desc="Flag")
+                self.add_input("length", val=0.0, desc="Length")
+                self.add_input("width", val=0.0, desc="Width")
+
+                self.add_output("area", val=0.0, desc="Area")
+
+            def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+                if discrete_inputs['definition'] == 0:
+                    outputs["area"] = inputs['length'] * inputs['width']
+                else:
+                    outputs["area"] = 2.* inputs['length'] * inputs['width']
+
+        myopt = om.Problem(model=OMGroup(), driver=om.ScipyOptimizeDriver())
+
+        myopt.model.approx_totals(method="fd")
+        myopt.model.add_objective("area")
+        myopt.model.add_design_var("length",lower=0,upper=10)
+
+        myopt.setup()
+
+        myopt["width"] = 3.
+        myopt["length"] = 2.
+        myopt.run_driver()
+
+        # generate scaling report
+        myopt.driver.scaling_report(show_browser=False)
+
+        # verify access to discrete value
+        self.assertEqual(myopt["definition"], 1)
+
 
 if __name__ == '__main__':
     unittest.main()
