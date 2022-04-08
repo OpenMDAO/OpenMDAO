@@ -1,13 +1,17 @@
 // <<hpp_insert gen/Layout.js>>
+// <<hpp_insert gen/ClickHandler.js>>
+// <<hpp_insert gen/UserInterface.js>>
+// <<hpp_insert gen/ArrowManager.js>>
+// <<hpp_insert gen/Search.js>>
 
 /**
- * Manage all components of the application. The model data, the CSS styles, the
+ * Manage all pieces of the application. The model data, the CSS styles, the
  * user interface, the layout of the matrix, and the matrix grid itself are
  * all member objects.
  * @typedef Diagram
  * @property {ModelData} model Processed model data received from Python.
- * @property {N2Style} style Manages N2-related styles and functions.
- * @property {N2Layout} layout Sizes and positions of visible elements.
+ * @property {OmStyle} style Manages N2-related styles and functions.
+ * @property {Layout} layout Sizes and positions of visible elements.
  * @property {N2Matrix} matrix Manages the grid of visible model parameters.
  * @property {TreeNode} zoomedElement The element the diagram is currently based on.
  * @property {TreeNode} zoomedElementPrev Reference to last zoomedElement.
@@ -47,14 +51,14 @@ class Diagram {
      * set values before execution.
      */
     _init() {
-        this.style = new N2Style(this.dom.svgStyle, this.dims.size.font);
+        this.style = new Style(this.dom.svgStyle, this.dims.size.font);
         this.layout = this._newLayout();
 
-        this.search = new N2Search(this.zoomedElement, this.model.root);
-        this.ui = new N2UserInterface(this);
+        this.search = new Search(this.zoomedElement, this.model.root);
+        this.ui = new UserInterface(this);
 
         // Keep track of arrows to show and hide them
-        this.arrowMgr = new N2ArrowManager(this.dom.n2Groups);
+        this.arrowMgr = new ArrowManager(this.dom.n2Groups);
         this.matrix = new N2Matrix(this.model, this.layout, this.dom.n2Groups,
             this.arrowMgr, true, this.ui.findRootOfChangeFunction);
     }
@@ -196,13 +200,13 @@ class Diagram {
      */
     leftClickSelector(e, obj, node) {
         switch (this.ui.click.clickEffect) {
-            case N2Click.ClickEffect.NodeInfo:
+            case ClickHandler.ClickEffect.NodeInfo:
                 this.ui.nodeInfoBox.pin();
                 break;
-            case N2Click.ClickEffect.Collapse:
+            case ClickHandler.ClickEffect.Collapse:
                 this.ui.rightClick(e, node, obj);
                 break;
-            case N2Click.ClickEffect.Filter:
+            case ClickHandler.ClickEffect.Filter:
                 const color = d3.select(obj).select('rect').style('fill');
                 this.ui.altRightClick(e, node, color);
                 break;

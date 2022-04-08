@@ -1,27 +1,28 @@
+// <<hpp_insert gen/SymbolType.js>>
+
 /**
- * @typedef {Object} SymbolType
+ * @typedef {Object} OmSymbolType
  * @property {string} name What the symbol is called.
  * @property {Boolean} declaredPartial Whether the symbol is a declared partial.
  */
-class SymbolType {
+class OmSymbolType extends SymbolType {
 
     /**
      * Determine the name and whether it's a declared partial based on info
      * from the provided node.
      * @param {N2MatrixCell} cell The object to select the type from.
-     * @param {ModelData} model Reference to the model to get some info from it.
+     * @param {OmModelData} model Reference to the model to get some info from it.
      */
     constructor(cell, model) {
-        this.name = null;
+        super(cell, model);
+    }
 
+    _init() {
         // Indicates that the type of symbol CAN be a declared partial
         // AND both source and target objects are part of the same component.
         this.potentialDeclaredPartial = false;
 
         this.declaredPartial = false;
-
-        // Update properties based on the the referenced node.
-        this.getType(cell, model);
     }
 
     /**

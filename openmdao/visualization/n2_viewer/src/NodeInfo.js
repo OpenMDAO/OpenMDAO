@@ -1,3 +1,5 @@
+// <<hpp_insert gen/WindowResizable.js>>
+
 /**
  * Manage info for each node metadata property
  * @typedef InfoPropDefault
@@ -271,7 +273,7 @@ InfoPropArray.floatFormatter = d3.format('g');
  * Manage a window for displaying the value of a variable.
  * @typedef ValueInfo
  */
-class ValueInfo extends N2WindowResizable {
+class ValueInfo extends WindowResizable {
 
     /**
      * Add a new value window if it doesn't already exist.
@@ -411,7 +413,7 @@ ValueInfo.existingValueWindows = {};
  * visible or not.
  * @typedef NodeInfo
  */
-class NodeInfo extends N2Window {
+class NodeInfo extends Window {
     /**
      * Build a list of the properties we care about and set up
      * references to the HTML elements.
@@ -563,7 +565,7 @@ class NodeInfo extends N2Window {
  * Make a persistent copy of the NodeInfo panel and handle its drag/close events
  * @typedef PersistentNodeInfo
  */
-class PersistentNodeInfo extends N2WindowDraggable {
+class PersistentNodeInfo extends WindowDraggable {
     constructor(nodeInfo) {
         super('persistentNodeInfo-' + uuidv4(), '#' + nodeInfo.window.attr('id'));
 

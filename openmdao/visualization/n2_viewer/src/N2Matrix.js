@@ -11,7 +11,7 @@
  * @property {Object} prevNodeSize Width and height of each node in the previous matrix.
  * @property {Object[][]} grid Object keys corresponding to rows and columns.
  * @property {Array} visibleCells One-dimensional array of all cells, for D3 processing.
- * @property {Array} boxInfo Component box dimensions.
+ * @property {Array} boxInfo Variable box dimensions.
  */
 class N2Matrix {
     /**
@@ -19,7 +19,7 @@ class N2Matrix {
      * @param {ModelData} model The pre-processed model data.
      * @param {N2Layout} layout Pre-computed layout of the diagram.
      * @param {Object} n2Groups References to <g> SVG elements created by N2Diagram.
-     * @param {N2ArrowManager} arrowMgr Object to create and manage conn. arrows.
+     * @param {ArrowManager} arrowMgr Object to create and manage conn. arrows.
      * @param {Boolean} lastClickWasLeft
      * @param {function} findRootOfChangeFunction
      */
@@ -54,7 +54,7 @@ class N2Matrix {
         this.updateLevelOfDetailThreshold(layout.size.n2matrix.height);
 
         this._buildGrid();
-        this._setupComponentBoxesAndGridLines();
+        this._setupVariableBoxesAndGridLines();
     }
 
     get cellDims() { return N2CellRenderer.dims; }
@@ -329,7 +329,7 @@ class N2Matrix {
     /**
      * Determine the size of the boxes that will enclose the variables of each component.
      */
-    _setupComponentBoxesAndGridLines() {
+    _setupVariableBoxesAndGridLines() {
         let currentBox = {
             "startI": 0,
             "stopI": 0
@@ -337,7 +337,7 @@ class N2Matrix {
 
         this.boxInfo = [currentBox];
 
-        // Find which component box each of the variables belong in,
+        // Find which variable box each of the variables belong in,
         // while finding the bounds of that box. Top and bottom
         // rows recorded for each node in this.boxInfo[].
         for (let ri = 1; ri < this.diagNodes.length; ++ri) {
@@ -358,8 +358,8 @@ class N2Matrix {
         }
 
         // Step through this.boxInfo[] and record one set of dimensions
-        // for each box in this.componentBoxInfo[].
-        this.componentBoxInfo = [];
+        // for each box in this.variableBoxInfo[].
+        this.variableBoxInfo = [];
         for (let i = 0; i < this.boxInfo.length; ++i) {
             let box = this.boxInfo[i];
             if (box.startI == box.stopI) continue;
@@ -369,7 +369,7 @@ class N2Matrix {
             }
             box.obj = curNode.parentComponent;
             i = box.stopI;
-            this.componentBoxInfo.push(box);
+            this.variableBoxInfo.push(box);
         }
 
         //do this so you save old index for the exit()
@@ -574,15 +574,13 @@ class N2Matrix {
     }
 
     /** Draw boxes around the cells associated with each component. */
-    _drawComponentBoxes() {
+    _drawVariableBoxes() {
         const self = this; // For callbacks that change "this". Alternative to using .bind().
 
-        const selection = self.n2Groups.componentBoxes.selectAll(".component_box")
-            .data(self.componentBoxInfo, function (d) {
-                return d.obj.id;
-            });
+        const selection = self.n2Groups.variableBoxes.selectAll(".variable_box")
+            .data(self.variableBoxInfo, d => d.obj.id);
         const gEnter = selection.enter().append("g")
-            .attr("class", "component_box")
+            .attr("class", "variable_box")
             .attr("transform", function (d) {
                 if (self.lastClickWasLeft) return "translate(" +
                     (self.prevCellDims.size.width * (d.startI - enterIndex)) + "," +
@@ -670,7 +668,7 @@ class N2Matrix {
             this.n2Groups.gridlines.selectAll('.horiz_line').remove();
             this.n2Groups.gridlines.selectAll(".vert_line").remove();
         }
-        this._drawComponentBoxes();
+        this._drawVariableBoxes();
 
         stopTimer('N2Matrix.draw');
 
@@ -726,7 +724,7 @@ class N2Matrix {
                             'row': cell.row,
                             'id': cell.tgtObj.id
                         },
-                        'color': N2Style.color.outputArrow,
+                        'color': OmStyle.color.outputArrow,
                     });
 
                     highlights.push({
@@ -750,7 +748,7 @@ class N2Matrix {
                             'row': cell.row,
                             'id': cell.tgtObj.id
                         },
-                        'color': N2Style.color.inputArrow,
+                        'color': OmStyle.color.inputArrow,
                     });
 
                     highlights.push({
@@ -811,7 +809,7 @@ class N2Matrix {
                     'id': this.grid[arrow.end][arrow.end].tgtObj.id
                 },
                 'color': (startIndex < endIndex) ?
-                    N2Style.color.outputArrow : N2Style.color.inputArrow,
+                    OmStyle.color.outputArrow : OmStyle.color.inputArrow,
             });
         }
     }
@@ -835,7 +833,7 @@ class N2Matrix {
                 'row': cell.col,
                 'id': cell.tgtObj.id
             },
-            'color': N2Style.color.inputArrow,
+            'color': OmStyle.color.inputArrow,
         });
 
         /* Cycle arrows are only drawn in the bottom triangle of the diagram */
