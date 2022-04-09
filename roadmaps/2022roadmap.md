@@ -34,9 +34,13 @@ The focus on various Jupyter notebook based tools should help this effort signif
 ### General performance improvments
 
 We've made strides on improving performance.  In particular, total derivative coloring is substantially cheaper.
+
+Metamodel interpolation has been a consistent bottleneck, largely due to allowing a variable number of dimensions for each interpolant.
+By developing a series of fixed-dimension interpolants for structured data, we've been able to achieve considerably faster interpolation and differentiation.
+
 While not on the 2021 roadmap, the new function wrapping capability is a big deal that lowers the barrier to entry for OpenMDAO.
 Users no longer need to rewrite their existing functions as OpenMDAO components, and can put the `omf` function wrappers around them instead.
-This is an avenue to the use of automatic differentiation via Google `jax`
+This is an avenue to the use of automatic differentiation via Google `jax`.
 
 ### No Copy Transfers
 
@@ -61,19 +65,22 @@ Teach users to get a feel for how to debug models when things aren't working.
 
 ### Goal:
 
-Document the use of subproblems to hide complex internal behavior from the higher OpenMDAO model.
-Recent experience has demonstrated that this is a simple way to gain performance by reducing the size of the input/output vectors at the outer level.
+There are two ways in which we can focus on achieving larger monolithic components.
+We've experimented with the use of subproblems and by keeping a lot of their internal data out of the vectors of the outer problem, we've noticed signficant performance increases.
+We will document the use of subproblems.  If it becomes a common pattern, then some sort of official API for them might be warranted, but it's too early to make that call.
 
-Writing trainging and documentation of automatic differentiation in the form of Google's `jax` as well as `sympy` and its lambdify feature.
+Developing training and documentation of automatic differentiation in the form of Google's `jax` as well as `sympy` and its lambdify feature.
 The ability to effectively use automatic differentiation is a prerequesite to computing second derivative information for those optimizers which can utilize it.
 
 ## Large multi-point parallelism
 
 We've continued to push the parallel capability of OpenMDAO and are actively developing larger and larger applications.
+In 2021 we accomplished a major overhaul of some of our distributed memory API.
+As we start to push costlier applications, we're stressing the parallization capabilities that have long-existed in OpenMDAO; distributed components and parallel groups.
 
 ### Goal:
 Leverage the reports system to provide better user feedback on processor utilization when running in parallel.
-Continue to improve parallel performance.
+Continue to improve parallel performance, potentially developing an API for easier control over how processors are distributed on large-scale models.
 
 ## Hessian Information
 
