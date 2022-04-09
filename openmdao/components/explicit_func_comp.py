@@ -1,5 +1,7 @@
 """Define the ExplicitFuncComp class."""
 
+import sys
+import traceback
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
@@ -15,7 +17,10 @@ try:
     from jax.numpy import DeviceArray
     from jax.config import config
     config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
-except ImportError as err:
+except Exception:
+    _, err, tb = sys.exc_info()
+    if not isinstance(err, ImportError):
+        traceback.print_tb(tb)
     jax = None
 
 
