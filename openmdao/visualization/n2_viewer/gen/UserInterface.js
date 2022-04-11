@@ -2,6 +2,7 @@
 // <<hpp_insert gen/Toolbar.js>>
 // <<hpp_insert gen/ChildSelectDialog.js>>
 // <<hpp_insert gen/NodeInfo.js>>
+// <<hpp_insert gen/Legend.js>>
 
 /**
  * Handle input events for the matrix and toolbar.
@@ -44,7 +45,6 @@ class UserInterface {
         this._setupWindowResizer();
         this.click = new ClickHandler();
 
-        this.legend = new N2Legend(this.diag.modelData);
 
         // Add listener for reading in a saved view.
         const self = this;
@@ -56,6 +56,7 @@ class UserInterface {
      * set values before execution.
      */
     _init() {
+        this.legend = new Legend(this.diag.modelData);
         this.toolbar = new Toolbar(this);
     }
 

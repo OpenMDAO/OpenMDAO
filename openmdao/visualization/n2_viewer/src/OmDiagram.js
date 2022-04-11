@@ -23,7 +23,6 @@ class OmDiagram extends Diagram {
         this._init();
     }
 
-
     /**
      * Separate these calls from the constructor so that subclasses can
      * set values before execution.

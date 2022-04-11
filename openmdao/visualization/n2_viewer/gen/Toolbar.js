@@ -1,6 +1,7 @@
 // <<hpp_insert gen/ToolbarButtonClick.js>>
 // <<hpp_insert gen/ToolbarButtonToggle.js>>
 // <<hpp_insert gen/ClickHandler.js>>
+// <<hpp_insert gen/Help.js>
 
 /**
  * Manage the set of buttons and tools at the left of the diagram.
@@ -69,7 +70,7 @@ class Toolbar {
 
     /** Either create the help window the first time or redisplay it */
     _showHelp() {
-        if (!this._helpWindow) this._helpWindow = new N2Help(this.helpInfo);
+        if (!this._helpWindow) this._helpWindow = new Help(this.helpInfo);
         else this._helpWindow.show().modal(true);
     }
 
@@ -267,11 +268,11 @@ class Toolbar {
             .setHelpInfo("Toggle legend");
 
         this._addButton(new ToolbarButtonClick('#question-button', tooltipBox,
-            "Show N2 diagram help",
+            "Display help window",
             (e, target) => { self._showHelp(); self._setRootButton(target); }));
 
         this._addButton(new ToolbarButtonClick('#question-button-2', tooltipBox,
-            "Show N2 diagram help",
+            "Display help window",
             (e, target) => { self._showHelp(); self._setRootButton(target); }));
 
         // Don't add this to the array of tracked buttons because it confuses

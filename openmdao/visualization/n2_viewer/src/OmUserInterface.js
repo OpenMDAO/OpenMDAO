@@ -1,6 +1,7 @@
 // <<hpp_insert gen/UserInterface.js>>
 // <<hpp_insert src/OmToolbar.js>>
 // <<hpp_insert src/OmNodeInfo.js>>
+// <<hpp_insert src/OmLegend.js>>
 
 /**
  * Handle input events for the matrix and toolbar.
@@ -23,6 +24,7 @@ class OmUserInterface extends UserInterface {
      */
     _init() {
         this.desVars = true;
+        this.legend = new OmLegend(this.diag.modelData);
         this.toolbar = new OmToolbar(this);
     }
 
