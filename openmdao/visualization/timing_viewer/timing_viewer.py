@@ -204,6 +204,7 @@ def view_timing(timing_file, outfile='timing_report.html', show_browser=True):
 _view_options = [
     'text',
     'browser',
+    'no_browser',
     'dump',
     'none'
 ]
@@ -218,8 +219,8 @@ def _show_view(timing_file, options):
             ret = view_MPI_timing(timing_file, method=f, out_stream=sys.stdout)
             if ret is None:
                 issue_warning(f"Could find no children of a ParallelGroup running method '{f}'.")
-    elif view == 'browser':
-        view_timing(timing_file, outfile='timing_report.html', show_browser=True)
+    elif view == 'browser' or view == 'no_browser':
+        view_timing(timing_file, outfile='timing_report.html', show_browser=view == 'browser')
     elif view == 'dump':
         view_timing_dump(timing_file, out_stream=sys.stdout)
     elif view == 'none':
