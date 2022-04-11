@@ -2,6 +2,7 @@
 // <<hpp_insert src/OmLayout.js>>
 // <<hpp_insert src/OmStyle.js>>
 // <<hpp_insert src/OmUserInterface.js>>
+// <<hpp_insert src/OmMatrix.js>>
 
 /**
  * Manage all components of the application. The model data, the CSS styles, the
@@ -23,23 +24,6 @@ class OmDiagram extends Diagram {
         this._init();
     }
 
-    /**
-     * Separate these calls from the constructor so that subclasses can
-     * set values before execution.
-     */
-     _init() {
-        this.style = new OmStyle(this.dom.svgStyle, this.dims.size.font);
-        this.layout = this._newLayout();
-
-        this.search = new Search(this.zoomedElement, this.model.root);
-        this.ui = new OmUserInterface(this);
-
-        // Keep track of arrows to show and hide them
-        this.arrowMgr = new ArrowManager(this.dom.n2Groups);
-        this.matrix = new N2Matrix(this.model, this.layout, this.dom.n2Groups,
-            this.arrowMgr, true, this.ui.findRootOfChangeFunction);
-    }
-
     /** Override Diagram._newLayout() to create an OmLayout object. */
     _newLayout() {
         if (this.showLinearSolverNames === undefined)
@@ -50,6 +34,22 @@ class OmDiagram extends Diagram {
 
         return new OmLayout(this.model, this.zoomedElement, this.dims,
             this.showLinearSolverNames, this.showSolvers);
+    }
+
+    _newMatrix(lastClickWasLeft, prevCellSize = null) {
+        return new OmMatrix(this.model, this.layout, this.dom.n2Groups,
+            this.arrowMgr, lastClickWasLeft, this.ui.findRootOfChangeFunction, prevCellSize);
+    }
+
+    /**
+     * Separate these calls from the constructor so that subclasses can
+     * set values before execution.
+     */
+     _init() {
+        this.style = new OmStyle(this.dom.svgStyle, this.dims.size.font);
+        this.layout = this._newLayout();
+        this.ui = new OmUserInterface(this);
+        this.matrix = this._newMatrix(true);
     }
 
     /**

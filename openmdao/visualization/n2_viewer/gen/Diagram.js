@@ -3,6 +3,7 @@
 // <<hpp_insert gen/UserInterface.js>>
 // <<hpp_insert gen/ArrowManager.js>>
 // <<hpp_insert gen/Search.js>>
+// <<hpp_insert gen/Matrix.js>>
 
 /**
  * Manage all pieces of the application. The model data, the CSS styles, the
@@ -12,7 +13,7 @@
  * @property {ModelData} model Processed model data received from Python.
  * @property {OmStyle} style Manages N2-related styles and functions.
  * @property {Layout} layout Sizes and positions of visible elements.
- * @property {N2Matrix} matrix Manages the grid of visible model parameters.
+ * @property {Matrix} matrix Manages the grid of visible model parameters.
  * @property {TreeNode} zoomedElement The element the diagram is currently based on.
  * @property {TreeNode} zoomedElementPrev Reference to last zoomedElement.
  * @property {Object} dom Container for references to web page elements.
@@ -43,7 +44,21 @@ class Diagram {
         this.transitionStartDelay = N2TransitionDefaults.startDelay;
         this.chosenCollapseDepth = -1;
 
-        if (callInit) this._init();
+        this.search = new Search(this.zoomedElement, this.model.root);
+        this.arrowMgr = new ArrowManager(this.dom.n2Groups);
+
+        if (callInit) { this._init(); }
+    }
+
+
+    /** Create a Layout object. Can be overridden to create different types of Layouts */
+    _newLayout() {
+        return new Layout(this.model, this.zoomedElement, this.dims);
+    }
+
+    _newMatrix(lastClickWasLeft, prevCellSize = null) {
+        return new Matrix(this.model, this.layout, this.dom.n2Groups,
+            this.arrowMgr, lastClickWasLeft, this.ui.findRootOfChangeFunction, prevCellSize);
     }
 
     /**
@@ -53,14 +68,8 @@ class Diagram {
     _init() {
         this.style = new Style(this.dom.svgStyle, this.dims.size.font);
         this.layout = this._newLayout();
-
-        this.search = new Search(this.zoomedElement, this.model.root);
         this.ui = new UserInterface(this);
-
-        // Keep track of arrows to show and hide them
-        this.arrowMgr = new ArrowManager(this.dom.n2Groups);
-        this.matrix = new N2Matrix(this.model, this.layout, this.dom.n2Groups,
-            this.arrowMgr, true, this.ui.findRootOfChangeFunction);
+        this.matrix = this._newMatrix(true);
     }
 
     /**
@@ -101,11 +110,6 @@ class Diagram {
             offgrid[name] = d3elem;
         })
         this.dom.n2Groups.offgrid = offgrid;
-    }
-
-    /** Create a Layout object. Can be overridden to create different types of Layouts */
-    _newLayout() {
-        return new Layout(this.model, this.zoomedElement, this.dims);
     }
 
     /**
@@ -427,9 +431,7 @@ class Diagram {
         if (computeNewTreeLayout) {
             this.layout = this._newLayout();
             this.ui.updateClickedIndices();
-            this.matrix = new N2Matrix(this.model, this.layout,
-                this.dom.n2Groups, this.arrowMgr, this.ui.lastClickWasLeft,
-                this.ui.findRootOfChangeFunction, this.matrix.nodeSize);
+            this.matrix = this._newMatrix(this.ui.lastClickWasLeft, this.matrix.nodeSize);
         }
 
         this.layout.updateGeometry(this.dom);
@@ -491,7 +493,7 @@ class Diagram {
     /**
      * Since the matrix can be destroyed and recreated, use this to invoke the callback
      * rather than setting one up that points directly to a specific matrix.
-     * @param {N2MatrixCell} cell The cell the event occured on.
+     * @param {MatrixCell} cell The cell the event occured on.
      */
     mouseOverOnDiagonal(e, cell) {
         if (this.matrix.cellExists(cell)) {
@@ -502,7 +504,7 @@ class Diagram {
 
     /**
      * Move the node info panel around if it's visible
-     * @param {N2MatrixCell} cell The cell the event occured on.
+     * @param {MatrixCell} cell The cell the event occured on.
      */
     mouseMoveOnDiagonal(e, cell) {
         if (this.matrix.cellExists(cell)) {
@@ -533,7 +535,7 @@ class Diagram {
      * When the mouse is left-clicked on a cell, change their CSS class
      * so they're not removed when the mouse moves out. Or, if in info panel
      * mode, pin the info panel.
-     * @param {N2MatrixCell} cell The cell the event occured on.
+     * @param {MatrixCell} cell The cell the event occured on.
      */
     mouseClick(cell) {
         if (this.ui.click.isNormal) { // If not in info-panel mode, pin/unpin arrows
@@ -597,9 +599,7 @@ class Diagram {
         // Needed to do this so that the arrows don't slip in before the element zoom.
         this.layout = this._newLayout();
         this.ui.updateClickedIndices();
-        this.matrix = new N2Matrix(this.model, this.layout,
-            this.dom.n2Groups, this.arrowMgr, this.ui.lastClickWasLeft,
-            this.ui.findRootOfChangeFunction, this.matrix.nodeSize);
+        this.matrix = this._newMatrix(this.ui.findRootOfChangeFunction, this.matrix.nodeSize);
         this.layout.updateGeometry(this.dom);
         this.layout.updateTransitionInfo(this.dom, this.transitionStartDelay, this.manuallyResized);
 
