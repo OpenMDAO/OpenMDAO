@@ -344,11 +344,11 @@ class Group(System):
             cache_key = excl_sub.pathname
 
         try:
-            io_vars = self._scope_cache[cache_key]
+            iovars, excl = self._scope_cache[cache_key]
 
             # Make sure they're the same subsystem instance before returning
-            if io_vars[2] is excl_sub:
-                return (io_vars[:2])
+            if excl is excl_sub:
+                return iovars
         except KeyError:
             pass
 
@@ -377,7 +377,7 @@ class Group(System):
         # Use the pathname as the dict key instead of the object itself. When
         # the object is used as the key, memory leaks result from multiple
         # calls to setup().
-        self._scope_cache[cache_key] = (scope_out, scope_in, excl_sub)
+        self._scope_cache[cache_key] = ((scope_out, scope_in), excl_sub)
         return scope_out, scope_in
 
     def _compute_root_scale_factors(self):

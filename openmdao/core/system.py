@@ -2230,9 +2230,9 @@ class System(object):
             old_outs = d_outputs._names
 
             if scope_out is not None:
-                d_outputs._names = scope_out.intersection(d_outputs._abs_iter())
+                d_outputs._names = scope_out.intersection(old_outs)
             if scope_in is not None:
-                d_inputs._names = scope_in.intersection(d_inputs._abs_iter())
+                d_inputs._names = scope_in.intersection(old_ins)
 
             try:
                 yield d_inputs, d_outputs, d_residuals
