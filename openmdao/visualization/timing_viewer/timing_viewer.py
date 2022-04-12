@@ -161,7 +161,7 @@ def view_timing(timing_file, outfile='timing_report.html', show_browser=True):
         parent_dict[(rank, probname, sname, method)] = dct
 
     data = {
-        'title': f"Total time: {max(tot_by_rank.values()):12.6f} sec",
+        'title': f"Total time: {max(tot_by_rank.values() if tot_by_rank else [0.]):12.6f} sec",
         'timing_table': timing_table,
         'tot_procs': max_rank + 1,
     }
