@@ -365,14 +365,10 @@ class Group(System):
             scope_out = frozenset()
 
             # All inputs connected to an output in this system but not in excl_sub
-            scope_in = set()
-            for abs_in in self._var_allprocs_abs2meta['input']:
-                if abs_in in self._conn_global_abs_in2out:
-                    abs_out = self._conn_global_abs_in2out[abs_in]
-
-                    if abs_out not in excl_sub._var_allprocs_abs2idx:
-                        scope_in.add(abs_in)
-            scope_in = frozenset(scope_in)
+            allins = self._var_allprocs_abs2meta['input']
+            exvars = excl_sub._var_allprocs_abs2idx
+            scope_in = frozenset(abs_in for abs_in, abs_out in self._conn_global_abs_in2out.items()
+                                 if abs_out not in exvars and abs_in in allins)
 
         # Use the pathname as the dict key instead of the object itself. When
         # the object is used as the key, memory leaks result from multiple
