@@ -117,6 +117,7 @@ class ScalarBase extends CellRenderer {
     update(svgGroup, dims, d3Elem = null) {
         if (!d3Elem) d3Elem = d3.select(svgGroup).select("." + this.className)
             .transition(sharedTransition);
+            
         return d3Elem
             .attr("rx", dims.bottomRight.x * .6)
             .attr("ry", dims.bottomRight.y * .6);
@@ -128,7 +129,7 @@ class ScalarBase extends CellRenderer {
      * @param {Object} dims The cell spec to use while rendering.
      */
     render(svgGroup, dims) {
-        let d3Elem = d3.select(svgGroup)
+        const d3Elem = d3.select(svgGroup)
             .append("ellipse")
             .attr("class", this.className)
             .attr("id", this.id)
@@ -162,7 +163,7 @@ class VectorBase extends CellRenderer {
         if (!d3Elem) d3Elem = d3.select(svgGroup).select("." + this.className)
             .transition(sharedTransition);
 
-        let ret = d3Elem
+        const ret = d3Elem
             .attr("x", dims.topLeft.x * .6)
             .attr("y", dims.topLeft.y * .6)
             .attr("width", dims.bottomRight.x * 1.2)
@@ -177,7 +178,7 @@ class VectorBase extends CellRenderer {
      * @param {Object} dims The cell spec to use while rendering.
      */
     render(svgGroup, dims) {
-        let d3Elem = d3.select(svgGroup).append('rect')
+        const d3Elem = d3.select(svgGroup).append('rect')
             .attr("class", this.className)
             .attr("id", this.id)
             .style("fill", this.color);
@@ -210,7 +211,7 @@ class Connector extends CellRenderer {
         if (!d3Elem) d3Elem = d3.select(svgGroup).select("." + this.className)
             .transition(sharedTransition);
 
-        let ret = d3Elem.attr("transform", this._transform(dims.size.width/10.0));
+        const ret = d3Elem.attr("transform", this._transform(dims.size.width/10.0));
 
         return ret;
     }
@@ -221,7 +222,7 @@ class Connector extends CellRenderer {
      * @param {Object} dims The cell spec to use while rendering.
      */
     render(svgGroup, dims) {
-        let d3Elem = d3.select(svgGroup).append('use')
+        const d3Elem = d3.select(svgGroup).append('use')
             .attr("class", this.className)
             .attr("id", this.id)
             .style("fill", this.color)
@@ -285,7 +286,7 @@ class GroupBase extends CellRenderer {
      * @param {Object} d3Group D3 selection for the group that we add to.
      */
     _renderBorder(d3Group) {
-        let border = [
+        const border = [
             d3Group.append("rect").attr("class", "bordR1").style("fill", this.color),
             d3Group.append("rect").attr("class", "bordR2").style("fill", this.color),
             d3Group.append("rect").attr("class", "bordR3").style("fill", this.color),
@@ -304,7 +305,7 @@ class GroupBase extends CellRenderer {
      * @param {Array} [border = null] Border selections created in _renderBorder().
      */
     update(svgGroup, dims, d3Elem = null, border = null) {
-        let d3Group = d3.select(svgGroup);
+        const d3Group = d3.select(svgGroup);
         if (!d3Elem) d3Elem = d3Group.select("." + this.className)
             .transition(sharedTransition);
 
@@ -324,9 +325,9 @@ class GroupBase extends CellRenderer {
      * @param {Object} dims The cell spec to use while rendering.
      */
     render(svgGroup, dims) {
-        let d3Group = d3.select(svgGroup);
-        let border = this._renderBorder(d3Group);
-        let d3Elem = d3Group
+        const d3Group = d3.select(svgGroup);
+        const border = this._renderBorder(d3Group);
+        const d3Elem = d3Group
             .append("rect")
             .attr("class", this.className)
             .attr("id", this.id)

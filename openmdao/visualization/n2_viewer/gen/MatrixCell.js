@@ -14,10 +14,10 @@
 class MatrixCell {
     /**
      * Initialize the cell.
-     * @param {number} row Vertical coordinate of the cell in the matrix.
-     * @param {number} col Horizontal coordinate of the cell in the matrix.
-     * @param {OmTreeNode} srcObj The node in the model tree this node is associated with.
-     * @param {OmTreeNode} tgtObj The model tree node that this outputs to.
+     * @param {Number} row Vertical coordinate of the cell in the matrix.
+     * @param {Number} col Horizontal coordinate of the cell in the matrix.
+     * @param {TreeNode} srcObj The node in the model tree this node is associated with.
+     * @param {TreeNode} tgtObj The model tree node that this outputs to.
      * @param {ModelData} model Reference to the model to get some info from it.
      */
     constructor(row, col, srcObj, tgtObj, model) {

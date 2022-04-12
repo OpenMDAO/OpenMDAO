@@ -6,14 +6,13 @@
  * @typedef Matrix
  * @property {TreeNodes[]} nodes Reference to nodes that will be drawn.
  * @property {ModelData} model Reference to the pre-processed model.
- * @property {N2Layout} layout Reference to object managing columns widths and such.
+ * @property {Layout} layout Reference to object managing columns widths and such.
  * @property {Object} n2Groups References to <g> SVG elements created by N2Diagram.
  * @property {number} levelOfDetailThreshold Don't draw elements below this size in pixels.
  * @property {Object} nodeSize Width and height of each node in the matrix.
  * @property {Object} prevNodeSize Width and height of each node in the previous matrix.
  * @property {Object[][]} grid Object keys corresponding to rows and columns.
- * @property {Array} visibleCells One-dimensional array of all cells, for D3 processing.
- * @property {Array} boxInfo Variable box dimensions.
+ * @property {MatrixCell[]} visibleCells One-dimensional array of all cells, for D3 processing.
  */
 class Matrix {
     /**
@@ -201,11 +200,25 @@ class Matrix {
         this.visibleCells.push(newCell);
     }
 
+    /**
+     * Generate a new MatrixCell object. Can be overridden by subclass.
+     * @param {Number} row Vertical coordinate of the cell in the matrix.
+     * @param {Number} col Horizontal coordinate of the cell in the matrix.
+     * @param {TreeNode} srcObj The node in the model tree this node is associated with.
+     * @param {TreeNode} tgtObj The model tree node that this outputs to.
+     * @param {ModelData} model Reference to the model to get some info from it.
+     * @returns {MatrixCell} Newly created cell.
+     */
     _createCell(row, col, srcObj, tgtObj, model) {
         return new MatrixCell(row, col, srcObj, tgtObj, model);
     }
 
-    _extraProcessing(srcIdx, newDiagCell) { }
+    /**
+     * Stub to be overridden by subclasses that need to add more info.
+     * @param {Number} srcIdx Index of the diagonal node being processed.
+     * @param {MatrixCell} newDiagCell A new cell being placed.
+     */
+    _customProcessing(srcIdx, newDiagCell) { }
 
     /**
      * Set up MatrixCell arrays resembling a two-dimensional grid as the matrix, but not
@@ -258,7 +271,7 @@ class Matrix {
                 }
             }
 
-            this._extraProcessing(srcIdx, newDiagCell);
+            this._customProcessing(srcIdx, newDiagCell);
         }
     }
 
@@ -271,17 +284,16 @@ class Matrix {
             "stopI": 0
         };
 
-        this.boxInfo = [currentBox];
+        this._boxInfo = [currentBox];
 
         // Find which variable box each of the variables belong in,
         // while finding the bounds of that box. Top and bottom
-        // rows recorded for each node in this.boxInfo[].
+        // rows recorded for each node in this._boxInfo[].
         for (let ri = 1; ri < this.diagNodes.length; ++ri) {
-            let curNode = this.diagNodes[ri];
-            let startINode = this.diagNodes[currentBox.startI];
-            if (startINode.parent &&
-                curNode.parent &&
-                startINode.parent === curNode.parent) {
+            const curNode = this.diagNodes[ri];
+            const startINode = this.diagNodes[currentBox.startI];
+
+            if (startINode.parent && curNode.parent && startINode.parent === curNode.parent) {
                 ++currentBox.stopI;
             }
             else {
@@ -290,80 +302,73 @@ class Matrix {
                     "stopI": ri
                 };
             }
-            this.boxInfo.push(currentBox);
+            this._boxInfo.push(currentBox);
         }
 
-        // Step through this.boxInfo[] and record one set of dimensions
-        // for each box in this.variableBoxInfo[].
-        this.variableBoxInfo = [];
-        for (let i = 0; i < this.boxInfo.length; ++i) {
-            let box = this.boxInfo[i];
+        // Step through this._boxInfo[] and record one set of dimensions
+        // for each box in this._variableBoxInfo[].
+        this._variableBoxInfo = [];
+        for (let i = 0; i < this._boxInfo.length; ++i) {
+            const box = this._boxInfo[i];
             if (box.startI == box.stopI) continue;
-            let curNode = this.diagNodes[box.startI];
-            if (!curNode.parent) {
-                throw "Parent not found in box.";
-            }
+
+            const curNode = this.diagNodes[box.startI];
+            if (!curNode.parent) { throw "Parent not found in box."; }
+
             box.obj = curNode.parent;
             i = box.stopI;
-            this.variableBoxInfo.push(box);
+            this._variableBoxInfo.push(box);
         }
 
         //do this so you save old index for the exit()
-        this.gridLines = [];
+        this._gridLines = [];
         if (!this.tooMuchDetail()) {
             for (let i = 0; i < this.diagNodes.length; ++i) {
-                let obj = this.diagNodes[i];
-                let gl = {
-                    "i": i,
-                    "obj": obj
-                };
-                this.gridLines.push(gl);
+                const obj = this.diagNodes[i];
+                const gl = { "i": i, "obj": obj };
+                this._gridLines.push(gl);
             }
         }
     }
 
-    /**
-     * Create an SVG group for each visible element, and have the element
-     * render its shape in it. Move the groups around to their correct
-     * positions, providing an animated transition from the previous
-     * rendering.
-     */
     _drawCells() {
-        let self = this; // For callbacks that change "this". Alternative to using .bind().
+        const allCells = this.n2Groups.elements.selectAll('.n2cell')
+            .data(this.visibleCells, d => d.id);
 
-        let selection = this.n2Groups.elements.selectAll('.n2cell')
-            .data(self.visibleCells, d => d.id);
+        const enterSelection = this._addNewMatrixCells(allCells.enter());
+        this._updateExistingMatrixCells(enterSelection.merge(allCells));
+        this._removeOldMatrixCells(allCells.exit())
+    }
 
-        // Use D3 to join MatrixCells to SVG groups, and render shapes in them.
-        let gEnter = selection.enter().append('g')
+    _addNewMatrixCells(enter) {
+        const self = this;
+        const width = this.prevCellDims.size.width,
+            height = this.prevCellDims.size.height,
+            x = this.prevCellDims.bottomRight.x,
+            y = this.prevCellDims.bottomRight.y;
+
+        return enter.append('g')
             .attr('class', 'n2cell')
-            .attr('transform', function (d) {
+            .attr('transform', d => {
+                let transX = null, transY = null;
+
                 if (self.lastClickWasLeft) {
-                    let tranStr = 'translate(' +
-                        (self.prevCellDims.size.width *
-                            (d.col - enterIndex) +
-                            self.prevCellDims.bottomRight.x) + ',' +
-                        (self.prevCellDims.size.height *
-                            (d.row - enterIndex) +
-                            self.prevCellDims.bottomRight.y) + ')';
-
-                    return tranStr;
+                    transX = width * (d.col - enterIndex) + x;
+                    transY = height * (d.row - enterIndex) + y;
+                }
+                else {
+                    const roc = (d.obj && self.findRootOfChangeFunction) ?
+                        self.findRootOfChangeFunction(d.obj) : null;
+        
+                    if (roc) {
+                        const prevIdx = roc.rootIndex - self.layout.zoomedElement.rootIndex;
+                        transX = width * prevIdx + x;
+                        transY = height * prevIdx + y;
+                    }
+                    else throw ('_addNewMatrixCells(): Cannot determine event source');
                 }
 
-                let roc = (d.obj && self.findRootOfChangeFunction) ?
-                    self.findRootOfChangeFunction(d.obj) : null;
-
-                if (roc) {
-                    let prevIdx = roc.prevRootIndex -
-                        self.layout.zoomedElement.prevRootIndex;
-                    let tranStr = 'translate(' + (self.prevCellDims.size.width * prevIdx +
-                        self.prevCellDims.bottomRight.x) + ',' +
-                        (self.prevCellDims.size.height * prevIdx +
-                            self.prevCellDims.bottomRight.y) + ')';
-
-                    return tranStr;
-                }
-                throw ('Enter transform not found');
+                return `translate(${transX},${transY})`;
             })
             .each(function (d) {
                 // "this" refers to the element here, so leave it alone:
@@ -371,45 +376,54 @@ class Matrix {
                     .on('mouseover', d.mouseover())
                     .on('mousemove', d.mousemove())
                     .on('mouseleave', n2MouseFuncs.out)
-                    .on('click', n2MouseFuncs.click);
+                    .on('click', (e,d) => n2MouseFuncs.click(d));
             });
+    }
 
-        gEnter.merge(selection)
-            .transition(sharedTransition)
-            .attr('transform', function (d) {
-                let tranStr = 'translate(' + (self.cellDims.size.width * d.col +
-                    self.cellDims.bottomRight.x) + ',' +
-                    (self.cellDims.size.height * d.row +
-                        self.cellDims.bottomRight.y) + ')';
+    _updateExistingMatrixCells(update) {
+        const self = this;
 
-                return (tranStr);
+        update.transition(sharedTransition)
+            .attr('transform', d => {
+                const transX = self.cellDims.size.width * d.col + self.cellDims.bottomRight.x,
+                    transY = self.cellDims.size.height * d.row + self.cellDims.bottomRight.y;
+
+                return `translate(${transX},${transY})`;
             })
             // "this" refers to the element here, so leave it alone:
             .each(function (d) {
                 d.renderer.updateCurrent(this)
             });
+    }
 
-        selection.exit()
-            .transition(sharedTransition)
-            .attr('transform', function (d) {
+    _removeOldMatrixCells(exit) {
+        const self = this;
+
+        const width = this.cellDims.size.width,
+            height = this.cellDims.size.height,
+            x = this.cellDims.bottomRight.x,
+            y = this.cellDims.bottomRight.y;
+
+        exit.transition(sharedTransition)
+            .attr('transform', d => {
+                let transX = null, transY = null;
+
                 if (self.lastClickWasLeft) {
-                    let tranStr = 'translate(' + (self.cellDims.size.width *
-                        (d.col - exitIndex) + self.cellDims.bottomRight.x) + ',' +
-                        (self.cellDims.size.height * (d.row - exitIndex) +
-                            self.cellDims.bottomRight.y) + ')';
-                    return tranStr;
+                    transX = width * (d.col - exitIndex) + x;
+                    transY = height * (d.row - exitIndex) + y;
                 }
+                else {
+                    const roc = (d.obj && self.findRootOfChangeFunction) ?
+                        self.findRootOfChangeFunction(d.obj) : null;
 
-                let roc = (d.obj && self.findRootOfChangeFunction) ?
-                    self.findRootOfChangeFunction(d.obj) : null;
-
-                if (roc) {
-                    let index = roc.rootIndex - self.layout.zoomedElement.rootIndex;
-                    return 'translate(' + (self.cellDims.size.width * index +
-                        self.cellDims.bottomRight.x) + ',' +
-                        (self.cellDims.size.height * index + self.cellDims.bottomRight.y) + ')';
+                    if (roc) {
+                        const index = roc.rootIndex - self.layout.zoomedElement.rootIndex;
+                        transX = width * index + x;
+                        transY = height * index + y;
+                    }
+                    throw ('_removeOldMatrixCells(): Cannot determine event source');
                 }
-                throw ('Exit transform not found');
+                return `translate(${transX},${transY})`;
             })
             // "this" refers to the element here, so leave it alone:
             .each(function (d) {
@@ -423,7 +437,7 @@ class Matrix {
         const self = this; // For callbacks that change "this". Alternative to using .bind().
 
         const selection = self.n2Groups.gridlines.selectAll('.horiz_line')
-            .data(self.gridLines, function (d) {
+            .data(self._gridLines, function (d) {
                 return d.obj.id;
             });
 
@@ -470,7 +484,7 @@ class Matrix {
         const self = this; // For callbacks that change "this". Alternative to using .bind().
 
         const selection = self.n2Groups.gridlines.selectAll(".vert_line")
-            .data(self.gridLines, function (d) {
+            .data(self._gridLines, function (d) {
                 return d.obj.id;
             });
         const gEnter = selection.enter().append("g")
@@ -514,7 +528,7 @@ class Matrix {
         const self = this; // For callbacks that change "this". Alternative to using .bind().
 
         const selection = self.n2Groups.variableBoxes.selectAll(".variable_box")
-            .data(self.variableBoxInfo, d => d.obj.id);
+            .data(self._variableBoxInfo, d => d.obj.id);
         const gEnter = selection.enter().append("g")
             .attr("class", "variable_box")
             .attr("transform", function (d) {
@@ -706,8 +720,8 @@ class Matrix {
     }
 
     drawArrowsInputView(cell, startIndex, endIndex) {
-        let boxStart = this.boxInfo[startIndex];
-        let boxEnd = this.boxInfo[endIndex];
+        let boxStart = this._boxInfo[startIndex];
+        let boxEnd = this._boxInfo[endIndex];
 
         // Draw multiple horizontal lines, but no more than one vertical line
         // for box-to-box connections

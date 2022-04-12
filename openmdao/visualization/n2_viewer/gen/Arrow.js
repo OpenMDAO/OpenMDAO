@@ -147,15 +147,15 @@ class BentArrow extends Arrow {
     draw() {
         if (this.doTransition) {
             // Arrow already exists, size and/or shape needs updated
-            this.path = this.group.select('path').transition(sharedTransition);
+            this.path = this.group.select('path').transition(getTransition());
 
             if (this.group.classed('off-grid-arrow')) {
                 // The arrow was previously going offscreen but now is fully onscreen
                 this._createDots();
             }
             else {
-                this.bottomCircle = this.group.select('circle#bottom-circle').transition(sharedTransition);
-                this.topCircle = this.group.select('circle#top-circle').transition(sharedTransition);
+                this.bottomCircle = this.group.select('circle#bottom-circle').transition(getTransition());
+                this.topCircle = this.group.select('circle#top-circle').transition(getTransition());
             }
         }
         else {
@@ -274,7 +274,7 @@ class OffGridArrow extends Arrow {
                 this.group.selectAll('circle').remove();
             }
 
-            this.path = this.group.select('path').transition(sharedTransition);
+            this.path = this.group.select('path').transition(getTransition());
         }
         else {
             this.path = this.group.insert('path')

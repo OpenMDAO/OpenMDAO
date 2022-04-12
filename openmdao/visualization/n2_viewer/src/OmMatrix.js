@@ -6,15 +6,14 @@
  * perform operations with it.
  * @typedef OmMatrix
  * @property {OmTreeNodes[]} nodes Reference to nodes that will be drawn.
- * @property {ModelData} model Reference to the pre-processed model.
- * @property {N2Layout} layout Reference to object managing columns widths and such.
+ * @property {OmModelData} model Reference to the pre-processed model.
+ * @property {OmLayout} layout Reference to object managing columns widths and such.
  * @property {Object} n2Groups References to <g> SVG elements created by N2Diagram.
- * @property {number} levelOfDetailThreshold Don't draw elements below this size in pixels.
+ * @property {Number} levelOfDetailThreshold Don't draw elements below this size in pixels.
  * @property {Object} nodeSize Width and height of each node in the matrix.
  * @property {Object} prevNodeSize Width and height of each node in the previous matrix.
  * @property {Object[][]} grid Object keys corresponding to rows and columns.
- * @property {Array} visibleCells One-dimensional array of all cells, for D3 processing.
- * @property {Array} boxInfo Variable box dimensions.
+ * @property {OmMatrixCell[]} visibleCells One-dimensional array of all cells, for D3 processing.
  */
 class OmMatrix extends Matrix {
     /**
@@ -26,13 +25,8 @@ class OmMatrix extends Matrix {
      * @param {Boolean} lastClickWasLeft
      * @param {function} findRootOfChangeFunction
      */
-    constructor(model, layout, n2Groups, arrowMgr,
-        lastClickWasLeft,
-        findRootOfChangeFunction,
-        prevNodeSize = {
-            'width': 0,
-            'height': 0
-        }) {
+    constructor(model, layout, n2Groups, arrowMgr, lastClickWasLeft, findRootOfChangeFunction,
+        prevNodeSize = { 'width': 0, 'height': 0 }) {
         super(model, layout, n2Groups, arrowMgr, lastClickWasLeft, findRootOfChangeFunction, prevNodeSize);
     }
 
@@ -93,11 +87,25 @@ class OmMatrix extends Matrix {
         }
     }
 
+    /**
+     * Generate a new OmMatrixCell object. Overrides superclass definition.
+     * @param {Number} row Vertical coordinate of the cell in the matrix.
+     * @param {Number} col Horizontal coordinate of the cell in the matrix.
+     * @param {OmTreeNode} srcObj The node in the model tree this node is associated with.
+     * @param {OmTreeNode} tgtObj The model tree node that this outputs to.
+     * @param {ModelData} model Reference to the model to get some info from it.
+     * @returns {OmMatrixCell} Newly created cell.
+     */
     _createCell(row, col, srcObj, tgtObj, model) {
         return new OmMatrixCell(row, col, srcObj, tgtObj, model);
     }
 
-    _extraProcessing(srcIdx, newDiagCell) {
+    /**
+     * Handle solver processing and cycle arrows. Overrides superclass definition.
+     * @param {Number} srcIdx Index of the diagonal node being processed.
+     * @param {MatrixCell} newDiagCell A new cell being placed.
+     */
+    _customProcessing(srcIdx, newDiagCell) {
         const diagNode = this.diagNodes[srcIdx]
 
         // Solver nodes

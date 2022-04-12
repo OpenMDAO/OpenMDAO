@@ -454,11 +454,7 @@ class Layout {
      * @param {Boolean} manuallyResized Have the diagram dimensions have been changed through UI
      */
     updateTransitionInfo(dom, transitionStartDelay, manuallyResized) {
-        sharedTransition = d3.transition('global')
-            .duration(N2TransitionDefaults.duration)
-            .delay(transitionStartDelay)
-            // Hide the transition waiting animation when it ends:
-            .on('end', () => dom.waiter.attr('class', 'no-show'));
+        sharedTransition = getTransition(transitionStartDelay);
 
         const outerDims = this.calcOuterDims();
         const u = outerDims.unit;

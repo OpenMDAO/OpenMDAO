@@ -538,7 +538,7 @@ class Diagram {
      * @param {MatrixCell} cell The cell the event occured on.
      */
     mouseClick(cell) {
-        if (this.ui.click.isNormal) { // If not in info-panel mode, pin/unpin arrows
+        if (! this.ui.click.isNodeInfo) { // If not in info-panel mode, pin/unpin arrows
             this.arrowMgr.togglePin(cell.id);
         }
         else { // Make a persistent info panel

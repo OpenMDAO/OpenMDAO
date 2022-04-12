@@ -57,3 +57,16 @@ const DebugFlags = {
     'timings': false,
     'info': false
 }
+
+/**
+ * Create a D3 transition that creates animations for selected geometry changes.
+ * @param {Number} transitionStartDelay Number of milliseconds before animation starts.
+ * @returns {Transition} The newly created transition.
+ */
+function getTransition(transitionStartDelay = N2TransitionDefaults.startDelay) {
+    return d3.transition('global')
+    .duration(N2TransitionDefaults.duration)
+    .delay(transitionStartDelay)
+    // Hide the transition waiting animation when it ends:
+    .on('end', () => d3.select('#waiting-container').attr('class', 'no-show'));
+}
