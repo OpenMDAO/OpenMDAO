@@ -2117,7 +2117,7 @@ class System(object):
         try:
             return self._scope_cache[None]
         except KeyError:
-            self._scope_cache[None] = (frozenset(self._var_abs2meta['output']), _empty_frozen_set)
+            self._scope_cache[None] = (None, _empty_frozen_set)
             return self._scope_cache[None]
 
     @contextmanager
