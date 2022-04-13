@@ -169,6 +169,7 @@ class VectorBase extends CellRenderer {
             .attr("width", dims.bottomRight.x * 1.2)
             .attr("height", dims.bottomRight.y * 1.2);
 
+
         return ret;
     }
 

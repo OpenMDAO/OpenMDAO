@@ -36,6 +36,7 @@ class OmDiagram extends Diagram {
             this.showLinearSolverNames, this.showSolvers);
     }
 
+    /** Create a new OmMatrix object. Overrides superclass method. */
     _newMatrix(lastClickWasLeft, prevCellSize = null) {
         return new OmMatrix(this.model, this.layout, this.dom.n2Groups,
             this.arrowMgr, lastClickWasLeft, this.ui.findRootOfChangeFunction, prevCellSize);
@@ -69,18 +70,18 @@ class OmDiagram extends Diagram {
         this.dom.clips.solverTree = d3.select("#solverTreeClip > rect");
     }
 
-    /** Add SVG groups & contents coupled to the visible nodes in the trees. */
+    /**
+     * Add SVG groups & contents coupled to the visible nodes in the trees.
+     * Select all <g> elements that have class "solver_group". If any already
+     * exist, join to their associated nodes in the solver tree. If no
+     * existing <g> matches a displayable node, add it to the "enter"
+     * selection so the <g> can be created. If a <g> exists but there is
+     * no longer a displayable node for it, put it in the "exit" selection so
+     * it can be removed:
+     */
     _updateTreeCells() {
         super._updateTreeCells();
 
-        /*
-        Select all <g> elements that have class "solver_group". If any already
-        exist, join to their associated nodes in the solver tree. If no
-        existing <g> matches a displayable node, add it to the "enter"
-        selection so the <g> can be created. If a <g> exists but there is
-        no longer a displayable node for it, put it in the "exit" selection so
-        it can be removed:
-        */
         const self = this;
         const scale = this.layout.scales.solver;
         const treeSize = this.layout.treeSize.solver;
@@ -97,7 +98,7 @@ class OmDiagram extends Diagram {
     /**
      * Using the visible nodes in the solver tree as data points, create SVG objects to
      * represent each one. Dimensions are obtained from the precalculated layout.
-     * @param {Object} enter The selection to add <g> elements and children to.
+     * @param {Selection} enter The selection to add <g> elements and children to.
      * @param {Scale} scale Linear scales of the diagram width and height.
      * @param {Dimensions} treeSize Actual width and height of the tree in pixels.
      */
@@ -184,7 +185,7 @@ class OmDiagram extends Diagram {
 
     /**
      * Update the geometry for existing <g> with a transition.
-     * @param {Object} update The selected group of existing solver tree <g> elements.
+     * @param {Selection} update The selected group of existing solver tree <g> elements.
      * @param {Scale} scale Linear scales of the diagram width and height.
      * @param {Dimensions} treeSize Actual width and height of the tree in pixels.
      */
@@ -232,7 +233,7 @@ class OmDiagram extends Diagram {
     /**
      * Remove <g> that no longer have displayable nodes associated with them, and
      * transition them away.
-     * @param {Object} exit The selected group of solver tree <g> elements to remove.
+     * @param {Selection} exit The selected group of solver tree <g> elements to remove.
      * @param {Scale} scale Linear scales of the diagram width and height.
      * @param {Dimensions} treeSize Actual width and height of the tree in pixels.
      */

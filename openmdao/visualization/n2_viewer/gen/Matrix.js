@@ -275,9 +275,7 @@ class Matrix {
         }
     }
 
-    /**
-     * Determine the size of the boxes that will enclose the variables of each group.
-     */
+    /** Determine the size of the boxes that will enclose the variables of each group. */
     _setupVariableBoxesAndGridLines() {
         let currentBox = {
             "startI": 0,
@@ -331,62 +329,89 @@ class Matrix {
         }
     }
 
+    /**
+     * Add SVG groups & contents coupled to the visible nodes in the matrix.
+     * Select all <g> elements that have class "n2cell". If any already
+     * exist, join to their associated cells in the matrix. If no
+     * existing <g> matches a displayable cell, add it to the "enter"
+     * selection so the <g> can be created. If a <g> exists but there is
+     * no longer a displayable cell for it, put it in the "exit" selection so
+     * it can be removed.
+     */
     _drawCells() {
-        const allCells = this.n2Groups.elements.selectAll('.n2cell')
-            .data(this.visibleCells, d => d.id);
+        const self = this;
 
-        const enterSelection = this._addNewMatrixCells(allCells.enter());
-        this._updateExistingMatrixCells(enterSelection.merge(allCells));
-        this._removeOldMatrixCells(allCells.exit())
+        const dims = {
+            width: this.cellDims.size.width,
+            height: this.cellDims.size.height,
+            x: this.cellDims.bottomRight.x,
+            y: this.cellDims.bottomRight.y
+        };
+
+        this.n2Groups.elements.selectAll('g.n2cell')
+            .data(this.visibleCells, d => d.id)
+            .join(
+                enter => self._addNewMatrixCells(enter, dims),
+                update => self._updateExistingMatrixCells(update, dims),
+                exit => self._removeOldMatrixCells(exit, dims)
+            )
     }
 
-    _addNewMatrixCells(enter) {
-        const self = this;
-        const width = this.prevCellDims.size.width,
-            height = this.prevCellDims.size.height,
-            x = this.prevCellDims.bottomRight.x,
-            y = this.prevCellDims.bottomRight.y;
+    /**
+     * Using the visible cells in the matrix grid as data points, create SVG objects to
+     * represent each one. Location is calculated from a cell's column and row.
+     * @param {Selection} enter The selection to add <g> elements and children to.
+     * @param {Object} dims Size of the cell and placement within its group.
+     */
+    _addNewMatrixCells(enter, dims) {
+        const prevDims = {
+            width: this.prevCellDims.size.width,
+            height: this.prevCellDims.size.height,
+            x: this.prevCellDims.bottomRight.x,
+            y: this.prevCellDims.bottomRight.y      
+        }
 
-        return enter.append('g')
-            .attr('class', 'n2cell')
+        const enterSelection = enter.append('g')
+            .attr('class', 'n2cell');
+
+        enterSelection
+            // Initialize at "previous" location...
             .attr('transform', d => {
-                let transX = null, transY = null;
+                const transX = prevDims.width * (d.col - enterIndex) + prevDims.x,
+                    transY = prevDims.height * (d.row - enterIndex) + prevDims.y;
 
-                if (self.lastClickWasLeft) {
-                    transX = width * (d.col - enterIndex) + x;
-                    transY = height * (d.row - enterIndex) + y;
-                }
-                else {
-                    const roc = (d.obj && self.findRootOfChangeFunction) ?
-                        self.findRootOfChangeFunction(d.obj) : null;
-        
-                    if (roc) {
-                        const prevIdx = roc.rootIndex - self.layout.zoomedElement.rootIndex;
-                        transX = width * prevIdx + x;
-                        transY = height * prevIdx + y;
-                    }
-                    else throw ('_addNewMatrixCells(): Cannot determine event source');
-                }
+                return `translate(${transX},${transY})`;
+            })
+            .transition(sharedTransition)
+            // ... then smoothly transition to new location to appear to slide in:
+            .attr('transform', d => {
+                const transX = dims.width * d.col + dims.x,
+                    transY = dims.height * d.row + dims.y;
 
                 return `translate(${transX},${transY})`;
             })
             .each(function (d) {
                 // "this" refers to the element here, so leave it alone:
-                d.renderer.renderPrevious(this)
+                d.renderer.renderCurrent(this)
                     .on('mouseover', d.mouseover())
                     .on('mousemove', d.mousemove())
                     .on('mouseleave', n2MouseFuncs.out)
-                    .on('click', (e,d) => n2MouseFuncs.click(d));
+                    .on('click', (e,d) => n2MouseFuncs.click(d))
             });
+        
+        return enterSelection;
     }
 
-    _updateExistingMatrixCells(update) {
-        const self = this;
-
+    /**
+     * Update the geometry for existing <g> with a transition.
+     * @param {Selection} update The selected group of existing matrix grid <g> elements.
+     * @param {Object} dims Size of the cell and placement within its group.
+     */
+    _updateExistingMatrixCells(update, dims) {
         update.transition(sharedTransition)
             .attr('transform', d => {
-                const transX = self.cellDims.size.width * d.col + self.cellDims.bottomRight.x,
-                    transY = self.cellDims.size.height * d.row + self.cellDims.bottomRight.y;
+                const transX = dims.width * d.col + dims.x,
+                    transY = dims.height * d.row + dims.y;
 
                 return `translate(${transX},${transY})`;
             })
@@ -396,40 +421,25 @@ class Matrix {
             });
     }
 
-    _removeOldMatrixCells(exit) {
-        const self = this;
-
-        const width = this.cellDims.size.width,
-            height = this.cellDims.size.height,
-            x = this.cellDims.bottomRight.x,
-            y = this.cellDims.bottomRight.y;
-
-        exit.transition(sharedTransition)
+    /**
+     * Remove <g> that no longer have displayable cells associated with them, and
+     * transition them away.
+     * @param {Selection} exit The selected group of matrix grid <g> elements to remove.
+     * @param {Object} dims Size of the cell and placement within its group.
+     */
+    _removeOldMatrixCells(exit, dims) {
+        const exitSelection = exit.transition(sharedTransition)
             .attr('transform', d => {
-                let transX = null, transY = null;
+                const transX = dims.width * (d.col - exitIndex) + dims.x,
+                    transY = dims.height * (d.row - exitIndex) + dims.y;
 
-                if (self.lastClickWasLeft) {
-                    transX = width * (d.col - exitIndex) + x;
-                    transY = height * (d.row - exitIndex) + y;
-                }
-                else {
-                    const roc = (d.obj && self.findRootOfChangeFunction) ?
-                        self.findRootOfChangeFunction(d.obj) : null;
+                return `translate(${transX},${transY})`
+            })
+            .each(function (d) { d.renderer.updateCurrent(this); });
 
-                    if (roc) {
-                        const index = roc.rootIndex - self.layout.zoomedElement.rootIndex;
-                        transX = width * index + x;
-                        transY = height * index + y;
-                    }
-                    throw ('_removeOldMatrixCells(): Cannot determine event source');
-                }
-                return `translate(${transX},${transY})`;
-            })
-            // "this" refers to the element here, so leave it alone:
-            .each(function (d) {
-                d.renderer.updateCurrent(this)
-            })
-            .remove();
+        exitSelection.on('end', function() {d3.select(this).remove(); })
+
+        return exitSelection;
     }
 
     /** Draw a line above every row in the matrix. */
