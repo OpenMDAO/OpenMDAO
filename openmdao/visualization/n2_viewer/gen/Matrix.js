@@ -338,15 +338,8 @@ class Matrix {
      * no longer a displayable cell for it, put it in the "exit" selection so
      * it can be removed.
      */
-    _drawCells() {
+    _drawCells(dims) {
         const self = this;
-
-        const dims = {
-            width: this.cellDims.size.width,
-            height: this.cellDims.size.height,
-            x: this.cellDims.bottomRight.x,
-            y: this.cellDims.bottomRight.y
-        };
 
         this.n2Groups.elements.selectAll('g.n2cell')
             .data(this.visibleCells, d => d.id)
@@ -361,24 +354,17 @@ class Matrix {
      * Using the visible cells in the matrix grid as data points, create SVG objects to
      * represent each one. Location is calculated from a cell's column and row.
      * @param {Selection} enter The selection to add <g> elements and children to.
-     * @param {Object} dims Size of the cell and placement within its group.
+     * @param {Dimensions} dims Size of the cell and placement within its group.
      */
     _addNewMatrixCells(enter, dims) {
-        const prevDims = {
-            width: this.prevCellDims.size.width,
-            height: this.prevCellDims.size.height,
-            x: this.prevCellDims.bottomRight.x,
-            y: this.prevCellDims.bottomRight.y      
-        }
-
         const enterSelection = enter.append('g')
             .attr('class', 'n2cell');
 
         enterSelection
             // Initialize at "previous" location...
             .attr('transform', d => {
-                const transX = prevDims.width * (d.col - enterIndex) + prevDims.x,
-                    transY = prevDims.height * (d.row - enterIndex) + prevDims.y;
+                const transX = dims.prev.width * (d.col - enterIndex) + dims.prev.x,
+                    transY = dims.prev.height * (d.row - enterIndex) + dims.prev.y;
 
                 return `translate(${transX},${transY})`;
             })
@@ -405,7 +391,7 @@ class Matrix {
     /**
      * Update the geometry for existing <g> with a transition.
      * @param {Selection} update The selected group of existing matrix grid <g> elements.
-     * @param {Object} dims Size of the cell and placement within its group.
+     * @param {Dimensions} dims Size of the cell and placement within its group.
      */
     _updateExistingMatrixCells(update, dims) {
         update.transition(sharedTransition)
@@ -425,7 +411,7 @@ class Matrix {
      * Remove <g> that no longer have displayable cells associated with them, and
      * transition them away.
      * @param {Selection} exit The selected group of matrix grid <g> elements to remove.
-     * @param {Object} dims Size of the cell and placement within its group.
+     * @param {Dimensions} dims Size of the cell and placement within its group.
      */
     _removeOldMatrixCells(exit, dims) {
         const exitSelection = exit.transition(sharedTransition)
@@ -442,95 +428,67 @@ class Matrix {
         return exitSelection;
     }
 
-    /** Draw a line above every row in the matrix. */
-    _drawHorizontalLines() {
-        const self = this; // For callbacks that change "this". Alternative to using .bind().
+    /**
+     * Draw a line above every row in the matrix.
+     * @param {Dimensions} dims Sizes for a current and previous matrix cell.
+     */
+    _drawHorizontalLines(dims) {
+        const self = this;
 
-        const selection = self.n2Groups.gridlines.selectAll('.horiz_line')
-            .data(self._gridLines, function (d) {
-                return d.obj.id;
-            });
+        self.n2Groups.gridlines.selectAll('g.horiz_line')
+            .data(self._gridLines, d => d.obj.id)
+            .join(
+                enter => { 
+                    const enterGroups = enter.append('g')
+                        .attr('class', 'horiz_line')
+                        .attr('transform', d => `translate(0, ${dims.prev.height * (d.i - enterIndex)})`);
 
-        const gEnter = selection.enter().append('g')
-            .attr('class', 'horiz_line')
-            .attr('transform', function (d) {
-                if (self.lastClickWasLeft) return 'translate(0,' +
-                    (self.prevCellDims.size.height * (d.i - enterIndex)) + ')';
-                let roc = (self.findRootOfChangeFunction) ?
-                    self.findRootOfChangeFunction(d.obj) : null;
-                if (roc) {
-                    let index0 = roc.prevRootIndex - self.layout.zoomedElement.prevRootIndex;
-                    return 'translate(0,' + (self.prevCellDims.size.height * index0) + ')';
-                }
-                throw ('enter transform not found');
-            });
-        gEnter.append('line')
-            .attr('x2', self.layout.size.n2matrix.width);
+                    enterGroups.transition(sharedTransition)
+                        .attr('transform', d => `translate(0, ${dims.height * d.i})`)
 
-        const gUpdate = gEnter.merge(selection).transition(sharedTransition)
-            .attr('transform', function (d) {
-                return 'translate(0,' + (self.cellDims.size.height * d.i) + ')';
-            });
-        gUpdate.select('line')
-            .attr('x2', self.layout.size.n2matrix.width);
-
-        selection.exit().transition(sharedTransition)
-            .attr('transform', function (d) {
-                if (self.lastClickWasLeft) return 'translate(0,' +
-                    (self.cellDims.size.height * (d.i - exitIndex)) + ')';
-                let roc = (self.findRootOfChangeFunction) ?
-                    self.findRootOfChangeFunction(d.obj) : null;
-                if (roc) {
-                    let index = roc.rootIndex - self.layout.zoomedElement.rootIndex;
-                    return 'translate(0,' + (self.cellDims.size.height * index) + ')';
-                }
-                throw ('exit transform not found');
-            })
-            .remove();
+                    enterGroups.append('line')
+                        .attr('x2', self.layout.size.n2matrix.width)
+                },
+                update => update.transition(sharedTransition)
+                    .attr('transform', d => `translate(0, ${dims.height * d.i})`)
+                    .select('line')
+                    .attr('x2', self.layout.size.n2matrix.width),
+                exit => exit.transition(sharedTransition)
+                    .attr('transform', d => `translate(0, ${dims.height * (d.i - exitIndex)})`)
+                    .remove()
+            )
     }
 
-    /** Draw a vertical line for every column in the matrix. */
-    _drawVerticalLines() {
-        const self = this; // For callbacks that change "this". Alternative to using .bind().
+    /**
+     * Draw a vertical line for every column in the matrix.
+     * @param {Dimensions} dims Sizes for a current and previous matrix cell.
+     */
+     _drawVerticalLines(dims) {
+        const self = this;
 
-        const selection = self.n2Groups.gridlines.selectAll(".vert_line")
-            .data(self._gridLines, function (d) {
-                return d.obj.id;
-            });
-        const gEnter = selection.enter().append("g")
-            .attr("class", "vert_line")
-            .attr("transform", function (d) {
-                if (self.lastClickWasLeft) return "translate(" +
-                    (self.prevCellDims.size.width * (d.i - enterIndex)) + ")rotate(-90)";
-                const roc = (self.findRootOfChangeFunction) ? self.findRootOfChangeFunction(d.obj) : null;
-                if (roc) {
-                    const i0 = roc.prevRootIndex - self.layout.zoomedElement.prevRootIndex;
-                    return "translate(" + (self.prevCellDims.size.width * i0) + ")rotate(-90)";
-                }
-                throw ("enter transform not found");
-            });
-        gEnter.append("line")
-            .attr("x1", -self.layout.size.n2matrix.height);
+        self.n2Groups.gridlines.selectAll('g.vert_line')
+        .data(self._gridLines, d => d.obj.id)
+        .join(
+            enter => { 
+                const enterGroups = enter.append('g')
+                    .attr('class', 'vert_line')
+                    .attr('transform', d => `translate(${dims.prev.width * (d.i - enterIndex)}) rotate(-90)`);
 
-        const gUpdate = gEnter.merge(selection).transition(sharedTransition)
-            .attr("transform", function (d) {
-                return "translate(" + (self.cellDims.size.width * d.i) + ")rotate(-90)";
-            });
-        gUpdate.select("line")
-            .attr("x1", -self.layout.size.n2matrix.height);
+                enterGroups.transition(sharedTransition)
+                    .attr('transform', d => `translate(${dims.width * d.i}) rotate(-90)`)
 
-        selection.exit().transition(sharedTransition)
-            .attr("transform", function (d) {
-                if (self.lastClickWasLeft) return "translate(" +
-                    (self.cellDims.size.width * (d.i - exitIndex)) + ")rotate(-90)";
-                const roc = (self.findRootOfChangeFunction) ? self.findRootOfChangeFunction(d.obj) : null;
-                if (roc) {
-                    const i = roc.rootIndex - self.layout.zoomedElement.rootIndex;
-                    return "translate(" + (self.cellDims.size.width * i) + ")rotate(-90)";
-                }
-                throw ("exit transform not found");
-            })
-            .remove();
+                enterGroups.append('line')
+                    .attr('x1', -self.layout.size.n2matrix.height)
+            },
+            update => update.transition(sharedTransition)
+                .attr('transform', d => `translate(${dims.width * d.i}) rotate(-90)`)
+                .select('line')
+                .attr('x1', -self.layout.size.n2matrix.height),
+            exit => exit.transition(sharedTransition)
+                .attr('transform', d => `translate(0, ${dims.width * (d.i - exitIndex)}) rotate(-90)`)
+                .remove()
+        )
+
     }
 
     /** Draw boxes around the cells associated with each component. */
@@ -613,13 +571,30 @@ class Matrix {
             .attr('width', size.n2matrix.width + size.svgMargin * 2)
             .attr('height', size.n2matrix.height + size.svgMargin * 2);
 
-        this._drawCells();
+        // Dimensions used for cell geometry and gridlines
+        const dims = new Dimensions(
+            {
+                width: this.cellDims.size.width,
+                height: this.cellDims.size.height,
+                x: this.cellDims.bottomRight.x,
+                y: this.cellDims.bottomRight.y   
+            }, 
+            null, 
+            {
+                width: this.prevCellDims.size.width,
+                height: this.prevCellDims.size.height,
+                x: this.prevCellDims.bottomRight.x,
+                y: this.prevCellDims.bottomRight.y 
+            }
+        );
+
+        this._drawCells(dims);
 
         // Draw gridlines:
         if (!this.tooMuchDetail()) {
             debugInfo("Drawing gridlines.")
-            this._drawHorizontalLines();
-            this._drawVerticalLines();
+            this._drawHorizontalLines(dims);
+            this._drawVerticalLines(dims);
         }
         else {
             debugInfo("Erasing gridlines.")
