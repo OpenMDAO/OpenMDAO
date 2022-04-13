@@ -337,6 +337,7 @@ class Matrix {
      * selection so the <g> can be created. If a <g> exists but there is
      * no longer a displayable cell for it, put it in the "exit" selection so
      * it can be removed.
+     * @param {Dimensions} dims Size of a cell and placement within its group.
      */
     _drawCells(dims) {
         const self = this;
@@ -354,7 +355,7 @@ class Matrix {
      * Using the visible cells in the matrix grid as data points, create SVG objects to
      * represent each one. Location is calculated from a cell's column and row.
      * @param {Selection} enter The selection to add <g> elements and children to.
-     * @param {Dimensions} dims Size of the cell and placement within its group.
+     * @param {Dimensions} dims Size of a cell and placement within its group.
      */
     _addNewMatrixCells(enter, dims) {
         const enterSelection = enter.append('g')
@@ -389,7 +390,7 @@ class Matrix {
     }
 
     /**
-     * Update the geometry for existing <g> with a transition.
+     * Update the geometry for existing SVG groups with a transition.
      * @param {Selection} update The selected group of existing matrix grid <g> elements.
      * @param {Dimensions} dims Size of the cell and placement within its group.
      */
@@ -408,7 +409,7 @@ class Matrix {
     }
 
     /**
-     * Remove <g> that no longer have displayable cells associated with them, and
+     * Remove SVG groups that no longer have displayable cells associated with them, and
      * transition them away.
      * @param {Selection} exit The selected group of matrix grid <g> elements to remove.
      * @param {Dimensions} dims Size of the cell and placement within its group.
@@ -491,76 +492,52 @@ class Matrix {
 
     }
 
-    /** Draw boxes around the cells associated with each component. */
-    _drawVariableBoxes() {
-        const self = this; // For callbacks that change "this". Alternative to using .bind().
+    /** Draw boxes around the cells associated with each variable grouping. */
+    _drawVariableBoxes(dims) {
+        const self = this; 
 
-        const selection = self.n2Groups.variableBoxes.selectAll(".variable_box")
-            .data(self._variableBoxInfo, d => d.obj.id);
-        const gEnter = selection.enter().append("g")
-            .attr("class", "variable_box")
-            .attr("transform", function (d) {
-                if (self.lastClickWasLeft) return "translate(" +
-                    (self.prevCellDims.size.width * (d.startI - enterIndex)) + "," +
-                    (self.prevCellDims.size.height * (d.startI - enterIndex)) + ")";
-                const roc = (d.obj && self.findRootOfChangeFunction) ? self.findRootOfChangeFunction(d.obj) : null;
-                if (roc) {
-                    const index0 = roc.prevRootIndex - self.layout.zoomedElement.prevRootIndex;
-                    return "translate(" + (self.prevCellDims.size.width * index0) + "," +
-                        (self.prevCellDims.size.height * index0) + ")";
+        self.n2Groups.variableBoxes.selectAll('g.variable_box')
+            .data(self._variableBoxInfo, d => d.obj.id)
+            .join(
+                enter => {
+                    const newGroups = enter.append('g')
+                        .attr('class', 'variable_box')
+                        .attr('transform', d => {
+                            const transX = dims.prev.width * (d.startI - enterIndex),
+                                transY = dims.prev.height * (d.startI - enterIndex);
+                            return `translate(${transX}, ${transY})`;
+                        });
+
+                    newGroups.transition(sharedTransition)
+                        .attr('transform', d =>
+                            `translate(${dims.width * d.startI}, ${dims.height * d.startI})`);
+
+                    newGroups.append('rect')
+                        .attr('width', d => dims.prev.width * (1 + d.stopI - d.startI))
+                        .attr('height', d => dims.prev.height * (1 + d.stopI - d.startI))
+                        .transition(sharedTransition)
+                        .attr('width', d => dims.width * (1 + d.stopI - d.startI))
+                        .attr('height', d => dims.height * (1 + d.stopI - d.startI));
+                },
+                update => {
+                    update.transition(sharedTransition)
+                        .attr('transform', d =>
+                            `translate(${dims.width * d.startI}, ${dims.height * d.startI})`)
+
+                    update.select('rect').transition(sharedTransition)
+                        .attr('width', d => dims.width * (1 + d.stopI - d.startI))
+                        .attr('height', d => dims.height * (1 + d.stopI - d.startI))
+                },
+                exit => {
+                    exit.transition(sharedTransition)
+                        .attr('transform', d => {
+                            const transX = dims.width * (d.startI - exitIndex),
+                              transY = dims.height * (d.startI - exitIndex);
+                            return `translate(${transX}, ${transY})`;
+                        })
+                        .remove();                 
                 }
-                throw ("enter transform not found");
-            })
-
-        gEnter.append("rect")
-            .attr("width", function (d) {
-                if (self.lastClickWasLeft) return self.prevCellDims.size.width * (1 + d.stopI - d.startI);
-                return self.prevCellDims.size.width;
-            })
-            .attr("height", function (d) {
-                if (self.lastClickWasLeft) return self.prevCellDims.size.height * (1 + d.stopI - d.startI);
-                return self.prevCellDims.size.height;
-            });
-
-        const gUpdate = gEnter.merge(selection).transition(sharedTransition)
-            .attr("transform", function (d) {
-                return "translate(" + (self.cellDims.size.width * d.startI) + "," +
-                    (self.cellDims.size.height * d.startI) + ")";
-            });
-
-        gUpdate.select("rect")
-            .attr("width", function (d) {
-                return self.cellDims.size.width * (1 + d.stopI - d.startI);
-            })
-            .attr("height", function (d) {
-                return self.cellDims.size.height * (1 + d.stopI - d.startI);
-            });
-
-        const nodeExit = selection.exit().transition(sharedTransition)
-            .attr("transform", function (d) {
-                if (self.lastClickWasLeft) return "translate(" +
-                    (self.cellDims.size.width * (d.startI - exitIndex)) + "," +
-                    (self.cellDims.size.height * (d.startI - exitIndex)) + ")";
-                const roc = (d.obj && self.findRootOfChangeFunction) ?
-                    self.findRootOfChangeFunction(d.obj) : null;
-                if (roc) {
-                    const index = roc.rootIndex - self.layout.zoomedElement.rootIndex;
-                    return "translate(" + (self.cellDims.size.width * index) + "," +
-                        (self.cellDims.size.height * index) + ")";
-                }
-                throw ("exit transform not found");
-            })
-            .remove();
-
-        nodeExit.select("rect")
-            .attr("width", function (d) {
-                if (self.lastClickWasLeft) return self.cellDims.size.width * (1 + d.stopI - d.startI);
-                return self.cellDims.size.width;
-            })
-            .attr("height", function (d) {
-                if (self.lastClickWasLeft) return self.cellDims.size.height * (1 + d.stopI - d.startI);
-                return self.cellDims.size.height;
-            });
+            )
     }
 
     /** Add all the visible elements to the matrix. */
@@ -571,16 +548,16 @@ class Matrix {
             .attr('width', size.n2matrix.width + size.svgMargin * 2)
             .attr('height', size.n2matrix.height + size.svgMargin * 2);
 
-        // Dimensions used for cell geometry and gridlines
+        // Dimensions used to calculate cell geometry and gridlines
         const dims = new Dimensions(
-            {
+            { // Current cell geometry:
                 width: this.cellDims.size.width,
                 height: this.cellDims.size.height,
                 x: this.cellDims.bottomRight.x,
                 y: this.cellDims.bottomRight.y   
             }, 
             null, 
-            {
+            { // Previous cell geometry:
                 width: this.prevCellDims.size.width,
                 height: this.prevCellDims.size.height,
                 x: this.prevCellDims.bottomRight.x,
@@ -590,7 +567,6 @@ class Matrix {
 
         this._drawCells(dims);
 
-        // Draw gridlines:
         if (!this.tooMuchDetail()) {
             debugInfo("Drawing gridlines.")
             this._drawHorizontalLines(dims);
@@ -601,7 +577,7 @@ class Matrix {
             this.n2Groups.gridlines.selectAll('.horiz_line').remove();
             this.n2Groups.gridlines.selectAll(".vert_line").remove();
         }
-        this._drawVariableBoxes();
+        this._drawVariableBoxes(dims);
     }
 
     /**
