@@ -133,6 +133,48 @@ class OmMatrix extends Matrix {
     }
 
     /**
+     * Draw the cycle arrows in the lower-left corner of the matrix.
+     * @param {OmMatrixCell} cell The focused cell.
+     * @param {Number} startIndex The index of the first diagonal node.
+     * @param {Number} endIndex The index of the last diagonal node.
+     */
+    _drawArrowsInputView(cell, startIndex, endIndex) {
+        const boxStart = this._boxInfo[startIndex],
+            boxEnd = this._boxInfo[endIndex];
+
+        // Draw multiple horizontal lines, but no more than one vertical line
+        // for box-to-box connections
+        const arrows = [];
+        for (let startsI = boxStart.startI; startsI <= boxStart.stopI; ++startsI) {
+            for (let endsI = boxEnd.startI; endsI <= boxEnd.stopI; ++endsI) {
+                if (this.exists(startsI, endsI)) {
+                    arrows.push({
+                        'start': startsI,
+                        'end': endsI
+                    });
+                }
+            }
+        }
+
+        for (const arrow of arrows) {
+            this.arrowMgr.addFullArrow(cell.id, {
+                'start': {
+                    'col': arrow.start,
+                    'row': arrow.start,
+                    'id': this.grid[arrow.start][arrow.start].srcObj.id
+                },
+                'end': {
+                    'col': arrow.end,
+                    'row': arrow.end,
+                    'id': this.grid[arrow.end][arrow.end].tgtObj.id
+                },
+                'color': (startIndex < endIndex) ?
+                    OmStyle.color.outputArrow : OmStyle.color.inputArrow,
+            });
+        }
+    }
+
+    /**
      * Look for and draw cycle arrows of the specified cell.
      * @param {OmMatrixCell} cell The off-diagonal cell to draw arrows for.
      */
@@ -141,8 +183,8 @@ class OmMatrix extends Matrix {
 
         /* Cycle arrows are only drawn in the bottom triangle of the diagram */
         if (cell.row > cell.col) {
-            const src = this.diagNodes[cell.row];
-            const tgt = this.diagNodes[cell.col];
+            const src = this.diagNodes[cell.row],
+                tgt = this.diagNodes[cell.col];
 
             // Get an array of all the parents and children of the target with cycle arrows
             const relativesWithCycleArrows = tgt.getNodesWithCycleArrows();
@@ -151,35 +193,18 @@ class OmMatrix extends Matrix {
                 for (const ai of relative.cycleArrows) {
                     if (src.hasNode(ai.src)) {
                         for (const arrow of ai.arrows) {
-                            let firstBeginIndex = -1,
-                                firstEndIndex = -1;
+                            const firstBeginIndex =
+                                this.diagNodes.findIndex(diagNode => diagNode.hasNode(arrow.begin));
+                            if (firstBeginIndex == -1)
+                                throw ("OmMatrix.drawOffDiagonalArrows() error: first begin index not found");
 
-                            // find first begin index
-                            for (let diagIdx in this.diagNodes) {
-                                const diagNode = this.diagNodes[diagIdx];
-                                if (diagNode.hasNode(arrow.begin)) {
-                                    firstBeginIndex = diagIdx;
-                                    break;
-                                }
-                            }
-                            if (firstBeginIndex == -1) {
-                                throw ("Error: first begin index not found");
-                            }
-
-                            // find first end index
-                            for (let diagIdx in this.diagNodes) {
-                                const diagNode = this.diagNodes[diagIdx];
-                                if (diagNode.hasNode(arrow.end)) {
-                                    firstEndIndex = diagIdx;
-                                    break;
-                                }
-                            }
-                            if (firstEndIndex == -1) {
-                                throw ("Error: first end index not found");
-                            }
+                            const firstEndIndex =
+                                this.diagNodes.findIndex(diagNode => diagNode.hasNode(arrow.end));
+                            if (firstEndIndex == -1)
+                                throw ("OmMatrix.drawOffDiagonalArrows() error: first end index not found");
 
                             if (firstBeginIndex != firstEndIndex) {
-                                this.drawArrowsInputView(cell, firstBeginIndex, firstEndIndex);
+                                this._drawArrowsInputView(cell, firstBeginIndex, firstEndIndex);
                             }
                         }
                     }

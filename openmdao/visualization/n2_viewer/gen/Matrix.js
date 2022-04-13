@@ -587,9 +587,9 @@ class Matrix {
     _drawOffscreenArrows(cell) {
         if (!cell.offScreen.total) return;
 
-        for (let side in cell.offScreen) {
-            for (let dir in cell.offScreen[side]) {
-                for (let offscreenNode of cell.offScreen[side][dir]) {
+        for (const side in cell.offScreen) {
+            for (const dir in cell.offScreen[side]) {
+                for (const offscreenNode of cell.offScreen[side][dir]) {
                     this.arrowMgr.addOffGridArrow(cell.id, side, dir, {
                         'cell': {
                             'col': cell.row,
@@ -674,49 +674,9 @@ class Matrix {
      * @param {MatrixCell} cell The cell the event occured on.
      */
     mouseOverOnDiagonal(cell) {
-        // Don't do anything during transition:
-        if (d3.active(cell)) return;
-        const highlights = this.drawOnDiagonalArrows(cell);
-        for (const h of highlights) h.cell.highlight(h.varType, h.direction);
-    }
-
-    drawArrowsInputView(cell, startIndex, endIndex) {
-        let boxStart = this._boxInfo[startIndex];
-        let boxEnd = this._boxInfo[endIndex];
-
-        // Draw multiple horizontal lines, but no more than one vertical line
-        // for box-to-box connections
-        let arrows = [];
-        for (let startsI = boxStart.startI; startsI <= boxStart.stopI; ++startsI) {
-            for (let endsI = boxEnd.startI; endsI <= boxEnd.stopI; ++endsI) {
-                if (this.exists(startsI, endsI)) {
-                    arrows.push({
-                        'start': startsI,
-                        'end': endsI
-                    });
-                }
-                /*
-                else {
-                    throw ("Doesn't exist in matrix: " + startsI + ', ' + endsI);
-                } */
-            }
-        }
-
-        for (let arrow of arrows) {
-            this.arrowMgr.addFullArrow(cell.id, {
-                'start': {
-                    'col': arrow.start,
-                    'row': arrow.start,
-                    'id': this.grid[arrow.start][arrow.start].srcObj.id
-                },
-                'end': {
-                    'col': arrow.end,
-                    'row': arrow.end,
-                    'id': this.grid[arrow.end][arrow.end].tgtObj.id
-                },
-                'color': (startIndex < endIndex) ?
-                    OmStyle.color.outputArrow : OmStyle.color.inputArrow,
-            });
+        if (! d3.active(cell)) { // Don't do anything during transition
+            const highlights = this.drawOnDiagonalArrows(cell);
+            highlights.forEach(h => h.cell.highlight(h.varType, h.direction));
         }
     }
 
