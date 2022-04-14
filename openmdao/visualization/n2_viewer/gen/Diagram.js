@@ -260,9 +260,9 @@ class Diagram {
             .append("g")
             .attr("class", d => `partition_group ${self.style.getNodeClass(d)}`)
             .on("click", (e,d) => self.leftClickSelector(e, d))
-            .on("contextmenu", (e,d) => {
+            .on("contextmenu", function(e,d) {
                 if (e.altKey) {
-                    self.ui.altRightClick(e, d, d3.select(e.target).select('rect').style('fill'));
+                    self.ui.altRightClick(e, d, d3.select(this).select('rect').style('fill'));
                 }
                 else {
                     self.ui.rightClick(e, d);

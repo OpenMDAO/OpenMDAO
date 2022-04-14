@@ -14,10 +14,10 @@ class OmNodeDisplayData extends NodeDisplayData {
 }
 
 /**
- * Extend TreeNode by adding support for feedback cycle arrows and solvers.
+ * Extend FilterCapableTreeNode by adding support for feedback cycle arrows and solvers.
  * @typedef OmTreeNode
  */
-class OmTreeNode extends TreeNode {
+class OmTreeNode extends FilterCapableNode {
     constructor(origNode, attribNames) {
         super(origNode, attribNames);
 

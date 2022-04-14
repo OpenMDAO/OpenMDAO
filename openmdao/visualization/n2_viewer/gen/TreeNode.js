@@ -6,12 +6,12 @@
  */
 class NodeDisplayData {
     constructor() {
-        this.nameWidthPx = 1; // Width of the label in pixels as computed by N2Layout
-        this.numLeaves = 0; // Set by N2Layout
+        this.nameWidthPx = 1; // Width of the label in pixels as computed by Layout
+        this.numLeaves = 0; // Set by Layout
         this.minimized = false; // When true, do not draw children
         this.hidden = false; // Do add to matrix at all
         this.filtered = false; // Node is a child to be shown w/partially collapsed parent
-        this.filterParent = null; // When filtered, reference to N2FilterNode container
+        this.filterParent = null; // When filtered, reference to FilterNode container
         this.manuallyExpanded = false; // Node was pre-collapsed but expanded by user
         this.boxChildren = false; // Surround children with a box in the matrix grid
 
@@ -66,10 +66,6 @@ class TreeNode {
     // Accessor functions for this.draw.hidden - whether to draw at all
     hide() { this.draw.hidden = true; return this; }
     show() { this.draw.hidden = false; return this; }
-
-    // Accessor functions for this.draw.filtered - whether a variable is shown in collapsed form
-    doFilter(filterNode) { this.draw.filtered = true; this.draw.filterParent = filterNode; }
-    undoFilter() { this.draw.filtered = false; this.draw.filterParent = null; }
 
     /**
      * Create a backup of our position and other info.
@@ -249,45 +245,6 @@ class TreeNode {
         this.children.splice(idx + 1, 0, newChild);
     }
 
-    /** If this node has children add special children that can hold filtered variables */
-    addFilterChild(attribNames) {
-        if (this.hasChildren()) {
-
-            // Separate N2FilterNodes are added for inputs and outputs so
-            // they can be inserted at the correct place in the diagram.
-            this.filter = {
-                inputs: new N2FilterNode(this, attribNames, 'inputs'),
-                outputs: new N2FilterNode(this, attribNames, 'outputs')
-            };
-            this._insertAsLastInput(this.filter.inputs);
-            this.children.push(this.filter.outputs);
-        }
-    }
-
-    /** Add ourselves to the corrent parental filter */
-    addSelfToFilter() {
-        if (this.isInput()) { this.parent.filter.inputs.add(this); }
-        else if (this.isOutput()) { this.parent.filter.outputs.add(this); }
-    }
-
-    /** Remove ourselves from the corrent parental filter */
-    removeSelfFromFilter() {
-        if (this.isInput()) { this.parent.filter.inputs.del(this); }
-        else if (this.isOutput()) { this.parent.filter.outputs.del(this); }
-    }
-
-    /**
-     * Filter ourselves based on the supplied filter state.
-     * @param {Boolean} filtered Whether to filter or not.
-     * @return {Boolean} The newly set state.
-     */
-    filterSelf(filtered) {
-        if (filtered) { this.addSelfToFilter(); }
-        else { this.removeSelfFromFilter(); }
-
-        return this.draw.filtered;
-    }
-
     isFilter() { return false; } // Always false in base class
     hasFilters() { return ('filter' in this); } // True if we contain filters
     isInputFilter() { return false; } // Always false in base class
@@ -320,9 +277,10 @@ class TreeNode {
 
 /**
  * Special TreeNode subclass whose children are filtered variables of the parent component.
- * @typedef N2FilterNode
+ * Not intended to be used except as a component of a FilterCapableNode.
+ * @typedef FilterNode
  */
-class N2FilterNode extends TreeNode {
+class FilterNode extends TreeNode {
     /**
      * Give ourselves a special name and the "filter" type.
      * @param {TreeNode} parentComponent The component that we are filtering variables for.
@@ -331,7 +289,7 @@ class N2FilterNode extends TreeNode {
     constructor(parentComponent, attribNames, suffix) {
         super(
             {
-                name: `${parentComponent.name}_N2_FILTER_${suffix}`,
+                name: `${parentComponent.name}_FILTER_${suffix}`,
                 type: 'filter'
             },
             attribNames
@@ -446,4 +404,62 @@ class N2FilterNode extends TreeNode {
 
     get targetParentSet() { return this._genParentSet('target'); }
     set targetParentSet(val) { return val; }
+}
+
+/**
+ * Add the ability of a TreeNode to contain FilterNodes managing its input/output variables.
+ * The TreeNode base class has some accessor methods that refer to filters, but no
+ * ability to actually filter anything or be filtered by itself.
+ * @typedef FilterCapableNode
+ * @property {FilterNode} filter.inputs Children that are inputs to be viewed as collapsed.
+ * @property {FilterNode} filter.outputs Children that are outputs to be viewed as collapsed.
+ */
+class FilterCapableNode extends TreeNode {
+    constructor(origNode, attribNames) {
+        super(origNode, attribNames);
+    }
+
+    // Accessor functions for this.draw.filtered - whether a variable is shown in collapsed form
+    doFilter(filterNode) { this.draw.filtered = true; this.draw.filterParent = filterNode; }
+    undoFilter() { this.draw.filtered = false; this.draw.filterParent = null; }
+
+    /** If this node has children add special children that can hold filtered variables */
+    addFilterChild(attribNames) {
+        if (this.hasChildren()) {
+
+            // Separate FilterNodes are added for inputs and outputs so
+            // they can be inserted at the correct place in the diagram.
+            this.filter = {
+                inputs: new FilterNode(this, attribNames, 'inputs'),
+                outputs: new FilterNode(this, attribNames, 'outputs')
+            };
+            this._insertAsLastInput(this.filter.inputs);
+            this.children.push(this.filter.outputs);
+        }
+    }
+
+    /** Add ourselves to the corrent parental filter */
+    addSelfToFilter() {
+        if (this.isInput()) { this.parent.filter.inputs.add(this); }
+        else if (this.isOutput()) { this.parent.filter.outputs.add(this); }
+    }
+
+    /** Remove ourselves from the corrent parental filter */
+    removeSelfFromFilter() {
+        if (this.isInput()) { this.parent.filter.inputs.del(this); }
+        else if (this.isOutput()) { this.parent.filter.outputs.del(this); }
+    }
+
+    /**
+     * Filter ourselves based on the supplied filter state.
+     * @param {Boolean} filtered Whether to filter or not.
+     * @return {Boolean} The newly set state.
+     */
+    filterSelf(filtered) {
+        if (filtered) { this.addSelfToFilter(); }
+        else { this.removeSelfFromFilter(); }
+
+        return this.draw.filtered;
+    }
+
 }
