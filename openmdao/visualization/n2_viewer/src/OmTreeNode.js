@@ -24,6 +24,7 @@ class OmTreeNode extends TreeNode {
         // Solver names may be empty, so set them to "None" instead.
         if (this.linear_solver == "") this.linear_solver = "None";
         if (this.nonlinear_solver == "") this.nonlinear_solver = "None";
+        if (this.isComponent()) this.draw.boxChildren = true;
     }
 
     get absPathName() { return this.path; }
@@ -34,6 +35,21 @@ class OmTreeNode extends TreeNode {
     addFilterChild(attribNames) {
         if (this.isComponent()) { super.addFilterChild(attribNames); }
     }
+
+    /** True if this is an input whose source is an auto-ivc'd output */
+    isAutoIvcInput() { return (this.type == 'autoivc_input'); }
+
+    /** True if this is an output and it's not implicit */
+    isExplicitOutput() { return (this.isOutput() && !this.implicit); }
+
+    /** True if this is an output and it is implicit */
+    isImplicitOutput() { return (this.isOutput() && this.implicit); }
+
+    /** True is this.type is 'subsystem' */
+    isSubsystem() { return (this.type == 'subsystem'); }
+
+    /** True if it's a subsystem and this.subsystem_type is 'component' */
+    isComponent() { return (this.isSubsystem() && this.subsystem_type == 'component'); }
 
     /**
      * Add ourselves to the supplied array if we contain a cycleArrows property.

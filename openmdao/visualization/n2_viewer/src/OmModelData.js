@@ -89,7 +89,7 @@ class OmModelData extends ModelData {
             }
         }
 
-        if (node.isSubsystem()) {
+        if (node instanceof OmTreeNode && node.isSubsystem()) {
             this.maxSystemDepth = Math.max(depth, this.maxSystemDepth);
         }
 
@@ -143,7 +143,7 @@ class OmModelData extends ModelData {
         }
 
         for (const child of node.children) {
-            if (child.isSubsystem()) {
+            if (child instanceof OmTreeNode && child.isSubsystem()) {
                 if (!node.hasChildren('subsystem_children'))
                     node.subsystem_children = [];
 

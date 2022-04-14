@@ -291,7 +291,8 @@ class Matrix {
             const curNode = this.diagNodes[ri];
             const startINode = this.diagNodes[currentBox.startI];
 
-            if (startINode.parent && curNode.parent && startINode.parent === curNode.parent) {
+            if (startINode.parent && startINode.parent.draw.boxChildren && 
+                curNode.parent && startINode.parent === curNode.parent) {
                 ++currentBox.stopI;
             }
             else {
@@ -542,14 +543,14 @@ class Matrix {
 
     /** Add all the visible elements to the matrix. */
     draw() {
-        let size = this.layout.size;
+        const size = this.layout.size;
         d3.select("#n2MatrixClip > rect")
             .transition(sharedTransition)
             .attr('width', size.n2matrix.width + size.svgMargin * 2)
             .attr('height', size.n2matrix.height + size.svgMargin * 2);
 
         // Dimensions used to calculate cell geometry and gridlines
-        const dims = new Dimensions(
+        const cellDims = new Dimensions(
             { // Current cell geometry:
                 width: this.cellDims.size.width,
                 height: this.cellDims.size.height,
@@ -565,19 +566,19 @@ class Matrix {
             }
         );
 
-        this._drawCells(dims);
+        this._drawCells(cellDims);
 
         if (!this.tooMuchDetail()) {
             debugInfo("Drawing gridlines.")
-            this._drawHorizontalLines(dims);
-            this._drawVerticalLines(dims);
+            this._drawHorizontalLines(cellDims);
+            this._drawVerticalLines(cellDims);
         }
         else {
             debugInfo("Erasing gridlines.")
             this.n2Groups.gridlines.selectAll('.horiz_line').remove();
             this.n2Groups.gridlines.selectAll(".vert_line").remove();
         }
-        this._drawVariableBoxes(dims);
+        this._drawVariableBoxes(cellDims);
     }
 
     /**
@@ -616,7 +617,7 @@ class Matrix {
         this._drawOffscreenArrows(cell);
         const highlights = [{ 'cell': cell, 'varType': 'self', 'direction': 'self' }];
 
-        for (let col = 0; col < this.layout.visibleNodes.length; ++col) {
+        this.layout.visibleNodes.forEach( (node, col) => {
             if (this.exists(cell.row, col)) {
                 if (col != cell.row) {
                     this.arrowMgr.addFullArrow(cell.id, {
@@ -663,7 +664,7 @@ class Matrix {
                     });
                 }
             }
-        }
+        });
 
         return highlights;
     }

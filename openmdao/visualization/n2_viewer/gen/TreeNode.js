@@ -13,6 +13,7 @@ class NodeDisplayData {
         this.filtered = false; // Node is a child to be shown w/partially collapsed parent
         this.filterParent = null; // When filtered, reference to N2FilterNode container
         this.manuallyExpanded = false; // Node was pre-collapsed but expanded by user
+        this.boxChildren = false; // Surround children with a box in the matrix grid
 
         this.dims = new Dimensions({ x: 1e-6, y: 1e-6, width: 1, height: 1 });
         this.dims.preserve();
@@ -54,7 +55,6 @@ class TreeNode {
         this.numDescendants = 0; // Set by ModelData
 
         this.rootIndex = -1;
-
     }
 
     _newDisplayData() { return new NodeDisplayData(); }
@@ -101,32 +101,17 @@ class TreeNode {
     /** True if this an input and unconnected. */
     isUnconnectedInput() { return (this.type == 'unconnected_input'); }
 
-    /** True if this is an input whose source is an auto-ivc'd output */
-    isAutoIvcInput() { return (this.type == 'autoivc_input'); }
-
     /** True if this.type is 'output'. */
     isOutput() { return (this.type == 'output'); }
 
     /** True if this is the root node in the model */
     isRoot() { return (this.type == 'root'); }
 
-    /** True if this is an output and it's not implicit */
-    isExplicitOutput() { return (this.isOutput() && !this.implicit); }
-
-    /** True if this is an output and it is implicit */
-    isImplicitOutput() { return (this.isOutput() && this.implicit); }
-
     /** True if this.type is 'input', 'unconnected_input', or 'output'. */
     isInputOrOutput() { return this.type.match(inputOrOutputRegex); }
 
-    /** True is this.type is 'subsystem' */
-    isSubsystem() { return (this.type == 'subsystem'); }
-
     /** True if it's a subsystem and this.subsystem_type is 'group' */
     isGroup() { return (this.isSubsystem() && this.subsystem_type == 'group'); }
-
-    /** True if it's a subsystem and this.subsystem_type is 'component' */
-    isComponent() { return (this.isSubsystem() && this.subsystem_type == 'component'); }
 
     /** True if this is a "fake" node that manages filtered children. */
     isFilter() { return (this.type == 'filter'); }
@@ -264,7 +249,7 @@ class TreeNode {
         this.children.splice(idx + 1, 0, newChild);
     }
 
-    /** If this is a component, add special children that can hold filtered variables */
+    /** If this node has children add special children that can hold filtered variables */
     addFilterChild(attribNames) {
         if (this.hasChildren()) {
 

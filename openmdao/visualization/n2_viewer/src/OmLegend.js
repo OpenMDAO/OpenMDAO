@@ -110,7 +110,8 @@ class OmLegend extends Legend {
                         'color': OmStyle.color.group
                     })
                 }
-                else if (!this.showSysVar.component && node.isComponent()) {
+                else if (!this.showSysVar.component && node instanceof OmTreeNode &&
+                    node.isComponent()) {
                     this.showSysVar.component = true;
                     this.sysAndVar.push({
                         'name': 'Component',
@@ -127,21 +128,24 @@ class OmLegend extends Legend {
                         'color': OmStyle.color.input
                     })
                 }
-                else if (!this.showSysVar.outputExplicit && node.isExplicitOutput()) {
+                else if (!this.showSysVar.outputExplicit && node instanceof OmTreeNode &&
+                    node.isExplicitOutput()) {
                     this.showSysVar.outputExplicit = true;
                     this.sysAndVar.push({
                         'name': 'Explicit Output',
                         'color': OmStyle.color.outputExplicit
                     })
                 }
-                else if (!this.showSysVar.outputImplicit && node.isImplicitOutput()) {
+                else if (!this.showSysVar.outputImplicit && node instanceof OmTreeNode &&
+                    node.isImplicitOutput()) {
                     this.showSysVar.outputImplicit = true;
                     this.sysAndVar.push({
                         'name': 'Implicit Output',
                         'color': OmStyle.color.outputImplicit
                     })
                 }
-                else if (!this.showSysVar.autoivcInput && node.isAutoIvcInput()) {
+                else if (!this.showSysVar.autoivcInput && node instanceof OmTreeNode &&
+                    node.isAutoIvcInput()) {
                     this.showSysVar.autoivcInput = true;
                     this.sysAndVar.push({
                         'name': 'Auto-IVC Input',
