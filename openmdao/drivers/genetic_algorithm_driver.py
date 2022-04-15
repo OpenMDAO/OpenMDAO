@@ -648,9 +648,9 @@ class GeneticAlgorithm(object):
             Pm = (self.lchrom + 1.0) / (2.0 * pop_size * np.sum(bits))
         elite = self.elite
 
-        new_gen = np.round(lhs(self.lchrom, self.npop, criterion='center',
+        new_gen = np.round(lhs(self.lchrom, self.npop-1, criterion='center',
                                random_state=random_state))
-        new_gen[0] = self.encode(x0, vlb, vub, bits)
+        new_gen = np.vstack((new_gen,self.encode(x0, vlb, vub, bits)))
 
         # Main Loop
         nfit = 0

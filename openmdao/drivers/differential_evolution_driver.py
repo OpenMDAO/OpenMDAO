@@ -17,6 +17,7 @@ import os
 import copy
 
 import numpy as np
+from pyDOE2 import lhs
 
 from openmdao.core.constants import INF_BOUND
 from openmdao.core.driver import Driver, RecordingDebugging
@@ -541,8 +542,10 @@ class DifferentialEvolution(object):
 
         rng = np.random.default_rng(seed)
 
-        # create random initial population, scaled to bounds
-        population = rng.random([self.npop, self.lchrom]) * (vub - vlb) + vlb  # scale to bounds
+        # create LHS initial population (scaled to bounds) + user initial condition
+        population = lhs(self.lchrom, self.npop-1, criterion='center', random_state=seed)
+        population = population * (vub - vlb) + vlb  # scale to bounds
+        population = np.vstack((population, x0))
         fitness = np.ones(self.npop) * np.inf  # initialize fitness to infinitely bad
 
         # Main Loop
