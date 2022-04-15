@@ -201,6 +201,7 @@ def _setup(options):
     verbose = options.verbose
     memory = options.memory
     leaks = options.leaks
+    show_returns = options.show_returns or memory or leaks
 
     if not _registered:
         methods = _get_methods(options, default='openmdao')
@@ -236,9 +237,11 @@ def _setup(options):
 
         _printer = _get_printer(stream, options.rank)
 
+        ret = _trace_return if show_returns else None
+
         _trace_calls = _create_profile_callback(call_stack, _collect_methods(methods),
                                                 do_call=_trace_call,
-                                                do_ret=_trace_return,
+                                                do_ret=ret,
                                                 context=(qual_cache, method_counts,
                                                          class_counts, id2count, verbose, memory,
                                                          leaks, stream, options.show_ptrs),
@@ -374,6 +377,8 @@ def _itrace_setup_parser(parser):
                         help="Show memory usage.")
     parser.add_argument('-l', '--leaks', action='store_true', dest='leaks',
                         help="Show objects that are not garbage collected after each function call.")
+    parser.add_argument('--show_returns', action='store_true', dest='show_returns',
+                        help="Show return for each function.")
     parser.add_argument('-r', '--rank', action='store', dest='rank', type=int,
                         default=-1, help='MPI rank where output is desired.  Default is all ranks.')
     parser.add_argument('-o', '--outfile', action='store', dest='outfile',

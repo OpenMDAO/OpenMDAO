@@ -261,7 +261,7 @@ class DefaultTransfer(Transfer):
         if mode == 'fwd':
             # this works whether the vecs have multi columns or not due to broadcasting
             in_vec.set_val(out_vec.asarray()[self._out_inds.flat], self._in_inds)
-
+            print(f"transfer {list(out_vec.idxs2nameloc(self._out_inds).items())} --> {list(in_vec.idxs2nameloc(self._in_inds).items())}")
         else:  # rev
             out_vec.iadd(np.bincount(self._out_inds, in_vec._get_data()[self._in_inds],
                                      minlength=out_vec._data.size))

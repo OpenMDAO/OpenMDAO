@@ -2074,18 +2074,22 @@ class Group(System):
         else:
             if mode == 'fwd' and self._conn_discrete_in2out and vec_name == 'nonlinear':
                 self._discrete_transfer(sub)
+            print(f"{self.pathname}: transfer, sub={sub} <nothing transferred>")
             return
 
         vec_inputs = self._vectors['input'][vec_name]
 
         if mode == 'fwd':
             if xfer is not None:
+                print(f"{self.pathname}: transfer, sub={sub}")
                 if self._has_input_scaling:
                     vec_inputs.scale_to_norm()
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
                     vec_inputs.scale_to_phys()
                 else:
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
+            else:
+                print(f"{self.pathname}: transfer, sub={sub} <nothing transferred>")
             if self._conn_discrete_in2out and vec_name == 'nonlinear':
                 self._discrete_transfer(sub)
 
@@ -2649,6 +2653,8 @@ class Group(System):
                         # zero out dvecs of irrelevant subsystems
                         s._vectors['residual']['linear'].set_val(0.0)
 
+            print("group:", self.pathname, "dinputs:", self._vectors['input']['linear']._data,
+                  "dresids:", self._vectors['residual']['linear']._data)
             for subsys in self._subsystems_myproc:
                 if rel_systems is None or subsys.pathname in rel_systems:
                     subsys._apply_linear(jac, rel_systems, mode, scope_out, scope_in)

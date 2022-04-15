@@ -1,4 +1,5 @@
 """Define the default Vector class."""
+from collections import defaultdict
 import numpy as np
 
 from openmdao.vectors.vector import Vector, _full_slice
@@ -496,6 +497,18 @@ class DefaultVector(Vector):
             self._slices = slices
 
         return self._slices
+
+    def idxs2nameloc(self, idxs):
+        names = defaultdict(list)
+        start = end = 0
+        for name, arr in self._views_flat.items():
+            end += arr.size
+            for idx in idxs:
+                if start <= idx < end:
+                    names[name].append(idx - start)
+            start = end
+
+        return names
 
     def __getstate__(self):
         """
