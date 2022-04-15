@@ -1,7 +1,7 @@
 // <<hpp_insert gen/ToolbarButtonClick.js>>
 // <<hpp_insert gen/ToolbarButtonToggle.js>>
 // <<hpp_insert gen/ClickHandler.js>>
-// <<hpp_insert gen/Help.js>
+// <<hpp_insert gen/DiagramHelp.js>>
 
 /**
  * Manage the set of buttons and tools at the left of the diagram.
@@ -70,7 +70,7 @@ class Toolbar {
 
     /** Either create the help window the first time or redisplay it */
     _showHelp() {
-        if (!this._helpWindow) this._helpWindow = new Help(this.helpInfo);
+        if (!this._helpWindow) this._helpWindow = new DiagramHelp(this.helpInfo);
         else this._helpWindow.show().modal(true);
     }
 
