@@ -5,7 +5,7 @@
  * caches of hovered/pinned arrows, move arrows between them, and
  * transition on updates.
  * @typedef ArrowManager
- * @prop {Object} n2Groups DOM elements referenced by Diagram
+ * @prop {Object} diagGroups DOM elements referenced by Diagram
  * @prop {ArrowCache} hoverArrows Arrows that disappear if the mouse moves away from the cell
  * @prop {ArrowCache} pinnedArrows Arrows that persist and are redrawn during updates
  * @prop {Object} nodeSize Matrix cell width and height
@@ -13,8 +13,8 @@
  * @prop {Object} arrowDirClasses The various offscreen Arrow derived classes.
  */
  class ArrowManager {
-    constructor(n2Groups) {
-        this.n2Groups = n2Groups;
+    constructor(diagGroups) {
+        this.diagGroups = diagGroups;
         this.hoverArrows = new ArrowCache();
         this.pinnedArrows = new ArrowCache();
         this.nodeSize = { 'width': -1, 'height': -1 };
@@ -69,7 +69,7 @@
      */
     addFullArrow(cellId, attribs) {
         attribs.width = this.lineWidth;
-        const newArrow = new BentArrow(attribs, this.n2Groups, this.nodeSize);
+        const newArrow = new BentArrow(attribs, this.diagGroups, this.nodeSize);
 
         // Add or replace the cache entry with the new arrow
         if (this.pinnedArrows.hasArrow(newArrow.id)) {
@@ -98,7 +98,7 @@
         attribs.cellId = cellId;
         debugInfo("addOffGridArrow(): ", side, dir, attribs)
         const newArrow = new (this.arrowDirClasses[side][dir])(attribs,
-            this.n2Groups, this.nodeSize);
+            this.diagGroups, this.nodeSize);
 
         // Add or replace the cache entry with the new arrow
         if (this.pinnedArrows.hasArrow(newArrow.id)) {
@@ -127,7 +127,7 @@
         attribs.end.row = endCell.row;
         attribs.width = this.lineWidth;
         this.pinnedArrows.arrows[arrow.id] =
-            new BentArrow(attribs, this.n2Groups, this.nodeSize);
+            new BentArrow(attribs, this.diagGroups, this.nodeSize);
     }
 
     /**
@@ -157,7 +157,7 @@
         }
         this.pinnedArrows.arrows[arrow.id] =
             new (this.arrowDirClasses[side]['outgoing'])(attribs,
-                    this.n2Groups, this.nodeSize);
+                    this.diagGroups, this.nodeSize);
     }
 
     /**
@@ -187,7 +187,7 @@
         }
         this.pinnedArrows.arrows[arrow.id] =
             new (this.arrowDirClasses[side]['incoming'])(attribs,
-                this.n2Groups, this.nodeSize);
+                this.diagGroups, this.nodeSize);
     }
 
     /**
@@ -359,7 +359,7 @@
 
                 attribs.width = this.lineWidth;
                 const newArrow = new (arrowClasses[arrow[1]])(attribs,
-                    this.n2Groups, this.nodeSize);
+                    this.diagGroups, this.nodeSize);
                 this.pinnedArrows.add(arrow[0], newArrow);
             }
             else {
@@ -378,7 +378,7 @@
                     'color': arrow[7],
                 };
                 attribs.width = this.lineWidth;
-                const newArrow = new BentArrow(attribs, this.n2Groups, this.nodeSize);
+                const newArrow = new BentArrow(attribs, this.diagGroups, this.nodeSize);
                 this.pinnedArrows.add(arrow[0], newArrow);
             }
         }

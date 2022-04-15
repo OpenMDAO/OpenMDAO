@@ -37,7 +37,7 @@ async def create_help(playwright):
 
     # Milliseconds to allow for the last transition animation to finish.
     # Obtain value defined in N2 code.
-    transition_wait = await page.evaluate("N2TransitionDefaults.durationSlow")
+    transition_wait = await page.evaluate("transitionDefaults.durationSlow")
     transition_wait += 100
 
     await page.wait_for_selector("#cellShape_node_26")

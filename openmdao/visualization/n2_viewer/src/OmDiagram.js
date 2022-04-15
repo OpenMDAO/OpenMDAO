@@ -38,7 +38,7 @@ class OmDiagram extends Diagram {
 
     /** Create a new OmMatrix object. Overrides superclass method. */
     _newMatrix(lastClickWasLeft, prevCellSize = null) {
-        return new OmMatrix(this.model, this.layout, this.dom.n2Groups,
+        return new OmMatrix(this.model, this.layout, this.dom.diagGroups,
             this.arrowMgr, lastClickWasLeft, this.ui.findRootOfChangeFunction, prevCellSize);
     }
 

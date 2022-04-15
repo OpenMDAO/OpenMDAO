@@ -7,7 +7,7 @@
  * @property {TreeNodes[]} nodes Reference to nodes that will be drawn.
  * @property {ModelData} model Reference to the pre-processed model.
  * @property {Layout} layout Reference to object managing columns widths and such.
- * @property {Object} n2Groups References to <g> SVG elements created by Diagram.
+ * @property {Object} diagGroups References to <g> SVG elements created by Diagram.
  * @property {number} levelOfDetailThreshold Don't draw elements below this size in pixels.
  * @property {Object} nodeSize Width and height of each node in the matrix.
  * @property {Object} prevNodeSize Width and height of each node in the previous matrix.
@@ -19,12 +19,12 @@ class Matrix {
      * Render the matrix of visible elements in the model.
      * @param {ModelData} model The pre-processed model data.
      * @param {Layout} layout Pre-computed layout of the diagram.
-     * @param {Object} n2Groups References to <g> SVG elements created by Diagram.
+     * @param {Object} diagGroups References to <g> SVG elements created by Diagram.
      * @param {ArrowManager} arrowMgr Object to create and manage conn. arrows.
      * @param {Boolean} lastClickWasLeft
      * @param {function} findRootOfChangeFunction
      */
-    constructor(model, layout, n2Groups, arrowMgr,
+    constructor(model, layout, diagGroups, arrowMgr,
         lastClickWasLeft,
         findRootOfChangeFunction,
         prevNodeSize = {
@@ -35,15 +35,15 @@ class Matrix {
         this.model = model;
         this.layout = layout;
         this.diagNodes = layout.visibleNodes;
-        this.n2Groups = n2Groups;
+        this.diagGroups = diagGroups;
         this.arrowMgr = arrowMgr;
         this.lastClickWasLeft = lastClickWasLeft;
         this.findRootOfChangeFunction = findRootOfChangeFunction;
 
         this.prevNodeSize = prevNodeSize;
         this.nodeSize = {
-            'width': layout.size.n2matrix.width / this.diagNodes.length,
-            'height': layout.size.n2matrix.height / this.diagNodes.length,
+            'width': layout.size.matrix.width / this.diagNodes.length,
+            'height': layout.size.matrix.height / this.diagNodes.length,
         }
         this.arrowMgr.setNodeSize(this.nodeSize);
 
@@ -52,7 +52,7 @@ class Matrix {
         d3.select("#offgridArrow").attr("markerWidth", markerSize * 2).attr("markerHeight", markerSize);
 
         CellRenderer.updateDims(this.nodeSize.width, this.nodeSize.height);
-        this.updateLevelOfDetailThreshold(layout.size.n2matrix.height);
+        this.updateLevelOfDetailThreshold(layout.size.matrix.height);
 
         this._buildGrid();
         this._setupVariableBoxesAndGridLines();
@@ -343,7 +343,7 @@ class Matrix {
     _drawCells(dims) {
         const self = this;
 
-        this.n2Groups.elements.selectAll('g.n2cell')
+        this.diagGroups.elements.selectAll('g.n2cell')
             .data(this.visibleCells, d => d.id)
             .join(
                 enter => self._addNewMatrixCells(enter, dims),
@@ -437,7 +437,7 @@ class Matrix {
     _drawHorizontalLines(dims) {
         const self = this;
 
-        self.n2Groups.gridlines.selectAll('g.horiz_line')
+        self.diagGroups.gridlines.selectAll('g.horiz_line')
             .data(self._gridLines, d => d.obj.id)
             .join(
                 enter => { 
@@ -449,12 +449,12 @@ class Matrix {
                         .attr('transform', d => `translate(0, ${dims.height * d.i})`)
 
                     enterGroups.append('line')
-                        .attr('x2', self.layout.size.n2matrix.width)
+                        .attr('x2', self.layout.size.matrix.width)
                 },
                 update => update.transition(sharedTransition)
                     .attr('transform', d => `translate(0, ${dims.height * d.i})`)
                     .select('line')
-                    .attr('x2', self.layout.size.n2matrix.width),
+                    .attr('x2', self.layout.size.matrix.width),
                 exit => exit.transition(sharedTransition)
                     .attr('transform', d => `translate(0, ${dims.height * (d.i - exitIndex)})`)
                     .remove()
@@ -468,7 +468,7 @@ class Matrix {
      _drawVerticalLines(dims) {
         const self = this;
 
-        self.n2Groups.gridlines.selectAll('g.vert_line')
+        self.diagGroups.gridlines.selectAll('g.vert_line')
         .data(self._gridLines, d => d.obj.id)
         .join(
             enter => { 
@@ -480,12 +480,12 @@ class Matrix {
                     .attr('transform', d => `translate(${dims.width * d.i}) rotate(-90)`)
 
                 enterGroups.append('line')
-                    .attr('x1', -self.layout.size.n2matrix.height)
+                    .attr('x1', -self.layout.size.matrix.height)
             },
             update => update.transition(sharedTransition)
                 .attr('transform', d => `translate(${dims.width * d.i}) rotate(-90)`)
                 .select('line')
-                .attr('x1', -self.layout.size.n2matrix.height),
+                .attr('x1', -self.layout.size.matrix.height),
             exit => exit.transition(sharedTransition)
                 .attr('transform', d => `translate(0, ${dims.width * (d.i - exitIndex)}) rotate(-90)`)
                 .remove()
@@ -497,7 +497,7 @@ class Matrix {
     _drawVariableBoxes(dims) {
         const self = this; 
 
-        self.n2Groups.variableBoxes.selectAll('g.variable_box')
+        self.diagGroups.variableBoxes.selectAll('g.variable_box')
             .data(self._variableBoxInfo, d => d.obj.id)
             .join(
                 enter => {
@@ -546,8 +546,8 @@ class Matrix {
         const size = this.layout.size;
         d3.select("#n2MatrixClip > rect")
             .transition(sharedTransition)
-            .attr('width', size.n2matrix.width + size.svgMargin * 2)
-            .attr('height', size.n2matrix.height + size.svgMargin * 2);
+            .attr('width', size.matrix.width + size.svgMargin * 2)
+            .attr('height', size.matrix.height + size.svgMargin * 2);
 
         // Dimensions used to calculate cell geometry and gridlines
         const cellDims = new Dimensions(
@@ -575,8 +575,8 @@ class Matrix {
         }
         else {
             debugInfo("Erasing gridlines.")
-            this.n2Groups.gridlines.selectAll('.horiz_line').remove();
-            this.n2Groups.gridlines.selectAll(".vert_line").remove();
+            this.diagGroups.gridlines.selectAll('.horiz_line').remove();
+            this.diagGroups.gridlines.selectAll(".vert_line").remove();
         }
         this._drawVariableBoxes(cellDims);
     }

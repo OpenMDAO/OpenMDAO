@@ -284,7 +284,7 @@ class UserInterface {
             this.findRootOfChangeFunction =
                 this.findRootOfChangeForRightClick.bind(this);
 
-            N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
+            transitionDefaults.duration = transitionDefaults.durationFast;
             this.lastClickWasLeft = false;
             node.minimize();
             this.diag.update();
@@ -349,7 +349,7 @@ class UserInterface {
             this.leftClickIsForward = false; // backwards
         }
         this.diag.updateZoomedElement(node);
-        N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
+        transitionDefaults.duration = transitionDefaults.durationFast;
     }
 
     /**
@@ -576,7 +576,7 @@ class UserInterface {
     collapseOutputsButtonClick(startNode) {
         this.addBackButtonHistory();
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
-        N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
+        transitionDefaults.duration = transitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
         this._collapseOutputs(startNode);
         this.diag.update();
@@ -606,7 +606,7 @@ class UserInterface {
     uncollapseButtonClick(startNode) {
         this.addBackButtonHistory();
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
-        N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
+        transitionDefaults.duration = transitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
         this._uncollapse(startNode);
         startNode.draw.manuallyExpanded = true;
@@ -621,7 +621,7 @@ class UserInterface {
         this.diag.model.manuallyExpandAll(startNode);
 
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
-        N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
+        transitionDefaults.duration = transitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
         this.diag.update();
     }
@@ -632,7 +632,7 @@ class UserInterface {
         this.diag.model.minimizeAll(startNode);
 
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
-        N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
+        transitionDefaults.duration = transitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
         this.diag.update();
     }
@@ -647,12 +647,12 @@ class UserInterface {
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseDepth.bind(
             this
         );
-        N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
+        transitionDefaults.duration = transitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
         this.diag.update();
     }
 
-    /** React to the toggle legend button, and show or hide the legend below the N2. */
+    /** React to the toggle legend button, and show or hide the legend. */
     toggleLegend() {
         this.legend.toggle();
 
@@ -709,7 +709,7 @@ class UserInterface {
         this.diag.search.performSearch();
 
         this.findRootOfChangeFunction = this.diag.search.findRootOfChangeForSearch;
-        N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
+        transitionDefaults.duration = transitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
         this.diag.search.updateRecomputesAutoComplete = false;
         this.diag.update();

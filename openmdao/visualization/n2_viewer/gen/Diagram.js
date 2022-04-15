@@ -21,8 +21,8 @@
  * @property {Object} dom.svg The SVG element.
  * @property {Object} dom.svgStyle Object where SVG style changes can be made.
  * @property {Object} dom.toolTip Div to display tooltips.
- * @property {Object} dom.n2OuterGroup The outermost div of the diagram itself.
- * @property {Object} dom.n2Groups References to <g> SVG elements.
+ * @property {Object} dom.diagOuterGroup The outermost div of the diagram itself.
+ * @property {Object} dom.diagGroups References to <g> SVG elements.
  * @property {number} chosenCollapseDepth The selected depth from the drop-down.
  */
 class Diagram {
@@ -41,11 +41,11 @@ class Diagram {
         this.dims = structuredClone(defaultDims);
 
         this._referenceD3Elements();
-        this.transitionStartDelay = N2TransitionDefaults.startDelay;
+        this.transitionStartDelay = transitionDefaults.startDelay;
         this.chosenCollapseDepth = -1;
 
         this.search = new Search(this.zoomedElement, this.model.root);
-        this.arrowMgr = new ArrowManager(this.dom.n2Groups);
+        this.arrowMgr = new ArrowManager(this.dom.diagGroups);
 
         if (callInit) { this._init(); }
     }
@@ -58,7 +58,7 @@ class Diagram {
 
     /** Create a Matrix object. Can be overridden by subclasses */
     _newMatrix(lastClickWasLeft, prevCellSize = null) {
-        return new Matrix(this.model, this.layout, this.dom.n2Groups,
+        return new Matrix(this.model, this.layout, this.dom.diagGroups,
             this.arrowMgr, lastClickWasLeft, this.ui.findRootOfChangeFunction, prevCellSize);
     }
 
@@ -84,11 +84,11 @@ class Diagram {
             'svgStyle': d3.select("#svgId style"),
             'toolTip': d3.select(".tool-tip"),
             'arrowMarker': d3.select("#arrow"),
-            'n2OuterGroup': d3.select('g#n2outer'),
-            'n2InnerGroup': d3.select('g#n2inner'),
+            'diagOuterGroup': d3.select('g#n2outer'),
+            'diagInnerGroup': d3.select('g#n2inner'),
             'pTreeGroup': d3.select('g#tree'),
             'highlightBar': d3.select('g#highlight-bar'),
-            'n2BackgroundRect': d3.select('g#n2inner rect'),
+            'diagBackgroundRect': d3.select('g#n2inner rect'),
             'waiter': d3.select('#waiting-container'),
             'clips': {
                 'partitionTree': d3.select("#partitionTreeClip > rect"),
@@ -96,21 +96,21 @@ class Diagram {
             }
         };
 
-        const n2Groups = {};
-        this.dom.n2InnerGroup.selectAll('g').each(function () {
+        const diagGroups = {};
+        this.dom.diagInnerGroup.selectAll('g').each(function () {
             const d3elem = d3.select(this);
             const name = new String(d3elem.attr('id')).replace(/n2/, '');
-            n2Groups[name] = d3elem;
+            diagGroups[name] = d3elem;
         })
-        this.dom.n2Groups = n2Groups;
+        this.dom.diagGroups = diagGroups;
 
         const offgrid = {};
-        this.dom.n2OuterGroup.selectAll('g.offgridLabel').each(function () {
+        this.dom.diagOuterGroup.selectAll('g.offgridLabel').each(function () {
             const d3elem = d3.select(this);
             const name = new String(d3elem.attr('id')).replace(/n2/, '');
             offgrid[name] = d3elem;
         })
-        this.dom.n2Groups.offgrid = offgrid;
+        this.dom.diagGroups.offgrid = offgrid;
     }
 
     /**
@@ -453,11 +453,11 @@ class Diagram {
      updateSizes(height, fontSize) {
         let gapSize = fontSize + 4;
 
-        this.dims.size.n2matrix.margin = gapSize;
+        this.dims.size.matrix.margin = gapSize;
         this.dims.size.partitionTreeGap = gapSize;
 
-        this.dims.size.n2matrix.height =
-            this.dims.size.n2matrix.width = // Match base height, keep it looking square
+        this.dims.size.matrix.height =
+            this.dims.size.matrix.width = // Match base height, keep it looking square
             this.dims.size.partitionTree.height = height;
 
         this.dims.size.font = fontSize;
@@ -477,7 +477,7 @@ class Diagram {
 
         this.updateSizes(height, this.dims.size.font);
 
-        N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
+        transitionDefaults.duration = transitionDefaults.durationFast;
         this.update();
     }
 
@@ -486,7 +486,7 @@ class Diagram {
      * @param {number} fontSize The new font size in pixels.
      */
      fontSizeSelectChange(fontSize) {
-        N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
+        transitionDefaults.duration = transitionDefaults.durationFast;
         this.style.updateSvgStyle(fontSize);
         this.update();
     }
@@ -580,7 +580,7 @@ class Diagram {
     reset() {
         this.model.resetAllHidden([]);
         this.updateZoomedElement(this.model.root);
-        N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
+        transitionDefaults.duration = transitionDefaults.durationFast;
         this.update();
     }
 

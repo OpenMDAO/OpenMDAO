@@ -1,37 +1,37 @@
 // Constants and default values
-const EMBEDDED = (d3.selectAll("#all-diagram-content").classed("embedded-n2"));
-const _DEFAULT_N2_DIAGRAM_UNIT = 'px';
-const _DEFAULT_N2_DIAGRAM_HEIGHT = window.innerHeight * .95;
+const EMBEDDED = (d3.selectAll("#all-diagram-content").classed("embedded"));
+const _DEFAULT_DIAGRAM_UNIT = 'px';
+const _DEFAULT_DIAGRAM_HEIGHT = window.innerHeight * .95;
 const _DEFAULT_FONT_SIZE = 11;
 const _DEFAULT_GAP_SIZE = _DEFAULT_FONT_SIZE + 4;
 
 defaultDims = {
     'size': {
-        'unit': _DEFAULT_N2_DIAGRAM_UNIT,
-        'n2matrix': {
-            // Dimensions of N2 matrix diagram
-            'height': _DEFAULT_N2_DIAGRAM_HEIGHT,
-            'width': _DEFAULT_N2_DIAGRAM_HEIGHT,
+        'unit': _DEFAULT_DIAGRAM_UNIT,
+        'matrix': {
+            // Dimensions of the matrix grid
+            'height': _DEFAULT_DIAGRAM_HEIGHT,
+            'width': _DEFAULT_DIAGRAM_HEIGHT,
             'margin': _DEFAULT_GAP_SIZE
         },
         'partitionTree': {
             // Dimensions of the tree on the left side of the diagram
             'width': 0,
-            'height': _DEFAULT_N2_DIAGRAM_HEIGHT,
+            'height': _DEFAULT_DIAGRAM_HEIGHT,
         },
         'font': _DEFAULT_FONT_SIZE,
         'minColumnWidth': 2,
         'rightTextMargin': 8,
         'parentNodeWidth': 30,
-        'partitionTreeGap': _DEFAULT_GAP_SIZE, // Pixels between partition tree and N2 matrix
+        'partitionTreeGap': _DEFAULT_GAP_SIZE, // Pixels between model tree and matrix grid
         'svgMargin': 1,
     }
 };
 
 Object.freeze(defaultDims);
 
-// TODO: Probably move this into N2Diagram or other class
-const N2TransitionDefaults = {
+// TODO: Probably move this into Diagram or other class
+const transitionDefaults = {
     'startDelay': 100,
     'duration': 0,
     'durationFast': 1000,
@@ -61,9 +61,9 @@ const DebugFlags = {
  * @param {Number} transitionStartDelay Number of milliseconds before animation starts.
  * @returns {Transition} The newly created transition.
  */
-function getTransition(transitionStartDelay = N2TransitionDefaults.startDelay) {
+function getTransition(transitionStartDelay = transitionDefaults.startDelay) {
     return d3.transition('global')
-    .duration(N2TransitionDefaults.duration)
+    .duration(transitionDefaults.duration)
     .delay(transitionStartDelay)
     // Hide the transition waiting animation when it ends:
     .on('end', () => d3.select('#waiting-container').attr('class', 'no-show'));
