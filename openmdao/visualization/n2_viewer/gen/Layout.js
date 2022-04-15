@@ -5,7 +5,7 @@
  * Calculates and stores the size and positions of visible elements.
  * @typedef Layout
  * @property {ModelData} model Reference to the preprocessed model.
- * @property {OmTreeNode} zoomedElement Reference to zoomedElement managed by N2Diagram.
+ * @property {OmTreeNode} zoomedElement Reference to zoomedElement managed by Diagram.
  * @property {OmTreeNode[]} zoomedNodes  Child workNodes of the current zoomed element.
  * @property {OmTreeNode[]} visibleNodes Zoomed workNodes that are actually drawn.
  * @property {Object} svg Reference to the top-level SVG element in the document.
@@ -156,7 +156,7 @@ class Layout {
             retVal = 'Auto-IVC';
         }
         else if (node.isFilter()) {
-            if (node.name.match(/.*_N2_FILTER_inputs$/)) retVal = 'Filtered Inputs';
+            if (node.name.match(/.*_FILTER_inputs$/)) retVal = 'Filtered Inputs';
             else retVal = 'Filtered Outputs';
         }
         else if (node.path.match(/^_auto_ivc.*/) && node.promotedName !== undefined) {

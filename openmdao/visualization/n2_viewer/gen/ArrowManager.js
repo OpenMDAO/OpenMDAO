@@ -115,8 +115,8 @@
     /**
      * Both endpoints are visible, so draw a full arrow between them.
      * @param {Arrow} arrow The arrow object to transition.
-     * @param {N2MatrixCell} startCell Cell at the beginning of the arrow.
-     * @param {N2MatrixCell} endCell Cell at the end of the arrow.
+     * @param {MatrixCell} startCell Cell at the beginning of the arrow.
+     * @param {MatrixCell} endCell Cell at the end of the arrow.
      */
     _transitionFullArrow(arrow, startCell, endCell) {
         debugInfo(`transition: Found both sides of ${arrow.id}`)
@@ -134,8 +134,8 @@
      * Only the starting cell is visible, so draw an arrow from that
      * heading offscreen in the direction the end would be.
      * @param {Arrow} arrow The arrow object to transition.
-     * @param {N2MatrixCell} startCell Cell at the beginning of the arrow.
-     * @param {N2Matrix} matrix Reference to the matrix object.
+     * @param {MatrixCell} startCell Cell at the beginning of the arrow.
+     * @param {Matrix} matrix Reference to the matrix object.
      */
     _transitionStartArrow(arrow, startCell, matrix) {
         debugInfo(`transition: Only found start cell for ${arrow.id}`)
@@ -164,8 +164,8 @@
      * Only the ending cell is visible, so draw an arrow to that
      * from offscreen in the direction the starting cell would be.
      * @param {Arrow} arrow The arrow object to transition.
-     * @param {N2MatrixCell} endCell Cell at the end of the arrow.
-     * @param {N2Matrix} matrix Reference to the matrix object.
+     * @param {MatrixCell} endCell Cell at the end of the arrow.
+     * @param {Matrix} matrix Reference to the matrix object.
      */
     _transitionEndArrow(arrow, endCell, matrix) {
         debugInfo(`transition: Only found end cell for ${arrow.id}`)
@@ -195,7 +195,7 @@
      * to their visible child nodes. This is done after the rest of the arrow
      * transitions because new arrows are added to the cache.
      * @param {Array} uncollapsedNodeIds List of nodeIds that were uncollapsed.
-     * @param {N2Matrix} matrix Reference to the matrix object.
+     * @param {Matrix} matrix Reference to the matrix object.
      */
     _transitionUncollapsedNodes(uncollapsedNodeIds, matrix) {
         for (const row in matrix.grid) {
@@ -213,7 +213,7 @@
      * Redraw all the visible arrows in the pinned arrow cache, and remove
      * the ones for which neither endpoint is visible. Full arrows may
      * need to transition to offgrid arrows and vice versa.
-     * @param {N2Matrix} matrix The matrix to operate with.
+     * @param {Matrix} matrix The matrix to operate with.
      */
     transition(matrix) {
         let uncollapsedNodeIds = [];
@@ -266,7 +266,7 @@
 
     /**
      * If arrows are hovering, then pin them, and vice versa.
-     * @param {String} cellId The ID of the N2MatrixCell to operate on.
+     * @param {String} cellId The ID of the MatrixCell to operate on.
      * @param {Boolean} [ pinOnly = false] If true, don't unpin anything.
      */
     togglePin(cellId, pinOnly = false) {

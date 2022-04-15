@@ -47,7 +47,7 @@ class Legend extends WindowDraggable {
             'connection': true
         };
 
-        this.showN2Symbols = {
+        this.showSymbols = {
             'scalar': false,
             'vector': false,
             'collapsedVariables': false

@@ -1,7 +1,5 @@
-// <<hpp_insert gen/Dimensions.js>>
-
 // Constants and default values
-const EMBEDDED = (d3.selectAll("#all_pt_n2_content_div").classed("embedded-n2"));
+const EMBEDDED = (d3.selectAll("#all-diagram-content").classed("embedded-n2"));
 const _DEFAULT_N2_DIAGRAM_UNIT = 'px';
 const _DEFAULT_N2_DIAGRAM_HEIGHT = window.innerHeight * .95;
 const _DEFAULT_FONT_SIZE = 11;

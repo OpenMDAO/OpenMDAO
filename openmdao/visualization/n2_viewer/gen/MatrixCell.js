@@ -1,7 +1,7 @@
 // <<hpp_insert gen/CellRenderer.js>>
 
 /**
- * A visible cell in the N2 matrix.
+ * A visible cell in the matrix grid.
  * @typedef {Object} MatrixCell
  * @property {number} row Vertical coordinate of the cell in the matrix.
  * @property {number} col Horizontal coordinate of the cell in the matrix.

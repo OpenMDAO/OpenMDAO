@@ -8,7 +8,7 @@
  * @property {OmTreeNodes[]} nodes Reference to nodes that will be drawn.
  * @property {OmModelData} model Reference to the pre-processed model.
  * @property {OmLayout} layout Reference to object managing columns widths and such.
- * @property {Object} n2Groups References to <g> SVG elements created by N2Diagram.
+ * @property {Object} n2Groups References to <g> SVG elements created by Diagram.
  * @property {Number} levelOfDetailThreshold Don't draw elements below this size in pixels.
  * @property {Object} nodeSize Width and height of each node in the matrix.
  * @property {Object} prevNodeSize Width and height of each node in the previous matrix.
@@ -20,7 +20,7 @@ class OmMatrix extends Matrix {
      * Render the matrix of visible elements in the model.
      * @param {OmModelData} model The pre-processed model data.
      * @param {OmLayout} layout Pre-computed layout of the diagram.
-     * @param {Object} n2Groups References to <g> SVG elements created by N2Diagram.
+     * @param {Object} n2Groups References to <g> SVG elements created by Diagram.
      * @param {ArrowManager} arrowMgr Object to create and manage conn. arrows.
      * @param {Boolean} lastClickWasLeft
      * @param {function} findRootOfChangeFunction

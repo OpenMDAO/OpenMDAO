@@ -89,7 +89,7 @@ class TreeNode {
     }
 
     /** True if this.type is 'input' or 'unconnected_input'. */
-    isInput() { return this.type.match(inputRegex); }
+    isInput() { return this.type.match(/^(input|unconnected_input)$/); }
 
     /** True if this is an input and connected. */
     isConnectedInput() { return (this.type == 'input'); }
@@ -104,7 +104,7 @@ class TreeNode {
     isRoot() { return (this.type == 'root'); }
 
     /** True if this.type is 'input', 'unconnected_input', or 'output'. */
-    isInputOrOutput() { return this.type.match(inputOrOutputRegex); }
+    isInputOrOutput() { return this.type.match(/^(output|input|unconnected_input)$/); }
 
     /** True if it's a subsystem and this.subsystem_type is 'group' */
     isGroup() { return (this.isSubsystem() && this.subsystem_type == 'group'); }

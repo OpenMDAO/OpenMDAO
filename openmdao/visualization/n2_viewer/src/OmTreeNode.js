@@ -7,7 +7,7 @@
 class OmNodeDisplayData extends NodeDisplayData {
     constructor() {
         super();
-        this.nameSolverWidthPx = 1; // Solver-side label width pixels as computed by N2Layout
+        this.nameSolverWidthPx = 1; // Solver-side label width pixels as computed by Layout
         this.solverDims = new Dimensions({ x: 1e-6, y: 1e-6, width: 1, height: 1 });
         this.solverDims.preserve();
     }
@@ -35,6 +35,12 @@ class OmTreeNode extends FilterCapableNode {
     addFilterChild(attribNames) {
         if (this.isComponent()) { super.addFilterChild(attribNames); }
     }
+
+    /** Override superclass method to include 'autoivc_input'. */
+    isInput() { return this.type.match(/^(input|unconnected_input|autoivc_input)$/); }
+
+    /** Override superclass method to include 'autoivc_input'. */
+    isInputOrOutput() { return this.type.match(/^(output|input|unconnected_input|autoivc_input)$/); }
 
     /** True if this is an input whose source is an auto-ivc'd output */
     isAutoIvcInput() { return (this.type == 'autoivc_input'); }

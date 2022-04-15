@@ -239,7 +239,7 @@ class InfoPropArray extends InfoPropDefault {
      * @returns {String} A string representation of the array.
      */
     output(array) {
-        if (array == null) { return 'Value too large to include in N2'; }
+        if (array == null) { return 'Value too large to include in diagram'; }
 
         const valStr = InfoPropArray.valToString(array);
         const maxLen = ValueInfo.TRUNCATE_LIMIT;

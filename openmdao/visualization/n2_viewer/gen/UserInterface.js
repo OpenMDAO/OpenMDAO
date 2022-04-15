@@ -26,7 +26,7 @@ class UserInterface {
     constructor(diag) {
         this.diag = diag;
 
-        this.leftClickedNode = document.getElementById('ptN2ContentDivId');
+        this.leftClickedNode = document.getElementById('diagram-content');
         this.rightClickedNode = null;
         this.lastClickWasLeft = true;
         this.leftClickIsForward = true;

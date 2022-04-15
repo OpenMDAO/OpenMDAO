@@ -33,7 +33,7 @@ class OmLegend extends Legend {
             'declaredPartial': true
         };
 
-        this.showN2Symbols = {
+        this.showSymbols = {
             'scalar': false,
             'vector': false,
             'collapsedVariables': false

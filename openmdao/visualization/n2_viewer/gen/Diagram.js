@@ -11,7 +11,7 @@
  * all member objects.
  * @typedef Diagram
  * @property {ModelData} model Processed model data received from Python.
- * @property {OmStyle} style Manages N2-related styles and functions.
+ * @property {OmStyle} style Manages diagram-related styles and functions.
  * @property {Layout} layout Sizes and positions of visible elements.
  * @property {Matrix} matrix Manages the grid of visible model parameters.
  * @property {TreeNode} zoomedElement The element the diagram is currently based on.
@@ -21,7 +21,7 @@
  * @property {Object} dom.svg The SVG element.
  * @property {Object} dom.svgStyle Object where SVG style changes can be made.
  * @property {Object} dom.toolTip Div to display tooltips.
- * @property {Object} dom.n2OuterGroup The outermost div of N2 itself.
+ * @property {Object} dom.n2OuterGroup The outermost div of the diagram itself.
  * @property {Object} dom.n2Groups References to <g> SVG elements.
  * @property {number} chosenCollapseDepth The selected depth from the drop-down.
  */
@@ -151,7 +151,7 @@ class Diagram {
      * @param {OmTreeNode} node The current node being examined.
      */
      getSubState(dataList, node = this.model.root) {
-        if (node.isFilter()) return; // Ignore state for N2FilterNodes
+        if (node.isFilter()) return; // Ignore state for FilterNodes
 
         dataList.push(node.getStateForSave());
 
@@ -168,7 +168,7 @@ class Diagram {
      * @param {OmTreeNode} node The node currently being restored.
      */
     setSubState(dataList, node = this.model.root) {
-        if (node.isFilter()) return; // Ignore state for N2FilterNodes
+        if (node.isFilter()) return; // Ignore state for FilterNodes
 
         node.setStateFromLoad(dataList.pop());
 

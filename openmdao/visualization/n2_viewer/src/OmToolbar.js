@@ -58,10 +58,10 @@ class OmToolbar extends Toolbar {
 
     _showHelp() {
         if (!this._helpWindow) {
-            const version = d3.select('div#all_pt_n2_content_div').attr('data-openmdao-version');
+            const version = d3.select('div#all-diagram-content').attr('data-openmdao-version');
             const footerText = `OpenMDAO Version ${version} Model Hierarchy and N2 diagram`;
 
-            this._helpWindow = new N2Help(this.helpInfo, footerText);
+            this._helpWindow = new Help(this.helpInfo, footerText);
         }
         else this._helpWindow.show().modal(true);
     }
