@@ -288,7 +288,7 @@ class SimpleGADriver(Driver):
         lower_bound = np.empty((count, ))
         upper_bound = np.empty((count, ))
         outer_bound = np.full((count, ), np.inf)
-        bits = np.empty((count, ), dtype=np.int)
+        bits = np.empty((count, ), dtype=np.int_)
         x0 = np.empty(count)
 
         # Figure out bounds vectors and initial design vars
@@ -648,9 +648,9 @@ class GeneticAlgorithm(object):
             Pm = (self.lchrom + 1.0) / (2.0 * pop_size * np.sum(bits))
         elite = self.elite
 
-        new_gen = np.round(lhs(self.lchrom, self.npop-1, criterion='center',
+        new_gen = np.round(lhs(self.lchrom, self.npop, criterion='center',
                                random_state=random_state))
-        new_gen = np.vstack((new_gen,self.encode(x0, vlb, vub, bits)))
+        new_gen[0] = self.encode(x0, vlb, vub, bits)
 
         # Main Loop
         nfit = 0
@@ -1000,7 +1000,7 @@ class GeneticAlgorithm(object):
         interval = (vub - vlb) / (2**bits - 1)
         x = np.maximum(x, vlb)
         x = np.minimum(x, vub)
-        x = np.round((x - vlb) / interval).astype(np.int)
+        x = np.round((x - vlb) / interval).astype(np.int_)
         byte_str = [("0" * b + bin(i)[2:])[-b:] for i, b in zip(x, bits)]
         result = np.array([int(c) for s in byte_str for c in s])
         if self.gray_code:
