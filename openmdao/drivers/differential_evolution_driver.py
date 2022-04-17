@@ -545,7 +545,7 @@ class DifferentialEvolution(object):
         # create LHS initial population (scaled to bounds) + user initial condition
         population = lhs(self.lchrom, self.npop-1, criterion='center', random_state=seed)
         population = population * (vub - vlb) + vlb  # scale to bounds
-        population = np.vstack((population, x0))
+        population = np.vstack( (population, x0) )
         fitness = np.ones(self.npop) * np.inf  # initialize fitness to infinitely bad
 
         # Main Loop
