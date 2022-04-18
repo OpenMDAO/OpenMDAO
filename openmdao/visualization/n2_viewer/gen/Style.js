@@ -102,10 +102,10 @@ class Style {
             '.horiz_line, .vert_line': {
                 'stroke': Style.color.gridline,
             },
-            "g.partition_group > rect[id$='_N2_FILTER_inputs'] + text": {
+            "g.partition_group > rect[id$='_FILTER_inputs'] + text": {
                 'font-style': 'italic'
             },
-            "g.partition_group > rect[id$='_N2_FILTER_outputs'] + text": {
+            "g.partition_group > rect[id$='_FILTER_outputs'] + text": {
                 'font-style': 'italic'
             },
             'g.variable_box > rect': {

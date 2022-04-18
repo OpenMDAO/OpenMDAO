@@ -7,8 +7,14 @@
  class Dimensions {
     static allowedProps = ['x', 'y', 'z', 'height', 'width', 'margin', 'top', 'right', 'bottom', 'left'];
 
-    constructor(obj, unit = 'px') {
-        this.initFrom(obj, unit)
+    /**
+     * Load the values into the object.
+     * @param {Object} obj The primary object to copy values from.
+     * @param {String} [unit = 'px'] Unit to append to numerical values with valAsStyleStr(). 
+     * @param {OBject} [prevObj = null] Optional object to initialize previous values with.
+     */
+    constructor(obj, unit = 'px', prevObj = null) {
+        this.initFrom(obj, unit, true, prevObj)
     }
 
     /** Return the property value as a string with the unit appended. */
@@ -20,9 +26,10 @@
      * Duplicate known values from any Object. Reset managed values and previous dimensions.
      * @param {Object} obj The object to find values in.
      * @param {String} unit The unit of measurement that applied to all values.
-     * @param {Boolean} initPrev Whether to create & initialize the prev object.
+     * @param {Boolean} [initPrev = true] Whether to create & initialize the prev object.
+     * @param {OBject} [prevObj = null] Optional object to initialize previous values with.
      */
-    initFrom(obj, unit = 'px', initPrev = true) {
+    initFrom(obj, unit = 'px', initPrev = true, prevObj = null) {
         const self = this;
         this.unit = unit;
         this._managedProps = new Set();
@@ -32,7 +39,7 @@
             if (prop in obj) {
                 this._managedProps.add(prop);
                 this[prop] = obj[prop];
-                if (initPrev) this.prev[prop] = 0;
+                if (initPrev) this.prev[prop] = prevObj? prevObj[prop]: 0;
 
                 // Add a getter function for the property to be used with a CSS style
                 Object.defineProperty(this, `${prop}Style`, {
@@ -41,7 +48,6 @@
             }
         } 
     }
-
 
     /**
      * Duplicate another Dimensions object.

@@ -14,7 +14,7 @@ class ClickHandler {
      * Set up the initial mode and define parameters for the other modes. 
      * @param {NodeInfo} nodeInfoBox Reference to the NodeInfo window to activate/deactivate it.
      */
-    constructor(nodeInfoBox) {
+    constructor() {
         // This tracks the current mode:
         this.clickEffect = ClickHandler.ClickEffect.Normal;
 
@@ -23,7 +23,7 @@ class ClickHandler {
                 val: ClickHandler.ClickEffect.NodeInfo,
                 icon: 'i.icon-info-circle',
                 cursor: 'node-data-cursor',
-                obj: nodeInfoBox
+                obj: null // to be set to nodeInfoBox later
             },
             collapse: {
                 val: ClickHandler.ClickEffect.Collapse,
@@ -39,6 +39,8 @@ class ClickHandler {
             }
         };
     }
+
+    update(nodeInfoBox) { this.modeData.nodeinfo.obj = nodeInfoBox; }
 
     get isNormal() { return this.clickEffect == ClickHandler.ClickEffect.Normal; }
     get isNodeInfo() { return this.clickEffect == ClickHandler.ClickEffect.NodeInfo; }
@@ -61,7 +63,7 @@ class ClickHandler {
 
         const m = this.modeData[modeName];
         d3.selectAll(m.icon).classed('active-tab-icon', true);
-        d3.select('#all_pt_n2_content_div').classed(m.cursor, true);
+        d3.select('#all-diagram-content').classed(m.cursor, true);
         this.clickEffect = m.val;
         if (m.obj) { m.obj.activate(); }
 
@@ -78,7 +80,7 @@ class ClickHandler {
 
         const m = this.modeData[modeName];
         d3.selectAll(m.icon).classed('active-tab-icon', false);
-        d3.select('#all_pt_n2_content_div').classed(m.cursor, false);
+        d3.select('#all-diagram-content').classed(m.cursor, false);
         this.clickEffect = ClickHandler.ClickEffect.Normal;
         if (m.obj) { m.obj.deactivate(); }
 

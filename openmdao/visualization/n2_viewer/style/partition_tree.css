@@ -14,13 +14,13 @@ body {
     background-color: white;
 }
 
-#all_pt_n2_content_div {
+#all-diagram-content {
     position: absolute;
     width: 100vw;
     z-index: 5;
 }
 
-#ptN2ContentDivId {
+#diagram-content {
     display: flex;
     flex: 0 0 auto;
 }

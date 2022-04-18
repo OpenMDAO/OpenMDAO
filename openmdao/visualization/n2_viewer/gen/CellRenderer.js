@@ -1,7 +1,7 @@
 // <<hpp_insert src/OmSymbolType.js>>
 
 /** Base class for all cell renderers */
-class N2CellRenderer {
+class CellRenderer {
     /**
      * Set values shared by objects of all derived class types.
      * @param {string} color The color to render all shapes in.
@@ -14,8 +14,8 @@ class N2CellRenderer {
     }
 
     static updateDims(baseWidth, baseHeight) {
-        if (!N2CellRenderer.dims) {
-            N2CellRenderer.prevDims = {
+        if (!CellRenderer.dims) {
+            CellRenderer.prevDims = {
                 "size": {
                     "width": 0,
                     "height": 0
@@ -31,13 +31,13 @@ class N2CellRenderer {
             }
         }
         else {
-            for (let prop of ["size", "bottomRight", "topLeft"]) {
-                Object.assign(N2CellRenderer.prevDims[prop],
-                    N2CellRenderer.dims[prop]);
+            for (const prop of ["size", "bottomRight", "topLeft"]) {
+                Object.assign(CellRenderer.prevDims[prop],
+                    CellRenderer.dims[prop]);
             }
         }
 
-        N2CellRenderer.dims = {
+        CellRenderer.dims = {
             "size": {
                 "width": baseWidth,
                 "height": baseHeight
@@ -55,22 +55,22 @@ class N2CellRenderer {
 
     /** Enable access to the static dims variable through "this". */
     get dims() {
-        return N2CellRenderer.dims;
+        return CellRenderer.dims;
     }
 
     /** Enable access to the static prevDims variable through "this". */
     get prevDims() {
-        return N2CellRenderer.prevDims;
+        return CellRenderer.prevDims;
     }
 
     /** Act like an abstract base class force derived classes to define. */
     update() {
-        throw ("ERROR: N2CellRenderer.update() called.")
+        throw ("ERROR: CellRenderer.update() called.")
     }
 
     /** Act like an abstract base class force derived classes to define. */
     render() {
-        throw ("ERROR: N2CellRenderer.render() called.")
+        throw ("ERROR: CellRenderer.render() called.")
     }
 
     /** Reposition an SVG element based on dimensions of the current cell size. */
@@ -95,7 +95,7 @@ class N2CellRenderer {
 }
 
 /** Draws/updates an SVG circle for scalar types, with a transition animation. */
-class N2ScalarBase extends N2CellRenderer {
+class ScalarBase extends CellRenderer {
 
     /**
      * Invoke the superclass constructor with these values and "sMid" as a CSS class.
@@ -117,6 +117,7 @@ class N2ScalarBase extends N2CellRenderer {
     update(svgGroup, dims, d3Elem = null) {
         if (!d3Elem) d3Elem = d3.select(svgGroup).select("." + this.className)
             .transition(sharedTransition);
+            
         return d3Elem
             .attr("rx", dims.bottomRight.x * .6)
             .attr("ry", dims.bottomRight.y * .6);
@@ -128,7 +129,7 @@ class N2ScalarBase extends N2CellRenderer {
      * @param {Object} dims The cell spec to use while rendering.
      */
     render(svgGroup, dims) {
-        let d3Elem = d3.select(svgGroup)
+        const d3Elem = d3.select(svgGroup)
             .append("ellipse")
             .attr("class", this.className)
             .attr("id", this.id)
@@ -139,7 +140,7 @@ class N2ScalarBase extends N2CellRenderer {
 }
 
 /** Draws/updates an SVG rect for vector types, with a transition animation. */
-class N2VectorBase extends N2CellRenderer {
+class VectorBase extends CellRenderer {
 
     /**
      * Invoke the superclass constructor with these values and "vMid" as a CSS class.
@@ -162,11 +163,12 @@ class N2VectorBase extends N2CellRenderer {
         if (!d3Elem) d3Elem = d3.select(svgGroup).select("." + this.className)
             .transition(sharedTransition);
 
-        let ret = d3Elem
+        const ret = d3Elem
             .attr("x", dims.topLeft.x * .6)
             .attr("y", dims.topLeft.y * .6)
             .attr("width", dims.bottomRight.x * 1.2)
             .attr("height", dims.bottomRight.y * 1.2);
+
 
         return ret;
     }
@@ -177,7 +179,7 @@ class N2VectorBase extends N2CellRenderer {
      * @param {Object} dims The cell spec to use while rendering.
      */
     render(svgGroup, dims) {
-        let d3Elem = d3.select(svgGroup).append('rect')
+        const d3Elem = d3.select(svgGroup).append('rect')
             .attr("class", this.className)
             .attr("id", this.id)
             .style("fill", this.color);
@@ -186,7 +188,7 @@ class N2VectorBase extends N2CellRenderer {
     }
 }
 
-class N2Connector extends N2CellRenderer {
+class Connector extends CellRenderer {
     /**
      * Invoke the superclass constructor with these values and "vMid" as a CSS class.
      * @param {Object} dims Layout and dimensions for the current cell spec.
@@ -197,7 +199,7 @@ class N2Connector extends N2CellRenderer {
         super(color, "vMid", id);
     }
 
-    _transform(scale) { throw ("ERROR: N2Connector._transform() called.") }
+    _transform(scale) { throw ("ERROR: Connector._transform() called.") }
 
     /**
      * Select the element with D3 if not already done, attach a transition
@@ -210,7 +212,7 @@ class N2Connector extends N2CellRenderer {
         if (!d3Elem) d3Elem = d3.select(svgGroup).select("." + this.className)
             .transition(sharedTransition);
 
-        let ret = d3Elem.attr("transform", this._transform(dims.size.width/10.0));
+        const ret = d3Elem.attr("transform", this._transform(dims.size.width/10.0));
 
         return ret;
     }
@@ -221,7 +223,7 @@ class N2Connector extends N2CellRenderer {
      * @param {Object} dims The cell spec to use while rendering.
      */
     render(svgGroup, dims) {
-        let d3Elem = d3.select(svgGroup).append('use')
+        const d3Elem = d3.select(svgGroup).append('use')
             .attr("class", this.className)
             .attr("id", this.id)
             .style("fill", this.color)
@@ -234,7 +236,7 @@ class N2Connector extends N2CellRenderer {
 }
 
 /** Draws/updates an SVG rect with a border for group types, with a transition animation. */
-class N2GroupBase extends N2CellRenderer {
+class GroupBase extends CellRenderer {
     /**
      * Invoke the superclass constructor with these values and "gMid" as a CSS class.
      * @param {Object} dims Layout and dimensions for the current cell spec.
@@ -285,7 +287,7 @@ class N2GroupBase extends N2CellRenderer {
      * @param {Object} d3Group D3 selection for the group that we add to.
      */
     _renderBorder(d3Group) {
-        let border = [
+        const border = [
             d3Group.append("rect").attr("class", "bordR1").style("fill", this.color),
             d3Group.append("rect").attr("class", "bordR2").style("fill", this.color),
             d3Group.append("rect").attr("class", "bordR3").style("fill", this.color),
@@ -304,7 +306,7 @@ class N2GroupBase extends N2CellRenderer {
      * @param {Array} [border = null] Border selections created in _renderBorder().
      */
     update(svgGroup, dims, d3Elem = null, border = null) {
-        let d3Group = d3.select(svgGroup);
+        const d3Group = d3.select(svgGroup);
         if (!d3Elem) d3Elem = d3Group.select("." + this.className)
             .transition(sharedTransition);
 
@@ -324,9 +326,9 @@ class N2GroupBase extends N2CellRenderer {
      * @param {Object} dims The cell spec to use while rendering.
      */
     render(svgGroup, dims) {
-        let d3Group = d3.select(svgGroup);
-        let border = this._renderBorder(d3Group);
-        let d3Elem = d3Group
+        const d3Group = d3.select(svgGroup);
+        const border = this._renderBorder(d3Group);
+        const d3Elem = d3Group
             .append("rect")
             .attr("class", this.className)
             .attr("id", this.id)
@@ -336,49 +338,25 @@ class N2GroupBase extends N2CellRenderer {
     }
 }
 
-class N2ScalarCell extends N2ScalarBase {
+class ScalarCell extends ScalarBase {
     constructor(color, id) {
         super(color, id);
     }
 }
 
-class N2VectorCell extends N2VectorBase {
+class VectorCell extends VectorBase {
     constructor(color, id) {
         super(color, id);
     }
 }
 
-class N2GroupCell extends N2GroupBase {
+class GroupCell extends GroupBase {
     constructor(color, id) {
         super(color, id);
     }
 }
 
-class N2ScalarScalarCell extends N2ScalarBase {
-    constructor(color, id) {
-        super(color, id);
-    }
-}
-
-class N2ScalarVectorCell extends N2VectorBase {
-    constructor(color, id) {
-        super(color, id);
-    }
-}
-
-class N2VectorScalarCell extends N2VectorBase {
-    constructor(color, id) {
-        super(color, id);
-    }
-}
-
-class N2VectorVectorCell extends N2VectorBase {
-    constructor(color, id) {
-        super(color, id);
-    }
-}
-
-class N2ConnectorUpper extends N2Connector {
+class ConnectorUpper extends Connector {
     constructor(color, id) {
         super(color, id);
     }
@@ -387,7 +365,7 @@ class N2ConnectorUpper extends N2Connector {
     _transform(scale) { return('scale(' + scale + ')'); }
 }
 
-class N2ConnectorLower extends N2Connector {
+class ConnectorLower extends Connector {
     constructor(color, id) {
         super(color, id);
     }
@@ -396,252 +374,8 @@ class N2ConnectorLower extends N2Connector {
     _transform(scale) { return('scale(' + scale + ') rotate(180)'); }
 }
 
-class N2ScalarGroupCell extends N2GroupBase {
+class FilterCell extends VectorBase {
     constructor(color, id) {
         super(color, id);
-    }
-}
-
-class N2GroupScalarCell extends N2GroupBase {
-    constructor(color, id) {
-        super(color, id);
-    }
-}
-
-class N2VectorGroupCell extends N2GroupBase {
-    constructor(color, id) {
-        super(color, id);
-    }
-}
-
-class N2GroupVectorCell extends N2GroupBase {
-    constructor(color, id) {
-        super(color, id);
-    }
-}
-
-class N2GroupGroupCell extends N2GroupBase {
-    constructor(color, id) {
-        super(color, id);
-    }
-}
-
-class N2FilterCell extends N2VectorBase {
-    constructor(color, id) {
-        super(color, id);
-    }
-}
-
-// TODO: Consider moving color management into CSS styles
-
-/**
- * A visible cell in the N2 matrix.
- * @typedef {Object} N2MatrixCell
- * @property {number} row Vertical coordinate of the cell in the matrix.
- * @property {number} col Horizontal coordinate of the cell in the matrix.
- * @property {OmTreeNode} srcObj The node in the model tree this cell is associated with.
- * @property {OmTreeNode} tgtObj The model tree node that this outputs to.
- * @property {string} id The srcObj id appended with the tgtObj id.
- * @property {OmSymbolType} symbolType Info about the type of symbol represented by the node.
- * @property {N2CellRenderer} renderer The object that draws the cell.
- */
-class N2MatrixCell {
-    /**
-     * Initialize the cell.
-     * @param {number} row Vertical coordinate of the cell in the matrix.
-     * @param {number} col Horizontal coordinate of the cell in the matrix.
-     * @param {OmTreeNode} srcObj The node in the model tree this node is associated with.
-     * @param {OmTreeNode} tgtObj The model tree node that this outputs to.
-     * @param {ModelData} model Reference to the model to get some info from it.
-     */
-    constructor(row, col, srcObj, tgtObj, model) {
-        this.row = row;
-        this.col = col;
-        this.srcObj = this.obj = srcObj;
-        this.tgtObj = tgtObj;
-        this.id = N2MatrixCell.makeId(srcObj.id, tgtObj.id);
-
-        this.symbolType = new OmSymbolType(this, model);
-        this.renderer = this._newRenderer();
-
-        this.offScreen = {
-            "top": {
-                "incoming": new Set(),
-                "outgoing": new Set()
-            },
-            "bottom": {
-                "incoming": new Set(),
-                "outgoing": new Set()
-            },
-            "total": 0
-        }
-    }
-
-    static makeId(srcId, tgtId = null) {
-        if (! tgtId || srcId == tgtId) return "node_" + srcId;
-        
-        return "conn_" + srcId + "_to_" + tgtId;
-    }
-
-    /**
-     * Determine if this node is on the main diagonal of the matrix.
-     * @return {Boolean} True if row equals column.
-     */
-    onDiagonal() {
-        return (this.row == this.col);
-    }
-
-    /**
-     * Determine if this node is in the upper-right triangle of the matrix.
-     * @return {Boolean} True if column is greater than row.
-     */
-    inUpperTriangle() {
-        return (this.col > this.row);
-    }
-
-    /**
-     * Determine if this node is in the lower-left triangle of the matrix.
-     * @return {Boolean} True if row is greater than column.
-     */
-    inLowerTriangle() {
-        return (this.row > this.col);
-    }
-
-    /**
-     * Select the mouseover callback depending on whether we're on the diagonal.
-     * TODO: Remove these globals
-     */
-    mouseover() {
-        return (this.onDiagonal() ? n2MouseFuncs.overOnDiag :
-            n2MouseFuncs.overOffDiag);
-    }
-
-    /**
-    * Select the mousemove callback depending on whether we're on the diagonal.
-    * TODO: Remove these globals
-    */
-    mousemove() {
-        return (this.onDiagonal() ? n2MouseFuncs.moveOnDiag : null);
-    }
-
-    /**
-     * Choose a color based on our location and state of the associated OmTreeNode.
-     */
-    color() {
-        if (this.symbolType.potentialDeclaredPartial &&
-            this.symbolType.declaredPartial) return OmStyle.color.declaredPartial;
-
-        if (this.onDiagonal()) {
-            if (this.obj.draw.minimized) return OmStyle.color.collapsed;
-            if (this.obj.isAutoIvcInput()) return OmStyle.color.autoivcInput;
-            if (this.obj.isConnectedInput()) return OmStyle.color.input;
-            if (this.obj.isUnconnectedInput()) return OmStyle.color.unconnectedInput;
-            return (this.obj.implicit) ?
-                OmStyle.color.outputImplicit :
-                OmStyle.color.outputExplicit;
-        }
-
-        return OmStyle.color.connection;
-    }
-
-
-    /**
-     * A connection going "off-screen" was detected between two nodes.
-     * Determine whether the arrow should be in the top or bottom section of the
-     * matrix based on rootIndex, and add to the appropriate array of
-     * tracked offscreen connections.
-     * @param {OmTreeNode} srcNode Where the connection starts.
-     * @param {OmTreeNode} tgtNode Where the connection ends.
-     */
-    addOffScreenConn(srcNode, tgtNode) {
-        let offscreenNode = null, dir = '', side = '';
-
-        if (srcNode === this.tgtObj) {
-            dir = 'outgoing';
-            offscreenNode = tgtNode;           
-        }
-        else {
-            dir = 'incoming';
-            offscreenNode = srcNode;
-        }
-        side = (srcNode.rootIndex < tgtNode.rootIndex)? 'top' : 'bottom';
-
-        const offScreenSet = this.offScreen[side][dir];
-
-        if (!offScreenSet.has(offscreenNode)) {
-            offScreenSet.add(offscreenNode);
-            this.offScreen.total++;
-        }
-    }
-
-    /** Choose a renderer based on our SymbolType. */
-    _newRenderer() {
-        if (this.color() == OmStyle.color.connection) {
-            if (this.inUpperTriangle()) return new N2ConnectorUpper(this.color(), this.id);
-
-            return new N2ConnectorLower(this.color(), this.id)
-        }
-
-        const color = this.color();
-
-        switch (this.symbolType.name) {
-            case "scalar":
-                return new N2ScalarCell(color, this.id);
-            case "vector":
-                return new N2VectorCell(color, this.id);
-            case "group":
-                return new N2GroupCell(color, this.id);
-            case "scalarScalar":
-                return new N2ScalarScalarCell(color, this.id);
-            case "scalarVector":
-                return new N2ScalarVectorCell(color, this.id);
-            case "vectorScalar":
-                return new N2VectorScalarCell(color, this.id);
-            case "vectorVector":
-                return new N2VectorVectorCell(color, this.id);
-            case "scalarGroup":
-                return new N2ScalarGroupCell(color, this.id);
-            case "groupScalar":
-                return new N2GroupScalarCell(color, this.id);
-            case "vectorGroup":
-                return new N2VectorGroupCell(color, this.id);
-            case "groupVector":
-                return new N2GroupVectorCell(color, this.id);
-            case "groupGroup":
-                return new N2GroupGroupCell(color, this.id);
-            case "filter":
-                return new N2FilterCell(color, this.id);
-        }
-    }
-
-    /**
-     * Highlight the variable nodes *associated* with the cell, not the cell
-     * itself. The default is for cells on the diagonal to highlight the
-     * variable directly across from them.
-     * @param {String} [varType = 'self'] Either 'self', 'source', or 'target'
-     *   to indicate the variable name to highlight.
-     * @param {String} [direction = 'self'] Either 'self', 'input', or 'output'
-     *   to indicate the style of the highlighting.
-     */
-    highlight(varType = 'self', direction = 'self') {
-
-        let obj = (varType == 'target') ? this.tgtObj : this.srcObj;
-        if (obj.draw.filtered) { obj = obj.draw.filterParent; }
-        const treeId = OmTreeNode.pathToId(obj.path);
-        const treeNode = d3.select('rect#' + treeId);
-
-        let fill = treeNode.style('fill');
-        if (direction == 'input') fill = OmStyle.color.inputArrow;
-        else if (direction == 'output') fill = OmStyle.color.outputArrow;
-
-        d3.select('#highlight-bar').append('rect')
-            .attr('x', 0)
-            .attr('y', treeNode.node().parentNode.transform.baseVal[0].matrix.f)
-            .attr('rx', 4)
-            .attr('ry', 4)
-            .attr('width', 8)
-            .attr('height', treeNode.attr('height'))
-            .attr('stroke', OmStyle.color.treeStroke)
-            .attr('fill', fill);
     }
 }

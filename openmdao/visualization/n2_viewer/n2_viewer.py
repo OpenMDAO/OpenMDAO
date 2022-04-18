@@ -584,7 +584,7 @@ def n2(data_source, outfile=_default_n2_filename, case_id=None, show_browser=Tru
 
     html_vars = {
         'title': title,
-        'embeddable': "embedded-n2" if embeddable else "non-embedded-n2",
+        'embeddable': "embedded-diagram" if embeddable else "non-embedded-diagram",
         'openmdao_version': openmdao_version,
         'model_data': model_data
     }

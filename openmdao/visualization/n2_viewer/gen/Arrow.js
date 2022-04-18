@@ -16,10 +16,10 @@ class Arrow {
     /**
      * Determine whether arrow elements already exist, and create them if not.
      * @param {Object} attribs All of the specific arrow properties.
-     * @param {Object} n2Groups References to <g> SVG elements.
+     * @param {Object} diagGroups References to <g> SVG elements.
      * @param {Object} nodeSize The dimensions of each cell in the matrix.
      */
-    constructor(attribs, n2Groups, nodeSize) {
+    constructor(attribs, diagGroups, nodeSize) {
         this.color = attribs.color;
         this.width = attribs.width;
         this.nodeSize = nodeSize;
@@ -41,7 +41,7 @@ class Arrow {
             debugInfo(`Arrow(): Creating new ${this.id}`);
             this.doTransition = false;
             this.cssClass = 'n2_hover_elements';
-            this.group = n2Groups.arrows.append('g')
+            this.group = diagGroups.arrows.append('g')
                 .attr('id', this.id)
                 .attr('class', this.cssClass)
         }
@@ -74,8 +74,8 @@ Arrow.cellOverlap = .125;
  * Draws a two-segment arrow, using provided beginning and end node locations.
  */
 class BentArrow extends Arrow {
-    constructor(attribs, n2Groups, nodeSize) {
-        super(attribs, n2Groups, nodeSize);
+    constructor(attribs, diagGroups, nodeSize) {
+        super(attribs, diagGroups, nodeSize);
 
         this.start = attribs.start;
         this.end = attribs.end;
@@ -147,15 +147,15 @@ class BentArrow extends Arrow {
     draw() {
         if (this.doTransition) {
             // Arrow already exists, size and/or shape needs updated
-            this.path = this.group.select('path').transition(sharedTransition);
+            this.path = this.group.select('path').transition(getTransition());
 
             if (this.group.classed('off-grid-arrow')) {
                 // The arrow was previously going offscreen but now is fully onscreen
                 this._createDots();
             }
             else {
-                this.bottomCircle = this.group.select('circle#bottom-circle').transition(sharedTransition);
-                this.topCircle = this.group.select('circle#top-circle').transition(sharedTransition);
+                this.bottomCircle = this.group.select('circle#bottom-circle').transition(getTransition());
+                this.topCircle = this.group.select('circle#top-circle').transition(getTransition());
             }
         }
         else {
@@ -200,8 +200,8 @@ class BentArrow extends Arrow {
  * offscreen node. Show a tooltip near the offscreen.
  */
 class OffGridArrow extends Arrow {
-    constructor(attribs, n2Groups, nodeSize) {
-        super(attribs, n2Groups, nodeSize);
+    constructor(attribs, diagGroups, nodeSize) {
+        super(attribs, diagGroups, nodeSize);
 
         this.cell = attribs.cell;
         this.direction = attribs.direction;
@@ -274,7 +274,7 @@ class OffGridArrow extends Arrow {
                 this.group.selectAll('circle').remove();
             }
 
-            this.path = this.group.select('path').transition(sharedTransition);
+            this.path = this.group.select('path').transition(getTransition());
         }
         else {
             this.path = this.group.insert('path')
@@ -309,14 +309,14 @@ class OffGridArrow extends Arrow {
  * the onscreen target cell from the offscreen source.
  */
 class OffGridUpArrow extends OffGridArrow {
-    constructor(attribs, n2Groups, nodeSize) {
+    constructor(attribs, diagGroups, nodeSize) {
         super(Object.assign(attribs, {
             'start': { 'id': attribs.offscreenId },
             'end': { 'id': attribs.cell.tgtId },
             'direction': 'up',
             'cellId': attribs.cellId,
             'color': attribs.color ? attribs.color : OmStyle.color.inputArrow
-        }), n2Groups, nodeSize);
+        }), diagGroups, nodeSize);
 
         this.label.ref = d3.select("div#left.offgrid");
 
@@ -354,14 +354,14 @@ class OffGridUpArrow extends OffGridArrow {
  * onscreen target cell from the offscreen source.
  */
 class OffGridDownArrow extends OffGridArrow {
-    constructor(attribs, n2Groups, nodeSize) {
+    constructor(attribs, diagGroups, nodeSize) {
         super(Object.assign(attribs, {
             'start': { 'id': attribs.offscreenId },
             'end': { 'id': attribs.cell.tgtId },
             'direction': 'down',
             'cellId': attribs.cellId,
             'color': attribs.color ? attribs.color : OmStyle.color.inputArrow
-        }), n2Groups, nodeSize);
+        }), diagGroups, nodeSize);
 
         this.label.ref = d3.select("div#bottom.offgrid");
 
@@ -398,14 +398,14 @@ class OffGridDownArrow extends OffGridArrow {
  * onscreen source cell to the offscreen target.
  */
 class OffGridLeftArrow extends OffGridArrow {
-    constructor(attribs, n2Groups, nodeSize) {
+    constructor(attribs, diagGroups, nodeSize) {
         super(Object.assign(attribs, {
             'start': { 'id': attribs.cell.srcId },
             'end': { 'id': attribs.offscreenId },
             'direction': 'left',
             'cellId': attribs.cellId,
             'color': attribs.color ? attribs.color : OmStyle.color.outputArrow
-        }), n2Groups, nodeSize);
+        }), diagGroups, nodeSize);
 
         this.label.ref = d3.select("div#bottom.offgrid");
 
@@ -443,14 +443,14 @@ class OffGridLeftArrow extends OffGridArrow {
  * the onscreen source cell to the offscreen target.
  */
 class OffGridRightArrow extends OffGridArrow {
-    constructor(attribs, n2Groups, nodeSize) {
+    constructor(attribs, diagGroups, nodeSize) {
         super(Object.assign(attribs, {
             'start': { 'id': attribs.cell.srcId },
             'end': { 'id': attribs.offscreenId },
             'direction': 'right',
             'cellId': attribs.cellId,
             'color': attribs.color ? attribs.color : OmStyle.color.outputArrow
-        }), n2Groups, nodeSize);
+        }), diagGroups, nodeSize);
 
         this.label.ref = d3.select("div#right.offgrid");
 
