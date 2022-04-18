@@ -348,8 +348,6 @@ class Problem(object):
 
         # Vector not setup, so we need to pull values from saved metadata request.
         else:
-            proms = self.model._var_allprocs_prom2abs_list
-            meta = self.model._var_abs2meta
             try:
                 conns = self.model._conn_abs_in2out
             except AttributeError:
@@ -362,12 +360,22 @@ class Problem(object):
             abs_name = abs_names[0]
             vars_to_gather = self._metadata['vars_to_gather']
 
+            meta = self.model._var_abs2meta
             io = 'output' if abs_name in meta['output'] else 'input'
             if abs_name in meta[io]:
                 if abs_name in conns:
                     val = meta['output'][conns[abs_name]]['val']
                 else:
                     val = meta[io][abs_name]['val']
+            else:
+                # not found in real outputs or inputs, try discretes
+                meta = self.model._var_discrete
+                io = 'output' if abs_name in meta['output'] else 'input'
+                if abs_name in meta[io]:
+                    if abs_name in conns:
+                        val = meta['output'][conns[abs_name]]['val']
+                    else:
+                        val = meta[io][abs_name]['val']
 
             if get_remote and abs_name in vars_to_gather:
                 owner = vars_to_gather[abs_name]

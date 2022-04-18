@@ -705,6 +705,15 @@ class DiscreteTestCase(unittest.TestCase):
         with assert_no_warning(OMDeprecationWarning, msg):
             prob.run_model()
 
+    def test_discrete_get_cached_val(self):
+        # make sure _get_cached_val() works for discretes
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', ModCompEx(3), promotes=['*'])
+        prob.setup()
+
+        self.assertEqual(prob['x'], 10)
+
+
 class SolverDiscreteTestCase(unittest.TestCase):
     def _setup_model(self, solver_class):
         prob = om.Problem()
