@@ -230,9 +230,6 @@ jobs:
         id: build_docs
         shell: bash -l {0}
         run: |
-          # Temporary: Install the latest jupyter-book which isn't on pypi
-          pip install git+https://github.com/executablebooks/jupyter-book
-
           cd openmdao/docs
           if [[ "${{ secrets.SNOPT_LOCATION_72 }}" || "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
             echo "============================================================="
