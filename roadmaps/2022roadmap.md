@@ -31,7 +31,7 @@ The ability for users to test out code in the documentation online via Binder or
 However, this means that building a signficant training course is still on the todo list for 2022.
 The focus on various Jupyter notebook based tools should help this effort signifcantly, however.
 
-### General performance improvments
+### General performance improvements
 
 We've made strides on improving performance.  In particular, total derivative coloring is substantially cheaper.
 
@@ -51,9 +51,9 @@ To date this remains a goal.
 
 ## Training
 
-With our advancements in Jupyter notebook-based tools and documentation, the next step is to develop and interactive training course with these as the foundation.
+With our advancements in Jupyter notebook-based tools and documentation, the next step is to develop an interactive training course with these as the foundation.
 
-### Goal:
+### Goal
 
 Provide a series of Jupyter notebooks, separate from the documentation, which entail a training course on optimization.
 Starting from basics of single disicipline optimization, work up in complexity to systems involving implicit behavior, multi-point optimization, and cover how to identify degenerate cases.
@@ -63,20 +63,20 @@ Teach users to get a feel for how to debug models when things aren't working.
 
 ## Aiming for Larger Components
 
-### Goal:
+### Goal
 
 There are two ways in which we can focus on achieving larger monolithic components.
-We've experimented with the use of subproblems and by keeping a lot of their internal data out of the vectors of the outer problem, we've noticed signficant performance increases.
+We've experimented with the use of subproblems, and we've noticed significant performance increases gained from keeping the subproblem's internal data out of the vectors of the outer problem.
 We will document the use of subproblems.  If it becomes a common pattern, then some sort of official API for them might be warranted, but it's too early to make that call.
 
-Developing training and documentation of automatic differentiation in the form of Google's `jax` as well as `sympy` and its lambdify feature.
+We will develop training and documentation of automatic differentiation in the form of Google's `jax` as well as `sympy` and its lambdify feature.
 The ability to effectively use automatic differentiation is a prerequesite to computing second derivative information for those optimizers which can utilize it.
 
 ## Large multi-point parallelism
 
 We've continued to push the parallel capability of OpenMDAO and are actively developing larger and larger applications.
 In 2021 we accomplished a major overhaul of some of our distributed memory API.
-As we start to push costlier applications, we're stressing the parallization capabilities that have long-existed in OpenMDAO; distributed components and parallel groups.
+As we start to push costlier applications, we're stressing the parallization capabilities that have long-existed in OpenMDAO: distributed components and parallel groups.
 
 ### Goal:
 Leverage the reports system to provide better user feedback on processor utilization when running in parallel.
