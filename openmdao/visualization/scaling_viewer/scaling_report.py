@@ -204,7 +204,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
 
     model = driver._problem().model
 
-    mod_meta = model._var_allprocs_abs2meta['output']
+    mod_meta = model._var_allprocs_abs2meta['output'].copy()  # shallow copy
     mod_meta.update(model._var_allprocs_discrete['output'])
 
     discretes = {'dvs': [], 'con': [], 'obj': []}
