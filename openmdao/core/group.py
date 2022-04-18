@@ -1864,10 +1864,6 @@ class Group(System):
         # to True for this Group if units are defined and different, or if
         # ref or ref0 are defined for the output.
         for abs_in, abs_out in global_abs_in2out.items():
-            if abs_in[:path_len] != path_dot or abs_out[:path_len] != path_dot:
-                raise RuntimeError("FOO!")
-                continue
-
             # Check that they are in different subsystems of this system.
             out_subsys = abs_out[path_len:].split('.', 1)[0]
             in_subsys = abs_in[path_len:].split('.', 1)[0]
