@@ -19,6 +19,7 @@ optional_dependencies = {
         'tabulate',
         'jupyter-book',
         'jupyter-sphinx==0.3.1',
+        'sphinx-book-theme',
         'sphinx-sitemap',
         'jinja2<3.1'
     ],
