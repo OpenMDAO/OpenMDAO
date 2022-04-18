@@ -447,6 +447,22 @@ class ImplicitComponent(Component):
         """
         pass
 
+    def is_implicit(self, simple=False):
+        """
+        Return True, that this system is implicit.
+
+        Parameters
+        ----------
+        simple : bool
+            Ignored by Components.
+
+        Returns
+        -------
+        bool
+            True.
+        """
+        return True
+
     def _list_states(self):
         """
         Return list of all states at and below this system.

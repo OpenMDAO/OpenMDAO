@@ -195,6 +195,8 @@ class Group(System):
         Dynamic shape dependency graph, or None.
     _shape_knowns : set
         Set of shape dependency graph nodes with known (non-dynamic) shapes.
+    _is_implicit : bool
+        True if this Group contains implicit systems or has cycles.
     """
 
     def __init__(self, **kwargs):
@@ -221,6 +223,7 @@ class Group(System):
         self._order_set = False
         self._shapes_graph = None
         self._shape_knowns = None
+        self._is_implicit = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -1006,6 +1009,8 @@ class Group(System):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
         """
+        from openmdao.core.implicitcomponent import ImplicitComponent
+
         if self._var_allprocs_prom2abs_list is None:
             old_prom2abs = {}
         else:
@@ -1036,6 +1041,9 @@ class Group(System):
             self._has_output_adder |= subsys._has_output_adder
             self._has_resid_scaling |= subsys._has_resid_scaling
             self._has_distrib_vars |= subsys._has_distrib_vars
+
+            if subsys.is_implicit(simple=True) is True:
+                self._is_implicit = True
 
             var_maps = subsys._get_promotion_maps()
 
@@ -1094,7 +1102,8 @@ class Group(System):
                                                     mysub._full_comm.rank == 0)):
                 raw = (allprocs_discrete, allprocs_prom2abs_list, allprocs_abs2meta,
                        self._has_output_scaling, self._has_output_adder,
-                       self._has_resid_scaling, self._group_inputs, self._has_distrib_vars)
+                       self._has_resid_scaling, self._group_inputs, self._has_distrib_vars,
+                       self._is_implicit)
             else:
                 raw = (
                     {'input': {}, 'output': {}},
@@ -1105,6 +1114,7 @@ class Group(System):
                     False,
                     {},
                     False,
+                    None,
                 )
 
             gathered = self.comm.allgather(raw)
@@ -1118,11 +1128,15 @@ class Group(System):
 
             myrank = self.comm.rank
             for rank, (proc_discrete, proc_prom2abs_list, proc_abs2meta,
-                       oscale, oadd, rscale, ginputs, has_dist_vars) in enumerate(gathered):
+                       oscale, oadd, rscale, ginputs, has_dist_vars,
+                       is_implicit) in enumerate(gathered):
                 self._has_output_scaling |= oscale
                 self._has_output_adder |= oadd
                 self._has_resid_scaling |= rscale
                 self._has_distrib_vars |= has_dist_vars
+
+                if is_implicit is True:
+                    self._is_implicit = True
 
                 if rank != myrank:
                     for p, mlist in ginputs.items():
@@ -1851,6 +1865,7 @@ class Group(System):
         # ref or ref0 are defined for the output.
         for abs_in, abs_out in global_abs_in2out.items():
             if abs_in[:path_len] != path_dot or abs_out[:path_len] != path_dot:
+                raise RuntimeError("FOO!")
                 continue
 
             # Check that they are in different subsystems of this system.
@@ -2074,22 +2089,22 @@ class Group(System):
         else:
             if mode == 'fwd' and self._conn_discrete_in2out and vec_name == 'nonlinear':
                 self._discrete_transfer(sub)
-            print(f"{self.pathname}: transfer, sub={sub} <nothing transferred>")
+            # print(f"{self.pathname}: transfer, sub={sub} <nothing transferred>")
             return
 
         vec_inputs = self._vectors['input'][vec_name]
 
         if mode == 'fwd':
             if xfer is not None:
-                print(f"{self.pathname}: transfer, sub={sub}")
+                # print(f"{self.pathname}: transfer, sub={sub}")
                 if self._has_input_scaling:
                     vec_inputs.scale_to_norm()
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
                     vec_inputs.scale_to_phys()
                 else:
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
-            else:
-                print(f"{self.pathname}: transfer, sub={sub} <nothing transferred>")
+            # else:
+                # print(f"{self.pathname}: transfer, sub={sub} <nothing transferred>")
             if self._conn_discrete_in2out and vec_name == 'nonlinear':
                 self._discrete_transfer(sub)
 
@@ -2320,32 +2335,36 @@ class Group(System):
             same time, and get the reference back.
         """
         if self._setup_procs_finished:
-            raise RuntimeError("%s: Cannot call add_subsystem in "
-                               "the configure method" % (self.msginfo))
+            raise RuntimeError(f"{self.msginfo}: Cannot call add_subsystem in "
+                               "the configure method.")
 
         if inspect.isclass(subsys):
-            raise TypeError("%s: Subsystem '%s' should be an instance, but a %s class object was "
-                            "found." % (self.msginfo, name, subsys.__name__))
+            raise TypeError(f"{self.msginfo}: Subsystem '{name}' should be an instance, but a "
+                            f"{subsys.__name__} class object was found.")
 
         if name in self._subsystems_allprocs or name in self._static_subsystems_allprocs:
-            raise RuntimeError("%s: Subsystem name '%s' is already used." % (self.msginfo, name))
+            raise RuntimeError(f"{self.msginfo}: Subsystem name '{name}' is already used.")
 
         if hasattr(self, name) and not isinstance(getattr(self, name), System):
             # replacing a subsystem is ok (e.g. resetup) but no other attribute
-            raise RuntimeError("%s: Can't add subsystem '%s' because an attribute with that name "
-                               "already exits." % (self.msginfo, name))
+            raise RuntimeError(f"{self.msginfo}: Can't add subsystem '{name}' because an attribute "
+                               f"with that name already exits.")
+
+        if not isinstance(subsys, System):
+            raise TypeError(f"{self.msginfo}: Subsystem '{name}' should be a System instance, but "
+                            f"an instance of type {type(subsys).__name__} was found.")
 
         match = namecheck_rgx.match(name)
         if match is None or match.group() != name:
-            raise NameError("%s: '%s' is not a valid sub-system name." % (self.msginfo, name))
+            raise NameError(f"{self.msginfo}: '{name}' is not a valid sub-system name.")
 
         subsys.name = subsys.pathname = name
 
         if isinstance(promotes, str) or \
            isinstance(promotes_inputs, str) or \
            isinstance(promotes_outputs, str):
-            raise RuntimeError("%s: promotes must be an iterator of strings and/or tuples."
-                               % self.msginfo)
+            raise RuntimeError(f"{self.msginfo}: promotes must be an iterator of strings and/or "
+                               "tuples.")
 
         prominfo = None
 
@@ -2372,14 +2391,14 @@ class Group(System):
         subsystems_allprocs[subsys.name] = _SysInfo(subsys, len(subsystems_allprocs))
 
         if not isinstance(min_procs, int) or min_procs < 1:
-            raise TypeError("%s: min_procs must be an int > 0 but (%s) was given." %
-                            (self.msginfo, min_procs))
+            raise TypeError(f"{self.msginfo}: min_procs must be an int > 0 but ({min_procs}) was "
+                            "given.")
         if max_procs is not None and (not isinstance(max_procs, int) or max_procs < min_procs):
-            raise TypeError("%s: max_procs must be None or an int >= min_procs but (%s) was given."
-                            % (self.msginfo, max_procs))
+            raise TypeError(f"{self.msginfo}: max_procs must be None or an int >= min_procs but "
+                            f"({max_procs}) was given.")
         if isinstance(proc_weight, Number) and proc_weight < 0:
-            raise TypeError("%s: proc_weight must be a float > 0. but (%s) was given." %
-                            (self.msginfo, proc_weight))
+            raise TypeError(f"{self.msginfo}: proc_weight must be a float > 0. but ({proc_weight}) "
+                            "was given.")
 
         self._proc_info[name] = (min_procs, max_procs, proc_weight)
 
@@ -2460,7 +2479,7 @@ class Group(System):
         """
         if self._problem_meta is not None and \
                 self._problem_meta['setup_status'] == _SetupStatus.POST_CONFIGURE:
-            raise RuntimeError("%s: Cannot call set_order in the configure method" % (self.msginfo))
+            raise RuntimeError("%s: Cannot call set_order in the configure method." % (self.msginfo))
 
         # Make sure the new_order is valid. It must contain all subsystems
         # in this model.
@@ -2653,8 +2672,8 @@ class Group(System):
                         # zero out dvecs of irrelevant subsystems
                         s._vectors['residual']['linear'].set_val(0.0)
 
-            print("group:", self.pathname, "dinputs:", self._vectors['input']['linear']._data,
-                  "dresids:", self._vectors['residual']['linear']._data)
+            # print("group:", self.pathname, "dinputs:", self._vectors['input']['linear']._data,
+            #       "dresids:", self._vectors['residual']['linear']._data)
             for subsys in self._subsystems_myproc:
                 if rel_systems is None or subsys.pathname in rel_systems:
                     subsys._apply_linear(jac, rel_systems, mode, scope_out, scope_in)
@@ -3191,7 +3210,7 @@ class Group(System):
         else:
             systems = [s.name for s in self._subsystems_myproc]
 
-        if not comps_only and self.comm.size > 1:
+        if not comps_only and self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             systems = set()
             for slist in self.comm.allgather(systems):
                 systems.update(slist)
@@ -3696,3 +3715,27 @@ class Group(System):
                     yield from s._ordered_comp_name_iter()
                 else:
                     yield s.pathname
+
+    def is_implicit(self, simple=False):
+        """
+        Return True if this Group, directly or indirectly, contains implicit systems or cycles.
+
+        Parameters
+        ----------
+        simple : bool
+            If True, report only if this Group contains (directly or indirectly), implicit
+            components, else return True if it contains any implicit components OR cycles.
+
+        Returns
+        -------
+        bool
+            True if this Group should be treated as implicit.
+        """
+        if simple:
+            return self._is_implicit
+
+        if self._is_implicit is None:
+            # see if there are any cycles
+            pass
+
+        return self._is_implicit

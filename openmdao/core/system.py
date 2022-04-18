@@ -5109,6 +5109,8 @@ class System(object):
             Dict of ({'outputs': dep_outputs, 'inputs': dep_inputs}, dep_systems)
             keyed by design vars and responses.
         """
+        from openmdao.core.group import Group
+
         conns = self._conn_global_abs_in2out
         relevant = defaultdict(dict)
 
@@ -5122,10 +5124,10 @@ class System(object):
                 graph.add_node(src, type_='out')
             graph.add_node(tgt, type_='in')
 
-            src_sys = src.rsplit('.', 1)[0]
+            src_sys, _, _ = src.rpartition('.')
             graph.add_edge(src_sys, src)
 
-            tgt_sys = tgt.rsplit('.', 1)[0]
+            tgt_sys, _, _ = tgt.rpartition('.')
             graph.add_edge(tgt, tgt_sys)
 
             graph.add_edge(src, tgt)
@@ -5150,6 +5152,9 @@ class System(object):
                 else:
                     system = parts[0]
                 graph.add_edge(system, res)
+
+        if isinstance(self, Group) and self._is_implicit is None:
+            self._is_implicit = not nx.is_directed_acyclic_graph(graph)
 
         nodes = graph.nodes
         grev = graph.reverse(copy=False)

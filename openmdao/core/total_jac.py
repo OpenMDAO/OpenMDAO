@@ -1050,7 +1050,7 @@ class _TotalJacInfo(object):
 
         loc_idx = self.in_loc_idxs[mode][idx]
         if loc_idx >= 0:
-            print("Setting seed at idx:", idx, self.seeds[mode][idx])
+            # print("Setting seed at idx:", idx, self.seeds[mode][idx])
             self.input_vec[mode]['linear'].set_val(self.seeds[mode][idx], loc_idx)
 
         if cache_lin_sol:
@@ -1349,10 +1349,10 @@ class _TotalJacInfo(object):
         # Main loop over columns (fwd) or rows (rev) of the jacobian
         for mode in self.modes:
             for key, idx_info in self.idx_iter_dict[mode].items():
-                print("KEY:", key)
+                # print("KEY:", key)
                 imeta, idx_iter = idx_info
                 for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
-                    print("INDEX:", inds)
+                    # print("INDEX:", inds)
                     rel_systems, vec_names, cache_key = input_setter(inds, itermeta, mode)
 
                     if debug_print:

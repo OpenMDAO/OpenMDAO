@@ -521,3 +521,19 @@ class ExplicitComponent(Component):
             If not None, dict containing discrete input values.
         """
         pass
+
+    def is_implicit(self, simple=False):
+        """
+        Return False, meaning this system is not implicit.
+
+        Parameters
+        ----------
+        simple : bool
+            Ignored by Components.
+
+        Returns
+        -------
+        bool
+            False.
+        """
+        return False
