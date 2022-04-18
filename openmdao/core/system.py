@@ -9,7 +9,6 @@ from collections import defaultdict
 from itertools import chain
 from enum import IntEnum
 
-import re
 from fnmatch import fnmatchcase
 
 from numbers import Integral
@@ -1693,8 +1692,6 @@ class System(object):
         Compute unit conversions for driver variables.
         """
         abs2meta = self._var_allprocs_abs2meta['output']
-        pro2abs = self._var_allprocs_prom2abs_list['output']
-        pro2abs_in = self._var_allprocs_prom2abs_list['input']
 
         dv = self._design_vars
         for name, meta in dv.items():

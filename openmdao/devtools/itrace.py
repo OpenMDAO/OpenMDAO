@@ -3,13 +3,10 @@ import os
 import sys
 import re
 import time
-import argparse
-import warnings
 from contextlib import contextmanager
 from collections import defaultdict, OrderedDict
 
 from io import StringIO
-from numpy import ndarray
 try:
     import objgraph
 except ImportError:

@@ -96,6 +96,8 @@ class LinearBlockGS(BlockLinearSolver):
             delta_d_n = d_out_vec.asarray(copy=True)
 
         if mode == 'fwd':
+            b_vec = system._vectors['residual']['linear']
+
             for subsys, _ in system._subsystems_allprocs.values():
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
                     continue
@@ -107,7 +109,6 @@ class LinearBlockGS(BlockLinearSolver):
 
                 scope_out, scope_in = system._get_scope(subsys)
                 subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
-                b_vec = system._vectors['residual']['linear']
                 b_vec *= -1.0
                 b_vec += self._rhs_vec
                 subsys._solve_linear(mode, self._rel_systems)
@@ -115,6 +116,8 @@ class LinearBlockGS(BlockLinearSolver):
         else:  # rev
             subsystems = list(system._subsystems_allprocs)
             subsystems.reverse()
+            b_vec = system._vectors['output']['linear']
+
             for sname in subsystems:
                 subsys, _ = system._subsystems_allprocs[sname]
 
@@ -122,7 +125,6 @@ class LinearBlockGS(BlockLinearSolver):
                     continue
 
                 if subsys._is_local:
-                    b_vec = system._vectors['output']['linear']
                     b_vec.set_val(0.0)
                     system._transfer('linear', mode, sname)
                     b_vec *= -1.0

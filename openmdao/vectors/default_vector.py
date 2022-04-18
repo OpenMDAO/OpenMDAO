@@ -499,6 +499,21 @@ class DefaultVector(Vector):
         return self._slices
 
     def idxs2nameloc(self, idxs):
+        """
+        Given some indices, return a dict mapping variable name to corresponding local indices.
+
+        This is meant to be used for debugging.
+
+        Parameters
+        ----------
+        idxs : list of int
+            Vector indices to be converted to local indices for each corresponding variable.
+
+        Returns
+        -------
+        dict
+            Mapping of variable name to a list of local indices into that variable.
+        """
         names = defaultdict(list)
         start = end = 0
         for name, arr in self._views_flat.items():
