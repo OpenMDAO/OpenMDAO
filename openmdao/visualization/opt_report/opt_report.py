@@ -316,6 +316,51 @@ def _sparkline(kind, meta, val, width=300):
 
     return html
 
+def _constraint_plot(kind, meta, val, width=300):
+    """
+    Given the metadata and value of a design variable or constraint, make an html-embeddable
+    constraint plot. Only for scalars
+
+    Parameters
+    ----------
+    kind : str
+        One of 'desvar' or 'constraint' to specify which type of sparkline is being made.
+        This has a slight impact on how the bounds are plotted.
+    meta : dict-like
+        The metadata associated with the design variable or constraint.
+    val : np.array
+        The value of the design variable or constraint.
+    width : int
+        The width of the figure in the returned HTML tag.
+
+    Returns
+    -------
+    str
+        An HTML image tag containing the encoded sparkline image.
+
+    """
+    # Prepare the matplotlib figure/axes
+    _backend = mpl.get_backend()
+    plt.style.use('default')
+    plt.autoscale(False)
+    mpl.use('Agg')
+
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(3, .4))
+
+    from openmdao.visualization.opt_report.constraint_plot import in_or_out_of_bounds_plot
+
+    in_or_out_of_bounds_plot(ax, float(val), meta['lower'], meta['upper'])
+    tmpfile = io.BytesIO()
+    fig.savefig(tmpfile, format='png', transparent=True)
+    encoded = base64.b64encode(tmpfile.getvalue()).decode('utf-8')
+
+    html = f'<img width={width} src=\'data:image/png;base64,{encoded}\'>'
+
+    mpl.use(_backend)
+    plt.close()
+
+    return html
+
 
 def _make_obj_table(objs_meta, objs_vals,
                     cols=['size', 'index', 'val', 'ref', 'ref0', 'adder', 'scaler', 'units']):
@@ -422,7 +467,10 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
                     else:
                         row[col_name] = meta_dict[name][col_name]
             elif col_name == 'plot':
-                row['plot'] = _sparkline(meta=meta, val=vals_dict[name], kind=kind)
+                if meta['size'] > 1:
+                    row['plot'] = _sparkline(meta=meta, val=vals_dict[name], kind=kind)
+                else:
+                    row['plot'] = _constraint_plot(meta=meta, val=vals_dict[name], kind=kind)
             else:
                 row[col_name] = meta[col_name]
 

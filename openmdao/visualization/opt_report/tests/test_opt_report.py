@@ -8,12 +8,15 @@ from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.test_suite.components.paraboloid import Paraboloid
 
 from openmdao.visualization.opt_report.opt_report import opt_report
-
+from openmdao.core.constants import INF_BOUND
 
 # @use_tempdirs
 class TestOptimizationReport(unittest.TestCase):
 
-    def setup_problem(self, optimizer):
+    def setup_problem(self, optimizer,
+                      vars_lower=-INF_BOUND, vars_upper=INF_BOUND,
+                      cons_lower=-INF_BOUND, cons_upper=INF_BOUND
+                      ):
         # build the model
         self.prob = prob = om.Problem()
         prob.model.add_subsystem('parab', Paraboloid(), promotes_inputs=['x', 'y'])
@@ -29,20 +32,39 @@ class TestOptimizationReport(unittest.TestCase):
         # setup the optimization
         prob.driver = optimizer()
 
-        prob.model.add_design_var('x', lower=-50, upper=50)
-        prob.model.add_design_var('y', lower=-50, upper=50)
+        prob.model.add_design_var('x', lower=vars_lower, upper=vars_upper)
+        prob.model.add_design_var('y', lower=vars_lower, upper=vars_upper)
         prob.model.add_objective('parab.f_xy')
 
         # to add the constraint to the model
-        prob.model.add_constraint('const.g', lower=0, upper=10., alias='ALIAS_TEST')
+        prob.model.add_constraint('const.g', lower=cons_lower, upper=cons_upper, alias='ALIAS_TEST')
 
         prob.setup()
 
         prob.run_driver()
         return prob
 
-    def test_opt_report_scipyopt(self):
-        prob = self.setup_problem(om.ScipyOptimizeDriver)
+    def test_opt_report_scipyopt_cons_bound(self):
+        prob = self.setup_problem(om.ScipyOptimizeDriver,
+                                  vars_lower=-50, vars_upper=50.,
+                                  cons_lower=0, cons_upper=10.,
+                                  )
+        prob.driver.options['optimizer'] = 'SLSQP'
+        opt_report(self.prob)
+
+    def test_opt_report_scipyopt_var_bound(self):
+        prob = self.setup_problem(om.ScipyOptimizeDriver,
+                                  vars_lower=0, vars_upper=10.,
+                                  cons_lower=0, cons_upper=10.,
+                                  )
+        prob.driver.options['optimizer'] = 'SLSQP'
+        opt_report(self.prob)
+
+    def test_opt_report_scipyopt_only_var_lower_bound(self):
+        prob = self.setup_problem(om.ScipyOptimizeDriver,
+                                  vars_lower=0,
+                                  cons_lower=0, cons_upper=10.,
+                                  )
         prob.driver.options['optimizer'] = 'SLSQP'
         opt_report(self.prob)
 
