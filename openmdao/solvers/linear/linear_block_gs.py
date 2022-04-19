@@ -107,7 +107,7 @@ class LinearBlockGS(BlockLinearSolver):
                 if not subsys._is_local:
                     continue
 
-                scope_out, scope_in = system._get_scope(subsys)
+                scope_out, scope_in = system._get_matvec_scope(subsys)
                 subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
                 b_vec *= -1.0
                 b_vec += self._rhs_vec
@@ -131,7 +131,7 @@ class LinearBlockGS(BlockLinearSolver):
                     b_vec += self._rhs_vec
 
                     subsys._solve_linear(mode, self._rel_systems)
-                    scope_out, scope_in = system._get_scope(subsys)
+                    scope_out, scope_in = system._get_matvec_scope(subsys)
                     subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
                 else:   # subsys not local
                     system._transfer('linear', mode, sname)

@@ -925,7 +925,7 @@ class LinearSolver(Solver):
         self._recording_iter.push(('_run_apply', 0))
 
         system = self._system()
-        scope_out, scope_in = system._get_scope()
+        scope_out, scope_in = system._get_matvec_scope()
 
         try:
             system._apply_linear(self._assembled_jac, self._rel_systems,

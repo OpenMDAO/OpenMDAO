@@ -299,7 +299,7 @@ class PETScKrylov(LinearSolver):
         x_vec.set_val(_get_petsc_vec_array(in_vec))
 
         # apply linear
-        scope_out, scope_in = system._get_scope()
+        scope_out, scope_in = system._get_matvec_scope()
         system._apply_linear(self._assembled_jac, self._rel_systems, self._mode,
                              scope_out, scope_in)
 

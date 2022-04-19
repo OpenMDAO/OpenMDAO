@@ -240,7 +240,7 @@ class DirectSolver(LinearSolver):
         nmtx = x_data.size
         seed = np.zeros(x_data.size)
         mtx = np.empty((nmtx, nmtx), dtype=b_data.dtype)
-        scope_out, scope_in = system._get_scope()
+        scope_out, scope_in = system._get_matvec_scope()
 
         # Assemble the Jacobian by running the identity matrix through apply_linear
         for i, seed in enumerate(identity_column_iter(seed)):

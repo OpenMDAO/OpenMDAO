@@ -2102,7 +2102,7 @@ class System(object):
 
         return maps
 
-    def _get_scope(self):
+    def _get_matvec_scope(self):
         """
         Find the input and output variables that are needed for a particular matvec product.
 

@@ -327,7 +327,7 @@ class Group(System):
         else:
             dct[name] = [meta]
 
-    def _get_scope(self, excl_sub=None):
+    def _get_matvec_scope(self, excl_sub=None):
         """
         Find the input and output variables that are needed for a particular matvec product.
 
@@ -2475,7 +2475,7 @@ class Group(System):
         """
         if self._problem_meta is not None and \
                 self._problem_meta['setup_status'] == _SetupStatus.POST_CONFIGURE:
-            raise RuntimeError("%s: Cannot call set_order in the configure method." % (self.msginfo))
+            raise RuntimeError(f"{self.msginfo}: Cannot call set_order in the configure method.")
 
         # Make sure the new_order is valid. It must contain all subsystems
         # in this model.

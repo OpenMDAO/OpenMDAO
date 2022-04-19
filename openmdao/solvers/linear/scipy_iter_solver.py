@@ -147,7 +147,7 @@ class ScipyKrylov(LinearSolver):
             b_vec = system._vectors['output']['linear']
 
         x_vec.set_val(in_arr)
-        scope_out, scope_in = system._get_scope()
+        scope_out, scope_in = system._get_matvec_scope()
         system._apply_linear(self._assembled_jac, self._rel_systems, self._mode,
                              scope_out, scope_in)
 
