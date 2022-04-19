@@ -2,6 +2,7 @@
 // <<hpp_insert src/OmLayout.js>>
 // <<hpp_insert src/OmStyle.js>>
 // <<hpp_insert src/OmUserInterface.js>>
+// <<hpp_insert src/OmMatrix.js>>
 
 /**
  * Manage all components of the application. The model data, the CSS styles, the
@@ -23,24 +24,6 @@ class OmDiagram extends Diagram {
         this._init();
     }
 
-
-    /**
-     * Separate these calls from the constructor so that subclasses can
-     * set values before execution.
-     */
-     _init() {
-        this.style = new OmStyle(this.dom.svgStyle, this.dims.size.font);
-        this.layout = this._newLayout();
-
-        this.search = new Search(this.zoomedElement, this.model.root);
-        this.ui = new OmUserInterface(this);
-
-        // Keep track of arrows to show and hide them
-        this.arrowMgr = new ArrowManager(this.dom.n2Groups);
-        this.matrix = new N2Matrix(this.model, this.layout, this.dom.n2Groups,
-            this.arrowMgr, true, this.ui.findRootOfChangeFunction);
-    }
-
     /** Override Diagram._newLayout() to create an OmLayout object. */
     _newLayout() {
         if (this.showLinearSolverNames === undefined)
@@ -51,6 +34,23 @@ class OmDiagram extends Diagram {
 
         return new OmLayout(this.model, this.zoomedElement, this.dims,
             this.showLinearSolverNames, this.showSolvers);
+    }
+
+    /** Create a new OmMatrix object. Overrides superclass method. */
+    _newMatrix(lastClickWasLeft, prevCellSize = null) {
+        return new OmMatrix(this.model, this.layout, this.dom.diagGroups,
+            this.arrowMgr, lastClickWasLeft, this.ui.findRootOfChangeFunction, prevCellSize);
+    }
+
+    /**
+     * Separate these calls from the constructor so that subclasses can
+     * set values before execution.
+     */
+     _init() {
+        this.style = new OmStyle(this.dom.svgStyle, this.dims.size.font);
+        this.layout = this._newLayout();
+        this.ui = new OmUserInterface(this);
+        this.matrix = this._newMatrix(true);
     }
 
     /**
@@ -70,18 +70,18 @@ class OmDiagram extends Diagram {
         this.dom.clips.solverTree = d3.select("#solverTreeClip > rect");
     }
 
-    /** Add SVG groups & contents coupled to the visible nodes in the trees. */
+    /**
+     * Add SVG groups & contents coupled to the visible nodes in the trees.
+     * Select all <g> elements that have class "solver_group". If any already
+     * exist, join to their associated nodes in the solver tree. If no
+     * existing <g> matches a displayable node, add it to the "enter"
+     * selection so the <g> can be created. If a <g> exists but there is
+     * no longer a displayable node for it, put it in the "exit" selection so
+     * it can be removed:
+     */
     _updateTreeCells() {
         super._updateTreeCells();
 
-        /*
-        Select all <g> elements that have class "solver_group". If any already
-        exist, join to their associated nodes in the solver tree. If no
-        existing <g> matches a displayable node, add it to the "enter"
-        selection so the <g> can be created. If a <g> exists but there is
-        no longer a displayable node for it, put it in the "exit" selection so
-        it can be removed:
-        */
         const self = this;
         const scale = this.layout.scales.solver;
         const treeSize = this.layout.treeSize.solver;
@@ -98,7 +98,7 @@ class OmDiagram extends Diagram {
     /**
      * Using the visible nodes in the solver tree as data points, create SVG objects to
      * represent each one. Dimensions are obtained from the precalculated layout.
-     * @param {Object} enter The selection to add <g> elements and children to.
+     * @param {Selection} enter The selection to add <g> elements and children to.
      * @param {Scale} scale Linear scales of the diagram width and height.
      * @param {Dimensions} treeSize Actual width and height of the tree in pixels.
      */
@@ -115,31 +115,31 @@ class OmDiagram extends Diagram {
                     { 'linear': d.linear_solver, 'nonLinear': d.nonlinear_solver });
                 return `${solver_class} solver_group ${self.style.getNodeClass(d)}`;
             })
-            .on("click", function(e,d) {self.leftClickSelector(e, this, d)})
-            .on("contextmenu", function (e,d) { self.ui.rightClick(e, d)})
-            .on("mouseover", function(e,d) {
-                self.ui.nodeInfoBox.update(e, d, d3.select(this).select('rect').style('fill'), true);
+            .on("click", (e,d) => self.leftClickSelector(e, d))
+            .on("contextmenu", (e,d) => self.ui.rightClick(e, d))
+            .on("mouseover", (e,d) => {
+                self.ui.showInfoBox(e, d);
 
                 if (self.model.abs2prom != undefined) {
                     if (d.isInput()) {
-                        return self.dom.toolTip.text(self.model.abs2prom.input[d.absPathName])
+                        return self.dom.toolTip.text(self.model.abs2prom.input[d.path])
                             .style("visibility", "visible");
                     }
                     if (d.isOutput()) {
-                        return self.dom.toolTip.text(self.model.abs2prom.output[d.absPathName])
+                        return self.dom.toolTip.text(self.model.abs2prom.output[d.path])
                             .style("visibility", "visible");
                     }
                 }
             })
             .on("mouseleave", () => {
-                self.ui.nodeInfoBox.clear();
+                self.ui.removeInfoBox();
 
                 if (self.model.abs2prom != undefined) {
                     self.dom.toolTip.style("visibility", "hidden");
                 }
             })
-            .on("mousemove", (e) => {
-                self.ui.nodeInfoBox.moveNearMouse(e);
+            .on("mousemove", e => {
+                self.ui.moveInfoBox(e);
 
                 if (self.model.abs2prom != undefined) {
                     self.dom.toolTip.style("top", (e.pageY - 30) + "px")
@@ -162,7 +162,7 @@ class OmDiagram extends Diagram {
             .transition(sharedTransition)
             .attr("width", d => d.draw.solverDims.width * treeSize.width)
             .attr("height", d => d.draw.solverDims.height * treeSize.height)
-            .attr("id", d => d.absPathName.replace(/\./g, '_'))
+            .attr("id", d => d.path.replace(/\./g, '_'))
             .attr('rx', 12)
             .attr('ry', 12);
 
@@ -185,7 +185,7 @@ class OmDiagram extends Diagram {
 
     /**
      * Update the geometry for existing <g> with a transition.
-     * @param {Object} update The selected group of existing solver tree <g> elements.
+     * @param {Selection} update The selected group of existing solver tree <g> elements.
      * @param {Scale} scale Linear scales of the diagram width and height.
      * @param {Dimensions} treeSize Actual width and height of the tree in pixels.
      */
@@ -233,7 +233,7 @@ class OmDiagram extends Diagram {
     /**
      * Remove <g> that no longer have displayable nodes associated with them, and
      * transition them away.
-     * @param {Object} exit The selected group of solver tree <g> elements to remove.
+     * @param {Selection} exit The selected group of solver tree <g> elements to remove.
      * @param {Scale} scale Linear scales of the diagram width and height.
      * @param {Dimensions} treeSize Actual width and height of the tree in pixels.
      */

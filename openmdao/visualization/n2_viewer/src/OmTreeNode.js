@@ -7,23 +7,24 @@
 class OmNodeDisplayData extends NodeDisplayData {
     constructor() {
         super();
-        this.nameSolverWidthPx = 1; // Solver-side label width pixels as computed by N2Layout
+        this.nameSolverWidthPx = 1; // Solver-side label width pixels as computed by Layout
         this.solverDims = new Dimensions({ x: 1e-6, y: 1e-6, width: 1, height: 1 });
         this.solverDims.preserve();
     }
 }
 
 /**
- * Extend TreeNode by adding support for feedback cycle arrows and solvers.
+ * Extend FilterCapableTreeNode by adding support for feedback cycle arrows and solvers.
  * @typedef OmTreeNode
  */
-class OmTreeNode extends TreeNode {
+class OmTreeNode extends FilterCapableNode {
     constructor(origNode, attribNames) {
         super(origNode, attribNames);
 
         // Solver names may be empty, so set them to "None" instead.
         if (this.linear_solver == "") this.linear_solver = "None";
         if (this.nonlinear_solver == "") this.nonlinear_solver = "None";
+        if (this.isComponent()) this.draw.boxChildren = true;
     }
 
     get absPathName() { return this.path; }
@@ -34,6 +35,27 @@ class OmTreeNode extends TreeNode {
     addFilterChild(attribNames) {
         if (this.isComponent()) { super.addFilterChild(attribNames); }
     }
+
+    /** Override superclass method to include 'autoivc_input'. */
+    isInput() { return this.type.match(/^(input|unconnected_input|autoivc_input)$/); }
+
+    /** Override superclass method to include 'autoivc_input'. */
+    isInputOrOutput() { return this.type.match(/^(output|input|unconnected_input|autoivc_input)$/); }
+
+    /** True if this is an input whose source is an auto-ivc'd output */
+    isAutoIvcInput() { return (this.type == 'autoivc_input'); }
+
+    /** True if this is an output and it's not implicit */
+    isExplicitOutput() { return (this.isOutput() && !this.implicit); }
+
+    /** True if this is an output and it is implicit */
+    isImplicitOutput() { return (this.isOutput() && this.implicit); }
+
+    /** True is this.type is 'subsystem' */
+    isSubsystem() { return (this.type == 'subsystem'); }
+
+    /** True if it's a subsystem and this.subsystem_type is 'component' */
+    isComponent() { return (this.isSubsystem() && this.subsystem_type == 'component'); }
 
     /**
      * Add ourselves to the supplied array if we contain a cycleArrows property.

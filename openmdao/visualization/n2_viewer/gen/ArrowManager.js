@@ -5,7 +5,7 @@
  * caches of hovered/pinned arrows, move arrows between them, and
  * transition on updates.
  * @typedef ArrowManager
- * @prop {Object} n2Groups DOM elements referenced by Diagram
+ * @prop {Object} diagGroups DOM elements referenced by Diagram
  * @prop {ArrowCache} hoverArrows Arrows that disappear if the mouse moves away from the cell
  * @prop {ArrowCache} pinnedArrows Arrows that persist and are redrawn during updates
  * @prop {Object} nodeSize Matrix cell width and height
@@ -13,8 +13,8 @@
  * @prop {Object} arrowDirClasses The various offscreen Arrow derived classes.
  */
  class ArrowManager {
-    constructor(n2Groups) {
-        this.n2Groups = n2Groups;
+    constructor(diagGroups) {
+        this.diagGroups = diagGroups;
         this.hoverArrows = new ArrowCache();
         this.pinnedArrows = new ArrowCache();
         this.nodeSize = { 'width': -1, 'height': -1 };
@@ -69,7 +69,7 @@
      */
     addFullArrow(cellId, attribs) {
         attribs.width = this.lineWidth;
-        const newArrow = new BentArrow(attribs, this.n2Groups, this.nodeSize);
+        const newArrow = new BentArrow(attribs, this.diagGroups, this.nodeSize);
 
         // Add or replace the cache entry with the new arrow
         if (this.pinnedArrows.hasArrow(newArrow.id)) {
@@ -98,7 +98,7 @@
         attribs.cellId = cellId;
         debugInfo("addOffGridArrow(): ", side, dir, attribs)
         const newArrow = new (this.arrowDirClasses[side][dir])(attribs,
-            this.n2Groups, this.nodeSize);
+            this.diagGroups, this.nodeSize);
 
         // Add or replace the cache entry with the new arrow
         if (this.pinnedArrows.hasArrow(newArrow.id)) {
@@ -115,8 +115,8 @@
     /**
      * Both endpoints are visible, so draw a full arrow between them.
      * @param {Arrow} arrow The arrow object to transition.
-     * @param {N2MatrixCell} startCell Cell at the beginning of the arrow.
-     * @param {N2MatrixCell} endCell Cell at the end of the arrow.
+     * @param {MatrixCell} startCell Cell at the beginning of the arrow.
+     * @param {MatrixCell} endCell Cell at the end of the arrow.
      */
     _transitionFullArrow(arrow, startCell, endCell) {
         debugInfo(`transition: Found both sides of ${arrow.id}`)
@@ -127,15 +127,15 @@
         attribs.end.row = endCell.row;
         attribs.width = this.lineWidth;
         this.pinnedArrows.arrows[arrow.id] =
-            new BentArrow(attribs, this.n2Groups, this.nodeSize);
+            new BentArrow(attribs, this.diagGroups, this.nodeSize);
     }
 
     /**
      * Only the starting cell is visible, so draw an arrow from that
      * heading offscreen in the direction the end would be.
      * @param {Arrow} arrow The arrow object to transition.
-     * @param {N2MatrixCell} startCell Cell at the beginning of the arrow.
-     * @param {N2Matrix} matrix Reference to the matrix object.
+     * @param {MatrixCell} startCell Cell at the beginning of the arrow.
+     * @param {Matrix} matrix Reference to the matrix object.
      */
     _transitionStartArrow(arrow, startCell, matrix) {
         debugInfo(`transition: Only found start cell for ${arrow.id}`)
@@ -152,20 +152,20 @@
             'cellId': arrow.cellId,
             'matrixSize': matrix.diagNodes.length,
             'offscreenId': arrow.attribs.end.id,
-            'label': matrix.model.nodeIds[arrow.attribs.end.id].absPathName,
+            'label': matrix.model.nodeIds[arrow.attribs.end.id].path,
             'color': arrow.attribs.color
         }
         this.pinnedArrows.arrows[arrow.id] =
             new (this.arrowDirClasses[side]['outgoing'])(attribs,
-                    this.n2Groups, this.nodeSize);
+                    this.diagGroups, this.nodeSize);
     }
 
     /**
      * Only the ending cell is visible, so draw an arrow to that
      * from offscreen in the direction the starting cell would be.
      * @param {Arrow} arrow The arrow object to transition.
-     * @param {N2MatrixCell} endCell Cell at the end of the arrow.
-     * @param {N2Matrix} matrix Reference to the matrix object.
+     * @param {MatrixCell} endCell Cell at the end of the arrow.
+     * @param {Matrix} matrix Reference to the matrix object.
      */
     _transitionEndArrow(arrow, endCell, matrix) {
         debugInfo(`transition: Only found end cell for ${arrow.id}`)
@@ -182,12 +182,12 @@
             'cellId': arrow.cellId,
             'matrixSize': matrix.diagNodes.length,
             'offscreenId': arrow.attribs.start.id,
-            'label': matrix.model.nodeIds[arrow.attribs.start.id].absPathName,
+            'label': matrix.model.nodeIds[arrow.attribs.start.id].path,
             'color': arrow.attribs.color
         }
         this.pinnedArrows.arrows[arrow.id] =
             new (this.arrowDirClasses[side]['incoming'])(attribs,
-                this.n2Groups, this.nodeSize);
+                this.diagGroups, this.nodeSize);
     }
 
     /**
@@ -195,7 +195,7 @@
      * to their visible child nodes. This is done after the rest of the arrow
      * transitions because new arrows are added to the cache.
      * @param {Array} uncollapsedNodeIds List of nodeIds that were uncollapsed.
-     * @param {N2Matrix} matrix Reference to the matrix object.
+     * @param {Matrix} matrix Reference to the matrix object.
      */
     _transitionUncollapsedNodes(uncollapsedNodeIds, matrix) {
         for (const row in matrix.grid) {
@@ -213,7 +213,7 @@
      * Redraw all the visible arrows in the pinned arrow cache, and remove
      * the ones for which neither endpoint is visible. Full arrows may
      * need to transition to offgrid arrows and vice versa.
-     * @param {N2Matrix} matrix The matrix to operate with.
+     * @param {Matrix} matrix The matrix to operate with.
      */
     transition(matrix) {
         let uncollapsedNodeIds = [];
@@ -266,7 +266,7 @@
 
     /**
      * If arrows are hovering, then pin them, and vice versa.
-     * @param {String} cellId The ID of the N2MatrixCell to operate on.
+     * @param {String} cellId The ID of the MatrixCell to operate on.
      * @param {Boolean} [ pinOnly = false] If true, don't unpin anything.
      */
     togglePin(cellId, pinOnly = false) {
@@ -359,7 +359,7 @@
 
                 attribs.width = this.lineWidth;
                 const newArrow = new (arrowClasses[arrow[1]])(attribs,
-                    this.n2Groups, this.nodeSize);
+                    this.diagGroups, this.nodeSize);
                 this.pinnedArrows.add(arrow[0], newArrow);
             }
             else {
@@ -378,7 +378,7 @@
                     'color': arrow[7],
                 };
                 attribs.width = this.lineWidth;
-                const newArrow = new BentArrow(attribs, this.n2Groups, this.nodeSize);
+                const newArrow = new BentArrow(attribs, this.diagGroups, this.nodeSize);
                 this.pinnedArrows.add(arrow[0], newArrow);
             }
         }

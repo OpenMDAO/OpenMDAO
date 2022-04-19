@@ -147,7 +147,7 @@ class TestKrigingSurrogate(unittest.TestCase):
 
         surrogate.train(x, y)
         jac = surrogate.linearize(np.array([[0.5, 0.5]]))
-        assert_near_equal(jac, np.array([[1, 1], [1, -1], [1, 2]]), 6e-4)
+        assert_near_equal(jac, np.array([[1, 1], [1, -1], [1, 2]]), 1e-3)
 
     def test_cache(self):
         x = np.array([[-2., 0.], [-0.5, 1.5], [1., 3.], [8.5, 4.5],

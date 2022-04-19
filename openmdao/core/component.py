@@ -956,8 +956,11 @@ class Component(System):
                     else:
                         src_shape = all_abs2meta_out[src]['global_shape']
 
-                    meta_in['src_indices'] = indexer(slice(offset, end), flat_src=True,
-                                                     src_shape=src_shape)
+                    if offset == end:
+                        idx = np.zeros(0, dtype=INT_DTYPE)
+                    else:
+                        idx = slice(offset, end)
+                    meta_in['src_indices'] = indexer(idx, flat_src=True, src_shape=src_shape)
                     meta_in['flat_src_indices'] = True
                     added_src_inds.append(iname)
 

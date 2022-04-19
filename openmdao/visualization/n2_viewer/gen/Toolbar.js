@@ -1,6 +1,7 @@
 // <<hpp_insert gen/ToolbarButtonClick.js>>
 // <<hpp_insert gen/ToolbarButtonToggle.js>>
 // <<hpp_insert gen/ClickHandler.js>>
+// <<hpp_insert gen/DiagramHelp.js>>
 
 /**
  * Manage the set of buttons and tools at the left of the diagram.
@@ -69,7 +70,7 @@ class Toolbar {
 
     /** Either create the help window the first time or redisplay it */
     _showHelp() {
-        if (!this._helpWindow) this._helpWindow = new N2Help(this.helpInfo);
+        if (!this._helpWindow) this._helpWindow = new DiagramHelp(this.helpInfo);
         else this._helpWindow.show().modal(true);
     }
 
@@ -202,12 +203,12 @@ class Toolbar {
 
         this._addButton(new ToolbarButtonToggle('#info-button', tooltipBox,
             ["Hide detailed node information", "Show detailed node information"],
-            () => { return ui.nodeInfoBox.active; },
+            () => { return ui.click.isNodeInfo; },
             () => { ui.click.toggle('nodeinfo'); })).setHelpInfo("Select left-click action");
 
         this._addButton(new ToolbarButtonToggle('#info-button-2', tooltipBox,
             ["Hide detailed node information", "Show detailed node information"],
-            () => { return ui.nodeInfoBox.active; },
+            () => { return ui.click.isNodeInfo; },
             (e, target) => {
                 ui.click.toggle('nodeinfo');
                 self._setRootButton(target);
@@ -267,11 +268,11 @@ class Toolbar {
             .setHelpInfo("Toggle legend");
 
         this._addButton(new ToolbarButtonClick('#question-button', tooltipBox,
-            "Show N2 diagram help",
+            "Display help window",
             (e, target) => { self._showHelp(); self._setRootButton(target); }));
 
         this._addButton(new ToolbarButtonClick('#question-button-2', tooltipBox,
-            "Show N2 diagram help",
+            "Display help window",
             (e, target) => { self._showHelp(); self._setRootButton(target); }));
 
         // Don't add this to the array of tracked buttons because it confuses

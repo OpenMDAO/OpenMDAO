@@ -55,4 +55,14 @@ class OmToolbar extends Toolbar {
             () => ui.desVars, () => ui.toggleDesVars()))
             .setHelpInfo("Toggle optimization variables");
     }
+
+    _showHelp() {
+        if (!this._helpWindow) {
+            const version = d3.select('div#all-diagram-content').attr('data-openmdao-version');
+            const footerText = `OpenMDAO Version ${version} Model Hierarchy and N2 diagram`;
+
+            this._helpWindow = new DiagramHelp(this.helpInfo, footerText);
+        }
+        else this._helpWindow.show().modal(true);
+    }
 }
