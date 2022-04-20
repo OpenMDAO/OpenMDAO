@@ -5,7 +5,7 @@
  * Calculates and stores the size and positions of visible elements.
  * @typedef Layout
  * @property {ModelData} model Reference to the preprocessed model.
- * @property {OmTreeNode} zoomedElement Reference to zoomedElement managed by N2Diagram.
+ * @property {OmTreeNode} zoomedElement Reference to zoomedElement managed by Diagram.
  * @property {OmTreeNode[]} zoomedNodes  Child workNodes of the current zoomed element.
  * @property {OmTreeNode[]} visibleNodes Zoomed workNodes that are actually drawn.
  * @property {Object} svg Reference to the top-level SVG element in the document.
@@ -81,9 +81,9 @@ class Layout {
         const highWaterMark = Math.max(this.prevVisibleNodeCount, this.visibleNodeCount);
 
         // Too many nodes, disable transitions.
-        if (highWaterMark >= N2TransitionDefaults.maxNodes) {
+        if (highWaterMark >= transitionDefaults.maxNodes) {
             debugInfo("Denying transitions: ", this.visibleNodes.length,
-                " visible nodes, max allowed: ", N2TransitionDefaults.maxNodes)
+                " visible nodes, max allowed: ", transitionDefaults.maxNodes)
 
             // Return if already denied
             if (!d3.selection.prototype.transitionAllowed) return;
@@ -95,7 +95,7 @@ class Layout {
         }
         else { // OK, enable transitions.
             debugInfo("Allowing transitions: ", this.visibleNodes.length,
-                " visible nodes, max allowed: ", N2TransitionDefaults.maxNodes)
+                " visible nodes, max allowed: ", transitionDefaults.maxNodes)
 
             // Return if already allowed
             if (d3.selection.prototype.transitionAllowed) return;
@@ -156,10 +156,10 @@ class Layout {
             retVal = 'Auto-IVC';
         }
         else if (node.isFilter()) {
-            if (node.name.match(/.*_N2_FILTER_inputs$/)) retVal = 'Filtered Inputs';
+            if (node.name.match(/.*_FILTER_inputs$/)) retVal = 'Filtered Inputs';
             else retVal = 'Filtered Outputs';
         }
-        else if (node.absPathName.match(/^_auto_ivc.*/) && node.promotedName !== undefined) {
+        else if (node.path.match(/^_auto_ivc.*/) && node.promotedName !== undefined) {
             retVal = node.promotedName;
         }
 
@@ -223,7 +223,7 @@ class Layout {
     _setColumnWidthsFromWidestText(node, childrenProp, colArr, leafArr, widthProp) {
         if (node.draw.hidden) return;
 
-        const height = this.size.n2matrix.height * node.draw.numLeaves / this.zoomedElement.draw.numLeaves;
+        const height = this.size.matrix.height * node.draw.numLeaves / this.zoomedElement.draw.numLeaves;
         node.prevTextOpacity = node.propExists('textOpacity') ? node.textOpacity : 0;
         node.textOpacity = (height > this.size.font) ? 1 : 0;
         const hasVisibleDetail = (height >= 2.0);
@@ -343,10 +343,10 @@ class Layout {
      * @returns {Dimensions} Members width and height.
      */
     calcOuterDims() {
-        const width = this.size.partitionTree.width + this.size.n2matrix.width +
-            this.size.n2matrix.margin * 2;
+        const width = this.size.partitionTree.width + this.size.matrix.width +
+            this.size.matrix.margin * 2;
 
-        const height = this.size.n2matrix.height + this.size.n2matrix.margin * 2;
+        const height = this.size.matrix.height + this.size.matrix.margin * 2;
 
         return new Dimensions({'width': width, 'height': height});
     }
@@ -356,11 +356,11 @@ class Layout {
      * @returns {Dimensions} Members width, height, and margin as numbers.
      */
     calcInnerDims() {
-        const width = this.size.partitionTree.width + this.size.n2matrix.margin +
-            this.size.n2matrix.width + this.size.n2matrix.margin;
+        const width = this.size.partitionTree.width + this.size.matrix.margin +
+            this.size.matrix.width + this.size.matrix.margin;
 
         const height = this.size.partitionTree.height;
-        const margin = this.size.n2matrix.margin;
+        const margin = this.size.matrix.margin;
 
         return new Dimensions({'width': width, 'height': height, 'margin': margin});
     }
@@ -400,28 +400,28 @@ class Layout {
             .attr('width', '8')
             .attr('transform', `translate(${size.partitionTree.width + 1},${innerDims.margin})`);
 
-        dom.n2OuterGroup
+        dom.diagOuterGroup
             .attr('height', outerDims.height)
             .attr('width', outerDims.height)
             .attr('transform', `translate(${size.partitionTree.width},0)`);
 
-        dom.n2InnerGroup
+        dom.diagInnerGroup
             .attr('height', innerDims.height)
             .attr('width', innerDims.height)
             .attr('transform', `translate(${innerDims.margin},${innerDims.margin})`);
 
-        dom.n2BackgroundRect
+        dom.diagBackgroundRect
             .attr('width', innerDims.height)
             .attr('height', innerDims.height)
             .attr('transform', 'translate(0,0)');
 
         const offgridHeight = size.font + 2;
-        dom.n2Groups.offgrid.top
+        dom.diagGroups.offgrid.top
             .attr('transform', `translate(${innerDims.margin},0)`)
             .attr('width', innerDims.height)
             .attr('height', offgridHeight);
 
-        dom.n2Groups.offgrid.bottom
+        dom.diagGroups.offgrid.bottom
             .attr('transform', `translate(0,${innerDims.height + offgridHeight})`)
             .attr('width', outerDims.height)
             .attr('height', offgridHeight);
@@ -454,11 +454,7 @@ class Layout {
      * @param {Boolean} manuallyResized Have the diagram dimensions have been changed through UI
      */
     updateTransitionInfo(dom, transitionStartDelay, manuallyResized) {
-        sharedTransition = d3.transition('global')
-            .duration(N2TransitionDefaults.duration)
-            .delay(transitionStartDelay)
-            // Hide the transition waiting animation when it ends:
-            .on('end', () => dom.waiter.attr('class', 'no-show'));
+        sharedTransition = getTransition(transitionStartDelay);
 
         const outerDims = this.calcOuterDims();
         const u = outerDims.unit;
@@ -496,17 +492,17 @@ class Layout {
                 `translate(${this.size.partitionTree.width + 1}${u},${innerDims.marginStyle})`);
 
         // Move n2 outer group to right of partition tree, spaced by the margin.
-        dom.n2OuterGroup.transition(sharedTransition)
+        dom.diagOuterGroup.transition(sharedTransition)
             .style('height', outerDims.heightStyle)
             .style('width', outerDims.heightStyle)
             .style('transform', `translate(${this.size.partitionTree.width}${u},0)`);
 
-        dom.n2InnerGroup.transition(sharedTransition)
+        dom.diagInnerGroup.transition(sharedTransition)
             .style('height', innerDims.heightStyle)
             .style('width', innerDims.heightStyle)
             .style('transform', `translate(${innerDims.marginStyle},${innerDims.marginStyle})`);
 
-        dom.n2BackgroundRect.transition(sharedTransition)
+        dom.diagBackgroundRect.transition(sharedTransition)
             .style('width', innerDims.heightStyle)
             .style('height', innerDims.heightStyle)
             .style('transform', 'translate(0,0)');
@@ -519,7 +515,7 @@ class Layout {
      * @returns {Number} Calculated width of the diagram.
      */
     calcWidthBasedOnNewHeight(height) {
-        return this.size.partitionTree.width + height + this.size.n2matrix.margin * 2;
+        return this.size.partitionTree.width + height + this.size.matrix.margin * 2;
     }
 
     /**
@@ -529,7 +525,7 @@ class Layout {
      * @returns {Number} Calculated height of the diagram.
      */
     calcHeightBasedOnNewWidth(width) {
-        return width - this.size.partitionTree.width - this.size.n2matrix.margin * 2;
+        return width - this.size.partitionTree.width - this.size.matrix.margin * 2;
     }
 
     /**

@@ -3,6 +3,7 @@
 // <<hpp_insert gen/UserInterface.js>>
 // <<hpp_insert gen/ArrowManager.js>>
 // <<hpp_insert gen/Search.js>>
+// <<hpp_insert gen/Matrix.js>>
 
 /**
  * Manage all pieces of the application. The model data, the CSS styles, the
@@ -10,9 +11,9 @@
  * all member objects.
  * @typedef Diagram
  * @property {ModelData} model Processed model data received from Python.
- * @property {OmStyle} style Manages N2-related styles and functions.
+ * @property {OmStyle} style Manages diagram-related styles and functions.
  * @property {Layout} layout Sizes and positions of visible elements.
- * @property {N2Matrix} matrix Manages the grid of visible model parameters.
+ * @property {Matrix} matrix Manages the grid of visible model parameters.
  * @property {TreeNode} zoomedElement The element the diagram is currently based on.
  * @property {TreeNode} zoomedElementPrev Reference to last zoomedElement.
  * @property {Object} dom Container for references to web page elements.
@@ -20,8 +21,8 @@
  * @property {Object} dom.svg The SVG element.
  * @property {Object} dom.svgStyle Object where SVG style changes can be made.
  * @property {Object} dom.toolTip Div to display tooltips.
- * @property {Object} dom.n2OuterGroup The outermost div of N2 itself.
- * @property {Object} dom.n2Groups References to <g> SVG elements.
+ * @property {Object} dom.diagOuterGroup The outermost div of the diagram itself.
+ * @property {Object} dom.diagGroups References to <g> SVG elements.
  * @property {number} chosenCollapseDepth The selected depth from the drop-down.
  */
 class Diagram {
@@ -40,10 +41,25 @@ class Diagram {
         this.dims = structuredClone(defaultDims);
 
         this._referenceD3Elements();
-        this.transitionStartDelay = N2TransitionDefaults.startDelay;
+        this.transitionStartDelay = transitionDefaults.startDelay;
         this.chosenCollapseDepth = -1;
 
-        if (callInit) this._init();
+        this.search = new Search(this.zoomedElement, this.model.root);
+        this.arrowMgr = new ArrowManager(this.dom.diagGroups);
+
+        if (callInit) { this._init(); }
+    }
+
+
+    /** Create a Layout object. Can be overridden to create different types of Layouts */
+    _newLayout() {
+        return new Layout(this.model, this.zoomedElement, this.dims);
+    }
+
+    /** Create a Matrix object. Can be overridden by subclasses */
+    _newMatrix(lastClickWasLeft, prevCellSize = null) {
+        return new Matrix(this.model, this.layout, this.dom.diagGroups,
+            this.arrowMgr, lastClickWasLeft, this.ui.findRootOfChangeFunction, prevCellSize);
     }
 
     /**
@@ -53,14 +69,8 @@ class Diagram {
     _init() {
         this.style = new Style(this.dom.svgStyle, this.dims.size.font);
         this.layout = this._newLayout();
-
-        this.search = new Search(this.zoomedElement, this.model.root);
         this.ui = new UserInterface(this);
-
-        // Keep track of arrows to show and hide them
-        this.arrowMgr = new ArrowManager(this.dom.n2Groups);
-        this.matrix = new N2Matrix(this.model, this.layout, this.dom.n2Groups,
-            this.arrowMgr, true, this.ui.findRootOfChangeFunction);
+        this.matrix = this._newMatrix(true);
     }
 
     /**
@@ -74,11 +84,11 @@ class Diagram {
             'svgStyle': d3.select("#svgId style"),
             'toolTip': d3.select(".tool-tip"),
             'arrowMarker': d3.select("#arrow"),
-            'n2OuterGroup': d3.select('g#n2outer'),
-            'n2InnerGroup': d3.select('g#n2inner'),
+            'diagOuterGroup': d3.select('g#n2outer'),
+            'diagInnerGroup': d3.select('g#n2inner'),
             'pTreeGroup': d3.select('g#tree'),
             'highlightBar': d3.select('g#highlight-bar'),
-            'n2BackgroundRect': d3.select('g#n2inner rect'),
+            'diagBackgroundRect': d3.select('g#n2inner rect'),
             'waiter': d3.select('#waiting-container'),
             'clips': {
                 'partitionTree': d3.select("#partitionTreeClip > rect"),
@@ -86,26 +96,21 @@ class Diagram {
             }
         };
 
-        const n2Groups = {};
-        this.dom.n2InnerGroup.selectAll('g').each(function () {
+        const diagGroups = {};
+        this.dom.diagInnerGroup.selectAll('g').each(function () {
             const d3elem = d3.select(this);
             const name = new String(d3elem.attr('id')).replace(/n2/, '');
-            n2Groups[name] = d3elem;
+            diagGroups[name] = d3elem;
         })
-        this.dom.n2Groups = n2Groups;
+        this.dom.diagGroups = diagGroups;
 
         const offgrid = {};
-        this.dom.n2OuterGroup.selectAll('g.offgridLabel').each(function () {
+        this.dom.diagOuterGroup.selectAll('g.offgridLabel').each(function () {
             const d3elem = d3.select(this);
             const name = new String(d3elem.attr('id')).replace(/n2/, '');
             offgrid[name] = d3elem;
         })
-        this.dom.n2Groups.offgrid = offgrid;
-    }
-
-    /** Create a Layout object. Can be overridden to create different types of Layouts */
-    _newLayout() {
-        return new Layout(this.model, this.zoomedElement, this.dims);
+        this.dom.diagGroups.offgrid = offgrid;
     }
 
     /**
@@ -146,7 +151,7 @@ class Diagram {
      * @param {OmTreeNode} node The current node being examined.
      */
      getSubState(dataList, node = this.model.root) {
-        if (node.isFilter()) return; // Ignore state for N2FilterNodes
+        if (node.isFilter()) return; // Ignore state for FilterNodes
 
         dataList.push(node.getStateForSave());
 
@@ -163,7 +168,7 @@ class Diagram {
      * @param {OmTreeNode} node The node currently being restored.
      */
     setSubState(dataList, node = this.model.root) {
-        if (node.isFilter()) return; // Ignore state for N2FilterNodes
+        if (node.isFilter()) return; // Ignore state for FilterNodes
 
         node.setStateFromLoad(dataList.pop());
 
@@ -198,16 +203,16 @@ class Diagram {
      * @param {Object} obj The HTML element that was clicked on.
      * @param {TreeNode} node The node associated with the element.
      */
-    leftClickSelector(e, obj, node) {
+    leftClickSelector(e, node) {
         switch (this.ui.click.clickEffect) {
             case ClickHandler.ClickEffect.NodeInfo:
-                this.ui.nodeInfoBox.pin();
+                this.ui.pinInfoBox();
                 break;
             case ClickHandler.ClickEffect.Collapse:
-                this.ui.rightClick(e, node, obj);
+                this.ui.rightClick(e, node, e.currentTarget);
                 break;
             case ClickHandler.ClickEffect.Filter:
-                const color = d3.select(obj).select('rect').style('fill');
+                const color = d3.select(e.currentTarget).select('rect').style('fill');
                 this.ui.altRightClick(e, node, color);
                 break;
             default:
@@ -215,16 +220,16 @@ class Diagram {
         }
     }
 
-    /** Add SVG groups & contents coupled to the visible nodes in the model tree. */
+    /**
+     * Add SVG groups & contents coupled to the visible nodes in the model tree.
+     * Select all <g> elements that have class "partition_group". If any already
+     * exist, join to their associated nodes in the model tree. If no
+     * existing <g> matches a displayable node, add it to the "enter"
+     * selection so the <g> can be created. If a <g> exists but there is
+     * no longer a displayable node for it, put it in the "exit" selection so
+     * it can be removed.
+     */
     _updateTreeCells() {
-        /*
-        Select all <g> elements that have class "partition_group". If any already
-        exist, join to their associated nodes in the model tree. If no
-        existing <g> matches a displayable node, add it to the "enter"
-        selection so the <g> can be created. If a <g> exists but there is
-        no longer a displayable node for it, put it in the "exit" selection so
-        it can be removed:
-        */
         const self = this;
         const scale = this.layout.scales.model;
         const treeSize = this.layout.treeSize.model;
@@ -241,7 +246,7 @@ class Diagram {
     /**
      * Using the visible nodes in the model tree as data points, create SVG objects to
      * represent each one. Dimensions are obtained from the precalculated layout.
-     * @param {Object} enter The selection to add <g> elements and children to.
+     * @param {Selection} enter The selection to add <g> elements and children to.
      * @param {Scale} scale Linear scales of the diagram width and height.
      * @param {Dimensions} treeSize Actual width and height of the tree in pixels.
      */
@@ -254,7 +259,7 @@ class Diagram {
         const enterSelection = enter
             .append("g")
             .attr("class", d => `partition_group ${self.style.getNodeClass(d)}`)
-            .on("click", function(e,d) { self.leftClickSelector(e, this, d); })
+            .on("click", (e,d) => self.leftClickSelector(e, d))
             .on("contextmenu", function(e,d) {
                 if (e.altKey) {
                     self.ui.altRightClick(e, d, d3.select(this).select('rect').style('fill'));
@@ -263,11 +268,9 @@ class Diagram {
                     self.ui.rightClick(e, d);
                 }
             })
-            .on("mouseover", function(e, d) {
-                self.ui.nodeInfoBox.update(e, d, d3.select(this).select('rect').style('fill'))
-            })
-            .on("mouseleave", () => self.ui.nodeInfoBox.clear())
-            .on("mousemove", e => self.ui.nodeInfoBox.moveNearMouse(e));
+            .on("mouseover", (e,d) => self.ui.showInfoBox(e, d))
+            .on("mouseleave", () => self.ui.removeInfoBox())
+            .on("mousemove", e => self.ui.moveInfoBox(e));
 
         enterSelection
             .transition(sharedTransition)
@@ -304,7 +307,7 @@ class Diagram {
 
     /**
      * Update the geometry for existing <g> with a transition.
-     * @param {Object} update The selected group of existing model tree <g> elements.
+     * @param {Selection} update The selected group of existing model tree <g> elements.
      * @param {Scale} scale Linear scales of the diagram width and height.
      * @param {Dimensions} treeSize Actual width and height of the tree in pixels.
      */
@@ -344,7 +347,7 @@ class Diagram {
     /**
      * Remove <g> that no longer have displayable nodes associated with them, and
      * transition them away.
-     * @param {Object} exit The selected group of model tree <g> elements to remove.
+     * @param {Selection} exit The selected group of model tree <g> elements to remove.
      * @param {Scale} scale Linear scales of the diagram width and height.
      * @param {Dimensions} treeSize Actual width and height of the tree in pixels.
      */
@@ -429,9 +432,7 @@ class Diagram {
         if (computeNewTreeLayout) {
             this.layout = this._newLayout();
             this.ui.updateClickedIndices();
-            this.matrix = new N2Matrix(this.model, this.layout,
-                this.dom.n2Groups, this.arrowMgr, this.ui.lastClickWasLeft,
-                this.ui.findRootOfChangeFunction, this.matrix.nodeSize);
+            this.matrix = this._newMatrix(this.ui.lastClickWasLeft, this.matrix.nodeSize);
         }
 
         this.layout.updateGeometry(this.dom);
@@ -452,11 +453,11 @@ class Diagram {
      updateSizes(height, fontSize) {
         let gapSize = fontSize + 4;
 
-        this.dims.size.n2matrix.margin = gapSize;
+        this.dims.size.matrix.margin = gapSize;
         this.dims.size.partitionTreeGap = gapSize;
 
-        this.dims.size.n2matrix.height =
-            this.dims.size.n2matrix.width = // Match base height, keep it looking square
+        this.dims.size.matrix.height =
+            this.dims.size.matrix.width = // Match base height, keep it looking square
             this.dims.size.partitionTree.height = height;
 
         this.dims.size.font = fontSize;
@@ -476,7 +477,7 @@ class Diagram {
 
         this.updateSizes(height, this.dims.size.font);
 
-        N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
+        transitionDefaults.duration = transitionDefaults.durationFast;
         this.update();
     }
 
@@ -485,7 +486,7 @@ class Diagram {
      * @param {number} fontSize The new font size in pixels.
      */
      fontSizeSelectChange(fontSize) {
-        N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
+        transitionDefaults.duration = transitionDefaults.durationFast;
         this.style.updateSvgStyle(fontSize);
         this.update();
     }
@@ -493,22 +494,22 @@ class Diagram {
     /**
      * Since the matrix can be destroyed and recreated, use this to invoke the callback
      * rather than setting one up that points directly to a specific matrix.
-     * @param {N2MatrixCell} cell The cell the event occured on.
+     * @param {MatrixCell} cell The cell the event occured on.
      */
     mouseOverOnDiagonal(e, cell) {
         if (this.matrix.cellExists(cell)) {
             this.matrix.mouseOverOnDiagonal(cell);
-            this.ui.nodeInfoBox.update(e, cell.obj, cell.color());
+            this.ui.showInfoBox(e, cell.obj, cell.color());
         }
     }
 
     /**
      * Move the node info panel around if it's visible
-     * @param {N2MatrixCell} cell The cell the event occured on.
+     * @param {MatrixCell} cell The cell the event occured on.
      */
     mouseMoveOnDiagonal(e, cell) {
         if (this.matrix.cellExists(cell)) {
-            this.ui.nodeInfoBox.moveNearMouse(e);
+            this.ui.moveInfoBox(e);
         }
     }
 
@@ -528,21 +529,21 @@ class Diagram {
         this.clearHighlights();
         d3.selectAll("div.offgrid").style("visibility", "hidden").html('');
 
-        this.ui.nodeInfoBox.clear();
+        this.ui.removeInfoBox();
     }
 
     /**
      * When the mouse is left-clicked on a cell, change their CSS class
      * so they're not removed when the mouse moves out. Or, if in info panel
      * mode, pin the info panel.
-     * @param {N2MatrixCell} cell The cell the event occured on.
+     * @param {MatrixCell} cell The cell the event occured on.
      */
     mouseClick(cell) {
-        if (this.ui.click.isNormal) { // If not in info-panel mode, pin/unpin arrows
+        if (! this.ui.click.isNodeInfo) { // If not in info-panel mode, pin/unpin arrows
             this.arrowMgr.togglePin(cell.id);
         }
         else { // Make a persistent info panel
-            this.ui.nodeInfoBox.pin();
+            this.ui.pinInfoBox();
         }
     }
 
@@ -579,7 +580,7 @@ class Diagram {
     reset() {
         this.model.resetAllHidden([]);
         this.updateZoomedElement(this.model.root);
-        N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
+        transitionDefaults.duration = transitionDefaults.durationFast;
         this.update();
     }
 
@@ -599,9 +600,7 @@ class Diagram {
         // Needed to do this so that the arrows don't slip in before the element zoom.
         this.layout = this._newLayout();
         this.ui.updateClickedIndices();
-        this.matrix = new N2Matrix(this.model, this.layout,
-            this.dom.n2Groups, this.arrowMgr, this.ui.lastClickWasLeft,
-            this.ui.findRootOfChangeFunction, this.matrix.nodeSize);
+        this.matrix = this._newMatrix(this.ui.findRootOfChangeFunction, this.matrix.nodeSize);
         this.layout.updateGeometry(this.dom);
         this.layout.updateTransitionInfo(this.dom, this.transitionStartDelay, this.manuallyResized);
 

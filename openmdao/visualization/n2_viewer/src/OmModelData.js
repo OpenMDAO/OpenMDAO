@@ -50,6 +50,12 @@ class OmModelData extends ModelData {
         }
     }
 
+    /**
+     * Convert the element to an OmTreeNode. Overrides the superclass method.
+     * @param {Object} element The basic properties for the element obtained from JSON.
+     * @param {Object} attribNames Map of this model's properties to standard names.
+     * @returns {OmTreeNode} The newly-created object.
+     */
     _newNode(element, attribNames) {
         return new OmTreeNode(element, attribNames);
     }
@@ -83,13 +89,18 @@ class OmModelData extends ModelData {
             }
         }
 
-        if (node.isSubsystem()) {
+        if (node instanceof OmTreeNode && node.isSubsystem()) {
             this.maxSystemDepth = Math.max(depth, this.maxSystemDepth);
         }
 
         if (parent && node.implicit) { parent.implicit = true; }
     }
 
+    /**
+     * Determine if the specified path has an input source that's an Auto-IVC output.
+     * @param {String} elementPath Absolute path to the element.
+     * @returns {Boolean} True if the input source is an Auto-IVC output.
+     */
     hasAutoIvcSrc(elementPath) {
         for (const conn of this.conns) {
             if (conn.tgt == elementPath && conn.src.match(/^_auto_ivc.*$/)) {
@@ -132,7 +143,7 @@ class OmModelData extends ModelData {
         }
 
         for (const child of node.children) {
-            if (child.isSubsystem()) {
+            if (child instanceof OmTreeNode && child.isSubsystem()) {
                 if (!node.hasChildren('subsystem_children'))
                     node.subsystem_children = [];
 
@@ -150,11 +161,16 @@ class OmModelData extends ModelData {
      * @return {Boolean} True if the string was found.
      */
     isDeclaredPartial(srcObj, tgtObj) {
-        let partialsStr = tgtObj.absPathName + " > " + srcObj.absPathName;
+        let partialsStr = tgtObj.path + " > " + srcObj.path;
 
         return this.declarePartialsList.includes(partialsStr);
     }
 
+    /**
+     * Create a connection object between nodes and handle cycle arrows.
+     * @param {Object} conn Object with src and tgt properties.
+     * @returns {OmNodeConnection} The newly created connection object.
+     */
     _newConnectionObj(conn) {
         return new OmNodeConnection(conn, this.nodePaths, this.sysPathnamesList);
     }
@@ -168,7 +184,7 @@ class OmModelData extends ModelData {
         if (aivc !== undefined && aivc.hasChildren()) {
             for (const ivc of aivc.children) {
                 if (!ivc.isFilter()) {
-                    const tgtPath = this.getAutoIvcTgt(ivc.absPathName);
+                    const tgtPath = this.getAutoIvcTgt(ivc.path);
 
                     if (tgtPath !== undefined) {
                         ivc.promotedName = this.nodePaths[tgtPath].promotedName;

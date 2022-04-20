@@ -1,6 +1,8 @@
 // <<hpp_insert gen/ClickHandler.js>>
-// <<hpp_insert src/OmToolbar.js>>
+// <<hpp_insert gen/Toolbar.js>>
 // <<hpp_insert gen/ChildSelectDialog.js>>
+// <<hpp_insert gen/NodeInfo.js>>
+// <<hpp_insert gen/Legend.js>>
 
 /**
  * Handle input events for the matrix and toolbar.
@@ -24,31 +26,83 @@ class UserInterface {
     constructor(diag) {
         this.diag = diag;
 
-        this.leftClickedNode = document.getElementById('ptN2ContentDivId');
+        this.leftClickedNode = document.getElementById('diagram-content');
         this.rightClickedNode = null;
         this.lastClickWasLeft = true;
         this.leftClickIsForward = true;
         this.findRootOfChangeFunction = null;
         this.callSearchFromEnterKeyPressed = false;
-        this.desVars = true;
+        this.nodeInfoBox = null;
 
         this.backButtonHistory = [];
         this.forwardButtonHistory = [];
 
+        this._init();
         this._setupCollapseDepthSlider();
         this.updateClickedIndices();
         this._setupSearch();
         this._setupResizerDrag();
         this._setupWindowResizer();
+        this.click = new ClickHandler();
 
-        this.legend = new N2Legend(this.diag.modelData);
-        this.nodeInfoBox = new NodeInfo(this);
-        this.click = new ClickHandler(this.nodeInfoBox);
-        this.toolbar = new OmToolbar(this);
 
         // Add listener for reading in a saved view.
         const self = this;
         d3.select('#state-file-input').on('change', function(e) { self.loadView(e, self); });
+    }
+
+    /**
+     * Separate these calls from the constructor so that subclasses can
+     * set values before execution.
+     */
+    _init() {
+        this.legend = new Legend(this.diag.modelData);
+        this.toolbar = new Toolbar(this);
+    }
+
+    /**
+     * Create a new node info window.
+     * @param {Selection} svgNodeGroup Placeholder for subclasses.
+     */
+    _newInfoBox(svgNodeGroup) { 
+        this.nodeInfoBox = new NodeInfo(this);
+    }
+
+    /**
+     * If node info mode is active, create a new node info window, populate, and display it.
+     * @param {Event} event The Event object created by the trigger.
+     * @param {TreeNode} node The node associated with the HTML object.
+     * @param {String} [color = null] The color of the titlebard. Autoselected if null.
+     */
+    showInfoBox(event, node, color = null) {
+        if (this.click.isNodeInfo) {
+            const svgNodeGroup = d3.select(event.currentTarget);
+            if (!color) color = svgNodeGroup.select('rect').style('fill');
+
+            this._newInfoBox(svgNodeGroup);
+            this.nodeInfoBox.activate();
+            this.click.update(this.nodeInfoBox);
+            this.nodeInfoBox.update(event, node, color);
+        }
+    }
+
+    /** Hide and destroy the node info window */
+    removeInfoBox() {
+        if (this.nodeInfoBox) {
+            this.nodeInfoBox.clear();
+            delete this.nodeInfoBox;
+            this.nodeInfoBox = null;
+        }
+    }
+
+    /** Move the node info window near the mouse if node info mode is active */
+    moveInfoBox(e) {
+        if (this.nodeInfoBox) { this.nodeInfoBox.moveNearMouse(e); }        
+    }
+
+    /** Create a persistent node info window if node info mode is active */
+    pinInfoBox() {
+        if (this.nodeInfoBox) { this.nodeInfoBox.pin(); }
     }
 
     /**
@@ -230,7 +284,7 @@ class UserInterface {
             this.findRootOfChangeFunction =
                 this.findRootOfChangeForRightClick.bind(this);
 
-            N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
+            transitionDefaults.duration = transitionDefaults.durationFast;
             this.lastClickWasLeft = false;
             node.minimize();
             this.diag.update();
@@ -295,7 +349,7 @@ class UserInterface {
             this.leftClickIsForward = false; // backwards
         }
         this.diag.updateZoomedElement(node);
-        N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
+        transitionDefaults.duration = transitionDefaults.durationFast;
     }
 
     /**
@@ -522,7 +576,7 @@ class UserInterface {
     collapseOutputsButtonClick(startNode) {
         this.addBackButtonHistory();
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
-        N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
+        transitionDefaults.duration = transitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
         this._collapseOutputs(startNode);
         this.diag.update();
@@ -552,7 +606,7 @@ class UserInterface {
     uncollapseButtonClick(startNode) {
         this.addBackButtonHistory();
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
-        N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
+        transitionDefaults.duration = transitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
         this._uncollapse(startNode);
         startNode.draw.manuallyExpanded = true;
@@ -567,7 +621,7 @@ class UserInterface {
         this.diag.model.manuallyExpandAll(startNode);
 
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
-        N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
+        transitionDefaults.duration = transitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
         this.diag.update();
     }
@@ -578,7 +632,7 @@ class UserInterface {
         this.diag.model.minimizeAll(startNode);
 
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
-        N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
+        transitionDefaults.duration = transitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
         this.diag.update();
     }
@@ -593,12 +647,12 @@ class UserInterface {
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseDepth.bind(
             this
         );
-        N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
+        transitionDefaults.duration = transitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
         this.diag.update();
     }
 
-    /** React to the toggle legend button, and show or hide the legend below the N2. */
+    /** React to the toggle legend button, and show or hide the legend. */
     toggleLegend() {
         this.legend.toggle();
 
@@ -655,7 +709,7 @@ class UserInterface {
         this.diag.search.performSearch();
 
         this.findRootOfChangeFunction = this.diag.search.findRootOfChangeForSearch;
-        N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
+        transitionDefaults.duration = transitionDefaults.durationSlow;
         this.lastClickWasLeft = false;
         this.diag.search.updateRecomputesAutoComplete = false;
         this.diag.update();

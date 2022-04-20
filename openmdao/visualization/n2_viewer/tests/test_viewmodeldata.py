@@ -542,7 +542,7 @@ class TestUnderMPI(unittest.TestCase):
                               0.03538417,  0.03029845,  0.02575245,  0.02186027,  0.01872173,  0.01641869,
                               0.0150119,   0.01453876])
 
-        assert np.linalg.norm(h - expected) < 1e-6
+        assert np.linalg.norm(h - expected) < 1e-4
 
         def check_initial_value(subsys, parallel=False):
             """
