@@ -529,7 +529,7 @@ class DifferentialEvolution(object):
                 # ranks.  Because we add the rank to the starting random state, no ranks will
                 # have the same seed.
                 rng = np.random.default_rng()
-                random_state = rng.integers(1e15)
+                random_state = rng.integers(2**31)  # Must be less than 2^32-1
                 if self.comm.rank == 0:
                     self.comm.bcast(random_state, root=0)
                 else:
@@ -543,9 +543,9 @@ class DifferentialEvolution(object):
         rng = np.random.default_rng(seed)
 
         # create LHS initial population (scaled to bounds) + user initial condition
-        population = lhs(self.lchrom, self.npop-1, criterion='center', random_state=seed)
+        population = lhs(self.lchrom, self.npop - 1, criterion='center', random_state=seed)
         population = population * (vub - vlb) + vlb  # scale to bounds
-        population = np.vstack( (population, x0) )
+        population = np.vstack((population, x0))
         fitness = np.ones(self.npop) * np.inf  # initialize fitness to infinitely bad
 
         # Main Loop
