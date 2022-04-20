@@ -5,8 +5,9 @@ import numpy as np
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.core.component import Component
-from openmdao.vectors.vector import _full_slice
+from openmdao.vectors.vector import _full_slice, _CompMatVecWrapper
 from openmdao.utils.class_util import overrides_method
+from openmdao.utils.name_maps import name2abs_name
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE
 
@@ -28,6 +29,12 @@ class ExplicitComponent(Component):
         Dictionary of names mapped to bound methods.
     _has_compute_partials : bool
         If True, the instance overrides compute_partials.
+    _last_dinput : ndarray
+        Caching array, used if matrix_free_caching option is True.
+    _last_input : ndarray
+        Caching array, used if matrix_free_caching option is True.
+    _last_doutput : ndarray
+        Caching array, used if matrix_free_caching option is True.
     """
 
     def __init__(self, **kwargs):
@@ -39,6 +46,9 @@ class ExplicitComponent(Component):
         self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
         self._has_compute_partials = overrides_method('compute_partials', self, ExplicitComponent)
         self.options.undeclare('assembled_jac_type')
+        self._last_dinput = None
+        self._last_input = None
+        self._last_doutput = None
 
     def _configure(self):
         """
@@ -339,8 +349,8 @@ class ExplicitComponent(Component):
             J._apply(self, d_inputs, d_outputs, d_residuals, mode)
 
             if not self.matrix_free:
-                # if we're not matrix free, we can skip the bottom of
-                # this loop because compute_jacvec_product does nothing.
+                # if we're not matrix free, we can skip the rest because
+                # compute_jacvec_product does nothing.
                 return
 
             # Jacobian and vectors are all unscaled, dimensional
@@ -349,17 +359,30 @@ class ExplicitComponent(Component):
                 # set appropriate vectors to read_only to help prevent user error
                 if mode == 'fwd':
                     d_inputs.read_only = True
+                    if self.options['matrix_free_caching']:
+                        ins = _CompMatVecWrapper(self._inputs)
+                        dins = _CompMatVecWrapper(d_inputs)
+                    else:
+                        ins = self._inputs
+                        dins = d_inputs
+                    dres = d_residuals
                 else:  # rev
                     d_residuals.read_only = True
+                    if self.options['matrix_free_caching']:
+                        dres = _CompMatVecWrapper(d_residuals)
+                    else:
+                        dres = d_residuals
+                    ins = self._inputs
+                    dins = d_inputs
 
                 try:
                     # handle identity subjacs (output_or_resid wrt itself)
                     if isinstance(J, DictionaryJacobian):
-                        d_out_names = self._vectors['output']['linear']._names
+                        d_out_names = d_outputs._names
 
                         if d_out_names:
-                            rflat = self._vectors['residual']['linear']._abs_get_val
-                            oflat = self._vectors['output']['linear']._abs_get_val
+                            rflat = d_residuals._abs_get_val
+                            oflat = d_outputs._abs_get_val
 
                             # 'val' in the code below is a reference to the part of the
                             # output or residual array corresponding to the variable 'v'
@@ -377,12 +400,10 @@ class ExplicitComponent(Component):
                     # We used to negate the residual here, and then re-negate after the hook
                     with self._call_user_function('compute_jacvec_product'):
                         if self._discrete_inputs:
-                            self._compute_jacvec_product_wrapper(self._inputs, d_inputs,
-                                                                 d_residuals, mode,
+                            self._compute_jacvec_product_wrapper(ins, dins, dres, mode,
                                                                  self._discrete_inputs)
                         else:
-                            self._compute_jacvec_product_wrapper(self._inputs, d_inputs,
-                                                                 d_residuals, mode)
+                            self._compute_jacvec_product_wrapper(ins, dins, dres, mode)
                 finally:
                     d_inputs.read_only = d_residuals.read_only = False
 
@@ -537,3 +558,57 @@ class ExplicitComponent(Component):
             False.
         """
         return False
+
+    def get_full_jacvec_product(self, inputs, dinputs, doutputs, mode):
+        """
+        Return the full jacobian vector product array, possibly pulling it from cache.
+
+        This calls the compute_full_jacvec_product method, which must be defined by the
+        component author.
+
+        Parameters
+        ----------
+        inputs : Vector
+            Nonlinear input vector.
+        dinputs : Vector
+            Linear input vector.
+        doutputs : Vector
+            Linear residuals vector.
+        mode : str
+            Direction of derivative computation ('fwd' or 'rev').
+
+        Returns
+        -------
+        ndarray
+            The full jacobian vector product array.
+        """
+        if mode == 'fwd':
+            if self._last_dinput is None:
+                self._last_dinput = np.zeros_like(dinputs.asarray())
+                self._last_input = np.zeros_like(inputs.asarray())
+                self._last_doutput = self.compute_full_jacvec_product(inputs, dinputs, doutputs,
+                                                                      mode)
+
+            if not (np.array_equal(dinputs.asarray(), self._last_dinput) and
+                    np.array_equal(inputs.asarray(), self._last_input)):
+                self._last_doutput = self.compute_full_jacvec_product(inputs, dinputs, doutputs,
+                                                                      mode)
+                self._last_input[:] = inputs.asarray()
+                self._last_dinput[:] = dinputs.asarray()
+                print("RETRIEVED FROM CACHE")
+
+            return self._last_doutput
+
+        else:  # rev
+            if self._last_doutput is None:
+                self._last_doutput = np.zeros_like(doutputs.asarray())
+                self._last_dinput = self.compute_full_jacvec_product(inputs, dinputs, doutputs,
+                                                                     mode)
+
+            if np.array_equal(doutputs.asarray(), self._last_doutput):
+                self._last_dinput = self.compute_full_jacvec_product(inputs, dinputs, doutputs,
+                                                                     mode)
+                self._last_doutput[:] = doutputs.asarray()
+                print("RETRIEVED FROM CACHE")
+
+            return self._last_dinput

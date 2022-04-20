@@ -77,7 +77,7 @@ def abs_key2rel_key(system, abs_key):
     return (abs_name2rel_name(system, abs_key[0]), abs_name2rel_name(system, abs_key[1]))
 
 
-def prom_name2abs_name(system, prom_name, type_):
+def prom_name2abs_name(system, prom_name, iotype):
     """
     Map the given promoted name to the absolute name.
 
@@ -89,7 +89,7 @@ def prom_name2abs_name(system, prom_name, type_):
         System to which prom_name is relative.
     prom_name : str
         Promoted variable name in the owning system's namespace.
-    type_ : str
+    iotype : str
         Either 'input' or 'output'.
 
     Returns
@@ -97,28 +97,18 @@ def prom_name2abs_name(system, prom_name, type_):
     str or None
         Absolute variable name or None if prom_name is invalid.
     """
-    prom2abs_lists = system._var_allprocs_prom2abs_list[type_]
+    prom2abs_lists = system._var_allprocs_prom2abs_list[iotype]
 
     if prom_name in prom2abs_lists:
         abs_list = prom2abs_lists[prom_name]
         if len(abs_list) == 1:
             return abs_list[0]
-        else:
-            # looks like an aliased input, which must be set via the connected output
-            src_name = system._conn_global_abs_in2out.get(abs_list[0])
-            if src_name and src_name in system._var_abs2prom['output']:
-                src_name = system._var_abs2prom['output'][src_name]  # use promoted name
-            if src_name:  # input is connected
-                raise RuntimeError("The promoted name {} is invalid because it refers to "
-                                   "multiple inputs: [{}]. "
-                                   "Access the value from the connected output variable {} instead."
-                                   .format(prom_name, ' ,'.join(abs_list), src_name))
-            else:
-                raise RuntimeError("The promoted name {} is invalid because it refers to "
-                                   "multiple inputs: [{}] that are not connected to an output "
-                                   "variable.".format(prom_name, ', '.join(abs_list)))
-    else:
-        return None
+
+        # looks like an aliased input, which must be set via the connected output
+        src_name = system._var_abs2prom['output'][system._conn_global_abs_in2out.get(abs_list[0])]
+        raise RuntimeError(f"The promoted name {prom_name} is invalid because it refers to "
+                           f"multiple inputs: [{' ,'.join(abs_list)}]. Access the value from the "
+                           f"connected output variable {src_name} instead.")
 
 
 def name2abs_name(system, name):

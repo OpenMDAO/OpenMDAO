@@ -139,6 +139,7 @@ class DefaultVector(Vector):
         system = self._system()
         io = self._typ
         kind = self._kind
+        islinear = self._name == 'linear'
 
         do_scaling = self._do_scaling
         if do_scaling:
@@ -165,7 +166,7 @@ class DefaultVector(Vector):
                     # Input vector unit conversion.
                     a0, a1, factor, offset = factor_tuple
 
-                    if self._name == 'linear':
+                    if islinear:
                         scale0 = None
                         scale1 = a1 / factor
 
@@ -181,7 +182,7 @@ class DefaultVector(Vector):
 
             start = end
 
-        self._names = frozenset(views)
+        self._names = frozenset(views) if islinear else views
         self._len = end
 
     def _in_matvec_context(self):

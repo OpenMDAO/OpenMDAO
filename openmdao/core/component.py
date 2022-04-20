@@ -120,6 +120,10 @@ class Component(System):
                              desc='If True, call compute, compute_partials, linearize, '
                                   'apply_linear, apply_nonlinear, and compute_jacvec_product '
                                   'only on rank 0 and broadcast the results to the other ranks.')
+        self.options.declare('matrix_free_caching', types=bool, default=False,
+                             desc='If True, use cached jacobian vector product when matrix free '
+                             'method (compute_jacvec_product or apply_linear) is called when the'
+                             '"seed" values do not change.')
 
     def setup(self):
         """

@@ -260,11 +260,11 @@ class Vector(object):
 
         # try relative name first
         abs_name = '.'.join((system.pathname, name)) if system.pathname else name
-        if abs_name in self._names:
+        if abs_name in self._views:
             return abs_name
 
         abs_name = prom_name2abs_name(system, name, self._typ)
-        if abs_name in self._names:
+        if abs_name in self._views:
             return abs_name
 
     def __iter__(self):
@@ -331,7 +331,7 @@ class Vector(object):
         bool
             True or False.
         """
-        return self._name2abs_name(name) is not None
+        return self._name2abs_name(name) in self._names
 
     def _contains_abs(self, name):
         """
@@ -691,3 +691,31 @@ class Vector(object):
             Complex mode flag; set to True prior to commencing complex step.
         """
         self._under_complex_step = active
+
+
+class _CompMatVecWrapper(object):
+    """
+    Wrapper for a Vector in a matvec context (for Components only).
+
+    This 'vector' will return zero values for __getitem__ when the lookup variable is not
+    relevant to the current matrix vector context.
+    """
+
+    def __init__(self, vec):
+        self._vec = vec
+
+    def __getitem__(self, name):
+        absname = self._vec._name2abs_name(name)
+        if absname in self._vec._names:
+            return self._vec._views[absname]
+        elif absname is not None:  # was found in _vec._views
+            return np.zeros_like(self._vec._views[absname])
+
+        # call the wrapped vector to get the error message
+        self._vec[name]
+
+    def __setitem__(self, name, val):
+        raise RuntimeError("_CompMatVecWrapper is read-only.")
+
+    def __getattr__(self, name):
+        return getattr(self._vec, name)

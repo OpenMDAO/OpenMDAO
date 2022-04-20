@@ -89,6 +89,7 @@
             "options": {
                 "distributed": false,
                 "run_root_only": false,
+                "matrix_free_caching": false,
                 "name": "UNDEFINED",
                 "val": 1.0,
                 "shape": null,
@@ -245,7 +246,8 @@
             ],
             "options": {
                 "distributed": false,
-                "run_root_only": false
+                "run_root_only": false,
+                "matrix_free_caching": false
             }
         }
     ],
