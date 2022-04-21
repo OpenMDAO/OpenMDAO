@@ -9,7 +9,7 @@
 class ChildSelectDialog extends WindowDraggable {
     /**
      * Setup the basic structure of the variable selection dialog.
-     * @param {OmTreeNode} node The node to examine the variables of.
+     * @param {TreeNode} node The node to examine the variables of.
      * @param {String} color The color to make the window header/footer ribbons.
      * @param {Diagram} diag The diagram object to work with.
      */

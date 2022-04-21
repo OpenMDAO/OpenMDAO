@@ -81,7 +81,7 @@ class TreeNode {
     /**
      * Determine if a children array exists and has members.
      * @param {string} [childrenPropName = 'children'] Usually "children", but
-     *   some models have addition child arrays like "subsystem_children".
+     *   some subclasses may have additional child arrays.
      * @return {boolean} True if the children property is an Array and length > 0.
      */
     hasChildren(childrenPropName = 'children') {
@@ -106,11 +106,14 @@ class TreeNode {
     /** True if this.type is 'input', 'unconnected_input', or 'output'. */
     isInputOrOutput() { return this.type.match(/^(output|input|unconnected_input)$/); }
 
-    /** True if it's a subsystem and this.subsystem_type is 'group' */
-    isGroup() { return (this.isSubsystem() && this.subsystem_type == 'group'); }
+    /** True if it's a group */
+    isGroup() { return this.type == 'group'; }
 
     /** True if this is a "fake" node that manages filtered children. */
     isFilter() { return (this.type == 'filter'); }
+
+    /** True if this node can use filters (always false for base class) */
+    canFilter() { return false; } 
 
     /** Not connectable if this is an input group or parents are minimized. */
     isConnectable() {
@@ -422,6 +425,8 @@ class FilterCapableNode extends TreeNode {
     // Accessor functions for this.draw.filtered - whether a variable is shown in collapsed form
     doFilter(filterNode) { this.draw.filtered = true; this.draw.filterParent = filterNode; }
     undoFilter() { this.draw.filtered = false; this.draw.filterParent = null; }
+
+    canFilter() { return true; }
 
     /** If this node has children add special children that can hold filtered variables */
     addFilterChild(attribNames) {

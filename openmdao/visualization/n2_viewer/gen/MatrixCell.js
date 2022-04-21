@@ -5,10 +5,10 @@
  * @typedef {Object} MatrixCell
  * @property {number} row Vertical coordinate of the cell in the matrix.
  * @property {number} col Horizontal coordinate of the cell in the matrix.
- * @property {OmTreeNode} srcObj The node in the model tree this cell is associated with.
- * @property {OmTreeNode} tgtObj The model tree node that this outputs to.
+ * @property {TreeNode} srcObj The node in the model tree this cell is associated with.
+ * @property {TreeNode} tgtObj The model tree node that this outputs to.
  * @property {string} id The srcObj id appended with the tgtObj id.
- * @property {OmSymbolType} symbolType Info about the type of symbol represented by the node.
+ * @property {SymbolType} symbolType Info about the type of symbol represented by the node.
  * @property {CellRenderer} renderer The object that draws the cell.
  */
 class MatrixCell {
@@ -27,7 +27,7 @@ class MatrixCell {
         this.tgtObj = tgtObj;
         this.id = MatrixCell.makeId(srcObj.id, tgtObj.id);
 
-        this.symbolType = new OmSymbolType(this, model);
+        this.symbolType = new SymbolType(this, model);
         this.renderer = this._newRenderer();
 
         this.offScreen = {
@@ -91,17 +91,17 @@ class MatrixCell {
     }
 
     /**
-     * Choose a color based on our location and state of the associated OmTreeNode.
+     * Choose a color based on our location and state of the associated TreeNode.
      */
     color() {
         if (this.onDiagonal()) {
-            if (this.obj.draw.minimized) return OmStyle.color.collapsed;
-            if (this.obj.isConnectedInput()) return OmStyle.color.input;
-            if (this.obj.isOutput()) return OmStyle.color.output;
-            if (this.obj.isUnconnectedInput()) return OmStyle.color.unconnectedInput;
+            if (this.obj.draw.minimized) return Style.color.collapsed;
+            if (this.obj.isConnectedInput()) return Style.color.input;
+            if (this.obj.isOutput()) return Style.color.output;
+            if (this.obj.isUnconnectedInput()) return Style.color.unconnectedInput;
         }
 
-        return OmStyle.color.connection;
+        return Style.color.connection;
     }
 
     /**
@@ -109,8 +109,8 @@ class MatrixCell {
      * Determine whether the arrow should be in the top or bottom section of the
      * matrix based on rootIndex, and add to the appropriate array of
      * tracked offscreen connections.
-     * @param {OmTreeNode} srcNode Where the connection starts.
-     * @param {OmTreeNode} tgtNode Where the connection ends.
+     * @param {TreeNode} srcNode Where the connection starts.
+     * @param {TreeNode} tgtNode Where the connection ends.
      */
     addOffScreenConn(srcNode, tgtNode) {
         let offscreenNode = null, dir = '', side = '';
@@ -135,7 +135,7 @@ class MatrixCell {
 
     /** Choose a renderer based on our SymbolType. */
     _newRenderer() {
-        if (this.color() == OmStyle.color.connection) {
+        if (this.color() == Style.color.connection) {
             if (this.inUpperTriangle()) return new ConnectorUpper(this.color(), this.id);
 
             return new ConnectorLower(this.color(), this.id)
@@ -170,12 +170,12 @@ class MatrixCell {
 
         let obj = (varType == 'target') ? this.tgtObj : this.srcObj;
         if (obj.draw.filtered) { obj = obj.draw.filterParent; }
-        const treeId = OmTreeNode.pathToId(obj.path);
+        const treeId = TreeNode.pathToId(obj.path);
         const treeNode = d3.select('rect#' + treeId);
 
         let fill = treeNode.style('fill');
-        if (direction == 'input') fill = OmStyle.color.inputArrow;
-        else if (direction == 'output') fill = OmStyle.color.outputArrow;
+        if (direction == 'input') fill = Style.color.inputArrow;
+        else if (direction == 'output') fill = Style.color.outputArrow;
 
         d3.select('#highlight-bar').append('rect')
             .attr('x', 0)
@@ -184,7 +184,7 @@ class MatrixCell {
             .attr('ry', 4)
             .attr('width', 8)
             .attr('height', treeNode.attr('height'))
-            .attr('stroke', OmStyle.color.treeStroke)
+            .attr('stroke', Style.color.treeStroke)
             .attr('fill', fill);
     }
 }

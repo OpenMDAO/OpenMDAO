@@ -54,6 +54,9 @@ class OmTreeNode extends FilterCapableNode {
     /** True is this.type is 'subsystem' */
     isSubsystem() { return (this.type == 'subsystem'); }
 
+    /** True if it's a subsystem and this.subsystem_type is 'group'. Overrides base class */
+    isGroup() { return (this.isSubsystem() && this.subsystem_type == 'group'); }
+
     /** True if it's a subsystem and this.subsystem_type is 'component' */
     isComponent() { return (this.isSubsystem() && this.subsystem_type == 'component'); }
 

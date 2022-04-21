@@ -90,4 +90,30 @@ class OmUserInterface extends UserInterface {
         d3.select('#desvars-button').attr('class',
             this.desVars ? 'fas icon-fx-2' : 'fas icon-fx-2 active-tab-icon');
     }
+
+    /**
+     * Minimize the specified node and recursively minimize its children.
+     * @param {OmTreeNode} node The current node to operate on.
+     */
+     _collapseOutputs(node) {
+        if (node.subsystem_type && node.subsystem_type == 'component') {
+            node.minimize();
+        }
+        if (node.hasChildren()) {
+            for (const child of node.children) {
+                this._collapseOutputs(child);
+            }
+        }
+    }
+
+    /** Save the model state to a file. Adds solver support to the base class. */
+    saveState() {
+        // Solver toggle state.
+        const extraData = {
+            'showLinearSolverNames': this.diag.showLinearSolverNames,
+            'showSolvers': this.diag.showSolvers,            
+        }
+
+        super.saveState(extraData);
+    }
 }

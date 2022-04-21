@@ -146,7 +146,7 @@ class Style {
     /**
        * Based on the element's type and conditionally other info, determine
        * what CSS style is associated.
-       * @param {OmTreeNode} node The item to check.
+       * @param {TreeNode} node The item to check.
        * @return {string} The name of an existing CSS class.
        */
     getNodeClass(node) {
@@ -169,7 +169,10 @@ class Style {
                 return 'output';
 
             case 'root':
-                return 'subsystem';
+                return 'group';
+
+            case 'group':
+                return 'group';
 
             default:
                 throw `CSS class not found for node type: ${node.type}`

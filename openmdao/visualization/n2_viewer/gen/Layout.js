@@ -5,9 +5,9 @@
  * Calculates and stores the size and positions of visible elements.
  * @typedef Layout
  * @property {ModelData} model Reference to the preprocessed model.
- * @property {OmTreeNode} zoomedElement Reference to zoomedElement managed by Diagram.
- * @property {OmTreeNode[]} zoomedNodes  Child workNodes of the current zoomed element.
- * @property {OmTreeNode[]} visibleNodes Zoomed workNodes that are actually drawn.
+ * @property {TreeNode} zoomedElement Reference to zoomedElement managed by Diagram.
+ * @property {TreeNode[]} zoomedNodes  Child workNodes of the current zoomed element.
+ * @property {TreeNode[]} visibleNodes Zoomed workNodes that are actually drawn.
  * @property {Object} svg Reference to the top-level SVG element in the document.
  * @property {Object} size The dimensions of the model tree.
  * @property {Object} scales Scalers in the X and Y directions to associate the relative
@@ -146,7 +146,7 @@ class Layout {
 
     /** Determine the text associated with the node. Normally its name,
      * but can be changed if promoted.
-     * @param {OmTreeNode} node The item to operate on.
+     * @param {TreeNode} node The item to operate on.
      * @return {String} The selected text.
      */
     getText(node) {
@@ -168,7 +168,7 @@ class Layout {
 
     /**
      * Determine text widths for all descendents of the specified node.
-     * @param {OmTreeNode} [node = this.zoomedElement] Item to begin looking from.
+     * @param {TreeNode} [node = this.zoomedElement] Item to begin looking from.
      */
     _updateTextWidths(node = this.zoomedElement) {
         if (node.draw.hidden) return;
@@ -186,7 +186,7 @@ class Layout {
     /**
      * Recurse through the tree and add up the number of leaves that each
      * node has, based on their array of visible children.
-     * @param {OmTreeNode} [node = this.model.root] The starting node.
+     * @param {TreeNode} [node = this.model.root] The starting node.
      */
     _computeLeaves(node = this.model.root) {
         node.draw.numLeaves = 0;
@@ -214,13 +214,13 @@ class Layout {
     /**
      * For visible nodes with children, choose a column width
      * large enough to accomodate the widest label in their column.
-     * @param {OmTreeNode} node The item to operate on.
-     * @param {String} childrenProp Either 'children' or 'subsystem_children'.
+     * @param {TreeNode} node The item to operate on.
+     * @param {String} childrenProp Usually 'children', subclasses may use a different property.
      * @param {Object[]} colArr The array of column info.
      * @param {Number[]} leafArr The array of leaf width info.
-     * @param {String} widthProp Either 'nameWidthPx' or 'nameSolverWidthPx'.
+     * @param {String} [widthProp = 'nameWidthPx'] Can be modified by derived classes.
      */
-    _setColumnWidthsFromWidestText(node, childrenProp, colArr, leafArr, widthProp) {
+    _setColumnWidthsFromWidestText(node, childrenProp, colArr, leafArr, widthProp = 'nameWidthPx') {
         if (node.draw.hidden) return;
 
         const height = this.size.matrix.height * node.draw.numLeaves / this.zoomedElement.draw.numLeaves;
@@ -245,7 +245,7 @@ class Layout {
 
     /**
      * Compute column widths across the model, then adjust ends as needed.
-     * @param {OmTreeNode} [node = this.zoomedElement] Item to operate on.
+     * @param {TreeNode} [node = this.zoomedElement] Item to operate on.
      */
     _computeColumnWidths(node = this.zoomedElement) {
         this.greatestDepth = 0;
@@ -286,7 +286,7 @@ class Layout {
      * Recurse over the model tree and determine the coordinates and
      * size of visible nodes. If a parent is minimized, operations are
      * performed on it instead.
-     * @param {OmTreeNode} node The node to operate on.
+     * @param {TreeNode} node The node to operate on.
      * @param {number} leafCounter Tally of leaves encountered so far.
      * @param {Boolean} isChildOfZoomed Whether node is a descendant of this.zoomedElement.
      * @param {Object} earliestMinimizedParent The minimized parent, if any, appearing

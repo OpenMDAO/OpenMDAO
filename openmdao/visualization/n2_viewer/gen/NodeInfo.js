@@ -103,7 +103,7 @@ class NodeInfo extends Window {
      * Iterate over the list of known properties and display them
      * if the specified object contains them.
      * @param {Object} event The related event so we can get position.
-     * @param {OmTreeNode} node The node to examine.
+     * @param {TreeNode} node The node to examine.
      * @param {String} color Match the color of the node for the header/footer.
      */
     update(event, node, color) {

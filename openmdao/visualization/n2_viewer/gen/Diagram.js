@@ -4,6 +4,7 @@
 // <<hpp_insert gen/ArrowManager.js>>
 // <<hpp_insert gen/Search.js>>
 // <<hpp_insert gen/Matrix.js>>
+// <<hpp_insert gen/Style.js>>
 
 /**
  * Manage all pieces of the application. The model data, the CSS styles, the
@@ -11,7 +12,7 @@
  * all member objects.
  * @typedef Diagram
  * @property {ModelData} model Processed model data received from Python.
- * @property {OmStyle} style Manages diagram-related styles and functions.
+ * @property {Style} style Manages diagram-related styles and functions.
  * @property {Layout} layout Sizes and positions of visible elements.
  * @property {Matrix} matrix Manages the grid of visible model parameters.
  * @property {TreeNode} zoomedElement The element the diagram is currently based on.
@@ -33,7 +34,7 @@ class Diagram {
      */
     constructor(modelJSON, callInit = true) {
         this.modelData = modelJSON;
-        this.model = new OmModelData(modelJSON);
+        this._newModelData();
         this.zoomedElement = this.zoomedElementPrev = this.model.root;
         this.manuallyResized = false; // If the diagram has been sized by the user
 
@@ -50,6 +51,10 @@ class Diagram {
         if (callInit) { this._init(); }
     }
 
+    _newModelData() {
+        this.model = new ModelData(this.modelData);
+        console.log(this.model)
+    }
 
     /** Create a Layout object. Can be overridden to create different types of Layouts */
     _newLayout() {
@@ -148,7 +153,7 @@ class Diagram {
     /**
      * Recurse and pull state info from model for saving.
      * @param {Array} dataList Array of objects with state info for each node.
-     * @param {OmTreeNode} node The current node being examined.
+     * @param {TreeNode} node The current node being examined.
      */
      getSubState(dataList, node = this.model.root) {
         if (node.isFilter()) return; // Ignore state for FilterNodes
@@ -165,7 +170,7 @@ class Diagram {
     /**
      * Recurse and set state info into model.
      * @param {Array} dataList Array of objects with state info for each node. 
-     * @param {OmTreeNode} node The node currently being restored.
+     * @param {TreeNode} node The node currently being restored.
      */
     setSubState(dataList, node = this.model.root) {
         if (node.isFilter()) return; // Ignore state for FilterNodes
@@ -590,10 +595,10 @@ class Diagram {
      * @param {Object} oldState The model view to restore.
      */
      restoreSavedState(oldState) {
-        // Zoomed node (subsystem).
+        // Zoomed node
         this.zoomedElement = this.model.nodeIds[oldState.zoomedElement];
 
-        // Expand/Collapse state of all nodes (subsystems) in model.
+        // Expand/Collapse state of all group nodes in model.
         this.setSubState(oldState.expandCollapse.reverse());
 
         // Force an immediate display update.

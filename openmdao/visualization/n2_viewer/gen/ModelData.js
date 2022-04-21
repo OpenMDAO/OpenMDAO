@@ -102,7 +102,7 @@ class ModelData {
             }
         }
 
-        newNode.addFilterChild(this._attribNames);
+        if (newNode.canFilter()) newNode.addFilterChild(this._attribNames);
 
         return newNode;
     }
@@ -221,7 +221,7 @@ class ModelData {
      * add it to the hiddenList array, and optionally reset its state.
      * @param {Object[]} hiddenList The provided array to populate.
      * @param {Boolean} reveal If true, make the node visible.
-     * @param {OmTreeNode} node The current node to operate on.
+     * @param {TreeNode} node The current node to operate on.
      */
     findAllHidden(hiddenList, reveal = false, node = this.root) {
         // Filtered nodes are handled by their true parents
@@ -256,7 +256,7 @@ class ModelData {
     /**
      * Restore the minimized/hidden value to all the specified nodes.
      * @param {Object[]} hiddenList The list of preserved objects
-     * @param {OmTreeNode} node The current node to operate on.
+     * @param {TreeNode} node The current node to operate on.
      */
     resetAllHidden(hiddenList, node = this.root) {
         // Filtered nodes are handled by their true parents
@@ -292,7 +292,7 @@ class ModelData {
     /**
      * Set the node as not minimized and manually expanded, as well as
      * all children.
-     * @param {OmTreeNode} startNode The node to begin from.
+     * @param {TreeNode} startNode The node to begin from.
      */
      manuallyExpandAll(startNode) {
         startNode.draw.minimized = false;
@@ -307,7 +307,7 @@ class ModelData {
 
     /**
      * Set all the children of the specified node as minimized and not manually expanded.
-     * @param {OmTreeNode} startNode The node to begin from.
+     * @param {TreeNode} startNode The node to begin from.
      * @param {Boolean} [initialNode = true] Indicate the starting node.
      */
     minimizeAll(startNode, initialNode = true) {
@@ -325,7 +325,7 @@ class ModelData {
 
     /**
      * Recursively minimize non-input nodes to the specified depth.
-     * @param {OmTreeNode} node The node to work on.
+     * @param {TreeNode} node The node to work on.
      * @param {Number} chosenCollapseDepth If the node's depth is the same or more, collapse it.
      */
     minimizeToDepth(node, chosenCollapseDepth) {

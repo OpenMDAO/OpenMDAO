@@ -24,6 +24,10 @@ class OmDiagram extends Diagram {
         this._init();
     }
 
+    _newModelData() {
+        this.model = new OmModelData(this.modelData);
+    }
+
     /** Override Diagram._newLayout() to create an OmLayout object. */
     _newLayout() {
         if (this.showLinearSolverNames === undefined)

@@ -1,4 +1,4 @@
-// <<hpp_insert src/OmSymbolType.js>>
+// <<hpp_insert gen/SymbolType.js>>
 
 /** Base class for all cell renderers */
 class CellRenderer {
