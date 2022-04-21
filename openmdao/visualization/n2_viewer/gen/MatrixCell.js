@@ -27,7 +27,7 @@ class MatrixCell {
         this.tgtObj = tgtObj;
         this.id = MatrixCell.makeId(srcObj.id, tgtObj.id);
 
-        this.symbolType = new SymbolType(this, model);
+        this._setSymbolType(model);
         this.renderer = this._newRenderer();
 
         this.offScreen = {
@@ -41,6 +41,10 @@ class MatrixCell {
             },
             "total": 0
         }
+    }
+
+    _setSymbolType(model) {
+        this.symbolType = new SymbolType(this, model);
     }
 
     static makeId(srcId, tgtId = null) {

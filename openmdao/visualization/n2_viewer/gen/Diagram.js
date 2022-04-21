@@ -227,7 +227,7 @@ class Diagram {
 
     /**
      * Add SVG groups & contents coupled to the visible nodes in the model tree.
-     * Select all <g> elements that have class "partition_group". If any already
+     * Select all <g> elements that have class "model_tree_grp". If any already
      * exist, join to their associated nodes in the model tree. If no
      * existing <g> matches a displayable node, add it to the "enter"
      * selection so the <g> can be created. If a <g> exists but there is
@@ -239,7 +239,7 @@ class Diagram {
         const scale = this.layout.scales.model;
         const treeSize = this.layout.treeSize.model;
 
-        this.dom.pTreeGroup.selectAll("g.partition_group")
+        this.dom.pTreeGroup.selectAll("g.model_tree_grp")
             .data(this.layout.zoomedNodes, d => d.id)
             .join(
                 enter => self._addNewTreeCells(enter, scale, treeSize),
@@ -263,7 +263,7 @@ class Diagram {
         // to the new size together with the existing nodes.
         const enterSelection = enter
             .append("g")
-            .attr("class", d => `partition_group ${self.style.getNodeClass(d)}`)
+            .attr("class", d => `model_tree_grp ${self.style.getNodeClass(d)}`)
             .on("click", (e,d) => self.leftClickSelector(e, d))
             .on("contextmenu", function(e,d) {
                 if (e.altKey) {
@@ -325,7 +325,7 @@ class Diagram {
 
         // New location for each group
         const mergedSelection = update
-            .attr("class", d => `partition_group ${self.style.getNodeClass(d)}`)
+            .attr("class", d => `model_tree_grp ${self.style.getNodeClass(d)}`)
             .transition(sharedTransition)
             .attr("transform", d => 
                 `translate(${scale.x(d.draw.dims.x)} ${scale.y(d.draw.dims.y)})`);

@@ -78,7 +78,7 @@ class Style {
                 //'dominant-baseline: middle',
                 //'dy: .35em',
             },
-            '#svgId g.partition_group > text': {
+            '#svgId g.model_tree_grp > text': {
                 'text-anchor': 'end',
                 'pointer-events': 'none',
                 'font-family': 'helvetica, sans-serif',
@@ -102,10 +102,10 @@ class Style {
             '.horiz_line, .vert_line': {
                 'stroke': Style.color.gridline,
             },
-            "g.partition_group > rect[id$='_FILTER_inputs'] + text": {
+            "g.model_tree_grp > rect[id$='_FILTER_inputs'] + text": {
                 'font-style': 'italic'
             },
-            "g.partition_group > rect[id$='_FILTER_outputs'] + text": {
+            "g.model_tree_grp > rect[id$='_FILTER_outputs'] + text": {
                 'font-style': 'italic'
             },
             'g.variable_box > rect': {

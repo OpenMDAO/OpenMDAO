@@ -668,7 +668,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Verify size of model tree",
             "test": "count",
-            "selector": "g#tree > g.partition_group",
+            "selector": "g#tree > g.model_tree_grp",
             "count": 6
         },
         {
@@ -680,7 +680,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Verify size of model tree",
             "test": "count",
-            "selector": "g#tree > g.partition_group",
+            "selector": "g#tree > g.model_tree_grp",
             "count": 10
         },
         {
