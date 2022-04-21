@@ -125,69 +125,72 @@ class TransferOrbitComp(om.ExplicitComponent):
         outputs['vp'] = h / rp
         outputs['va'] = h / ra
 
-if __name__ == '__main__':
 
-    prob = om.Problem()
+class TestHohmannTransfer(unittest.TestCase):
 
-    model = prob.model
+    def test_dv_at_apogee(self):
 
-    model.add_subsystem('leo', subsys=VCircComp(), promotes_inputs=[('r', 'r1'), 'mu'])
-    model.add_subsystem('geo', subsys=VCircComp(), promotes_inputs=[('r', 'r2'), 'mu'])
+        prob = om.Problem()
 
-    model.add_subsystem('transfer', subsys=TransferOrbitComp(),
-                        promotes_inputs=[('rp', 'r1'), ('ra', 'r2'), 'mu'])
+        model = prob.model
 
-    model.add_subsystem('dv1', subsys=DeltaVComp(), promotes_inputs=[('dinc', 'dinc1')])
+        model.add_subsystem('leo', subsys=VCircComp(), promotes_inputs=[('r', 'r1'), 'mu'])
+        model.add_subsystem('geo', subsys=VCircComp(), promotes_inputs=[('r', 'r2'), 'mu'])
 
-    model.connect('leo.vcirc', 'dv1.v1')
-    model.connect('transfer.vp', 'dv1.v2')
+        model.add_subsystem('transfer', subsys=TransferOrbitComp(),
+                            promotes_inputs=[('rp', 'r1'), ('ra', 'r2'), 'mu'])
 
-    model.add_subsystem('dv2', subsys=DeltaVComp(), promotes_inputs=[('dinc', 'dinc2')])
+        model.add_subsystem('dv1', subsys=DeltaVComp(), promotes_inputs=[('dinc', 'dinc1')])
 
-    model.connect('transfer.va', 'dv2.v1')
-    model.connect('geo.vcirc', 'dv2.v2')
+        model.connect('leo.vcirc', 'dv1.v1')
+        model.connect('transfer.vp', 'dv1.v2')
 
-    model.add_subsystem('dv_total',
-                        subsys=om.ExecComp('delta_v=dv1+dv2',
-                                           delta_v={'units': 'km/s'},
-                                           dv1={'units': 'km/s'},
-                                           dv2={'units': 'km/s'}),
-                        promotes=['delta_v'])
+        model.add_subsystem('dv2', subsys=DeltaVComp(), promotes_inputs=[('dinc', 'dinc2')])
 
-    model.connect('dv1.delta_v', 'dv_total.dv1')
-    model.connect('dv2.delta_v', 'dv_total.dv2')
+        model.connect('transfer.va', 'dv2.v1')
+        model.connect('geo.vcirc', 'dv2.v2')
 
-    model.add_subsystem('dinc_total',
-                        subsys=om.ExecComp('dinc=dinc1+dinc2',
-                                           dinc={'units': 'deg'},
-                                           dinc1={'units': 'deg'},
-                                           dinc2={'units': 'deg'}),
-                        promotes=['dinc', 'dinc1', 'dinc2'])
+        model.add_subsystem('dv_total',
+                            subsys=om.ExecComp('delta_v=dv1+dv2',
+                                               delta_v={'units': 'km/s'},
+                                               dv1={'units': 'km/s'},
+                                               dv2={'units': 'km/s'}),
+                            promotes=['delta_v'])
 
-    prob.driver = om.SimpleGADriver() #ScipyOptimizeDriver() #DifferentialEvolutionDriver() #
+        model.connect('dv1.delta_v', 'dv_total.dv1')
+        model.connect('dv2.delta_v', 'dv_total.dv2')
 
-    model.add_design_var('dinc1', lower=0, upper=28.5)
-    model.add_design_var('dinc2', lower=0, upper=28.5)
-    model.add_constraint('dinc', lower=28.5, upper=28.5, scaler=1.0)
-    model.add_objective('delta_v', scaler=1.0)
+        model.add_subsystem('dinc_total',
+                            subsys=om.ExecComp('dinc=dinc1+dinc2',
+                                               dinc={'units': 'deg'},
+                                               dinc1={'units': 'deg'},
+                                               dinc2={'units': 'deg'}),
+                            promotes=['dinc', 'dinc1', 'dinc2'])
 
-    # set defaults for our promoted variables to remove ambiguities in value and/or units
-    model.set_input_defaults('r1', val=6778.0)
-    model.set_input_defaults('r2', val=42164.0)
-    model.set_input_defaults('mu', val=398600.4418)
-    model.set_input_defaults('dinc1', val=0.0, units='deg')
-    model.set_input_defaults('dinc2', val=28.5, units='deg')
+        prob.driver = om.ScipyOptimizeDriver()
 
-    # Setup the problem
-    prob.setup()
+        model.add_design_var('dinc1', lower=0, upper=28.5)
+        model.add_design_var('dinc2', lower=0, upper=28.5)
+        model.add_constraint('dinc', lower=28.5, upper=28.5, scaler=1.0)
+        model.add_objective('delta_v', scaler=1.0)
 
-    # Execute the model with the given inputs
-    prob.run_model()
+        # set defaults for our promoted variables to remove ambiguities in value and/or units
+        model.set_input_defaults('r1', val=6778.0)
+        model.set_input_defaults('r2', val=42164.0)
+        model.set_input_defaults('mu', val=398600.4418)
+        model.set_input_defaults('dinc1', val=0., units='deg')
+        model.set_input_defaults('dinc2', val=28.5, units='deg')
 
-    print('Delta-V (km/s):', prob['delta_v'][0])
-    print('Inclination change split (deg):', prob['dinc1'][0], prob['dinc2'][0])
+        # Setup the problem
+        prob.setup()
 
-    prob.run_driver()
+        # Execute the model with the given inputs
+        prob.run_model()
 
-    print('Optimized Delta-V (km/s):', prob['delta_v'][0])
-    print('Inclination change split (deg):', prob['dinc1'][0], prob['dinc2'][0])
+        print('Delta-V (km/s):', prob['delta_v'][0])
+        print('Inclination change split (deg):', prob['dinc1'][0], prob['dinc2'][0])
+
+        prob.run_driver()
+
+        print('Optimized Delta-V (km/s):', prob['delta_v'][0])
+        print('Inclination change split (deg):', prob['dinc1'][0], prob['dinc2'][0])
