@@ -2221,8 +2221,9 @@ class System(object):
                 d_outputs.set_val(0.0)
 
         if scope_out is None and scope_in is None:
-            print(self.pathname, "matvec dinputs:", list(d_inputs._names), "d_outputs:",
-                  list(d_outputs._names))
+            # if self.pathname != 'indeps':
+            #     print(self.pathname, "matvec dinputs:", list(d_inputs._names), "d_outputs:",
+            #           list(d_outputs._names))
             yield d_inputs, d_outputs, d_residuals
         else:
             old_ins = d_inputs._names
@@ -2234,8 +2235,9 @@ class System(object):
                 d_inputs._names = scope_in.intersection(old_ins)
 
             try:
-                print(self.pathname, "matvec dinputs:", list(d_inputs._names), "d_outputs:",
-                      list(d_outputs._names))
+                # if self.pathname != 'indeps':
+                #     print(self.pathname, "matvec dinputs:", list(d_inputs._names), "d_outputs:",
+                #             list(d_outputs._names))
                 yield d_inputs, d_outputs, d_residuals
             finally:
                 # reset _names so users will see full vector contents

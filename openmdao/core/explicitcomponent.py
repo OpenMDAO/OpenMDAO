@@ -319,6 +319,8 @@ class ExplicitComponent(Component):
                 else:  # rev
                     d_inputs.set_val(new_vals)
         else:
+            _, d_inputs, d_resids, mode = args[:4]
+            print(f"[{self.pathname}]: CJP wrapper: d_inputs: {d_inputs._data}, d_resids: {d_resids._data}")
             self.compute_jacvec_product(*args)
 
     def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
@@ -340,6 +342,10 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
+        # if scope_out is not None and scope_in is not None and not scope_in and not scope_out:
+        #     print(f"{self.pathname}: SKIPPING _apply_linear")
+        #     return True
+
         J = self._jacobian if jac is None else jac
 
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
@@ -589,13 +595,14 @@ class ExplicitComponent(Component):
                 self._last_doutput = self.compute_full_jacvec_product(inputs, dinputs, doutputs,
                                                                       mode)
 
-            if not (np.array_equal(dinputs.asarray(), self._last_dinput) and
-                    np.array_equal(inputs.asarray(), self._last_input)):
+            elif not (np.array_equal(dinputs.asarray(), self._last_dinput) and
+                      np.array_equal(inputs.asarray(), self._last_input)):
                 self._last_doutput = self.compute_full_jacvec_product(inputs, dinputs, doutputs,
                                                                       mode)
                 self._last_input[:] = inputs.asarray()
                 self._last_dinput[:] = dinputs.asarray()
-                print("RETRIEVED FROM CACHE")
+            else:
+                print("RETRIEVED FROM CACHE, dinputs:", dinputs.asarray())
 
             return self._last_doutput
 
@@ -605,10 +612,11 @@ class ExplicitComponent(Component):
                 self._last_dinput = self.compute_full_jacvec_product(inputs, dinputs, doutputs,
                                                                      mode)
 
-            if np.array_equal(doutputs.asarray(), self._last_doutput):
+            elif np.array_equal(doutputs.asarray(), self._last_doutput):
                 self._last_dinput = self.compute_full_jacvec_product(inputs, dinputs, doutputs,
                                                                      mode)
                 self._last_doutput[:] = doutputs.asarray()
+            else:
                 print("RETRIEVED FROM CACHE")
 
             return self._last_dinput

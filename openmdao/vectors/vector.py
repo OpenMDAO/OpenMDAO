@@ -706,10 +706,8 @@ class _CompMatVecWrapper(object):
 
     def __getitem__(self, name):
         absname = self._vec._name2abs_name(name)
-        if absname in self._vec._names:
+        if absname is not None:
             return self._vec._views[absname]
-        elif absname is not None:  # was found in _vec._views
-            return np.zeros_like(self._vec._views[absname])
 
         # call the wrapped vector to get the error message
         self._vec[name]

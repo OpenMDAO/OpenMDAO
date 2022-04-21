@@ -974,11 +974,10 @@ class BlockLinearSolver(LinearSolver):
             self._rhs_vec = system._vectors['output']['linear'].asarray(True)
 
     def _update_rhs_vec(self):
-        system = self._system()
         if self._mode == 'fwd':
-            self._rhs_vec[:] = system._vectors['residual']['linear'].asarray()
+            self._rhs_vec[:] = self._system()._vectors['residual']['linear'].asarray()
         else:
-            self._rhs_vec[:] = system._vectors['output']['linear'].asarray()
+            self._rhs_vec[:] = self._system()._vectors['output']['linear'].asarray()
 
     def _set_complex_step_mode(self, active):
         """

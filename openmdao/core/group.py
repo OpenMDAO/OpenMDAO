@@ -2653,6 +2653,10 @@ class Group(System):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
+        # if scope_out is not None and scope_in is not None and not scope_in and not scope_out:
+        #     print(f"{self.pathname}: SKIPPING _apply_linear")
+        #     return True
+
         if self._owns_approx_jac:
             jac = self._jacobian
         elif jac is None and self._assembled_jac is not None:

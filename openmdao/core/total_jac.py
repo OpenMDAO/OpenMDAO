@@ -1010,14 +1010,14 @@ class _TotalJacInfo(object):
         for tup in zip(*idxs):
             yield tup, self.par_deriv_input_setter, self.par_deriv_jac_setter, imeta
 
-    def _zero_vecs(self, vecname, mode):
+    def _zero_vecs(self, mode):
         vecs = self.model._vectors
 
         # clean out vectors from last solve
-        vecs['output'][vecname].set_val(0.0)
-        vecs['residual'][vecname].set_val(0.0)
+        vecs['output']['linear'].set_val(0.0)
+        vecs['residual']['linear'].set_val(0.0)
         if mode == 'rev':
-            vecs['input'][vecname].set_val(0.0)
+            vecs['input']['linear'].set_val(0.0)
 
     #
     # input setter functions
@@ -1046,11 +1046,11 @@ class _TotalJacInfo(object):
         """
         _, rel_systems, cache_lin_sol = self.in_idx_map[mode][idx]
 
-        self._zero_vecs('linear', mode)
+        self._zero_vecs(mode)
 
         loc_idx = self.in_loc_idxs[mode][idx]
         if loc_idx >= 0:
-            # print("Setting seed at idx:", idx, self.seeds[mode][idx])
+            print(f"Setting seed {self.seeds[mode][idx]} at index: {idx}, loc: {loc_idx}")
             self.input_vec[mode]['linear'].set_val(self.seeds[mode][idx], loc_idx)
 
         if cache_lin_sol:
@@ -1083,7 +1083,7 @@ class _TotalJacInfo(object):
         if itermeta is None:
             return self.single_input_setter(inds[0], None, mode)
 
-        self._zero_vecs('linear', mode)
+        self._zero_vecs(mode)
 
         self.input_vec[mode]['linear'].set_val(itermeta['seeds'], itermeta['local_in_idxs'])
 
@@ -1349,10 +1349,10 @@ class _TotalJacInfo(object):
         # Main loop over columns (fwd) or rows (rev) of the jacobian
         for mode in self.modes:
             for key, idx_info in self.idx_iter_dict[mode].items():
-                # print("KEY:", key)
+                print("KEY:", key)
                 imeta, idx_iter = idx_info
                 for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
-                    # print("INDEX:", inds)
+                    print("INDEX:", inds)
                     rel_systems, vec_names, cache_key = input_setter(inds, itermeta, mode)
 
                     if debug_print:
