@@ -139,6 +139,8 @@ class Vector(object):
 
         if root_vector is None:
             self._root_vector = self
+            self._set_count = 0  # used to determine if vector has changed between calls to
+                                 # compute_jacvec_product or apply_linear
         else:
             self._root_vector = root_vector
 
@@ -566,6 +568,7 @@ class Vector(object):
         vals : ndarray, float, or iter of ndarrays and/or floats
             Values for each variable contained in this vector, in the proper order.
         """
+        # print(f"VECTOR set_vals, system={self._system().pathname}, vecname={self._name}, {self._kind}")
         arr = self.asarray()
 
         if self.nvars() == 1:
@@ -583,6 +586,8 @@ class Vector(object):
                     end += v.size
                     arr[start:end] = v.ravel()
                 start = end
+
+        self._root_vector._set_count += 1
 
     def set_var(self, name, val, idxs=_full_slice, flat=False, var_name=None):
         """
@@ -602,6 +607,7 @@ class Vector(object):
             If specified, the variable name to use when reporting errors. This is useful
             when setting an AutoIVC value that the user only knows by a connected input name.
         """
+        # print(f"VECTOR set_var, system={self._system().pathname}, vecname={self._name}, {self._kind}")
         abs_name = self._name2abs_name(name)
         if abs_name is None:
             raise KeyError(f"{self._system().msginfo}: Variable name "
@@ -644,6 +650,8 @@ class Vector(object):
                     raise ValueError(f"{self._system().msginfo}: Failed to set value of "
                                      f"'{var_name if var_name else name}': {str(err)}.")
                 view[idxs()] = value
+
+        self._root_vector._set_count += 1
 
     def dot(self, vec):
         """
@@ -691,6 +699,9 @@ class Vector(object):
             Complex mode flag; set to True prior to commencing complex step.
         """
         self._under_complex_step = active
+
+    def changed_since(self, count):
+        return count != self._root_vector._set_count
 
 
 class _CompMatVecWrapper(object):

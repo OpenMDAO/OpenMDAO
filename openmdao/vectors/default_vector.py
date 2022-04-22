@@ -215,6 +215,7 @@ class DefaultVector(Vector):
         else:
             data = self.asarray()
             data += vec
+            self._root_vector._set_count += 1
         return self
 
     def __isub__(self, vec):
@@ -236,6 +237,8 @@ class DefaultVector(Vector):
         else:
             data = self.asarray()
             data -= vec
+            self._root_vector._set_count += 1
+
         return self
 
     def __imul__(self, vec):
@@ -257,6 +260,7 @@ class DefaultVector(Vector):
         else:
             data = self.asarray()
             data *= vec
+            self._root_vector._set_count += 1
         return self
 
     def add_scal_vec(self, val, vec):
@@ -272,6 +276,7 @@ class DefaultVector(Vector):
         """
         data = self.asarray()
         data += (val * vec.asarray())
+        self._root_vector._set_count += 1
 
     def set_vec(self, vec):
         """
@@ -295,9 +300,12 @@ class DefaultVector(Vector):
         idxs : int or slice or tuple of ints and/or slices
             The locations where the data array should be updated.
         """
+        # ids = '' if idxs is _full_slice else f"idxs={idxs}"
+        # print(f"VECTOR set_val, system={self._system().pathname}, vecname={self._name}, {self._kind}, val={val}, {ids}")
         # we use _data here specifically so that imaginary part
         # will get properly reset, e.g. when the array is zeroed out.
         self._data[idxs] = val
+        self._root_vector._set_count += 1
 
     def scale_to_norm(self, mode='fwd'):
         """
@@ -354,6 +362,7 @@ class DefaultVector(Vector):
         if adder is not None:  # nonlinear only
             data -= adder
         data /= scaler
+        self._root_vector._set_count += 1
 
     def _scale_reverse(self, scaler, adder):
         """
@@ -370,6 +379,7 @@ class DefaultVector(Vector):
         data *= scaler
         if adder is not None:  # nonlinear only
             data += adder
+        self._root_vector._set_count += 1
 
     def asarray(self, copy=False):
         """
@@ -423,6 +433,7 @@ class DefaultVector(Vector):
         """
         data = self.asarray()
         data[idxs] += val
+        self._root_vector._set_count += 1
 
     def isub(self, val, idxs=_full_slice):
         """
@@ -437,6 +448,7 @@ class DefaultVector(Vector):
         """
         data = self.asarray()
         data[idxs] -= val
+        self._root_vector._set_count += 1
 
     def imul(self, val, idxs=_full_slice):
         """
@@ -451,6 +463,7 @@ class DefaultVector(Vector):
         """
         data = self.asarray()
         data[idxs] *= val
+        self._root_vector._set_count += 1
 
     def dot(self, vec):
         """

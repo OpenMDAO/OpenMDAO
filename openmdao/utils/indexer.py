@@ -547,8 +547,9 @@ class ShapedSliceIndexer(Indexer):
         if self._src_shape is None or len(self._src_shape) == 1:
             # Case 1: Requested flat or nonflat indices but src_shape is None or flat
             # return a flattened arange
-            # use maxsize here since a shaped slice always has positive int start and stop
-            return np.arange(*self._slice.indices(sys.maxsize), dtype=int)
+            if self._slice.stop >= 0:
+                # use maxsize here if a shaped slice has positive int start and stop
+                return np.arange(*self._slice.indices(sys.maxsize), dtype=int)
         else:
             src_size = np.prod(self._src_shape, dtype=int)
             arr = np.arange(src_size, dtype=int).reshape(self._src_shape)[self._slice].ravel()

@@ -288,7 +288,6 @@ class IndexerTestCase(unittest.TestCase):
         assert_equal(ind.indexed_src_shape, (4,))
         assert_equal(ind.min_src_dim, 1)
 
-
 class IndexerMultiDimTestCase(unittest.TestCase):
     def test_multi_slice(self):
         ind = indexer[:,:,:]

@@ -33,6 +33,16 @@ class ImplicitComponent(Component):
         super().__init__(**kwargs)
 
         self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
+        self._last_dinput_count = -1
+        self._last_doutput_count = -1
+        self._last_dresidual_count = -1
+        self._last_input_count = -1
+        self._last_output_count = -1
+        self._last_dinput = None
+        self._last_doutput = None
+        self._last_dresidual = None
+        self._last_input = None
+        self._last_output = None
 
     def _configure(self):
         """
@@ -182,6 +192,12 @@ class ImplicitComponent(Component):
 
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
             d_inputs, d_outputs, d_residuals = vecs
+
+            ch = self.seed_changed(self._inputs, self._outputs, d_inputs, d_outputs, d_residuals, mode)
+            chold = self.seed_changed_old(self._inputs, self._outputs, d_inputs, d_outputs, d_residuals, mode)
+            if ch != chold:
+                raise RuntimeError("SEED CHECK FAIL!!!!!")
+            self.save_vecs(self._inputs, self._outputs, d_inputs, d_outputs, d_residuals, mode)
 
             # Jacobian and vectors are all scaled, unitless
             jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
@@ -488,3 +504,73 @@ class ImplicitComponent(Component):
             List of all states.
         """
         return self._list_states()
+
+    def seed_changed_old(self, inputs, outputs, dinputs, doutputs, dresiduals, mode):
+        if self._last_input is None:
+            self._last_input = np.zeros_like(inputs.asarray())
+            self._last_output = np.zeros_like(outputs.asarray())
+
+        if mode == 'fwd':
+            if self._last_dinput is None:
+                self._last_dinput = np.zeros_like(dinputs.asarray())
+                self._last_doutput = np.zeros_like(doutputs.asarray())
+                return True
+
+            return not (np.array_equal(outputs.asarray(), self._last_output) and
+                        np.array_equal(inputs.asarray(), self._last_input) and
+                        np.array_equal(dinputs.asarray(), self._last_dinput) and
+                        np.array_equal(doutputs.asarray(), self._last_doutput))
+
+        else:  # rev
+            if self._last_dresidual is None:
+                self._last_dresidual = np.zeros_like(dresiduals.asarray())
+
+            return not (np.array_equal(dresiduals.asarray(), self._last_dresidual) and
+                        np.array_equal(inputs.asarray(), self._last_input) and
+                        np.array_equal(outputs.asarray(), self._last_output))
+
+    def save_vecs(self, inputs, outputs, dinputs, doutputs, dresiduals, mode):
+
+        self._last_input[:] = inputs.asarray()
+        self._last_output[:] = outputs.asarray()
+
+        if mode == 'fwd':
+            self._last_dinput[:] = dinputs.asarray()
+            self._last_doutput[:] = doutputs.asarray()
+
+        else:  # rev
+            self._last_dresidual[:] = dresiduals.asarray()
+
+    def seed_changed(self, inputs, outputs, dinputs, doutputs, dresiduals, mode):
+        """
+        Return True if inputs/dinputs (fwd) or doutputs (rev) have changed since last JVP call.
+
+        Parameters
+        ----------
+        inputs : Vector
+            Nonlinear input vector.
+        dinputs : Vector
+            Linear input vector.
+        doutputs : Vector
+            Linear residuals vector.
+        mode : str
+            Direction of derivative computation ('fwd' or 'rev').
+
+        Returns
+        -------
+        bool
+            True if inputs/dinputs (fwd) or doutputs (rev) have changed since last call to
+            compute_jacvec_product.
+        """
+        if mode == 'fwd':
+            changed = dinputs.changed_since(self._last_dinput_count) or \
+                      doutputs.changed_since(self._last_doutput_count) or \
+                      inputs.changed_since(self._last_input_count) or \
+                      outputs.changed_since(self._last_output_count)
+        else:  # rev
+            changed = dresiduals.changed_since(self._last_dresidual_count) or \
+                      inputs.changed_since(self._last_input_count) or \
+                      outputs.changed_since(self._last_output_count)
+        if not changed:
+            print("NO SEED CHANGE!!!!")
+        return changed
