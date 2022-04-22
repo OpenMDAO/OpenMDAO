@@ -529,14 +529,12 @@ class UserInterface {
 
     /**
      * When either of the collapse or uncollapse toolbar buttons are
-     * pressed, return the parent component of the targetted node if
-     * it has one, or the node itself if not.
-     * @returns Parent component of output node or node itself.
+     * pressed, return the parent of the targetted node if it's a variable,
+     * or the node itself if not.
+     * @returns Parent of output node or node itself.
      */
     findRootOfChangeForCollapseUncollapseOutputs(node) {
-        return node.hasOwnProperty('parentComponent') ?
-            node.parentComponent :
-            node;
+        return node.isInputOrOutput()? node.parent : node;
     }
 
     /**

@@ -70,9 +70,11 @@ class ModelData {
      * to create different type of node objects derived from TreeNode.
      * @param {Object} element A simple object that will be REPLACED with the TreeNode.
      * @param {Object} attribNames The customized attribute names for this model.
+     * @param {TreeNode} parent The node whose children array that this new node will be in.
+     * @returns {TreeNode} The newly-created object.
      */
-    _newNode(element, attribNames) {
-        return new TreeNode(element, attribNames);
+    _newNode(element, attribNames, parent) {
+        return new TreeNode(element, attribNames, parent);
     }
 
     /**
@@ -90,15 +92,12 @@ class ModelData {
      * provided by n2_viewer.py with TreeNodes.
      * @param {Object} element The current element being updated.
      */
-     _adoptNodes(element) {
-        const newNode = this._newNode(element, this._attribNames);
+     _adoptNodes(element, parent = null) {
+        const newNode = this._newNode(element, this._attribNames, parent);
 
         if (newNode.hasChildren()) {
-            for (let i in newNode.children) {
-                newNode.children[i] = this._adoptNodes(newNode.children[i]);
-                newNode.children[i].parent = newNode;
-                if (exists(newNode.children[i].parentComponent))
-                    newNode.children[i].parentComponent = newNode;
+            for (const i in newNode.children) {
+                newNode.children[i] = this._adoptNodes(newNode.children[i], newNode);
             }
         }
 
@@ -216,7 +215,7 @@ class ModelData {
     }
 
    /**
-     * Recurse through the model, and determine whether a group/component is
+     * Recurse through the model, and determine whether a parent node is
      * minimized or manually expanded, or an input/output hidden. If it is,
      * add it to the hiddenList array, and optionally reset its state.
      * @param {Object[]} hiddenList The provided array to populate.

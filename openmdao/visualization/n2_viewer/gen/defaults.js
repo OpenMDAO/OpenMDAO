@@ -43,7 +43,7 @@ const Precollapse = {
     'minimumNodes': 200, // Precollapse nodes in models larger than this
     'threshold': 0, // Only precollapse nodes with more descendants than this
     'grpDepthStart': 3, // Only precollapse group nodes at least this deep
-    'cmpDepthStart': 2, // Only precollapse component nodes at least this deep
+    'cmpDepthStart': 2, // Only precollapse nodes w/variable children at least this deep
     'depthLimit': 6, // Only precollapse nodes with more than this many others at the same depth
     'children': 6, // Only precollapse nodes with more direct children than this
                    // (decreases by 1 w/each depth level)

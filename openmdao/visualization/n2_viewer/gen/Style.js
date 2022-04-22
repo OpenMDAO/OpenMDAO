@@ -10,6 +10,7 @@ class Style {
         'gridline': 'white',
         'treeStroke': '#eee',
         'outputGroup': '#888',
+        'output': '#888',
         'input': '#30B0AD',
         'inputGroup': 'Orchid',
         'group': '#6092B5',
@@ -60,6 +61,16 @@ class Style {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
                 'fill': Style.color.inputGroup,
+            },
+            '#tree > g.output > rect': {
+                'cursor': 'pointer',
+                'fill-opacity': '.8',
+                'fill': Style.color.output,
+            },
+            '#tree > g.group > rect': {
+                'cursor': 'pointer',
+                'fill-opacity': '.8',
+                'fill': Style.color.group,
             },
             '#tree > g.output_group > rect': {
                 'cursor': 'pointer',

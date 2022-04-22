@@ -312,8 +312,8 @@ class Layout {
         const dims = node.draw.dims;
 
         if (! node.isVisible()) { // input or hidden leaf leaving
-            dims.x = this.cols[node.parentComponent.depth + 1].location / this.size.partitionTree.width;
-            dims.y = node.parentComponent.draw.dims.y;
+            dims.x = this.cols[node.parent.depth + 1].location / this.size.partitionTree.width;
+            dims.y = node.parent.draw.dims.y;
             dims.width = 1e-6;
             dims.height = 1e-6;
         }

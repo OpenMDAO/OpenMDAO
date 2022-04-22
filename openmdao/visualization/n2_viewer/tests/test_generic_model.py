@@ -16,7 +16,7 @@ model_data = {
 
 tree=model_data['tree']
 
-for x in range (1,5):
+for x in range (1,3):
     newchild0 = {
         'name': f'grp_{num2words(x)}',
         'type': 'group',
@@ -50,11 +50,11 @@ for x in range (1,5):
             ch1.append(newchild3) 
 
 model_data['connections_list'] = (
-    { 'src': 'grp_two.child_one.output_1_1', 'tgt': 'grp_four.child_two.input_2_1'},
-    { 'src': 'grp_one.child_two.output_2_2', 'tgt': 'grp_three.child_one.input_1_2'},
-    { 'src': 'grp_two.child_three.output_3_1', 'tgt': 'grp_four.child_four.input_4_1'},
-    { 'src': 'grp_two.child_one.output_1_2', 'tgt': 'grp_four.child_two.input_2_1'},
-    { 'src': 'grp_two.child_two.output_2_1', 'tgt': 'grp_four.child_two.input_2_1'},
+    { 'src': 'grp_one.child_one.output_1_1', 'tgt': 'grp_one.child_two.input_2_1'},
+    { 'src': 'grp_one.child_two.output_2_2', 'tgt': 'grp_two.child_one.input_1_2'},
+    { 'src': 'grp_one.child_three.output_3_1', 'tgt': 'grp_two.child_four.input_4_1'},
+    { 'src': 'grp_one.child_one.output_1_2', 'tgt': 'grp_two.child_two.input_2_1'},
+    { 'src': 'grp_two.child_two.output_2_1', 'tgt': 'grp_one.child_two.input_2_1'},
     
 )
 

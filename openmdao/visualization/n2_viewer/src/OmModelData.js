@@ -54,10 +54,11 @@ class OmModelData extends ModelData {
      * Convert the element to an OmTreeNode. Overrides the superclass method.
      * @param {Object} element The basic properties for the element obtained from JSON.
      * @param {Object} attribNames Map of this model's properties to standard names.
+     * @param {TreeNode} parent The node whose children array that this new node will be in.
      * @returns {OmTreeNode} The newly-created object.
      */
-    _newNode(element, attribNames) {
-        return new OmTreeNode(element, attribNames);
+    _newNode(element, attribNames, parent) {
+        return new OmTreeNode(element, attribNames, parent);
     }
 
     /**
