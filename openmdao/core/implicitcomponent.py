@@ -195,7 +195,9 @@ class ImplicitComponent(Component):
 
             ch = self.seed_changed(self._inputs, self._outputs, d_inputs, d_outputs, d_residuals, mode)
             chold = self.seed_changed_old(self._inputs, self._outputs, d_inputs, d_outputs, d_residuals, mode)
-            if ch != chold:
+            if ch and not chold:
+                print(f"{self.msginfo}: TOO CONSERVATIVE, vecs didn't actually change!")
+            if not ch and chold:
                 raise RuntimeError("SEED CHECK FAIL!!!!!")
             self.save_vecs(self._inputs, self._outputs, d_inputs, d_outputs, d_residuals, mode)
 
