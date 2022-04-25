@@ -3,7 +3,10 @@ Classes that handle array indexing.
 """
 
 import sys
-from math import prod
+if sys.version_info >= (3, 8):
+    from math import prod
+else:
+    from numpy import prod
 import numpy as np
 from numbers import Integral
 from itertools import zip_longest
@@ -557,7 +560,8 @@ class ShapedSliceIndexer(Indexer):
                 # use maxsize here since a shaped slice always has positive int start and stop
                 return np.arange(*slc.indices(sys.maxsize), dtype=int)
         else:
-            src_size = prod(self._src_shape)
+            # TODO: get rid of int() after we drop python 3.7 support
+            src_size = int(prod(self._src_shape))
             arr = np.arange(src_size, dtype=int).reshape(self._src_shape)[self._slice].ravel()
             if flat:
                 # Case 2: Requested flattened indices of multidimensional array
