@@ -12,31 +12,35 @@ from scipy.sparse import coo_matrix
 from openmdao.core.constants import INT_DTYPE
 
 
-def shape_to_len(shape):
-    """
-    Compute length given a shape tuple.
+if False:  # sys.version_info >= (3, 8):
+    import math
+    shape_to_len = math.prod
+else:
+    def shape_to_len(shape):
+        """
+        Compute length given a shape tuple.
 
-    For realistic-dimension arrays, looping over the shape tuple is much faster than np.prod.
+        For realistic-dimension arrays, looping over the shape tuple is much faster than np.prod.
 
-    Parameters
-    ----------
-    shape : tuple
-        Numpy shape tuple.
+        Parameters
+        ----------
+        shape : tuple
+            Numpy shape tuple.
 
-    Returns
-    -------
-    int
-        Length of multidimensional array.
-    """
-    if shape is None:
-        return None
+        Returns
+        -------
+        int
+            Length of multidimensional array.
+        """
+        # if shape is None:
+        #     return None
 
-    length = 1
-    if not isinstance(shape, Integral):
+        length = 1
+        #if not isinstance(shape, Integral):
         for dim in shape:
             length *= dim
 
-    return length
+        return length
 
 
 def evenly_distrib_idxs(num_divisions, arr_size):

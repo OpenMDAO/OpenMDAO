@@ -178,16 +178,16 @@ def ensure_compatible(name, value, shape=None, indices=None):
 
     if indices is not None:
         if not indices._flat_src and shape is None:
-            raise RuntimeError("src_indices for '%s' is not flat, so its input "
-                               "shape must be provided." % name)
+            raise RuntimeError(f"src_indices for '{name}' is not flat, so its input "
+                               "shape must be provided.")
         try:
             indshape = indices.indexed_src_shape
         except (RuntimeError, ValueError, TypeError):
             pass  # use shape provided or shape of value and check vs. shape of indices later
         else:
             if shape is not None and np.product(indshape) != np.product(shape):
-                raise ValueError("Shape of indices %s does not match shape of %s for '%s'." %
-                                 (indshape, shape, name))
+                raise ValueError(f"Shape of indices {indshape} does not match shape of {shape} for"
+                                 f" '{name}'.")
             if shape is None:
                 shape = indshape
 
@@ -203,8 +203,8 @@ def ensure_compatible(name, value, shape=None, indices=None):
         else:
             value = np.atleast_1d(value).astype(np.float64)
             if value.shape != shape:
-                raise ValueError("Incompatible shape for '%s': Expected %s but got %s." %
-                                 (name, shape, value.shape))
+                raise ValueError(f"Incompatible shape for '{name}': Expected {shape} but got "
+                                 f"{value.shape}.")
 
     return value, shape
 
