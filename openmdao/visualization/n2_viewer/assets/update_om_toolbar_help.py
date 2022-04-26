@@ -40,7 +40,7 @@ async def create_help(playwright):
     transition_wait = await page.evaluate("transitionDefaults.durationSlow")
     transition_wait += 100
 
-    await page.wait_for_selector("#cellShape_node_26")
+    await page.wait_for_selector("#cellShape_node_39")
 
     br_call_str = "d3.select('#toolbarLoc').node().getBoundingClientRect()"
     tb_height = await page.evaluate(f"{br_call_str}.height")
@@ -80,7 +80,7 @@ async def main():
     async with async_playwright() as playwright:
         await create_help(playwright)
 
-if os.path.exists("./update_toolbar_help.py"):
+if os.path.exists("./update_om_toolbar_help.py"):
     print(f"Generating N2 from {MODEL_FILE}")
     cmd = f"openmdao n2 -o {N2_FILE} --no_browser {MODEL_FILE}"
     subprocess.run(cmd.split())  # nosec: trusted input

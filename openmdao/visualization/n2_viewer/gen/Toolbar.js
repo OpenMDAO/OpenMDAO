@@ -90,12 +90,16 @@ class Toolbar {
         this.hidden = false;
     }
 
+    /** Automatically select between visibile/hidden. */
     toggle() {
         if (this.hidden) this.show();
         else this.hide();
     }
 
-    /** When an expanded button is clicked, update the 'root' button to the same icon/function. */
+    /**
+     * When an expanded button is clicked, update the 'root' button to the same icon/function.
+     * @param {HTMLElement} clickedNode The element where the event was triggered.
+     */
     _setRootButton(clickedNode) {
         const container = d3.select(clickedNode.parentNode.parentNode);
         if (!container.classed('expandable')) return;
@@ -109,9 +113,27 @@ class Toolbar {
             .on('click', button.on('click'));
     }
 
-    /** Minimal management of buttons which will be described on the help window. */
+    /**
+     * Minimal management of buttons which will be described on the help window.
+     * @param {ToolbarButton} btn The button to add.
+     * @returns {ToolbarButton} A reference to the new button.
+     */
     _addButton(btn) {
         this.buttons.push(btn);
+        return btn;
+    }
+
+    /**
+     * When buttons are added out-of-order, the help screen can be jumbled. Using
+     * this method gives control over where the button goes into the array which
+     * corresponds to the order it appears on the help screen. This doesn't affect
+     * the appearance of the functional toolbar.
+     * @param {ToolbarButton} btn The button to add.
+     * @param {Number} idx The position to insert the button into the array.
+     * @returns {ToolbarButton} A reference to the new button.
+     */
+    _addButtonAtIndex(btn, idx) {
+        this.buttons.splice(idx, 0, btn);
         return btn;
     }
 
