@@ -231,7 +231,7 @@ class ModelData {
                 'node': node,
                 'draw': {
                     'minimized': node.draw.minimized,
-                    'hidden': node.draw.hidden,
+                    'hidden': node.draw.hidden,.
                     'filtered': node.draw.filtered,
                     'manuallyExpanded': node.draw.manuallyExpanded
                 }
@@ -241,7 +241,7 @@ class ModelData {
                 node.expand();
                 node.show();
                 node.draw.manuallyExpanded = false;
-                node.removeSelfFromFilter();
+                if (node.isFilteredVariable()) node.removeSelfFromFilter();
             }
         }
 
@@ -271,14 +271,14 @@ class ModelData {
             node.expand();
             node.show();
             node.draw.manuallyExpanded = false;
-            node.removeSelfFromFilter();
+            if (node.isFilteredVariable()) node.removeSelfFromFilter();
         }
         else { // Found, restore values
             node.draw.minimized = foundEntry.draw.minimized;
             node.draw.hidden = foundEntry.draw.hidden;
             node.draw.manuallyExpanded = foundEntry.draw.manuallyExpanded;
             if (foundEntry.draw.filtered) { node.addSelfToFilter(); }
-            else { node.removeSelfFromFilter(); }
+            else { if (node.isFilteredVariable()) node.removeSelfFromFilter(); }
         }
 
         if (node.hasChildren()) {
