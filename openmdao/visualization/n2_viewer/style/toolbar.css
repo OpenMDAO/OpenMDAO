@@ -90,7 +90,9 @@
 #toolbarLoc {
     margin: 0;
     padding: 0;
-    height: 605px;
+    /* height: 605px; */
+    height: fit-content;
+    padding-bottom: 7px;
     width: 65px;
     border-bottom-right-radius: 15px;
     position: relative;
