@@ -62,8 +62,7 @@ class ExplicitSleepComp(om.ExplicitComponent):
     def compute(self, inputs, outputs):
         if debug: print(f"running {self.pathname}")
         self.sleep(self.compute_delay)
-        for iname, oname in zip(self.inames, self.onames):
-            outputs[oname] = inputs[iname]
+        outputs.set_val(inputs.asarray())
 
     def compute_partials(self, inputs, partials):
         """
@@ -205,30 +204,8 @@ if __name__ == '__main__':
 
     p.setup()
 
-    # from openmdao.devtools.debug import profiling
-    # if MPI:
-    #     profname = f"profile.out.{MPI.COMM_WORLD.rank}"
-    # else:
-    #     profname = 'profile.out'
-
-    # with om.timing_context():
-    #     with profiling(profname):
-    #         for i in range(nruns):
-    #             p.run_model()
-
-
     with om.timing_context():
         for i in range(nruns):
             p.run_model()
-
-    ## checking totals is quite slow...
-
-    # ofs = []
-    # wrts = []
-    # for c, i, o in sys_var_path_iter(ncomps, nvars, 'par'):
-    #     ofs.append(o)
-    #     wrts.append(i)
-
-    # assert_check_totals(p.check_totals(of=ofs, wrt=wrts, out_stream=None))
 
     print("Total time:", perf_counter() - start)

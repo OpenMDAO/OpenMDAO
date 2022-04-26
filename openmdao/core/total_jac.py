@@ -72,8 +72,8 @@ class _TotalJacInfo(object):
     output_list : list of str
         List of names of output variables for this total jacobian.  In fwd mode, outputs
         are responses.  In rev mode, outputs are design variables.
-    output_vec : dict of linear vectors keyed by mode.
-        Designated output vectors based on value of fwd.
+    output_vec : dict of Vector.
+        Designated linear output vectors based on value of mode ('fwd' or 'rev').
     owning_ranks : dict
         Map of absolute var name to the MPI process that owns it.
     par_deriv : dict
