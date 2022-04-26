@@ -140,9 +140,6 @@ class Vector(object):
 
         if root_vector is None:
             self._root_vector = self
-            # used to determine if vector has changed between calls to compute_jacvec_product
-            # or apply_linear
-            self._set_count = 0
         else:
             self._root_vector = root_vector
 
@@ -588,8 +585,6 @@ class Vector(object):
                     arr[start:end] = v.ravel()
                 start = end
 
-        self._root_vector._set_count += 1
-
     def set_var(self, name, val, idxs=_full_slice, flat=False, var_name=None):
         """
         Set the array view corresponding to the named variable, with optional indexing.
@@ -651,8 +646,6 @@ class Vector(object):
                                      f"'{var_name if var_name else name}': {str(err)}.")
                 view[idxs()] = value
 
-        self._root_vector._set_count += 1
-
     def dot(self, vec):
         """
         Compute the dot product of the current vec and the incoming vec.
@@ -701,12 +694,22 @@ class Vector(object):
         self._under_complex_step = active
 
     def get_hash(self, alg=hashlib.sha1):
+        """
+        Return a hash string for the array contained in this Vector.
+
+        Parameters
+        ----------
+        alg : function
+            Algorithm used to generate the hash.  Default is hashlib.sha1.
+
+        Returns
+        -------
+        str
+            The hash string.
+        """
         if self._data.size == 0:
-            # print('hash=', self._data, self)
             return ''
-        h = array_hash(self._data)
-        # print('hash=', h, 'data=', self._data, repr(self))
-        return h
+        return array_hash(self._data, alg)
 
 
 class _CompMatVecWrapper(object):

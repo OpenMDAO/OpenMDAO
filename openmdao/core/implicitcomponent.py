@@ -25,6 +25,18 @@ class ImplicitComponent(Component):
     ----------
     _inst_functs : dict
         Dictionary of names mapped to bound methods.
+    _last_input_hash : str
+        Keeps track of changes to input vector. Used if matrix_free_caching option is True.
+    _last_output_hash : str
+        Keeps track of changes to output vector. Used if matrix_free_caching option is True.
+    _last_dinput_hash : str
+        Keeps track of changes to dinput vector. Used if matrix_free_caching option is True.
+    _last_doutput_hash : str
+        Keeps track of changes to doutput vector. Used if matrix_free_caching option is True.
+    _last_dresidual_hash : str
+        Keeps track of changes to dresidual vector. Used if matrix_free_caching option is True.
+    _last_mode : str
+        Keeps track of changes to derivative direction. Used if matrix_free_caching option is True.
     """
 
     def __init__(self, **kwargs):
@@ -34,16 +46,12 @@ class ImplicitComponent(Component):
         super().__init__(**kwargs)
 
         self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
+        self._last_input_hash = ''
+        self._last_output_hash = ''
         self._last_dinput_hash = ''
         self._last_doutput_hash = ''
         self._last_dresidual_hash = ''
-        self._last_input_hash = ''
-        self._last_output_hash = ''
-        self._last_dinput = None
-        self._last_doutput = None
-        self._last_dresidual = None
-        self._last_input = None
-        self._last_output = None
+        self._last_mode = ''
 
     def _configure(self):
         """
@@ -193,9 +201,6 @@ class ImplicitComponent(Component):
 
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
             d_inputs, d_outputs, d_residuals = vecs
-
-            self._check_seed_change(self._inputs, self._outputs, d_inputs, d_outputs,
-                                    d_residuals, mode)
 
             # Jacobian and vectors are all scaled, unitless
             jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
@@ -503,42 +508,6 @@ class ImplicitComponent(Component):
         """
         return self._list_states()
 
-    # def seed_changed_old(self, inputs, outputs, dinputs, doutputs, dresiduals, mode):
-    #     if self._last_input is None:
-    #         self._last_input = np.zeros_like(inputs.asarray())
-    #         self._last_output = np.zeros_like(outputs.asarray())
-
-    #     if mode == 'fwd':
-    #         if self._last_dinput is None:
-    #             self._last_dinput = np.zeros_like(dinputs.asarray())
-    #             self._last_doutput = np.zeros_like(doutputs.asarray())
-    #             return True
-
-    #         return not (np.array_equal(outputs.asarray(), self._last_output) and
-    #                     np.array_equal(inputs.asarray(), self._last_input) and
-    #                     np.array_equal(dinputs.asarray(), self._last_dinput) and
-    #                     np.array_equal(doutputs.asarray(), self._last_doutput))
-
-    #     else:  # rev
-    #         if self._last_dresidual is None:
-    #             self._last_dresidual = np.zeros_like(dresiduals.asarray())
-
-    #         return not (np.array_equal(dresiduals.asarray(), self._last_dresidual) and
-    #                     np.array_equal(inputs.asarray(), self._last_input) and
-    #                     np.array_equal(outputs.asarray(), self._last_output))
-
-    # def save_vecs(self, inputs, outputs, dinputs, doutputs, dresiduals, mode):
-
-    #     self._last_input[:] = inputs.asarray()
-    #     self._last_output[:] = outputs.asarray()
-
-    #     if mode == 'fwd':
-    #         self._last_dinput[:] = dinputs.asarray()
-    #         self._last_doutput[:] = doutputs.asarray()
-
-    #     else:  # rev
-    #         self._last_dresidual[:] = dresiduals.asarray()
-
     def seed_changed(self, inputs, outputs, dinputs, doutputs, dresiduals, mode):
         """
         Return True if inputs/dinputs (fwd) or doutputs (rev) have changed since last JVP call.
@@ -547,10 +516,14 @@ class ImplicitComponent(Component):
         ----------
         inputs : Vector
             Nonlinear input vector.
+        outputs : Vector
+            Nonlinear output vector.
         dinputs : Vector
             Linear input vector.
         doutputs : Vector
-            Linear residuals vector.
+            Linear output vector.
+        dresiduals : Vector
+            Linear residual vector.
         mode : str
             Direction of derivative computation ('fwd' or 'rev').
 
@@ -563,84 +536,27 @@ class ImplicitComponent(Component):
         inhash = inputs.get_hash()
         outhash = outputs.get_hash()
 
-        inch = inhash != self._last_input_hash
-        outch = outhash != self._last_output_hash
-
-        if self._last_input is None:
-            self._last_input = inputs._data.copy()
-            self._last_output = outputs._data.copy()
-            oldinch = True
-            oldoutch = True
-        else:
-            oldinch = not np.array_equal(inputs._data, self._last_input)
-            oldoutch = not np.array_equal(outputs._data, self._last_output)
-            self._last_input[:] = inputs._data
-            self._last_output[:] = outputs._data
-
-        if inch and not oldinch:
-            print("OVERLY CONSERVATIVE...")
-        elif not inch and oldinch and inputs._data.size > 0:
-            raise RuntimeError(self.pathname, "INPUTS change diff")
-        if outch and not oldoutch:
-            print("OVERLY CONSERVATIVE...")
-        elif not outch and oldoutch and inputs._data.size > 0:
-            raise RuntimeError(self.pathname, "OUTPUTS change diff")
+        changed = inhash != self._last_input_hash or outhash != self._last_output_hash
 
         if mode == 'fwd':
             dinhash = dinputs.get_hash()
             douthash = doutputs.get_hash()
 
-            dinch = dinhash != self._last_dinput_hash
-            doutch = douthash != self._last_doutput_hash
-
-            changed = dinch or doutch or inch or outch
-
-            if self._last_dinput is None:
-                self._last_dinput = dinputs._data.copy()
-                self._last_doutput = doutputs._data.copy()
-                olddinch = olddoutch = True
-            else:
-                olddinch = not np.array_equal(dinputs._data, self._last_dinput)
-                olddoutch = not np.array_equal(doutputs._data, self._last_doutput)
-
-            if dinch and not olddinch:
-                print("OVERLY CONSERVATIVE...")
-            elif not dinch and olddinch and inputs._data.size > 0:
-                raise RuntimeError(self.pathname, "DINPUTS change diff")
-            if doutch and not olddoutch:
-                print("OVERLY CONSERVATIVE...")
-            elif not doutch and olddoutch and inputs._data.size > 0:
-                raise RuntimeError(self.pathname, "DOUTPUTS change diff")
+            changed |= dinhash != self._last_dinput_hash or douthash != self._last_doutput_hash
 
             self._last_dinput_hash = dinhash
             self._last_doutput_hash = douthash
-            self._last_dinput[:] = dinputs._data
-            self._last_doutput[:] = doutputs._data
         else:  # rev
             dreshash = dresiduals.get_hash()
 
-            dresch = dreshash != self._last_dresidual_hash
-
-            if self._last_dresidual is None:
-                self._last_dresidual = dresiduals._data.copy()
-                olddresch = True
-            else:
-                olddresch = not np.array_equal(dresiduals._data, self._last_dresidual)
-
-            changed = dresch or inch or outch
-
-            if dresch and not olddresch:
-                print("OVERLY CONSERVATIVE...")
-            elif not dresch and olddresch and inputs._data.size > 0:
-                raise RuntimeError(self.pathname, "DRESIDS change diff")
+            changed |= dreshash != self._last_dresidual_hash
 
             self._last_dresidual_hash = dreshash
-            self._last_dresidual[:] = dresiduals._data
+
+        changed |= mode != self._last_mode
 
         self._last_input_hash = inhash
         self._last_output_hash = outhash
+        self._last_mode = mode
 
         return changed
-
-    def _check_seed_change(self, inputs, outputs, dinputs, doutputs, dresiduals, mode):
-        ch = self.seed_changed(self._inputs, self._outputs, dinputs, doutputs, dresiduals, mode)

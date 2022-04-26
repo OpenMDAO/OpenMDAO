@@ -30,12 +30,14 @@ class ExplicitComponent(Component):
         Dictionary of names mapped to bound methods.
     _has_compute_partials : bool
         If True, the instance overrides compute_partials.
-    _last_dinput_hash : str
-        Keeps track of changes to dinput vector. Used if matrix_free_caching option is True.
     _last_input_hash : str
         Keeps track of changes to input vector. Used if matrix_free_caching option is True.
+    _last_dinput_hash : str
+        Keeps track of changes to dinput vector. Used if matrix_free_caching option is True.
     _last_doutput_hash : str
         Keeps track of changes to doutput vector. Used if matrix_free_caching option is True.
+    _last_mode : str
+        Keeps track of changes to derivative direction. Used if matrix_free_caching option is True.
     """
 
     def __init__(self, **kwargs):
@@ -50,9 +52,7 @@ class ExplicitComponent(Component):
         self._last_dinput_hash = ''
         self._last_input_hash = ''
         self._last_doutput_hash = ''
-        self._last_dinput = None
-        self._last_input = None
-        self._last_doutput = None
+        self._last_mode = ''
 
     def _configure(self):
         """
@@ -345,16 +345,10 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        # if scope_out is not None and scope_in is not None and not scope_in and not scope_out:
-        #     print(f"{self.pathname}: SKIPPING _apply_linear")
-        #     return True
-
         J = self._jacobian if jac is None else jac
 
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
             d_inputs, d_outputs, d_residuals = vecs
-
-            self._check_seed_change(self._inputs, d_inputs, d_outputs, mode)
 
             # Jacobian and vectors are all scaled, unitless
             J._apply(self, d_inputs, d_outputs, d_residuals, mode)
@@ -591,58 +585,24 @@ class ExplicitComponent(Component):
             True if inputs/dinputs (fwd) or doutputs (rev) have changed since last call to
             compute_jacvec_product.
         """
+        inhash = inputs.get_hash()
+        changed = inhash != self._last_input_hash
+
         if mode == 'fwd':
-            if self._last_dinput is None:
-                self._last_dinput = dinputs._data.copy()
-                self._last_input = inputs._data.copy()
-                oldinch = True
-                olddinch = True
-                first = True
-            else:
-                oldinch = not np.array_equal(inputs._data, self._last_input)
-                olddinch = not np.array_equal(dinputs._data, self._last_dinput)
-
-            inhash = inputs.get_hash()
             dinhash = dinputs.get_hash()
-            inch = inhash != self._last_input_hash
-            if inch and not oldinch:
-                print("OVERLY CONSERVATIVE...")
-            elif not inch and oldinch and inputs._data.size > 0:
-                raise RuntimeError(self.pathname, "INPUT diff")
-            dinch = dinhash != self._last_dinput_hash
-            if dinch and not olddinch:
-                print("OVERLY CONSERVATIVE...")
-            elif not dinch and olddinch and inputs._data.size > 0:
-                raise RuntimeError(self.pathname, "DINPUT diff")
-
-            # changed = dinhash != self._last_dinput_hash or inhash != self._last_input_hash
-            changed = inch or dinch
+            changed |= dinhash != self._last_dinput_hash
             self._last_dinput_hash = dinhash
-            self._last_input_hash = inhash
-            self._last_input[:] = inputs._data
-            self._last_dinput[:] = dinputs._data
         else:  # rev
-            if self._last_doutput is None:
-                self._last_doutput =doutputs._data.copy()
-                olddoutch = True
-            else:
-                olddoutch = not np.array_equal(doutputs._data, self._last_doutput)
-
             douthash = doutputs.get_hash()
-            doutch = douthash != self._last_doutput_hash
-            if doutch and not olddoutch:
-                print("OVERLY CONSERVATIVE...")
-            elif not doutch and olddoutch and doutputs._data.size > 0:
-                raise RuntimeError(self.pathname, "DOUTPUT diff")
-
-            changed = doutch  # douthash != self._last_doutput_hash
+            changed |= douthash != self._last_doutput_hash
             self._last_doutput_hash = douthash
-            self._last_doutput[:] = doutputs._data
+
+        changed |= mode != self._last_mode
+
+        self._last_input_hash = inhash
+        self._last_mode = mode
 
         return changed
-
-    def _check_seed_change(self, inputs, dinputs, doutputs, mode):
-        ch = self.seed_changed(inputs, dinputs, doutputs, mode)
 
     def get_full_jacvec_product(self, inputs, dinputs, doutputs, mode):
         """
