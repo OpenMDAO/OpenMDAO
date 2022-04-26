@@ -108,7 +108,6 @@ class LinearBlockGS(BlockLinearSolver):
                     continue
 
                 scope_out, scope_in = system._get_matvec_scope(subsys)
-                # if subsys.pathname != 'indeps': print(f"\n{system.pathname}: LNBGS: setting scope for sub {subsys.pathname} to {list(scope_in)} , {list(scope_out)}")
                 subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
                 b_vec *= -1.0
                 b_vec += self._rhs_vec
@@ -133,7 +132,6 @@ class LinearBlockGS(BlockLinearSolver):
 
                     subsys._solve_linear(mode, self._rel_systems)
                     scope_out, scope_in = system._get_matvec_scope(subsys)
-                    # if subsys.pathname != 'indeps': print(f"LNBGS: setting scope from {system.pathname} for sub {subsys.pathname} to {list(scope_in)} , {list(scope_out)}")
 
                     subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
                 else:   # subsys not local

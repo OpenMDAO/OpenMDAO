@@ -1,13 +1,14 @@
 """Define the base Vector and Transfer classes."""
 from copy import deepcopy
-import os
 import weakref
+import hashlib
 
 import numpy as np
 from numpy import isscalar
 
 from openmdao.utils.name_maps import prom_name2abs_name, rel_name2abs_name
 from openmdao.utils.indexer import Indexer, indexer
+from openmdao.utils.array_utils import array_hash
 
 
 _full_slice = slice(None)
@@ -139,8 +140,9 @@ class Vector(object):
 
         if root_vector is None:
             self._root_vector = self
-            self._set_count = 0  # used to determine if vector has changed between calls to
-                                 # compute_jacvec_product or apply_linear
+            # used to determine if vector has changed between calls to compute_jacvec_product
+            # or apply_linear
+            self._set_count = 0
         else:
             self._root_vector = root_vector
 
@@ -568,7 +570,6 @@ class Vector(object):
         vals : ndarray, float, or iter of ndarrays and/or floats
             Values for each variable contained in this vector, in the proper order.
         """
-        # print(f"VECTOR set_vals, system={self._system().pathname}, vecname={self._name}, {self._kind}")
         arr = self.asarray()
 
         if self.nvars() == 1:
@@ -607,7 +608,6 @@ class Vector(object):
             If specified, the variable name to use when reporting errors. This is useful
             when setting an AutoIVC value that the user only knows by a connected input name.
         """
-        # print(f"VECTOR set_var, system={self._system().pathname}, vecname={self._name}, {self._kind}")
         abs_name = self._name2abs_name(name)
         if abs_name is None:
             raise KeyError(f"{self._system().msginfo}: Variable name "
@@ -700,8 +700,13 @@ class Vector(object):
         """
         self._under_complex_step = active
 
-    def changed_since(self, count):
-        return count != self._root_vector._set_count
+    def get_hash(self, alg=hashlib.sha1):
+        if self._data.size == 0:
+            # print('hash=', self._data, self)
+            return ''
+        h = array_hash(self._data)
+        # print('hash=', h, 'data=', self._data, repr(self))
+        return h
 
 
 class _CompMatVecWrapper(object):

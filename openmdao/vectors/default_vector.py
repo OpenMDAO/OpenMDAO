@@ -300,8 +300,6 @@ class DefaultVector(Vector):
         idxs : int or slice or tuple of ints and/or slices
             The locations where the data array should be updated.
         """
-        # ids = '' if idxs is _full_slice else f"idxs={idxs}"
-        # print(f"VECTOR set_val, system={self._system().pathname}, vecname={self._name}, {self._kind}, val={val}, {ids}")
         # we use _data here specifically so that imaginary part
         # will get properly reset, e.g. when the array is zeroed out.
         self._data[idxs] = val

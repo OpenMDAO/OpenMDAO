@@ -8,6 +8,7 @@ from openmdao.core.component import Component
 from openmdao.vectors.vector import _full_slice, _CompMatVecWrapper
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.name_maps import name2abs_name
+from openmdao.utils.array_utils import array_hash
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE
 
@@ -29,11 +30,11 @@ class ExplicitComponent(Component):
         Dictionary of names mapped to bound methods.
     _has_compute_partials : bool
         If True, the instance overrides compute_partials.
-    _last_dinput_count : int
+    _last_dinput_hash : str
         Keeps track of changes to dinput vector. Used if matrix_free_caching option is True.
-    _last_input_count : int
+    _last_input_hash : str
         Keeps track of changes to input vector. Used if matrix_free_caching option is True.
-    _last_doutput_count : int
+    _last_doutput_hash : str
         Keeps track of changes to doutput vector. Used if matrix_free_caching option is True.
     """
 
@@ -46,9 +47,9 @@ class ExplicitComponent(Component):
         self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
         self._has_compute_partials = overrides_method('compute_partials', self, ExplicitComponent)
         self.options.undeclare('assembled_jac_type')
-        self._last_dinput_count = -1
-        self._last_input_count = -1
-        self._last_doutput_count = -1
+        self._last_dinput_hash = ''
+        self._last_input_hash = ''
+        self._last_doutput_hash = ''
         self._last_dinput = None
         self._last_input = None
         self._last_doutput = None
@@ -323,7 +324,6 @@ class ExplicitComponent(Component):
                     d_inputs.set_val(new_vals)
         else:
             _, d_inputs, d_resids, mode = args[:4]
-            # print(f"[{self.pathname}]: CJP wrapper: d_inputs: {d_inputs._data}, d_resids: {d_resids._data}")
             self.compute_jacvec_product(*args)
 
     def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
@@ -354,13 +354,7 @@ class ExplicitComponent(Component):
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
             d_inputs, d_outputs, d_residuals = vecs
 
-            ch = self.seed_changed(self._inputs, d_inputs, d_outputs, mode)
-            chold = self.seed_changed_old(self._inputs, d_inputs, d_outputs, mode)
-            if ch and not chold:
-                print(f"{self.msginfo}: TOO CONSERVATIVE, vecs didn't actually change!")
-            if not ch and chold:
-                raise RuntimeError(f"{self.msginfo}: SEED CHECK FAIL!!!!!")
-            self.save_vecs(self._inputs, d_inputs, d_outputs, mode)
+            self._check_seed_change(self._inputs, d_inputs, d_outputs, mode)
 
             # Jacobian and vectors are all scaled, unitless
             J._apply(self, d_inputs, d_outputs, d_residuals, mode)
@@ -576,36 +570,6 @@ class ExplicitComponent(Component):
         """
         return False
 
-    def save_vecs(self, inputs, dinputs, doutputs, mode):
-        if mode == 'fwd':
-            if self._last_dinput is None:
-                self._last_dinput = np.zeros_like(dinputs.asarray())
-                self._last_input = np.zeros_like(inputs.asarray())
-            else:
-                self._last_input[:] = inputs.asarray()
-                self._last_dinput[:] = dinputs.asarray()
-                
-            self._last_dinput_count = dinputs._root_vector._set_count
-            self._last_input_count = inputs._root_vector._set_count
-
-        else:  # rev
-            if self._last_doutput is None:
-                self._last_doutput = np.zeros_like(doutputs.asarray())
-            else:
-                self._last_doutput[:] = doutputs.asarray()
-                
-            self._last_doutput_count = doutputs._root_vector._set_count
-
-    def seed_changed_old(self, inputs, dinputs, doutputs, mode):
-        if mode == 'fwd':
-            if inputs._data.size == 0:
-                return False
-            return not (np.array_equal(dinputs.asarray(), self._last_dinput) and
-                        np.array_equal(inputs.asarray(), self._last_input))
-
-        else:  # rev
-            return not np.array_equal(doutputs.asarray(), self._last_doutput)
-
     def seed_changed(self, inputs, dinputs, doutputs, mode):
         """
         Return True if inputs/dinputs (fwd) or doutputs (rev) have changed since last JVP call.
@@ -628,13 +592,57 @@ class ExplicitComponent(Component):
             compute_jacvec_product.
         """
         if mode == 'fwd':
-            changed = (dinputs.changed_since(self._last_dinput_count) or 
-                       inputs.changed_since(self._last_input_count)) and inputs._data.size > 0
+            if self._last_dinput is None:
+                self._last_dinput = dinputs._data.copy()
+                self._last_input = inputs._data.copy()
+                oldinch = True
+                olddinch = True
+                first = True
+            else:
+                oldinch = not np.array_equal(inputs._data, self._last_input)
+                olddinch = not np.array_equal(dinputs._data, self._last_dinput)
+
+            inhash = inputs.get_hash()
+            dinhash = dinputs.get_hash()
+            inch = inhash != self._last_input_hash
+            if inch and not oldinch:
+                print("OVERLY CONSERVATIVE...")
+            elif not inch and oldinch and inputs._data.size > 0:
+                raise RuntimeError(self.pathname, "INPUT diff")
+            dinch = dinhash != self._last_dinput_hash
+            if dinch and not olddinch:
+                print("OVERLY CONSERVATIVE...")
+            elif not dinch and olddinch and inputs._data.size > 0:
+                raise RuntimeError(self.pathname, "DINPUT diff")
+
+            # changed = dinhash != self._last_dinput_hash or inhash != self._last_input_hash
+            changed = inch or dinch
+            self._last_dinput_hash = dinhash
+            self._last_input_hash = inhash
+            self._last_input[:] = inputs._data
+            self._last_dinput[:] = dinputs._data
         else:  # rev
-            changed = doutputs.changed_since(self._last_doutput_count)
-        if not changed and inputs._data.size > 0:
-            print(f"{self.msginfo}: NO SEED CHANGE!!!!")
+            if self._last_doutput is None:
+                self._last_doutput =doutputs._data.copy()
+                olddoutch = True
+            else:
+                olddoutch = not np.array_equal(doutputs._data, self._last_doutput)
+
+            douthash = doutputs.get_hash()
+            doutch = douthash != self._last_doutput_hash
+            if doutch and not olddoutch:
+                print("OVERLY CONSERVATIVE...")
+            elif not doutch and olddoutch and doutputs._data.size > 0:
+                raise RuntimeError(self.pathname, "DOUTPUT diff")
+
+            changed = doutch  # douthash != self._last_doutput_hash
+            self._last_doutput_hash = douthash
+            self._last_doutput[:] = doutputs._data
+
         return changed
+
+    def _check_seed_change(self, inputs, dinputs, doutputs, mode):
+        ch = self.seed_changed(inputs, dinputs, doutputs, mode)
 
     def get_full_jacvec_product(self, inputs, dinputs, doutputs, mode):
         """
