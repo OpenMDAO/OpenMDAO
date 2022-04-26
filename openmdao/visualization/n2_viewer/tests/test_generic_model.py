@@ -3,8 +3,9 @@ from num2words import num2words
 import json
 import os
 import inspect 
+import sys
 
-default_output_filename = 'gen_model.html'
+default_output_filename = 'gen_diag.html' if len(sys.argv) < 2 else sys.argv[1]
 
 model_data = {
     'tree': {
@@ -75,6 +76,6 @@ import openmdao
 openmdao_dir = os.path.dirname(inspect.getfile(openmdao))
 vis_dir = os.path.join(openmdao_dir, "visualization/n2_viewer")
 
-HtmlPreprocessor(os.path.join(vis_dir, "tests/gen_test.html"), "gen_diag.html",
+HtmlPreprocessor(os.path.join(vis_dir, "tests/gen_test.html"), default_output_filename,
                     start_path=vis_dir, allow_overwrite=True, var_dict=html_vars,
                     verbose=False).run()
