@@ -231,7 +231,7 @@ class ModelData {
                 'node': node,
                 'draw': {
                     'minimized': node.draw.minimized,
-                    'hidden': node.draw.hidden,.
+                    'hidden': node.draw.hidden,
                     'filtered': node.draw.filtered,
                     'manuallyExpanded': node.draw.manuallyExpanded
                 }
