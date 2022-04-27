@@ -1391,8 +1391,6 @@ class Problem(object):
                                 dinputs.set_val(0.0)
                                 dstate.set_val(0.0)
 
-                                # Dictionary access returns a scalar for 1d input, and we
-                                # need a vector for clean code, so use _views_flat.
                                 if directional:
                                     flat_view[:] = perturb
                                 elif idx is not None:

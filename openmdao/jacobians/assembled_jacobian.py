@@ -107,7 +107,6 @@ class AssembledJacobian(Jacobian):
         self._int_mtx = int_mtx = self._matrix_class(system.comm, True)
         ext_mtx = self._matrix_class(system.comm, False)
 
-        iproc = system.comm.rank
         out_ranges = self._out_ranges
         in_ranges = self._in_ranges
 

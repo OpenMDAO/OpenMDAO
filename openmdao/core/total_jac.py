@@ -1050,7 +1050,7 @@ class _TotalJacInfo(object):
 
         loc_idx = self.in_loc_idxs[mode][idx]
         if loc_idx >= 0:
-            # print(f"\nSetting seed {self.seeds[mode][idx]} at index: {idx}, loc: {loc_idx}")
+            print(f"\nSetting seed {self.seeds[mode][idx]} at index: {idx}, loc: {loc_idx}")
             self.input_vec[mode]['linear'].set_val(self.seeds[mode][idx], loc_idx)
 
         if cache_lin_sol:

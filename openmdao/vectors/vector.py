@@ -241,6 +241,17 @@ class Vector(object):
                 if n in self._names:
                     yield n, v.real
 
+    def _syspath(self):
+        """
+        Return the pathname of the System that owns this Vector.
+
+        Returns
+        -------
+        str
+            The pathname of the owning System.
+        """
+        return self._system().pathname
+
     def _name2abs_name(self, name):
         """
         Map the given promoted or relative name to the absolute name.
@@ -709,6 +720,7 @@ class Vector(object):
         """
         if self._data.size == 0:
             return ''
+        # we must use self._data here because the hashing alg requires array to be C-contiguous
         return array_hash(self._data, alg)
 
 

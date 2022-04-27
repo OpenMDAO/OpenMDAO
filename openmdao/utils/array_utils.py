@@ -560,6 +560,8 @@ def array_hash(arr, alg=hashlib.sha1):
     """
     Return a hash of the given numpy array.
 
+    arr must be C-contiguous.
+
     Parameters
     ----------
     arr : ndarray
@@ -573,3 +575,68 @@ def array_hash(arr, alg=hashlib.sha1):
         The computed hash.
     """
     return alg(arr.view(np.uint8)).hexdigest()
+
+
+class _ArrayDict(object):
+    """
+    Simple dict wrapper around an array.
+
+    The array may be a vector jacobian product containing both input and output variables.
+
+    Parameters
+    ----------
+    arr : ndarray
+        The array being wrapped.
+    outvec : Vector
+        The output vector.
+    invec : Vector or None
+        The input vector.
+
+    Attributes
+    ----------
+    _prefix : str
+        Prefix to convert from relative to absoute name based on the system that owns the vector(s).
+    _arr : ndarray
+        The array being wrapped.
+    _inslices : dict of slice or ()
+        Dict of slices into the corresponding input Vector keyed by variable name.
+    _outslices : dict of slice or ()
+        Dict of slices into the corresponding output (or residual) Vector keyed by variable name.
+    _in_offset : int
+        If _inslices is not None, this is the offset of the beginning of the input part of the
+        array, which corresponds to a vector jacobian product.
+    """
+    def __init__(self, arr, outvec, invec=None):
+        self._arr = arr
+        self._outslices = outvec.get_slice_dict()
+        implicit = outvec._system().is_implicit()
+        self._in_offset = 0
+
+        if invec is not None:
+            self._inslices = invec.get_slice_dict()
+            if implicit:
+                for slc in self._outslices.values():
+                    pass
+                # slc is the last slice
+                self._in_offset = slc.stop
+        else:
+            self._inslices = {}
+
+        path = outvec._syspath()
+        self._prefix = path + '.' if path else ''
+
+    def __getitem__(self, name):
+        """
+        Return a view into our array based on the given name.
+
+        Name is assumed to be a local component name.
+        """
+        path = self._prefix + name
+
+        if path in self._outslices:
+            return self._arr[self._outslices[path]]
+        try:
+            slc = self._inslices[path]
+            return self._arr[slc.start + self._in_offset:slc.stop + self._in_offset]
+        except KeyError:
+            raise KeyError(f"Variable '{name}' not found in array.")
