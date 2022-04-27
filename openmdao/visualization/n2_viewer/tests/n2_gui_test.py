@@ -289,7 +289,7 @@ n2_gui_test_scripts = {
             "desc": "Check the number of cells in the N2 Matrix",
             "test": "count",
             "selector": "g#n2elements > g.n2cell",
-            "count": 39
+            "count": 36
         },
     ],
     "bug_arrow": [

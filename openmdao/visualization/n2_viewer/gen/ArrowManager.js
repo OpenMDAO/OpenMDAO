@@ -283,9 +283,6 @@
             this.pinnedArrows.migrateCell(cellId, this.hoverArrows,
                 cellClassName, 'n2_hover_elements');
         }
-        else {
-            console.warn(`togglePin(): No known arrows for cell ${cellId}.`);
-        }
     }
 
     /** Remove all arrows in the hoverArrow cache */

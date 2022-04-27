@@ -34,11 +34,11 @@ class SymbolType {
         if (cell.srcObj.isFilter() || cell.tgtObj.isFilter()) {
             this.name = 'filter';
         }
-        else if (cell.onDiagonal()) {
-            this.name = 'vector';
-        }
         else if (cell.srcObj.isGroup() || cell.tgtObj.isGroup()) {
             this.name = 'group';
+        }
+        else if (cell.onDiagonal()) {
+            this.name = 'vector';
         }
         else if (cell.srcObj.isInputOrOutput() || cell.tgtObj.isInputOrOutput() ) {
             this.name = 'vectorVector';
