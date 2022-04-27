@@ -156,7 +156,7 @@ class Group(System):
     ----------
     _mpi_proc_allocator : ProcAllocator
         Object used to allocate MPI processes to subsystems.
-    _proc_info : dict of subsys_name: (min_procs, max_procs, weight)
+    _proc_info : dict of subsys_name: (min_procs, max_procs, weight, proc_group)
         Information used to determine MPI process allocation to subsystems.
     _subgroups_myproc : list
         List of local subgroups.
@@ -412,7 +412,7 @@ class Group(System):
                 src_indices = meta_in['src_indices']
 
                 if src_indices is not None:
-                    if not (np.isscalar(ref) and np.isscalar(ref0)):
+                    if not (np.ndim(ref) == 0 and np.ndim(ref0) == 0):
                         # TODO: if either ref or ref0 are not scalar and the output is
                         # distributed, we need to do a scatter
                         # to obtain the values needed due to global src_indices
@@ -595,7 +595,7 @@ class Group(System):
 
             # Define local subsystems
             if (self._mpi_proc_allocator.parallel and
-                    not (np.sum([minp for minp, _, _ in proc_info]) <= comm.size)):
+                    not (np.sum([minp for minp, _, _, _ in proc_info]) <= comm.size)):
                 # reorder the subsystems_allprocs based on which procs they live on. If we don't
                 # do this, we can get ordering mismatches in some of our data structures.
                 new_allsubs = {}
@@ -1599,14 +1599,13 @@ class Group(System):
         conn_list.extend(abs_in2out.items())
         global_abs_in2out.update(abs_in2out)
 
-        for subsys in self._subsystems_myproc:
-            if isinstance(subsys, Group):
-                if subsys.name in new_conns:
-                    subsys._setup_global_connections(conns=new_conns[subsys.name])
-                else:
-                    subsys._setup_global_connections()
-                global_abs_in2out.update(subsys._conn_global_abs_in2out)
-                conn_list.extend(subsys._conn_global_abs_in2out.items())
+        for subgroup in self._subgroups_myproc:
+            if subgroup.name in new_conns:
+                subgroup._setup_global_connections(conns=new_conns[subgroup.name])
+            else:
+                subgroup._setup_global_connections()
+            global_abs_in2out.update(subgroup._conn_global_abs_in2out)
+            conn_list.extend(subgroup._conn_global_abs_in2out.items())
 
         if len(conn_list) > len(global_abs_in2out):
             dupes = [n for n, val in Counter(tgt for tgt, src in conn_list).items() if val > 1]
@@ -2278,7 +2277,7 @@ class Group(System):
 
     def add_subsystem(self, name, subsys, promotes=None,
                       promotes_inputs=None, promotes_outputs=None,
-                      min_procs=1, max_procs=None, proc_weight=1.0):
+                      min_procs=1, max_procs=None, proc_weight=1.0, proc_group=None):
         """
         Add a subsystem.
 
@@ -2311,6 +2310,12 @@ class Group(System):
         proc_weight : float
             Weight given to the subsystem when allocating available MPI processes
             to all subsystems.  Default is 1.0.
+        proc_group : str or None
+            Name of a processor group such that any system with that processor group name
+            within the same parent group will be allocated on the same mpi process(es).
+            If this is not None, then any other systems sharing the same proc_group must
+            have identical values of min_procs, max_procs, and proc_weight or an exception
+            will be raised.
 
         Returns
         -------
@@ -2334,6 +2339,10 @@ class Group(System):
             # replacing a subsystem is ok (e.g. resetup) but no other attribute
             raise RuntimeError("%s: Can't add subsystem '%s' because an attribute with that name "
                                "already exits." % (self.msginfo, name))
+
+        if proc_group is not None and not isinstance(proc_group, str):
+            raise TypeError(f"{self.msginfo}: proc_group must be a str or None, but is of type "
+                            f"'{type(proc_group).__name__}'.")
 
         match = namecheck_rgx.match(name)
         if match is None or match.group() != name:
@@ -2381,7 +2390,7 @@ class Group(System):
             raise TypeError("%s: proc_weight must be a float > 0. but (%s) was given." %
                             (self.msginfo, proc_weight))
 
-        self._proc_info[name] = (min_procs, max_procs, proc_weight)
+        self._proc_info[name] = (min_procs, max_procs, proc_weight, proc_group)
 
         setattr(self, name, subsys)
 
@@ -3337,7 +3346,7 @@ class Group(System):
             else:
                 if val is None:
                     val = value
-                elif np.isscalar(value):
+                elif np.ndim(value) == 0:
                     if val.size > 1:
                         raise ValueError(f"Shape of input '{tgt}', (), doesn't match shape "
                                          f"{val.shape}.")

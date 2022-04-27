@@ -5,9 +5,9 @@ from collections import defaultdict
 from collections.abc import Iterable
 from itertools import product
 
-import numpy as np
 from numbers import Integral
-from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types
+import numpy as np
+from numpy import ndarray, isscalar, ndim, atleast_1d, atleast_2d, promote_types
 from scipy.sparse import issparse, coo_matrix
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
@@ -25,8 +25,9 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
     DerivativesWarning, SetupWarning, warn_deprecation
 
-_forbidden_chars = ['.', '*', '?', '!', '[', ']']
+_forbidden_chars = {'.', '*', '?', '!', '[', ']'}
 _whitespace = {' ', '\t', '\r', '\n'}
+_allowed_types = (list, tuple, ndarray, Iterable)
 
 
 def _valid_var_name(name):
@@ -49,10 +50,9 @@ def _valid_var_name(name):
     global _forbidden_chars, _whitespace
     if not name:
         return False
-    for char in _forbidden_chars:
-        if char in name:
-            return False
-    return name[0] not in _whitespace and name[-1] not in _whitespace
+    if _forbidden_chars.intersection(name):
+        return False
+    return name is name.strip()
 
 
 class Component(System):
@@ -182,7 +182,7 @@ class Component(System):
             if 'shape_by_conn' in meta and (meta['shape_by_conn'] or
                                             meta['copy_shape'] is not None):
                 meta['shape'] = None
-                if not np.isscalar(meta['val']):
+                if not isscalar(meta['val']):
                     if meta['val'].size > 0:
                         meta['val'] = meta['val'].flatten()[0]
                     else:
@@ -478,7 +478,7 @@ class Component(System):
         if not _valid_var_name(name):
             raise NameError("%s: '%s' is not a valid input name." % (self.msginfo, name))
 
-        if not isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
+        if not isscalar(val) and not isinstance(val, _allowed_types):
             raise TypeError('%s: The val argument should be a float, list, tuple, ndarray or '
                             'Iterable' % self.msginfo)
         if shape is not None and not isinstance(shape, (Integral, tuple, list)):
@@ -499,7 +499,7 @@ class Component(System):
             raise TypeError('The tags argument should be a str or list')
 
         if (shape_by_conn or copy_shape):
-            if shape is not None or not isscalar(val):
+            if shape is not None or ndim(val) > 0:
                 raise ValueError("%s: If shape is to be set dynamically using 'shape_by_conn' or "
                                  "'copy_shape', 'shape' and 'val' should be a scalar, "
                                  "but shape of '%s' and val of '%s' was given for variable '%s'."
@@ -681,8 +681,10 @@ class Component(System):
         dict
             Metadata for added variable.
         """
+        global _allowed_types
+
         # First, type check all arguments
-        if (shape_by_conn or copy_shape) and (shape is not None or not isscalar(val)):
+        if (shape_by_conn or copy_shape) and (shape is not None or ndim(val) > 0):
             raise ValueError("%s: If shape is to be set dynamically using 'shape_by_conn' or "
                              "'copy_shape', 'shape' and 'val' should be scalar, "
                              "but shape of '%s' and val of '%s' was given for variable '%s'."
@@ -692,20 +694,6 @@ class Component(System):
             raise TypeError('%s: The name argument should be a string.' % self.msginfo)
         if not _valid_var_name(name):
             raise NameError("%s: '%s' is not a valid output name." % (self.msginfo, name))
-
-        if not (copy_shape or shape_by_conn):
-            if not isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
-                msg = '%s: The val argument should be a float, list, tuple, ndarray or Iterable'
-                raise TypeError(msg % self.msginfo)
-            if not isscalar(ref) and not isinstance(val, (list, tuple, ndarray, Iterable)):
-                msg = '%s: The ref argument should be a float, list, tuple, ndarray or Iterable'
-                raise TypeError(msg % self.msginfo)
-            if not isscalar(ref0) and not isinstance(val, (list, tuple, ndarray, Iterable)):
-                msg = '%s: The ref0 argument should be a float, list, tuple, ndarray or Iterable'
-                raise TypeError(msg % self.msginfo)
-            if not isscalar(res_ref) and not isinstance(val, (list, tuple, ndarray, Iterable)):
-                msg = '%s: The res_ref argument should be a float, list, tuple, ndarray or Iterable'
-                raise TypeError(msg % self.msginfo)
 
         if shape is not None and not isinstance(shape, (int, tuple, list, np.integer)):
             raise TypeError("%s: The shape argument should be an int, tuple, or list but "
@@ -725,6 +713,10 @@ class Component(System):
             raise TypeError('The tags argument should be a str, set, or list')
 
         if not (copy_shape or shape_by_conn):
+            if not isscalar(val) and not isinstance(val, _allowed_types):
+                msg = '%s: The val argument should be a float, list, tuple, ndarray or Iterable'
+                raise TypeError(msg % self.msginfo)
+
             # value, shape: based on args, making sure they are compatible
             val, shape = ensure_compatible(name, val, shape)
 
@@ -738,12 +730,15 @@ class Component(System):
             # All refs: check the shape if necessary
             for item, item_name in zip([ref, ref0, res_ref], ['ref', 'ref0', 'res_ref']):
                 if not isscalar(item):
+                    if not isinstance(item, _allowed_types):
+                        raise TypeError(f'{self.msginfo}: The {item_name} argument should be a '
+                                        'float, list, tuple, ndarray or Iterable')
+
                     it = atleast_1d(item)
                     if it.shape != shape:
-                        raise ValueError("{}: When adding output '{}', expected shape {} but got "
-                                         "shape {} for argument '{}'.".format(self.msginfo, name,
-                                                                              shape, it.shape,
-                                                                              item_name))
+                        raise ValueError(f"{self.msginfo}: When adding output '{name}', expected "
+                                         f"shape {shape} but got shape {it.shape} for argument "
+                                         f"'{item_name}'.")
 
         if isscalar(ref):
             self._has_output_scaling |= ref != 1.0

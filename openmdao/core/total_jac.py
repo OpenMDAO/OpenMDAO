@@ -72,8 +72,8 @@ class _TotalJacInfo(object):
     output_list : list of str
         List of names of output variables for this total jacobian.  In fwd mode, outputs
         are responses.  In rev mode, outputs are design variables.
-    output_vec : dict of vectors keyed by vec_name.
-        Designated output vectors based on value of fwd.
+    output_vec : dict of Vector.
+        Designated linear output vectors based on value of mode ('fwd' or 'rev').
     owning_ranks : dict
         Map of absolute var name to the MPI process that owns it.
     par_deriv : dict
@@ -226,8 +226,14 @@ class _TotalJacInfo(object):
         self.output_list = {'fwd': of, 'rev': wrt}
         self.input_meta = {'fwd': design_vars, 'rev': responses}
         self.output_meta = {'fwd': responses, 'rev': design_vars}
-        self.input_vec = {'fwd': model._vectors['residual'], 'rev': model._vectors['output']}
-        self.output_vec = {'fwd': model._vectors['output'], 'rev': model._vectors['residual']}
+        self.input_vec = {
+            'fwd': model._vectors['residual']['linear'],
+            'rev': model._vectors['output']['linear']
+        }
+        self.output_vec = {
+            'fwd': model._vectors['output']['linear'],
+            'rev': model._vectors['residual']['linear']
+        }
         self._dist_driver_vars = driver._dist_driver_vars
 
         abs2meta_out = model._var_allprocs_abs2meta['output']
@@ -1050,7 +1056,7 @@ class _TotalJacInfo(object):
 
         loc_idx = self.in_loc_idxs[mode][idx]
         if loc_idx >= 0:
-            self.input_vec[mode]['linear'].set_val(self.seeds[mode][idx], loc_idx)
+            self.input_vec[mode].set_val(self.seeds[mode][idx], loc_idx)
 
         if cache_lin_sol:
             return rel_systems, ('linear',), (idx, mode)
@@ -1084,7 +1090,7 @@ class _TotalJacInfo(object):
 
         self._zero_vecs('linear', mode)
 
-        self.input_vec[mode]['linear'].set_val(itermeta['seeds'], itermeta['local_in_idxs'])
+        self.input_vec[mode].set_val(itermeta['seeds'], itermeta['local_in_idxs'])
 
         if itermeta['cache_lin_solve']:
             return itermeta['relevant'], ('linear',), (inds[0], mode)
@@ -1145,7 +1151,7 @@ class _TotalJacInfo(object):
             Direction of derivative solution.
         """
         deriv_idxs, jac_idxs, _ = self.sol2jac_map[mode]
-        deriv_val = self.output_vec[mode]['linear'].asarray()
+        deriv_val = self.output_vec[mode].asarray()
         if not self.get_remote:
             loc_idx = self.loc_jac_idxs[mode][i]
             if loc_idx >= 0:
@@ -1285,7 +1291,7 @@ class _TotalJacInfo(object):
         J = self.J
         deriv_idxs, jac_idxs, _ = self.sol2jac_map[mode]
 
-        deriv_val = self.output_vec[mode]['linear'].asarray()
+        deriv_val = self.output_vec[mode].asarray()
         if self.jac_scratch is None:
             reduced_derivs = deriv_val[deriv_idxs]
         else:
@@ -1319,15 +1325,10 @@ class _TotalJacInfo(object):
         has_lin_cons = self.has_lin_cons
 
         model = self.model
-        vec_dinput = model._vectors['input']
-        vec_doutput = model._vectors['output']
-        vec_dresid = model._vectors['residual']
-
-        # Prepare model for calculation by cleaning out the derivatives
-        # vectors.
-        vec_dinput['linear'].set_val(0.0)
-        vec_doutput['linear'].set_val(0.0)
-        vec_dresid['linear'].set_val(0.0)
+        # Prepare model for calculation by cleaning out the derivatives vectors.
+        model._vectors['input']['linear'].set_val(0.0)
+        model._vectors['output']['linear'].set_val(0.0)
+        model._vectors['residual']['linear'].set_val(0.0)
 
         # Linearize Model
         model._tot_jac = self
@@ -1609,10 +1610,10 @@ class _TotalJacInfo(object):
         """
         lin_sol_cache = self.lin_sol_cache
         if key in lin_sol_cache:
-            doutputs = self.output_vec[mode]['linear']
+            doutputs = self.output_vec[mode]
             doutputs.set_val(lin_sol_cache[key])
         else:
-            lin_sol_cache[key] = deepcopy(self.output_vec[mode]['linear'].asarray())
+            lin_sol_cache[key] = deepcopy(self.output_vec[mode].asarray())
 
     def _save_linear_solution(self, key, mode):
         """
@@ -1625,7 +1626,7 @@ class _TotalJacInfo(object):
         mode : str
             Direction of derivative solution.
         """
-        self.lin_sol_cache[key][:] = self.output_vec[mode]['linear'].asarray()
+        self.lin_sol_cache[key][:] = self.output_vec[mode].asarray()
 
     def _do_driver_scaling(self, J):
         """

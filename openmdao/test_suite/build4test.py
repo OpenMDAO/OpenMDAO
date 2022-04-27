@@ -32,10 +32,10 @@ class DynComp(ExplicitComponent):
 
     def setup(self):
         for i in range(self.ninputs):
-            self.add_input('i%d'%i, self.var_factory(*self.vf_args))
+            self.add_input(f'i{i}', self.var_factory(*self.vf_args))
 
         for i in range(self.noutputs):
-            self.add_output("o%d"%i, self.var_factory(*self.vf_args))
+            self.add_output(f'o{i}', self.var_factory(*self.vf_args))
 
     def compute(self, inputs, outputs):
         time.sleep(self.nl_sleep)

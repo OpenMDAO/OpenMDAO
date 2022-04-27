@@ -9,7 +9,6 @@ from collections import defaultdict
 from itertools import chain
 from enum import IntEnum
 
-import re
 from fnmatch import fnmatchcase
 
 from numbers import Integral
@@ -37,8 +36,7 @@ from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, PromotionWarning,\
     UnusedOptionWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, \
-    format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, \
-        _is_slicer_op
+    format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -549,7 +547,7 @@ class System(object):
         return f"<class {type(self).__name__}>"
 
     def _get_inst_id(self):
-        return self.pathname
+        return self.pathname if self.pathname is not None else ''
 
     def abs_name_iter(self, iotype, local=True, cont=True, discrete=False):
         """

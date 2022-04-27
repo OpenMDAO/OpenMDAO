@@ -116,6 +116,7 @@ setup(
         'openmdao.visualization',
         'openmdao.visualization.case_viewer',
         'openmdao.visualization.connection_viewer',
+        'openmdao.visualization.timing_viewer',
         'openmdao.visualization.scaling_viewer',
         'openmdao.visualization.n2_viewer',
         'openmdao.visualization.meta_model_viewer',
@@ -138,6 +139,9 @@ setup(
             '*.html'
         ],
         'openmdao.visualization.connection_viewer': [
+            '*.html',
+        ],
+        'openmdao.visualization.timing_viewer': [
             '*.html',
         ],
         'openmdao.visualization.scaling_viewer': [

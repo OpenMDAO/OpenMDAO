@@ -309,7 +309,7 @@ class BalanceComp(ImplicitComponent):
         if val is None:
             # If user doesn't specify initial guess for val, we can size problem from initial
             # rhs_val.
-            if 'shape' not in kwargs and not np.isscalar(rhs_val):
+            if 'shape' not in kwargs and np.ndim(rhs_val) > 0:
                 kwargs['shape'] = rhs_val.shape
 
         else:

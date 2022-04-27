@@ -29,6 +29,7 @@ from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
 from openmdao.visualization.scaling_viewer.scaling_report import _scaling_setup_parser, \
     _scaling_cmd
+from openmdao.visualization.timing_viewer.timing_viewer import _timing_setup_parser, _timing_cmd
 from openmdao.visualization.dyn_shape_plot import _view_dyn_shapes_setup_parser, \
     _view_dyn_shapes_cmd
 try:
@@ -490,6 +491,7 @@ _command_map = {
                  'Generate a simple scaffold for a component.'),
     'summary': (_config_summary_setup_parser, _config_summary_cmd,
                 'Print a short top-level summary of the problem.'),
+    'timing': (_timing_setup_parser, _timing_cmd, 'Collect timing information for all systems.'),
     'total_coloring': (_total_coloring_setup_parser, _total_coloring_cmd,
                        'Compute a coloring for the total jacobian.'),
     'trace': (_itrace_setup_parser, _itrace_exec, 'Dump trace output.'),
