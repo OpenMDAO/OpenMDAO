@@ -17,7 +17,7 @@ from scipy.sparse import coo_matrix
 try:
     import pyoptsparse
     Optimization = pyoptsparse.Optimization
-except ImportError:
+except Exception:
     Optimization = None
     pyoptsparse = None
 
