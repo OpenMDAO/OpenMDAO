@@ -94,15 +94,14 @@ class HtmlPreprocessor():
     Nothing is written until every directive has been successfully processed.
     """
 
-    def __init__(self, start_filename: str, output_filename: str, start_path: str=None, 
+    def __init__(self, start_filename: str, output_filename: str, start_path: str = None,
                  allow_overwrite=False, var_dict: dict = None, json_dumps_default=None,
                  verbose=False):
         """
         Configure the preprocessor and validate file paths.
         """
-       
         self._start_path = Path(start_filename)
- 
+
         if self._start_path.is_file() is False:
             raise FileNotFoundError(f"Error: {self._start_path} not found")
 
@@ -111,7 +110,8 @@ class HtmlPreprocessor():
             raise FileExistsError(f"Error: {output_filename} already exists")
 
         self._start_filename = start_filename
-        self._start_dirname = self._start_path.resolve().parent if start_path is None else Path(start_path)
+        self._start_dirname = \
+            self._start_path.resolve().parent if start_path is None else Path(start_path)
         self._output_filename = output_filename
         self._allow_overwrite = allow_overwrite
         self._var_dict = var_dict
