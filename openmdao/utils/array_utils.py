@@ -295,13 +295,13 @@ def tile_sparse_jac(data, rows, cols, nrow, ncol, num_nodes):
     """
     nnz = len(rows)
 
-    if np.isscalar(data):
+    if np.ndim(data) == 0:
         data = data * np.ones(nnz)
 
-    if not np.isscalar(nrow):
+    if np.ndim(nrow) > 0:
         nrow = shape_to_len(nrow)
 
-    if not np.isscalar(ncol):
+    if np.ndim(ncol) > 0:
         ncol = shape_to_len(ncol)
 
     repeat_arr = np.repeat(np.arange(num_nodes), nnz)

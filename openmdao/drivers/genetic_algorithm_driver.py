@@ -276,7 +276,7 @@ class SimpleGADriver(Driver):
         for name, meta in desvars.items():
             if name in self._designvars_discrete:
                 val = desvar_vals[name]
-                if np.isscalar(val):
+                if np.ndim(val) == 0:
                     size = 1
                 else:
                     size = len(val)

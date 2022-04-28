@@ -6,7 +6,6 @@ import functools
 
 import numpy as np
 
-import openmdao
 from openmdao.core.constants import _SetupStatus, INF_BOUND
 import openmdao.utils.coloring as coloring_mod
 import openmdao.utils.hooks as hooks
@@ -40,7 +39,7 @@ def _getdef(val, unset):
 def _get_val_and_size(val, unset=''):
     # return val (or max abs val) and the size of the value
     val = _getdef(val, unset)
-    if np.isscalar(val) or val.size == 1:
+    if np.ndim(val) == 0 or val.size == 1:
         return [val, 1]
     return [np.max(np.abs(val)), val.size]
 

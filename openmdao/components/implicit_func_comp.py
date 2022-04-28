@@ -1,5 +1,7 @@
 """Define the ImplicitFuncComp class."""
 
+import sys
+import traceback
 from itertools import chain
 import numpy as np
 from openmdao.core.implicitcomponent import ImplicitComponent
@@ -14,7 +16,10 @@ try:
     from jax import jit, jacfwd, jacrev
     from jax.config import config
     config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
-except ImportError:
+except Exception:
+    _, err, tb = sys.exc_info()
+    if not isinstance(err, ImportError):
+        traceback.print_tb(tb)
     jax = None
 
 

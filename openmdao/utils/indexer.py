@@ -261,12 +261,11 @@ class Indexer(object):
         Indexer
             Self is returned to allow chaining.
         """
-        if self._flat_src is None and shape is not None:
-            self._flat_src = len(shape2tuple(shape)) <= 1
-
         self._src_shape, self._dist_shape, = self._get_shapes(shape, dist_shape)
 
         if shape is not None:
+            if self._flat_src is None:
+                self._flat_src = len(self._src_shape) <= 1
             self._check_bounds()
 
         self._shaped_inst = None
@@ -494,6 +493,8 @@ class ShapedSliceIndexer(Indexer):
         """
         super().__init__(flat_src)
         self._check_ind_type(slc, slice)
+        if slc.step is None:
+            slc = slice(slc.start, slc.stop, 1)
         self._slice = slc
 
     def __call__(self):
@@ -545,11 +546,15 @@ class ShapedSliceIndexer(Indexer):
         ndarray
             The index array.
         """
-        if self._src_shape is None or len(self._src_shape) == 1:
+        if len(self._src_shape) == 1:
             # Case 1: Requested flat or nonflat indices but src_shape is None or flat
             # return a flattened arange
-            # use maxsize here since a shaped slice always has positive int start and stop
-            return np.arange(*self._slice.indices(sys.maxsize), dtype=int)
+            slc = self._slice
+            if slc.stop is None and slc.step < 0:  # special case - neg step down to -1
+                return np.arange(self._src_shape[0], dtype=int)[slc]
+            else:
+                # use maxsize here since a shaped slice always has positive int start and stop
+                return np.arange(*slc.indices(sys.maxsize), dtype=int)
         else:
             src_size = shape_to_len(self._src_shape)
             arr = np.arange(src_size, dtype=int).reshape(self._src_shape)[self._slice].ravel()
@@ -647,7 +652,10 @@ class SliceIndexer(ShapedSliceIndexer):
             return None
 
         slc = self._slice
-        if (slc.start is not None and slc.start < 0) or slc.stop is None or slc.stop < 0:
+        if slc.stop is None and slc.step < 0:  # special backwards indexing case
+            self._shaped_inst = \
+                ShapedSliceIndexer(slc)
+        elif (slc.start is not None and slc.start < 0) or slc.stop is None or slc.stop < 0:
             self._shaped_inst = \
                 ShapedSliceIndexer(slice(*self._slice.indices(self._src_shape[0])))
         else:
@@ -685,8 +693,7 @@ class SliceIndexer(ShapedSliceIndexer):
         """
         slc = self._slice
         if self._flat_src and slc.start is not None and slc.stop is not None:
-            step = 1 if slc.step is None else slc.step
-            return (len(range(slc.start, slc.stop, step)),)
+            return (len(range(slc.start, slc.stop, slc.step)),)
         return super().indexed_src_shape
 
 

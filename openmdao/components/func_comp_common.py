@@ -2,6 +2,8 @@
 Define functions and objects common to the ExplicitFuncComp and ImplicitFuncComp classes.
 """
 
+import sys
+import traceback
 import re
 from functools import partial
 
@@ -12,10 +14,12 @@ try:
     from jax.config import config
     from jax.api_util import argnums_partial
     from jax._src.api import _jvp, _vjp
-    from jax.tree_util import register_pytree_node
     config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
-except ImportError as err:
-    pass
+except Exception:
+    _, err, tb = sys.exc_info()
+    if not isinstance(err, ImportError):
+        traceback.print_tb(tb)
+    jax = None
 
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.vectors.vector import Vector

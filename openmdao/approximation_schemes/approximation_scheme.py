@@ -353,7 +353,7 @@ class ApproximationScheme(object):
                 # run the finite difference
                 result = self._run_point(system, vec_ind_list, data, results_array, total_or_semi)
 
-                if par_fd_w_serial_model or not is_parallel:
+                if par_fd_w_serial_model or not use_parallel_fd:
                     result = self._transform_result(result)
 
                     if mult != 1.0:
