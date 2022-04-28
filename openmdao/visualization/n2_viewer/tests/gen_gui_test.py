@@ -14,8 +14,8 @@ except ImportError:
     from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 # set DEBUG to True if you want to view the generated HTML file
-GUI_TEST_SUBDIR = '/tmp'
 GUI_DIAG_SUFFIX = '_GEN_TEST.html'
+GUI_TEST_SUBDIR = 'gui_test_models'
 URL_PREFIX = 'file://'
 DEBUG = False
 LINE_STR = '-' * 78
@@ -199,8 +199,7 @@ class gen_gui_test_case(_GuiTestCase):
     def generate_html_file(self):
         """ Generate HTML file for a generic model. """
         self.parentDir = os.path.dirname(os.path.realpath(__file__))
-        self.outputDir = GUI_TEST_SUBDIR
-
+        self.outputDir = os.path.join(self.parentDir, GUI_TEST_SUBDIR)
         self.scripts = gen_gui_test_scripts
 
         self.diagram_file = os.path.join(self.outputDir, f"gen_diag{GUI_DIAG_SUFFIX}")
