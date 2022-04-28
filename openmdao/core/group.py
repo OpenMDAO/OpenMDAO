@@ -2244,12 +2244,6 @@ class Group(System):
                     lst.extend(inputs)
                 raise err.__class__(f"{self.msginfo}: When promoting {sorted(lst)}: {err}")
 
-            if flat_src_indices and _is_slicer_op(src_indices):
-                promoted = inputs if inputs else any
-                issue_warning(f"When promoting {promoted}, slice src_indices were "
-                              "specified, so flat_src_indices is ignored.", prefix=self.msginfo,
-                              category=UnusedOptionWarning)
-
         subsys = getattr(self, subsys_name)
         if any:
             subsys._var_promotes['any'].extend((a, prominfo) for a in any)

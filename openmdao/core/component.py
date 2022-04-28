@@ -508,8 +508,7 @@ class Component(System):
                 raise ValueError("%s: Setting of 'src_indices' along with 'shape_by_conn' or "
                                  "'copy_shape' for variable '%s' is currently unsupported." %
                                  (self.msginfo, name))
-
-        if not (shape_by_conn or copy_shape):
+        else:
             # value, shape: based on args, making sure they are compatible
             val, shape = ensure_compatible(name, val, shape, src_indices)
 

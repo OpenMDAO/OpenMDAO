@@ -6,6 +6,7 @@ import sys
 import numpy as np
 from contextlib import contextmanager
 from collections import Counter
+from inspect import signature
 
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group

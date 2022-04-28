@@ -1,15 +1,19 @@
 """Some miscellaneous utility functions."""
-from contextlib import contextmanager
 import os
 import re
 import sys
 import warnings
 import unittest
+import atexit
+from contextlib import contextmanager
+from functools import wraps, partial
+from inspect import signature
 from fnmatch import fnmatchcase
 from io import StringIO
 from numbers import Number, Integral
 
 from collections.abc import Iterable
+from collections import Counter, defaultdict
 
 import numpy as np
 
@@ -20,6 +24,75 @@ from openmdao.utils.array_utils import shape_to_len
 # Certain command line tools can make use of this to allow visualization of models when errors
 # are present that would normally cause setup to abort.
 _ignore_errors = False
+
+_float_inf = float('inf')
+_total_arg_type_counts = defaultdict(dict)
+
+
+def _dump_typ_counts():
+    """
+    Take any collected arg type counts and print them out.
+    """
+    global _total_arg_type_counts
+    if _total_arg_type_counts:
+        for funcname, counters in _total_arg_type_counts.items():
+            keep = False
+            for counter in counters.values():
+                if counter:
+                    keep = True
+                    break
+            if keep:
+                print("Function", funcname)
+                for argname, counter in counters.items():
+                    if counter:
+                        print(f"{argname}:", counter.most_common())
+
+
+# register _dump_typ_counts before any save_arg_type_counts is called so _dump_typ_counts will
+# always be called last.
+atexit.register(_dump_typ_counts)
+
+
+def _save_typ_counts_atexit(funcname, type_counts):
+    global _total_arg_type_counts
+    counts = _total_arg_type_counts[funcname]
+    if not counts:
+        for n, c in type_counts:
+            counts[n] = c
+    else:
+        cdict = counts
+        for n, cnt in type_counts:
+            if n not in cdict:
+                cdict[n] = cnt
+            else:
+                cdict[n].update(cnt)
+
+
+def save_arg_type_counts(fnc):
+    """
+    Keep track of the count of the types passed as each argument of a decorated function.
+
+    Parameters
+    ----------
+    fnc : function
+        The function to be decorated.
+
+    Returns
+    -------
+    function
+        The function wrapper.
+    """
+    _typcounts = [(n, Counter()) for n in signature(fnc).parameters]
+    atexit.register(partial(_save_typ_counts_atexit, fnc.__name__, _typcounts))
+
+    @wraps(fnc)
+    def _wrap(*args, **kwargs):
+        for i, a in enumerate(args):
+            _typcounts[i][1][type(a).__name__] += 1
+        for i, val in enumerate(kwargs.values()):
+            _typcounts[i][1][type(val).__name__] += 1
+        return fnc(*args, **kwargs)
+    return _wrap
 
 
 def _convert_auto_ivc_to_conn_name(conns_dict, name):
@@ -135,6 +208,7 @@ def simple_warning(msg, category=UserWarning, stacklevel=2):
         warnings.formatwarning = old_format
 
 
+# @save_arg_type_counts
 def ensure_compatible(name, value, shape=None, indices=None):
     """
     Make value compatible with the specified shape or the shape of indices.
@@ -333,6 +407,7 @@ def set_pyoptsparse_opt(optname, fallback=True):
     return OPT, OPTIMIZER
 
 
+# @save_arg_type_counts
 def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
     """
     Format array option values.
@@ -366,26 +441,27 @@ def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
         If values is scalar, not None, and not a Number.
     """
     # Convert adder to ndarray/float as necessary
-    if isinstance(values, np.ndarray):
-        if flatten:
-            values = values.flatten()
-    elif not isinstance(values, str) \
-            and isinstance(values, Iterable):
-        values = np.asarray(values, dtype=float)
+    if isinstance(values, float):
+        if values == _float_inf:
+            values = INF_BOUND
+        elif values == -_float_inf:
+            values = -INF_BOUND
+    elif isinstance(values, np.ndarray):
         if flatten:
             values = values.flatten()
     elif values is None:
         values = val_if_none
-    elif values == float('inf'):
-        values = INF_BOUND
-    elif values == -float('inf'):
-        values = -INF_BOUND
-    elif isinstance(values, Number):
-        values = float(values)
+    elif isinstance(values, Iterable) and not isinstance(values, str):
+        values = np.asarray(values, dtype=float)
+        if flatten:
+            values = values.flatten()
     else:
-        raise TypeError('Expected values of {0} to be an Iterable of '
-                        'numeric values, or a scalar numeric value. '
-                        'Got {1} instead.'.format(name, values))
+        try:
+            values = float(values)
+        except Exception:
+            raise TypeError(f'Expected values of {name} to be an Iterable of '
+                            'numeric values, or a scalar numeric value. '
+                            f'Got {values} instead.')
     return values
 
 
@@ -797,6 +873,7 @@ def default_noraise(o):
         return f"unserializable object ({type(o).__name__})"
 
 
+# @save_arg_type_counts
 def make_set(str_data, name=None):
     """
     Construct a set containing the specified character strings.
@@ -970,6 +1047,7 @@ def common_subpath(pathnames):
     return ''
 
 
+# @save_arg_type_counts
 def _is_slicer_op(indices):
     """
     Check if an indexer contains a slice or ellipsis operator.
@@ -1087,6 +1165,7 @@ def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shap
         return parent_src_inds.shaped_array(flat=False).reshape(my_src_shape)[my_src_inds()]
 
 
+# @save_arg_type_counts
 def shape2tuple(shape):
     """
     Return shape as a tuple.
@@ -1098,19 +1177,21 @@ def shape2tuple(shape):
 
     Returns
     -------
-    tuple
-        The shape as a tuple.
+    tuple or None
+        The shape as a tuple or None if shape is None.
     """
-    if isinstance(shape, int):
-        return (shape,)
-    elif isinstance(shape, tuple):
+    if isinstance(shape, tuple):
         return shape
+    elif isinstance(shape, int):
+        return (shape,)
     elif shape is None:
-        return None
+        return shape
     else:
         try:
             return tuple(shape)
         except TypeError:
+            if not isinstance(shape, Integral):
+                raise TypeError(f"{type(shape).__name__} is not a valid shape type.")
             return (shape,)
 
 
