@@ -134,6 +134,7 @@ setup(
             'style/*',
             'tests/*.js',
             'tests/*.json',
+            'tests/*.html',
             'tests/gui_test_models/*.py',
             '*.html'
         ],

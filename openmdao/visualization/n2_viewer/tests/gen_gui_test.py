@@ -14,7 +14,7 @@ except ImportError:
     from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 # set DEBUG to True if you want to view the generated HTML file
-GUI_TEST_SUBDIR = 'gui_test_models'
+GUI_TEST_SUBDIR = '/tmp'
 GUI_DIAG_SUFFIX = '_GEN_TEST.html'
 URL_PREFIX = 'file://'
 DEBUG = False
@@ -199,20 +199,23 @@ class gen_gui_test_case(_GuiTestCase):
     def generate_html_file(self):
         """ Generate HTML file for a generic model. """
         self.parentDir = os.path.dirname(os.path.realpath(__file__))
-        self.modelDir = os.path.join(self.parentDir, GUI_TEST_SUBDIR)
+        self.outputDir = GUI_TEST_SUBDIR
 
         self.scripts = gen_gui_test_scripts
 
-        self.diagram_file = os.path.join(self.modelDir, f"gen_diag{GUI_DIAG_SUFFIX}")
+        self.diagram_file = os.path.join(self.outputDir, f"gen_diag{GUI_DIAG_SUFFIX}")
         pyfile = os.path.join(self.parentDir, 'create_generic_model.py')
         print("Creating " + self.diagram_file)
 
         cmd = ['python', pyfile, self.diagram_file]
-        subprocess.run(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE)  # nosec: trusted input
+        cp = subprocess.run(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE)  # nosec: trusted input
+
+        if (cp.returncode != 0):
+            raise RuntimeError(f"Failed to create HTML file with generic model ({cp.stderr}).")
 
     async def load_test_page(self):
         """ Load the specified HTML file from the local filesystem. """
-        url = URL_PREFIX + '/' + self.diagram_file
+        url = URL_PREFIX + self.diagram_file
 
         # Without wait_until: 'networkidle', processing will begin before
         # the page is fully rendered
