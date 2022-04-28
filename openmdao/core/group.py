@@ -2008,17 +2008,25 @@ class Group(System):
                         # initial dimensions of indices shape must be same shape as target
                         for idx_d, inp_d in zip(src_indices.indexed_src_shape, in_shape):
                             if idx_d != inp_d:
-                                msg = f"{self.msginfo}: The source indices " + \
-                                      f"{meta_in['src_indices']} do not specify a " + \
-                                      f"valid shape for the connection '{abs_out}' to " + \
-                                      f"'{abs_in}'. The target shape is " + \
-                                      f"{in_shape} but indices are shape " + \
-                                      f"{src_indices.indexed_src_shape}."
+                                msg = (f"{self.msginfo}: The source indices "
+                                       f"{meta_in['src_indices']} do not specify a "
+                                       f"valid shape for the connection '{abs_out}' to "
+                                       f"'{abs_in}'. The target shape is "
+                                       f"{in_shape} but indices are shape "
+                                       f"{src_indices.indexed_src_shape}.")
                                 if self._raise_connection_errors:
                                     raise ValueError(msg)
                                 else:
                                     issue_warning(msg, category=SetupWarning)
                                     continue
+                        else:
+                            msg = (f"{self.msginfo}: src_indices shape "
+                                   f"{src_indices.indexed_src_shape} does not match {abs_in} shape "
+                                   f"{in_shape}.")
+                            if self._raise_connection_errors:
+                                raise ValueError(msg)
+                            else:
+                                issue_warning(msg, category=SetupWarning)
 
                     # any remaining dimension of indices must match shape of source
                     if not src_indices._flat_src and (len(src_indices.indexed_src_shape) >
@@ -2033,15 +2041,6 @@ class Group(System):
                         else:
                             issue_warning(msg, category=SetupWarning)
                             continue
-
-                    if src_indices.indexed_src_size != shape_to_len(in_shape):
-                        msg = f"{self.msginfo}: src_indices shape " + \
-                              f"{src_indices.indexed_src_shape} does not match {abs_in} shape " + \
-                              f"{in_shape}."
-                        if self._raise_connection_errors:
-                            raise ValueError(msg)
-                        else:
-                            issue_warning(msg, category=SetupWarning)
 
     def _set_subsys_connection_errors(self, val=True):
         """

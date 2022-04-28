@@ -4,7 +4,6 @@ Utils for dealing with arrays.
 import sys
 from itertools import product
 from copy import copy
-from numbers import Integral
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -12,9 +11,26 @@ from scipy.sparse import coo_matrix
 from openmdao.core.constants import INT_DTYPE
 
 
-if False:  # sys.version_info >= (3, 8):
-    import math
-    shape_to_len = math.prod
+if sys.version_info >= (3, 8):
+    from math import prod
+
+    def shape_to_len(shape):
+        """
+        Compute length given a shape tuple.
+
+        Parameters
+        ----------
+        shape : tuple of int or None
+            Numpy shape tuple.
+
+        Returns
+        -------
+        int
+            Length of array.
+        """
+        if shape is None:
+            return None
+        return prod(shape)
 else:
     def shape_to_len(shape):
         """
@@ -24,7 +40,7 @@ else:
 
         Parameters
         ----------
-        shape : tuple
+        shape : tuple of int
             Numpy shape tuple.
 
         Returns
@@ -32,11 +48,10 @@ else:
         int
             Length of multidimensional array.
         """
-        # if shape is None:
-        #     return None
+        if shape is None:
+            return None
 
         length = 1
-        #if not isinstance(shape, Integral):
         for dim in shape:
             length *= dim
 
@@ -357,6 +372,26 @@ def get_input_idx_split(full_idxs, inputs, outputs, use_full_cols, is_total):
         return [(outputs, full_idxs)]
     else:
         return [(inputs, full_idxs)]
+
+
+def convert_neg(arr, size):
+    """
+    Convert negative indices based on full array size.
+
+    Parameters
+    ----------
+    arr : ndarray
+        The index array.
+    size : int
+        The full size of the array.
+
+    Returns
+    -------
+    ndarray
+        The array with negative indices converted to positive.
+    """
+    arr[arr < 0] += size
+    return arr
 
 
 def _flatten_src_indices(src_indices, shape_in, shape_out, size_out):

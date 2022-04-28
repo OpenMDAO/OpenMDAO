@@ -28,7 +28,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
 from openmdao.utils.variable_table import write_var_table
-from openmdao.utils.array_utils import evenly_distrib_idxs
+from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len
 from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
@@ -5432,7 +5432,7 @@ class System(object):
         high_dims = meta['shape'][1:]
         with multi_proc_exception_check(self.comm):
             if high_dims:
-                high_size = np.prod(high_dims)
+                high_size = shape_to_len(high_dims)
 
                 dim_size_match = bool(global_size % high_size == 0)
                 if dim_size_match is False:

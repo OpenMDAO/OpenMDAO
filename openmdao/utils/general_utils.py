@@ -7,16 +7,15 @@ import warnings
 import unittest
 from fnmatch import fnmatchcase
 from io import StringIO
-from numbers import Number
+from numbers import Number, Integral
 
 from collections.abc import Iterable
-
-import numbers
 
 import numpy as np
 
 from openmdao.core.constants import INT_DTYPE, INF_BOUND
 from openmdao.utils.om_warnings import issue_warning, _warn_simple_format, warn_deprecation
+from openmdao.utils.array_utils import shape_to_len
 
 # Certain command line tools can make use of this to allow visualization of models when errors
 # are present that would normally cause setup to abort.
@@ -169,7 +168,7 @@ def ensure_compatible(name, value, shape=None, indices=None):
 
     # if shape is not given, infer from value (if not scalar) or indices
     if shape is not None:
-        if isinstance(shape, numbers.Integral):
+        if isinstance(shape, Integral):
             shape = (shape,)
         elif isinstance(shape, list):
             shape = tuple(shape)
@@ -185,7 +184,7 @@ def ensure_compatible(name, value, shape=None, indices=None):
         except (RuntimeError, ValueError, TypeError):
             pass  # use shape provided or shape of value and check vs. shape of indices later
         else:
-            if shape is not None and np.product(indshape) != np.product(shape):
+            if shape is not None and shape_to_len(indshape) != shape_to_len(shape):
                 raise ValueError(f"Shape of indices {indshape} does not match shape of {shape} for"
                                  f" '{name}'.")
             if shape is None:
@@ -381,7 +380,7 @@ def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
         values = INF_BOUND
     elif values == -float('inf'):
         values = -INF_BOUND
-    elif isinstance(values, numbers.Number):
+    elif isinstance(values, Number):
         values = float(values)
     else:
         raise TypeError('Expected values of {0} to be an Iterable of '
@@ -1102,11 +1101,17 @@ def shape2tuple(shape):
     tuple
         The shape as a tuple.
     """
-    if isinstance(shape, Number):
+    if isinstance(shape, int):
         return (shape,)
-    elif shape is None:
+    elif isinstance(shape, tuple):
         return shape
-    return tuple(shape)
+    elif shape is None:
+        return None
+    else:
+        try:
+            return tuple(shape)
+        except TypeError:
+            return (shape,)
 
 
 def get_connection_owner(system, tgt):

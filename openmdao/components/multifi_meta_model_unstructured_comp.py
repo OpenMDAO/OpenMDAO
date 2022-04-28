@@ -4,6 +4,7 @@ from itertools import chain
 import numpy as np
 
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
+from openmdao.utils.array_utils import shape_to_len
 
 
 def _get_name_fi(name, fi_index):
@@ -316,7 +317,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         # add training data for each output
         outputs = self._nfi * [None]
         for name_root, shape in self._surrogate_output_names:
-            output_size = np.prod(shape)
+            output_size = shape_to_len(shape)
             for fi in range(self._nfi):
                 name_fi = _get_name_fi(name_root, fi)
                 outputs[fi] = np.zeros((num_sample[fi], output_size))
