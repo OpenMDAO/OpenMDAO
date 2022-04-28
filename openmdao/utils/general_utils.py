@@ -4,20 +4,16 @@ import re
 import sys
 import warnings
 import unittest
-import atexit
 from contextlib import contextmanager
-from functools import wraps, partial
-from inspect import signature
 from fnmatch import fnmatchcase
 from io import StringIO
-from numbers import Number, Integral
+from numbers import Integral
 
 from collections.abc import Iterable
-from collections import Counter, defaultdict
 
 import numpy as np
 
-from openmdao.core.constants import INT_DTYPE, INF_BOUND
+from openmdao.core.constants import INF_BOUND
 from openmdao.utils.om_warnings import issue_warning, _warn_simple_format, warn_deprecation
 from openmdao.utils.array_utils import shape_to_len
 
