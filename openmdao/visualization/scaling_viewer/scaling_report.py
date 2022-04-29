@@ -387,11 +387,13 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
         # save old totals
         save = driver._total_jac
         driver._total_jac = None
+        prob = driver._problem()
 
         coloring = driver._get_static_coloring()
         if coloring_mod._use_total_sparsity:
             if coloring is None and driver._coloring_info['dynamic']:
-                coloring = coloring_mod.dynamic_total_coloring(driver)
+                coloring = coloring_mod.dynamic_total_coloring(driver,
+                                                               run_model=prob._run_counter < 0)
 
         # assemble data for jacobian visualization
         data['oflabels'] = driver._get_ordered_nl_responses()

@@ -284,7 +284,6 @@ run_n2_report = _run_n2_report_enclosing()
 
 # scaling report definition
 def _run_scaling_report_enclosing():
-    # def run_scaling_report_inner(driver):
     def run_scaling_report_inner(driver, report_filename=None):
 
         prob = driver._problem()
@@ -335,13 +334,13 @@ def setup_default_reports():
         return
 
     if 'OPENMDAO_REPORTS' in os.environ:
-        if os.environ['OPENMDAO_REPORTS'] in ['0', 'false', 'off', "none"]:
+        if os.environ['OPENMDAO_REPORTS'].lower() in ['0', 'false', 'off', "none"]:
             return  # do not do any reports
 
-        if os.environ['OPENMDAO_REPORTS'] in ['1', 'true', 'on', "all"]:
+        if os.environ['OPENMDAO_REPORTS'].lower() in ['1', 'true', 'on', "all"]:
             reports_on = _default_reports.keys()
         else:
-            reports_on = os.environ['OPENMDAO_REPORTS'].split(',')
+            reports_on = [s.strip() for s in os.environ['OPENMDAO_REPORTS'].split(',') if s.stip()]
     else:  # if no env set, all reports are on
         reports_on = _default_reports.keys()
 
