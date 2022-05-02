@@ -565,5 +565,9 @@ def _scaling_cmd(options, user_args):
     import atexit
     atexit.register(functools.partial(_exitfunc, options.problem))
 
+    from openmdao.utils.reports_system import _register_cmdline_report
+    # tell report system not to duplicate effort
+    _register_cmdline_report('scaling')
+
     ignore_errors(True)
     _load_and_exec(options.file[0], user_args)

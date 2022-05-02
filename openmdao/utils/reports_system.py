@@ -19,6 +19,7 @@ from openmdao.core.driver import Driver
 # Keeping track of the registered reports
 _Report = namedtuple('Report', 'func desc class_name inst_id method pre_or_post report_filename')
 _reports_registry = {}
+_cmdline_reports = set()  # cmdline reports can be registered here to prevent default reports
 
 _reports_dir = './reports'  # the default location for the reports
 
@@ -26,6 +27,11 @@ _reports_dir = './reports'  # the default location for the reports
 def _is_rank_0(prob):
     # Utility function to determine if MPI and on rank0 or not on MPI at all
     return not MPI or prob.comm.rank == 0
+
+
+def _register_cmdline_report(name):
+    global _cmdline_reports
+    _cmdline_reports.add(name)
 
 
 def report_function():
@@ -236,13 +242,15 @@ def clear_reports():
 def _should_report_run(reports, report_name):
     # Utility function that checks the _reports attribute on Problem
     #   to determine whether the report named "report_name" should be run
+    if report_name in _cmdline_reports:
+        return False
+
     if isinstance(reports, str):
-        reports_on = reports.split(',')
+        reports_on = [r.strip() for r in reports.split(',') if r.strip()]
         if report_name not in reports_on:
             return False
     elif isinstance(reports, bool):
-        if not reports:
-            return False
+        return reports
     elif reports is None:
         return False
 
@@ -340,7 +348,7 @@ def setup_default_reports():
         if os.environ['OPENMDAO_REPORTS'].lower() in ['1', 'true', 'on', "all"]:
             reports_on = _default_reports.keys()
         else:
-            reports_on = [s.strip() for s in os.environ['OPENMDAO_REPORTS'].split(',') if s.stip()]
+            reports_on = [s.strip() for s in os.environ['OPENMDAO_REPORTS'].split(',') if s.strip()]
     else:  # if no env set, all reports are on
         reports_on = _default_reports.keys()
 
