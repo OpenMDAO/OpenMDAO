@@ -38,7 +38,7 @@ optional_dependencies = {
         'numpydoc>=1.1',
         'pycodestyle>=2.4.0',
         'pydocstyle==2.0.0',
-        'testflo>=1.3.6'
+        'testflo>=1.3.6',
         'websockets>8',
         'aiounittest',
         'playwright>=1.20'
