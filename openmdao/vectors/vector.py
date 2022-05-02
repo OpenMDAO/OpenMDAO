@@ -734,11 +734,17 @@ class _CompMatVecWrapper(object):
 
     def __init__(self, vec):
         self._vec = vec
+        
+    def __contains__(self, name):
+        return name in self._vec
 
     def __getitem__(self, name):
         absname = self._vec._name2abs_name(name)
         if absname is not None:
-            return self._vec._views[absname]
+            if self._under_complex_step:
+                return self._vec._views[absname]
+            else:
+                return self._vec._views[absname].real
 
         # call the wrapped vector to get the error message
         self._vec[name]

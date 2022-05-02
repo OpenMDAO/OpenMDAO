@@ -20,33 +20,21 @@ class MyParaboloid(Paraboloid):
         """Analytical derivatives."""
         pass
 
-    def compute_full_jacvec_product(self, inputs, dinputs, doutputs, mode):
+    def compute_jacvec_product(self, inputs, dinputs, doutputs, mode):
         x = inputs['x'][0]
         y = inputs['y'][0]
 
-        print("computing full JVP, dinput rels:", list(dinputs._names), "doutput rels", list(doutputs._names))
-
         if mode == 'fwd':
-            return np.array([(2.0*x - 6.0 + y)*dinputs['x'][0] + (2.0*y + 8.0 + x)*dinputs['y'][0]])
-        else:  # rev
-            return np.array([(2.0*x - 6.0 + y)*doutputs['f_xy'][0], (2.0*y + 8.0 + x)*doutputs['f_xy'][0]])
-
-    def compute_jacvec_product(self, inputs, dinputs, doutputs, mode):
-        full = self.get_full_jacvec_product(inputs, dinputs, doutputs, mode)
-
-        if mode == 'fwd':
-            # if 'x' in dinputs:
-            #     doutputs['f_xy'] += full['f_xy']
-            # if 'y' in dinputs:
-            #     doutputs['f_xy'] += full['f_xy']
-            doutputs.iadd(full)
+            if 'x' in dinputs:
+                doutputs['f_xy'] += (2.0*x - 6.0 + y)*dinputs['x']
+            if 'y' in dinputs:
+                doutputs['f_xy'] += (2.0*y + 8.0 + x)*dinputs['y']
 
         elif mode == 'rev':
-            # if 'x' in dinputs:
-            #     dinputs['x'] += full['x']
-            # if 'y' in dinputs:
-            #     dinputs['y'] += full['y']
-            dinputs.iadd(full)
+            if 'x' in dinputs:
+                dinputs['x'] += (2.0*x - 6.0 + y)*doutputs['f_xy']
+            if 'y' in dinputs:
+                dinputs['y'] += (2.0*y + 8.0 + x)*doutputs['f_xy']
 
 
 def execute_model(mode):
@@ -59,7 +47,7 @@ def execute_model(mode):
     sub1.add_subsystem('c1', om.ExecComp(exprs=['y = x']))
 
     sub2 = sub1.add_subsystem('sub2', om.Group())
-    sub2.add_subsystem('comp', MyParaboloid())
+    comp = sub2.add_subsystem('comp', MyParaboloid(matrix_free_caching=True))
 
     model.connect('indeps.dv1', ['sub1.c1.x', 'sub1.sub2.comp.x'])
     sub1.connect('c1.y', 'sub2.comp.y')
@@ -87,4 +75,4 @@ class TestLinOpCaching(unittest.TestCase):
         execute_model('rev')
 
 if __name__ == '__main__':
-    execute_model('fwd')
+    execute_model('rev')

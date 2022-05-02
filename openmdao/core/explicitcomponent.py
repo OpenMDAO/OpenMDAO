@@ -361,6 +361,18 @@ class ExplicitComponent(Component):
         """
         J = self._jacobian if jac is None else jac
 
+        matfreecache = self.options['matrix_free_caching']
+        clear = not matfreecache
+        print(self.pathname, "matfree_cache:", matfreecache)
+
+        d_inputs = self._vectors['input']['linear']
+        d_resids = self._vectors['residual']['linear']
+        changed = clear or self.seed_changed(self._inputs, d_inputs, d_resids, mode)
+        if changed:
+            pass
+        else:
+            print("USE CACHE")
+
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
             d_inputs, d_outputs, d_residuals = vecs
 
@@ -416,10 +428,13 @@ class ExplicitComponent(Component):
                                         val = oflat(v)
                                         val -= rflat(v)
 
-                    # We used to negate the residual here, and then re-negate after the hook
-                    with self._call_user_function('compute_jacvec_product'):
-                        self._compute_jacvec_product_wrapper(ins, dins, dres, mode,
-                                                             self._discrete_inputs)
+                    if changed:
+                        # We used to negate the residual here, and then re-negate after the hook
+                        with self._call_user_function('compute_jacvec_product'):
+                            self._compute_jacvec_product_wrapper(ins, dins, dres, mode,
+                                                                self._discrete_inputs)
+                    else:
+                        print("SKIPPING", self.pathname)
                 finally:
                     d_inputs.read_only = d_residuals.read_only = False
 
