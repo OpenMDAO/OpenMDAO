@@ -1,26 +1,27 @@
 """Some miscellaneous utility functions."""
-from contextlib import contextmanager
 import os
 import re
 import sys
 import warnings
 import unittest
+from contextlib import contextmanager
 from fnmatch import fnmatchcase
 from io import StringIO
-from numbers import Number
+from numbers import Integral
 
 from collections.abc import Iterable
 
-import numbers
-
 import numpy as np
 
-from openmdao.core.constants import INT_DTYPE, INF_BOUND
+from openmdao.core.constants import INF_BOUND
 from openmdao.utils.om_warnings import issue_warning, _warn_simple_format, warn_deprecation
+from openmdao.utils.array_utils import shape_to_len
 
 # Certain command line tools can make use of this to allow visualization of models when errors
 # are present that would normally cause setup to abort.
 _ignore_errors = False
+
+_float_inf = float('inf')
 
 
 def _convert_auto_ivc_to_conn_name(conns_dict, name):
@@ -169,7 +170,7 @@ def ensure_compatible(name, value, shape=None, indices=None):
 
     # if shape is not given, infer from value (if not scalar) or indices
     if shape is not None:
-        if isinstance(shape, numbers.Integral):
+        if isinstance(shape, Integral):
             shape = (shape,)
         elif isinstance(shape, list):
             shape = tuple(shape)
@@ -178,16 +179,16 @@ def ensure_compatible(name, value, shape=None, indices=None):
 
     if indices is not None:
         if not indices._flat_src and shape is None:
-            raise RuntimeError("src_indices for '%s' is not flat, so its input "
-                               "shape must be provided." % name)
+            raise RuntimeError(f"src_indices for '{name}' is not flat, so its input "
+                               "shape must be provided.")
         try:
             indshape = indices.indexed_src_shape
         except (RuntimeError, ValueError, TypeError):
             pass  # use shape provided or shape of value and check vs. shape of indices later
         else:
-            if shape is not None and np.product(indshape) != np.product(shape):
-                raise ValueError("Shape of indices %s does not match shape of %s for '%s'." %
-                                 (indshape, shape, name))
+            if shape is not None and shape_to_len(indshape) != shape_to_len(shape):
+                raise ValueError(f"Shape of indices {indshape} does not match shape of {shape} for"
+                                 f" '{name}'.")
             if shape is None:
                 shape = indshape
 
@@ -203,8 +204,8 @@ def ensure_compatible(name, value, shape=None, indices=None):
         else:
             value = np.atleast_1d(value).astype(np.float64)
             if value.shape != shape:
-                raise ValueError("Incompatible shape for '%s': Expected %s but got %s." %
-                                 (name, shape, value.shape))
+                raise ValueError(f"Incompatible shape for '{name}': Expected {shape} but got "
+                                 f"{value.shape}.")
 
     return value, shape
 
@@ -367,26 +368,27 @@ def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
         If values is scalar, not None, and not a Number.
     """
     # Convert adder to ndarray/float as necessary
-    if isinstance(values, np.ndarray):
-        if flatten:
-            values = values.flatten()
-    elif not isinstance(values, str) \
-            and isinstance(values, Iterable):
-        values = np.asarray(values, dtype=float)
+    if isinstance(values, float):
+        if values == _float_inf:
+            values = INF_BOUND
+        elif values == -_float_inf:
+            values = -INF_BOUND
+    elif isinstance(values, np.ndarray):
         if flatten:
             values = values.flatten()
     elif values is None:
         values = val_if_none
-    elif values == float('inf'):
-        values = INF_BOUND
-    elif values == -float('inf'):
-        values = -INF_BOUND
-    elif isinstance(values, numbers.Number):
-        values = float(values)
+    elif isinstance(values, Iterable) and not isinstance(values, str):
+        values = np.asarray(values, dtype=float)
+        if flatten:
+            values = values.flatten()
     else:
-        raise TypeError('Expected values of {0} to be an Iterable of '
-                        'numeric values, or a scalar numeric value. '
-                        'Got {1} instead.'.format(name, values))
+        try:
+            values = float(values)
+        except Exception:
+            raise TypeError(f'Expected values of {name} to be an Iterable of '
+                            'numeric values, or a scalar numeric value. '
+                            f'Got {values} instead.')
     return values
 
 
@@ -1099,14 +1101,22 @@ def shape2tuple(shape):
 
     Returns
     -------
-    tuple
-        The shape as a tuple.
+    tuple or None
+        The shape as a tuple or None if shape is None.
     """
-    if isinstance(shape, Number):
+    if isinstance(shape, tuple):
+        return shape
+    elif isinstance(shape, int):
         return (shape,)
     elif shape is None:
         return shape
-    return tuple(shape)
+    else:
+        try:
+            return tuple(shape)
+        except TypeError:
+            if not isinstance(shape, Integral):
+                raise TypeError(f"{type(shape).__name__} is not a valid shape type.")
+            return (shape,)
 
 
 def get_connection_owner(system, tgt):

@@ -3,15 +3,12 @@ Classes that handle array indexing.
 """
 
 import sys
-if sys.version_info >= (3, 8):
-    from math import prod
-else:
-    from numpy import prod
 import numpy as np
 from numbers import Integral
 from itertools import zip_longest
 
 from openmdao.utils.general_utils import shape2tuple
+from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.om_warnings import issue_warning, OMDeprecationWarning
 
 
@@ -162,7 +159,7 @@ class Indexer(object):
             raise RuntimeError(f"Can't get indexed_src_shape of {self} because source shape "
                                "is unknown.")
         if self._flat_src:
-            return resolve_shape(np.product(self._src_shape, dtype=int))[self.flat()]
+            return resolve_shape(shape_to_len(self._src_shape))[self.flat()]
         else:
             return resolve_shape(self._src_shape)[self()]
 
@@ -176,7 +173,7 @@ class Indexer(object):
         int
             Size of flattened indices.
         """
-        return np.product(self.indexed_src_shape, dtype=int)
+        return shape_to_len(self.indexed_src_shape)
 
     def _check_ind_type(self, ind, types):
         if not isinstance(ind, types):
@@ -264,12 +261,11 @@ class Indexer(object):
         Indexer
             Self is returned to allow chaining.
         """
-        if self._flat_src is None and shape is not None:
-            self._flat_src = len(shape2tuple(shape)) <= 1
-
         self._src_shape, self._dist_shape, = self._get_shapes(shape, dist_shape)
 
         if shape is not None:
+            if self._flat_src is None:
+                self._flat_src = len(self._src_shape) <= 1
             self._check_bounds()
 
         self._shaped_inst = None
@@ -288,14 +284,14 @@ class Indexer(object):
 
         shape = shape2tuple(shape)
         if self._flat_src:
-            shape = (np.product(shape, dtype=int),)
+            shape = (shape_to_len(shape),)
 
         if dist_shape is None:
             return shape, shape
 
         dist_shape = shape2tuple(dist_shape)
         if self._flat_src:
-            dist_shape = (np.product(dist_shape, dtype=int),)
+            dist_shape = (shape_to_len(dist_shape),)
 
         return shape, dist_shape
 
@@ -560,8 +556,7 @@ class ShapedSliceIndexer(Indexer):
                 # use maxsize here since a shaped slice always has positive int start and stop
                 return np.arange(*slc.indices(sys.maxsize), dtype=int)
         else:
-            # TODO: get rid of int() after we drop python 3.7 support
-            src_size = int(prod(self._src_shape))
+            src_size = shape_to_len(self._src_shape)
             arr = np.arange(src_size, dtype=int).reshape(self._src_shape)[self._slice].ravel()
             if flat:
                 # Case 2: Requested flattened indices of multidimensional array
@@ -611,7 +606,7 @@ class ShapedSliceIndexer(Indexer):
         if self._src_shape is not None:
             start = self._slice.start
             stop = self._slice.stop
-            sz = np.product(self._dist_shape, dtype=int)
+            sz = shape_to_len(self._dist_shape)
             if (start is not None and (start >= sz or start < -sz)
                     or (stop is not None and (stop > sz or stop < -sz))):
                 raise IndexError(f"{self._slice} is out of bounds of the source shape "
@@ -826,7 +821,7 @@ class ShapedArrayIndexer(Indexer):
         Check that indices are within the bounds of the source shape.
         """
         if self._src_shape is not None and self._arr.size > 0:
-            src_size = np.product(self._dist_shape, dtype=int)
+            src_size = shape_to_len(self._dist_shape)
             amax = np.max(self._arr)
             ob = None
             if amax >= src_size or -amax < -src_size:
@@ -1003,8 +998,7 @@ class ShapedMultiIndexer(Indexer):
         if self._src_shape is None:
             raise ValueError(f"Can't determine extent of array because source shape is not known.")
 
-        idxs = np.arange(np.product(self._src_shape, dtype=int),
-                         dtype=np.int32).reshape(self._src_shape)
+        idxs = np.arange(shape_to_len(self._src_shape), dtype=np.int32).reshape(self._src_shape)
 
         if flat:
             return idxs[self()].ravel()
@@ -1343,7 +1337,7 @@ class IndexMaker(object):
 
         if src_shape is not None:
             if flat_src:
-                src_shape = (np.product(src_shape, dtype=int),)
+                src_shape = (shape_to_len(src_shape),)
             idxer.set_src_shape(src_shape)
 
         return idxer

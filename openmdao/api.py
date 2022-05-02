@@ -120,6 +120,7 @@ import os
 import builtins
 
 from openmdao.utils.general_utils import wing_dbg, env_truthy
+from openmdao.utils.array_utils import shape_to_len
 
 wing_dbg()
 

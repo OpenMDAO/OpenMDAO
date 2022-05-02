@@ -9,6 +9,7 @@ from openmdao.core.constants import INT_DTYPE
 import openmdao.func_api as omf
 from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore, _add_options, \
     jac_forward, jac_reverse, jacvec_prod, _get_tangents
+from openmdao.utils.array_utils import shape_to_len
 
 try:
     import jax
@@ -173,7 +174,7 @@ class ExplicitFuncComp(ExplicitComponent):
                         j[:, cstart:cend] = a.reshape((a.shape[0], cend - cstart))
                     cstart = cend
             else:
-                j = [np.asarray(a).reshape((a.shape[0], np.prod(a.shape[1:], dtype=INT_DTYPE)))
+                j = [np.asarray(a).reshape((a.shape[0], shape_to_len(a.shape[1:])))
                      for a in jac_reverse(func, argnums, tangents)(*invals)]
                 j = coloring.expand_jac(np.hstack(j), 'rev')
         else:
@@ -186,7 +187,7 @@ class ExplicitFuncComp(ExplicitComponent):
                     if a.ndim < 2:
                         a = a.reshape((1, a.size))
                     else:
-                        a = a.reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1]))
+                        a = a.reshape((shape_to_len(a.shape[:-1]), a.shape[-1]))
                     end += a.shape[0]
                     if osize == 1:
                         j[0, start:end] = a
@@ -194,7 +195,7 @@ class ExplicitFuncComp(ExplicitComponent):
                         j[start:end, :] = a
                     start = end
             else:
-                j = [np.asarray(a).reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1]))
+                j = [np.asarray(a).reshape((shape_to_len(a.shape[:-1]), a.shape[-1]))
                      for a in jac_forward(func, argnums, tangents)(*invals)]
                 j = coloring.expand_jac(np.vstack(j), 'fwd')
 

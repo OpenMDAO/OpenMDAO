@@ -5,6 +5,7 @@ import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.om_warnings import warn_deprecation
+from openmdao.utils.array_utils import shape_to_len
 
 
 class DemuxComp(ExplicitComponent):
@@ -76,7 +77,7 @@ class DemuxComp(ExplicitComponent):
         options = self._vars[name]
         kwgs = dict(options)
         shape = options['shape']
-        size = np.prod(shape)
+        size = shape_to_len(shape)
         axis = kwgs.pop('axis')
 
         if axis >= len(shape):
@@ -108,7 +109,7 @@ class DemuxComp(ExplicitComponent):
                             units=options['units'],
                             desc=options['desc'])
 
-            rs = np.arange(np.prod(out_shape))
+            rs = np.arange(shape_to_len(out_shape))
             cs = np.atleast_1d(np.take(template, indices=i, axis=axis)).flatten()
 
             self.declare_partials(of=out_name, wrt=name, rows=rs, cols=cs, val=1.0)
