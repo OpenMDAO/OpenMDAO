@@ -150,7 +150,7 @@ class Problem(object):
         If _UNDEFINED, the OPENMDAO_REPORTS variable is used. Defaults to _UNDEFINED.
         If given, reports should override OPENMDAO_REPORTS. If boolean, enable/disable all reports.
         Since none is acceptable in the environment variable, a value of reports=None
-        is equivalent to reports=False. Otherwise, reports may be a sequence of
+        is equivalent to reports=False. Otherwise, reports may be a comma separated sequence of
         strings giving the names of the reports to run.
     _reports_dir : str, _UNDEFINED
         Directory in which to place the reports.

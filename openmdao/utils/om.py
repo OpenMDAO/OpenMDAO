@@ -119,6 +119,10 @@ def _n2_cmd(options, user_args):
         hooks._register_hook('setup', 'Problem', pre=_noraise, ncalls=1)
         hooks._register_hook('final_setup', 'Problem', post=_viewmod, exit=True)
 
+        from openmdao.utils.reports_system import _register_cmdline_report
+        # tell report system not to duplicate effort
+        _register_cmdline_report('n2')
+
         ignore_errors(True)
         _load_and_exec(options.file[0], user_args)
     else:
