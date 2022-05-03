@@ -3381,6 +3381,95 @@ class TestProblemCheckTotals(unittest.TestCase):
         for key, val in totals.items():
             assert_near_equal(val['rel error'][0], 0.0, 1e-10)
 
+    def test_cs_around_newton_in_comp(self):
+        # CS around Newton in an ImplicitComponent.
+        class MyComp(om.ImplicitComponent):
+            def __init__(self, **kwargs):
+                super().__init__(**kwargs)
+                self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+                self.linear_solver = om.DirectSolver()
+
+            def setup(self):
+                self.add_input('mm', np.ones(1))
+                self.add_output('Re', np.ones((1, 1)))
+                self.add_output('temp', np.ones((1, 1)))
+
+            def setup_partials(self):
+                self.declare_partials('Re', 'Re', val=1.0)
+                self.declare_partials('temp', ['temp', 'mm'])
+                self.declare_partials('Re', ['mm'])
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                mm = inputs['mm']
+                T = np.array([389.97])
+                pp = np.array([.0260239151])
+                cf = 0.01
+                temp = outputs['temp']
+                kelvin = T / 1.8
+                RE = 1.479301E9 * pp * (kelvin + 110.4) / kelvin ** 2
+                su = T + 198.72
+                comb = 4.593153E-6 * 0.8 * su / (RE * mm * T ** 1.5)
+                reyn = RE * mm
+                residuals['Re'] = outputs['Re'] - reyn
+                temp_ratio = 1.0 + 0.45 * (temp / T - 1.0)
+                fact = 0.035 * mm * mm
+                temp_ratio += fact
+                CFL = cf / (1.0 + 3.59 * np.sqrt(cf) * temp_ratio)
+                prod = comb * temp ** 3
+                residuals['temp'] = (1.0 / (1.0 + prod / CFL) + temp) * 0.5 - temp
+
+            def linearize(self, inputs, outputs, partials):
+                mm = inputs['mm']
+                temp = outputs['temp']
+                T = np.array([389.97])
+                pp = np.array([.0260239151])
+                cf = 0.01
+                kelvin = T / 1.8
+                RE = 1.479301E9 * pp * (kelvin + 110.4) / kelvin ** 2
+                partials['Re', 'mm'] = -RE
+                su = T + 198.72
+                comb = 4.593153E-6 * 0.8 * su / (RE * mm * T ** 1.5)
+                dcomb_dmm = -4.593153E-6 * 0.8 * su / (RE * mm * mm * T ** 1.5)
+                temp_ratio = 1.0 + 0.45 * temp / T - 1.0
+                fact = 0.035 * mm * mm
+                temp_ratio += fact
+                dwtr_dmm = 0.07 * mm
+                dwtr_dwt = 0.45 / T
+                den = 1.0 + 3.59 * np.sqrt(cf) * temp_ratio
+                CFL = cf / den
+                dCFL_dwtr = - cf * 3.59 * np.sqrt(cf) / den ** 2
+                dCFL_dmm = dCFL_dwtr * dwtr_dmm
+                dCFL_dwt = dCFL_dwtr * dwtr_dwt
+                term = comb * temp ** 3
+                den = 1.0 + term / CFL
+                dreswt_dcomb = -0.5 * temp ** 3 / (CFL * den ** 2)
+                dreswt_dCFL = 0.5 * term / (CFL * den) ** 2
+                dreswt_dwt = -0.5 - 1.5 * comb * temp ** 2 / (CFL * den ** 2)
+                partials['temp', 'mm'] = dreswt_dcomb * dcomb_dmm +  dreswt_dCFL * dCFL_dmm
+                partials['temp', 'temp'] = (dreswt_dCFL * dCFL_dwt + dreswt_dwt)
+
+        class DDG(om.Group):
+            def setup(self):
+                comp = MyComp()
+                self.add_subsystem('MyComp', comp, promotes=['*'])
+
+        prob = om.Problem(model=DDG())
+        model = prob.model
+
+        model.add_objective('Re')
+        model.add_design_var('mm')
+
+        prob.setup(force_alloc_complex=True)
+        prob.set_solver_print(level=0)
+
+        prob.set_val("mm", val=0.2)
+
+        prob.run_model()
+        totals = prob.check_totals(method='cs', out_stream=None)
+
+        for key, val in totals.items():
+            assert_near_equal(val['rel error'][0], 0.0, 1e-12)
+
     def test_cs_around_broyden(self):
         # Basic sellar test.
 
