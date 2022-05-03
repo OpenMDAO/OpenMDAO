@@ -978,6 +978,7 @@ class BlockLinearSolver(LinearSolver):
             self._rhs_vec[:] = self._system()._vectors['residual']['linear'].asarray()
         else:
             self._rhs_vec[:] = self._system()._vectors['output']['linear'].asarray()
+        # print("Updating RHS vec to", self._rhs_vec)
 
     def _set_complex_step_mode(self, active):
         """
@@ -1027,12 +1028,10 @@ class BlockLinearSolver(LinearSolver):
         float
             norm.
         """
-        system = self._system()
-
         if self._mode == 'fwd':
-            b_vecs = system._vectors['residual']['linear']
+            b_vecs = self._system()._vectors['residual']['linear']
         else:  # rev
-            b_vecs = system._vectors['output']['linear']
+            b_vecs = self._system()._vectors['output']['linear']
 
         b_vecs -= self._rhs_vec
         return b_vecs.get_norm()

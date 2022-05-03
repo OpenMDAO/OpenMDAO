@@ -1050,7 +1050,7 @@ class _TotalJacInfo(object):
 
         loc_idx = self.in_loc_idxs[mode][idx]
         if loc_idx >= 0:
-            print(f"\nSetting seed {self.seeds[mode][idx]} at index: {idx}, loc: {loc_idx}")
+            # print(f"\nSetting seed {self.seeds[mode][idx]} at index: {idx}, loc: {loc_idx}")
             self.input_vec[mode]['linear'].set_val(self.seeds[mode][idx], loc_idx)
 
         if cache_lin_sol:
@@ -1375,6 +1375,7 @@ class _TotalJacInfo(object):
 
                     # restore old linear solution if cache_linear_solution was set by the user for
                     # any input variables involved in this linear solution.
+                    # print("Calling model _solve_linear")
                     with model._scaled_context_all():
                         if cache_key is not None and not has_lin_cons and self.mode == mode:
                             self._restore_linear_solution(cache_key, self.mode)

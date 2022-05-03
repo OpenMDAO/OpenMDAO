@@ -298,6 +298,8 @@ class DefaultVector(Vector):
         """
         # we use _data here specifically so that imaginary part
         # will get properly reset, e.g. when the array is zeroed out.
+        # if not np.any(val):
+        #     print("ZEROING OUT!!", self._name, self._kind)
         self._data[idxs] = val
 
     def scale_to_norm(self, mode='fwd'):

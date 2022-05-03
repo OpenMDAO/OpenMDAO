@@ -126,6 +126,7 @@ class LinearBlockGS(BlockLinearSolver):
 
                 if subsys._is_local:
                     b_vec.set_val(0.0)
+                    # subsys._vectors['output']['linear'].set_val(0.0)
                     system._transfer('linear', mode, sname)
                     b_vec *= -1.0
                     b_vec += self._rhs_vec

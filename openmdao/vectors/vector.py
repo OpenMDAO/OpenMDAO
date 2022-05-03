@@ -734,9 +734,9 @@ class _CompMatVecWrapper(object):
 
     def __init__(self, vec):
         self._vec = vec
-        
+
     def __contains__(self, name):
-        return name in self._vec
+        return self._vec._name2abs_name(name) is not None
 
     def __getitem__(self, name):
         absname = self._vec._name2abs_name(name)

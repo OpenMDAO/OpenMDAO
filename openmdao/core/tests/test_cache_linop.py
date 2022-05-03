@@ -23,6 +23,7 @@ class MyParaboloid(Paraboloid):
     def compute_jacvec_product(self, inputs, dinputs, doutputs, mode):
         x = inputs['x'][0]
         y = inputs['y'][0]
+        print("x,y=", x, y)
 
         if mode == 'fwd':
             if 'x' in dinputs:
@@ -33,8 +34,10 @@ class MyParaboloid(Paraboloid):
         elif mode == 'rev':
             if 'x' in dinputs:
                 dinputs['x'] += (2.0*x - 6.0 + y)*doutputs['f_xy']
+                print('dx', dinputs['x'])
             if 'y' in dinputs:
                 dinputs['y'] += (2.0*y + 8.0 + x)*doutputs['f_xy']
+                print('dy', dinputs['y'])
 
 
 def execute_model(mode):
@@ -64,6 +67,8 @@ def execute_model(mode):
     assert_check_partials(prob.check_partials(method='cs'))
     totals = prob.compute_totals()
     assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+    # J = prob.compute_totals()
+    # print(J)
 
 
 class TestLinOpCaching(unittest.TestCase):

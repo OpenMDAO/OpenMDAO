@@ -2113,6 +2113,7 @@ class Group(System):
 
         else:  # rev
             if xfer is not None:
+                # print(f"{self.pathname}: transfer, sub={sub}")
                 if self._has_input_scaling:
                     vec_inputs.scale_to_norm(mode='rev')
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
@@ -2654,9 +2655,7 @@ class Group(System):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        # if scope_out is not None and scope_in is not None and not scope_in and not scope_out:
-        #     print(f"{self.pathname}: SKIPPING _apply_linear")
-        #     return True
+        # print("Group", self.pathname, "_apply_linear")
 
         if self._owns_approx_jac:
             jac = self._jacobian
@@ -2703,6 +2702,7 @@ class Group(System):
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
         """
+        # print("Group", self.pathname, "_solve_linear")
         if self._owns_approx_jac:
             # No subsolves if we are approximating our jacobian. Instead, we behave like an
             # ExplicitComponent and pass on the values in the derivatives vectors.
