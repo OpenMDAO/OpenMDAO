@@ -747,9 +747,9 @@ def check_allocate_complex_ln(group, under_cs):
     for sub, _ in group._subsystems_allprocs.values():
         if isinstance(sub, Group) and check_allocate_complex_ln(sub, under_cs):
             return True
-        elif sub.nonlinear_solver is not None and \
-            sub.nonlinear_solver.supports['gradients']:
+
+        elif sub.nonlinear_solver is not None and sub.nonlinear_solver.supports['gradients']:
             # Special case, gradient-supporting solver in an ImplicitComponent.
-            return False
+            return True
 
     return False
