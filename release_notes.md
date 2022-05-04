@@ -59,6 +59,7 @@ The generalization of the N2 diagram also continues in this release, with a goal
 - Changed a few test tolerances to avoid sporadic failures on Python 3.7 test environment. [#2501](https://github.com/OpenMDAO/OpenMDAO/pull/2501)
 - Cleaned up dependencies. [#2502](https://github.com/OpenMDAO/OpenMDAO/pull/2502)
 - Added scripts to create and test a generic N2 model and to build an N2 screenshot for the help screen. [#2510](https://github.com/OpenMDAO/OpenMDAO/pull/2510)
+- Fixed text formatting in notebook describing parallel groups. [#2519](https://github.com/OpenMDAO/OpenMDAO/pull/2519)
 
 ***********************************
 # Release Notes for OpenMDAO 3.17.0
