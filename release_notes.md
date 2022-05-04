@@ -47,6 +47,7 @@ The generalization of the N2 diagram also continues in this release, with a goal
 - Added a missing comma to test dependencies in setup.py. [#2513](https://github.com/OpenMDAO/OpenMDAO/pull/2513)
 - Fixed infinite recursion when running `openmdao scaling` when coloring is active. [#2515](https://github.com/OpenMDAO/OpenMDAO/pull/2515)
 - Added a fix for a bug where complex step around an implicit component containing a Newton solver would discard the imaginary part. [#2517](https://github.com/OpenMDAO/OpenMDAO/pull/2517)
+- Fixed a bug in which calling run_model from within run_driver would cause the case_prefix to be lost. [#2520](https://github.com/OpenMDAO/OpenMDAO/pull/2520)
 
 ## Miscellaneous
 
