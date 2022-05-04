@@ -36,7 +36,8 @@ from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, PromotionWarning,\
     UnusedOptionWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, \
-    format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs
+    format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, \
+        conditional_error
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -3083,29 +3084,30 @@ class System(object):
                 if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
                     self._problem_meta['using_par_deriv_color'] = True
 
+                data['orig'] = name
+
                 if name in pro2abs_out:
 
                     # This is an output name, most likely a manual indepvarcomp.
                     abs_name = pro2abs_out[name][0]
                     out[abs_name] = data
-                    out[abs_name]['source'] = abs_name
-                    out[abs_name]['distributed'] = \
-                        abs_name in abs2meta_out and abs2meta_out[abs_name]['distributed']
+                    data['source'] = abs_name
+                    dist = abs_name in abs2meta_out and abs2meta_out[abs_name]['distributed']
 
                 else:  # assume an input name else KeyError
 
                     # Design variable on an auto_ivc input, so use connected output name.
                     in_abs = pro2abs_in[name][0]
-                    ivc_path = conns[in_abs]
-                    distrib = ivc_path in abs2meta_out and abs2meta_out[ivc_path]['distributed']
+                    data['source'] = source = conns[in_abs]
+                    dist = source in abs2meta_out and abs2meta_out[source]['distributed']
                     if use_prom_ivc:
                         out[name] = data
-                        out[name]['source'] = ivc_path
-                        out[name]['distributed'] = distrib
                     else:
-                        out[ivc_path] = data
-                        out[ivc_path]['source'] = ivc_path
-                        out[ivc_path]['distributed'] = distrib
+                        out[source] = data
+
+                    data['iabs'] = in_abs
+
+                data['distributed'] = dist
 
         except KeyError as err:
             msg = "{}: Output not found for design variable {}."
@@ -3179,11 +3181,15 @@ class System(object):
                                 out[name] = meta
 
         if out and self is model:
-            for var in out:
-                if var in abs2meta_out:
-                    if "openmdao:allow_desvar" not in abs2meta_out[var]['tags']:
-                        raise RuntimeError(f"Design variable '{var}' is not an IndepVarComp or "
-                                           f"ImplicitComp output.")
+            for var, outmeta in out.items():
+                if var in abs2meta_out and "openmdao:allow_desvar" not in abs2meta_out[var]['tags']:
+                    if 'iabs' in outmeta:
+                        conditional_error(f"{self.msginfo}: Design variable '{outmeta['orig']}' is "
+                                          f"connected to '{var}', but '{var}' is not an "
+                                          "IndepVarComp or ImplicitComp output.")
+                    else:
+                        conditional_error(f"{self.msginfo}: Design variable '{outmeta['orig']}' is "
+                                          "not an IndepVarComp or ImplicitComp output.")
 
         return out
 
