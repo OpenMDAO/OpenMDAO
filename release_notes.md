@@ -6,13 +6,13 @@ May 05, 2022
 OpenMDAO 3.18.0 adds some enhanced MPI capability to OpenMDAO, and includes several bug fixes and internal cleanup.
 
 The implementation of [POEM 065](https://github.com/OpenMDAO/POEMs/blob/master/POEM_065.md) allows users to specify
-`proc_group` for subsystems in ParallelGroups. This enables the grouping less computationally expensive subsystems onto
+`proc_group` for subsystems in ParallelGroups. This enables the grouping of less computationally expensive subsystems onto
 fewer processors to achieve better balancing.
 
 We also recently discovered that `math.prod` in the standard Python library as of 3.8 is over an order of magnitude
-faster than `numpy.prod`.  Since this function is frequently used to determine sizes given the shape of a variable in
-OpenMDAO-related tools, we've updated the `shape_to_len` function to take advantage of it and encourage users to use
-this implementation over `numpy.prod`.
+faster than `numpy.prod` for reasonably small arrays. Since this function is frequently used to determine sizes given 
+the shape of a variable in OpenMDAO-related tools, we've updated the `shape_to_len` function to take advantage of it 
+and encourage users to use this implementation over `numpy.prod`.
 
 The generalization of the N2 diagram also continues in this release, with a goal of allowing its use in other contexts.
 
