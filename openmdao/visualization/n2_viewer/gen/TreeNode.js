@@ -285,7 +285,7 @@ class TreeNode {
 
 /**
  * Special TreeNode subclass whose children are filtered variables of the parent node.
- * Not intended to be used except with of a FilterCapableNode.
+ * Not intended to be used outside of a FilterCapableNode.
  * @typedef FilterNode
  */
 class FilterNode extends TreeNode {
