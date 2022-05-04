@@ -18,13 +18,14 @@ class OmNodeDisplayData extends NodeDisplayData {
  * @typedef OmTreeNode
  */
 class OmTreeNode extends FilterCapableNode {
-    constructor(origNode, attribNames) {
-        super(origNode, attribNames);
+    constructor(origNode, attribNames, parent) {
+        super(origNode, attribNames, parent);
 
         // Solver names may be empty, so set them to "None" instead.
         if (this.linear_solver == "") this.linear_solver = "None";
         if (this.nonlinear_solver == "") this.nonlinear_solver = "None";
         if (this.isComponent()) this.draw.boxChildren = true;
+        if (exists(this.parentComponent)) this.parentComponent = parent;
     }
 
     get absPathName() { return this.path; }
@@ -54,8 +55,19 @@ class OmTreeNode extends FilterCapableNode {
     /** True is this.type is 'subsystem' */
     isSubsystem() { return (this.type == 'subsystem'); }
 
+    /** True if it's a subsystem and this.subsystem_type is 'group'. Overrides base class */
+    isGroup() { return (this.isSubsystem() && this.subsystem_type == 'group'); }
+
     /** True if it's a subsystem and this.subsystem_type is 'component' */
     isComponent() { return (this.isSubsystem() && this.subsystem_type == 'component'); }
+
+    /** Not connectable if this is an input group or parents are minimized. */
+    isConnectable() {
+        if (this.isInputOrOutput() && !(this.hasChildren() ||
+            this.parent.draw.minimized || this.parentComponent.draw.minimized)) return true;
+
+        return this.draw.minimized;
+    }
 
     /**
      * Add ourselves to the supplied array if we contain a cycleArrows property.
@@ -104,4 +116,7 @@ class OmTreeNode extends FilterCapableNode {
         if (this.rootIndex < 0) this.rootIndex = leafNum;
         this.prevRootIndex = this.rootIndex;
     }
+
+    _preCollapseDepth() { return this.isComponent()? Precollapse.cmpDepthStart : Precollapse.grpDepthStart; }
+
 }

@@ -19,7 +19,7 @@
 
 </head>
 <body>
-<div id="all-diagram-content" class="<<hpp_pyvar embeddable>>" data-openmdao-version='<<hpp_pyvar openmdao_version>>'>
+<div id="all-diagram-content" class="<<hpp_pyvar embeddable>>" data-openmdao-version='<<hpp_pyvar sw_version>>'>
     <div id="diagram-content">
         <!-- Toolbar -->
         <div id="toolbarLoc">
@@ -69,18 +69,6 @@
                             <i class="fas icon-bezier-curve" id="show-all-connections"></i>
                         </div>
                     </div>
-
-                    <div class="expandable">
-                        <i class="fas icon-linear-solver solver-button" id="linear-solver-button"></i>
-                        <i class="fas icon-caret-right caret"></i>
-                        <div class="toolbar-group-expandable" id="solvers-expandable">
-                            <i class="fas icon-linear-solver solver-button" id="linear-solver-button-2"></i>
-                            <i class="fas icon-nonlinear-solver solver-button" id="non-linear-solver-button"></i>
-                            <i class="fas icon-no-solver solver-button" id="no-solver-button"></i>
-                        </div>
-                    </div>
-
-                    <i class="fas icon-fx-2" id="desvars-button"></i>
                 </div>
                 <div class="toolbar-group group-4">
                     <div class="expandable">
@@ -167,7 +155,6 @@
                     </defs>
                     <g id='tree' clip-path='url(#partitionTreeClip)'></g>
                     <g id='highlight-bar'></g>
-                    <g id='solver_tree' clip-path='url(#solverTreeClip)'></g>
                     <g id='n2outer'>
                         <g id='n2inner'>
                             <rect id='backgroundRect' class='background'></rect>
@@ -224,12 +211,6 @@
                         </div>
                     </div>
                 </div>
-                <div class="linear-solvers-container">
-                    <div class="legend-title-container">
-                        <p class="legend-title" id="solvers-legend-title">Linear Solvers</p>
-                    </div>
-                    <div id="solvers-legend"></div>
-                </div>
             </div>
         </div>
 
@@ -265,10 +246,6 @@
     <div id="right" class="offgrid" style="visibility: hidden;"></div>
     <div id="bottom" class="offgrid" style="visibility: hidden;"></div>
 
-    <div id="logo-container">
-        <img id="company-logo" alt="OpenMDAO" src="data:image/png;base64,<<hpp_bin2b64 assets/logo.png>>" />
-    </div>
-
     <div id="show-error-button-container">
         <button id="show-error-button">
             <i class="fas icon-notification"></i> Show N2 Error
@@ -288,7 +265,7 @@
         <h3>Toolbar Help</h3>
         <div class='help-graphic'>
             <img id="toolbar-snapshot" alt="Snapshot of toolbar buttons"
-                src="data:image/png;base64,<<hpp_insert assets/om_toolbar_screenshot_png.b64>>" />
+                src="data:image/png;base64,<<hpp_insert assets/gen_toolbar_screenshot_png.b64>>" />
             <svg id='help-graphic-svg'></svg>
         </div>
     </div>
@@ -322,7 +299,7 @@
     var compressedModel = "<<hpp_pyvar model_data compress>>";
 </script>
 
-<!--<<hpp_script src/main.js>>-->
+<!--<<hpp_script tests/gen_main.js>>-->
 
 </body>
 </html>

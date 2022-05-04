@@ -29,7 +29,23 @@ class SymbolType {
      * Decide what object the cell will be drawn as, based on its position
      * in the matrix, type, source, target, and/or other conditions.
      * @param {MatrixCell} cell The cell to operate on.
-     * @param {ModelData} model Reference to the entire model.
      */
-    getType(cell, model) { }
+    getType(cell) {
+        if (cell.srcObj.isFilter() || cell.tgtObj.isFilter()) {
+            this.name = 'filter';
+        }
+        else if (cell.srcObj.isGroup() || cell.tgtObj.isGroup()) {
+            this.name = 'group';
+        }
+        else if (cell.onDiagonal()) {
+            this.name = 'vector';
+        }
+        else if (cell.srcObj.isInputOrOutput() || cell.tgtObj.isInputOrOutput() ) {
+            this.name = 'vectorVector';
+        }
+        else {
+            console.warn("Completely unrecognized symbol type for cell ", cell)
+            throw ("Completely unrecognized symbol type.")
+        }
+    }
 }

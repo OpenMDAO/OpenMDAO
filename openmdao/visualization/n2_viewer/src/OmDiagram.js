@@ -24,6 +24,10 @@ class OmDiagram extends Diagram {
         this._init();
     }
 
+    _newModelData() {
+        this.model = new OmModelData(this.modelData);
+    }
+
     /** Override Diagram._newLayout() to create an OmLayout object. */
     _newLayout() {
         if (this.showLinearSolverNames === undefined)
@@ -270,7 +274,7 @@ class OmDiagram extends Diagram {
         [Object.keys(modelData.design_vars), Object.keys(modelData.responses)].flat().forEach(
             item => d3.select("#" + item.replaceAll(".", "_")).classed('opt-vars', true)
             );
-        d3.select('.partition_group #_auto_ivc').classed('opt-vars', true)
+        d3.select('.model_tree_grp #_auto_ivc').classed('opt-vars', true)
     }
 
     /** Remove the opt-vars class from design variable elements to use the default fill color */

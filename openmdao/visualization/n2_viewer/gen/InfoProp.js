@@ -42,7 +42,7 @@ class InfoPropDefault {
      * If the object contains a non-empty property with our key, create
      * a new row with it in the supplied table body.
      * @param {Object} tbody D3 reference to an existing table body.
-     * @param {OmTreeNode} node Reference to the node that may have the property.
+     * @param {TreeNode} node Reference to the node that may have the property.
      */
     addRow(tbody, node) {
         if (this.canShow(node)) {
@@ -96,46 +96,6 @@ class InfoPropMessage extends InfoPropYesNo {
     }
 }
 
-/** Display a subsection of options values in the info panel */
-class InfoPropOptions extends InfoPropDefault {
-    constructor(key, desc, solverType = null) {
-        super(key, desc, false);
-        this.solverType = solverType;
-    }
-
-    /** Also check whether there are any options in the list */
-    canShow(node) {
-        return (super.canShow(node) && Object.keys(node[this.key]).length > 0);
-    }
-
-    /**
-     * There may be a list of options, so create a subsection in the table for them.
-     * @param {Object} tbody D3 reference to an existing table body.
-     * @param {OmTreeNode} node Reference to the node that may have the property.
-     */
-    addRow(tbody, node) {
-        if (!this.canShow(node)) return;
-
-        const val = node[this.key];
-
-        let desc = this.desc;
-        if (this.solverType) {
-            desc += ': ' + node[this.solverType + '_solver'].substring(3);
-        }
-
-        // Add a subsection header for the option rows to follow
-        tbody.append('tr').append('th')
-            .text(desc)
-            .attr('colspan', '2')
-            .attr('class', 'options-header');
-
-        for (const key of Object.keys(val).sort()) {
-            const optVal = (val[key] === null) ? 'None' : val[key];
-            InfoPropDefault.addRowWithVal(tbody, key, optVal);
-        }
-    }
-}
-
 /** Display a subsection of expression values in the info panel for ExecComps */
 class InfoPropExpr extends InfoPropDefault {
     constructor(key, desc) {
@@ -145,7 +105,7 @@ class InfoPropExpr extends InfoPropDefault {
     /**
      * There may be a list of expressions, so create a subsection in the table for them.
      * @param {Object} tbody D3 reference to an existing table body.
-     * @param {OmTreeNode} node Reference to the node that may have the property.
+     * @param {TreeNode} node Reference to the node that may have the property.
      */
     addRow(tbody, node) {
         if (!this.canShow(node)) return;

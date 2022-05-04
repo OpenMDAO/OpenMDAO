@@ -119,7 +119,7 @@ class Matrix {
     /**
      * Given the node ID, determine if one of the cells in the matrix
      * represents it or contains it.
-     * @param {Number} nodeId The id of the OmTreeNode to search for
+     * @param {Number} nodeId The id of the TreeNode to search for
      * @returns {Object} Contains reference to cell if found, and flags describing it.
      */
     findCellByNodeId(nodeId) {
@@ -631,7 +631,7 @@ class Matrix {
                             'row': cell.row,
                             'id': cell.tgtObj.id
                         },
-                        'color': OmStyle.color.outputArrow,
+                        'color': Style.color.outputArrow,
                     });
 
                     highlights.push({
@@ -655,7 +655,7 @@ class Matrix {
                             'row': cell.row,
                             'id': cell.tgtObj.id
                         },
-                        'color': OmStyle.color.inputArrow,
+                        'color': Style.color.inputArrow,
                     });
 
                     highlights.push({
@@ -697,7 +697,7 @@ class Matrix {
                 'row': cell.col,
                 'id': cell.tgtObj.id
             },
-            'color': OmStyle.color.inputArrow,
+            'color': Style.color.inputArrow,
         });
     }
 

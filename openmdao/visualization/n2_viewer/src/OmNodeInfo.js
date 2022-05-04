@@ -1,4 +1,5 @@
 // <<hpp_insert gen/NodeInfo.js>>
+// <<hpp_insert src/InfoPropOptions.js>>
 
 /**
  * Manage a table containing all available metadata properties for

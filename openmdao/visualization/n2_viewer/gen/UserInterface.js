@@ -8,8 +8,8 @@
  * Handle input events for the matrix and toolbar.
  * @typedef UserInterface
  * @property {Diagram} diag Reference to the main diagram.
- * @property {OmTreeNode} leftClickedNode The last node that was left-clicked.
- * @property {OmTreeNode} rightClickedNode The last node that was right-clicked, if any.
+ * @property {TreeNode} leftClickedNode The last node that was left-clicked.
+ * @property {TreeNode} rightClickedNode The last node that was right-clicked, if any.
  * @property {Boolean} lastClickWasLeft True is last mouse click was left, false if right.
  * @property {Boolean} leftClickIsForward True if the last node clicked has a greater depth
  *  than the current zoomed element.
@@ -260,7 +260,7 @@ class UserInterface {
     /**
      * Make sure the clicked node is deeper than the zoomed node, that
      * it's not the root node, and that it actually has children.
-     * @param {OmTreeNode} node The right-clicked node to check.
+     * @param {TreeNode} node The right-clicked node to check.
      */
     isCollapsible(node) {
         return (node.depth > this.diag.zoomedElement.depth &&
@@ -293,7 +293,7 @@ class UserInterface {
 
     /**
      * When a node is right-clicked, collapse it if it's allowed.
-     * @param {OmTreeNode} node The node that was right-clicked.
+     * @param {TreeNode} node The node that was right-clicked.
      */
     rightClick(e, node) {
         e.preventDefault();
@@ -319,7 +319,7 @@ class UserInterface {
     /**
      * When a node with variables is alt-right-clicked, present a dialog with the
      * list of variables and allow the user to select which ones should be displayed.
-     * @param {OmTreeNode} node The node that was alt-right-clicked.
+     * @param {TreeNode} node The node that was alt-right-clicked.
      * @param {String} color The color of the clicked node, to use for the dialog ribbons.
      */
     altRightClick(e, node, color) {
@@ -337,7 +337,7 @@ class UserInterface {
     /**
      * Update states as if a left-click was performed, which may or may not have
      * actually happened.
-     * @param {OmTreeNode} node The node that was targetted.
+     * @param {TreeNode} node The node that was targetted.
      */
     _setupLeftClick(node) {
         this.leftClickedNode = node;
@@ -354,7 +354,7 @@ class UserInterface {
 
     /**
      * React to a left-clicked node by zooming in on it.
-     * @param {OmTreeNode} node The targetted node.
+     * @param {TreeNode} node The targetted node.
      */
     leftClick(e, node) {
         // Don't do it if the node is already zoomed
@@ -413,7 +413,7 @@ class UserInterface {
     /**
      * Preserve the specified node as the zoomed element,
      * and remember the state of all hidden elements.
-     * @param {OmTreeNode} node The node to preserve as the zoomed element.
+     * @param {TreeNode} node The node to preserve as the zoomed element.
      */
     addForwardButtonHistory(node) {
         let formerHidden = [];
@@ -529,14 +529,12 @@ class UserInterface {
 
     /**
      * When either of the collapse or uncollapse toolbar buttons are
-     * pressed, return the parent component of the targetted node if
-     * it has one, or the node itself if not.
-     * @returns Parent component of output node or node itself.
+     * pressed, return the parent of the targetted node if it's a variable,
+     * or the node itself if not.
+     * @returns Parent of output node or node itself.
      */
     findRootOfChangeForCollapseUncollapseOutputs(node) {
-        return node.hasOwnProperty('parentComponent') ?
-            node.parentComponent :
-            node;
+        return node.isInputOrOutput()? node.parent : node;
     }
 
     /**
@@ -556,14 +554,13 @@ class UserInterface {
 
     /**
      * Minimize the specified node and recursively minimize its children.
-     * @param {OmTreeNode} node The current node to operate on.
+     * @param {TreeNode} node The current node to operate on.
      */
     _collapseOutputs(node) {
-        if (node.subsystem_type && node.subsystem_type == 'component') {
-            node.minimize();
-        }
+        if (node.isGroup()) node.minimize();
+
         if (node.hasChildren()) {
-            for (let child of node.children) {
+            for (const child of node.children) {
                 this._collapseOutputs(child);
             }
         }
@@ -571,7 +568,7 @@ class UserInterface {
 
     /**
      * React to a button click and collapse all outputs of the specified node.
-     * @param {OmTreeNode} node The initial node, usually the currently zoomed element.
+     * @param {TreeNode} node The initial node, usually the currently zoomed element.
      */
     collapseOutputsButtonClick(startNode) {
         this.addBackButtonHistory();
@@ -584,7 +581,7 @@ class UserInterface {
 
     /**
      * Mark this node and all of its children as unminimized/unhidden
-     * @param {OmTreeNode} node The node to operate on.
+     * @param {TreeNode} node The node to operate on.
      */
     _uncollapse(node) {
         node.expand().show();
@@ -601,7 +598,7 @@ class UserInterface {
 
     /**
      * React to a button click and uncollapse the specified node.
-     * @param {OmTreeNode} startNode The initial node.
+     * @param {TreeNode} startNode The initial node.
      */
     uncollapseButtonClick(startNode) {
         this.addBackButtonHistory();
@@ -748,18 +745,17 @@ class UserInterface {
         }
     }
 
-    /** Save the model state to a file. */
-    saveState() {
+    /**
+     * Save the model state to a file.
+     * @param {Object} [extraData={}] Additional items to save.
+     */
+    saveState(extraData = {}) {
         const stateFileName = prompt("Filename to save view state as", 'saved.n2view');
 
-        // Solver toggle state.
-        const showLinearSolverNames = this.diag.showLinearSolverNames;
-        const showSolvers = this.diag.showSolvers;
-
-        // Zoomed node (subsystem).
+        // Zoomed node
         const zoomedElement = this.diag.zoomedElement.id;
 
-        // Expand/Collapse state of all nodes (subsystems) in model.
+        // Expand/Collapse state of all nodes in model.
         const expandCollapse = Array();
         this.diag.getSubState(expandCollapse);
 
@@ -767,8 +763,7 @@ class UserInterface {
         const arrowState = this.diag.arrowMgr.savePinnedArrows();
 
         const dataDict = {
-            'showLinearSolverNames': showLinearSolverNames,
-            'showSolvers': showSolvers,
+            ...extraData,
             'zoomedElement': zoomedElement,
             'expandCollapse': expandCollapse,
             'arrowState': arrowState,

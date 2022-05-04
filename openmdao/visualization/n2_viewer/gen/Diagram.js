@@ -4,6 +4,7 @@
 // <<hpp_insert gen/ArrowManager.js>>
 // <<hpp_insert gen/Search.js>>
 // <<hpp_insert gen/Matrix.js>>
+// <<hpp_insert gen/Style.js>>
 
 /**
  * Manage all pieces of the application. The model data, the CSS styles, the
@@ -11,7 +12,7 @@
  * all member objects.
  * @typedef Diagram
  * @property {ModelData} model Processed model data received from Python.
- * @property {OmStyle} style Manages diagram-related styles and functions.
+ * @property {Style} style Manages diagram-related styles and functions.
  * @property {Layout} layout Sizes and positions of visible elements.
  * @property {Matrix} matrix Manages the grid of visible model parameters.
  * @property {TreeNode} zoomedElement The element the diagram is currently based on.
@@ -33,7 +34,7 @@ class Diagram {
      */
     constructor(modelJSON, callInit = true) {
         this.modelData = modelJSON;
-        this.model = new OmModelData(modelJSON);
+        this._newModelData();
         this.zoomedElement = this.zoomedElementPrev = this.model.root;
         this.manuallyResized = false; // If the diagram has been sized by the user
 
@@ -50,6 +51,10 @@ class Diagram {
         if (callInit) { this._init(); }
     }
 
+    _newModelData() {
+        this.model = new ModelData(this.modelData);
+        console.log(this.model)
+    }
 
     /** Create a Layout object. Can be overridden to create different types of Layouts */
     _newLayout() {
@@ -148,7 +153,7 @@ class Diagram {
     /**
      * Recurse and pull state info from model for saving.
      * @param {Array} dataList Array of objects with state info for each node.
-     * @param {OmTreeNode} node The current node being examined.
+     * @param {TreeNode} node The current node being examined.
      */
      getSubState(dataList, node = this.model.root) {
         if (node.isFilter()) return; // Ignore state for FilterNodes
@@ -165,7 +170,7 @@ class Diagram {
     /**
      * Recurse and set state info into model.
      * @param {Array} dataList Array of objects with state info for each node. 
-     * @param {OmTreeNode} node The node currently being restored.
+     * @param {TreeNode} node The node currently being restored.
      */
     setSubState(dataList, node = this.model.root) {
         if (node.isFilter()) return; // Ignore state for FilterNodes
@@ -222,7 +227,7 @@ class Diagram {
 
     /**
      * Add SVG groups & contents coupled to the visible nodes in the model tree.
-     * Select all <g> elements that have class "partition_group". If any already
+     * Select all <g> elements that have class "model_tree_grp". If any already
      * exist, join to their associated nodes in the model tree. If no
      * existing <g> matches a displayable node, add it to the "enter"
      * selection so the <g> can be created. If a <g> exists but there is
@@ -234,7 +239,7 @@ class Diagram {
         const scale = this.layout.scales.model;
         const treeSize = this.layout.treeSize.model;
 
-        this.dom.pTreeGroup.selectAll("g.partition_group")
+        this.dom.pTreeGroup.selectAll("g.model_tree_grp")
             .data(this.layout.zoomedNodes, d => d.id)
             .join(
                 enter => self._addNewTreeCells(enter, scale, treeSize),
@@ -258,7 +263,7 @@ class Diagram {
         // to the new size together with the existing nodes.
         const enterSelection = enter
             .append("g")
-            .attr("class", d => `partition_group ${self.style.getNodeClass(d)}`)
+            .attr("class", d => `model_tree_grp ${self.style.getNodeClass(d)}`)
             .on("click", (e,d) => self.leftClickSelector(e, d))
             .on("contextmenu", function(e,d) {
                 if (e.altKey) {
@@ -320,7 +325,7 @@ class Diagram {
 
         // New location for each group
         const mergedSelection = update
-            .attr("class", d => `partition_group ${self.style.getNodeClass(d)}`)
+            .attr("class", d => `model_tree_grp ${self.style.getNodeClass(d)}`)
             .transition(sharedTransition)
             .attr("transform", d => 
                 `translate(${scale.x(d.draw.dims.x)} ${scale.y(d.draw.dims.y)})`);
@@ -590,10 +595,10 @@ class Diagram {
      * @param {Object} oldState The model view to restore.
      */
      restoreSavedState(oldState) {
-        // Zoomed node (subsystem).
+        // Zoomed node
         this.zoomedElement = this.model.nodeIds[oldState.zoomedElement];
 
-        // Expand/Collapse state of all nodes (subsystems) in model.
+        // Expand/Collapse state of all group nodes in model.
         this.setSubState(oldState.expandCollapse.reverse());
 
         // Force an immediate display update.

@@ -41,7 +41,8 @@ optional_dependencies = {
         'testflo>=1.3.6',
         'websockets>8',
         'aiounittest',
-        'playwright>=1.20'
+        'playwright>=1.20',
+        'num2words'
     ]
 }
 
@@ -135,6 +136,7 @@ setup(
             'style/*',
             'tests/*.js',
             'tests/*.json',
+            'tests/*.html',
             'tests/gui_test_models/*.py',
             '*.html'
         ],

@@ -1,5 +1,6 @@
 // <<hpp_insert gen/MatrixCell.js>>
 // <<hpp_insert src/OmCellRenderer.js>>
+// <<hpp_insert src/OmSymbolType.js>>
 
 /**
  * A visible cell in the matrix grid.
@@ -23,6 +24,10 @@ class OmMatrixCell extends MatrixCell {
      */
     constructor(row, col, srcObj, tgtObj, model) {
         super(row, col, srcObj, tgtObj, model);
+    }
+
+    _setSymbolType(model) {
+        this.symbolType = new OmSymbolType(this, model);
     }
 
     /**
@@ -71,6 +76,8 @@ class OmMatrixCell extends MatrixCell {
                 return new OmGroupVectorCell(color, this.id);
             case "groupGroup":
                 return new OmGroupGroupCell(color, this.id);
+            default:
+                throw(`No known renderer for ${this.symbolType.name}`);
         }
     }
 }

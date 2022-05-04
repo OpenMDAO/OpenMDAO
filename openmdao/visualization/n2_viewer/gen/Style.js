@@ -10,6 +10,7 @@ class Style {
         'gridline': 'white',
         'treeStroke': '#eee',
         'outputGroup': '#888',
+        'output': '#888',
         'input': '#30B0AD',
         'inputGroup': 'Orchid',
         'group': '#6092B5',
@@ -61,6 +62,16 @@ class Style {
                 'fill-opacity': '.8',
                 'fill': Style.color.inputGroup,
             },
+            '#tree > g.output > rect': {
+                'cursor': 'pointer',
+                'fill-opacity': '.8',
+                'fill': Style.color.output,
+            },
+            '#tree > g.group > rect': {
+                'cursor': 'pointer',
+                'fill-opacity': '.8',
+                'fill': Style.color.group,
+            },
             '#tree > g.output_group > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
@@ -78,7 +89,7 @@ class Style {
                 //'dominant-baseline: middle',
                 //'dy: .35em',
             },
-            '#svgId g.partition_group > text': {
+            '#svgId g.model_tree_grp > text': {
                 'text-anchor': 'end',
                 'pointer-events': 'none',
                 'font-family': 'helvetica, sans-serif',
@@ -102,10 +113,10 @@ class Style {
             '.horiz_line, .vert_line': {
                 'stroke': Style.color.gridline,
             },
-            "g.partition_group > rect[id$='_FILTER_inputs'] + text": {
+            "g.model_tree_grp > rect[id$='_FILTER_inputs'] + text": {
                 'font-style': 'italic'
             },
-            "g.partition_group > rect[id$='_FILTER_outputs'] + text": {
+            "g.model_tree_grp > rect[id$='_FILTER_outputs'] + text": {
                 'font-style': 'italic'
             },
             'g.variable_box > rect': {
@@ -146,7 +157,7 @@ class Style {
     /**
        * Based on the element's type and conditionally other info, determine
        * what CSS style is associated.
-       * @param {OmTreeNode} node The item to check.
+       * @param {TreeNode} node The item to check.
        * @return {string} The name of an existing CSS class.
        */
     getNodeClass(node) {
@@ -169,7 +180,10 @@ class Style {
                 return 'output';
 
             case 'root':
-                return 'subsystem';
+                return 'group';
+
+            case 'group':
+                return 'group';
 
             default:
                 throw `CSS class not found for node type: ${node.type}`

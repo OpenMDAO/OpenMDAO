@@ -33,13 +33,15 @@ class TreeNode {
      * @param {Object} origNode The node to work from.
      * @param {Object} attribNames Names of variables in the model.
      */
-    constructor(origNode, attribNames) {
+    constructor(origNode, attribNames, parent) {
         // Merge all of the props from the original JSON tree node to us.
         Object.assign(this, origNode);
         if (attribNames.descendants != 'children') {
             this.children = this[attribNames.descendants];
             delete this[attribNames.descendants];
         }
+
+        this.parent = parent;
 
         this.sourceParentSet = new Set();
         this.targetParentSet = new Set();
@@ -49,7 +51,6 @@ class TreeNode {
 
         this.childNames = new Set(); // Set by ModelData
         this.depth = -1; // Set by ModelData
-        this.parent = null; // Set by ModelData
         this.id = -1; // Set by ModelData
         this.path = ''; // Set by ModelData
         this.numDescendants = 0; // Set by ModelData
@@ -57,7 +58,10 @@ class TreeNode {
         this.rootIndex = -1;
     }
 
-    _newDisplayData() { return new NodeDisplayData(); }
+    _newDisplayData() {
+        if (this.isInputOrOutput()) { this.parent.draw.boxChildren = true; }
+        return new NodeDisplayData();
+    }
 
     // Accessor functions for this.draw.minimized - whether or not to draw children
     minimize() { this.draw.minimized = true; return this; }
@@ -81,7 +85,7 @@ class TreeNode {
     /**
      * Determine if a children array exists and has members.
      * @param {string} [childrenPropName = 'children'] Usually "children", but
-     *   some models have addition child arrays like "subsystem_children".
+     *   some subclasses may have additional child arrays.
      * @return {boolean} True if the children property is an Array and length > 0.
      */
     hasChildren(childrenPropName = 'children') {
@@ -106,16 +110,19 @@ class TreeNode {
     /** True if this.type is 'input', 'unconnected_input', or 'output'. */
     isInputOrOutput() { return this.type.match(/^(output|input|unconnected_input)$/); }
 
-    /** True if it's a subsystem and this.subsystem_type is 'group' */
-    isGroup() { return (this.isSubsystem() && this.subsystem_type == 'group'); }
+    /** True if it's a group */
+    isGroup() { return this.type == 'group'; }
 
     /** True if this is a "fake" node that manages filtered children. */
     isFilter() { return (this.type == 'filter'); }
 
+    /** True if this node can use filters (always false for base class) */
+    canFilter() { return false; } 
+
     /** Not connectable if this is an input group or parents are minimized. */
     isConnectable() {
         if (this.isInputOrOutput() && !(this.hasChildren() ||
-            this.parent.draw.minimized || this.parentComponent.draw.minimized)) return true;
+            this.parent.draw.minimized)) return true;
 
         return this.draw.minimized;
     }
@@ -129,7 +136,7 @@ class TreeNode {
     isVisibleLeaf() {
         if (this.draw.hidden || this.draw.filtered) return false; // Any explicitly hidden node
         if (this.isInputOrOutput()) return !this.draw.filtered; // Variable
-        if (!this.hasChildren()) return true; // Group or component w/out children
+        if (!this.hasChildren()) return true; // Group w/out children
         return this.draw.minimized; // Collapsed non-variable
     }
 
@@ -193,6 +200,8 @@ class TreeNode {
         return null;
     }
 
+    _preCollapseDepth() { return Precollapse.grpDepthStart; }
+
     /**
      * If the node has a lot of descendants and it wasn't manually expanded,
      * minimize it.
@@ -201,8 +210,7 @@ class TreeNode {
      */
     minimizeIfLarge(depthCount) {
         if (!(this.isRoot() || this.draw.manuallyExpanded) &&
-            (this.depth >= (this.isComponent() ?
-                Precollapse.cmpDepthStart : Precollapse.grpDepthStart) &&
+            (this.depth >= this._preCollapseDepth() &&
                 this.numDescendants > Precollapse.threshold &&
                 this.children.length > Precollapse.children - this.depth &&
                 depthCount > Precollapse.depthLimit)) {
@@ -276,26 +284,26 @@ class TreeNode {
 }
 
 /**
- * Special TreeNode subclass whose children are filtered variables of the parent component.
- * Not intended to be used except as a component of a FilterCapableNode.
+ * Special TreeNode subclass whose children are filtered variables of the parent node.
+ * Not intended to be used outside of a FilterCapableNode.
  * @typedef FilterNode
  */
 class FilterNode extends TreeNode {
     /**
      * Give ourselves a special name and the "filter" type.
-     * @param {TreeNode} parentComponent The component that we are filtering variables for.
+     * @param {TreeNode} parent The node that we are filtering variables for.
      * @param {String} suffix Either "inputs" or "outputs".
      */
-    constructor(parentComponent, attribNames, suffix) {
+    constructor(parent, attribNames, suffix) {
         super(
             {
-                name: `${parentComponent.name}_FILTER_${suffix}`,
+                name: `${parent.name}_FILTER_${suffix}`,
                 type: 'filter'
             },
             attribNames
         )
 
-        this.parentComponent = parentComponent;
+        this.parent = parent;
         this.hide();
         this.minimize();
         this.suffix = suffix;
@@ -373,7 +381,7 @@ class FilterNode extends TreeNode {
     }
 
     isFilter() { return true; } // Always true for the TreeNode class
-    hasFilters() { return false; } // Only components contains filters
+    hasFilters() { return false; }
     isInputFilter() { return this.suffix == 'inputs'; } // True if this manages input filters
     isOutputFilter() { return this.suffix == 'outputs'; } // True if this manages output filters
 
@@ -422,6 +430,8 @@ class FilterCapableNode extends TreeNode {
     // Accessor functions for this.draw.filtered - whether a variable is shown in collapsed form
     doFilter(filterNode) { this.draw.filtered = true; this.draw.filterParent = filterNode; }
     undoFilter() { this.draw.filtered = false; this.draw.filterParent = null; }
+
+    canFilter() { return true; }
 
     /** If this node has children add special children that can hold filtered variables */
     addFilterChild(attribNames) {

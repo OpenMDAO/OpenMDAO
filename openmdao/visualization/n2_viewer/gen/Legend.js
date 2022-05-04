@@ -54,8 +54,8 @@ class Legend extends WindowDraggable {
         };
 
         this.sysAndVar = [
-            { 'name': "Connection", 'color': OmStyle.color.connection },
-            { 'name': "Collapsed", 'color': OmStyle.color.collapsed },
+            { 'name': "Connection", 'color': Style.color.connection },
+            { 'name': "Collapsed", 'color': Style.color.collapsed },
         ];
     }
 
@@ -87,7 +87,7 @@ class Legend extends WindowDraggable {
                     this.showSysVar.group = true;
                     this.sysAndVar.push({
                         'name': 'Group',
-                        'color': OmStyle.color.group
+                        'color': Style.color.group
                     })
                 }
                 this._setDisplayBooleans(node.children);
@@ -97,21 +97,21 @@ class Legend extends WindowDraggable {
                     this.showSysVar.input = true;
                     this.sysAndVar.push({
                         'name': 'Input',
-                        'color': OmStyle.color.input
+                        'color': Style.color.input
                     })
                 }
                 else if (!this.showSysVar.output && node.isOutput()) {
                     this.showSysVar.output = true;
                     this.sysAndVar.push({
                         'name': 'Output',
-                        'color': OmStyle.color.output
+                        'color': Style.color.output
                     })
                 }
                 else if (!this.showSysVar.unconnectedInput && node.isUnconnectedInput()) {
                     this.showSysVar.unconnectedInput = true;
                     this.sysAndVar.push({
                         'name': 'Unconnected Input',
-                        'color': OmStyle.color.unconnectedInput
+                        'color': Style.color.unconnectedInput
                     })
                 }
             }

@@ -28,7 +28,7 @@ class Arrow {
 
         /*
          * Generate a CSS id for the arrow. This is based on the ids of the
-         * OmTreeNodes it points to rather than the cells, so if it's pinned
+         * TreeNodes it points to rather than the cells, so if it's pinned
          * and the matrix is redrawn, we know whether to transition it. The color
          * is included because there can be identical arrows of different colors
          * stacked on each other.
@@ -183,7 +183,7 @@ class BentArrow extends Arrow {
             .attr("r", this.width * 1.0)
             .style("stroke-width", 0)
             .style("fill-opacity", 1)
-            .style("fill", OmStyle.color.connection);
+            .style("fill", Style.color.connection);
 
         this.topCircle
             .attr("cx", this.pts.mid.x)
@@ -315,7 +315,7 @@ class OffGridUpArrow extends OffGridArrow {
             'end': { 'id': attribs.cell.tgtId },
             'direction': 'up',
             'cellId': attribs.cellId,
-            'color': attribs.color ? attribs.color : OmStyle.color.inputArrow
+            'color': attribs.color ? attribs.color : Style.color.inputArrow
         }), diagGroups, nodeSize);
 
         this.label.ref = d3.select("div#left.offgrid");
@@ -360,7 +360,7 @@ class OffGridDownArrow extends OffGridArrow {
             'end': { 'id': attribs.cell.tgtId },
             'direction': 'down',
             'cellId': attribs.cellId,
-            'color': attribs.color ? attribs.color : OmStyle.color.inputArrow
+            'color': attribs.color ? attribs.color : Style.color.inputArrow
         }), diagGroups, nodeSize);
 
         this.label.ref = d3.select("div#bottom.offgrid");
@@ -404,7 +404,7 @@ class OffGridLeftArrow extends OffGridArrow {
             'end': { 'id': attribs.offscreenId },
             'direction': 'left',
             'cellId': attribs.cellId,
-            'color': attribs.color ? attribs.color : OmStyle.color.outputArrow
+            'color': attribs.color ? attribs.color : Style.color.outputArrow
         }), diagGroups, nodeSize);
 
         this.label.ref = d3.select("div#bottom.offgrid");
@@ -449,7 +449,7 @@ class OffGridRightArrow extends OffGridArrow {
             'end': { 'id': attribs.offscreenId },
             'direction': 'right',
             'cellId': attribs.cellId,
-            'color': attribs.color ? attribs.color : OmStyle.color.outputArrow
+            'color': attribs.color ? attribs.color : Style.color.outputArrow
         }), diagGroups, nodeSize);
 
         this.label.ref = d3.select("div#right.offgrid");
