@@ -242,7 +242,6 @@ class ImplicitComponent(Component):
             self._linear_solver.solve(mode, rel_systems)
 
         else:
-            failed = False
             d_outputs = self._vectors['output']['linear']
             d_residuals = self._vectors['residual']['linear']
 

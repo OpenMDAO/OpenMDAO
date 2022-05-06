@@ -40,18 +40,9 @@ class DefaultAllocator(ProcAllocator):
         iproc = comm.rank
         nproc = comm.size
 
-        nsubs = len(proc_info)
-        min_procs, max_procs, proc_weights = self._split_proc_info(proc_info, comm)
+        min_procs, max_procs, proc_weights, rind_map = self._split_proc_info(proc_info, comm)
         min_sum = np.sum(min_procs)
-
-        if np.sum(max_procs) < nproc:
-            raise ProcAllocationError("too many MPI procs allocated. Comm is size %d but "
-                                      "can only use %d." % (nproc, np.sum(max_procs)))
-        if min_sum > nproc and np.any(min_procs > 1):
-            raise ProcAllocationError("can't meet min_procs required because the sum of the "
-                                      "min procs required exceeds the procs allocated and the "
-                                      "min procs required is > 1",
-                                      np.array(list(range(nsubs)))[min_procs > 1])
+        nsubs = len(min_procs)
 
         # Define the normalized weights for all subsystems
         proc_weights /= np.sum(proc_weights)
@@ -73,7 +64,13 @@ class DefaultAllocator(ProcAllocator):
 
             # Result
             sub_comm = comm.Split(iproc)
-            return sorted(isubs_list[iproc]), sub_comm, [comm.rank, comm.rank + sub_comm.size]
+            if rind_map is None:
+                return sorted(isubs_list[iproc]), sub_comm, [comm.rank, comm.rank + sub_comm.size]
+            else:  # must map indices back based on reduced isubs_list
+                isubs = []
+                for ris in isubs_list[iproc]:
+                    isubs.extend(rind_map[ris])
+                return sorted(isubs), sub_comm, [comm.rank, comm.rank + sub_comm.size]
 
         num_procs = min_procs.copy()
 
@@ -132,7 +129,11 @@ class DefaultAllocator(ProcAllocator):
         isub = color[iproc]
 
         # Result
-        isubs = [isub]
+        if rind_map is None:
+            isubs = [isub]
+        else:  # must map reduced isub to include all subs in proc_group
+            isubs = rind_map[isub]
+
         sub_comm = comm.Split(isub)
         start = list(color).index(isub)  # find lowest matching color
         sub_proc_range = [start, start + sub_comm.size]

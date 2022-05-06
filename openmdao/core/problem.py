@@ -150,7 +150,7 @@ class Problem(object):
         If _UNDEFINED, the OPENMDAO_REPORTS variable is used. Defaults to _UNDEFINED.
         If given, reports should override OPENMDAO_REPORTS. If boolean, enable/disable all reports.
         Since none is acceptable in the environment variable, a value of reports=None
-        is equivalent to reports=False. Otherwise, reports may be a sequence of
+        is equivalent to reports=False. Otherwise, reports may be a comma separated sequence of
         strings giving the names of the reports to run.
     _reports_dir : str, _UNDEFINED
         Directory in which to place the reports.
@@ -692,7 +692,8 @@ class Problem(object):
         Parameters
         ----------
         case_prefix : str or None
-            Prefix to prepend to coordinates when recording.
+            Prefix to prepend to coordinates when recording.  None means keep the preexisting
+            prefix.
 
         reset_iter_counts : bool
             If True and model has been run previously, reset all iteration counters.
@@ -701,24 +702,27 @@ class Problem(object):
             raise RuntimeError(self.msginfo +
                                ": The `setup` method must be called before `run_model`.")
 
-        if case_prefix:
+        old_prefix = self._recording_iter.prefix
+
+        if case_prefix is not None:
             if not isinstance(case_prefix, str):
                 raise TypeError(self.msginfo + ": The 'case_prefix' argument should be a string.")
             self._recording_iter.prefix = case_prefix
-        else:
-            self._recording_iter.prefix = None
 
-        if self.model.iter_count > 0 and reset_iter_counts:
-            self.driver.iter_count = 0
-            self.model._reset_iter_counts()
+        try:
+            if self.model.iter_count > 0 and reset_iter_counts:
+                self.driver.iter_count = 0
+                self.model._reset_iter_counts()
 
-        self.final_setup()
+            self.final_setup()
 
-        self._run_counter += 1
-        record_model_options(self, self._run_counter)
+            self._run_counter += 1
+            record_model_options(self, self._run_counter)
 
-        self.model._clear_iprint()
-        self.model.run_solve_nonlinear()
+            self.model._clear_iprint()
+            self.model.run_solve_nonlinear()
+        finally:
+            self._recording_iter.prefix = old_prefix
 
     def run_driver(self, case_prefix=None, reset_iter_counts=True):
         """
@@ -727,7 +731,8 @@ class Problem(object):
         Parameters
         ----------
         case_prefix : str or None
-            Prefix to prepend to coordinates when recording.
+            Prefix to prepend to coordinates when recording.  None means keep the preexisting
+            prefix.
 
         reset_iter_counts : bool
             If True and model has been run previously, reset all iteration counters.
@@ -741,24 +746,27 @@ class Problem(object):
             raise RuntimeError(self.msginfo +
                                ": The `setup` method must be called before `run_driver`.")
 
-        if case_prefix:
+        old_prefix = self._recording_iter.prefix
+
+        if case_prefix is not None:
             if not isinstance(case_prefix, str):
                 raise TypeError(self.msginfo + ": The 'case_prefix' argument should be a string.")
             self._recording_iter.prefix = case_prefix
-        else:
-            self._recording_iter.prefix = None
 
-        if self.model.iter_count > 0 and reset_iter_counts:
-            self.driver.iter_count = 0
-            self.model._reset_iter_counts()
+        try:
+            if self.model.iter_count > 0 and reset_iter_counts:
+                self.driver.iter_count = 0
+                self.model._reset_iter_counts()
 
-        self.final_setup()
+            self.final_setup()
 
-        self._run_counter += 1
-        record_model_options(self, self._run_counter)
+            self._run_counter += 1
+            record_model_options(self, self._run_counter)
 
-        self.model._clear_iprint()
-        return self.driver.run()
+            self.model._clear_iprint()
+            return self.driver.run()
+        finally:
+            self._recording_iter.prefix = old_prefix
 
     def compute_jacvec_product(self, of, wrt, mode, seed):
         """

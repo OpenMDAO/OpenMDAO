@@ -1,6 +1,6 @@
 """MetaModel provides basic meta modeling capability."""
 from copy import deepcopy
-from itertools import chain, product
+from itertools import chain
 
 import numpy as np
 
@@ -9,6 +9,7 @@ from openmdao.surrogate_models.surrogate_model import SurrogateModel
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.name_maps import rel_key2abs_key
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
+from openmdao.utils.array_utils import shape_to_len
 
 
 class MetaModelUnStructuredComp(ExplicitComponent):
@@ -191,9 +192,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             if metadata['shape'][0] != vec_size:
                 raise RuntimeError(f"{self.msginfo}: First dimension of output '{name}' "
                                    f"must be {vec_size}")
-            output_shape = metadata['shape'][1:]
-            if len(output_shape) == 0:
-                output_shape = 1
+            output_shape = tuple(metadata['shape'][1:])
         else:
             output_shape = metadata['shape']
 
@@ -263,7 +262,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             # Sparse specification of partials for vectorized models.
             for wrt, n_wrt in self._surrogate_input_names:
                 for of, shape_of in self._surrogate_output_names:
-                    n_of = np.prod(shape_of)
+                    n_of = shape_to_len(shape_of)
                     rows = np.repeat(np.arange(n_of), n_wrt)
                     cols = np.tile(np.arange(n_wrt), n_of)
                     repeat = np.repeat(vec_arange, len(rows))
@@ -541,7 +540,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         for out_name, out_shape in self._surrogate_output_names:
             surrogate = self._metadata(out_name).get('surrogate')
             if vec_size > 1:
-                out_size = np.prod(out_shape)
+                out_size = shape_to_len(out_shape)
                 for j in range(vec_size):
                     flat_input = flat_inputs[j]
                     if overrides_method('linearize', surrogate, SurrogateModel):
@@ -604,7 +603,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         # Assemble output data and train each output.
         for name, shape in self._surrogate_output_names:
-            output_size = np.prod(shape)
+            output_size = shape_to_len(shape)
 
             outputs = np.zeros((num_sample, output_size))
             self._training_output[name] = outputs

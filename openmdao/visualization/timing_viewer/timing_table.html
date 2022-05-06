@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <script type="text/javascript">
+        <tabulator_src>
+    </script>
+    <script type="text/javascript">
+        <d3_src>
+    </script>
+    <script>
+            var data = <timing_data>;
+    </script>
+    <style>
+        <tabulator_style>div.tooltip {
+            position: absolute;
+            text-align: left;
+            padding: 4px;
+            font: 10px sans-serif;
+            background: lightsteelblue;
+            border: 3px;
+            border-radius: 8px;
+            pointer-events: none;
+            -webkit-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+            -moz-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+            box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+            opacity: 0;
+        }
+
+        /* Style the tab */
+        .tab {
+            overflow: hidden;
+            border: 1px solid #ccc;
+            background-color: #f1f1f1;
+        }
+
+        /* Style the buttons that are used to open the tab content */
+        .tab button {
+            background-color: inherit;
+            float: left;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            padding: 10px 16px;
+            transition: 0.3s;
+        }
+
+        /* Change background color of buttons on hover */
+        .tab button:hover {
+            background-color: #ddd;
+        }
+
+        /* Create an active/current tablink class */
+        .tab button.active {
+            background-color: #ccc;
+        }
+
+        /* Style the tab content */
+        .tabcontent {
+            display: none;
+            padding: 6px 12px;
+            border: 1px solid #ccc;
+            border-top: none;
+        }
+
+        /* Style the close button */
+        .topright {
+            float: right;
+            cursor: pointer;
+            font-size: 28px;
+        }
+
+        .topright:hover {
+            color: red;
+        }
+
+        .spacer {
+            width: 100%;
+            height: 30px;
+        }
+
+        #help-text {
+            display: none;
+        }
+    </style>
+</head>
+
+<body">
+
+    <h2 id="timing_title"></h2>
+    <div id="timingstuff">
+        <div id="timing-table"></div>
+    </div>
+    <div class="tooltip"></div>
+
+    <script type="text/javascript">
+
+var timing_tabledata = data.timing_table;
+var is_par = data.tot_procs > 1;
+
+document.getElementById("timing_title").innerHTML = data.title
+
+var d3_format = d3.format(".6~g");
+
+function val_cell_formatter(cell, formatterParams, onRendered) {
+    let val = cell.getValue();
+    if (val === "") {
+        return "";
+    }
+    return d3_format(val);
+}
+
+
+function val_sorter(a, b, aRow, bRow, column, dir, sorterParams) {
+    if (a === "") {
+        a = -1e99;
+    }
+    if (b === "") {
+        b = -1e99;
+    }
+    return a - b;
+}
+
+
+function numcol(title, field) {
+    return {
+        title: title,
+        field: field,
+        hozAlign: "right",
+        visible: true,
+        headerFilter: false,
+        formatter: val_cell_formatter,
+        sorter: val_sorter,
+    }
+}
+
+
+let timingheight = (timing_tabledata.length > 15) ? 850 : null;
+
+var timingtable = new Tabulator("#timing-table", {
+    // set height of table (in CSS or here), this enables the Virtual DOM and
+    // improves render speed dramatically (can be any valid css height value)
+    height: timingheight,
+    dataTree:true,
+    dataTreeStartExpanded:false,
+    data:timing_tabledata, //assign data to table
+    layout:"fitDataFill", //"fitColumns", "fitDataFill",
+    groupBy: "probname",
+    columns:[ //Define Table Columns
+        {title: "Problem", field:"probname", hozAlign:"left", headerFilter:true, visible:false,},
+           {title: "System", field:"sysname", hozAlign:"left", headerFilter:true, visible:true,
+              tooltip:function(cell){
+                 return  cell.getRow().getData()["classname"];
+              },
+        },
+        {title: "Method", field:"method", hozAlign:"left", headerFilter:true, visible:true,},
+        {title: "Rank", field:"rank", hozAlign:"center", headerFilter:true, visible:is_par,},
+        {title: "Num Procs", field:"nprocs", hozAlign:"center", headerFilter:true, visible:is_par,},
+        {title: "Tree Level", field:"level", hozAlign:"center", headerFilter:true, visible:true,},
+        {title: "Parallel Child", field:"parallel", hozAlign:"center", visible: is_par,
+         headerFilter: "tickCross",
+         headerFilterParams:{"tristate": true}, // need 3 filter states (checked/unchecked/mixed)
+         headerFilterEmptyCheck: function(value){return value === null},
+         formatter:"tickCross",
+         formatterParams: {
+            crossElement: false,  // gets rid of 'x' elements so only check marks show
+         }},
+        {title: "Calls", field:"ncalls", hozAlign:"center", headerFilter:false, visible:true,},
+        numcol("Total Time", "tottime"),
+        {title:"Pct of Total", field:"pct", formatter:"progress", tooltip: true,
+          sorter:"number", width:100
+        },
+        numcol("Avg Time", "avgtime"),
+        numcol("Min Time", "mintime"),
+        numcol("Max Time", "maxtime"),
+    ]
+});
+
+
+</script>
+</body>
+
+</html>

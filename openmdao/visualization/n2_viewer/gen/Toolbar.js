@@ -1,6 +1,7 @@
 // <<hpp_insert gen/ToolbarButtonClick.js>>
 // <<hpp_insert gen/ToolbarButtonToggle.js>>
 // <<hpp_insert gen/ClickHandler.js>>
+// <<hpp_insert gen/DiagramHelp.js>>
 
 /**
  * Manage the set of buttons and tools at the left of the diagram.
@@ -69,7 +70,7 @@ class Toolbar {
 
     /** Either create the help window the first time or redisplay it */
     _showHelp() {
-        if (!this._helpWindow) this._helpWindow = new N2Help(this.helpInfo);
+        if (!this._helpWindow) this._helpWindow = new DiagramHelp(this.helpInfo);
         else this._helpWindow.show().modal(true);
     }
 
@@ -89,12 +90,16 @@ class Toolbar {
         this.hidden = false;
     }
 
+    /** Automatically select between visibile/hidden. */
     toggle() {
         if (this.hidden) this.show();
         else this.hide();
     }
 
-    /** When an expanded button is clicked, update the 'root' button to the same icon/function. */
+    /**
+     * When an expanded button is clicked, update the 'root' button to the same icon/function.
+     * @param {HTMLElement} clickedNode The element where the event was triggered.
+     */
     _setRootButton(clickedNode) {
         const container = d3.select(clickedNode.parentNode.parentNode);
         if (!container.classed('expandable')) return;
@@ -108,9 +113,27 @@ class Toolbar {
             .on('click', button.on('click'));
     }
 
-    /** Minimal management of buttons which will be described on the help window. */
+    /**
+     * Minimal management of buttons which will be described on the help window.
+     * @param {ToolbarButton} btn The button to add.
+     * @returns {ToolbarButton} A reference to the new button.
+     */
     _addButton(btn) {
         this.buttons.push(btn);
+        return btn;
+    }
+
+    /**
+     * When buttons are added out-of-order, the help screen can be jumbled. Using
+     * this method gives control over where the button goes into the array which
+     * corresponds to the order it appears on the help screen. This doesn't affect
+     * the appearance of the functional toolbar.
+     * @param {ToolbarButton} btn The button to add.
+     * @param {Number} idx The position to insert the button into the array.
+     * @returns {ToolbarButton} A reference to the new button.
+     */
+    _addButtonAtIndex(btn, idx) {
+        this.buttons.splice(idx, 0, btn);
         return btn;
     }
 
@@ -202,12 +225,12 @@ class Toolbar {
 
         this._addButton(new ToolbarButtonToggle('#info-button', tooltipBox,
             ["Hide detailed node information", "Show detailed node information"],
-            () => { return ui.nodeInfoBox.active; },
+            () => { return ui.click.isNodeInfo; },
             () => { ui.click.toggle('nodeinfo'); })).setHelpInfo("Select left-click action");
 
         this._addButton(new ToolbarButtonToggle('#info-button-2', tooltipBox,
             ["Hide detailed node information", "Show detailed node information"],
-            () => { return ui.nodeInfoBox.active; },
+            () => { return ui.click.isNodeInfo; },
             (e, target) => {
                 ui.click.toggle('nodeinfo');
                 self._setRootButton(target);
@@ -267,11 +290,11 @@ class Toolbar {
             .setHelpInfo("Toggle legend");
 
         this._addButton(new ToolbarButtonClick('#question-button', tooltipBox,
-            "Show N2 diagram help",
+            "Display help window",
             (e, target) => { self._showHelp(); self._setRootButton(target); }));
 
         this._addButton(new ToolbarButtonClick('#question-button-2', tooltipBox,
-            "Show N2 diagram help",
+            "Display help window",
             (e, target) => { self._showHelp(); self._setRootButton(target); }));
 
         // Don't add this to the array of tracked buttons because it confuses

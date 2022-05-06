@@ -276,7 +276,7 @@ class SimpleGADriver(Driver):
         for name, meta in desvars.items():
             if name in self._designvars_discrete:
                 val = desvar_vals[name]
-                if np.isscalar(val):
+                if np.ndim(val) == 0:
                     size = 1
                 else:
                     size = len(val)
@@ -288,7 +288,7 @@ class SimpleGADriver(Driver):
         lower_bound = np.empty((count, ))
         upper_bound = np.empty((count, ))
         outer_bound = np.full((count, ), np.inf)
-        bits = np.empty((count, ), dtype=np.int)
+        bits = np.empty((count, ), dtype=np.int_)
         x0 = np.empty(count)
 
         # Figure out bounds vectors and initial design vars
@@ -1000,7 +1000,7 @@ class GeneticAlgorithm(object):
         interval = (vub - vlb) / (2**bits - 1)
         x = np.maximum(x, vlb)
         x = np.minimum(x, vub)
-        x = np.round((x - vlb) / interval).astype(np.int)
+        x = np.round((x - vlb) / interval).astype(np.int_)
         byte_str = [("0" * b + bin(i)[2:])[-b:] for i, b in zip(x, bits)]
         result = np.array([int(c) for s in byte_str for c in s])
         if self.gray_code:

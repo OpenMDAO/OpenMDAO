@@ -1,3 +1,5 @@
+// <<hpp_insert gen/utils.js>>
+// <<hpp_insert gen/defaults.js>>
 // <<hpp_insert src/OmModelData.js>>
 // <<hpp_insert src/OmDiagram.js>>
 

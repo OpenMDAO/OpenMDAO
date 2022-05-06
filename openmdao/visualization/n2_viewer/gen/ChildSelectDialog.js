@@ -9,7 +9,7 @@
 class ChildSelectDialog extends WindowDraggable {
     /**
      * Setup the basic structure of the variable selection dialog.
-     * @param {OmTreeNode} node The node to examine the variables of.
+     * @param {TreeNode} node The node to examine the variables of.
      * @param {String} color The color to make the window header/footer ribbons.
      * @param {Diagram} diag The diagram object to work with.
      */
@@ -43,7 +43,7 @@ class ChildSelectDialog extends WindowDraggable {
             if (!child.isInputOrOutput()) { continue; }
             foundVariables = true;
 
-            // Use N2Layout.getText() because Auto-IVC variable names are not usually descriptive.
+            // Use Layout.getText() because Auto-IVC variable names are not usually descriptive.
             const varName = this.diag.layout.getText(child);
             this.varNames[varName] = child;
             this.varNameArr.push(varName)

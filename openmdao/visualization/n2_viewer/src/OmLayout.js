@@ -4,7 +4,7 @@
  * Calculates and stores the size and positions of visible elements.
  * @typedef OmLayout
  * @property {ModelData} model Reference to the preprocessed model.
- * @property {OmTreeNode} zoomedElement Reference to zoomedElement managed by N2Diagram.
+ * @property {OmTreeNode} zoomedElement Reference to zoomedElement managed by Diagram.
  * @property {OmTreeNode[]} zoomedNodes  Child workNodes of the current zoomed element.
  * @property {OmTreeNode[]} visibleNodes Zoomed workNodes that are actually drawn.
  * @property {OmTreeNode[]} zoomedSolverNodes Child solver workNodes of the current zoomed element.

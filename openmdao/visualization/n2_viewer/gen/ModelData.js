@@ -70,9 +70,11 @@ class ModelData {
      * to create different type of node objects derived from TreeNode.
      * @param {Object} element A simple object that will be REPLACED with the TreeNode.
      * @param {Object} attribNames The customized attribute names for this model.
+     * @param {TreeNode} parent The node whose children array that this new node will be in.
+     * @returns {TreeNode} The newly-created object.
      */
-    _newNode(element, attribNames) {
-        return new TreeNode(element, attribNames);
+    _newNode(element, attribNames, parent) {
+        return new TreeNode(element, attribNames, parent);
     }
 
     /**
@@ -90,19 +92,16 @@ class ModelData {
      * provided by n2_viewer.py with TreeNodes.
      * @param {Object} element The current element being updated.
      */
-     _adoptNodes(element) {
-        const newNode = this._newNode(element, this._attribNames);
+     _adoptNodes(element, parent = null) {
+        const newNode = this._newNode(element, this._attribNames, parent);
 
         if (newNode.hasChildren()) {
-            for (let i in newNode.children) {
-                newNode.children[i] = this._adoptNodes(newNode.children[i]);
-                newNode.children[i].parent = newNode;
-                if (exists(newNode.children[i].parentComponent))
-                    newNode.children[i].parentComponent = newNode;
+            for (const i in newNode.children) {
+                newNode.children[i] = this._adoptNodes(newNode.children[i], newNode);
             }
         }
 
-        newNode.addFilterChild(this._attribNames);
+        if (newNode.canFilter()) newNode.addFilterChild(this._attribNames);
 
         return newNode;
     }
@@ -216,12 +215,12 @@ class ModelData {
     }
 
    /**
-     * Recurse through the model, and determine whether a group/component is
+     * Recurse through the model, and determine whether a parent node is
      * minimized or manually expanded, or an input/output hidden. If it is,
      * add it to the hiddenList array, and optionally reset its state.
      * @param {Object[]} hiddenList The provided array to populate.
      * @param {Boolean} reveal If true, make the node visible.
-     * @param {OmTreeNode} node The current node to operate on.
+     * @param {TreeNode} node The current node to operate on.
      */
     findAllHidden(hiddenList, reveal = false, node = this.root) {
         // Filtered nodes are handled by their true parents
@@ -242,7 +241,7 @@ class ModelData {
                 node.expand();
                 node.show();
                 node.draw.manuallyExpanded = false;
-                node.removeSelfFromFilter();
+                if (node.isFilteredVariable()) node.removeSelfFromFilter();
             }
         }
 
@@ -256,7 +255,7 @@ class ModelData {
     /**
      * Restore the minimized/hidden value to all the specified nodes.
      * @param {Object[]} hiddenList The list of preserved objects
-     * @param {OmTreeNode} node The current node to operate on.
+     * @param {TreeNode} node The current node to operate on.
      */
     resetAllHidden(hiddenList, node = this.root) {
         // Filtered nodes are handled by their true parents
@@ -272,14 +271,14 @@ class ModelData {
             node.expand();
             node.show();
             node.draw.manuallyExpanded = false;
-            node.removeSelfFromFilter();
+            if (node.isFilteredVariable()) node.removeSelfFromFilter();
         }
         else { // Found, restore values
             node.draw.minimized = foundEntry.draw.minimized;
             node.draw.hidden = foundEntry.draw.hidden;
             node.draw.manuallyExpanded = foundEntry.draw.manuallyExpanded;
             if (foundEntry.draw.filtered) { node.addSelfToFilter(); }
-            else { node.removeSelfFromFilter(); }
+            else { if (node.isFilteredVariable()) node.removeSelfFromFilter(); }
         }
 
         if (node.hasChildren()) {
@@ -292,7 +291,7 @@ class ModelData {
     /**
      * Set the node as not minimized and manually expanded, as well as
      * all children.
-     * @param {OmTreeNode} startNode The node to begin from.
+     * @param {TreeNode} startNode The node to begin from.
      */
      manuallyExpandAll(startNode) {
         startNode.draw.minimized = false;
@@ -307,7 +306,7 @@ class ModelData {
 
     /**
      * Set all the children of the specified node as minimized and not manually expanded.
-     * @param {OmTreeNode} startNode The node to begin from.
+     * @param {TreeNode} startNode The node to begin from.
      * @param {Boolean} [initialNode = true] Indicate the starting node.
      */
     minimizeAll(startNode, initialNode = true) {
@@ -325,7 +324,7 @@ class ModelData {
 
     /**
      * Recursively minimize non-input nodes to the specified depth.
-     * @param {OmTreeNode} node The node to work on.
+     * @param {TreeNode} node The node to work on.
      * @param {Number} chosenCollapseDepth If the node's depth is the same or more, collapse it.
      */
     minimizeToDepth(node, chosenCollapseDepth) {

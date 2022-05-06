@@ -2,7 +2,6 @@
 
 
 import sys
-import os
 
 import numpy as np
 from contextlib import contextmanager
@@ -193,8 +192,8 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
             cprint("%s%s: %s\n" % (vindent, name, val))
 
 
-def _get_printer(comm, stream):
-    if comm.rank == 0:
+def _get_printer(comm, stream, rank=0):
+    if comm.rank == rank:
         def p(*args, **kwargs):
             print(*args, file=stream, **kwargs)
     else:
@@ -228,7 +227,7 @@ def config_summary(problem, stream=sys.stdout):
                          if s.nonlinear_solver is not None]
 
     max_depth = max([len(name.split('.')) for name in sysnames])
-    setup_done = model._problem_meta['setup_status'] == _SetupStatus.POST_FINAL_SETUP
+    setup_done = model._problem_meta['setup_status'] >= _SetupStatus.POST_FINAL_SETUP
 
     if problem.comm.size > 1:
         local_max = np.array([max_depth])

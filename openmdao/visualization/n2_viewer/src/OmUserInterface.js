@@ -1,4 +1,7 @@
 // <<hpp_insert gen/UserInterface.js>>
+// <<hpp_insert src/OmToolbar.js>>
+// <<hpp_insert src/OmNodeInfo.js>>
+// <<hpp_insert src/OmLegend.js>>
 
 /**
  * Handle input events for the matrix and toolbar.
@@ -15,6 +18,26 @@ class OmUserInterface extends UserInterface {
         super(diag);
     }
 
+    /**
+     * Separate these calls from the constructor so that subclasses can
+     * set values before execution.
+     */
+    _init() {
+        this.desVars = true;
+        this.legend = new OmLegend(this.diag.modelData);
+        this.toolbar = new OmToolbar(this);
+    }
+
+    /**
+     * Create a regular node info window if the hovered object is not a solver,
+     * or a solver node info window if it is.
+     * @param {Selection} svgNodeGroup Selected object that triggered the event.
+     */
+    _newInfoBox(svgNodeGroup) {
+        this.nodeInfoBox = svgNodeGroup.classed('solver_group')? 
+            new OmSolverNodeInfo(this) : new OmNodeInfo(this);        
+    }
+
     /** Determine the style of the inactive handle (overriding superclass) */
     _inactiveResizerHandlerStyle() {
         return self.diag.showSolvers?
@@ -26,7 +49,6 @@ class OmUserInterface extends UserInterface {
      * @param {Boolean} linear True to use linear solvers, false for non-linear.
      */
     setSolvers(linear) {
-
         // Update the diagram
         this.diag.showLinearSolverNames = linear;
 
@@ -67,5 +89,31 @@ class OmUserInterface extends UserInterface {
 
         d3.select('#desvars-button').attr('class',
             this.desVars ? 'fas icon-fx-2' : 'fas icon-fx-2 active-tab-icon');
+    }
+
+    /**
+     * Minimize the specified node and recursively minimize its children.
+     * @param {OmTreeNode} node The current node to operate on.
+     */
+     _collapseOutputs(node) {
+        if (node.subsystem_type && node.subsystem_type == 'component') {
+            node.minimize();
+        }
+        if (node.hasChildren()) {
+            for (const child of node.children) {
+                this._collapseOutputs(child);
+            }
+        }
+    }
+
+    /** Save the model state to a file. Adds solver support to the base class. */
+    saveState() {
+        // Solver toggle state.
+        const extraData = {
+            'showLinearSolverNames': this.diag.showLinearSolverNames,
+            'showSolvers': this.diag.showSolvers,            
+        }
+
+        super.saveState(extraData);
     }
 }

@@ -2,7 +2,8 @@ import unittest
 
 import numpy as np
 
-from openmdao.utils.array_utils import array_connection_compatible, abs_complex, dv_abs_complex
+from openmdao.utils.array_utils import array_connection_compatible, abs_complex, dv_abs_complex, \
+    convert_neg
 from openmdao.utils.assert_utils import assert_near_equal
 
 
@@ -64,6 +65,19 @@ class TestArrayUtils(unittest.TestCase):
         row = np.array([1.0 + 2j, 1.0 + 2j, 1.0 + 2j])
         dy_check = np.vstack((row, -row, -row, -row))
         assert_near_equal(dy, dy_check, 1e-10)
+
+    def test_convert_neg(self):
+        a = np.arange(16).reshape((4,4))
+        a[2, 3] = -5
+        a[0, 1] = -7
+
+        b = convert_neg(a.copy(), a.size)
+        self.assertEqual(b[2, 3], 11)
+        self.assertEqual(b[0, 1], 9)
+
+        inds = np.where(a != b)
+        self.assertTrue(np.all(inds[0] == np.array([0,2])))
+        self.assertTrue(np.all(inds[1] == np.array([1,3])))
 
 
 if __name__ == "__main__":

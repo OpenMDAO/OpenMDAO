@@ -4,6 +4,7 @@
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.utils.array_utils import shape_to_len
 
 
 class MuxComp(ExplicitComponent):
@@ -74,7 +75,7 @@ class MuxComp(ExplicitComponent):
         kwgs = dict(options)
         in_shape = np.asarray(options['val']).shape \
             if options['shape'] is None else options['shape']
-        in_size = np.prod(in_shape)
+        in_size = shape_to_len(in_shape)
         out_shape = list(in_shape)
         out_shape.insert(options['axis'], vec_size)
         kwgs.pop('shape')

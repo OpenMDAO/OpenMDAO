@@ -4,7 +4,6 @@ Utils for dealing with arrays.
 import sys
 from itertools import product
 from copy import copy
-from numbers import Integral
 import hashlib
 
 import numpy as np
@@ -13,31 +12,51 @@ from scipy.sparse import coo_matrix
 from openmdao.core.constants import INT_DTYPE
 
 
-def shape_to_len(shape):
-    """
-    Compute length given a shape tuple.
+if sys.version_info >= (3, 8):
+    from math import prod
 
-    For realistic-dimension arrays, looping over the shape tuple is much faster than np.prod.
+    def shape_to_len(shape):
+        """
+        Compute length given a shape tuple.
 
-    Parameters
-    ----------
-    shape : tuple
-        Numpy shape tuple.
+        Parameters
+        ----------
+        shape : tuple of int or None
+            Numpy shape tuple.
 
-    Returns
-    -------
-    int
-        Length of multidimensional array.
-    """
-    if shape is None:
-        return None
+        Returns
+        -------
+        int
+            Length of array.
+        """
+        if shape is None:
+            return None
+        return prod(shape)
+else:
+    def shape_to_len(shape):
+        """
+        Compute length given a shape tuple.
 
-    length = 1
-    if not isinstance(shape, Integral):
+        For realistic-dimension arrays, looping over the shape tuple is much faster than np.prod.
+
+        Parameters
+        ----------
+        shape : tuple of int
+            Numpy shape tuple.
+
+        Returns
+        -------
+        int
+            Length of multidimensional array.
+        """
+        if shape is None:
+            return None
+
+        length = 1
         for dim in shape:
             length *= dim
 
-    return length
+        return length
 
 
 def evenly_distrib_idxs(num_divisions, arr_size):
@@ -277,13 +296,13 @@ def tile_sparse_jac(data, rows, cols, nrow, ncol, num_nodes):
     """
     nnz = len(rows)
 
-    if np.isscalar(data):
+    if np.ndim(data) == 0:
         data = data * np.ones(nnz)
 
-    if not np.isscalar(nrow):
+    if np.ndim(nrow) > 0:
         nrow = shape_to_len(nrow)
 
-    if not np.isscalar(ncol):
+    if np.ndim(ncol) > 0:
         ncol = shape_to_len(ncol)
 
     repeat_arr = np.repeat(np.arange(num_nodes), nnz)
@@ -354,6 +373,26 @@ def get_input_idx_split(full_idxs, inputs, outputs, use_full_cols, is_total):
         return [(outputs, full_idxs)]
     else:
         return [(inputs, full_idxs)]
+
+
+def convert_neg(arr, size):
+    """
+    Convert negative indices based on full array size.
+
+    Parameters
+    ----------
+    arr : ndarray
+        The index array.
+    size : int
+        The full size of the array.
+
+    Returns
+    -------
+    ndarray
+        The array with negative indices converted to positive.
+    """
+    arr[arr < 0] += size
+    return arr
 
 
 def _flatten_src_indices(src_indices, shape_in, shape_out, size_out):

@@ -10,7 +10,7 @@ class OmSymbolType extends SymbolType {
     /**
      * Determine the name and whether it's a declared partial based on info
      * from the provided node.
-     * @param {N2MatrixCell} cell The object to select the type from.
+     * @param {MatrixCell} cell The object to select the type from.
      * @param {OmModelData} model Reference to the model to get some info from it.
      */
     constructor(cell, model) {
@@ -41,7 +41,7 @@ class OmSymbolType extends SymbolType {
     /** 
      * Decide what object the cell will be drawn as, based on its position
      * in the matrix, type, source, target, and/or other conditions.
-     * @param {N2MatrixCell} cell The cell to operate on.
+     * @param {MatrixCell} cell The cell to operate on.
      * @param {ModelData} model Reference to the entire model.
      */
     getType(cell, model) {

@@ -172,11 +172,8 @@ class TestDriverScalingReport(unittest.TestCase):
         prob.model.add_design_var('indeps.y', lower=-50, upper=50)
         prob.model.add_objective('paraboloid.f_xy', index=0)
 
-        print("setup start", flush=True)
         prob.setup()
-        print("setup done", flush=True)
         prob.run_driver()
-        print("run_driver done", flush=True)
 
         # minimum value
         assert_near_equal(prob['paraboloid.f_xy'], -27.33333, 1e-6)
@@ -186,9 +183,7 @@ class TestDriverScalingReport(unittest.TestCase):
         assert_near_equal(prob['indeps.y'], -7.33333, 1e-4)
 
         # just make sure this doesn't raise an exception
-        print("scaling report start", flush=True)
         prob.driver.scaling_report(show_browser=False)
-        print("scaling report done", flush=True)
 
     def test_setup_message(self):
         x_train = np.arange(0., 10.)

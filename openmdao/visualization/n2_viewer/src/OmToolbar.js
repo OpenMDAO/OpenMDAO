@@ -23,9 +23,9 @@ class OmToolbar extends Toolbar {
         const self = this; // For callbacks that change "this". Alternative to using .bind().
         const tooltipBox = d3.select(".tool-tip");
 
-        this._addButton(new ToolbarButtonClick('#linear-solver-button', tooltipBox,
+        this._addButtonAtIndex(new ToolbarButtonClick('#linear-solver-button', tooltipBox,
             "Control solver tree display",
-            () => { ui.setSolvers(true); ui.showSolvers(); }));
+            () => { ui.setSolvers(true); ui.showSolvers(); }), 15);
 
         this._addButton(new ToolbarButtonClick('#linear-solver-button-2', tooltipBox,
             "Show linear solvers",
@@ -54,5 +54,15 @@ class OmToolbar extends Toolbar {
             ["Show optimization variables", "Hide optimization variables"],
             () => ui.desVars, () => ui.toggleDesVars()))
             .setHelpInfo("Toggle optimization variables");
+    }
+
+    _showHelp() {
+        if (!this._helpWindow) {
+            const version = d3.select('div#all-diagram-content').attr('data-openmdao-version');
+            const footerText = `OpenMDAO Version ${version} Model Hierarchy and N2 diagram`;
+
+            this._helpWindow = new DiagramHelp(this.helpInfo, footerText);
+        }
+        else this._helpWindow.show().modal(true);
     }
 }

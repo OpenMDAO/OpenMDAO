@@ -4,7 +4,7 @@ import weakref
 import hashlib
 
 import numpy as np
-from numpy import isscalar
+from numpy import ndim
 
 from openmdao.utils.name_maps import prom_name2abs_name, rel_name2abs_name
 from openmdao.utils.indexer import Indexer, indexer
@@ -241,17 +241,6 @@ class Vector(object):
                 if n in self._names:
                     yield n, v.real
 
-    def _syspath(self):
-        """
-        Return the pathname of the System that owns this Vector.
-
-        Returns
-        -------
-        str
-            The pathname of the owning System.
-        """
-        return self._system().pathname
-
     def _name2abs_name(self, name):
         """
         Map the given promoted or relative name to the absolute name.
@@ -271,7 +260,7 @@ class Vector(object):
         system = self._system()
 
         # try relative name first
-        abs_name = '.'.join((system.pathname, name)) if system.pathname else name
+        abs_name = system.pathname + '.' + name if system.pathname else name
         if abs_name in self._views:
             return abs_name
 
@@ -581,14 +570,14 @@ class Vector(object):
         arr = self.asarray()
 
         if self.nvars() == 1:
-            if isscalar(vals):
+            if ndim(vals) == 0:
                 arr[:] = vals
             else:
                 arr[:] = vals.ravel()
         else:
             start = end = 0
             for v in vals:
-                if isscalar(v):
+                if ndim(v) == 0:
                     end += 1
                     arr[start] = v
                 else:

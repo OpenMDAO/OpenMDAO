@@ -17,6 +17,7 @@ from openmdao.components.interp_util.interp_slinear import InterpLinear, Interp3
 
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 from openmdao.utils.om_warnings import warn_deprecation
+from openmdao.utils.array_utils import shape_to_len
 
 
 INTERP_METHODS = {
@@ -415,7 +416,7 @@ class InterpND(object):
                 # Scipy implementation vectorized over lookups, but not over multiple table values.
                 interp = self._interp
                 n_nodes, _ = values.shape
-                nx = np.prod(xi.shape)
+                nx = shape_to_len(xi.shape)
 
                 result = np.empty((n_nodes, nx), dtype=values.dtype)
                 derivs_val = None
@@ -431,7 +432,7 @@ class InterpND(object):
         else:
             interp = self._interp
             n_nodes, _ = values.shape
-            nx = np.prod(xi.shape)
+            nx = shape_to_len(xi.shape)
             result = np.empty((n_nodes, nx), dtype=values.dtype)
             derivs_val = None
 
