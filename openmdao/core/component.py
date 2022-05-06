@@ -16,7 +16,7 @@ from openmdao.core.constants import INT_DTYPE
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.units import simplify_unit
-from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
+from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     find_matches, make_set, convert_src_inds, conditional_error
@@ -1000,8 +1000,7 @@ class Component(System):
                                                                                  wrt_pattern))
 
             info = self._subjacs_info
-            for rel_key in product(of_matches, wrt_matches):
-                abs_key = rel_key2abs_key(self, rel_key)
+            for abs_key in abs_key_iter(self, of_matches, wrt_matches):
                 meta = info[abs_key]
                 meta['method'] = method
                 meta.update(kwargs)
@@ -1423,8 +1422,7 @@ class Component(System):
                 raise ValueError('{}: No matches were found for wrt="{}"'.format(self.msginfo,
                                                                                  wrt_pattern))
 
-            for rel_key in product(of_matches, wrt_matches):
-                abs_key = rel_key2abs_key(self, rel_key)
+            for abs_key in abs_key_iter(self, of_matches, wrt_matches):
                 if not dependent:
                     if abs_key in self._subjacs_info:
                         del self._subjacs_info[abs_key]
@@ -1448,6 +1446,7 @@ class Component(System):
                     dist_in = abs2meta_out[wrt]['distributed']
 
                 if dist_in and not dist_out and not self.matrix_free:
+                    rel_key = abs_key2rel_key(self, abs_key)
                     raise RuntimeError(f"{self.msginfo}: component has defined partial {rel_key} "
                                        "which is a non-distributed output wrt a distributed input."
                                        " This is only supported using the matrix free API.")
@@ -1483,10 +1482,10 @@ class Component(System):
                     meta['val'] = val
 
                 if rows_max >= shape[0] or cols_max >= shape[1]:
-                    of, wrt = rel_key
-                    msg = '{}: d({})/d({}): Expected {}x{} but declared at least {}x{}'
-                    raise ValueError(msg.format(self.msginfo, of, wrt, shape[0], shape[1],
-                                                rows_max + 1, cols_max + 1))
+                    of, wrt = abs_key2rel_key(self, abs_key)
+                    raise ValueError(f"{self.msginfo}: d({of})/d({wrt}): Expected {shape[0]}x"
+                                     f"{shape[1]} but declared at least {rows_max + 1}x"
+                                     f"{cols_max + 1}")
 
                 self._check_partials_meta(abs_key, meta['val'],
                                           shape if rows is None else (rows.shape[0], 1))

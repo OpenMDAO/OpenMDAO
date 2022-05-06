@@ -268,3 +268,36 @@ def key2abs_key(system, key):
         return abs_key
     else:
         return None
+
+
+def abs_key_iter(system, rel_ofs, rel_wrts):
+    """
+    Return absolute jacobian keys given relative 'of' and 'wrt' names.
+
+    Parameters
+    ----------
+    system : System
+        The scoping system.
+    rel_ofs : iter of str
+        Names of the relative 'of' variables.
+    rel_wrts : iter of str
+        Names of the relative 'wrt' variables.
+
+    Yields
+    ------
+    abs_of
+        Absolute 'of' name.
+    abs_wrt
+        Absolute 'wrt' name.
+    """
+    pname = system.pathname
+    if pname:
+        abs_wrts = [pname + '.' + r for r in rel_wrts]
+        for rel_of in rel_ofs:
+            abs_of = pname + '.' + rel_of
+            for abs_wrt in abs_wrts:
+                yield abs_of, abs_wrt
+    else:
+        for abs_of in rel_ofs:
+            for abs_wrt in rel_wrts:
+                yield abs_of, abs_wrt
