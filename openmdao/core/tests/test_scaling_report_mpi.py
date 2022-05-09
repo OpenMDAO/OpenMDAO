@@ -8,7 +8,15 @@ class TestDriverScalingReportMPI(NonMPI.TestDriverScalingReport):
     N_PROCS = 2
 
 
-class TestDriverScalingReportMPI2(NonMPI.TestDriverScalingReport2):
+class TestDriverScalingReport2MPI(NonMPI.TestDriverScalingReport2):
+    N_PROCS = 2
+
+
+class TestDriverScalingReport3MPI(NonMPI.TestDriverScalingReport3):
+    N_PROCS = 2
+
+
+class TestDiscreteScalingReportMPI(NonMPI.TestDiscreteScalingReport):
     N_PROCS = 2
 
 

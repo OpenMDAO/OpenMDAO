@@ -164,8 +164,7 @@ class TestDriverScalingReport2(unittest.TestCase):
         prob.model.connect('indeps.y', 'paraboloid.y')
 
         # setup the optimization
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'COBYLA'
+        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA')
 
         prob.model.add_design_var('indeps.x', lower=-50, upper=50)
         prob.model.add_design_var('indeps.y', lower=-50, upper=50)
@@ -184,6 +183,9 @@ class TestDriverScalingReport2(unittest.TestCase):
         # just make sure this doesn't raise an exception
         prob.driver.scaling_report(show_browser=False)
 
+
+@use_tempdirs
+class TestDriverScalingReport3(unittest.TestCase):
     def test_setup_message(self):
         x_train = np.arange(0., 10.)
         y_train = np.arange(10., 20.)
@@ -230,6 +232,7 @@ class TestDriverScalingReport2(unittest.TestCase):
         p.driver.scaling_report(show_browser=False)
 
 
+@use_tempdirs
 class TestDiscreteScalingReport(unittest.TestCase):
 
     def test_scaling_report(self):
