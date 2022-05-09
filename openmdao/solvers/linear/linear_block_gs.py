@@ -3,6 +3,7 @@
 import numpy as np
 
 from openmdao.solvers.solver import BlockLinearSolver
+from openmdao.devtools.debug import dprint
 
 
 class LinearBlockGS(BlockLinearSolver):
@@ -96,7 +97,8 @@ class LinearBlockGS(BlockLinearSolver):
             delta_d_n = d_out_vec.asarray(copy=True)
 
         if mode == 'fwd':
-            b_vec = system._vectors['residual']['linear']
+            # b_vec = system._vectors['residual']['linear']
+            par_off = system._vectors['residual']['linear']._root_offset
 
             for subsys, _ in system._subsystems_allprocs.values():
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
@@ -107,16 +109,20 @@ class LinearBlockGS(BlockLinearSolver):
                 if not subsys._is_local:
                     continue
 
+                b_vec = subsys._vectors['residual']['linear']
                 scope_out, scope_in = system._get_matvec_scope(subsys)
                 subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+
                 b_vec *= -1.0
-                b_vec += self._rhs_vec
+                off = b_vec._root_offset - par_off
+                b_vec += self._rhs_vec[off:off + len(b_vec)]
                 subsys._solve_linear(mode, self._rel_systems)
 
         else:  # rev
             subsystems = list(system._subsystems_allprocs)
             subsystems.reverse()
-            b_vec = system._vectors['output']['linear']
+            # b_vec = system._vectors['output']['linear']
+            par_off = system._vectors['output']['linear']._root_offset
 
             for sname in subsystems:
                 subsys, _ = system._subsystems_allprocs[sname]
@@ -125,11 +131,22 @@ class LinearBlockGS(BlockLinearSolver):
                     continue
 
                 if subsys._is_local:
+                    b_vec = subsys._vectors['output']['linear']
+                    # print(f"LNBGS (sub '{subsys.pathname}) ZERO out doutputs for "
+                    #       f"'{system.pathname}'")
+                    # b_vec.set_val(0.0)
+                    dprint(f"LNBGS (sub '{subsys.pathname}) ZERO out doutputs")
                     b_vec.set_val(0.0)
-                    # subsys._vectors['output']['linear'].set_val(0.0)
+
                     system._transfer('linear', mode, sname)
+                    dprint("transfer to doutputs of", sname, 'vec=',
+                           subsys._vectors['output']['linear'].asarray())
+
                     b_vec *= -1.0
-                    b_vec += self._rhs_vec
+                    dprint("add rhs_vec to -doutputs")
+                    off = b_vec._root_offset - par_off
+                    b_vec += self._rhs_vec[off:off + len(b_vec)]
+                    dprint("doutputs =", b_vec.asarray())
 
                     subsys._solve_linear(mode, self._rel_systems)
                     scope_out, scope_in = system._get_matvec_scope(subsys)

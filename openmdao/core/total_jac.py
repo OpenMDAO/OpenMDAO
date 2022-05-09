@@ -17,6 +17,7 @@ from openmdao.utils.mpi import MPI, check_mpi_env
 from openmdao.utils.coloring import _initialize_model_approx, Coloring
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 from openmdao.vectors.vector import _full_slice
+from openmdao.devtools.debug import dprint
 
 
 use_mpi = check_mpi_env()
@@ -1019,6 +1020,9 @@ class _TotalJacInfo(object):
     def _zero_vecs(self, mode):
         vecs = self.model._vectors
 
+        if mode == 'rev':
+            dprint("ZERO doutput/dresid/dinput vecs in total jac input setter")
+
         # clean out vectors from last solve
         vecs['output']['linear'].set_val(0.0)
         vecs['residual']['linear'].set_val(0.0)
@@ -1319,7 +1323,7 @@ class _TotalJacInfo(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        # print("\n\n****** COMPUTE TOTALS")
+        # dprint("\n\n****** COMPUTE TOTALS")
         debug_print = self.debug_print
         par_print = self.par_deriv_printnames
 
@@ -1327,6 +1331,7 @@ class _TotalJacInfo(object):
 
         model = self.model
         # Prepare model for calculation by cleaning out the derivatives vectors.
+        dprint("compute_totals ZERO out dinput/doutput/dresid for model")
         model._vectors['input']['linear'].set_val(0.0)
         model._vectors['output']['linear'].set_val(0.0)
         model._vectors['residual']['linear'].set_val(0.0)
@@ -1350,10 +1355,10 @@ class _TotalJacInfo(object):
         # Main loop over columns (fwd) or rows (rev) of the jacobian
         for mode in self.modes:
             for key, idx_info in self.idx_iter_dict[mode].items():
-                # print("\nKEY:", key)
+                # dprint("\nKEY:", key)
                 imeta, idx_iter = idx_info
                 for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
-                    # print("INDEX:", inds)
+                    # dprint("INDEX:", inds)
                     rel_systems, vec_names, cache_key = input_setter(inds, itermeta, mode)
 
                     if debug_print:
@@ -1375,7 +1380,7 @@ class _TotalJacInfo(object):
 
                     # restore old linear solution if cache_linear_solution was set by the user for
                     # any input variables involved in this linear solution.
-                    # print("Calling model _solve_linear")
+                    # dprint("Calling model _solve_linear")
                     with model._scaled_context_all():
                         if cache_key is not None and not has_lin_cons and self.mode == mode:
                             self._restore_linear_solution(cache_key, self.mode)
@@ -1432,6 +1437,7 @@ class _TotalJacInfo(object):
 
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
+        dprint("ZERO out dinput/doutput/dresid for model in compute_totals_approx")
         model._vectors['input']['linear'].set_val(0.0)
         model._vectors['output']['linear'].set_val(0.0)
         model._vectors['residual']['linear'].set_val(0.0)

@@ -4,6 +4,7 @@ import numpy as np
 
 from openmdao.vectors.vector import Vector, _full_slice
 from openmdao.vectors.default_transfer import DefaultTransfer
+from openmdao.devtools.debug import dprint
 
 
 class DefaultVector(Vector):
@@ -82,6 +83,7 @@ class DefaultVector(Vector):
             myslice = slice(0, 0)
 
         data = root_vec._data[myslice]
+        self._root_offset = myslice.start
 
         scaling = None
         if self._do_scaling:
@@ -298,8 +300,8 @@ class DefaultVector(Vector):
         """
         # we use _data here specifically so that imaginary part
         # will get properly reset, e.g. when the array is zeroed out.
-        # if not np.any(val):
-        #     print("ZEROING OUT!!", self._name, self._kind)
+        # if self._name == 'linear' and not np.any(val):
+        #     dprint(f"ZEROING OUT d{self._kind} for '{self._system().pathname}'")
         self._data[idxs] = val
 
     def scale_to_norm(self, mode='fwd'):

@@ -34,7 +34,8 @@ from openmdao.utils.indexer import indexer, Indexer
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     SetupWarning, PromotionWarning, MPIWarning
 from openmdao.core.constants import _SetupStatus
-from openmdao.utils.om_warnings import warn_deprecation
+from openmdao.devtools.debug import dprint
+
 
 # regex to check for valid names.
 import re
@@ -2090,14 +2091,14 @@ class Group(System):
         else:
             if mode == 'fwd' and self._conn_discrete_in2out and vec_name == 'nonlinear':
                 self._discrete_transfer(sub)
-            # print(f"{self.pathname}: transfer, sub={sub} <nothing transferred>")
+            # dprint(f"{self.pathname}: transfer, sub={sub} <nothing transferred>")
             return
 
         vec_inputs = self._vectors['input'][vec_name]
 
         if mode == 'fwd':
             if xfer is not None:
-                # print(f"{self.pathname}: transfer, sub={sub}")
+                # dprint(f"{self.pathname}: transfer, sub={sub}")
                 if self._has_input_scaling:
                     vec_inputs.scale_to_norm()
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
@@ -2105,13 +2106,13 @@ class Group(System):
                 else:
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
             # else:
-                # print(f"{self.pathname}: transfer, sub={sub} <nothing transferred>")
+                # dprint(f"{self.pathname}: transfer, sub={sub} <nothing transferred>")
             if self._conn_discrete_in2out and vec_name == 'nonlinear':
                 self._discrete_transfer(sub)
 
         else:  # rev
             if xfer is not None:
-                # print(f"{self.pathname}: transfer, sub={sub}")
+                # dprint(f"{self.pathname}: transfer, sub={sub}")
                 if self._has_input_scaling:
                     vec_inputs.scale_to_norm(mode='rev')
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
@@ -2657,7 +2658,7 @@ class Group(System):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        # print("Group", self.pathname, "_apply_linear")
+        dprint(f"{self.pathname}._apply_linear")
 
         if self._owns_approx_jac:
             jac = self._jacobian
@@ -2680,10 +2681,11 @@ class Group(System):
                         # zero out dvecs of irrelevant subsystems
                         s._vectors['residual']['linear'].set_val(0.0)
 
-            # print("group:", self.pathname, "dinputs:", self._vectors['input']['linear']._data,
+            # dprint("group:", self.pathname, "dinputs:", self._vectors['input']['linear']._data,
             #       "dresids:", self._vectors['residual']['linear']._data)
             for subsys in self._subsystems_myproc:
                 if rel_systems is None or subsys.pathname in rel_systems:
+                    dprint("GROUP", self.pathname, "calling _apply_linear on", subsys.pathname)
                     subsys._apply_linear(jac, rel_systems, mode, scope_out, scope_in)
 
             if mode == 'rev':
@@ -2691,6 +2693,7 @@ class Group(System):
                 if rel_systems is not None:
                     for s in irrelevant_subs:
                         # zero out dvecs of irrelevant subsystems
+                        dprint("ZERO out irrelevant doutputs for", s.pathname)
                         s._vectors['output']['linear'].set_val(0.0)
 
     def _solve_linear(self, mode, rel_systems):
@@ -2704,7 +2707,7 @@ class Group(System):
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
         """
-        # print("Group", self.pathname, "_solve_linear")
+        dprint(f"{self.pathname}._solve_linear")
         if self._owns_approx_jac:
             # No subsolves if we are approximating our jacobian. Instead, we behave like an
             # ExplicitComponent and pass on the values in the derivatives vectors.

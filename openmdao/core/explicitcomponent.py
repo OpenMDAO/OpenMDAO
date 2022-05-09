@@ -8,6 +8,7 @@ from openmdao.vectors.vector import _full_slice, _CompMatVecWrapper
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE
+from openmdao.devtools.debug import dprint
 
 _inst_functs = ['compute_jacvec_product']
 
@@ -342,18 +343,16 @@ class ExplicitComponent(Component):
     def _cache_jvp(self, mode):
         if mode == 'rev':
             arr = self._vectors['input']['linear'].asarray()
+            dprint(f"**** SAVING cached array {arr} from dinputs for '{self.pathname}'")
             if self._linop_cache is None:
                 self._linop_cache = arr.copy()
             else:
                 self._linop_cache[:] = arr
 
-            # print(self.pathname, '**************** saved linop cache', self._linop_cache)
-
     def _use_cached_jvp(self, mode):
         if mode == 'rev':
+            dprint(f"**** ADDING cached array {self._linop_cache} to dinputs for '{self.pathname}'")
             self._vectors['input']['linear'].iadd(self._linop_cache)
-
-            # print(self.pathname, "****************** after restoring cache, vec=", vec.asarray())
 
     def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
         """
@@ -374,7 +373,8 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        # print("Component", self.pathname, "_apply_linear")
+        if self.name == 'comp':
+            dprint(f"{self.pathname}._apply_linear")
         J = self._jacobian if jac is None else jac
 
         matfreecache = self.options['matrix_free_caching']
@@ -382,10 +382,6 @@ class ExplicitComponent(Component):
         d_inputs = self._vectors['input']['linear']
         d_resids = self._vectors['residual']['linear']
         changed = not matfreecache or self.seed_changed(self._inputs, d_inputs, d_resids, mode)
-        # if changed:
-        #     pass
-        # else:
-        #     print("USE CACHE")
 
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
             d_inputs, d_outputs, d_residuals = vecs
@@ -442,8 +438,6 @@ class ExplicitComponent(Component):
                                         val = oflat(v)
                                         val -= rflat(v)
 
-                    # print('dins:', dins._data.real, 'dres:', dres._data.real, 'douts:',
-                    # self._vectors['output']['linear']._data.real)
                     if changed:
                         # We used to negate the residual here, and then re-negate after the hook
                         with self._call_user_function('compute_jacvec_product'):
@@ -452,10 +446,7 @@ class ExplicitComponent(Component):
                             if matfreecache:
                                 self._cache_jvp(mode)
                     else:
-                        # print("SKIPPING _compute_jacvec_product", self.pathname)
                         self._use_cached_jvp(mode)
-                    # print('dins:', dins._data.real, 'dres:', dres._data.real, 'douts:',
-                    # self._vectors['output']['linear']._data.real)
                 finally:
                     d_inputs.read_only = d_residuals.read_only = False
 
@@ -471,7 +462,8 @@ class ExplicitComponent(Component):
             Set of names of relevant systems based on the current linear solve.
 
         """
-        # print("Component", self.pathname, "_solve_linear")
+        if self.name == 'comp':
+            dprint(f"{self.pathname}._solve_linear")
         d_outputs = self._vectors['output']['linear']
         d_residuals = self._vectors['residual']['linear']
 
@@ -652,7 +644,5 @@ class ExplicitComponent(Component):
         self._last_input_hash = inhash
         self._last_mode = mode
 
-        # if changed:
-        #     print("SEED CHANGE")
-
+        dprint(f"{self.pathname}: SEED CHANGED?", changed)
         return changed

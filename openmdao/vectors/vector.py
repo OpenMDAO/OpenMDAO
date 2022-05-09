@@ -68,6 +68,8 @@ class Vector(object):
         Set of variables that are relevant in the current context.
     _root_vector : Vector
         Pointer to the vector owned by the root system.
+    _root_offset : int
+        Offset of this vector into the root vector.
     _alloc_complex : bool
         If True, then space for the complex vector is also allocated.
     _data : ndarray
@@ -119,6 +121,7 @@ class Vector(object):
         self._root_vector = None
         self._data = None
         self._slices = None
+        self._root_offset = 0
 
         # Support for Complex Step
         self._alloc_complex = alloc_complex

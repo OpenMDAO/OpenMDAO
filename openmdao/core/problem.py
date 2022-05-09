@@ -52,6 +52,7 @@ except ImportError:
     PETScVector = None
 
 from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
+from openmdao.devtools.debug import dprint
 
 _contains_all = ContainsAll()
 
@@ -1395,7 +1396,7 @@ class Problem(object):
                                 mult = 1.0 / comp.comm.size
 
                             for idx in idxs:
-
+                                dprint("check_partials ZEROING out dinputs/doutputs")
                                 dinputs.set_val(0.0)
                                 dstate.set_val(0.0)
 
