@@ -1,15 +1,11 @@
-"""Define the units/scaling tests."""
+"""Define the scaling report tests."""
 import unittest
-from copy import deepcopy
 
 import numpy as np
 
 import openmdao.api as om
-from openmdao.core.driver import Driver
 from openmdao.utils.testing_utils import use_tempdirs
 
-from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
-from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayDense
 from openmdao.utils.assert_utils import assert_near_equal
 
 

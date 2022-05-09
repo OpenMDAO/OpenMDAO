@@ -1,4 +1,4 @@
-"""Define the units/scaling tests."""
+"""Define MPI version of the scaling report tests."""
 import unittest
 
 import  openmdao.core.tests.test_scaling_report as NonMPI
