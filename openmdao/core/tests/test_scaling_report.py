@@ -1,15 +1,10 @@
-"""Define the units/scaling tests."""
+"""Define the scaling report tests."""
 import unittest
-from copy import deepcopy
 
 import numpy as np
-
 import openmdao.api as om
-from openmdao.core.driver import Driver
-from openmdao.utils.testing_utils import use_tempdirs
 
-from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
-from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayDense
+from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.assert_utils import assert_near_equal
 
 
@@ -150,6 +145,10 @@ class TestDriverScalingReport(unittest.TestCase):
         data = p.driver.scaling_report(show_browser=False)
         self._check_data(data, expected)
 
+
+@use_tempdirs
+class TestDriverScalingReport2(unittest.TestCase):
+
     def test_unconstrained(self):
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
@@ -165,8 +164,7 @@ class TestDriverScalingReport(unittest.TestCase):
         prob.model.connect('indeps.y', 'paraboloid.y')
 
         # setup the optimization
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'COBYLA'
+        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA')
 
         prob.model.add_design_var('indeps.x', lower=-50, upper=50)
         prob.model.add_design_var('indeps.y', lower=-50, upper=50)
@@ -185,6 +183,9 @@ class TestDriverScalingReport(unittest.TestCase):
         # just make sure this doesn't raise an exception
         prob.driver.scaling_report(show_browser=False)
 
+
+@use_tempdirs
+class TestDriverScalingReport3(unittest.TestCase):
     def test_setup_message(self):
         x_train = np.arange(0., 10.)
         y_train = np.arange(10., 20.)
@@ -231,6 +232,7 @@ class TestDriverScalingReport(unittest.TestCase):
         p.driver.scaling_report(show_browser=False)
 
 
+@use_tempdirs
 class TestDiscreteScalingReport(unittest.TestCase):
 
     def test_scaling_report(self):
