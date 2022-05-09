@@ -8,5 +8,9 @@ class TestDriverScalingReportMPI(NonMPI.TestDriverScalingReport):
     N_PROCS = 2
 
 
+class TestDriverScalingReportMPI2(NonMPI.TestDriverScalingReport2):
+    N_PROCS = 2
+
+
 if __name__ == '__main__':
     unittest.main()

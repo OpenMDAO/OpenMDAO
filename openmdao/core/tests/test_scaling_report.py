@@ -2,10 +2,9 @@
 import unittest
 
 import numpy as np
-
 import openmdao.api as om
-from openmdao.utils.testing_utils import use_tempdirs
 
+from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.assert_utils import assert_near_equal
 
 
@@ -145,6 +144,10 @@ class TestDriverScalingReport(unittest.TestCase):
         p.final_setup()
         data = p.driver.scaling_report(show_browser=False)
         self._check_data(data, expected)
+
+
+@use_tempdirs
+class TestDriverScalingReport2(unittest.TestCase):
 
     def test_unconstrained(self):
         from openmdao.test_suite.components.paraboloid import Paraboloid
