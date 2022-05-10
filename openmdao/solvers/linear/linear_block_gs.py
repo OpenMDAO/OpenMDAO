@@ -51,6 +51,27 @@ class LinearBlockGS(BlockLinearSolver):
         self.options.declare('aitken_initial_factor', default=1.0,
                              desc='initial value for Aitken relaxation factor')
 
+    def _setup_solvers(self, system, depth):
+        """
+        Assign system instance, set depth, and optionally perform setup.
+
+        Parameters
+        ----------
+        system : <System>
+            pointer to the owning system.
+        depth : int
+            depth of the current system (already incremented).
+        """
+        super()._setup_solvers(system, depth)
+        topsol = system._problem_meta['top_LNBGS']
+        self._matfree_cache_comps = []
+        if topsol is None:  # I'm the top LNBGS solver
+            from openmdao.core.component import Component
+            for s in system.system_iter(recurse=True, typ=Component):
+                if s.options['matrix_free_caching']:
+                    self._matfree_cache_comps.append(s)
+            system._problem_meta['top_LNBGS'] = system.pathname
+
     def _iter_initialize(self):
         """
         Perform any necessary pre-processing operations.
@@ -123,6 +144,8 @@ class LinearBlockGS(BlockLinearSolver):
             subsystems.reverse()
             # b_vec = system._vectors['output']['linear']
             par_off = system._vectors['output']['linear']._root_offset
+            for s in self._matfree_cache_comps:
+                s._reset_lin_hashes()  # we're the highest level LNBGS. reset hashes for each iter
 
             for sname in subsystems:
                 subsys, _ = system._subsystems_allprocs[sname]
@@ -132,21 +155,18 @@ class LinearBlockGS(BlockLinearSolver):
 
                 if subsys._is_local:
                     b_vec = subsys._vectors['output']['linear']
-                    # print(f"LNBGS (sub '{subsys.pathname}) ZERO out doutputs for "
-                    #       f"'{system.pathname}'")
-                    # b_vec.set_val(0.0)
-                    dprint(get_indent(self), f"LNBGS (sub '{subsys.pathname}) ZERO out doutputs")
+                    dprint(get_indent(self), f"LNBGS (sub '{subsys.pathname}) ZERO doutputs")
                     b_vec.set_val(0.0)
 
                     system._transfer('linear', mode, sname)
-                    dprint(get_indent(self), "transfer to doutputs of", sname, 'vec=',
-                           subsys._vectors['output']['linear'].asarray())
+                    # dprint(get_indent(self), "transfer to doutputs of", sname, 'vec=',
+                    #     subsys._vectors['output']['linear'].asarray())
 
                     b_vec *= -1.0
-                    dprint(get_indent(self), "add rhs_vec to -doutputs")
+                    # dprint(get_indent(self), "add rhs_vec to -doutputs")
                     off = b_vec._root_offset - par_off
                     b_vec += self._rhs_vec[off:off + len(b_vec)]
-                    dprint(get_indent(self), "doutputs =", b_vec.asarray())
+                    # dprint(get_indent(self), "doutputs =", b_vec.asarray())
 
                     subsys._solve_linear(mode, self._rel_systems)
                     scope_out, scope_in = system._get_matvec_scope(subsys)

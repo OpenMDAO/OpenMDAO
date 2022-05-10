@@ -8,6 +8,7 @@ import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials, \
     assert_check_totals
 from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.devtools.debug import dprint
 
 
 class MyParaboloid(Paraboloid):
@@ -37,7 +38,7 @@ class MyParaboloid(Paraboloid):
                 dinputs['y'] += (2.0*y + 8.0 + x)*doutputs['f_xy']
 
 
-def execute_model(mode):
+def execute_model1(mode):
     prob = om.Problem()
     model = prob.model
 
@@ -62,16 +63,56 @@ def execute_model(mode):
 
     prob.run_model()
     assert_check_totals(prob.check_totals(method='cs', out_stream=None))
-    assert_check_partials(prob.check_partials(method='cs'))
+    assert_check_partials(prob.check_partials(method='cs', out_stream=None))
+    dprint('-'*50)
+    dprint(prob.compute_totals())
+
+
+def execute_model2(mode):
+    prob = om.Problem()
+    model = prob.model
+
+    model.add_subsystem('indeps', om.IndepVarComp('dv1', val=1.0))
+
+    sub1 = model.add_subsystem('sub1', om.Group())
+    sub1.add_subsystem('c1', om.ExecComp(exprs=['y = x']))
+    sub1.add_subsystem('c2', om.ExecComp(exprs=['y = x']))
+
+    sub2 = sub1.add_subsystem('sub2', om.Group())
+    comp = sub2.add_subsystem('comp', MyParaboloid(matrix_free_caching=True))
+
+    model.connect('indeps.dv1', ['sub1.c1.x', 'sub1.c2.x'])
+    sub1.connect('c1.y', 'sub2.comp.x')
+    sub1.connect('c2.y', 'sub2.comp.y')
+
+    model.add_design_var('indeps.dv1')
+    model.add_constraint('sub1.sub2.comp.f_xy')
+
+    prob.setup(mode=mode, force_alloc_complex=True)
+    # prob.set_solver_print(level=0)
+
+    prob['indeps.dv1'] = 2.
+
+    prob.run_model()
+    assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+    assert_check_partials(prob.check_partials(method='cs', out_stream=None))
+    dprint('-'*50)
+    dprint(prob.compute_totals())
 
 
 class TestLinOpCaching(unittest.TestCase):
 
     def test_matrix_free_explicit_fwd(self):
-        execute_model('fwd')
+        execute_model1('fwd')
 
     def test_matrix_free_explicit_rev(self):
-        execute_model('rev')
+        execute_model1('rev')
+
+    def test_matrix_free_explicit2_fwd(self):
+        execute_model2('fwd')
+
+    def test_matrix_free_explicit2_rev(self):
+        execute_model2('rev')
 
 if __name__ == '__main__':
-    execute_model('rev')
+    execute_model1('fwd')

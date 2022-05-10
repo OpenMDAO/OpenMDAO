@@ -2216,10 +2216,11 @@ class System(object):
 
         if clear:
             if mode == 'fwd':
-                dprint(get_indent(self), "MatvecContext ZERO out dresids (FWD mode) for", self.pathname)
+                dprint(get_indent(self), "MatvecContext ZERO dresids (FWD mode) for", self.pathname)
                 d_residuals.set_val(0.0)
             else:  # rev
-                dprint(get_indent(self), "MatvecContext ZERO out dinputs & doutputs (REV mode) for", self.pathname)
+                dprint(get_indent(self), "MatvecContext ZERO dinputs & doutputs (REV mode) for",
+                       self.pathname)
                 d_inputs.set_val(0.0)
                 d_outputs.set_val(0.0)
 

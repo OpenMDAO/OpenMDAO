@@ -1020,14 +1020,12 @@ class _TotalJacInfo(object):
     def _zero_vecs(self, mode):
         vecs = self.model._vectors
 
-        if mode == 'rev':
-            dprint("ZERO doutput/dresid/dinput vecs in total jac input setter")
-
         # clean out vectors from last solve
         vecs['output']['linear'].set_val(0.0)
         vecs['residual']['linear'].set_val(0.0)
         if mode == 'rev':
             vecs['input']['linear'].set_val(0.0)
+            # dprint("ZERO doutput/dresid/dinput vecs in total jac input setter")
 
     #
     # input setter functions
@@ -1330,7 +1328,7 @@ class _TotalJacInfo(object):
 
         model = self.model
         # Prepare model for calculation by cleaning out the derivatives vectors.
-        dprint("compute_totals ZERO out dinput/doutput/dresid for model")
+        dprint("compute_totals ZERO dinput/doutput/dresid for model")
         model._vectors['input']['linear'].set_val(0.0)
         model._vectors['output']['linear'].set_val(0.0)
         model._vectors['residual']['linear'].set_val(0.0)
@@ -1433,7 +1431,7 @@ class _TotalJacInfo(object):
 
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
-        dprint("ZERO out dinput/doutput/dresid for model in compute_totals_approx")
+        # dprint("ZERO dinput/doutput/dresid for model in compute_totals_approx")
         model._vectors['input']['linear'].set_val(0.0)
         model._vectors['output']['linear'].set_val(0.0)
         model._vectors['residual']['linear'].set_val(0.0)

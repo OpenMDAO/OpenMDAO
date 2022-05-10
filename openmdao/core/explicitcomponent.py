@@ -318,6 +318,7 @@ class ExplicitComponent(Component):
         discrete_inputs : dict or None
             Mapping of variable name to discrete value.
         """
+        dprint(get_indent(self), f"{self.pathname}._compute_jacvec_product")
         if self._run_root_only():
             if self.comm.rank == 0:
                 if discrete_inputs:
@@ -339,26 +340,6 @@ class ExplicitComponent(Component):
                 self.compute_jacvec_product(inputs, d_inputs, d_resids, mode, discrete_inputs)
             else:
                 self.compute_jacvec_product(inputs, d_inputs, d_resids, mode)
-
-    def _cache_jvp(self, dinputs, doutputs, mode):
-        if mode == 'rev':
-            if dinputs._names:
-                arr = self._vectors['input']['linear'].asarray()
-                dprint(get_indent(self),
-                    f"---> SAVING cached array {arr} from dinputs for '{self.pathname}'")
-                if self._linop_cache is None:
-                    self._linop_cache = arr.copy()
-                else:
-                    self._linop_cache[:] = arr
-            else:
-                self._reset_lin_hashes()
-                self._linop_cache = None
-
-    def _use_cached_jvp(self, mode):
-        if mode == 'rev' and self._linop_cache is not None:
-            dprint(get_indent(self),
-                   f"---> ADDING cached array {self._linop_cache} to dinputs for '{self.pathname}'")
-            self._vectors['input']['linear'].iadd(self._linop_cache)
 
     def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
         """
@@ -388,7 +369,7 @@ class ExplicitComponent(Component):
         matfreecache = self.options['matrix_free_caching']
         changed = not matfreecache or self.seed_changed(self._inputs, d_inputs, d_resids, mode)
 
-        with self._matvec_context(scope_out, scope_in, mode) as vecs:
+        with self._matvec_context(scope_out, scope_in, mode, clear=changed or mode=='fwd') as vecs:
             d_inputs, d_outputs, d_residuals = vecs
 
             # Jacobian and vectors are all scaled, unitless
@@ -405,7 +386,7 @@ class ExplicitComponent(Component):
                 # set appropriate vectors to read_only to help prevent user error
                 if mode == 'fwd':
                     d_inputs.read_only = True
-                    if matfreecache:
+                    if changed:
                         ins = _CompMatVecWrapper(self._inputs)
                         dins = _CompMatVecWrapper(d_inputs)
                     else:
@@ -414,7 +395,7 @@ class ExplicitComponent(Component):
                     dres = d_residuals
                 else:  # rev
                     d_residuals.read_only = True
-                    if matfreecache:
+                    if changed:
                         dres = _CompMatVecWrapper(d_residuals)
                     else:
                         dres = d_residuals
@@ -443,15 +424,17 @@ class ExplicitComponent(Component):
                                         val = oflat(v)
                                         val -= rflat(v)
 
+                    # dprint("dinput._names:", d_inputs._names, "doutput._names:", d_outputs._names)
                     if changed:
                         # We used to negate the residual here, and then re-negate after the hook
                         with self._call_user_function('compute_jacvec_product'):
                             self._compute_jacvec_product_wrapper(ins, dins, dres, mode,
                                                                  self._discrete_inputs)
-                            if matfreecache:
-                                self._cache_jvp(d_inputs, d_outputs, mode)
+                            if matfreecache and mode == 'rev' and not d_inputs._names:
+                                self._reset_lin_hashes()
                     else:
-                        self._use_cached_jvp(mode)
+                        dprint(get_indent(self), "SKIPPING computeJVP for", self.pathname)
+                    #     self._use_cached_jvp(mode)
                 finally:
                     d_inputs.read_only = d_residuals.read_only = False
 
@@ -467,8 +450,7 @@ class ExplicitComponent(Component):
             Set of names of relevant systems based on the current linear solve.
 
         """
-        if self.name == 'comp':
-            dprint(get_indent(self), f"{self.pathname}._solve_linear")
+        dprint(get_indent(self), f"{self.pathname}._solve_linear")
         d_outputs = self._vectors['output']['linear']
         d_residuals = self._vectors['residual']['linear']
 
@@ -647,6 +629,7 @@ class ExplicitComponent(Component):
         self._last_input_hash = inhash
         self._last_mode = mode
 
+        # dprint(get_indent(self), f"in: {inputs.asarray()}, din: {dinputs.asarray()}, dout: {doutputs.asarray()}")
         dprint(get_indent(self), f"{self.pathname}: SEED CHANGED?", changed)
         return changed
 
@@ -654,4 +637,5 @@ class ExplicitComponent(Component):
         """
         Reset all hashes used to determine if linear vectors have changed.
         """
+        dprint(get_indent(self), "RESETTING lin hashes")
         self._last_input_hash = self._last_dinput_hash = self._last_doutput_hash = ''
