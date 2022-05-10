@@ -2166,7 +2166,8 @@ class TestProblem(unittest.TestCase):
 
         c1.add_design_var('x', lower=0, upper=5)
 
-        msg = "Design variable 'initial_comp.x' is not an IndepVarComp or ImplicitComp output."
+        msg = "Design variable 'x' is connected to 'initial_comp.x', but 'initial_comp.x' is not an IndepVarComp or ImplicitComp output."
+
         with self.assertRaises(RuntimeError) as cm:
             prob.setup()
         self.assertEqual(str(cm.exception), msg)
