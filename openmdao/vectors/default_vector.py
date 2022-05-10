@@ -4,7 +4,7 @@ import numpy as np
 
 from openmdao.vectors.vector import Vector, _full_slice
 from openmdao.vectors.default_transfer import DefaultTransfer
-from openmdao.devtools.debug import dprint
+from openmdao.devtools.debug import dprint, get_indent
 
 
 class DefaultVector(Vector):
@@ -300,8 +300,6 @@ class DefaultVector(Vector):
         """
         # we use _data here specifically so that imaginary part
         # will get properly reset, e.g. when the array is zeroed out.
-        # if self._name == 'linear' and not np.any(val):
-        #     dprint(f"ZEROING OUT d{self._kind} for '{self._system().pathname}'")
         self._data[idxs] = val
 
     def scale_to_norm(self, mode='fwd'):

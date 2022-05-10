@@ -8,7 +8,7 @@ from openmdao.vectors.vector import _full_slice, _CompMatVecWrapper
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE
-from openmdao.devtools.debug import dprint
+from openmdao.devtools.debug import dprint, get_indent
 
 _inst_functs = ['compute_jacvec_product']
 
@@ -340,18 +340,24 @@ class ExplicitComponent(Component):
             else:
                 self.compute_jacvec_product(inputs, d_inputs, d_resids, mode)
 
-    def _cache_jvp(self, mode):
+    def _cache_jvp(self, dinputs, doutputs, mode):
         if mode == 'rev':
-            arr = self._vectors['input']['linear'].asarray()
-            dprint(f"**** SAVING cached array {arr} from dinputs for '{self.pathname}'")
-            if self._linop_cache is None:
-                self._linop_cache = arr.copy()
+            if dinputs._names:
+                arr = self._vectors['input']['linear'].asarray()
+                dprint(get_indent(self),
+                    f"---> SAVING cached array {arr} from dinputs for '{self.pathname}'")
+                if self._linop_cache is None:
+                    self._linop_cache = arr.copy()
+                else:
+                    self._linop_cache[:] = arr
             else:
-                self._linop_cache[:] = arr
+                self._reset_lin_hashes()
+                self._linop_cache = None
 
     def _use_cached_jvp(self, mode):
-        if mode == 'rev':
-            dprint(f"**** ADDING cached array {self._linop_cache} to dinputs for '{self.pathname}'")
+        if mode == 'rev' and self._linop_cache is not None:
+            dprint(get_indent(self),
+                   f"---> ADDING cached array {self._linop_cache} to dinputs for '{self.pathname}'")
             self._vectors['input']['linear'].iadd(self._linop_cache)
 
     def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
@@ -373,14 +379,13 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        if self.name == 'comp':
-            dprint(f"{self.pathname}._apply_linear")
+        dprint(get_indent(self), f"{self.pathname}._apply_linear")
         J = self._jacobian if jac is None else jac
-
-        matfreecache = self.options['matrix_free_caching']
 
         d_inputs = self._vectors['input']['linear']
         d_resids = self._vectors['residual']['linear']
+
+        matfreecache = self.options['matrix_free_caching']
         changed = not matfreecache or self.seed_changed(self._inputs, d_inputs, d_resids, mode)
 
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
@@ -444,7 +449,7 @@ class ExplicitComponent(Component):
                             self._compute_jacvec_product_wrapper(ins, dins, dres, mode,
                                                                  self._discrete_inputs)
                             if matfreecache:
-                                self._cache_jvp(mode)
+                                self._cache_jvp(d_inputs, d_outputs, mode)
                     else:
                         self._use_cached_jvp(mode)
                 finally:
@@ -463,7 +468,7 @@ class ExplicitComponent(Component):
 
         """
         if self.name == 'comp':
-            dprint(f"{self.pathname}._solve_linear")
+            dprint(get_indent(self), f"{self.pathname}._solve_linear")
         d_outputs = self._vectors['output']['linear']
         d_residuals = self._vectors['residual']['linear']
 
@@ -625,8 +630,6 @@ class ExplicitComponent(Component):
             True if inputs/dinputs (fwd) or doutputs (rev) have changed since last call to
             compute_jacvec_product.
         """
-        # return True
-
         inhash = inputs.get_hash()
         changed = inhash != self._last_input_hash
 
@@ -644,5 +647,11 @@ class ExplicitComponent(Component):
         self._last_input_hash = inhash
         self._last_mode = mode
 
-        dprint(f"{self.pathname}: SEED CHANGED?", changed)
+        dprint(get_indent(self), f"{self.pathname}: SEED CHANGED?", changed)
         return changed
+
+    def _reset_lin_hashes(self):
+        """
+        Reset all hashes used to determine if linear vectors have changed.
+        """
+        self._last_input_hash = self._last_dinput_hash = self._last_doutput_hash = ''

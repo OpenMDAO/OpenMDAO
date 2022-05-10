@@ -61,9 +61,8 @@ def execute_model(mode):
     prob['indeps.dv1'] = 2.
 
     prob.run_model()
-    # assert_check_partials(prob.check_partials(method='cs'))
-    totals = prob.compute_totals()
-    # assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+    assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+    assert_check_partials(prob.check_partials(method='cs'))
 
 
 class TestLinOpCaching(unittest.TestCase):

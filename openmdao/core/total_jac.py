@@ -17,7 +17,7 @@ from openmdao.utils.mpi import MPI, check_mpi_env
 from openmdao.utils.coloring import _initialize_model_approx, Coloring
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 from openmdao.vectors.vector import _full_slice
-from openmdao.devtools.debug import dprint
+from openmdao.devtools.debug import dprint, get_indent
 
 
 use_mpi = check_mpi_env()
@@ -1323,7 +1323,6 @@ class _TotalJacInfo(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        # dprint("\n\n****** COMPUTE TOTALS")
         debug_print = self.debug_print
         par_print = self.par_deriv_printnames
 
@@ -1355,10 +1354,8 @@ class _TotalJacInfo(object):
         # Main loop over columns (fwd) or rows (rev) of the jacobian
         for mode in self.modes:
             for key, idx_info in self.idx_iter_dict[mode].items():
-                # dprint("\nKEY:", key)
                 imeta, idx_iter = idx_info
                 for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
-                    # dprint("INDEX:", inds)
                     rel_systems, vec_names, cache_key = input_setter(inds, itermeta, mode)
 
                     if debug_print:
@@ -1380,7 +1377,6 @@ class _TotalJacInfo(object):
 
                     # restore old linear solution if cache_linear_solution was set by the user for
                     # any input variables involved in this linear solution.
-                    # dprint("Calling model _solve_linear")
                     with model._scaled_context_all():
                         if cache_key is not None and not has_lin_cons and self.mode == mode:
                             self._restore_linear_solution(cache_key, self.mode)

@@ -40,7 +40,7 @@ from openmdao.utils.general_utils import determine_adder_scaler, \
         conditional_error
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
-from openmdao.devtools.debug import dprint
+from openmdao.devtools.debug import dprint, get_indent
 
 
 _empty_frozen_set = frozenset()
@@ -2216,17 +2216,14 @@ class System(object):
 
         if clear:
             if mode == 'fwd':
-                dprint("MatvecContext ZERO out dresids (FWD mode) for", self.pathname)
+                dprint(get_indent(self), "MatvecContext ZERO out dresids (FWD mode) for", self.pathname)
                 d_residuals.set_val(0.0)
             else:  # rev
-                dprint("MatvecContext ZERO out dinputs & doutputs (REV mode) for", self.pathname)
+                dprint(get_indent(self), "MatvecContext ZERO out dinputs & doutputs (REV mode) for", self.pathname)
                 d_inputs.set_val(0.0)
                 d_outputs.set_val(0.0)
 
         if scope_out is None and scope_in is None:
-            # if self.pathname != 'indeps':
-            #     dprint(self.pathname, "matvec dinputs:", list(d_inputs._names), "d_outputs:",
-            #           list(d_outputs._names))
             yield d_inputs, d_outputs, d_residuals
         else:
             old_ins = d_inputs._names
@@ -2238,9 +2235,6 @@ class System(object):
                 d_inputs._names = scope_in.intersection(old_ins)
 
             try:
-                # if self.pathname != 'indeps':
-                #     dprint(self.pathname, "matvec dinputs:", list(d_inputs._names), "d_outputs:",
-                #             list(d_outputs._names))
                 yield d_inputs, d_outputs, d_residuals
             finally:
                 # reset _names so users will see full vector contents

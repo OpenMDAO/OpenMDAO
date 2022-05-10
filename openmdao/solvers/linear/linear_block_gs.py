@@ -3,7 +3,7 @@
 import numpy as np
 
 from openmdao.solvers.solver import BlockLinearSolver
-from openmdao.devtools.debug import dprint
+from openmdao.devtools.debug import dprint, get_indent
 
 
 class LinearBlockGS(BlockLinearSolver):
@@ -135,18 +135,18 @@ class LinearBlockGS(BlockLinearSolver):
                     # print(f"LNBGS (sub '{subsys.pathname}) ZERO out doutputs for "
                     #       f"'{system.pathname}'")
                     # b_vec.set_val(0.0)
-                    dprint(f"LNBGS (sub '{subsys.pathname}) ZERO out doutputs")
+                    dprint(get_indent(self), f"LNBGS (sub '{subsys.pathname}) ZERO out doutputs")
                     b_vec.set_val(0.0)
 
                     system._transfer('linear', mode, sname)
-                    dprint("transfer to doutputs of", sname, 'vec=',
+                    dprint(get_indent(self), "transfer to doutputs of", sname, 'vec=',
                            subsys._vectors['output']['linear'].asarray())
 
                     b_vec *= -1.0
-                    dprint("add rhs_vec to -doutputs")
+                    dprint(get_indent(self), "add rhs_vec to -doutputs")
                     off = b_vec._root_offset - par_off
                     b_vec += self._rhs_vec[off:off + len(b_vec)]
-                    dprint("doutputs =", b_vec.asarray())
+                    dprint(get_indent(self), "doutputs =", b_vec.asarray())
 
                     subsys._solve_linear(mode, self._rel_systems)
                     scope_out, scope_in = system._get_matvec_scope(subsys)
