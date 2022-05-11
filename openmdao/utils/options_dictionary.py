@@ -524,14 +524,14 @@ class OptionsDictionary(object):
         Parameters
         ----------
         name : str
-            name of the option.
+            Name of the option.
         default : object
             Value to be returned if option is not found.
 
         Returns
         -------
-        value : object
-            value of the option, or default if value isn't found.
+        object
+            Value of the option, or default if value isn't found.
         """
         if name in self._dict:
             return self[name]

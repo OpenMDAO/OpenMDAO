@@ -369,7 +369,8 @@ class ExplicitComponent(Component):
         matfreecache = self.options['matrix_free_caching']
         changed = not matfreecache or self.seed_changed(self._inputs, d_inputs, d_resids, mode)
 
-        with self._matvec_context(scope_out, scope_in, mode, clear=changed or mode=='fwd') as vecs:
+        with self._matvec_context(scope_out, scope_in, mode,
+                                  clear=changed or mode == 'fwd') as vecs:
             d_inputs, d_outputs, d_residuals = vecs
 
             # Jacobian and vectors are all scaled, unitless
@@ -386,7 +387,7 @@ class ExplicitComponent(Component):
                 # set appropriate vectors to read_only to help prevent user error
                 if mode == 'fwd':
                     d_inputs.read_only = True
-                    if changed:
+                    if changed and matfreecache:
                         ins = _CompMatVecWrapper(self._inputs)
                         dins = _CompMatVecWrapper(d_inputs)
                     else:
@@ -395,7 +396,7 @@ class ExplicitComponent(Component):
                     dres = d_residuals
                 else:  # rev
                     d_residuals.read_only = True
-                    if changed:
+                    if changed and matfreecache:
                         dres = _CompMatVecWrapper(d_residuals)
                     else:
                         dres = d_residuals
@@ -632,7 +633,8 @@ class ExplicitComponent(Component):
         self._last_input_hash = inhash
         self._last_mode = mode
 
-        # dprint(get_indent(self), f"in: {inputs.asarray()}, din: {dinputs.asarray()}, dout: {doutputs.asarray()}")
+        # dprint(get_indent(self), f"in: {inputs.asarray()}, din: {dinputs.asarray()},
+        #        dout: {doutputs.asarray()}")
         dprint(get_indent(self), f"{self.pathname}: SEED CHANGED?", changed)
         return changed
 

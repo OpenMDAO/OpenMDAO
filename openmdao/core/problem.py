@@ -1397,7 +1397,8 @@ class Problem(object):
                                 mult = 1.0 / comp.comm.size
 
                             for idx in idxs:
-                                dprint(comp.pathname, "check_partials ZEROING out dinputs/doutputs, idx=", idx)
+                                dprint(comp.pathname,
+                                       "check_partials ZEROING out dinputs/doutputs, idx=", idx)
                                 dinputs.set_val(0.0)
                                 dstate.set_val(0.0)
 
