@@ -452,6 +452,7 @@ class Group(System):
                     a0 = ref0
                     a1 = ref - ref0
 
+                    # No unit conversion, only scaling. Just send the scale factors.
                     scale_factors[abs_in] = {
                         'input': (a0, a1),
                     }
@@ -461,27 +462,14 @@ class Group(System):
                     a0 = ref0
                     a1 = ref - ref0
 
-                    if a1 == 1.0:
-                        # No solver scaling, just unit conversion.
-                        # Note: a case like ref=3, ref0=2 is safe to treat as unscaled for the
-                        # linear vectors because the "scaler" is 1.0.
-                        a0 = (ref0 + offset) * factor
-                        a1 = (ref - ref0) * factor
+                    # Send both unit scaling and solver scaling. Linear input vectors need to
+                    # treat them differently in reverse mode.
+                    scale_factors[abs_in] = {
+                        'input': (a0, a1, factor, offset),
+                    }
 
-                        scale_factors[abs_in] = {
-                            'input': (a0, a1),
-                        }
-
-                    else:
-                        # When we have unit conversion and solver scaling, we need to track them
-                        # independently during reverse mode linear solves, so save the unit
-                        # conversion factors too, and let the root vector sort it out.
-                        scale_factors[abs_in] = {
-                            'input': (a0, a1, factor, offset),
-                        }
-
-                        # For adder allocation check.
-                        a0 = (ref0 + offset) * factor
+                    # For adder allocation check.
+                    a0 = (ref0 + offset) * factor
 
                 # Check whether we need to allocate an adder for the input vector.
                 if np.any(np.asarray(a0)):

@@ -165,18 +165,22 @@ class DefaultVector(Vector):
                 factor_tuple = factors[abs_name][kind]
 
                 if len(factor_tuple) == 4:
-                    # Input vector unit conversion.
+                    # Only input vectors can have 4 factors. Linear input vectors need to be able
+                    # to handle the unit and solver scaling in opposite directions in reverse mode.
                     a0, a1, factor, offset = factor_tuple
 
                     if islinear:
                         scale0 = None
-                        scale1 = a1 / factor
-
+                        scale1 = factor / a1
                     else:
                         scale0 = (a0 + offset) * factor
                         scale1 = a1 * factor
                 else:
-                    scale0, scale1 = factor_tuple
+                    if self._name == 'linear' and self._typ == 'input':
+                        scale0 = None
+                        scale1 = 1.0 / factor_tuple[1]
+                    else:
+                        scale0, scale1 = factor_tuple
 
                 if scaling[0] is not None:
                     scaling[0][start:end] = scale0
@@ -317,7 +321,7 @@ class DefaultVector(Vector):
         else:
             adder, scaler = self._scaling
 
-        if mode == 'rev' and not self._has_solver_ref:
+        if mode == 'rev':
             self._scale_reverse(scaler, adder)
         else:
             self._scale_forward(scaler, adder)
@@ -337,7 +341,7 @@ class DefaultVector(Vector):
         else:
             adder, scaler = self._scaling
 
-        if mode == 'rev' and not self._has_solver_ref:
+        if mode == 'rev':
             self._scale_forward(scaler, adder)
         else:
             self._scale_reverse(scaler, adder)

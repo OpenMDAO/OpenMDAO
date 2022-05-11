@@ -3095,6 +3095,7 @@ class System(object):
                     out[abs_name] = data
                     data['source'] = abs_name
                     dist = abs_name in abs2meta_out and abs2meta_out[abs_name]['distributed']
+                    data['orig'] = (name, None)
 
                 else:  # assume an input name else KeyError
 
@@ -3106,8 +3107,7 @@ class System(object):
                         out[name] = data
                     else:
                         out[source] = data
-
-                    data['iabs'] = in_abs
+                    data['orig'] = (None, name)
 
                 data['distributed'] = dist
 
@@ -3185,13 +3185,13 @@ class System(object):
         if out and self is model:
             for var, outmeta in out.items():
                 if var in abs2meta_out and "openmdao:allow_desvar" not in abs2meta_out[var]['tags']:
-                    if 'iabs' in outmeta:
-                        conditional_error(f"{self.msginfo}: Design variable '{outmeta['orig']}' is "
-                                          f"connected to '{var}', but '{var}' is not an "
-                                          "IndepVarComp or ImplicitComp output.")
+                    src, tgt = outmeta['orig']
+                    if src is None:
+                        conditional_error(f"Design variable '{tgt}' is connected to '{var}', but "
+                                          f"'{var}' is not an IndepVarComp or ImplicitComp output.")
                     else:
-                        conditional_error(f"{self.msginfo}: Design variable '{outmeta['orig']}' is "
-                                          "not an IndepVarComp or ImplicitComp output.")
+                        conditional_error(f"Design variable '{src}' is not an IndepVarComp or "
+                                          "ImplicitComp output.")
 
         return out
 

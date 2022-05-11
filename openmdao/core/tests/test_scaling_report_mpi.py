@@ -1,11 +1,22 @@
-"""Define the units/scaling tests."""
+"""Define MPI version of the scaling report tests."""
 import unittest
 
-from openmdao.utils.testing_utils import use_tempdirs
-from openmdao.core.tests.test_scaling_report import TestDriverScalingReport
+import  openmdao.core.tests.test_scaling_report as NonMPI
 
 
-class TestDriverScalingReportMPI(TestDriverScalingReport):
+class TestDriverScalingReportMPI(NonMPI.TestDriverScalingReport):
+    N_PROCS = 2
+
+
+class TestDriverScalingReport2MPI(NonMPI.TestDriverScalingReport2):
+    N_PROCS = 2
+
+
+class TestDriverScalingReport3MPI(NonMPI.TestDriverScalingReport3):
+    N_PROCS = 2
+
+
+class TestDiscreteScalingReportMPI(NonMPI.TestDiscreteScalingReport):
     N_PROCS = 2
 
 

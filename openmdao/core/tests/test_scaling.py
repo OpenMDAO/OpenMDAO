@@ -1096,6 +1096,104 @@ class TestScaling(unittest.TestCase):
         assert_near_equal(totals['comp_2.c', 'a1']['abs error'][0], 0.0, tolerance=1e-7)
         assert_near_equal(totals['comp_2.c', 'a2']['abs error'][0], 0.0, tolerance=1e-7)
 
+    def test_totals_with_solver_scaling_part2(self):
+        # Covers the part that the previous test missed, namely when the ref is in a different
+        # component than the unit conversion.
+
+        ref = 1.000
+        ref2 = 100.0
+
+        class Comp1(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('units', None)
+
+            def setup(self):
+                self.add_input('a1', units='inch')
+                self.add_input('a2')
+                self.add_output('b', units=self.options['units'], ref = ref)
+                self.declare_partials('*', '*')
+
+            def compute(self, inputs, outputs):
+                a1 = inputs['a1']
+                a2 = inputs['a2']
+                b = 2*a1*a2
+                outputs['b'] = b
+
+            def compute_partials(self, inputs, partials):
+                a1 = inputs['a1']
+                a2 = inputs['a2']
+                partials['b', 'a1'] = 2*a2
+                partials['b', 'a2'] = 2*a1
+
+        class Comp2(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('units', None)
+
+            def setup(self):
+                self.add_input('b', units=self.options['units'])
+                self.add_output('c')
+                self.declare_partials(['c'], ['b'])
+
+            def compute(self, inputs, outputs):
+                b = inputs['b']
+                c = 2*b
+                outputs['c'] = c
+
+            def compute_partials(self, inputs, partials):
+                partials['c', 'b'] = 2
+
+        class Comp3(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('units', None)
+
+            def setup(self):
+                self.add_input('a1', units='inch')
+                self.add_input('a2')
+                self.add_output('b', units=self.options['units'], ref=ref2)
+                self.declare_partials('*', '*')
+
+            def compute(self, inputs, outputs):
+                a1 = inputs['a1']
+                a2 = inputs['a2']
+                b = 2*a1*a2
+                outputs['b'] = b
+
+            def compute_partials(self, inputs, partials):
+                a1 = inputs['a1']
+                a2 = inputs['a2']
+                partials['b', 'a1'] = 2*a2
+                partials['b', 'a2'] = 2*a1
+
+        model = om.Group()
+        model.add_subsystem('comp_1', Comp1(units='ft'), promotes = ['*'])
+        model.add_subsystem('comp_2', Comp2(units='inch'), promotes = ['*'])
+        model.add_subsystem('comp_3', Comp3(units='inch'))
+
+        model.add_design_var('a1', lower = 0.5, upper = 1.5)
+        model.add_design_var('a2', lower = 0.5, upper = 1.5)
+
+        model.set_input_defaults('a1', val = 1., units='ft')
+        model.set_input_defaults('a2', val = 1.)
+
+        model.add_objective('c')
+
+        problem = om.Problem()
+        problem.model = model
+
+        problem.driver = om.ScipyOptimizeDriver()
+        problem.driver.options['optimizer'] = 'SLSQP'
+
+        problem.setup(mode='rev')
+        problem.set_solver_print(level=0)
+        problem.run_model()
+
+        totals = problem.check_totals(compact_print=True)
+        assert_near_equal(totals['comp_2.c', 'a1']['abs error'][0], 0.0, tolerance=3e-7)
+        assert_near_equal(totals['comp_2.c', 'a2']['abs error'][0], 0.0, tolerance=3e-7)
+
 
 class MyComp(om.ExplicitComponent):
 
