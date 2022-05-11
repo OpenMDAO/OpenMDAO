@@ -1,5 +1,6 @@
 """Define the LinearBlockGS class."""
 
+import sys
 import numpy as np
 
 from openmdao.solvers.solver import BlockLinearSolver
@@ -140,16 +141,17 @@ class LinearBlockGS(BlockLinearSolver):
                 subsys._solve_linear(mode, self._rel_systems)
 
         else:  # rev
-            subsystems = list(system._subsystems_allprocs)
-            subsystems.reverse()
+            if sys.version_info >= (3, 8):
+                subsystems = reversed(system._subsystems_allprocs.values())
+            else:
+                subsystems = list(system._subsystems_allprocs.values())
+                subsystems.reverse()
             # b_vec = system._vectors['output']['linear']
             par_off = system._vectors['output']['linear']._root_offset
             for s in self._matfree_cache_comps:
                 s._reset_lin_hashes()  # we're the highest level LNBGS. reset hashes for each iter
 
-            for sname in subsystems:
-                subsys, _ = system._subsystems_allprocs[sname]
-
+            for subsys, _ in subsystems:
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
                     continue
 
@@ -158,22 +160,18 @@ class LinearBlockGS(BlockLinearSolver):
                     dprint(get_indent(self), f"LNBGS (sub '{subsys.pathname}) ZERO doutputs")
                     b_vec.set_val(0.0)
 
-                    system._transfer('linear', mode, sname)
-                    # dprint(get_indent(self), "transfer to doutputs of", sname, 'vec=',
-                    #     subsys._vectors['output']['linear'].asarray())
+                    system._transfer('linear', mode, subsys.name)
 
                     b_vec *= -1.0
-                    # dprint(get_indent(self), "add rhs_vec to -doutputs")
                     off = b_vec._root_offset - par_off
                     b_vec += self._rhs_vec[off:off + len(b_vec)]
-                    # dprint(get_indent(self), "doutputs =", b_vec.asarray())
 
                     subsys._solve_linear(mode, self._rel_systems)
                     scope_out, scope_in = system._get_matvec_scope(subsys)
 
                     subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
                 else:   # subsys not local
-                    system._transfer('linear', mode, sname)
+                    system._transfer('linear', mode, subsys.name)
 
         if use_aitken:
             if self._mode == 'fwd':
