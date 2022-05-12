@@ -2622,6 +2622,21 @@ class Group(System):
         """
         pass
 
+    def _do_apply_linear(self):
+        """
+        Return whether to call _apply_linear on this Group from within parent _apply_linear.
+
+        Returns
+        -------
+        bool
+            True if _apply_linear should be called from within a parent _apply_linear.
+        """
+        if self._owns_approx_jac:
+            jac = self._jacobian
+        elif jac is None and self._assembled_jac is not None:
+            jac = self._assembled_jac
+        return jac is not None
+
     def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.

@@ -1027,7 +1027,7 @@ class Problem(object):
                                      # src_indices are applied to the variable somewhere.
             'raise_connection_errors': True,  # If False, connection related errors in setup will
                                               # be converted to warnings.
-            'top_LNBGS': None,       # highest level LNBGS solver in the model.
+            'lin_solver_stack': None,  # stack containing active linear solvers in the model
         }
         model._setup(model_comm, mode, self._metadata)
 
