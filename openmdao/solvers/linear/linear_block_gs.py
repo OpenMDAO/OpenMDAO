@@ -148,8 +148,8 @@ class LinearBlockGS(BlockLinearSolver):
                 subsystems.reverse()
             # b_vec = system._vectors['output']['linear']
             par_off = system._vectors['output']['linear']._root_offset
-            for s in self._matfree_cache_comps:
-                s._reset_lin_hashes()  # we're the highest level LNBGS. reset hashes for each iter
+            # for s in self._matfree_cache_comps:
+            #     s._reset_lin_hashes()  # we're the highest level LNBGS. reset hashes for each iter
 
             for subsys, _ in subsystems:
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:

@@ -363,14 +363,7 @@ class ExplicitComponent(Component):
         dprint(get_indent(self), f"{self.pathname}._apply_linear")
         J = self._jacobian if jac is None else jac
 
-        d_inputs = self._vectors['input']['linear']
-        d_resids = self._vectors['residual']['linear']
-
-        matfreecache = self.options['matrix_free_caching']
-        changed = not matfreecache or self.seed_changed(self._inputs, d_inputs, d_resids, mode)
-
-        with self._matvec_context(scope_out, scope_in, mode,
-                                  clear=changed or mode == 'fwd') as vecs:
+        with self._matvec_context(scope_out, scope_in, mode) as vecs:
             d_inputs, d_outputs, d_residuals = vecs
 
             # Jacobian and vectors are all scaled, unitless
@@ -387,21 +380,8 @@ class ExplicitComponent(Component):
                 # set appropriate vectors to read_only to help prevent user error
                 if mode == 'fwd':
                     d_inputs.read_only = True
-                    if changed and matfreecache:
-                        ins = _CompMatVecWrapper(self._inputs)
-                        dins = _CompMatVecWrapper(d_inputs)
-                    else:
-                        ins = self._inputs
-                        dins = d_inputs
-                    dres = d_residuals
                 else:  # rev
                     d_residuals.read_only = True
-                    if changed and matfreecache:
-                        dres = _CompMatVecWrapper(d_residuals)
-                    else:
-                        dres = d_residuals
-                    ins = self._inputs
-                    dins = d_inputs
 
                 try:
                     # handle identity subjacs (output_or_resid wrt itself)
@@ -428,17 +408,10 @@ class ExplicitComponent(Component):
                                         val = oflat(v)
                                         val -= rflat(v)
 
-                    # dprint("dinput._names:", d_inputs._names, "doutput._names:", d_outputs._names)
-                    if changed:
-                        # We used to negate the residual here, and then re-negate after the hook
-                        with self._call_user_function('compute_jacvec_product'):
-                            self._compute_jacvec_product_wrapper(ins, dins, dres, mode,
-                                                                 self._discrete_inputs)
-                            if matfreecache and mode == 'rev' and not d_inputs._names:
-                                self._reset_lin_hashes()
-                    else:
-                        dprint(get_indent(self), "SKIPPING computeJVP for", self.pathname)
-                    #     self._use_cached_jvp(mode)
+                    # We used to negate the residual here, and then re-negate after the hook
+                    with self._call_user_function('compute_jacvec_product'):
+                        self._compute_jacvec_product_wrapper(self._inputs, d_inputs, d_residuals,
+                                                             mode, self._discrete_inputs)
                 finally:
                     d_inputs.read_only = d_residuals.read_only = False
 
@@ -594,53 +567,3 @@ class ExplicitComponent(Component):
             False.
         """
         return False
-
-    def seed_changed(self, inputs, dinputs, doutputs, mode):
-        """
-        Return True if inputs/dinputs (fwd) or doutputs (rev) have changed since last JVP call.
-
-        Parameters
-        ----------
-        inputs : Vector
-            Nonlinear input vector.
-        dinputs : Vector
-            Linear input vector.
-        doutputs : Vector
-            Linear residuals vector.
-        mode : str
-            Direction of derivative computation ('fwd' or 'rev').
-
-        Returns
-        -------
-        bool
-            True if inputs/dinputs (fwd) or doutputs (rev) have changed since last call to
-            compute_jacvec_product.
-        """
-        inhash = inputs.get_hash()
-        changed = inhash != self._last_input_hash
-
-        if mode == 'fwd':
-            dinhash = dinputs.get_hash()
-            changed |= dinhash != self._last_dinput_hash
-            self._last_dinput_hash = dinhash
-        else:  # rev
-            douthash = doutputs.get_hash()
-            changed |= douthash != self._last_doutput_hash
-            self._last_doutput_hash = douthash
-
-        changed |= mode != self._last_mode
-
-        self._last_input_hash = inhash
-        self._last_mode = mode
-
-        # dprint(get_indent(self), f"in: {inputs.asarray()}, din: {dinputs.asarray()},
-        #        dout: {doutputs.asarray()}")
-        dprint(get_indent(self), f"{self.pathname}: SEED CHANGED?", changed)
-        return changed
-
-    def _reset_lin_hashes(self):
-        """
-        Reset all hashes used to determine if linear vectors have changed.
-        """
-        dprint(get_indent(self), "RESETTING lin hashes")
-        self._last_input_hash = self._last_dinput_hash = self._last_doutput_hash = ''
