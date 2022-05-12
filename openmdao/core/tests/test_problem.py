@@ -532,13 +532,13 @@ class TestProblem(unittest.TestCase):
         if mode == 'fwd':
             seed_names = wrt
             result_names = of
-            rvec = prob.model._vectors['output']['linear']
-            lvec = prob.model._vectors['residual']['linear']
+            rvec = prob.model._doutputs
+            lvec = prob.model._dresiduals
         else:
             seed_names = of
             result_names = wrt
-            rvec = prob.model._vectors['residual']['linear']
-            lvec = prob.model._vectors['output']['linear']
+            rvec = prob.model._dresiduals
+            lvec = prob.model._doutputs
 
         J = prob.compute_totals(of, wrt, return_format='array')
 

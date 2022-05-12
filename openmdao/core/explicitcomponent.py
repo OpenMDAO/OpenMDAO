@@ -428,8 +428,8 @@ class ExplicitComponent(Component):
 
         """
         dprint(get_indent(self), f"{self.pathname}._solve_linear")
-        d_outputs = self._vectors['output']['linear']
-        d_residuals = self._vectors['residual']['linear']
+        d_outputs = self._doutputs
+        d_residuals = self._dresiduals
 
         if mode == 'fwd':
             if self._has_resid_scaling:

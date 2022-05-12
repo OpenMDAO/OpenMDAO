@@ -67,8 +67,8 @@ class SubProbComp(om.ExplicitComponent):
                 seed['comp.inp'][:] = 0.0
                 seed[rhsname][rhs_i] = 1.0
                 for i in range(self.num_nodes):
-                    p.model._vectors['output']['linear'].set_val(0.0)
-                    p.model._vectors['residual']['linear'].set_val(0.0)
+                    p.model._doutputs.set_val(0.0)
+                    p.model._dresiduals.set_val(0.0)
                     jvp = p.compute_jacvec_product(of=['comp.out'], wrt=['comp.x','comp.inp'], mode='fwd', seed=seed)
                     seed['comp.inp'][:] = jvp['comp.out']
 
@@ -96,8 +96,8 @@ class SubProbComp(om.ExplicitComponent):
             comp._inputs['inp'] = comp._outputs['out']
 
         for i in range(self.num_nodes):
-            p.model._vectors['output']['linear'].set_val(0.0)
-            p.model._vectors['residual']['linear'].set_val(0.0)
+            p.model._doutputs.set_val(0.0)
+            p.model._dresiduals.set_val(0.0)
             comp._inputs['inp'] = stack.pop()
             comp._inputs['x'] = inputs['x']
             p.model._linearize(None)

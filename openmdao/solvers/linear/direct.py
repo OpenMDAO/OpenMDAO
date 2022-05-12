@@ -230,8 +230,8 @@ class DirectSolver(LinearSolver):
             Jacobian matrix.
         """
         system = self._system()
-        bvec = system._vectors['residual']['linear']
-        xvec = system._vectors['output']['linear']
+        bvec = system._dresiduals
+        xvec = system._doutputs
 
         # First make a backup of the vectors
         b_data = bvec.asarray(copy=True)
@@ -423,8 +423,8 @@ class DirectSolver(LinearSolver):
         iproc = system.comm.rank
         nproc = system.comm.size
 
-        d_residuals = system._vectors['residual']['linear']
-        d_outputs = system._vectors['output']['linear']
+        d_residuals = system._dresiduals
+        d_outputs = system._doutputs
 
         # assign x and b vectors based on mode
         if mode == 'fwd':

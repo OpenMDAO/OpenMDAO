@@ -56,8 +56,8 @@ class LinearUserDefined(LinearSolver):
         if solve is None:
             solve = system.solve_linear
 
-        d_outputs = system._vectors['output']['linear']
-        d_resids = system._vectors['residual']['linear']
+        d_outputs = system._doutputs
+        d_resids = system._dresiduals
 
         self._iter_count = 0
 

@@ -1167,7 +1167,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)
 
-        self.assertFalse(model._vectors['output']['linear']._alloc_complex,
+        self.assertFalse(model._doutputs._alloc_complex,
                          msg="Linear vector should not be allocated as complex.")
 
     def test_desvar_and_response_with_indices(self):

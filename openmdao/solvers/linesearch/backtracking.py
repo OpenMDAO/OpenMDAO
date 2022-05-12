@@ -213,7 +213,7 @@ class BoundsEnforceLS(LinesearchSolver):
         system = self._system()
 
         u = system._outputs
-        du = system._vectors['output']['linear']
+        du = system._doutputs
 
         if not system._has_bounds:
             u += du
@@ -291,7 +291,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         self.alpha = alpha = self.options['alpha']
 
         u = system._outputs
-        du = system._vectors['output']['linear']
+        du = system._doutputs
 
         self._run_apply()
         phi0 = self._line_search_objective()
@@ -424,7 +424,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
 
         system = self._system()
         u = system._outputs
-        du = system._vectors['output']['linear']  # Newton step
+        du = system._doutputs  # Newton step
 
         self._iter_count = 0
         phi = self._iter_initialize()

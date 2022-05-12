@@ -65,9 +65,9 @@ class LinearBlockGS(BlockLinearSolver):
         """
         if self.options['use_aitken']:
             if self._mode == 'fwd':
-                self._delta_d_n_1 = self._system()._vectors['output']['linear'].asarray(copy=True)
+                self._delta_d_n_1 = self._system()._doutputs.asarray(copy=True)
             else:
-                self._delta_d_n_1 = self._system()._vectors['residual']['linear'].asarray(copy=True)
+                self._delta_d_n_1 = self._system()._dresiduals.asarray(copy=True)
             self._theta_n_1 = 1.0
 
         return super()._iter_initialize()
@@ -90,16 +90,16 @@ class LinearBlockGS(BlockLinearSolver):
 
             # store a copy of the outputs, used to compute the change in outputs later
             if self._mode == 'fwd':
-                d_out_vec = system._vectors['output']['linear']
+                d_out_vec = system._doutputs
             else:
-                d_out_vec = system._vectors['residual']['linear']
+                d_out_vec = system._dresiduals
 
             d_n = d_out_vec.asarray(copy=True)
             delta_d_n = d_out_vec.asarray(copy=True)
 
         if mode == 'fwd':
-            # b_vec = system._vectors['residual']['linear']
-            par_off = system._vectors['residual']['linear']._root_offset
+            # b_vec = system._dresiduals
+            par_off = system._dresiduals._root_offset
 
             for subsys, _ in system._subsystems_allprocs.values():
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
@@ -110,7 +110,7 @@ class LinearBlockGS(BlockLinearSolver):
                 if not subsys._is_local:
                     continue
 
-                b_vec = subsys._vectors['residual']['linear']
+                b_vec = subsys._dresiduals
                 scope_out, scope_in = system._get_matvec_scope(subsys)
                 subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
 
@@ -125,15 +125,15 @@ class LinearBlockGS(BlockLinearSolver):
             else:
                 subsystems = list(system._subsystems_allprocs.values())
                 subsystems.reverse()
-            # b_vec = system._vectors['output']['linear']
-            par_off = system._vectors['output']['linear']._root_offset
+            # b_vec = system._doutputs
+            par_off = system._doutputs._root_offset
 
             for subsys, _ in subsystems:
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
                     continue
 
                 if subsys._is_local:
-                    b_vec = subsys._vectors['output']['linear']
+                    b_vec = subsys._doutputs
                     dprint(get_indent(self), f"LNBGS (sub '{subsys.pathname}) ZERO doutputs")
                     b_vec.set_val(0.0)
 
@@ -152,11 +152,11 @@ class LinearBlockGS(BlockLinearSolver):
 
         if use_aitken:
             if self._mode == 'fwd':
-                d_resid_vec = system._vectors['residual']['linear']
-                d_out_vec = system._vectors['output']['linear']
+                d_resid_vec = system._dresiduals
+                d_out_vec = system._doutputs
             else:
-                d_resid_vec = system._vectors['output']['linear']
-                d_out_vec = system._vectors['residual']['linear']
+                d_resid_vec = system._doutputs
+                d_out_vec = system._dresiduals
 
             theta_n = self.options['aitken_initial_factor']
 

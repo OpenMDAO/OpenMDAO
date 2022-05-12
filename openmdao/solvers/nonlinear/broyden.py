@@ -530,7 +530,7 @@ class BroydenSolver(NonlinearSolver):
         dx : ndarray
             Full step in the states for this iteration.
         """
-        linear = self._system()._vectors['output']['linear']
+        linear = self._system()._doutputs
 
         if self._full_inverse:
             linear.set_val(dx)
@@ -554,8 +554,8 @@ class BroydenSolver(NonlinearSolver):
         # TODO: Can do each state in parallel if procs are available.
         system = self._system()
         states = self.options['state_vars']
-        d_res = system._vectors['residual']['linear']
-        d_out = system._vectors['output']['linear']
+        d_res = system._dresiduals
+        d_out = system._doutputs
 
         inv_jac = self.Gm
         d_res.set_val(0.0)

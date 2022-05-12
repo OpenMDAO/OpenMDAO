@@ -177,9 +177,10 @@ class CaseRecorder(object):
 
         # collect scaling arrays
         scaling_vecs = {}
-        for kind, odict in system._vectors.items():
-            scaling_vecs[kind] = scaling = {}
-            for vecname, vec in odict.items():
+        for vecname, odict in system._vectors.items():
+            for kind, vec in odict.items():
+                if kind not in scaling_vecs:
+                    scaling_vecs[kind] = scaling = {}
                 scaling[vecname] = vec._scaling
 
         # create a copy of the system's metadata excluding what is in 'options_excludes'

@@ -289,11 +289,11 @@ class PETScKrylov(LinearSolver):
         system = self._system()
 
         if self._mode == 'fwd':
-            x_vec = system._vectors['output']['linear']
-            b_vec = system._vectors['residual']['linear']
+            x_vec = system._doutputs
+            b_vec = system._dresiduals
         else:  # rev
-            x_vec = system._vectors['residual']['linear']
-            b_vec = system._vectors['output']['linear']
+            x_vec = system._dresiduals
+            b_vec = system._doutputs
 
         # set value of x vector to KSP provided value
         x_vec.set_val(_get_petsc_vec_array(in_vec))
@@ -354,11 +354,11 @@ class PETScKrylov(LinearSolver):
 
         # assign x and b vectors based on mode
         if self._mode == 'fwd':
-            x_vec = system._vectors['output']['linear']
-            b_vec = system._vectors['residual']['linear']
+            x_vec = system._doutputs
+            b_vec = system._dresiduals
         else:  # rev
-            x_vec = system._vectors['residual']['linear']
-            b_vec = system._vectors['output']['linear']
+            x_vec = system._dresiduals
+            b_vec = system._doutputs
 
         # create numpy arrays to interface with PETSc
         sol_array = x_vec.asarray(copy=True)
@@ -397,15 +397,15 @@ class PETScKrylov(LinearSolver):
             mode = self._mode
 
             # Need to clear out any junk from the inputs.
-            system._vectors['input']['linear'].set_val(0.0)
+            system._dinputs.set_val(0.0)
 
             # assign x and b vectors based on mode
             if mode == 'fwd':
-                x_vec = system._vectors['output']['linear']
-                b_vec = system._vectors['residual']['linear']
+                x_vec = system._doutputs
+                b_vec = system._dresiduals
             else:  # rev
-                x_vec = system._vectors['residual']['linear']
-                b_vec = system._vectors['output']['linear']
+                x_vec = system._dresiduals
+                b_vec = system._doutputs
 
             # set value of b vector to KSP provided value
             b_vec.set_val(_get_petsc_vec_array(in_vec))

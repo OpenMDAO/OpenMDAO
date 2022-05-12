@@ -224,8 +224,8 @@ class NewtonSolver(NonlinearSolver):
         approx_status = system._owns_approx_jac
         system._owns_approx_jac = False
 
-        system._vectors['residual']['linear'].set_vec(system._residuals)
-        system._vectors['residual']['linear'] *= -1.0
+        system._dresiduals.set_vec(system._residuals)
+        system._dresiduals *= -1.0
         my_asm_jac = self.linear_solver._assembled_jac
 
         system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
@@ -240,7 +240,7 @@ class NewtonSolver(NonlinearSolver):
             self.linesearch._do_subsolve = do_subsolve
             self.linesearch.solve()
         else:
-            system._outputs += system._vectors['output']['linear']
+            system._outputs += system._doutputs
 
         self._solver_info.pop()
 

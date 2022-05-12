@@ -458,7 +458,7 @@ class TestCheckConfig(unittest.TestCase):
                 self.add_output('y', 45.0)
 
             def check_config(self, logger):
-                x = self._vectors['input']['nonlinear']['x']
+                x = self._vectors['nonlinear']['input']['x']
                 if x != 75.0:
                     raise ValueError('Check config is being called before initial conditions are set.')
 

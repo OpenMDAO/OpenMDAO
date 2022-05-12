@@ -804,8 +804,8 @@ class Problem(object):
             lnames, rnames = wrt, of
             lkind, rkind = 'residual', 'output'
 
-        rvec = self.model._vectors[rkind]['linear']
-        lvec = self.model._vectors[lkind]['linear']
+        rvec = self.model._vectors['linear'][rkind]
+        lvec = self.model._vectors['linear'][lkind]
 
         rvec.set_val(0.)
 
@@ -1340,15 +1340,15 @@ class Problem(object):
                         print_reverse = True
                         local_opts = comp._get_check_partial_options()
 
-                        dstate = comp._vectors['output']['linear']
+                        dstate = comp._doutputs
                         if mode == 'fwd':
-                            dinputs = comp._vectors['input']['linear']
-                            doutputs = comp._vectors['residual']['linear']
+                            dinputs = comp._dinputs
+                            doutputs = comp._dresiduals
                             in_list = wrt_list
                             out_list = of_list
                         else:
-                            dinputs = comp._vectors['residual']['linear']
-                            doutputs = comp._vectors['input']['linear']
+                            dinputs = comp._dresiduals
+                            doutputs = comp._dinputs
                             in_list = of_list
                             out_list = wrt_list
 

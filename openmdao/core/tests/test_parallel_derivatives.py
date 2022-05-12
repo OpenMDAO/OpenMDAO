@@ -174,7 +174,7 @@ class ParDerivTestCase(unittest.TestCase):
         assert_near_equal(J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
         # Piggyback to make sure the distributed norm calculation is correct.
-        vec = prob.model._vectors['residual']['linear']
+        vec = prob.model._dresiduals
         norm_val = vec.get_norm()
         # NOTE: BAN updated the norm value for the PR that removed vec_names vectors.
         # the seeds for the constraints are now back to -1 instead of -.5
@@ -527,7 +527,7 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
 
         of = ['ParallelGroup1.Con1.y', 'ParallelGroup1.Con2.y']
         wrt = ['Comp1.x']
-        
+
         p = om.Problem(model=PartialDependGroup())
         p.setup(mode='fwd')
         p.run_model()

@@ -264,11 +264,17 @@ class System(object):
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         Dictionaries of vectors keyed by vec_name.
     _inputs : <Vector>
-        The inputs vector; points to _vectors['input']['nonlinear'].
+        The nonlinear inputs vector.
     _outputs : <Vector>
-        The outputs vector; points to _vectors['output']['nonlinear'].
+        The nonlinear outputs vector.
     _residuals : <Vector>
-        The residuals vector; points to _vectors['residual']['nonlinear'].
+        The nonlinear residuals vector.
+    _dinputs : <Vector>
+        The linear inputs vector.
+    _doutputs : <Vector>
+        The linear outputs vector.
+    _dresiduals : <Vector>
+        The linear residuals vector.
     _nonlinear_solver : <NonlinearSolver>
         Nonlinear solver to be used for solve_nonlinear.
     _linear_solver : <LinearSolver>
@@ -458,11 +464,14 @@ class System(object):
 
         self._full_comm = None
 
-        self._vectors = {'input': {}, 'output': {}, 'residual': {}}
+        self._vectors = {}
 
         self._inputs = None
         self._outputs = None
         self._residuals = None
+        self._dinputs = None
+        self._doutputs = None
+        self._dresiduals = None
         self._discrete_inputs = None
         self._discrete_outputs = None
 
@@ -705,7 +714,9 @@ class System(object):
         """
         # save root vecs as an attribute so that we can reuse the nonlinear scaling vecs in the
         # linear root vec
-        self._root_vecs = root_vectors = {'input': {}, 'output': {}, 'residual': {}}
+        self._root_vecs = root_vectors = {'nonlinear': {}}
+        if self._use_derivatives:
+            root_vectors['linear'] = {}
 
         force_alloc_complex = self._problem_meta['force_alloc_complex']
 
@@ -732,21 +743,19 @@ class System(object):
         if self._vector_class is None:
             self._vector_class = self._local_vector_class
 
-        for vec_name in ('nonlinear', 'linear'):
-            sizes = self._var_sizes['output']
-            ncol = 1
+        for vec_name, vec_dict in root_vectors.items():
             if vec_name == 'nonlinear':
                 alloc_complex = nl_alloc_complex
             else:
                 alloc_complex = ln_alloc_complex
 
-            for key in ['input', 'output', 'residual']:
-                root_vectors[key][vec_name] = self._vector_class(vec_name, key, self,
-                                                                 alloc_complex=alloc_complex)
+            for kind in ['input', 'output', 'residual']:
+                vec_dict[kind] = self._vector_class(vec_name, kind, self,
+                                                    alloc_complex=alloc_complex)
 
-        if 'linear' in root_vectors['input']:
-            root_vectors['input']['linear']._scaling_nl_vec = \
-                root_vectors['input']['nonlinear']._scaling
+        if 'linear' in root_vectors:
+            root_vectors['linear']['input']._scaling_nl_vec = \
+                root_vectors['nonlinear']['input']._scaling
 
         return root_vectors
 
@@ -1791,10 +1800,10 @@ class System(object):
         root_vectors : dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         """
-        self._vectors = vectors = {'input': {}, 'output': {}, 'residual': {}}
+        self._vectors = vectors = {vecname: {} for vecname in root_vectors}
 
         # Allocate complex if root vector was allocated complex.
-        alloc_complex = root_vectors['output']['nonlinear']._alloc_complex
+        alloc_complex = root_vectors['nonlinear']['output']._alloc_complex
 
         # This happens if you reconfigure and switch to 'cs' without forcing the vectors to be
         # initially allocated as complex.
@@ -1808,22 +1817,29 @@ class System(object):
 
         vector_class = self._vector_class
 
-        for vec_name in ('nonlinear', 'linear'):
+        for vec_name in root_vectors:
 
             # Only allocate complex in the vectors we need.
-            vec_alloc_complex = root_vectors['output'][vec_name]._alloc_complex
+            vec_alloc_complex = root_vectors[vec_name]['output']._alloc_complex
 
             for kind in ['input', 'output', 'residual']:
-                rootvec = root_vectors[kind][vec_name]
-                vectors[kind][vec_name] = vector_class(
+                rootvec = root_vectors[vec_name][kind]
+                vectors[vec_name][kind] = vector_class(
                     vec_name, kind, self, rootvec, alloc_complex=vec_alloc_complex)
 
-        if 'linear' in vectors['input']:
-            vectors['input']['linear']._scaling_nl_vec = vectors['input']['nonlinear']._scaling
+        if 'linear' in vectors:
+            vectors['linear']['input']._scaling_nl_vec = vectors['nonlinear']['input']._scaling
 
-        self._inputs = vectors['input']['nonlinear']
-        self._outputs = vectors['output']['nonlinear']
-        self._residuals = vectors['residual']['nonlinear']
+        nlvecs = vectors['nonlinear']
+        self._inputs = nlvecs['input']
+        self._outputs = nlvecs['output']
+        self._residuals = nlvecs['residual']
+
+        if self._use_derivatives:
+            linvecs = vectors['linear']
+            self._dinputs = linvecs['input']
+            self._doutputs = linvecs['output']
+            self._dresiduals = linvecs['residual']
 
         for subsys in self._subsystems_myproc:
             subsys._scale_factors = self._scale_factors
@@ -2160,11 +2176,11 @@ class System(object):
         Context manager that temporarily puts all vectors in a scaled state.
         """
         if self._has_output_scaling:
-            for vec in self._vectors['output'].values():
-                vec.scale_to_norm()
+            for vecs in self._vectors.values():
+                vecs['output'].scale_to_norm()
         if self._has_resid_scaling:
-            for vec in self._vectors['residual'].values():
-                vec.scale_to_norm()
+            for vecs in self._vectors.values():
+                vecs['residual'].scale_to_norm()
 
         try:
 
@@ -2173,11 +2189,11 @@ class System(object):
         finally:
 
             if self._has_output_scaling:
-                for vec in self._vectors['output'].values():
-                    vec.scale_to_phys()
+                for vecs in self._vectors.values():
+                    vecs['output'].scale_to_phys()
             if self._has_resid_scaling:
-                for vec in self._vectors['residual'].values():
-                    vec.scale_to_phys()
+                for vecs in self._vectors.values():
+                    vecs['residual'].scale_to_phys()
 
     @contextmanager
     def _matvec_context(self, scope_out, scope_in, mode, clear=True):
@@ -2210,9 +2226,9 @@ class System(object):
             with variables relevant to the current matrix vector product.
 
         """
-        d_inputs = self._vectors['input']['linear']
-        d_outputs = self._vectors['output']['linear']
-        d_residuals = self._vectors['residual']['linear']
+        d_inputs = self._dinputs
+        d_outputs = self._doutputs
+        d_residuals = self._dresiduals
 
         if clear:
             if mode == 'fwd':
@@ -2308,9 +2324,7 @@ class System(object):
             raise RuntimeError("{}: Cannot get vectors because setup has not yet been "
                                "called.".format(self.msginfo))
 
-        return (self._vectors['input']['linear'],
-                self._vectors['output']['linear'],
-                self._vectors['residual']['linear'])
+        return (self._dinputs, self._doutputs, self._dresiduals)
 
     def _get_var_offsets(self):
         """
@@ -4258,10 +4272,10 @@ class System(object):
             sub._outputs.set_complex_step_mode(active)
             sub._residuals.set_complex_step_mode(active)
 
-            if sub._vectors['output']['linear']._alloc_complex:
-                sub._vectors['output']['linear'].set_complex_step_mode(active)
-                sub._vectors['input']['linear'].set_complex_step_mode(active)
-                sub._vectors['residual']['linear'].set_complex_step_mode(active)
+            if sub._doutputs._alloc_complex:
+                sub._doutputs.set_complex_step_mode(active)
+                sub._dinputs.set_complex_step_mode(active)
+                sub._dresiduals.set_complex_step_mode(active)
 
                 if sub.linear_solver:
                     sub.linear_solver._set_complex_step_mode(active)
@@ -4452,7 +4466,7 @@ class System(object):
 
         if not discrete:
             try:
-                vec = self._vectors[kind][vec_name]
+                vec = self._vectors[vec_name][kind]
             except KeyError:
                 if abs_name in my_meta:
                     if vec_name != 'nonlinear':
@@ -4838,14 +4852,14 @@ class System(object):
         vdict = {}
         variables = filtered_vars.get(kind)
         if variables:
-            vec = self._vectors[kind][vec_name]
+            vec = self._vectors[vec_name][kind]
             rank = self.comm.rank
             discrete_vec = () if kind == 'residual' else self._var_discrete[kind]
             offset = len(self.pathname) + 1 if self.pathname else 0
 
             if self.comm.size == 1:
                 get = vec._abs_get_val
-                srcget = self._vectors['output'][vec_name]._abs_get_val
+                srcget = self._vectors[vec_name]['output']._abs_get_val
                 vdict = {}
                 if discrete_vec:
                     for n in variables:

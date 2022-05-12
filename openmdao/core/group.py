@@ -2081,16 +2081,16 @@ class Group(System):
                 self._discrete_transfer(sub)
             return
 
-        vec_inputs = self._vectors['input'][vec_name]
+        vec_inputs = self._vectors[vec_name]['input']
 
         if mode == 'fwd':
             if xfer is not None:
                 if self._has_input_scaling:
                     vec_inputs.scale_to_norm()
-                    xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
+                    xfer._transfer(vec_inputs, self._vectors[vec_name]['output'], mode)
                     vec_inputs.scale_to_phys()
                 else:
-                    xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
+                    xfer._transfer(vec_inputs, self._vectors[vec_name]['output'], mode)
             if self._conn_discrete_in2out and vec_name == 'nonlinear':
                 self._discrete_transfer(sub)
 
@@ -2098,10 +2098,10 @@ class Group(System):
             if xfer is not None:
                 if self._has_input_scaling:
                     vec_inputs.scale_to_norm(mode='rev')
-                    xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
+                    xfer._transfer(vec_inputs, self._vectors[vec_name]['output'], mode)
                     vec_inputs.scale_to_phys(mode='rev')
                 else:
-                    xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
+                    xfer._transfer(vec_inputs, self._vectors[vec_name]['output'], mode)
 
     def _discrete_transfer(self, sub):
         """
@@ -2677,7 +2677,7 @@ class Group(System):
                 if rel_systems is not None:
                     for s in irrelevant_subs:
                         # zero out dvecs of irrelevant subsystems
-                        s._vectors['residual']['linear'].set_val(0.0)
+                        s._dresiduals.set_val(0.0)
 
             for subsys in self._subsystems_myproc:
                 if rel_systems is None or subsys.pathname in rel_systems:
@@ -2688,7 +2688,7 @@ class Group(System):
                 if rel_systems is not None:
                     for s in irrelevant_subs:
                         # zero out dvecs of irrelevant subsystems
-                        s._vectors['output']['linear'].set_val(0.0)
+                        s._doutputs.set_val(0.0)
 
     def _solve_linear(self, mode, rel_systems):
         """
@@ -2705,8 +2705,8 @@ class Group(System):
         if self._owns_approx_jac:
             # No subsolves if we are approximating our jacobian. Instead, we behave like an
             # ExplicitComponent and pass on the values in the derivatives vectors.
-            d_outputs = self._vectors['output']['linear']
-            d_residuals = self._vectors['residual']['linear']
+            d_outputs = self._doutputs
+            d_residuals = self._dresiduals
 
             if mode == 'fwd':
                 if self._has_resid_scaling:

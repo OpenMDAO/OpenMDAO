@@ -78,7 +78,7 @@ else:
             myproc = group.comm.rank
 
             transfers = group._transfers = {}
-            vectors = group._vectors
+            vectors = group._vectors['nonlinear']
             offsets = group._get_var_offsets()
             mypathlen = len(group.pathname) + 1 if group.pathname else 0
             allsubs = group._subsystems_allprocs
@@ -202,9 +202,9 @@ else:
             else:
                 xfer_in = xfer_out = np.zeros(0, dtype=INT_DTYPE)
 
-            out_vec = vectors['output']['nonlinear']
+            out_vec = vectors['output']
 
-            xfer_all = PETScTransfer(vectors['input']['nonlinear'], out_vec,
+            xfer_all = PETScTransfer(vectors['input'], out_vec,
                                      xfer_in, xfer_out, group.comm)
 
             transfers['fwd'] = xfwd = {}
@@ -214,14 +214,12 @@ else:
                 xrev[None] = xfer_all
 
             for sname, inds in fwd_xfer_in.items():
-                transfers['fwd'][sname] = PETScTransfer(
-                    vectors['input']['nonlinear'], vectors['output']['nonlinear'],
-                    inds, fwd_xfer_out[sname], group.comm)
+                transfers['fwd'][sname] = PETScTransfer(vectors['input'], vectors['output'],
+                                                        inds, fwd_xfer_out[sname], group.comm)
             if rev:
                 for sname, inds in rev_xfer_out.items():
-                    transfers['rev'][sname] = PETScTransfer(
-                        vectors['input']['nonlinear'], vectors['output']['nonlinear'],
-                        rev_xfer_in[sname], inds, group.comm)
+                    transfers['rev'][sname] = PETScTransfer(vectors['input'], vectors['output'],
+                                                            rev_xfer_in[sname], inds, group.comm)
 
         def _transfer(self, in_vec, out_vec, mode='fwd'):
             """

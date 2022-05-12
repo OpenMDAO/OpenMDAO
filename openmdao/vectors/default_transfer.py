@@ -56,7 +56,7 @@ class DefaultTransfer(Transfer):
         abs2meta = group._var_abs2meta
 
         group._transfers = transfers = {}
-        vectors = group._vectors
+        vectors = group._vectors['nonlinear']
         offsets = _global2local_offsets(group._get_var_offsets())
         mypathlen = len(group.pathname + '.' if group.pathname else '')
 
@@ -136,8 +136,7 @@ class DefaultTransfer(Transfer):
             except ValueError:
                 xfer_in = xfer_out = np.zeros(0, dtype=INT_DTYPE)
 
-            xfer_all = DefaultTransfer(vectors['input']['nonlinear'],
-                                       vectors['output']['nonlinear'], xfer_in, xfer_out,
+            xfer_all = DefaultTransfer(vectors['input'], vectors['output'], xfer_in, xfer_out,
                                        group.comm)
         else:
             xfer_all = None
@@ -150,8 +149,7 @@ class DefaultTransfer(Transfer):
 
         for sname, inds in fwd_xfer_in.items():
             if inds.size > 0:
-                xfwd[sname] = DefaultTransfer(vectors['input']['nonlinear'],
-                                              vectors['output']['nonlinear'],
+                xfwd[sname] = DefaultTransfer(vectors['input'], vectors['output'],
                                               inds, fwd_xfer_out[sname], group.comm)
             else:
                 xfwd[sname] = None
@@ -159,8 +157,7 @@ class DefaultTransfer(Transfer):
         if rev:
             for sname, inds in rev_xfer_out.items():
                 if inds.size > 0:
-                    xrev[sname] = DefaultTransfer(vectors['input']['nonlinear'],
-                                                  vectors['output']['nonlinear'],
+                    xrev[sname] = DefaultTransfer(vectors['input'], vectors['output'],
                                                   rev_xfer_in[sname], inds, group.comm)
                 else:
                     xrev[sname] = None

@@ -31,7 +31,7 @@ class LinearBlockJac(BlockLinearSolver):
                 scope_out, scope_in = system._get_matvec_scope(subsys)
                 subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
 
-            b_vec = system._vectors['residual']['linear']
+            b_vec = system._dresiduals
             b_vec *= -1.0
             b_vec += self._rhs_vec
 
@@ -45,7 +45,7 @@ class LinearBlockJac(BlockLinearSolver):
 
             system._transfer('linear', mode)
 
-            b_vec = system._vectors['output']['linear']
+            b_vec = system._doutputs
             b_vec *= -1.0
             b_vec += self._rhs_vec
 

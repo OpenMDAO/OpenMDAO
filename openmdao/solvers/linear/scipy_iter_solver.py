@@ -140,11 +140,11 @@ class ScipyKrylov(LinearSolver):
         system = self._system()
 
         if self._mode == 'fwd':
-            x_vec = system._vectors['output']['linear']
-            b_vec = system._vectors['residual']['linear']
+            x_vec = system._doutputs
+            b_vec = system._dresiduals
         else:  # rev
-            x_vec = system._vectors['residual']['linear']
-            b_vec = system._vectors['output']['linear']
+            x_vec = system._dresiduals
+            b_vec = system._doutputs
 
         x_vec.set_val(in_arr)
         scope_out, scope_in = system._get_matvec_scope()
@@ -200,12 +200,12 @@ class ScipyKrylov(LinearSolver):
 
         fail = False
 
-        if self._mode == 'fwd':
-            x_vec = system._vectors['output']['linear']
-            b_vec = system._vectors['residual']['linear']
+        if mode == 'fwd':
+            x_vec = system._doutputs
+            b_vec = system._dresiduals
         else:  # rev
-            x_vec = system._vectors['residual']['linear']
-            b_vec = system._vectors['output']['linear']
+            x_vec = system._dresiduals
+            b_vec = system._doutputs
 
         x_vec_combined = x_vec.asarray()
         size = x_vec_combined.size
@@ -249,19 +249,19 @@ class ScipyKrylov(LinearSolver):
         ndarray
             The preconditioned Vector.
         """
-        system = self._system()
         mode = self._mode
+        system = self._system()
 
         # Need to clear out any junk from the inputs.
-        system._vectors['input']['linear'].set_val(0.0)
+        system._dinputs.set_val(0.0)
 
         # assign x and b vectors based on mode
         if mode == 'fwd':
-            x_vec = system._vectors['output']['linear']
-            b_vec = system._vectors['residual']['linear']
+            x_vec = system._doutputs
+            b_vec = system._dresiduals
         else:  # rev
-            x_vec = system._vectors['residual']['linear']
-            b_vec = system._vectors['output']['linear']
+            x_vec = system._dresiduals
+            b_vec = system._doutputs
 
         # set value of b vector to KSP provided value
         b_vec.set_val(in_vec)

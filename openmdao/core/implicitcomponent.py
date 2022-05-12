@@ -242,8 +242,8 @@ class ImplicitComponent(Component):
             self._linear_solver.solve(mode, rel_systems)
 
         else:
-            d_outputs = self._vectors['output']['linear']
-            d_residuals = self._vectors['residual']['linear']
+            d_outputs = self._doutputs
+            d_residuals = self._dresiduals
 
             with self._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
                 # set appropriate vectors to read_only to help prevent user error

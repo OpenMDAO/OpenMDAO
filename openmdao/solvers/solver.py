@@ -969,15 +969,15 @@ class BlockLinearSolver(LinearSolver):
     def _create_rhs_vec(self):
         system = self._system()
         if self._mode == 'fwd':
-            self._rhs_vec = system._vectors['residual']['linear'].asarray(True)
+            self._rhs_vec = system._dresiduals.asarray(True)
         else:
-            self._rhs_vec = system._vectors['output']['linear'].asarray(True)
+            self._rhs_vec = system._doutputs.asarray(True)
 
     def _update_rhs_vec(self):
         if self._mode == 'fwd':
-            self._rhs_vec[:] = self._system()._vectors['residual']['linear'].asarray()
+            self._rhs_vec[:] = self._system()._dresiduals.asarray()
         else:
-            self._rhs_vec[:] = self._system()._vectors['output']['linear'].asarray()
+            self._rhs_vec[:] = self._system()._doutputs.asarray()
         # print("Updating RHS vec to", self._rhs_vec)
 
     def _set_complex_step_mode(self, active):
@@ -1029,9 +1029,9 @@ class BlockLinearSolver(LinearSolver):
             norm.
         """
         if self._mode == 'fwd':
-            b_vecs = self._system()._vectors['residual']['linear']
+            b_vecs = self._system()._dresiduals
         else:  # rev
-            b_vecs = self._system()._vectors['output']['linear']
+            b_vecs = self._system()._doutputs
 
         b_vecs -= self._rhs_vec
         return b_vecs.get_norm()

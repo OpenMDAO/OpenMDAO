@@ -147,14 +147,14 @@ class TestPETScVector2Proc(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        vec = prob.model._vectors['output']['nonlinear']
+        vec = prob.model._vectors['nonlinear']['output']
         norm_val = vec.get_norm()
 
         assert_near_equal(norm_val, 0.22595230821097395, 1e-10)
 
         # test petsc dot while we're at it
         vec.set_val(3.)
-        vec2 = prob.model._vectors['residual']['linear']
+        vec2 = prob.model._dresiduals
         vec2.set_val(4.)
         assert_near_equal(vec.dot(vec2), 12.*6, 1e-10)
 
@@ -179,14 +179,14 @@ class TestPETScVector3Proc(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        vec = prob.model._vectors['output']['nonlinear']
+        vec = prob.model._vectors['nonlinear']['output']
         norm_val = vec.get_norm()
 
         assert_near_equal(norm_val, 0.22595230821097395, 1e-10)
 
         # test petsc dot while we're at it
         vec.set_val(3.)
-        vec2 = prob.model._vectors['residual']['linear']
+        vec2 = prob.model._dresiduals
         vec2.set_val(4.)
         assert_near_equal(vec.dot(vec2), 12.*6, 1e-10)
 
@@ -214,19 +214,19 @@ class TestPETScVector3Proc(unittest.TestCase):
 
         prob.run_model()
 
-        vec = prob.model._vectors['output']['nonlinear']
+        vec = prob.model._vectors['nonlinear']['output']
         norm_val = vec.get_norm()
         assert_near_equal(norm_val, 89.61584681293817, 1e-10)
 
         J = prob.compute_totals(of=['pp.calc1.y', 'pp.calc2.y', 'pp.calc3.y'], wrt=['des_vars.v1'])
 
-        vec = prob.model._vectors['output']['linear']
+        vec = prob.model._doutputs
         norm_val = vec.get_norm()
         assert_near_equal(norm_val, 8.888194417315589, 1e-10)
 
         # test petsc dot while we're at it
         vec.set_val(3.)
-        vec2 = prob.model._vectors['residual']['linear']
+        vec2 = prob.model._dresiduals
         vec2.set_val(4.)
         assert_near_equal(vec.dot(vec2), 12.*13, 1e-10)
 
