@@ -121,8 +121,8 @@ class LinearBlockGS(BlockLinearSolver):
                 b_vec = subsys._dresiduals
 
                 scope_out, scope_in = system._get_matvec_scope(subsys)
-                if subsys._do_apply_linear():
-                    if self._scope_out is _UNDEFINED:
+                if True:  # subsys._do_apply_linear():
+                    if True:  # self._scope_out is _UNDEFINED:
                         # assume that if self._scope_out is _UNDEFINED, so is self._scope_in
                         subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
                     else:
@@ -135,8 +135,8 @@ class LinearBlockGS(BlockLinearSolver):
                 #else:
                     #assert not np.any(b_vec._data)
 
-                scope_out = self._combine_scopes(subsys, self._scope_out, scope_out, 'output')
-                scope_in = self._combine_scopes(subsys, self._scope_in, scope_in, 'input')
+                # scope_out = self._combine_scopes(subsys, self._scope_out, scope_out, 'output')
+                # scope_in = self._combine_scopes(subsys, self._scope_in, scope_in, 'input')
 
                 subsys._solve_linear(mode, self._rel_systems, scope_out, scope_in)
 
