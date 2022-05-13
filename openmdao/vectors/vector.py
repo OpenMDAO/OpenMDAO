@@ -9,6 +9,7 @@ from numpy import ndim
 from openmdao.utils.name_maps import prom_name2abs_name, rel_name2abs_name
 from openmdao.utils.indexer import Indexer, indexer
 from openmdao.utils.array_utils import array_hash
+from openmdao.devtools.debug import dprint, get_indent
 
 
 _full_slice = slice(None)

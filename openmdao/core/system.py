@@ -37,11 +37,13 @@ from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, Promot
     UnusedOptionWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, \
-        conditional_error
+        conditional_error, env_truthy
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.devtools.debug import dprint, get_indent
 
+
+omdebug = env_truthy('OMDEBUG')
 
 _empty_frozen_set = frozenset()
 
@@ -2230,13 +2232,14 @@ class System(object):
         d_outputs = self._doutputs
         d_residuals = self._dresiduals
 
+        self.dprint(f"MatvecContext: scope_out={list(scope_out)}, scope_in={list(scope_in)}")
         if clear:
             if mode == 'fwd':
-                dprint(get_indent(self), "MatvecContext ZERO dresids (FWD mode) for", self.pathname)
+                # dprint(get_indent(self), "MatvecContext ZERO dresids (FWD mode) for", self.pathname)
                 d_residuals.set_val(0.0)
             else:  # rev
-                dprint(get_indent(self), "MatvecContext ZERO dinputs & doutputs (REV mode) for",
-                       self.pathname)
+                # dprint(get_indent(self), "MatvecContext ZERO dinputs & doutputs (REV mode) for",
+                #    self.pathname)
                 d_inputs.set_val(0.0)
                 d_outputs.set_val(0.0)
 
@@ -4076,6 +4079,17 @@ class System(object):
         """
         pass
 
+    def _do_apply_linear(self):
+        """
+        Return whether to call _apply_linear on this Group from within parent _apply_linear.
+
+        Returns
+        -------
+        bool
+            True if _apply_linear should be called from within a parent _apply_linear.
+        """
+        return True
+
     def _apply_linear(self, jac, rel_systems, mode, scope_in=None, scope_out=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
@@ -4097,7 +4111,7 @@ class System(object):
         """
         raise NotImplementedError(self.msginfo + ": _apply_linear has not been overridden")
 
-    def _solve_linear(self, mode, rel_systems):
+    def _solve_linear(self, mode, rel_systems, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
@@ -4107,6 +4121,10 @@ class System(object):
             'fwd' or 'rev'.
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
+        scope_out : set, None, or _UNDEFINED
+            Outputs relevant to possible lower level calls to _apply_linear on Components.
+        scope_in : set, None, or _UNDEFINED
+            Inputs relevant to possible lower level calls to _apply_linear on Components.
         """
         pass
 
@@ -5557,3 +5575,8 @@ class System(object):
             tarr -= toffset
 
         return sarr, tarr, tsize, has_dist_data
+
+    def dprint(self, *args, **kwargs):
+        if omdebug:
+            args = (get_indent(self), self.pathname + ':') + args
+            print(*args, **kwargs)

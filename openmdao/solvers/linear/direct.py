@@ -408,7 +408,7 @@ class DirectSolver(LinearSolver):
 
         return inv_jac
 
-    def solve(self, mode, rel_systems=None):
+    def solve(self, mode, rel_systems=None, **kwargs):
         """
         Run the solver.
 
@@ -420,8 +420,6 @@ class DirectSolver(LinearSolver):
             Names of systems relevant to the current solve.
         """
         system = self._system()
-        iproc = system.comm.rank
-        nproc = system.comm.size
 
         d_residuals = system._dresiduals
         d_outputs = system._doutputs

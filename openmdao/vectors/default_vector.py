@@ -304,6 +304,8 @@ class DefaultVector(Vector):
         """
         # we use _data here specifically so that imaginary part
         # will get properly reset, e.g. when the array is zeroed out.
+        if not np.any(val):
+            self._system().dprint(f"ZEROING {self._name} {self._kind} {self.asarray()[idxs]}")
         self._data[idxs] = val
 
     def scale_to_norm(self, mode='fwd'):

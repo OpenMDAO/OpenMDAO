@@ -7,7 +7,7 @@ from openmdao.core.component import Component
 from openmdao.vectors.vector import _full_slice, _CompMatVecWrapper
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
-from openmdao.core.constants import INT_DTYPE
+from openmdao.core.constants import INT_DTYPE, _UNDEFINED
 from openmdao.devtools.debug import dprint, get_indent
 
 _inst_functs = ['compute_jacvec_product']
@@ -360,7 +360,7 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        dprint(get_indent(self), f"{self.pathname}._apply_linear")
+        self.dprint(f"._apply_linear, scope_out={list(scope_out)}, scope_in={list(scope_in)}")
         J = self._jacobian if jac is None else jac
 
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
@@ -415,7 +415,7 @@ class ExplicitComponent(Component):
                 finally:
                     d_inputs.read_only = d_residuals.read_only = False
 
-    def _solve_linear(self, mode, rel_systems):
+    def _solve_linear(self, mode, rel_systems, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
@@ -425,7 +425,10 @@ class ExplicitComponent(Component):
             'fwd' or 'rev'.
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
-
+        scope_out : set, None, or _UNDEFINED
+            Outputs relevant to possible lower level calls to _apply_linear on Components.
+        scope_in : set, None, or _UNDEFINED
+            Inputs relevant to possible lower level calls to _apply_linear on Components.
         """
         dprint(get_indent(self), f"{self.pathname}._solve_linear")
         d_outputs = self._doutputs

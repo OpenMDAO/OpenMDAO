@@ -10,6 +10,7 @@ import weakref
 import numpy as np
 
 from openmdao.core.analysis_error import AnalysisError
+from openmdao.core.constants import _UNDEFINED
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
@@ -17,8 +18,6 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.om_warnings import issue_warning, SolverWarning
 from openmdao.core.component import Component
-
-_emptyset = set()
 
 
 class SolverInfo(object):
@@ -789,6 +788,9 @@ class LinearSolver(Solver):
         self._assembled_jac = None
         super().__init__(**kwargs)
 
+    def is_recursive(self):
+        return False
+
     def _assembled_jac_solver_iter(self):
         """
         Return a generator of linear solvers using assembled jacs.
@@ -832,7 +834,7 @@ class LinearSolver(Solver):
             raise RuntimeError("Linear solver %s doesn't support assembled "
                                "jacobians." % self.msginfo)
 
-    def solve(self, mode, rel_systems=None):
+    def solve(self, mode, rel_systems=None, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
         Run the solver.
 
@@ -842,6 +844,10 @@ class LinearSolver(Solver):
             'fwd' or 'rev'.
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
+        scope_out : set, None, or _UNDEFINED
+            Outputs relevant to possible lower level calls to _apply_linear on Components.
+        scope_in : set, None, or _UNDEFINED
+            Inputs relevant to possible lower level calls to _apply_linear on Components.
         """
         raise NotImplementedError("class %s does not implement solve()." % (type(self).__name__))
 
@@ -951,6 +957,9 @@ class BlockLinearSolver(LinearSolver):
         super()._declare_options()
         self.supports['assembled_jac'] = False
 
+    def is_recursive(self):
+        return True
+
     def _setup_solvers(self, system, depth):
         """
         Assign system instance, set depth, and optionally perform setup.
@@ -1036,7 +1045,7 @@ class BlockLinearSolver(LinearSolver):
         b_vecs -= self._rhs_vec
         return b_vecs.get_norm()
 
-    def solve(self, mode, rel_systems=None):
+    def solve(self, mode, rel_systems=None, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
         Run the solver.
 
@@ -1046,7 +1055,13 @@ class BlockLinearSolver(LinearSolver):
             'fwd' or 'rev'.
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
+        scope_out : set, None, or _UNDEFINED
+            Outputs relevant to possible lower level calls to _apply_linear on Components.
+        scope_in : set, None, or _UNDEFINED
+            Inputs relevant to possible lower level calls to _apply_linear on Components.
         """
         self._rel_systems = rel_systems
         self._mode = mode
+        self._scope_out = scope_out
+        self._scope_in = scope_in
         self._solve()

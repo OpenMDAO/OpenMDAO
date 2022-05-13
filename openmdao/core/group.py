@@ -2075,6 +2075,8 @@ class Group(System):
         """
         xfer = self._transfers[mode]
         if sub in xfer:
+            if vec_name=='linear':
+                self.dprint("xfer to SUB", sub)
             xfer = xfer[sub]
         else:
             if mode == 'fwd' and self._conn_discrete_in2out and vec_name == 'nonlinear':
@@ -2631,11 +2633,12 @@ class Group(System):
         bool
             True if _apply_linear should be called from within a parent _apply_linear.
         """
+        jac = None
         if self._owns_approx_jac:
             jac = self._jacobian
         elif jac is None and self._assembled_jac is not None:
             jac = self._assembled_jac
-        return jac is not None
+        return jac is not None or not self._linear_solver.is_recursive()
 
     def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
         """
@@ -2656,7 +2659,7 @@ class Group(System):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        dprint(get_indent(self), f"{self.pathname}._apply_linear")
+        dprint(get_indent(self), f"{self.pathname}._apply_linear", 'scope_out', scope_out, 'scope_in', scope_in)
 
         if self._owns_approx_jac:
             jac = self._jacobian
@@ -2669,15 +2672,13 @@ class Group(System):
                 jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
         # Apply recursion
         else:
-            if rel_systems is not None:
-                irrelevant_subs = [s for s in self._subsystems_myproc
-                                   if s.pathname not in rel_systems]
             if mode == 'fwd':
                 self._transfer('linear', mode)
                 if rel_systems is not None:
-                    for s in irrelevant_subs:
-                        # zero out dvecs of irrelevant subsystems
-                        s._dresiduals.set_val(0.0)
+                    for s in self._subsystems_myproc:
+                        if s.pathname not in rel_systems:
+                            # zero out dvecs of irrelevant subsystems
+                            s._dresiduals.set_val(0.0)
 
             for subsys in self._subsystems_myproc:
                 if rel_systems is None or subsys.pathname in rel_systems:
@@ -2686,11 +2687,12 @@ class Group(System):
             if mode == 'rev':
                 self._transfer('linear', mode)
                 if rel_systems is not None:
-                    for s in irrelevant_subs:
-                        # zero out dvecs of irrelevant subsystems
-                        s._doutputs.set_val(0.0)
+                    for s in self._subsystems_myproc:
+                        if s.pathname not in rel_systems:
+                            # zero out dvecs of irrelevant subsystems
+                            s._doutputs.set_val(0.0)
 
-    def _solve_linear(self, mode, rel_systems):
+    def _solve_linear(self, mode, rel_systems, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
@@ -2700,6 +2702,10 @@ class Group(System):
             'fwd' or 'rev'.
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
+        scope_out : set, None, or _UNDEFINED
+            Outputs relevant to possible lower level calls to _apply_linear on Components.
+        scope_in : set, None, or _UNDEFINED
+            Inputs relevant to possible lower level calls to _apply_linear on Components.
         """
         dprint(get_indent(self), f"{self.pathname}._solve_linear")
         if self._owns_approx_jac:
@@ -2729,7 +2735,7 @@ class Group(System):
                 d_residuals *= -1.0
 
         else:
-            self._linear_solver.solve(mode, rel_systems)
+            self._linear_solver.solve(mode, rel_systems, scope_out=scope_out, scope_in=scope_in)
 
     def _linearize(self, jac, sub_do_ln=True):
         """

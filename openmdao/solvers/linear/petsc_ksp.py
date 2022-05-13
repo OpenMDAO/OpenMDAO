@@ -325,7 +325,7 @@ class PETScKrylov(LinearSolver):
         if self.precon is not None:
             self.precon._linearize()
 
-    def solve(self, mode, rel_systems=None):
+    def solve(self, mode, rel_systems=None, **kwargs):
         """
         Solve the linear system for the problem in self._system().
 

@@ -256,10 +256,14 @@ class DefaultTransfer(Transfer):
 
         """
         if mode == 'fwd':
+            if in_vec._name=='linear':
+                in_vec._system().dprint(f"FWD transfer, {out_vec.asarray()}")
             # this works whether the vecs have multi columns or not due to broadcasting
             in_vec.set_val(out_vec.asarray()[self._out_inds.flat], self._in_inds)
             # print(f"transfer {list(out_vec.idxs2nameloc(self._out_inds).items())} --> "
             #       f"{list(in_vec.idxs2nameloc(self._in_inds).items())}")
         else:  # rev
+            if out_vec._name=='linear':
+                out_vec._system().dprint(f"REV transfer, {out_vec.asarray()}")
             out_vec.iadd(np.bincount(self._out_inds, in_vec._get_data()[self._in_inds],
                                      minlength=out_vec._data.size))
