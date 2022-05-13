@@ -181,9 +181,7 @@ class ParDerivTestCase(unittest.TestCase):
         assert_near_equal(norm_val, 6.557438524302, 1e-6)
 
 
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class DecoupledTestCase(unittest.TestCase):
-    N_PROCS = 2
     asize = 3
 
     def setup_model(self):
@@ -194,12 +192,12 @@ class DecoupledTestCase(unittest.TestCase):
 
         Indep1 = root.add_subsystem('Indep1', om.IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
         Indep2 = root.add_subsystem('Indep2', om.IndepVarComp('x', np.arange(asize+2, dtype=float)+1.0))
-        G1 = root.add_subsystem('G1', om.ParallelGroup())
+        G1 = root.add_subsystem('G1', om.ParallelGroup() if MPI else om.Group())
         G1.linear_solver = om.LinearBlockGS()
 
         c1 = G1.add_subsystem('c1', om.ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
                                                 x=np.zeros(asize), y=np.zeros(asize)))
-        c2 = G1.add_subsystem('c2', om.ExecComp('y = x[:%d] * 2.0' % asize,
+        c2 = G1.add_subsystem('c2', om.ExecComp(f'y = x[:{asize}] * 2.0',
                                                 x=np.zeros(asize+2), y=np.zeros(asize)))
 
         Con1 = root.add_subsystem('Con1', om.ExecComp('y = x * 5.0',
@@ -296,9 +294,14 @@ class DecoupledTestCase(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class IndicesTestCase(unittest.TestCase):
+class DecoupledTestCaseMPI(DecoupledTestCase):
 
     N_PROCS = 2
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class IndicesTestCase(unittest.TestCase):
+
 
     def setup_model(self, mode):
         asize = 3

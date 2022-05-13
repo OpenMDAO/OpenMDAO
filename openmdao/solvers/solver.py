@@ -924,7 +924,7 @@ class LinearSolver(Solver):
         elif iprint == 2 and print_flag:
             print(prefix + ' Converged')
 
-    def _run_apply(self):
+    def _run_apply(self, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
         Run the apply_linear method on the system.
         """
@@ -1005,6 +1005,31 @@ class BlockLinearSolver(LinearSolver):
         else:
             self._rhs_vec = self._rhs_vec.real
 
+    def _combine_scopes(self, sub, scope1, scope2, mode):
+        if scope1 is None or scope2 is None:
+            return None
+        if scope1 is _UNDEFINED:
+            return scope2
+        return scope2.union(scope1)
+
+    def _run_apply(self, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
+        """
+        Run the apply_linear method on the system.
+        """
+        self._recording_iter.push(('_run_apply', 0))
+
+        system = self._system()
+        scope_out, scope_in = system._get_matvec_scope()
+        scope_out = self._combine_scopes(system, self._scope_out, scope_out, 'output')
+        scope_in = self._combine_scopes(system, self._scope_in, scope_in, 'input')
+
+        system.dprint("_run_apply, scope_out=", scope_out, "scope_in=", scope_in)
+        try:
+            system._apply_linear(self._assembled_jac, self._rel_systems,
+                                 self._mode, scope_out, scope_in)
+        finally:
+            self._recording_iter.pop()
+
     def _iter_initialize(self):
         """
         Perform any necessary pre-processing operations.
@@ -1018,7 +1043,7 @@ class BlockLinearSolver(LinearSolver):
         """
         self._update_rhs_vec()
         if self.options['maxiter'] > 1:
-            self._run_apply()
+            self._run_apply(self._scope_out, self._scope_in)
             norm = self._iter_get_norm()
         else:
             norm = 1.0

@@ -5,6 +5,9 @@ import numpy as np
 from openmdao.vectors.vector import Vector, _full_slice
 from openmdao.vectors.default_transfer import DefaultTransfer
 from openmdao.devtools.debug import dprint, get_indent
+from openmdao.utils.general_utils import env_truthy
+
+omdebug = env_truthy('OMDEBUG')
 
 
 class DefaultVector(Vector):
@@ -304,7 +307,7 @@ class DefaultVector(Vector):
         """
         # we use _data here specifically so that imaginary part
         # will get properly reset, e.g. when the array is zeroed out.
-        if not np.any(val):
+        if omdebug and not np.any(val):
             self._system().dprint(f"ZEROING {self._name} {self._kind} {self.asarray()[idxs]}")
         self._data[idxs] = val
 

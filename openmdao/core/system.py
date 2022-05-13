@@ -2232,14 +2232,13 @@ class System(object):
         d_outputs = self._doutputs
         d_residuals = self._dresiduals
 
-        self.dprint(f"MatvecContext: scope_out={list(scope_out)}, scope_in={list(scope_in)}")
+        self.dprint("MatvecContext:" 'scope_out', sorted(scope_out)
+                    if isinstance(scope_out, frozenset) else scope_out, 'scope_in',
+                    sorted(scope_in) if isinstance(scope_in, frozenset) else scope_in)
         if clear:
             if mode == 'fwd':
-                # dprint(get_indent(self), "MatvecContext ZERO dresids (FWD mode) for", self.pathname)
                 d_residuals.set_val(0.0)
             else:  # rev
-                # dprint(get_indent(self), "MatvecContext ZERO dinputs & doutputs (REV mode) for",
-                #    self.pathname)
                 d_inputs.set_val(0.0)
                 d_outputs.set_val(0.0)
 
@@ -5577,6 +5576,18 @@ class System(object):
         return sarr, tarr, tsize, has_dist_data
 
     def dprint(self, *args, **kwargs):
+        """
+        Print function for debugging.
+
+        Only prints if OMDEBUG is set in the environment.
+
+        Parameters
+        ----------
+        *args : tuple
+            Positional arguments.
+        **kwargs : dict
+            Keyword arguments.
+        """
         if omdebug:
             args = (get_indent(self), self.pathname + ':') + args
             print(*args, **kwargs)

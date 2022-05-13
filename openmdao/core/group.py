@@ -2075,7 +2075,7 @@ class Group(System):
         """
         xfer = self._transfers[mode]
         if sub in xfer:
-            if vec_name=='linear':
+            if vec_name == 'linear':
                 self.dprint("xfer to SUB", sub)
             xfer = xfer[sub]
         else:
@@ -2659,7 +2659,11 @@ class Group(System):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        dprint(get_indent(self), f"{self.pathname}._apply_linear", 'scope_out', scope_out, 'scope_in', scope_in)
+        self.dprint(f"_apply_linear", 'scope_out', sorted(scope_out)
+                    if isinstance(scope_out, frozenset) else scope_out, 'scope_in', sorted(scope_in)
+                    if isinstance(scope_in, frozenset) else scope_in)
+        self.dprint("_apply_linear, doutputs=", self._doutputs.asarray(), "dinputs=",
+                    self._dinputs.asarray(), "dresids", self._dresiduals.asarray())
 
         if self._owns_approx_jac:
             jac = self._jacobian
@@ -2692,6 +2696,9 @@ class Group(System):
                             # zero out dvecs of irrelevant subsystems
                             s._doutputs.set_val(0.0)
 
+        self.dprint("LEAVING _apply_linear, doutputs=", self._doutputs.asarray(), "dinputs=",
+                    self._dinputs.asarray(), "dresids", self._dresiduals.asarray())
+
     def _solve_linear(self, mode, rel_systems, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
@@ -2707,7 +2714,9 @@ class Group(System):
         scope_in : set, None, or _UNDEFINED
             Inputs relevant to possible lower level calls to _apply_linear on Components.
         """
-        dprint(get_indent(self), f"{self.pathname}._solve_linear")
+        self.dprint("_solve_linear, doutputs=", self._doutputs.asarray(), "dresids=",
+                    self._dresiduals.asarray())
+
         if self._owns_approx_jac:
             # No subsolves if we are approximating our jacobian. Instead, we behave like an
             # ExplicitComponent and pass on the values in the derivatives vectors.
@@ -2736,6 +2745,9 @@ class Group(System):
 
         else:
             self._linear_solver.solve(mode, rel_systems, scope_out=scope_out, scope_in=scope_in)
+
+        self.dprint("LEAVING _solve_linear, doutputs=", self._doutputs.asarray(), "dresids=",
+                    self._dresiduals.asarray())
 
     def _linearize(self, jac, sub_do_ln=True):
         """

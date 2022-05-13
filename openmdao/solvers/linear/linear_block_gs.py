@@ -73,13 +73,6 @@ class LinearBlockGS(BlockLinearSolver):
 
         return super()._iter_initialize()
 
-    def _combine_scopes(self, sub, scope1, scope2, mode):
-        if scope1 is None or scope2 is None:
-            return None
-        if scope1 is _UNDEFINED:
-            return scope2
-        return scope2.union(scope1).intersection(sub._var_allprocs_abs2meta[mode])
-
     def _single_iteration(self):
         """
         Perform the operations in the iteration loop.
@@ -108,6 +101,8 @@ class LinearBlockGS(BlockLinearSolver):
         if mode == 'fwd':
             # b_vec = system._dresiduals
             par_off = system._dresiduals._root_offset
+            system.dprint("REL_SYSTEMS:", None if self._rel_systems is None else
+                          sorted(self._rel_systems))
 
             for subsys, _ in system._subsystems_allprocs.values():
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
@@ -119,24 +114,22 @@ class LinearBlockGS(BlockLinearSolver):
                     continue
 
                 b_vec = subsys._dresiduals
+                subsys.dprint("RESIDS before _apply:", b_vec.asarray())
 
                 scope_out, scope_in = system._get_matvec_scope(subsys)
-                if True:  # subsys._do_apply_linear():
-                    if True:  # self._scope_out is _UNDEFINED:
-                        # assume that if self._scope_out is _UNDEFINED, so is self._scope_in
-                        subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
-                    else:
-                        subsys._apply_linear(None, self._rel_systems, mode, self._scope_out,
-                                             self._scope_in)
+                subsys.dprint("ORIG scopes:  out,", scope_out, "in", scope_in)
+                scope_out = self._combine_scopes(subsys, self._scope_out, scope_out, 'output')
+                scope_in = self._combine_scopes(subsys, self._scope_in, scope_in, 'input')
+                subsys.dprint("COMBINED scopes:  out,", scope_out, "in", scope_in)
+
+                # if True:
+                if subsys._do_apply_linear():
+                    # assume that if self._scope_out is _UNDEFINED, so is self._scope_in
+                    subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
 
                 b_vec *= -1.0
                 off = b_vec._root_offset - par_off
                 b_vec += self._rhs_vec[off:off + len(b_vec)]
-                #else:
-                    #assert not np.any(b_vec._data)
-
-                # scope_out = self._combine_scopes(subsys, self._scope_out, scope_out, 'output')
-                # scope_in = self._combine_scopes(subsys, self._scope_in, scope_in, 'input')
 
                 subsys._solve_linear(mode, self._rel_systems, scope_out, scope_in)
 

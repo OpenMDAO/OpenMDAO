@@ -163,6 +163,17 @@ class Vector(object):
         """
         return str(self.asarray())
 
+    def __repr__(self):
+        """
+        Return a string representation of the Vector object.
+
+        Returns
+        -------
+        str
+            String rep of this object.
+        """
+        return str(self.asarray())
+
     def __len__(self):
         """
         Return the flattened length of this Vector.
