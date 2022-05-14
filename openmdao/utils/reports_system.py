@@ -12,9 +12,12 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook, _unregister_hook
 from openmdao.visualization.n2_viewer.n2_viewer import n2, _default_n2_filename
 from openmdao.visualization.scaling_viewer.scaling_report import _default_scaling_filename
+from openmdao.visualization.opt_report.opt_report import _default_optimizer_report_filename
 from openmdao.core.constants import _UNDEFINED
 from openmdao.core.problem import Problem
 from openmdao.core.driver import Driver
+from openmdao.visualization.opt_report.opt_report import opt_report
+
 
 # Keeping track of the registered reports
 _Report = namedtuple('Report', 'func desc class_name inst_id method pre_or_post report_filename')
@@ -319,11 +322,45 @@ def _run_scaling_report_enclosing():
 
 run_scaling_report = _run_scaling_report_enclosing()
 
+
+# Optimizer report definition
+def _run_optimizer_report_enclosing():
+    def run_optimizer_report_inner(driver, report_filename=None):
+
+        prob = driver._problem()
+
+        if not _should_report_run(prob._reports, 'optimizer'):
+            return
+
+        run_optimizer_report_inner.calls[driver] += 1
+        if run_optimizer_report_inner.calls[driver] > 1:
+            return
+
+        problem_reports_dirpath = get_reports_dir(prob)
+
+        optimizer_reports_filepath = str(
+            pathlib.Path(problem_reports_dirpath).joinpath(report_filename))
+        if _is_rank_0(prob):
+            pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
+
+        opt_report(prob, outfile=optimizer_reports_filepath)
+
+    run_optimizer_report_inner.calls = defaultdict(int)
+    return run_optimizer_report_inner
+
+
+run_optimizer_report = _run_optimizer_report_enclosing()
+
+
+
+
 _default_reports = {
     'n2': (run_n2_report, 'N2 diagram', 'Problem', 'final_setup', 'post', _default_n2_filename,
            None),
     'scaling': (run_scaling_report, 'Driver scaling report', 'Driver', '_compute_totals', 'post',
-                _default_scaling_filename, None)
+                _default_scaling_filename, None),
+    'optimizer': (run_optimizer_report, 'Optimizer report', 'Driver', '_post_run', 'post',
+                _default_optimizer_report_filename, None),
 }
 
 
@@ -346,6 +383,7 @@ def setup_default_reports():
         reports_on = _default_reports.keys()
 
     for report_name, report_info in _default_reports.items():
+
         if report_name in reports_on:
             register_report(report_name, *report_info)
 
