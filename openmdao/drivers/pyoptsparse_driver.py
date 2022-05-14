@@ -272,9 +272,21 @@ class pyOptSparseDriver(Driver):
             self.options['user_terminate_signal'] = \
                 self.options._dict['user_teriminate_signal']['val']
 
-    def _post_run(self):
-        super()._post_run()
-        self.opt_result['exit_status'] = 'FAIL' if self.fail else 'SUCCESS'
+    # def _post_run(self):
+    #     super()._post_run()
+    #     self.opt_result['exit_status'] = 'FAIL' if self.fail else 'SUCCESS'
+    #
+    # def get_driver_iter_count(self):
+    #     return self.iter_count
+    #
+    def get_driver_objective_calls(self):
+        return self.pyopt_solution.userObjCalls
+
+    def get_driver_derivative_calls(self):
+        return self.pyopt_solution.userSensCalls
+
+    def get_exit_status(self):
+        return 'FAIL' if self.fail else 'SUCCESS'
 
     def run(self):
         """

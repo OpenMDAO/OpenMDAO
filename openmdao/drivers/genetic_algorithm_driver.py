@@ -92,6 +92,8 @@ class SimpleGADriver(Driver):
         self._concurrent_pop_size = 0
         self._concurrent_color = 0
 
+        self._nfit = 0  # Number of successful function evaluations
+
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
@@ -240,9 +242,18 @@ class SimpleGADriver(Driver):
         """
         return "SimpleGA"
 
-    def _post_run(self):
-        super()._post_run()
-        self.opt_result['exit_status'] = 'SUCCESS'
+    # def _post_run(self):
+    #     super()._post_run()
+    #     self.opt_result['exit_status'] = 'SUCCESS'
+
+    def get_driver_objective_calls(self):
+        return self._nfit
+
+    def get_driver_derivative_calls(self):
+        return 0
+
+    def get_exit_status(self):
+        return 'SUCCESS'
 
     def run(self):
         """
@@ -337,7 +348,7 @@ class SimpleGADriver(Driver):
         if pop_size == 0:
             pop_size = 4 * np.sum(bits)
 
-        desvar_new, obj, nfit = ga.execute_ga(x0, lower_bound, upper_bound, outer_bound,
+        desvar_new, obj, self._nfit = ga.execute_ga(x0, lower_bound, upper_bound, outer_bound,
                                               bits, pop_size, max_gen,
                                               self._randomstate, Pm, Pc)
 

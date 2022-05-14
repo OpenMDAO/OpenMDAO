@@ -178,9 +178,11 @@ class Driver(object):
 
         self.opt_result = {
             'runtime': 0.0,
+            'iter_count': 1,
+            'obj_calls': 1,
+            'deriv_calls': 1,
             'exit_status': 'NOTRUN'
         }
-
 
         # Want to allow the setting of hooks on Drivers
         _setup_hooks(self)
@@ -602,6 +604,15 @@ class Driver(object):
 
         return val
 
+    def get_driver_iter_count(self):
+        return self.iter_count
+
+    def get_driver_objective_calls(self):
+        return 1 #  TODO ????
+
+    def get_driver_derivative_calls(self):
+        return 1 #  TODO ????
+
     def get_design_var_values(self, get_remote=True, driver_scaling=True):
         """
         Return the design variable values.
@@ -813,11 +824,18 @@ class Driver(object):
 
         return response_size, desvar_size
 
+    def get_exit_status(self):
+        return 'SUCCESS'
+
     def _pre_run(self):
         self._start_time = time.time()
 
     def _post_run(self):
         self.opt_result['runtime'] = time.time() - self._start_time
+        self.opt_result['iter_count'] = self.iter_count
+        self.opt_result['obj_calls'] = self.get_driver_objective_calls()
+        self.opt_result['deriv_calls'] = self.get_driver_derivative_calls()
+        self.opt_result['exit_status'] = self.get_exit_status()
 
     def run(self):
         """
@@ -835,8 +853,8 @@ class Driver(object):
             self._problem().model.run_solve_nonlinear()
 
         end_time = time.time()
-        self.opt_result['runtime'] = end_time - start_time
-        self.opt_result['exit_status'] = 'SUCCESS'
+        # self.opt_result['runtime'] = end_time - start_time
+        # self.opt_result['exit_status'] = 'SUCCESS'
 
         self.iter_count += 1
         return False

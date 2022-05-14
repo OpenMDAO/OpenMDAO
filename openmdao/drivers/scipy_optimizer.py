@@ -226,10 +226,22 @@ class ScipyOptimizeDriver(Driver):
                     self._cons[name]['equals'] = None
                     self._cons[name]['linear'] = True
 
-    def _post_run(self):
-        super()._post_run()
-        self.opt_result['exit_status'] = 'FAIL' if self.fail else 'SUCCESS'
+    def get_driver_objective_calls(self):
+        nfev = self.result.nfev if self.result else 0
+        return nfev
 
+    def get_driver_derivative_calls(self):
+        njev = self.result.njev if self.result else 0
+        return njev
+
+    def get_exit_status(self):
+        return 'FAIL' if self.fail else 'SUCCESS'
+
+    # def _post_run(self):
+    #     super()._post_run()
+    #     self.opt_result['obj_calls'] = self.result.nfev if self.result else 0
+    #     self.opt_result['deriv_calls'] = self.result.njev if self.result else 0
+    #     self.opt_result['exit_status'] = 'FAIL' if self.fail else 'SUCCESS'
 
     def run(self):
         """
