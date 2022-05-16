@@ -34,7 +34,7 @@ class LinearUserDefined(LinearSolver):
 
         self.solve_function = solve_function
 
-    def solve(self, mode, rel_systems=None, **kwargs):
+    def solve(self, mode, rel_systems=None):
         """
         Solve the linear system for the problem in self._system().
 

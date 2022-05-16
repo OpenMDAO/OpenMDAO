@@ -408,7 +408,7 @@ class DirectSolver(LinearSolver):
 
         return inv_jac
 
-    def solve(self, mode, rel_systems=None, **kwargs):
+    def solve(self, mode, rel_systems=None):
         """
         Run the solver.
 

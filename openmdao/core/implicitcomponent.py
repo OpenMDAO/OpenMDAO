@@ -226,6 +226,7 @@ class ImplicitComponent(Component):
             Inputs relevant to possible lower level calls to _apply_linear on Components.
         """
         if self._linear_solver is not None:
+            self._linear_solver._set_matvec_scope(scope_out, scope_in)
             self._linear_solver.solve(mode, rel_systems)
 
         else:

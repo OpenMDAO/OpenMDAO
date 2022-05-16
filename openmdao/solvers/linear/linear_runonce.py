@@ -18,7 +18,7 @@ class LinearRunOnce(LinearBlockGS):
 
     SOLVER = 'LN: RUNONCE'
 
-    def solve(self, mode, rel_systems=None, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
+    def solve(self, mode, rel_systems=None):
         """
         Run the solver.
 
@@ -28,20 +28,16 @@ class LinearRunOnce(LinearBlockGS):
             'fwd' or 'rev'.
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
-        scope_out : set, None, or _UNDEFINED
-            Outputs relevant to possible lower level calls to _apply_linear on Components.
-        scope_in : set, None, or _UNDEFINED
-            Inputs relevant to possible lower level calls to _apply_linear on Components.
         """
         self._mode = mode
         self._rel_systems = rel_systems
-        self._scope_out = scope_out
-        self._scope_in = scope_in
 
         self._update_rhs_vec()
 
         # Single iteration of GS
         self._single_iteration()
+
+        self._scope_in = self._scope_out = _UNDEFINED
 
     def _declare_options(self):
         """

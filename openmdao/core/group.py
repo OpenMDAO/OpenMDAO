@@ -2738,7 +2738,8 @@ class Group(System):
                 d_residuals *= -1.0
 
         else:
-            self._linear_solver.solve(mode, rel_systems, scope_out=scope_out, scope_in=scope_in)
+            self._linear_solver._set_matvec_scope(scope_out, scope_in)
+            self._linear_solver.solve(mode, rel_systems)
 
         self.dprint("LEAVING _solve_linear, doutputs=", self._doutputs.asarray(), "dresids=",
                     self._dresiduals.asarray())

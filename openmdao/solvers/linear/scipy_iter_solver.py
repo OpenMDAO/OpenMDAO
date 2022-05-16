@@ -176,7 +176,7 @@ class ScipyKrylov(LinearSolver):
         self._mpi_print(self._iter_count, norm, norm / self._norm0)
         self._iter_count += 1
 
-    def solve(self, mode, rel_systems=None, **kwargs):
+    def solve(self, mode, rel_systems=None):
         """
         Run the solver.
 
