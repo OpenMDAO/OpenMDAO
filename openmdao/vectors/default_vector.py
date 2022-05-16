@@ -309,6 +309,8 @@ class DefaultVector(Vector):
         # will get properly reset, e.g. when the array is zeroed out.
         if omdebug and not np.any(val):
             self._system().dprint(f"ZEROING {self._name} {self._kind} {self.asarray()[idxs]}")
+        elif self._name == 'linear' and self._kind == 'residual':
+            self._system().dprint("SETTING dresids to", self.asarray()[idxs])
         self._data[idxs] = val
 
     def scale_to_norm(self, mode='fwd'):

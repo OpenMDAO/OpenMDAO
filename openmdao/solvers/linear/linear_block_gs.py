@@ -126,6 +126,8 @@ class LinearBlockGS(BlockLinearSolver):
                 if subsys._do_apply_linear():
                     # assume that if self._scope_out is _UNDEFINED, so is self._scope_in
                     subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+                else:
+                    b_vec.set_val(0.0)
 
                 b_vec *= -1.0
                 off = b_vec._root_offset - par_off

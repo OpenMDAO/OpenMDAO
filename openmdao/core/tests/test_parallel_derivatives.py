@@ -181,7 +181,10 @@ class ParDerivTestCase(unittest.TestCase):
         assert_near_equal(norm_val, 6.557438524302, 1e-6)
 
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class DecoupledTestCase(unittest.TestCase):
+
+    N_PROCS = 2
     asize = 3
 
     def setup_model(self):
@@ -291,13 +294,6 @@ class DecoupledTestCase(unittest.TestCase):
         expected = np.zeros((asize, asize+2))
         expected[:,:asize] = np.eye(asize)*8.0
         assert_near_equal(J['Con2.y', 'Indep2.x'], expected, 1e-6)
-
-
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class DecoupledTestCaseMPI(DecoupledTestCase):
-
-    N_PROCS = 2
-
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class IndicesTestCase(unittest.TestCase):

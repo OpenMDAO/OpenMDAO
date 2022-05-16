@@ -1022,8 +1022,8 @@ class BlockLinearSolver(LinearSolver):
         scope_out, scope_in = system._get_matvec_scope()
         scope_out = self._combine_scopes(system, self._scope_out, scope_out, 'output')
         scope_in = self._combine_scopes(system, self._scope_in, scope_in, 'input')
-
         system.dprint("_run_apply, scope_out=", scope_out, "scope_in=", scope_in)
+
         try:
             system._apply_linear(self._assembled_jac, self._rel_systems,
                                  self._mode, scope_out, scope_in)
@@ -1043,10 +1043,10 @@ class BlockLinearSolver(LinearSolver):
         """
         self._update_rhs_vec()
         if self.options['maxiter'] > 1:
-            self._run_apply(self._scope_out, self._scope_in)
+            self._run_apply()  # self._scope_out, self._scope_in)
             norm = self._iter_get_norm()
         else:
-            norm = 1.0
+            return 1.0, 1.0
         norm0 = norm if norm != 0.0 else 1.0
         return norm0, norm
 

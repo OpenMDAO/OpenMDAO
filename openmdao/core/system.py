@@ -5579,7 +5579,8 @@ class System(object):
         """
         Print function for debugging.
 
-        Only prints if OMDEBUG is set in the environment.
+        Only prints if OMDEBUG is set in the environment.  Also indents the output based
+        on the pathname of this System.
 
         Parameters
         ----------
@@ -5591,3 +5592,19 @@ class System(object):
         if omdebug:
             args = (get_indent(self), self.pathname + ':') + args
             print(*args, **kwargs)
+
+    def __repr__(self):
+        """
+        Return a string representing this System.
+
+        This is useful when debuggin in an IDE because it allows you to hover over a
+        System reference and see its class and instance name or pathname if available.
+
+        Returns
+        -------
+        str
+            A string representation of this System.
+        """
+        if self.pathname is not None:
+            return f"{self.__class__.__name__} {self.pathname}"
+        return f"{self.__class__.__name__} {self.name}"
