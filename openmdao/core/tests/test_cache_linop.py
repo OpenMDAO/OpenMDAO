@@ -1,12 +1,8 @@
 
 import unittest
-import time
-
-import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials, \
-    assert_check_totals
+from openmdao.utils.assert_utils import assert_check_partials, assert_check_totals
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.devtools.debug import dprint
 
@@ -48,7 +44,7 @@ def execute_model1(mode):
     sub1.add_subsystem('c1', om.ExecComp(exprs=['y = x']))
 
     sub2 = sub1.add_subsystem('sub2', om.Group())
-    comp = sub2.add_subsystem('comp', MyParaboloid(matrix_free_caching=True))
+    comp = sub2.add_subsystem('comp', MyParaboloid())
 
     model.connect('indeps.dv1', ['sub1.c1.x', 'sub1.sub2.comp.x'])
     sub1.connect('c1.y', 'sub2.comp.y')
@@ -57,15 +53,12 @@ def execute_model1(mode):
     model.add_constraint('sub1.sub2.comp.f_xy')
 
     prob.setup(mode=mode, force_alloc_complex=True)
-    # prob.set_solver_print(level=0)
 
     prob['indeps.dv1'] = 2.
 
     prob.run_model()
     assert_check_totals(prob.check_totals(method='cs', out_stream=None))
     assert_check_partials(prob.check_partials(method='cs', out_stream=None))
-    dprint('-'*50)
-    dprint(prob.compute_totals())
 
 
 def execute_model2(mode):
@@ -79,7 +72,7 @@ def execute_model2(mode):
     sub1.add_subsystem('c2', om.ExecComp(exprs=['y = x']))
 
     sub2 = sub1.add_subsystem('sub2', om.Group())
-    comp = sub2.add_subsystem('comp', MyParaboloid(matrix_free_caching=True))
+    comp = sub2.add_subsystem('comp', MyParaboloid())
 
     model.connect('indeps.dv1', ['sub1.c1.x', 'sub1.c2.x'])
     sub1.connect('c1.y', 'sub2.comp.x')
@@ -89,15 +82,12 @@ def execute_model2(mode):
     model.add_constraint('sub1.sub2.comp.f_xy')
 
     prob.setup(mode=mode, force_alloc_complex=True)
-    # prob.set_solver_print(level=0)
 
     prob['indeps.dv1'] = 2.
 
     prob.run_model()
     assert_check_totals(prob.check_totals(method='cs', out_stream=None))
     assert_check_partials(prob.check_partials(method='cs', out_stream=None))
-    dprint('-'*50)
-    dprint(prob.compute_totals())
 
 
 class TestLinOpCaching(unittest.TestCase):

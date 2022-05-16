@@ -4078,7 +4078,7 @@ class System(object):
         """
         pass
 
-    def _do_apply_linear(self):
+    def _iter_call_apply_linear(self):
         """
         Return whether to call _apply_linear on this Group from within parent _apply_linear.
 
@@ -5592,19 +5592,3 @@ class System(object):
         if omdebug:
             args = (get_indent(self), self.pathname + ':') + args
             print(*args, **kwargs)
-
-    def __repr__(self):
-        """
-        Return a string representing this System.
-
-        This is useful when debuggin in an IDE because it allows you to hover over a
-        System reference and see its class and instance name or pathname if available.
-
-        Returns
-        -------
-        str
-            A string representation of this System.
-        """
-        if self.pathname is not None:
-            return f"{self.__class__.__name__} {self.pathname}"
-        return f"{self.__class__.__name__} {self.name}"

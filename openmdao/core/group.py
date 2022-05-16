@@ -198,8 +198,6 @@ class Group(System):
         Set of shape dependency graph nodes with known (non-dynamic) shapes.
     _is_implicit : bool
         True if this Group contains implicit systems or has cycles.
-    _caching_comps : set
-        Set of names of child components that set 'matrix_free_caching' to True.
     """
 
     def __init__(self, **kwargs):
@@ -227,7 +225,6 @@ class Group(System):
         self._shapes_graph = None
         self._shape_knowns = None
         self._is_implicit = None
-        self._caching_comps = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -1028,7 +1025,6 @@ class Group(System):
         self._has_distrib_vars = False
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
         self._promotes_src_indices = {}
-        self._caching_comps = set()
 
         for subsys in self._subsystems_myproc:
             self._has_output_scaling |= subsys._has_output_scaling
@@ -1088,8 +1084,6 @@ class Group(System):
                         self._group_inputs[key] = [{'path': self.pathname, 'prom': key,
                                                     'auto': True}]
                     self._group_inputs[key].extend(metalist)
-            elif subsys.options['matrix_free_caching']:
-                self._caching_comps.add(subsys.name)
 
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
@@ -2624,7 +2618,7 @@ class Group(System):
         """
         pass
 
-    def _do_apply_linear(self):
+    def _iter_call_apply_linear(self):
         """
         Return whether to call _apply_linear on this Group from within parent _apply_linear.
 

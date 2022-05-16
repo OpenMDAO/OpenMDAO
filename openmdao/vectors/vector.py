@@ -726,35 +726,3 @@ class Vector(object):
             return ''
         # we must use self._data here because the hashing alg requires array to be C-contiguous
         return array_hash(self._data, alg)
-
-
-class _CompMatVecWrapper(object):
-    """
-    Wrapper for a Vector in a matvec context (for Components only).
-
-    This 'vector' will return zero values for __getitem__ when the lookup variable is not
-    relevant to the current matrix vector context.
-    """
-
-    def __init__(self, vec):
-        self._vec = vec
-
-    def __contains__(self, name):
-        return self._vec._name2abs_name(name) is not None
-
-    def __getitem__(self, name):
-        absname = self._vec._name2abs_name(name)
-        if absname is not None:
-            if self._under_complex_step:
-                return self._vec._views[absname]
-            else:
-                return self._vec._views[absname].real
-
-        # call the wrapped vector to get the error message
-        self._vec[name]
-
-    def __setitem__(self, name, val):
-        raise RuntimeError("_CompMatVecWrapper is read-only.")
-
-    def __getattr__(self, name):
-        return getattr(self._vec, name)

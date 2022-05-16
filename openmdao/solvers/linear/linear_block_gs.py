@@ -101,8 +101,6 @@ class LinearBlockGS(BlockLinearSolver):
         if mode == 'fwd':
             # b_vec = system._dresiduals
             par_off = system._dresiduals._root_offset
-            system.dprint("REL_SYSTEMS:", None if self._rel_systems is None else
-                          sorted(self._rel_systems))
 
             for subsys, _ in system._subsystems_allprocs.values():
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
@@ -114,17 +112,12 @@ class LinearBlockGS(BlockLinearSolver):
                     continue
 
                 b_vec = subsys._dresiduals
-                subsys.dprint("RESIDS before _apply:", b_vec.asarray())
 
                 scope_out, scope_in = system._get_matvec_scope(subsys)
-                subsys.dprint("ORIG scopes:  out,", scope_out, "in", scope_in)
                 scope_out = self._combine_scopes(subsys, self._scope_out, scope_out, 'output')
                 scope_in = self._combine_scopes(subsys, self._scope_in, scope_in, 'input')
-                subsys.dprint("COMBINED scopes:  out,", scope_out, "in", scope_in)
 
-                # if True:
-                if subsys._do_apply_linear():
-                    # assume that if self._scope_out is _UNDEFINED, so is self._scope_in
+                if subsys._iter_call_apply_linear():
                     subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
                 else:
                     b_vec.set_val(0.0)
@@ -141,7 +134,6 @@ class LinearBlockGS(BlockLinearSolver):
             else:
                 subsystems = list(system._subsystems_allprocs.values())
                 subsystems.reverse()
-            # b_vec = system._doutputs
             par_off = system._doutputs._root_offset
 
             for subsys, _ in subsystems:
@@ -150,7 +142,6 @@ class LinearBlockGS(BlockLinearSolver):
 
                 if subsys._is_local:
                     b_vec = subsys._doutputs
-                    dprint(get_indent(self), f"LNBGS (sub '{subsys.pathname}) ZERO doutputs")
                     b_vec.set_val(0.0)
 
                     system._transfer('linear', mode, subsys.name)
@@ -159,10 +150,16 @@ class LinearBlockGS(BlockLinearSolver):
                     off = b_vec._root_offset - par_off
                     b_vec += self._rhs_vec[off:off + len(b_vec)]
 
-                    subsys._solve_linear(mode, self._rel_systems)
                     scope_out, scope_in = system._get_matvec_scope(subsys)
+                    scope_out = self._combine_scopes(subsys, self._scope_out, scope_out, 'output')
+                    scope_in = self._combine_scopes(subsys, self._scope_in, scope_in, 'input')
 
-                    subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+                    subsys._solve_linear(mode, self._rel_systems, scope_out, scope_in)
+
+                    if subsys._iter_call_apply_linear():
+                        subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+                    else:
+                        b_vec.set_val(0.0)
                 else:   # subsys not local
                     system._transfer('linear', mode, subsys.name)
 

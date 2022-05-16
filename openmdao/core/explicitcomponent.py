@@ -4,7 +4,7 @@ import numpy as np
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.core.component import Component
-from openmdao.vectors.vector import _full_slice, _CompMatVecWrapper
+from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE, _UNDEFINED
@@ -28,16 +28,6 @@ class ExplicitComponent(Component):
         Dictionary of names mapped to bound methods.
     _has_compute_partials : bool
         If True, the instance overrides compute_partials.
-    _last_input_hash : str
-        Keeps track of changes to input vector. Used if matrix_free_caching is True.
-    _last_dinput_hash : str
-        Keeps track of changes to dinput vector. Used if matrix_free_caching is True.
-    _last_doutput_hash : str
-        Keeps track of changes to doutput vector. Used if matrix_free_caching is True.
-    _last_mode : str
-        Keeps track of changes to derivative direction. Used if matrix_free_caching is True.
-    _linop_cache : ndarray or None
-        Dict wrapper for the last computed full JVP or VJP. Used if matrix_free_caching is True.
     """
 
     def __init__(self, **kwargs):
@@ -49,11 +39,6 @@ class ExplicitComponent(Component):
         self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
         self._has_compute_partials = overrides_method('compute_partials', self, ExplicitComponent)
         self.options.undeclare('assembled_jac_type')
-        self._last_dinput_hash = ''
-        self._last_input_hash = ''
-        self._last_doutput_hash = ''
-        self._last_mode = ''
-        self._linop_cache = None
 
     def _configure(self):
         """

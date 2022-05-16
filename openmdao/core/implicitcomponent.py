@@ -26,18 +26,6 @@ class ImplicitComponent(Component):
     ----------
     _inst_functs : dict
         Dictionary of names mapped to bound methods.
-    _last_input_hash : str
-        Keeps track of changes to input vector. Used if matrix_free_caching option is True.
-    _last_output_hash : str
-        Keeps track of changes to output vector. Used if matrix_free_caching option is True.
-    _last_dinput_hash : str
-        Keeps track of changes to dinput vector. Used if matrix_free_caching option is True.
-    _last_doutput_hash : str
-        Keeps track of changes to doutput vector. Used if matrix_free_caching option is True.
-    _last_dresidual_hash : str
-        Keeps track of changes to dresidual vector. Used if matrix_free_caching option is True.
-    _last_mode : str
-        Keeps track of changes to derivative direction. Used if matrix_free_caching option is True.
     """
 
     def __init__(self, **kwargs):
@@ -47,12 +35,6 @@ class ImplicitComponent(Component):
         super().__init__(**kwargs)
 
         self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
-        self._last_input_hash = ''
-        self._last_output_hash = ''
-        self._last_dinput_hash = ''
-        self._last_doutput_hash = ''
-        self._last_dresidual_hash = ''
-        self._last_mode = ''
 
     def _configure(self):
         """
