@@ -413,12 +413,6 @@ class ContainsAll(object):
         """
         return True
 
-    def __repr__(self):
-        return '<ContainsAll>'
-
-    def __iter__(self):
-        return iter(['all'])
-
 
 def all_ancestors(pathname, delim='.'):
     """

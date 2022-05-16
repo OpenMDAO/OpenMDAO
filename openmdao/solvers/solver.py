@@ -788,7 +788,17 @@ class LinearSolver(Solver):
         self._assembled_jac = None
         super().__init__(**kwargs)
 
-    def is_recursive(self):
+    def does_recursive_applies(self):
+        """
+        Return False.
+
+        By default, assume linear solvers don't do recursive apply_linear calls.
+
+        Returns
+        -------
+        bool
+            True if solver makes recursive apply_linear calls on its subsystems.
+        """
         return False
 
     def _assembled_jac_solver_iter(self):
@@ -924,7 +934,7 @@ class LinearSolver(Solver):
         elif iprint == 2 and print_flag:
             print(prefix + ' Converged')
 
-    def _run_apply(self, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
+    def _run_apply(self):
         """
         Run the apply_linear method on the system.
         """
@@ -957,7 +967,17 @@ class BlockLinearSolver(LinearSolver):
         super()._declare_options()
         self.supports['assembled_jac'] = False
 
-    def is_recursive(self):
+    def does_recursive_applies(self):
+        """
+        Return True.
+
+        Block linear solvers make recursive apply_linear calls.
+
+        Returns
+        -------
+        bool
+            True if solver makes recursive apply_linear calls on its subsystems.
+        """
         return True
 
     def _setup_solvers(self, system, depth):
@@ -1012,7 +1032,7 @@ class BlockLinearSolver(LinearSolver):
             return scope2
         return scope2.union(scope1)
 
-    def _run_apply(self, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
+    def _run_apply(self):
         """
         Run the apply_linear method on the system.
         """
@@ -1043,7 +1063,7 @@ class BlockLinearSolver(LinearSolver):
         """
         self._update_rhs_vec()
         if self.options['maxiter'] > 1:
-            self._run_apply()  # self._scope_out, self._scope_in)
+            self._run_apply()
             norm = self._iter_get_norm()
         else:
             return 1.0, 1.0

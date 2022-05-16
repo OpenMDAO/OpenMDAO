@@ -2632,7 +2632,7 @@ class Group(System):
             jac = self._jacobian
         elif jac is None and self._assembled_jac is not None:
             jac = self._assembled_jac
-        return jac is not None or not self._linear_solver.is_recursive()
+        return jac is not None or not self._linear_solver.does_recursive_applies()
 
     def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
         """
