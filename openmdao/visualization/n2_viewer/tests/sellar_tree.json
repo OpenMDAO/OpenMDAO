@@ -78,7 +78,6 @@
             "options": {
                 "distributed": false,
                 "run_root_only": false,
-                "matrix_free_caching": false,
                 "name": "UNDEFINED",
                 "val": 1.0,
                 "shape": null,
@@ -183,8 +182,7 @@
                             "options": {
                                 "assembled_jac_type": "csc",
                                 "distributed": false,
-                                "run_root_only": false,
-                                "matrix_free_caching": false 
+                                "run_root_only": false
                     }
                         }
                     ],
@@ -258,8 +256,7 @@
                     ],
                     "options": {
                         "distributed": false,
-                        "run_root_only": false,
-                        "matrix_free_caching": false 
+                        "run_root_only": false
             }
                 },
                 {
@@ -316,8 +313,7 @@
                     ],
                     "options": {
                         "distributed": false,
-                        "run_root_only": false,
-                        "matrix_free_caching": false 
+                        "run_root_only": false
             }
                 }
             ],
@@ -406,7 +402,6 @@
             "options": {
                 "distributed": false,
                 "run_root_only": false,
-                "matrix_free_caching": false,
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,
@@ -457,7 +452,6 @@
             "options": {
                 "distributed": false,
                 "run_root_only": false,
-                "matrix_free_caching": false,
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,
@@ -508,7 +502,6 @@
             "options": {
                 "distributed": false,
                 "run_root_only": false,
-                "matrix_free_caching": false,
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,
