@@ -10,7 +10,8 @@ from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImpl
     SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 from openmdao.test_suite.components.sellar import SellarDerivatives
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
 
 from openmdao.utils.mpi import MPI
 try:
@@ -377,5 +378,178 @@ class ProcTestCase1(unittest.TestCase):
         else:
             self.fail("expected AnalysisError")
 
+
+class MyParaboloid(Paraboloid):
+    """ Use matrix-vector product."""
+
+    def setup_partials(self):
+        pass
+
+    def compute_partials(self, inputs, partials):
+        """Analytical derivatives."""
+        pass
+
+    def compute_jacvec_product(self, inputs, dinputs, doutputs, mode):
+        x = inputs['x'][0]
+        y = inputs['y'][0]
+
+        if mode == 'fwd':
+            if 'x' in dinputs:
+                doutputs['f_xy'] += (2.0*x - 6.0 + y)*dinputs['x']
+            if 'y' in dinputs:
+                doutputs['f_xy'] += (2.0*y + 8.0 + x)*dinputs['y']
+
+        elif mode == 'rev':
+            if 'x' in dinputs:
+                dinputs['x'] += (2.0*x - 6.0 + y)*doutputs['f_xy']
+            if 'y' in dinputs:
+                dinputs['y'] += (2.0*y + 8.0 + x)*doutputs['f_xy']
+
+
+def execute_model1(mode):
+    prob = om.Problem()
+    model = prob.model
+
+    model.add_subsystem('indeps', om.IndepVarComp('dv1', val=1.0))
+
+    sub1 = model.add_subsystem('sub1', om.Group())
+    sub1.add_subsystem('c1', om.ExecComp(exprs=['y = x']))
+
+    sub2 = sub1.add_subsystem('sub2', om.Group())
+    comp = sub2.add_subsystem('comp', MyParaboloid())
+
+    model.connect('indeps.dv1', ['sub1.c1.x', 'sub1.sub2.comp.x'])
+    sub1.connect('c1.y', 'sub2.comp.y')
+
+    model.add_design_var('indeps.dv1')
+    model.add_constraint('sub1.sub2.comp.f_xy')
+
+    prob.setup(mode=mode, force_alloc_complex=True)
+
+    prob['indeps.dv1'] = 2.
+
+    prob.run_model()
+    assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+    assert_check_partials(prob.check_partials(method='cs', out_stream=None))
+
+
+def execute_model2(mode):
+    prob = om.Problem()
+    model = prob.model
+
+    model.add_subsystem('indeps', om.IndepVarComp('dv1', val=1.0))
+
+    sub1 = model.add_subsystem('sub1', om.Group())
+    sub1.add_subsystem('c1', om.ExecComp(exprs=['y = x']))
+    sub1.add_subsystem('c2', om.ExecComp(exprs=['y = x']))
+
+    sub2 = sub1.add_subsystem('sub2', om.Group())
+    comp = sub2.add_subsystem('comp', MyParaboloid())
+
+    model.connect('indeps.dv1', ['sub1.c1.x', 'sub1.c2.x'])
+    sub1.connect('c1.y', 'sub2.comp.x')
+    sub1.connect('c2.y', 'sub2.comp.y')
+
+    model.add_design_var('indeps.dv1')
+    model.add_constraint('sub1.sub2.comp.f_xy')
+
+    prob.setup(mode=mode, force_alloc_complex=True)
+
+    prob['indeps.dv1'] = 2.
+
+    prob.run_model()
+    assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+    assert_check_partials(prob.check_partials(method='cs', out_stream=None))
+
+
+class TestRecursiveApplyFix(unittest.TestCase):
+
+    def test_matrix_free_explicit_fwd(self):
+        execute_model1('fwd')
+
+    def test_matrix_free_explicit_rev(self):
+        execute_model1('rev')
+
+    def test_matrix_free_explicit2_fwd(self):
+        execute_model2('fwd')
+
+    def test_matrix_free_explicit2_rev(self):
+        execute_model2('rev')
+
+
+class _ApplyLinearCounter(om.ExecComp):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._apply_lin_count = 0
+
+    def _apply_linear(self, *args, **kwargs):
+        super()._apply_linear(*args, **kwargs)
+        self._apply_lin_count += 1
+
+
+def build_nested_groups(nlevels, linsolver_class):
+    # construct a nested group model with a component at each group level
+    # and a component at the bottom that has one input for each component output.
+    # The new method should only call _apply_linear on the bottom component once.
+    p = om.Problem()
+    current = model = p.model
+    current.linear_solver = linsolver_class()
+    p.model.add_subsystem('ivc', om.IndepVarComp('x', 2.0))
+
+    parpath = ''
+    outs = ['ivc.x']
+
+    for i in range(nlevels):
+        current.add_subsystem(f"C{i}", _ApplyLinearCounter(f"y={i+3}*x"))
+        g = current.add_subsystem(f"G{i}", om.Group())
+        g.linear_solver = linsolver_class()
+        current = g
+
+        if parpath:
+            outs.append(parpath + '.' + f"C{i}.y")
+            model.connect('ivc.x', parpath + '.' + f"C{i}.x")
+            parpath = parpath + '.' + f"G{i}"
+        else:
+            outs.append(f"C{i}.y")
+            model.connect('ivc.x', f"C{i}.x")
+            parpath = f"G{i}"
+
+    # bottom of the tree
+    leafname = f"C{nlevels+1}"
+    parts = []
+    for i, out in enumerate(outs):
+        parts.append(f"x{i+1}*{i+2}")
+    expr = 'y = ' + '+'.join(parts)
+    print(expr)
+    current.add_subsystem(leafname, _ApplyLinearCounter(expr))
+
+    leafpath = parpath + '.' + leafname
+
+    # connect everything
+    for i, out in enumerate(outs):
+        model.connect(out, leafpath + '.' + f"x{i+1}")
+        print("connect ", out, "to", leafpath + '.' + f"x{i+1}")
+
+    return p, leafpath
+
+
+class TestRecursiveApplyFix2(unittest.TestCase):
+    def test_4levels(self):
+        p, lpath = build_nested_groups(4, om.LinearBlockGS)
+        p.setup()
+        p.run_model()
+
+
+
 if __name__ == "__main__":
-    unittest.main()
+    p, leafpath = build_nested_groups(4, om.LinearBlockGS)
+    p.setup()
+    p.run_model()
+
+    from openmdao.devtools.debug import tree
+    tree(p)
+
+    p.compute_totals(of=[leafpath + '.y'], wrt=['ivc.x'])
+
+    leaf = p.model._get_subsystem(leafpath)
+    print('ncalls:', leaf._apply_lin_count)
