@@ -4,9 +4,6 @@ import numpy as np
 
 from openmdao.vectors.vector import Vector, _full_slice
 from openmdao.vectors.default_transfer import DefaultTransfer
-from openmdao.utils.general_utils import env_truthy
-
-omdebug = env_truthy('OMDEBUG')
 
 
 class DefaultVector(Vector):

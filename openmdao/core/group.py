@@ -195,8 +195,6 @@ class Group(System):
         Dynamic shape dependency graph, or None.
     _shape_knowns : set
         Set of shape dependency graph nodes with known (non-dynamic) shapes.
-    _is_implicit : bool
-        True if this Group contains implicit systems or has cycles.
     """
 
     def __init__(self, **kwargs):
@@ -223,7 +221,6 @@ class Group(System):
         self._order_set = False
         self._shapes_graph = None
         self._shape_knowns = None
-        self._is_implicit = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -1029,9 +1026,6 @@ class Group(System):
             self._has_resid_scaling |= subsys._has_resid_scaling
             self._has_distrib_vars |= subsys._has_distrib_vars
 
-            if subsys.is_implicit(simple=True) is True:
-                self._is_implicit = True
-
             var_maps = subsys._get_promotion_maps()
 
             sub_prefix = subsys.name + '.'
@@ -1089,8 +1083,7 @@ class Group(System):
                                                     mysub._full_comm.rank == 0)):
                 raw = (allprocs_discrete, allprocs_prom2abs_list, allprocs_abs2meta,
                        self._has_output_scaling, self._has_output_adder,
-                       self._has_resid_scaling, self._group_inputs, self._has_distrib_vars,
-                       self._is_implicit)
+                       self._has_resid_scaling, self._group_inputs, self._has_distrib_vars)
             else:
                 raw = (
                     {'input': {}, 'output': {}},
@@ -1101,7 +1094,6 @@ class Group(System):
                     False,
                     {},
                     False,
-                    None,
                 )
 
             gathered = self.comm.allgather(raw)
@@ -1115,15 +1107,11 @@ class Group(System):
 
             myrank = self.comm.rank
             for rank, (proc_discrete, proc_prom2abs_list, proc_abs2meta,
-                       oscale, oadd, rscale, ginputs, has_dist_vars,
-                       is_implicit) in enumerate(gathered):
+                       oscale, oadd, rscale, ginputs, has_dist_vars) in enumerate(gathered):
                 self._has_output_scaling |= oscale
                 self._has_output_adder |= oadd
                 self._has_resid_scaling |= rscale
                 self._has_distrib_vars |= has_dist_vars
-
-                if is_implicit is True:
-                    self._is_implicit = True
 
                 if rank != myrank:
                     for p, mlist in ginputs.items():
@@ -3720,27 +3708,3 @@ class Group(System):
                     yield from s._ordered_comp_name_iter()
                 else:
                     yield s.pathname
-
-    def is_implicit(self, simple=False):
-        """
-        Return True if this Group, directly or indirectly, contains implicit systems or cycles.
-
-        Parameters
-        ----------
-        simple : bool
-            If True, report only if this Group contains (directly or indirectly), implicit
-            components, else return True if it contains any implicit components OR cycles.
-
-        Returns
-        -------
-        bool
-            True if this Group should be treated as implicit.
-        """
-        if simple:
-            return self._is_implicit
-
-        if self._is_implicit is None:
-            # see if there are any cycles
-            pass
-
-        return self._is_implicit

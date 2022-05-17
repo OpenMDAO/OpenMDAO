@@ -3095,28 +3095,26 @@ class System(object):
                 if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
                     self._problem_meta['using_par_deriv_color'] = True
 
-                data['orig'] = name
-
                 if name in pro2abs_out:
 
                     # This is an output name, most likely a manual indepvarcomp.
                     abs_name = pro2abs_out[name][0]
                     out[abs_name] = data
                     data['source'] = abs_name
-                    dist = abs_name in abs2meta_out and abs2meta_out[abs_name]['distributed']
                     data['orig'] = (name, None)
+                    dist = abs_name in abs2meta_out and abs2meta_out[abs_name]['distributed']
 
                 else:  # assume an input name else KeyError
 
                     # Design variable on an auto_ivc input, so use connected output name.
                     in_abs = pro2abs_in[name][0]
                     data['source'] = source = conns[in_abs]
+                    data['orig'] = (None, name)
                     dist = source in abs2meta_out and abs2meta_out[source]['distributed']
                     if use_prom_ivc:
                         out[name] = data
                     else:
                         out[source] = data
-                    data['orig'] = (None, name)
 
                 data['distributed'] = dist
 
@@ -5142,8 +5140,6 @@ class System(object):
             Dict of ({'outputs': dep_outputs, 'inputs': dep_inputs}, dep_systems)
             keyed by design vars and responses.
         """
-        from openmdao.core.group import Group
-
         conns = self._conn_global_abs_in2out
         relevant = defaultdict(dict)
 
@@ -5186,9 +5182,6 @@ class System(object):
                 else:
                     system = parts[0]
                 graph.add_edge(system, res)
-
-        if isinstance(self, Group) and self._is_implicit is None:
-            self._is_implicit = not nx.is_directed_acyclic_graph(graph)
 
         nodes = graph.nodes
         grev = graph.reverse(copy=False)

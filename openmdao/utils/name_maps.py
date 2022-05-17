@@ -105,7 +105,8 @@ def prom_name2abs_name(system, prom_name, iotype):
             return abs_list[0]
 
         # looks like an aliased input, which must be set via the connected output
-        src_name = system._var_abs2prom['output'][system._conn_global_abs_in2out.get(abs_list[0])]
+        model = system._problem_meta['model_ref']()
+        src_name = model._var_abs2prom['output'][model._conn_global_abs_in2out[abs_list[0]]]
         raise RuntimeError(f"The promoted name {prom_name} is invalid because it refers to "
                            f"multiple inputs: [{' ,'.join(abs_list)}]. Access the value from the "
                            f"connected output variable {src_name} instead.")
