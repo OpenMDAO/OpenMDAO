@@ -1031,7 +1031,22 @@ class BlockLinearSolver(LinearSolver):
         else:
             self._rhs_vec = self._rhs_vec.real
 
-    def _combine_scopes(self, sub, scope1, scope2, mode):
+    def _scope_union(self, scope1, scope2):
+        """
+        Return the union of the two 'set's of variables.
+
+        Parameters
+        ----------
+        scope1 : set, None, or _UNDEFINED
+            First variable set.
+        scope2 : set, None, or _UNDEFINED
+            Second variable set.
+
+        Returns
+        -------
+        set, None, or _UNDEFINED
+            The combined variable 'set'.
+        """
         if scope1 is None or scope2 is None:
             return None
         if scope1 is _UNDEFINED:
@@ -1046,9 +1061,8 @@ class BlockLinearSolver(LinearSolver):
 
         system = self._system()
         scope_out, scope_in = system._get_matvec_scope()
-        scope_out = self._combine_scopes(system, self._scope_out, scope_out, 'output')
-        scope_in = self._combine_scopes(system, self._scope_in, scope_in, 'input')
-        system.dprint("_run_apply, scope_out=", scope_out, "scope_in=", scope_in)
+        scope_out = self._scope_union(self._scope_out, scope_out)
+        scope_in = self._scope_union(self._scope_in, scope_in)
 
         try:
             system._apply_linear(self._assembled_jac, self._rel_systems,

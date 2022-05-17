@@ -338,9 +338,6 @@ class LinearSolverTests(object):
             prob.setup(check=False, mode='fwd')
             prob.run_model()
 
-            from openmdao.devtools.debug import tree
-            tree(prob, show_colors=False)
-            
             wrt = ['iv.x']
             of = ['c7.y1']
 
@@ -452,9 +449,6 @@ class LinearSolverTests(object):
             prob.setup(check=False, mode='fwd')
             prob.run_model()
 
-            from openmdao.devtools.debug import tree
-            tree(prob, show_colors=False)
-            
             # Just make sure we are at the right answer
             assert_near_equal(prob['y1'], 25.58830273, .00001)
             assert_near_equal(prob['d2.y2'], 12.05848819, .00001)
