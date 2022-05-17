@@ -99,7 +99,6 @@ class LinearBlockGS(BlockLinearSolver):
             delta_d_n = d_out_vec.asarray(copy=True)
 
         if mode == 'fwd':
-            # b_vec = system._dresiduals
             par_off = system._dresiduals._root_offset
 
             for subsys, _ in system._subsystems_allprocs.values():

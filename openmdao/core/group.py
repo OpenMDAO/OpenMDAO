@@ -2620,7 +2620,13 @@ class Group(System):
 
     def _iter_call_apply_linear(self):
         """
-        Return whether to call _apply_linear on this Group from within parent _apply_linear.
+        Return whether to call _apply_linear on this Group from within linear block GS/Jac.
+
+        Linear block solvers call _apply_linear then _solve_linear (fwd) or _solve_linear then
+        _apply_linear (rev) during an iteration.  This will tell those solvers whether they
+        should call _apply_linear on this group when they're calling _apply_linear on their
+        subsystems.  Note that _apply_linear will still be called from within a subsystem's
+        _solve_linear.
 
         Returns
         -------
