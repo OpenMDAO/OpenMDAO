@@ -249,8 +249,8 @@ class ScipyKrylov(LinearSolver):
         ndarray
             The preconditioned Vector.
         """
-        mode = self._mode
         system = self._system()
+        mode = self._mode
 
         # Need to clear out any junk from the inputs.
         system._dinputs.set_val(0.0)

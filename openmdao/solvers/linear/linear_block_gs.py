@@ -5,7 +5,6 @@ import numpy as np
 
 from openmdao.core.constants import _UNDEFINED
 from openmdao.solvers.solver import BlockLinearSolver
-from openmdao.devtools.debug import dprint, get_indent
 
 
 class LinearBlockGS(BlockLinearSolver):

@@ -1245,7 +1245,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
         # verify read_only status is reset after AnalysisError
         prob['bad.a'] = 111.
         prob['bad.x'] = 111.
-        prob.model.bad._dresiduals['x'] = 111.
+        prob.model.bad._vectors['residual']['linear']['x'] = 111.
 
     def test_solve_linear_doutputs_read_only(self):
         class BadComp(QuadraticJacVec):
@@ -1303,7 +1303,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_solve_linear('fwd')
 
         # verify read_only status is reset after AnalysisError
-        prob.model.bad._dresiduals['x'] = 111.
+        prob.model.bad._vectors['residual']['linear']['x'] = 111.
 
 
 class ListFeatureTestCase(unittest.TestCase):

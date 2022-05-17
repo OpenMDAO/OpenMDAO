@@ -4,7 +4,6 @@ import numpy as np
 
 from openmdao.vectors.vector import Vector, _full_slice
 from openmdao.vectors.default_transfer import DefaultTransfer
-from openmdao.devtools.debug import dprint, get_indent
 from openmdao.utils.general_utils import env_truthy
 
 omdebug = env_truthy('OMDEBUG')
@@ -125,7 +124,7 @@ class DefaultVector(Vector):
                         self._scaling = (None, np.ones(data.size))
                     else:
                         # Reuse the nonlinear scaling vecs since they're the same as ours.
-                        nlvec = self._system()._root_vecs['nonlinear'][self._kind]
+                        nlvec = self._system()._root_vecs[self._kind]['nonlinear']
                         self._scaling = (None, nlvec._scaling[1])
                 else:
                     self._scaling = (None, np.ones(data.size))
@@ -245,7 +244,6 @@ class DefaultVector(Vector):
         else:
             data = self.asarray()
             data -= vec
-
         return self
 
     def __imul__(self, vec):
@@ -307,10 +305,6 @@ class DefaultVector(Vector):
         """
         # we use _data here specifically so that imaginary part
         # will get properly reset, e.g. when the array is zeroed out.
-        if omdebug and not np.any(val):
-            self._system().dprint(f"ZEROING {self._name} {self._kind} {self.asarray()[idxs]}")
-        elif self._name == 'linear' and self._kind == 'residual':
-            self._system().dprint("SETTING dresids to", self.asarray()[idxs])
         self._data[idxs] = val
 
     def scale_to_norm(self, mode='fwd'):

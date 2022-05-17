@@ -8,7 +8,6 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE, _UNDEFINED
-from openmdao.devtools.debug import dprint, get_indent
 
 _inst_functs = ['compute_jacvec_product']
 
@@ -303,7 +302,6 @@ class ExplicitComponent(Component):
         discrete_inputs : dict or None
             Mapping of variable name to discrete value.
         """
-        dprint(get_indent(self), f"{self.pathname}._compute_jacvec_product")
         if self._run_root_only():
             if self.comm.rank == 0:
                 if discrete_inputs:
@@ -345,12 +343,6 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        self.dprint("._apply_linear", 'scope_out', sorted(scope_out)
-                    if isinstance(scope_out, frozenset) else scope_out, 'scope_in',
-                    sorted(scope_in) if isinstance(scope_in, frozenset) else scope_in)
-        self.dprint("._apply_linear, doutputs=", self._doutputs.asarray(), "dinputs=",
-                    self._dinputs.asarray(), "dresids=", self._dresiduals.asarray())
-
         J = self._jacobian if jac is None else jac
 
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
@@ -362,9 +354,6 @@ class ExplicitComponent(Component):
             if not self.matrix_free:
                 # if we're not matrix free, we can skip the rest because
                 # compute_jacvec_product does nothing.
-                self.dprint("LEAVING ._apply_linear, doutputs=", self._doutputs.asarray(),
-                            "dinputs=", self._dinputs.asarray(), "dresids=",
-                            self._dresiduals.asarray())
                 return
 
             # Jacobian and vectors are all unscaled, dimensional
@@ -408,9 +397,6 @@ class ExplicitComponent(Component):
                 finally:
                     d_inputs.read_only = d_residuals.read_only = False
 
-        self.dprint("LEAVING ._apply_linear, doutputs=", self._doutputs.asarray(), "dinputs=",
-                    self._dinputs.asarray(), "dresids=", self._dresiduals.asarray())
-
     def _solve_linear(self, mode, rel_systems, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
@@ -426,9 +412,6 @@ class ExplicitComponent(Component):
         scope_in : set, None, or _UNDEFINED
             Inputs relevant to possible lower level calls to _apply_linear on Components.
         """
-        self.dprint("._solve_linear, doutputs=", self._doutputs.asarray(), "dresids=",
-                    self._dresiduals.asarray())
-
         d_outputs = self._doutputs
         d_residuals = self._dresiduals
 
@@ -451,9 +434,6 @@ class ExplicitComponent(Component):
 
             # ExplicitComponent jacobian defined with -1 on diagonal.
             d_residuals *= -1.0
-
-        self.dprint("LEAVING ._solve_linear, doutputs=", self._doutputs.asarray(), "dresids=",
-                    self._dresiduals.asarray())
 
     def _compute_partials_wrapper(self):
         """

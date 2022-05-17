@@ -40,10 +40,7 @@ from openmdao.utils.general_utils import determine_adder_scaler, \
         conditional_error, env_truthy
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
-from openmdao.devtools.debug import dprint, get_indent
 
-
-omdebug = env_truthy('OMDEBUG')
 
 _empty_frozen_set = frozenset()
 
@@ -716,9 +713,7 @@ class System(object):
         """
         # save root vecs as an attribute so that we can reuse the nonlinear scaling vecs in the
         # linear root vec
-        self._root_vecs = root_vectors = {'nonlinear': {}}
-        if self._use_derivatives:
-            root_vectors['linear'] = {}
+        self._root_vecs = root_vectors = {'input': {}, 'output': {}, 'residual': {}}
 
         force_alloc_complex = self._problem_meta['force_alloc_complex']
 
@@ -745,19 +740,21 @@ class System(object):
         if self._vector_class is None:
             self._vector_class = self._local_vector_class
 
-        for vec_name, vec_dict in root_vectors.items():
+        vectypes = ('nonlinear', 'linear') if self._use_derivatives else ('nonlinear',)
+
+        for vec_name in vectypes:
             if vec_name == 'nonlinear':
                 alloc_complex = nl_alloc_complex
             else:
                 alloc_complex = ln_alloc_complex
 
-            for kind in ['input', 'output', 'residual']:
-                vec_dict[kind] = self._vector_class(vec_name, kind, self,
-                                                    alloc_complex=alloc_complex)
+            for key in ['input', 'output', 'residual']:
+                root_vectors[key][vec_name] = self._vector_class(vec_name, key, self,
+                                                                 alloc_complex=alloc_complex)
 
-        if 'linear' in root_vectors:
-            root_vectors['linear']['input']._scaling_nl_vec = \
-                root_vectors['nonlinear']['input']._scaling
+        if 'linear' in vectypes:
+            root_vectors['input']['linear']._scaling_nl_vec = \
+                root_vectors['input']['nonlinear']._scaling
 
         return root_vectors
 
@@ -1802,10 +1799,10 @@ class System(object):
         root_vectors : dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         """
-        self._vectors = vectors = {vecname: {} for vecname in root_vectors}
+        self._vectors = vectors = {'input': {}, 'output': {}, 'residual': {}}
 
         # Allocate complex if root vector was allocated complex.
-        alloc_complex = root_vectors['nonlinear']['output']._alloc_complex
+        alloc_complex = root_vectors['output']['nonlinear']._alloc_complex
 
         # This happens if you reconfigure and switch to 'cs' without forcing the vectors to be
         # initially allocated as complex.
@@ -1818,30 +1815,29 @@ class System(object):
             self._vector_class = self._local_vector_class
 
         vector_class = self._vector_class
+        vectypes = ('nonlinear', 'linear') if self._use_derivatives else ('nonlinear',)
 
-        for vec_name in root_vectors:
+        for vec_name in vectypes:
 
             # Only allocate complex in the vectors we need.
-            vec_alloc_complex = root_vectors[vec_name]['output']._alloc_complex
+            vec_alloc_complex = root_vectors['output'][vec_name]._alloc_complex
 
             for kind in ['input', 'output', 'residual']:
-                rootvec = root_vectors[vec_name][kind]
-                vectors[vec_name][kind] = vector_class(
+                rootvec = root_vectors[kind][vec_name]
+                vectors[kind][vec_name] = vector_class(
                     vec_name, kind, self, rootvec, alloc_complex=vec_alloc_complex)
 
-        if 'linear' in vectors:
-            vectors['linear']['input']._scaling_nl_vec = vectors['nonlinear']['input']._scaling
+        if 'linear' in vectypes:
+            vectors['input']['linear']._scaling_nl_vec = vectors['input']['nonlinear']._scaling
 
-        nlvecs = vectors['nonlinear']
-        self._inputs = nlvecs['input']
-        self._outputs = nlvecs['output']
-        self._residuals = nlvecs['residual']
+        self._inputs = vectors['input']['nonlinear']
+        self._outputs = vectors['output']['nonlinear']
+        self._residuals = vectors['residual']['nonlinear']
 
         if self._use_derivatives:
-            linvecs = vectors['linear']
-            self._dinputs = linvecs['input']
-            self._doutputs = linvecs['output']
-            self._dresiduals = linvecs['residual']
+            self._dinputs = vectors['input']['linear']
+            self._doutputs = vectors['output']['linear']
+            self._dresiduals = vectors['residual']['linear']
 
         for subsys in self._subsystems_myproc:
             subsys._scale_factors = self._scale_factors
@@ -2178,11 +2174,11 @@ class System(object):
         Context manager that temporarily puts all vectors in a scaled state.
         """
         if self._has_output_scaling:
-            for vecs in self._vectors.values():
-                vecs['output'].scale_to_norm()
+            for vec in self._vectors['output'].values():
+                vec.scale_to_norm()
         if self._has_resid_scaling:
-            for vecs in self._vectors.values():
-                vecs['residual'].scale_to_norm()
+            for vec in self._vectors['residual'].values():
+                vec.scale_to_norm()
 
         try:
 
@@ -2191,11 +2187,11 @@ class System(object):
         finally:
 
             if self._has_output_scaling:
-                for vecs in self._vectors.values():
-                    vecs['output'].scale_to_phys()
+                for vec in self._vectors['output'].values():
+                    vec.scale_to_phys()
             if self._has_resid_scaling:
-                for vecs in self._vectors.values():
-                    vecs['residual'].scale_to_phys()
+                for vec in self._vectors['residual'].values():
+                    vec.scale_to_phys()
 
     @contextmanager
     def _matvec_context(self, scope_out, scope_in, mode, clear=True):
@@ -2232,9 +2228,6 @@ class System(object):
         d_outputs = self._doutputs
         d_residuals = self._dresiduals
 
-        self.dprint("MatvecContext:" 'scope_out', sorted(scope_out)
-                    if isinstance(scope_out, frozenset) else scope_out, 'scope_in',
-                    sorted(scope_in) if isinstance(scope_in, frozenset) else scope_in)
         if clear:
             if mode == 'fwd':
                 d_residuals.set_val(0.0)
@@ -4483,7 +4476,7 @@ class System(object):
 
         if not discrete:
             try:
-                vec = self._vectors[vec_name][kind]
+                vec = self._vectors[kind][vec_name]
             except KeyError:
                 if abs_name in my_meta:
                     if vec_name != 'nonlinear':
@@ -4869,14 +4862,14 @@ class System(object):
         vdict = {}
         variables = filtered_vars.get(kind)
         if variables:
-            vec = self._vectors[vec_name][kind]
+            vec = self._vectors[kind][vec_name]
             rank = self.comm.rank
             discrete_vec = () if kind == 'residual' else self._var_discrete[kind]
             offset = len(self.pathname) + 1 if self.pathname else 0
 
             if self.comm.size == 1:
                 get = vec._abs_get_val
-                srcget = self._vectors[vec_name]['output']._abs_get_val
+                srcget = self._vectors['output'][vec_name]._abs_get_val
                 vdict = {}
                 if discrete_vec:
                     for n in variables:
@@ -5574,21 +5567,3 @@ class System(object):
             tarr -= toffset
 
         return sarr, tarr, tsize, has_dist_data
-
-    def dprint(self, *args, **kwargs):
-        """
-        Print function for debugging.
-
-        Only prints if OMDEBUG is set in the environment.  Also indents the output based
-        on the pathname of this System.
-
-        Parameters
-        ----------
-        *args : tuple
-            Positional arguments.
-        **kwargs : dict
-            Keyword arguments.
-        """
-        if omdebug:
-            args = (get_indent(self), self.pathname + ':') + args
-            print(*args, **kwargs)

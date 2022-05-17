@@ -17,7 +17,6 @@ from openmdao.utils.mpi import MPI, check_mpi_env
 from openmdao.utils.coloring import _initialize_model_approx, Coloring
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 from openmdao.vectors.vector import _full_slice
-from openmdao.devtools.debug import dprint, get_indent
 
 
 use_mpi = check_mpi_env()
@@ -1023,7 +1022,6 @@ class _TotalJacInfo(object):
         self.model._dresiduals.set_val(0.0)
         if mode == 'rev':
             self.model._dinputs.set_val(0.0)
-            # dprint("ZERO doutput/dresid/dinput vecs in total jac input setter")
 
     #
     # input setter functions
@@ -1326,7 +1324,7 @@ class _TotalJacInfo(object):
 
         model = self.model
         # Prepare model for calculation by cleaning out the derivatives vectors.
-        dprint("compute_totals ZERO dinput/doutput/dresid for model")
+        model._vectors['input']['linear'].set_val(0.0)
         model._dinputs.set_val(0.0)
         model._doutputs.set_val(0.0)
         model._dresiduals.set_val(0.0)
@@ -1427,9 +1425,7 @@ class _TotalJacInfo(object):
         return_format = self.return_format
         debug_print = self.debug_print
 
-        # Prepare model for calculation by cleaning out the derivatives
-        # vectors.
-        # dprint("ZERO dinput/doutput/dresid for model in compute_totals_approx")
+        # Prepare model for calculation by cleaning out the derivatives vectors.
         model._dinputs.set_val(0.0)
         model._doutputs.set_val(0.0)
         model._dresiduals.set_val(0.0)

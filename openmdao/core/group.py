@@ -34,8 +34,7 @@ from openmdao.utils.indexer import indexer, Indexer
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     SetupWarning, PromotionWarning, MPIWarning
 from openmdao.core.constants import _SetupStatus
-from openmdao.devtools.debug import dprint, get_indent
-
+from openmdao.utils.om_warnings import warn_deprecation
 
 # regex to check for valid names.
 import re
@@ -999,8 +998,6 @@ class Group(System):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
         """
-        from openmdao.core.implicitcomponent import ImplicitComponent
-
         if self._var_allprocs_prom2abs_list is None:
             old_prom2abs = {}
         else:
@@ -2069,24 +2066,22 @@ class Group(System):
         """
         xfer = self._transfers[mode]
         if sub in xfer:
-            if vec_name == 'linear':
-                self.dprint("xfer to SUB", sub)
             xfer = xfer[sub]
         else:
             if mode == 'fwd' and self._conn_discrete_in2out and vec_name == 'nonlinear':
                 self._discrete_transfer(sub)
             return
 
-        vec_inputs = self._vectors[vec_name]['input']
+        vec_inputs = self._vectors['input'][vec_name]
 
         if mode == 'fwd':
             if xfer is not None:
                 if self._has_input_scaling:
                     vec_inputs.scale_to_norm()
-                    xfer._transfer(vec_inputs, self._vectors[vec_name]['output'], mode)
+                    xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
                     vec_inputs.scale_to_phys()
                 else:
-                    xfer._transfer(vec_inputs, self._vectors[vec_name]['output'], mode)
+                    xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
             if self._conn_discrete_in2out and vec_name == 'nonlinear':
                 self._discrete_transfer(sub)
 
@@ -2094,10 +2089,10 @@ class Group(System):
             if xfer is not None:
                 if self._has_input_scaling:
                     vec_inputs.scale_to_norm(mode='rev')
-                    xfer._transfer(vec_inputs, self._vectors[vec_name]['output'], mode)
+                    xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
                     vec_inputs.scale_to_phys(mode='rev')
                 else:
-                    xfer._transfer(vec_inputs, self._vectors[vec_name]['output'], mode)
+                    xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
 
     def _discrete_transfer(self, sub):
         """
@@ -2659,12 +2654,6 @@ class Group(System):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        self.dprint(f"_apply_linear", 'scope_out', sorted(scope_out)
-                    if isinstance(scope_out, frozenset) else scope_out, 'scope_in', sorted(scope_in)
-                    if isinstance(scope_in, frozenset) else scope_in)
-        self.dprint("_apply_linear, doutputs=", self._doutputs.asarray(), "dinputs=",
-                    self._dinputs.asarray(), "dresids", self._dresiduals.asarray())
-
         if self._owns_approx_jac:
             jac = self._jacobian
         elif jac is None and self._assembled_jac is not None:
@@ -2696,9 +2685,6 @@ class Group(System):
                             # zero out dvecs of irrelevant subsystems
                             s._doutputs.set_val(0.0)
 
-        self.dprint("LEAVING _apply_linear, doutputs=", self._doutputs.asarray(), "dinputs=",
-                    self._dinputs.asarray(), "dresids", self._dresiduals.asarray())
-
     def _solve_linear(self, mode, rel_systems, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
@@ -2714,9 +2700,6 @@ class Group(System):
         scope_in : set, None, or _UNDEFINED
             Inputs relevant to possible lower level calls to _apply_linear on Components.
         """
-        self.dprint("_solve_linear, doutputs=", self._doutputs.asarray(), "dresids=",
-                    self._dresiduals.asarray())
-
         if self._owns_approx_jac:
             # No subsolves if we are approximating our jacobian. Instead, we behave like an
             # ExplicitComponent and pass on the values in the derivatives vectors.
@@ -2746,9 +2729,6 @@ class Group(System):
         else:
             self._linear_solver._set_matvec_scope(scope_out, scope_in)
             self._linear_solver.solve(mode, rel_systems)
-
-        self.dprint("LEAVING _solve_linear, doutputs=", self._doutputs.asarray(), "dresids=",
-                    self._dresiduals.asarray())
 
     def _linearize(self, jac, sub_do_ln=True):
         """

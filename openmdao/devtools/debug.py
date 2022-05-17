@@ -532,22 +532,3 @@ def prom_info_dump(system, tgt):
                 for p in abs_in2prom_info[t]:
                     print('        ', p)
     print(flush=True)
-
-
-if env_truthy("OMDEBUG"):
-    def dprint(*args, **kwargs):
-        print(*args, **kwargs)
-else:
-    def dprint(*args, **kwargs):
-        pass
-
-
-def get_indent(obj):
-    from openmdao.core.system import System
-    from openmdao.solvers.solver import Solver
-    if isinstance(obj, System):
-        return '   ' * (obj.pathname.count('.') + 1 if obj.pathname else 0)
-    elif isinstance(obj, Solver):
-        s = obj._system()
-        return '   ' * (s.pathname.count('.') + 2 if s.pathname else 1)
-    return ''

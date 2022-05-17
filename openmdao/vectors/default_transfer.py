@@ -56,7 +56,7 @@ class DefaultTransfer(Transfer):
         abs2meta = group._var_abs2meta
 
         group._transfers = transfers = {}
-        vectors = group._vectors['nonlinear']
+        vectors = group._vectors
         offsets = _global2local_offsets(group._get_var_offsets())
         mypathlen = len(group.pathname + '.' if group.pathname else '')
 
@@ -136,7 +136,8 @@ class DefaultTransfer(Transfer):
             except ValueError:
                 xfer_in = xfer_out = np.zeros(0, dtype=INT_DTYPE)
 
-            xfer_all = DefaultTransfer(vectors['input'], vectors['output'], xfer_in, xfer_out,
+            xfer_all = DefaultTransfer(vectors['input']['nonlinear'],
+                                       vectors['output']['nonlinear'], xfer_in, xfer_out,
                                        group.comm)
         else:
             xfer_all = None
@@ -149,7 +150,8 @@ class DefaultTransfer(Transfer):
 
         for sname, inds in fwd_xfer_in.items():
             if inds.size > 0:
-                xfwd[sname] = DefaultTransfer(vectors['input'], vectors['output'],
+                xfwd[sname] = DefaultTransfer(vectors['input']['nonlinear'],
+                                              vectors['output']['nonlinear'],
                                               inds, fwd_xfer_out[sname], group.comm)
             else:
                 xfwd[sname] = None
@@ -157,7 +159,8 @@ class DefaultTransfer(Transfer):
         if rev:
             for sname, inds in rev_xfer_out.items():
                 if inds.size > 0:
-                    xrev[sname] = DefaultTransfer(vectors['input'], vectors['output'],
+                    xrev[sname] = DefaultTransfer(vectors['input']['nonlinear'],
+                                                  vectors['output']['nonlinear'],
                                                   rev_xfer_in[sname], inds, group.comm)
                 else:
                     xrev[sname] = None
@@ -256,14 +259,9 @@ class DefaultTransfer(Transfer):
 
         """
         if mode == 'fwd':
-            if in_vec._name == 'linear':
-                in_vec._system().dprint(f"FWD transfer, {out_vec.asarray()}")
             # this works whether the vecs have multi columns or not due to broadcasting
             in_vec.set_val(out_vec.asarray()[self._out_inds.flat], self._in_inds)
-            # print(f"transfer {list(out_vec.idxs2nameloc(self._out_inds).items())} --> "
-            #       f"{list(in_vec.idxs2nameloc(self._in_inds).items())}")
+
         else:  # rev
-            if out_vec._name == 'linear':
-                out_vec._system().dprint(f"REV transfer, {out_vec.asarray()}")
             out_vec.iadd(np.bincount(self._out_inds, in_vec._get_data()[self._in_inds],
                                      minlength=out_vec._data.size))

@@ -52,7 +52,6 @@ except ImportError:
     PETScVector = None
 
 from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
-from openmdao.devtools.debug import dprint, get_indent
 
 _contains_all = ContainsAll()
 
@@ -804,8 +803,8 @@ class Problem(object):
             lnames, rnames = wrt, of
             lkind, rkind = 'residual', 'output'
 
-        rvec = self.model._vectors['linear'][rkind]
-        lvec = self.model._vectors['linear'][lkind]
+        rvec = self.model._vectors[rkind]['linear']
+        lvec = self.model._vectors[lkind]['linear']
 
         rvec.set_val(0.)
 
@@ -1027,7 +1026,6 @@ class Problem(object):
                                      # src_indices are applied to the variable somewhere.
             'raise_connection_errors': True,  # If False, connection related errors in setup will
                                               # be converted to warnings.
-            'lin_solver_stack': None,  # stack containing active linear solvers in the model
         }
         model._setup(model_comm, mode, self._metadata)
 
@@ -1397,8 +1395,7 @@ class Problem(object):
                                 mult = 1.0 / comp.comm.size
 
                             for idx in idxs:
-                                dprint(comp.pathname,
-                                       "check_partials ZEROING out dinputs/doutputs, idx=", idx)
+
                                 dinputs.set_val(0.0)
                                 dstate.set_val(0.0)
 

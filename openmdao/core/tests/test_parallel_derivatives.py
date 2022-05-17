@@ -174,7 +174,7 @@ class ParDerivTestCase(unittest.TestCase):
         assert_near_equal(J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
         # Piggyback to make sure the distributed norm calculation is correct.
-        vec = prob.model._dresiduals
+        vec = prob.model._vectors['residual']['linear']
         norm_val = vec.get_norm()
         # NOTE: BAN updated the norm value for the PR that removed vec_names vectors.
         # the seeds for the constraints are now back to -1 instead of -.5
@@ -183,7 +183,6 @@ class ParDerivTestCase(unittest.TestCase):
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class DecoupledTestCase(unittest.TestCase):
-
     N_PROCS = 2
     asize = 3
 
@@ -195,12 +194,12 @@ class DecoupledTestCase(unittest.TestCase):
 
         Indep1 = root.add_subsystem('Indep1', om.IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
         Indep2 = root.add_subsystem('Indep2', om.IndepVarComp('x', np.arange(asize+2, dtype=float)+1.0))
-        G1 = root.add_subsystem('G1', om.ParallelGroup() if MPI else om.Group())
+        G1 = root.add_subsystem('G1', om.ParallelGroup())
         G1.linear_solver = om.LinearBlockGS()
 
         c1 = G1.add_subsystem('c1', om.ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
                                                 x=np.zeros(asize), y=np.zeros(asize)))
-        c2 = G1.add_subsystem('c2', om.ExecComp(f'y = x[:{asize}] * 2.0',
+        c2 = G1.add_subsystem('c2', om.ExecComp('y = x[:%d] * 2.0' % asize,
                                                 x=np.zeros(asize+2), y=np.zeros(asize)))
 
         Con1 = root.add_subsystem('Con1', om.ExecComp('y = x * 5.0',
@@ -295,9 +294,11 @@ class DecoupledTestCase(unittest.TestCase):
         expected[:,:asize] = np.eye(asize)*8.0
         assert_near_equal(J['Con2.y', 'Indep2.x'], expected, 1e-6)
 
+
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class IndicesTestCase(unittest.TestCase):
 
+    N_PROCS = 2
 
     def setup_model(self, mode):
         asize = 3
@@ -526,7 +527,7 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
 
         of = ['ParallelGroup1.Con1.y', 'ParallelGroup1.Con2.y']
         wrt = ['Comp1.x']
-
+        
         p = om.Problem(model=PartialDependGroup())
         p.setup(mode='fwd')
         p.run_model()

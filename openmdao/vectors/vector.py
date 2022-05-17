@@ -6,10 +6,9 @@ import hashlib
 import numpy as np
 from numpy import ndim
 
-from openmdao.utils.name_maps import prom_name2abs_name, rel_name2abs_name
+from openmdao.utils.name_maps import prom_name2abs_name
 from openmdao.utils.indexer import Indexer, indexer
 from openmdao.utils.array_utils import array_hash
-from openmdao.devtools.debug import dprint, get_indent
 
 
 _full_slice = slice(None)
@@ -153,17 +152,6 @@ class Vector(object):
         self.read_only = False
 
     def __str__(self):
-        """
-        Return a string representation of the Vector object.
-
-        Returns
-        -------
-        str
-            String rep of this object.
-        """
-        return str(self.asarray())
-
-    def __repr__(self):
         """
         Return a string representation of the Vector object.
 

@@ -4,7 +4,6 @@ import unittest
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_check_partials, assert_check_totals
 from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.devtools.debug import dprint
 
 
 class MyParaboloid(Paraboloid):
