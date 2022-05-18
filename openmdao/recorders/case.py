@@ -459,6 +459,9 @@ class Case(object):
         meta = self._abs2meta
         inputs = []
 
+        # string to display when an attribute is not available (e.g. for a discrete)
+        NA = 'Unavailable'
+
         if values is not None:
             issue_warning("'value' is deprecated and will be removed in 4.0. "
                           "Please index in using 'val'")
@@ -503,9 +506,12 @@ class Case(object):
                 if prom_name:
                     var_meta['prom_name'] = var_name_prom
                 if units:
-                    var_meta['units'] = meta[var_name]['units']
+                    var_meta['units'] = meta[var_name].get('units', NA)
                 if shape:
-                    var_meta['shape'] = val.shape
+                    try:
+                        var_meta['shape'] = val.shape
+                    except AttributeError:
+                        var_meta['shape'] = NA
                 if desc:
                     var_meta['desc'] = meta[var_name]['desc']
 
@@ -611,6 +617,9 @@ class Case(object):
         expl_outputs = []
         impl_outputs = []
 
+        # string to display when an attribute is not available (e.g. for a discrete)
+        NA = 'Unavailable'
+
         if values is not None:
             issue_warning("'value' is deprecated and will be removed in 4.0. "
                           "Please index in using 'val'")
@@ -666,16 +675,19 @@ class Case(object):
             if residuals:
                 var_meta['resids'] = resids
             if units:
-                var_meta['units'] = meta[var_name]['units']
+                var_meta['units'] = meta[var_name].get('units', NA)
             if shape:
-                var_meta['shape'] = val.shape
+                try:
+                    var_meta['shape'] = val.shape
+                except AttributeError:
+                    var_meta['shape'] = NA
             if bounds:
-                var_meta['lower'] = meta[var_name]['lower']
-                var_meta['upper'] = meta[var_name]['upper']
+                var_meta['lower'] = meta[var_name].get('lower', NA)
+                var_meta['upper'] = meta[var_name].get('upper', NA)
             if scaling:
-                var_meta['ref'] = meta[var_name]['ref']
-                var_meta['ref0'] = meta[var_name]['ref0']
-                var_meta['res_ref'] = meta[var_name]['res_ref']
+                var_meta['ref'] = meta[var_name].get('ref', NA)
+                var_meta['ref0'] = meta[var_name].get('ref0', NA)
+                var_meta['res_ref'] = meta[var_name].get('res_ref', NA)
             if desc:
                 var_meta['desc'] = meta[var_name]['desc']
             if meta[var_name]['explicit']:
