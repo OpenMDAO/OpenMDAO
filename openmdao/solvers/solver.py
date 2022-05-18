@@ -1053,22 +1053,25 @@ class BlockLinearSolver(LinearSolver):
             return scope2
         return scope2.union(scope1)
 
-    def _run_apply(self):
+    def _run_apply(self, init=False):
         """
         Run the apply_linear method on the system.
         """
-        self._recording_iter.push(('_run_apply', 0))
-
         system = self._system()
-        scope_out, scope_in = system._get_matvec_scope()
-        scope_out = self._scope_union(self._scope_out, scope_out)
-        scope_in = self._scope_union(self._scope_in, scope_in)
+        if not init or system._iter_call_apply_linear():
+            # system.pindent(system.pathname, "_run_apply")
+            self._recording_iter.push(('_run_apply', 0))
+            try:
+                scope_out, scope_in = system._get_matvec_scope()
+                scope_out = self._scope_union(self._scope_out, scope_out)
+                scope_in = self._scope_union(self._scope_in, scope_in)
 
-        try:
-            system._apply_linear(self._assembled_jac, self._rel_systems,
-                                 self._mode, scope_out, scope_in)
-        finally:
-            self._recording_iter.pop()
+                system._apply_linear(self._assembled_jac, self._rel_systems,
+                                     self._mode, scope_out, scope_in)
+            finally:
+                self._recording_iter.pop()
+            return True
+        return False
 
     def _iter_initialize(self):
         """
@@ -1082,9 +1085,12 @@ class BlockLinearSolver(LinearSolver):
             error at the first iteration.
         """
         self._update_rhs_vec()
+
         if self.options['maxiter'] > 1:
-            self._run_apply()
-            norm = self._iter_get_norm()
+            if self._run_apply(init=True):
+                norm = self._iter_get_norm()
+            else:
+                return 1.0, 1.0
         else:
             return 1.0, 1.0
         norm0 = norm if norm != 0.0 else 1.0
@@ -1103,12 +1109,12 @@ class BlockLinearSolver(LinearSolver):
             norm.
         """
         if self._mode == 'fwd':
-            b_vecs = self._system()._dresiduals
+            b_vec = self._system()._dresiduals
         else:  # rev
-            b_vecs = self._system()._doutputs
+            b_vec = self._system()._doutputs
 
-        b_vecs -= self._rhs_vec
-        return b_vecs.get_norm()
+        b_vec -= self._rhs_vec
+        return b_vec.get_norm()
 
     def _set_matvec_scope(self, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
@@ -1135,7 +1141,9 @@ class BlockLinearSolver(LinearSolver):
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
         """
+        # self._system().pindent(self._system().pathname, "LINEAR SOLVE")
         self._rel_systems = rel_systems
         self._mode = mode
         self._solve()
         self._scope_out = self._scope_in = _UNDEFINED  # reset after solve is done
+        # self._system().pindent(self._system().pathname, "LINEAR SOLVE done")
