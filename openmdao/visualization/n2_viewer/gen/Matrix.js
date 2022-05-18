@@ -291,8 +291,7 @@ class Matrix {
             const curNode = this.diagNodes[ri];
             const startINode = this.diagNodes[currentBox.startI];
 
-            if (startINode.parent && startINode.parent.draw.boxChildren && 
-                curNode.parent && startINode.parent === curNode.parent) {
+            if (startINode.boxAncestor() === curNode.boxAncestor()) {
                 ++currentBox.stopI;
             }
             else {

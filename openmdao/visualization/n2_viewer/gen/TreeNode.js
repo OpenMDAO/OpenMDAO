@@ -13,7 +13,6 @@ class NodeDisplayData {
         this.filtered = false; // Node is a child to be shown w/partially collapsed parent
         this.filterParent = null; // When filtered, reference to FilterNode container
         this.manuallyExpanded = false; // Node was pre-collapsed but expanded by user
-        this.boxChildren = false; // Surround children with a box in the matrix grid
 
         this.dims = new Dimensions({ x: 1e-6, y: 1e-6, width: 1, height: 1 });
         this.dims.preserve();
@@ -59,8 +58,12 @@ class TreeNode {
     }
 
     _newDisplayData() {
-        if (this.isInputOrOutput()) { this.parent.draw.boxChildren = true; }
         return new NodeDisplayData();
+    }
+
+    /** In the matrix grid, draw a box around variables that share the same boxAncestor() */
+    boxAncestor() {
+        return this.isInputOrOutput()? this.parent : null;
     }
 
     // Accessor functions for this.draw.minimized - whether or not to draw children
@@ -423,8 +426,8 @@ class FilterNode extends TreeNode {
  * @property {FilterNode} filter.outputs Children that are outputs to be viewed as collapsed.
  */
 class FilterCapableNode extends TreeNode {
-    constructor(origNode, attribNames) {
-        super(origNode, attribNames);
+    constructor(origNode, attribNames, parent) {
+        super(origNode, attribNames, parent);
     }
 
     // Accessor functions for this.draw.filtered - whether a variable is shown in collapsed form

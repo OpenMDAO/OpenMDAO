@@ -24,7 +24,6 @@ class OmTreeNode extends FilterCapableNode {
         // Solver names may be empty, so set them to "None" instead.
         if (this.linear_solver == "") this.linear_solver = "None";
         if (this.nonlinear_solver == "") this.nonlinear_solver = "None";
-        if (this.isComponent()) this.draw.boxChildren = true;
         if (exists(this.parentComponent)) this.parentComponent = parent;
     }
 
