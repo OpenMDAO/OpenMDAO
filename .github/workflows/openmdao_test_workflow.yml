@@ -135,7 +135,7 @@ jobs:
           echo "============================================================="
           echo "Install PETSc"
           echo "============================================================="
-          conda install -c conda-forge mpi4py petsc=${{ matrix.PETSc }} petsc4py -q -y
+          conda install -c conda-forge mpi4py=3.0 petsc=${{ matrix.PETSc }} petsc4py -q -y
           echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> $GITHUB_ENV
 
       - name: Install pyOptSparse
