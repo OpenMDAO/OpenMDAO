@@ -964,7 +964,20 @@ class BlockLinearSolver(LinearSolver):
     ----------
     **kwargs : dict
         Options dictionary.
+
+    Attributes
+    ----------
+    _rhs_vec : ndarray
+        Contains the values of the linear resids (fwd) or outputs (rev) saved at the beginning
+        of the linear solve.
     """
+
+    def __init__(self, **kwargs):
+        """
+        Initialize attributes.
+        """
+        super().__init__(**kwargs)
+        self._rhs_vec = None
 
     def _declare_options(self):
         """
@@ -1113,8 +1126,10 @@ class BlockLinearSolver(LinearSolver):
         else:  # rev
             b_vec = self._system()._doutputs
 
-        b_vec -= self._rhs_vec
-        return b_vec.get_norm()
+        b_vec -= self._rhs_vec  # compute Ax - rhs
+        norm = b_vec.get_norm()
+        b_vec += self._rhs_vec  # revert b_vec back to original value
+        return norm
 
     def _set_matvec_scope(self, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
