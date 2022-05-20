@@ -30,6 +30,13 @@ _ABS_BOUNDS_TOL = 1.0E-4
 # from https://jfly.uni-koeln.de/color/ some colorblind friendly colors
 _out_of_bounds_color_text = 'rgb(213, 94, 0)'
 _out_of_bounds_color_plot = (0.83529,0.36862,0.)
+_out_of_bound_hatch_pattern = 'xxxxx'
+
+_plot_padding = 0.2
+
+_equality_constraint_tolerance = 1.0E-6
+
+_plot_marker_size = 0.1
 
 _in_bounds_color = (0., 0.61960, 0.45098)
 _value_plot_color = 'black'
@@ -137,6 +144,21 @@ def _make_opt_value_table(driver):
 
     return html
 
+def _get_bound_array_min_max(bounds, indices):
+    _bounds_no_inf = bounds[np.where(((bounds != -INF_BOUND) & (bounds != INF_BOUND)))]
+    if _bounds_no_inf.size > 0:
+        _bounds_min = np.min(_bounds_no_inf)
+        _bounds_max = np.max(_bounds_no_inf)
+    else:  # so that when we do min and max on these they are not used
+        _bounds_min = INF_BOUND
+        _bounds_max = - INF_BOUND
+
+    if isinstance(bounds, float):
+        _bounds = (bounds * np.ones_like(val)[indices]).ravel()
+    else:
+        _bounds = np.asarray(bounds).ravel()
+
+    return _bounds, _bounds_min, _bounds_max
 
 def _desvar_sparkline(fig, ax, meta, val):
     indices = np.s_[...] if meta['indices'] is None else meta['indices']()
@@ -153,61 +175,117 @@ def _desvar_sparkline(fig, ax, meta, val):
     else:
         _upper = np.asarray(meta['upper']).ravel()
 
-    # Plot the lower/upper/equals lines
+    # Get the x values
     ar = np.arange(_val.size)
-    x_min = -1
-    x_max = val.size
 
-    # ax.scatter(ar, val.ravel(), c='tab:blue', s=1)
-    # ax.scatter(ar, val.ravel(), c='tab:green', s=1)
-    # ax.scatter(ar, val.ravel(), c='tab:grey', s=1)
-    ax.scatter(ar, val.ravel(), c=_value_plot_color, s=1)
+    # get ranges
+    x_min = 0
+    x_max = val.size - 1
 
-    ax.margins(x=0, y=0.1)
+    _lower, _lower_no_inf_min, _lower_no_inf_max = _get_bound_array_min_max(_lower, indices)
+    _upper, _upper_no_inf_min, _upper_no_inf_max = _get_bound_array_min_max(_upper, indices)
+
+    # # get true min and max for upper, lower, and val
+    # _lower_no_inf = _lower[np.where(((_lower != -INF_BOUND) & (_lower != INF_BOUND)))]
+    # if _lower_no_inf.size > 0:
+    #     _lower_no_inf_min = np.min(_lower_no_inf)
+    #     _lower_no_inf_max = np.max(_lower_no_inf)
+    # else:
+    #     _lower_no_inf_min = INF_BOUND
+    #     _lower_no_inf_max = - INF_BOUND
+    #
+    # _upper_no_inf = _upper[np.where(((_upper != -INF_BOUND) & (_upper != INF_BOUND)))]
+    # if _upper_no_inf.size > 0:
+    #     _upper_no_inf_min = np.min(_upper_no_inf)
+    #     _upper_no_inf_max = np.max(_upper_no_inf)
+    # else:
+    #     _upper_no_inf_min = INF_BOUND
+    #     _upper_no_inf_max = - INF_BOUND
+
+
+    # get y min and max
+    y_min = min(_lower_no_inf_min, _upper_no_inf_min, np.min(_val ))
+    y_max = max(_lower_no_inf_max, _upper_no_inf_max, np.max(_val ))
+
+    # Set plot options
+    ax.margins(x=.2, y=0.1)
     ax.autoscale_view(True)
 
     plt.autoscale(False)
 
-    y_min = np.min(_lower) if np.min(_lower) > -INF_BOUND else np.min(_val)
-    y_max = np.max(_upper) if np.max(_upper) < INF_BOUND else np.max(_val)
+    # plot limits
 
-    if _val.size == 1:
+    # add a little to the top and bottom of the plot
+    yrange = y_max - y_min
+    ymin_plot = y_min - yrange * _plot_padding
+    ymax_plot = y_max + yrange * _plot_padding
 
-        #  (0., 0.61960, 0.45098)
-        pass
-        # TODO - does this need to be called since we handle that elsewhere?
+    xrange = x_max - x_min
+    xmin_plot = x_min - xrange * _plot_padding
+    xmax_plot = x_max + xrange * _plot_padding
 
-        # ax.fill_between([x_min, x_max], _lower, _upper, color='tab:orange', alpha=0.1)
-        # ax.fill_between([x_min, x_max], _lower, _upper, color=_in_bounds_color, alpha=0.1)
-    else:
-        # ax.fill_between(ar, _lower, _upper, color='tab:orange', alpha=0.1)
-        ax.fill_between(ar, _lower, _upper, color=_in_bounds_color, alpha=0.1)
+    ax.set_xlim([xmin_plot, xmax_plot])
+    ax.set_ylim([ymin_plot, ymax_plot])
 
+    # tick marks
+    # plt.setp(ax.get_xticklabels(), visible=False)
+    # plt.setp(ax.get_xticklines(), visible=False)
+    # plt.setp(ax.spines.values(), visible=False)
 
-        ymin_plot, ymax_plot = ax.get_ylim()
-        ax.fill_between(ar, _upper, ymax_plot, color=_out_of_bounds_color_plot, alpha=0.1)
-        # ax.fill_between(ar, ymin_plot, _lower, color=_out_of_bounds_color_plot, alpha=0.1)
-
-
-        ax.plot(ar, _lower, color=_in_bounds_color, linewidth=0.5)
-        ax.plot(ar, _upper, color=_in_bounds_color, linewidth=0.5)
-
-    plt.setp(ax.get_xticklabels(), visible=False)
-    plt.setp(ax.get_xticklines(), visible=False)
-    plt.setp(ax.spines.values(), visible=False)
-
-    ax.set_xlim([x_min, x_max])
-
+    ax.set_xticks([x_min, x_max])
     ax.set_yticks([y_min, y_max])
-
-    ax.margins(x=0, y=0.1)
     ax.tick_params(axis='y', labelsize=7)
+    ax.tick_params(axis='x', labelsize=7)
+
+    # plot values
+    # ax.scatter(ar, val.ravel(), c=_value_plot_color, s=1)
+
+    ax.plot(ar, _val, '-o', markersize=_plot_marker_size, color=_value_plot_color, linewidth=0.5)
+
+    # Need to do this because of a bug in matplotlib. If the upper or lowers include INF_BOUND
+    #  it affects how the other side of the fill_between is drawn
+    _lower = np.clip(_lower, ymin_plot, ymax_plot )
+    _upper = np.clip(_upper, ymin_plot, ymax_plot )
+
+    # indicate out of feasible ranges
+    # ymin_plot, ymax_plot = ax.get_ylim()
+
+    # plot lower, if exists
+    if not (isinstance(meta['lower'], float) and meta['lower'] == -INF_BOUND):
+        ax.fill_between(ar, ymin_plot, _lower, color=_out_of_bounds_color_plot,
+                        hatch=_out_of_bound_hatch_pattern, alpha=0.1)
+        ax.plot(ar, _lower, color=_out_of_bounds_color_plot, linewidth=0.5)
+
+    # plot upper, if exists
+    if not (isinstance(meta['upper'], float) and meta['upper'] == INF_BOUND):
+        ax.fill_between(ar, _upper, ymax_plot, color=_out_of_bounds_color_plot,
+                        hatch=_out_of_bound_hatch_pattern, alpha=0.1)
+        ax.plot(ar, _upper, color=_out_of_bounds_color_plot, linewidth=0.5)
+
+    # _lower = np.array([-INF_BOUND / 10e15, -INF_BOUND/ 10e15])
+
+    ax.fill_between(ar, _lower, _upper, color=_in_bounds_color, alpha=0.3)
+    # ax.fill_between(ar, _upper, ymax_plot, color=_out_of_bounds_color_plot, alpha=0.1)
+
 
 
 def _ineq_constraint_sparkline(fig, ax, meta, val):
     indices = np.s_[...] if meta['indices'] is None else meta['indices']()
 
     _val = np.asarray(val).ravel()
+    ar = np.arange(_val.size)
+
+    x_min = 0
+    x_max = val.size - 1
+
+    xrange = x_max - x_min
+    xmin_plot = x_min - xrange * _plot_padding
+    xmax_plot = x_max + xrange * _plot_padding
+
+    if isinstance(meta['lower'], float) and meta['lower'] == -INF_BOUND and \
+            isinstance(meta['upper'], float) and meta['upper'] == INF_BOUND:
+        raise ValueError("Upper, and lower bounds cannot both be None")
+
 
     if isinstance(meta['lower'], float):
         _lower = (meta['lower'] * np.ones_like(val)[indices]).ravel()
@@ -219,33 +297,187 @@ def _ineq_constraint_sparkline(fig, ax, meta, val):
     else:
         _upper = np.asarray(meta['upper']).ravel()
 
-    # Plot the lower/upper/equals lines
-    ar = np.arange(_val.size)
-    x_min = -1
-    x_max = val.size
 
-    ax.scatter(ar, _val, c='tab:blue', s=1)
+    _lower, _lower_no_inf_min, _lower_no_inf_max = _get_bound_array_min_max(_lower, indices)
+    _upper, _upper_no_inf_min, _upper_no_inf_max = _get_bound_array_min_max(_upper, indices)
 
-    # (0., 0.61960, 0.45098)
-    if _val.size == 1:
-        # ax.fill_between([x_min, x_max], _lower, _upper, color='tab:orange', alpha=0.1)
-        # ax.fill_between([x_min, x_max], _lower, _upper, color=(0., 0.61960, 0.45098), alpha=0.1)
-        pass
-    else:
-        # ax.fill_between(ar, _lower, _upper, color='tab:orange', alpha=0.1)
-        # ax.plot(ar, _lower, color='tab:orange', linewidth=0.5)
-        # ax.plot(ar, _upper, color='tab:orange', linewidth=0.5)
-        ax.fill_between(ar, _lower, _upper, color=_in_bounds_color, alpha=0.1)
-        ax.plot(ar, _lower, color=_in_bounds_color, linewidth=0.5)
-        ax.plot(ar, _upper, color=_in_bounds_color, linewidth=0.5)
+    _has_lower = not (isinstance(meta['lower'], float) and meta['lower'] == -INF_BOUND)
+    _has_upper = not (isinstance(meta['upper'], float) and meta['upper'] == INF_BOUND)
 
-    ax.set_xlim([x_min, x_max])
+    ax.margins(x=0.2, y=0.1)
 
-    y_min = np.min(_lower) if np.min(_lower) > -INF_BOUND else np.min(_val)
-    y_max = np.max(_upper) if np.max(_upper) < INF_BOUND else np.max(_val)
+    y_min = min(np.min(_val), _lower_no_inf_min, _upper_no_inf_min)
+    y_max = max(np.max(_val), _lower_no_inf_max, _upper_no_inf_max)
 
-    ax.margins(x=0, y=0.1)
+    yrange = y_max - y_min
+    ymin_plot = y_min - yrange * _plot_padding
+    ymax_plot = y_max + yrange * _plot_padding
+
+    ax.set_xlim([xmin_plot, xmax_plot])
+    ax.set_ylim([ymin_plot, ymax_plot])
+
     ax.set_yticks([y_min, y_max])
+    ax.set_xticks([x_min, x_max])
+
+    if _has_lower:
+        ax.fill_between(ar, ymin_plot, _lower, color=_out_of_bounds_color_plot, alpha=0.1,
+                        hatch=_out_of_bound_hatch_pattern)
+        ax.plot(ar, _lower,  color=_out_of_bounds_color_plot, linewidth=0.5)
+
+    if _has_upper:
+        ax.fill_between(ar, _upper, ymax_plot, color=_out_of_bounds_color_plot, alpha=0.1,
+                        hatch=_out_of_bound_hatch_pattern)
+        ax.plot(ar, _upper,  color=_out_of_bounds_color_plot, linewidth=0.5)
+
+    ax.fill_between(ar, _lower, _upper, color=_in_bounds_color, alpha=0.1)
+
+    ax.plot(ar, _val, '-o', markersize=_plot_marker_size, color=_value_plot_color, linewidth=0.5)
+
+
+
+
+    # make y min and max the min and max across all non INF_BOUND values
+
+    # if isinstance(meta['upper'], float) and meta['upper'] == INF_BOUND: # we have only lower
+    #     # plot values
+    #     # plot lower array
+    #     # where values less than lower by some margin, make some kind of indication.
+    #     # use out of bounds colors
+    #
+    #     if isinstance(meta['lower'], float):
+    #         _lower = (meta['lower'] * np.ones_like(val)[indices]).ravel()
+    #     else:
+    #         _lower = np.asarray(meta['lower']).ravel()
+    #
+    #
+    #     # colors = []
+    #     # for i, v in enumerate(_val):
+    #     #     if v < _lower[i] - 1.0E-6:   # TODO !
+    #     #         colors.append(_out_of_bounds_color_plot)
+    #     #     else:
+    #     #         colors.append(_in_bounds_color)
+    #
+    #     y_min = min(np.min(_lower), np.min(_val))
+    #     y_max = max(np.max(_lower), np.max(_val))
+    #
+    #     # add a little to the top and bottom of the plot
+    #     yrange = y_max - y_min
+    #     ymin_plot = y_min - yrange * _plot_padding
+    #     ymax_plot = y_max + yrange * _plot_padding
+    #
+    #     # y_min = np.min(_val)
+    #     # y_max = np.max(_val)
+    #
+    #     ax.fill_between(ar, ymin_plot, _lower, color=_out_of_bounds_color_plot, alpha=0.1,
+    #                     hatch=_out_of_bound_hatch_pattern)
+    #     ax.fill_between(ar, _lower, ymax_plot, color=_in_bounds_color, alpha=0.1)
+    #     ax.plot(ar, _lower,  color=_out_of_bounds_color_plot, linewidth=0.5)
+    #
+    #     ax.plot(ar, _val, '-o', markersize=_plot_marker_size, color=_value_plot_color, linewidth=0.5)
+    #
+    #     # smiddle = np.ma.masked_where(_val > _lower, _val)
+    #     # slower = np.ma.masked_where((_val < _lower), _val)
+    #     # ax.plot(ar, smiddle, color=_out_of_bounds_color_plot, linewidth=0.5)
+    #     # ax.plot(ar, slower, color=_in_bounds_color, linewidth=0.5)
+    #
+    #     # ax.plot(ar, _val, color=colors, linewidth=0.5)
+    #
+    #
+    #     ax.set_xlim([xmin_plot, xmax_plot])
+    #     ax.set_ylim([ymin_plot, ymax_plot])
+    #
+    #     # y_min = np.min(_lower) if np.min(_lower) > -INF_BOUND else np.min(_val)
+    #
+    #     # y_max = np.max(_val)
+    #     ax.set_yticks([y_min, y_max])
+    #     ax.set_xticks([x_min, x_max])
+    #
+    #
+
+
+    #
+    #
+    # if isinstance(meta['upper'], float):
+    #     _upper = (meta['upper'] * np.ones_like(val)[indices]).ravel()
+    # else:
+    #     _upper = np.asarray(meta['upper']).ravel()
+    #
+    # # Plot the lower/upper/equals lines
+    # ar = np.arange(_val.size)
+    # x_min = -1
+    # x_max = val.size
+    #
+    # ax.scatter(ar, _val, c='tab:blue', s=1)
+    #
+    # # (0., 0.61960, 0.45098)
+    # if _val.size == 1:
+    #     # ax.fill_between([x_min, x_max], _lower, _upper, color='tab:orange', alpha=0.1)
+    #     # ax.fill_between([x_min, x_max], _lower, _upper, color=(0., 0.61960, 0.45098), alpha=0.1)
+    #     pass
+    # else:
+    #     # ax.fill_between(ar, _lower, _upper, color='tab:orange', alpha=0.1)
+    #     # ax.plot(ar, _lower, color='tab:orange', linewidth=0.5)
+    #     # ax.plot(ar, _upper, color='tab:orange', linewidth=0.5)
+    #     ax.fill_between(ar, _lower, _upper, color=_in_bounds_color, alpha=0.1)
+    #     ax.plot(ar, _lower, color=_in_bounds_color, linewidth=0.5)
+    #     ax.plot(ar, _upper, color=_in_bounds_color, linewidth=0.5)
+    #
+    # ax.set_xlim([x_min, x_max])
+    #
+    # y_min = np.min(_lower) if np.min(_lower) > -INF_BOUND else np.min(_val)
+    # y_max = np.max(_upper) if np.max(_upper) < INF_BOUND else np.max(_val)
+    #
+    # ax.margins(x=0, y=0.1)
+    # ax.set_yticks([y_min, y_max])
+
+# def original_ineq_constraint_sparkline(fig, ax, meta, val):
+#     indices = np.s_[...] if meta['indices'] is None else meta['indices']()
+#
+#     _val = np.asarray(val).ravel()
+#
+#     if isinstance(meta['lower'], float):
+#         _lower = (meta['lower'] * np.ones_like(val)[indices]).ravel()
+#     else:
+#         _lower = np.asarray(meta['lower']).ravel()
+#
+#
+#     ## TODO need to check to see if upper or lower are INF
+#
+#
+#
+#
+#     if isinstance(meta['upper'], float):
+#         _upper = (meta['upper'] * np.ones_like(val)[indices]).ravel()
+#     else:
+#         _upper = np.asarray(meta['upper']).ravel()
+#
+#     # Plot the lower/upper/equals lines
+#     ar = np.arange(_val.size)
+#     x_min = -1
+#     x_max = val.size
+#
+#     ax.scatter(ar, _val, c='tab:blue', s=1)
+#
+#     # (0., 0.61960, 0.45098)
+#     if _val.size == 1:
+#         # ax.fill_between([x_min, x_max], _lower, _upper, color='tab:orange', alpha=0.1)
+#         # ax.fill_between([x_min, x_max], _lower, _upper, color=(0., 0.61960, 0.45098), alpha=0.1)
+#         pass
+#     else:
+#         # ax.fill_between(ar, _lower, _upper, color='tab:orange', alpha=0.1)
+#         # ax.plot(ar, _lower, color='tab:orange', linewidth=0.5)
+#         # ax.plot(ar, _upper, color='tab:orange', linewidth=0.5)
+#         ax.fill_between(ar, _lower, _upper, color=_in_bounds_color, alpha=0.1)
+#         ax.plot(ar, _lower, color=_in_bounds_color, linewidth=0.5)
+#         ax.plot(ar, _upper, color=_in_bounds_color, linewidth=0.5)
+#
+#     ax.set_xlim([x_min, x_max])
+#
+#     y_min = np.min(_lower) if np.min(_lower) > -INF_BOUND else np.min(_val)
+#     y_max = np.max(_upper) if np.max(_upper) < INF_BOUND else np.max(_val)
+#
+#     ax.margins(x=0, y=0.1)
+#     ax.set_yticks([y_min, y_max])
 
 
 def _eq_constraint_sparkline(fig, ax, meta, val):
@@ -260,17 +492,17 @@ def _eq_constraint_sparkline(fig, ax, meta, val):
     else:
         _equals = np.asarray(meta['equals']).ravel()
     (0., 0.61960, 0.45098)
-    colors = {
-        # 'lower': 'tab:orange',
-        # 'upper': 'tab:orange',
-        'lower': _in_bounds_color,
-        'upper': _in_bounds_color,
-        'equals': 'tab:gray',
-        'feas': 'tab:blue',
-        'infeas': 'tab:red',
-        'omit': 'lightgray'}
+    # colors = {
+    #     # 'lower': 'tab:orange',
+    #     # 'upper': 'tab:orange',
+    #     'lower': _in_bounds_color,
+    #     'upper': _in_bounds_color,
+    #     'equals': 'tab:gray',
+    #     'feas': 'tab:blue',
+    #     'infeas': 'tab:red',
+    #     'omit': 'lightgray'}
 
-    scatter_color = [colors['feas']] * int(val.size)
+    # scatter_color = [colors['feas']] * int(val.size)
 
     ar = np.arange(val.size)
 
@@ -284,16 +516,31 @@ def _eq_constraint_sparkline(fig, ax, meta, val):
     # ax.scatter(ar, err.ravel(), c=scatter_color, s=3)
     colors = []
     for e in err.ravel():
-        if np.abs(e) < 1.0E-6:
+        if np.abs(e) < _equality_constraint_tolerance:
             colors.append('tab:green')
         else:
             colors.append('tab:red')
 
-    y_min = np.min(err.ravel())
-    y_max = np.max(err.ravel())
-    ax.bar(ar, err.ravel(), color=colors)
+    y_min = min(np.min(_val), np.min(_equals))
+    y_max = max(np.max(_val), np.max(_equals))
+    # ax.bar(ar, err.ravel(), color=colors)
+    ax.plot(ar, _equals, color='black', linewidth=0.5)
+    ax.scatter(ar, _val, color=colors, s=10)
     ax.set_xlim([x_min[0], x_max[-1]])
     ax.set_yticks([y_min, y_max])
+
+    yrange = y_max - y_min
+    ymin_plot = y_min - yrange * _plot_padding
+    ymax_plot = y_max + yrange * _plot_padding
+    ax.set_ylim([ymin_plot, ymax_plot])
+
+
+    # y_min = np.min(err.ravel())
+    # y_max = np.max(err.ravel())
+    # # ax.bar(ar, err.ravel(), color=colors)
+    # ax.scatter(ar, err.ravel(), color=colors, s=10)
+    # ax.set_xlim([x_min[0], x_max[-1]])
+    # ax.set_yticks([y_min, y_max])
 
 
 def _sparkline(kind, meta, val, width=300):
@@ -322,6 +569,11 @@ def _sparkline(kind, meta, val, width=300):
     # Prepare the matplotlib figure/axes
     _backend = mpl.get_backend()
     plt.style.use('default')
+
+    _out_of_bound_hatch_color = (0., 0., 0.)
+
+    plt.rcParams['hatch.color'] = _out_of_bound_hatch_color
+
     plt.autoscale(False)
     mpl.use('Agg')
 
@@ -335,12 +587,13 @@ def _sparkline(kind, meta, val, width=300):
         _eq_constraint_sparkline(fig, ax, meta, val)
 
     ax.tick_params(axis='y', labelsize=7)
+    ax.tick_params(axis='x', labelsize=7)
 
     ax.yaxis.set_major_formatter(mpl.ticker.FormatStrFormatter('%5.3e'))
 
-    plt.setp(ax.get_xticklabels(), visible=False)
-    plt.setp(ax.get_xticklines(), visible=False)
-    plt.setp(ax.spines.values(), visible=False)
+    # plt.setp(ax.get_xticklabels(), visible=False)
+    # plt.setp(ax.get_xticklines(), visible=False)
+    # plt.setp(ax.spines.values(), visible=False)
 
     fig.patch.set_facecolor(None)
     fig.patch.set_alpha(0.0)
@@ -350,7 +603,8 @@ def _sparkline(kind, meta, val, width=300):
     fig.subplots_adjust(left=0.25)
 
     tmpfile = io.BytesIO()
-    fig.savefig(tmpfile, format='png')
+    fig.savefig(tmpfile, format='png',bbox_inches='tight')
+    # fig.savefig('junk.png', format='png')
     encoded = base64.b64encode(tmpfile.getvalue()).decode('utf-8')
 
     html = f'<img width={width} src=\'data:image/png;base64,{encoded}\'>'
@@ -383,7 +637,23 @@ def _constraint_plot(kind, meta, val, width=300):
         An HTML image tag containing the encoded sparkline image.
 
     """
+
+    if kind == 'desvar' and meta['upper'] == INF_BOUND and meta['lower'] == -INF_BOUND:
+        return   # nothing to plot
+
+
     # Prepare the matplotlib figure/axes
+    equals = meta['equals'] if 'equals' in meta else None
+
+    if equals is not None:
+        _relative_diff_from_bound = 1e-4
+
+        if abs(val - equals) < _relative_diff_from_bound:
+            html = '<span class="equality-constraint equality-constraint-satisfied">&#10003;</span>'
+        else:
+            html = '<span class="equality-constraint equality-constraint-violated">&#10007;</span>'
+        return html
+
     _backend = mpl.get_backend()
     plt.style.use('default')
     plt.autoscale(False)
@@ -391,8 +661,7 @@ def _constraint_plot(kind, meta, val, width=300):
 
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(3, .4))
 
-    equals = meta['equals'] if 'equals' in meta else None
-    var_bounds_plot(ax, float(val), meta['lower'], meta['upper'], equals)
+    var_bounds_plot(kind, ax, float(val), meta['lower'], meta['upper'], equals)
     tmpfile = io.BytesIO()
     fig.savefig(tmpfile, format='png', transparent=True)
     encoded = base64.b64encode(tmpfile.getvalue()).decode('utf-8')
@@ -452,7 +721,8 @@ def _indicate_value_is_derived_from_array(derived_value, original_value):
 
 def _make_dvcons_table(meta_dict, vals_dict, kind,
                        cols=['lower', 'upper', 'ref', 'ref0', 'adder', 'scaler', 'units', 'min',
-                             'max', 'plot']):
+                             'max', 'visual']):
+                             # 'max', 'plot']):
     _col_names = cols if cols is not None else []
     # col_names = ['name', 'size'] + _col_names
     col_names = ['name', 'alias', 'size'] + _col_names
@@ -545,11 +815,14 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
                         row[col_name] = meta_dict[alias][col_name]
                     else:
                         row[col_name] = meta_dict[name][col_name]
-            elif col_name == 'plot':
+            elif col_name == 'visual':
+            # elif col_name == 'plot':
                 if meta['size'] > 1:
-                    row['plot'] = _sparkline(meta=meta, val=vals_dict[name], kind=kind)
+                    # row['plot'] = _sparkline(meta=meta, val=vals_dict[name], kind=kind)
+                    row['visual'] = _sparkline(meta=meta, val=vals_dict[name], kind=kind)
                 else:
-                    row['plot'] = _constraint_plot(meta=meta, val=vals_dict[name], kind=kind)
+                    row['visual'] = _constraint_plot(meta=meta, val=vals_dict[name], kind=kind)
+                    # row['plot'] = _constraint_plot(meta=meta, val=vals_dict[name], kind=kind)
             elif col_name == 'size':
                 row[col_name] = int(meta[col_name])  # sometimes size in the meta data is a numpy
                                                     # array so tabulate does different formatting
@@ -653,12 +926,14 @@ def opt_report(prob, outfile=None):
     desvars_html = _make_dvcons_table(meta_dict=desvars_meta, vals_dict=desvars_vals, kind='desvar',
                                       # precision=precision,
                                       cols=['min', 'max', 'mean', 'lower', 'upper', 'equals', 'ref',
-                                            'ref0', 'units', 'plot'])
+                                            'ref0', 'units', 'visual'])
+                                            # 'ref0', 'units', 'plot'])
 
     cons_html = _make_dvcons_table(meta_dict=cons_meta, vals_dict=cons_vals, kind='constraint',
                                    # precision=precision,
                                    cols=['min', 'max', 'mean', 'lower', 'upper', 'equals', 'ref',
-                                         'ref0', 'units', 'plot'])
+                                         'ref0', 'units', 'visual'])
+                                         # 'ref0', 'units', 'plot'])
 
     # driver_info_html = _make_opt_info_table(prob.driver)
     driver_info_html = _make_opt_value_table(prob.driver)
