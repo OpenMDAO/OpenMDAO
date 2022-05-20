@@ -34,6 +34,7 @@ _near_bound_highlight_half_width_y_min = 0.0
 _near_bound_highlight_half_width_y_max = _plot_y_max
 _near_bound_highlight_alpha = 0.7
 _equality_bound_width = 0.01
+_ellipsis_x_offset = 0.2
 
 _out_of_bound_hatch_pattern = 'xxxxx'
 _out_of_bound_hatch_color = (0.,0.,0.)
@@ -72,8 +73,8 @@ def _draw_bound_highlight(ax, x):
 def _draw_ellipsis(ax, x_left):
     # Draw three dots as an ellipsis to show that the value is beyond
     #   either the left or right edge of the plot
-    for i in [5, 6, 7]:
-        circle = patches.Ellipse((x_left + i * _lower_plot / 12., 0),
+    for i in [1,2,3]:
+        circle = patches.Ellipse((x_left + i * _lower_plot / 12., _ellipsis_x_offset),
                                  _ellipse_width, _ellipse_height,
                                  facecolor=_out_of_bound_color)
         ax.add_patch(circle)
@@ -99,12 +100,14 @@ def _draw_pointer_and_label(ax, pointer_plot_coord, pointer_color, value):
 
 
 # def in_or_out_of_bounds_plot(value, lower, upper):
-def var_bounds_plot(ax, value, lower, upper, equals):
+def var_bounds_plot(kind, ax, value, lower, upper, equals):
     """
     Make a plot to show where a design variable is relative to constraints.
 
     Parameters
     ----------
+    kind : str
+        One of 'desvar' or 'constraint' to specify which type of plot is being made.
     value : float
         The design var value.
     lower : float or None
@@ -132,10 +135,10 @@ def var_bounds_plot(ax, value, lower, upper, equals):
     # plt.autoscale(False)
     # mpl.use('Agg')
 
+    if kind == 'constraint' and upper == INF_BOUND and lower == -INF_BOUND and equals is None:
+        raise ValueError("Upper, lower, and equals bounds cannot all be None for a constraint")
 
 
-    if upper == INF_BOUND and lower == -INF_BOUND and equals is None:
-        raise ValueError("Upper, lower, and equals bounds cannot all be None")
 
     # Basic plot setup
     plt.rcParams["figure.autolayout"] = True
@@ -225,19 +228,22 @@ def var_bounds_plot(ax, value, lower, upper, equals):
     if value_in_plot_coord >= 0.0:
         _draw_in_or_out_bound_section(ax, 0, _lower_plot, False)
     else:
-        _draw_in_or_out_bound_section(ax, 0, _lower_plot / 3., False)
-        _draw_in_or_out_bound_section(ax, 2 * _lower_plot / 3., _lower_plot / 3.,
-                                      False)
+        _draw_in_or_out_bound_section(ax, _lower_plot / 3., 2 * _lower_plot / 3., False)
+        # _draw_in_or_out_bound_section(ax, 0, _lower_plot / 3., False)
+        # _draw_in_or_out_bound_section(ax, 2 * _lower_plot / 3., _lower_plot / 3.,
+        #                               False)
         _draw_ellipsis(ax, 0.0)
 
     # upper bound
     if value_in_plot_coord <= _plot_x_max:
         _draw_in_or_out_bound_section(ax, _upper_plot, _lower_plot, False)
     else:
-        _draw_in_or_out_bound_section(ax, _upper_plot, _lower_plot / 3., False)
-        _draw_in_or_out_bound_section(ax, _upper_plot + 2 * _lower_plot / 3.,
-                                      _lower_plot / 3., False)
-        _draw_ellipsis(ax, _upper_plot)
+        _draw_in_or_out_bound_section(ax, _upper_plot, 2 * _lower_plot / 3., False)
+        _draw_ellipsis(ax, _upper_plot + 2 * _lower_plot / 3)
+        # _draw_in_or_out_bound_section(ax, _upper_plot, _lower_plot / 3., False)
+        # _draw_in_or_out_bound_section(ax, _upper_plot + 2 * _lower_plot / 3.,
+        #                               _lower_plot / 3., False)
+        # _draw_ellipsis(ax, _upper_plot)
 
     # upper and lower labels
     _draw_boundary_label(ax, func_val_to_plot_coord(lower), str(lower))
@@ -258,9 +264,11 @@ def var_bounds_plot(ax, value, lower, upper, equals):
 
     # pointer and pointer label
     if value_in_plot_coord < 0.0:
-        pointer_plot_coord = _plot_x_max / 18.0
+        pointer_plot_coord = 0.0
+        # pointer_plot_coord = _plot_x_max / 18.0
     elif value_in_plot_coord > _plot_x_max:
-        pointer_plot_coord = _plot_x_max - _plot_x_max / 18.0
+        # pointer_plot_coord = _plot_x_max - _plot_x_max / 18.0
+        pointer_plot_coord = _plot_x_max
     else:
         pointer_plot_coord = value_in_plot_coord
     pointer_color = _in_bound_color if (lower <= value <= upper) else _out_of_bound_color
