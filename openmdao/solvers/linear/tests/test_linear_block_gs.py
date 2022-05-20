@@ -702,26 +702,27 @@ class UserTestCase(unittest.TestCase):
         prob.run_model()
         totals = prob.compute_totals('post.comp4.z','ivc.x')
         self.assertEqual(prob.model._get_subsystem('scenario.post.comp4').count, 1)
-        self.assertEqual(prob.model._get_subsystem('scenario.coupling.comp2').count, 0)
-        self.assertEqual(prob.model._get_subsystem('scenario.coupling.comp3').count, 0)
 
     def test_with_scenario_rev(self):
-        prob = om.Problem(create_model_with_scenario(10))
+        prob = om.Problem(create_model_with_scenario(1))
         prob.setup(mode='rev')
         prob.run_model()
         totals = prob.compute_totals('post.comp4.z','ivc.x')
+        self.assertEqual(prob.model._get_subsystem('scenario.post.comp4').count, 1)
 
     def test_post_not_in_group_fwd(self):
         prob = om.Problem(create_model_with_post_not_in_a_group(10))
         prob.setup(mode='fwd')
         prob.run_model()
         totals = prob.compute_totals('comp4.z','ivc.x')
+        self.assertEqual(prob.model._get_subsystem('comp4').count, 1)
 
     def test_post_not_in_group_rev(self):
         prob = om.Problem(create_model_with_post_not_in_a_group(10))
         prob.setup(mode='rev')
         prob.run_model()
         totals = prob.compute_totals('comp4.z','ivc.x')
+        self.assertEqual(prob.model._get_subsystem('comp4').count, 1)
 
 if __name__ == "__main__":
     unittest.main()
