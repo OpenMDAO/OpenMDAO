@@ -1071,20 +1071,14 @@ class BlockLinearSolver(LinearSolver):
         Run the apply_linear method on the system.
         """
         system = self._system()
-        if not init or system._iter_call_apply_linear():
-            # system.pindent(system.pathname, "_run_apply")
-            self._recording_iter.push(('_run_apply', 0))
-            try:
-                scope_out, scope_in = system._get_matvec_scope()
-                scope_out = self._scope_union(self._scope_out, scope_out)
-                scope_in = self._scope_union(self._scope_in, scope_in)
-
-                system._apply_linear(self._assembled_jac, self._rel_systems,
-                                     self._mode, scope_out, scope_in)
-            finally:
-                self._recording_iter.pop()
-            return True
-        return False
+        self._recording_iter.push(('_run_apply', 0))
+        try:
+            scope_out, scope_in = system._get_matvec_scope()
+            system._apply_linear(self._assembled_jac, self._rel_systems, self._mode,
+                                 self._scope_union(self._scope_out, scope_out),
+                                 self._scope_union(self._scope_in, scope_in))
+        finally:
+            self._recording_iter.pop()
 
     def _iter_initialize(self):
         """
@@ -1100,10 +1094,8 @@ class BlockLinearSolver(LinearSolver):
         self._update_rhs_vec()
 
         if self.options['maxiter'] > 1:
-            if self._run_apply(init=True):
-                norm = self._iter_get_norm()
-            else:
-                return 1.0, 1.0
+            self._run_apply()
+            norm = self._iter_get_norm()
         else:
             return 1.0, 1.0
         norm0 = norm if norm != 0.0 else 1.0

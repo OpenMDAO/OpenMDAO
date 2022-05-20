@@ -490,6 +490,8 @@ class _ApplyLinearCounter(om.ExecComp):
 def build_nested_groups(nlevels, linsolver_class):
     # construct a nested group model with a component at each group level
     # and a component at the bottom that has one input for each component output.
+    # The top level IVC is connected to the 'x' input for each component except the
+    # component at the bottom.
     # The new method should only call _apply_linear on the bottom component once.
     p = om.Problem()
     current = model = p.model
@@ -520,7 +522,6 @@ def build_nested_groups(nlevels, linsolver_class):
     for i, out in enumerate(outs):
         parts.append(f"x{i+1}*{i+2}")
     expr = 'y = ' + '+'.join(parts)
-    print(expr)
     current.add_subsystem(leafname, _ApplyLinearCounter(expr))
 
     leafpath = parpath + '.' + leafname
@@ -528,28 +529,199 @@ def build_nested_groups(nlevels, linsolver_class):
     # connect everything
     for i, out in enumerate(outs):
         model.connect(out, leafpath + '.' + f"x{i+1}")
-        print("connect ", out, "to", leafpath + '.' + f"x{i+1}")
 
     return p, leafpath
 
 
 class TestRecursiveApplyFix2(unittest.TestCase):
-    def test_4levels(self):
-        p, lpath = build_nested_groups(4, om.LinearBlockGS)
-        p.setup()
+    def test_3levels_fwd(self):
+        p, leafpath = build_nested_groups(3, om.LinearBlockGS)
+        p.setup(mode='fwd')
         p.run_model()
+        p.compute_totals(of=[leafpath + '.y'], wrt=['ivc.x'])
+        leaf = p.model._get_subsystem(leafpath)
+        # expect 9 calls to the lowest level comp._apply_linear.
+        # 3 calls (run_apply from iter_initialize + direct apply_linear call + run_apply after each iteration)
+        # plus 2 additional calls per nesting level.
+        self.assertEqual(leaf._apply_lin_count, 9)
+
+    def test_3levels_rev(self):
+        p, leafpath = build_nested_groups(3, om.LinearBlockGS)
+        p.setup(mode='rev')
+        p.run_model()
+        p.compute_totals(of=[leafpath + '.y'], wrt=['ivc.x'])
+        leaf = p.model._get_subsystem(leafpath)
+        self.assertEqual(leaf._apply_lin_count, 9)
+
+    def test_4levels_fwd(self):
+        p, leafpath = build_nested_groups(4, om.LinearBlockGS)
+        p.setup(mode='fwd')
+        p.run_model()
+        p.compute_totals(of=[leafpath + '.y'], wrt=['ivc.x'])
+        leaf = p.model._get_subsystem(leafpath)
+        # expect 11 calls (3 + 2 * 4)
+        self.assertEqual(leaf._apply_lin_count, 11)
+
+    def test_4levels_rev(self):
+        p, leafpath = build_nested_groups(4, om.LinearBlockGS)
+        p.setup(mode='rev')
+        p.run_model()
+        p.compute_totals(of=[leafpath + '.y'], wrt=['ivc.x'])
+        leaf = p.model._get_subsystem(leafpath)
+        # expect 11 calls (3 + 2 * 4)
+        self.assertEqual(leaf._apply_lin_count, 11)
 
 
+class CompA(om.ExplicitComponent):
+
+    def setup(self):
+        self.count = 0
+        self.add_input('x')
+        self.add_output('z')
+
+    def compute(self, inputs, outputs):
+        outputs['z'] = inputs['x'] + 0.01
+
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        self.count += 1
+        if mode == 'fwd':
+            if 'x' in d_inputs:
+                if 'z' in d_outputs:
+                    d_outputs['z'] += d_inputs['x']
+        if mode == 'rev':
+            if 'x' in d_inputs:
+                if 'z' in d_outputs:
+                    d_inputs['x'] += d_outputs['z']
+
+class CompB(om.ExplicitComponent):
+    def setup(self):
+        self.count = 0
+        self.add_input('x')
+        self.add_input('y')
+        self.add_output('z')
+
+    def compute(self, inputs, outputs):
+        outputs['z'] = inputs['x'] + inputs['y']
+
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        self.count += 1
+        if mode == 'fwd':
+            if 'z' in d_outputs:
+                if 'x' in d_inputs:
+                    d_outputs['z'] += d_inputs['x']
+                if 'y' in d_inputs:
+                    d_outputs['z'] += d_inputs['y']
+        if mode == 'rev':
+            if 'z' in d_outputs:
+                if 'x' in d_inputs:
+                    d_inputs['x'] += d_outputs['z']
+                if 'y' in d_inputs:
+                    d_inputs['y'] += d_outputs['z']
+
+class CompPost(om.ExplicitComponent):
+    def setup(self):
+        self.count = 0
+        self.add_input('x')
+        self.add_input('y')
+        self.add_input('w')
+        self.add_output('z')
+
+    def compute(self, inputs, outputs):
+        outputs['z'] = inputs['x'] + inputs['y'] + inputs['w']
+
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        self.count += 1
+        # print(f'{self.name}: call to compute jacvecs have x? {"x" in d_inputs} have y? {"y" in d_inputs} have w? {"w" in d_inputs}')
+        if mode == 'fwd':
+            if 'z' in d_outputs:
+                if 'x' in d_inputs:
+                    d_outputs['z'] += d_inputs['x']
+                if 'y' in d_inputs:
+                    d_outputs['z'] += d_inputs['y']
+                if 'w' in d_inputs:
+                    d_outputs['z'] += d_inputs['w']
+        if mode == 'rev':
+            if 'z' in d_outputs:
+                if 'x' in d_inputs:
+                    d_inputs['x'] += d_outputs['z']
+                if 'y' in d_inputs:
+                    d_inputs['y'] += d_outputs['z']
+                if 'w' in d_inputs:
+                    d_inputs['w'] += d_outputs['z']
+
+class Coupled(om.Group):
+    def setup(self):
+        self.add_subsystem('comp2', CompB())
+        self.add_subsystem('comp3', CompA())
+        self.connect('comp2.z', 'comp3.x')
+        self.connect('comp3.z', 'comp2.y')
+
+
+def create_model_with_post_not_in_a_group(maxiter):
+    model = om.Group()
+
+    ivc = model.add_subsystem('ivc', om.IndepVarComp('x'))
+
+    coupling = model.add_subsystem('coupling', Coupled(), promotes=['*'])
+    coupling.nonlinear_solver = om.NonlinearBlockGS(maxiter=maxiter)
+    coupling.linear_solver = om.LinearBlockGS(maxiter=maxiter)
+
+    model.add_subsystem('comp4', CompPost())
+
+    model.connect('ivc.x', 'comp2.x')
+    model.connect('ivc.x', 'comp4.x')
+    model.connect('comp2.z', 'comp4.y')
+    model.connect('comp3.z', 'comp4.w')
+    return model
+
+
+def create_model_with_scenario(maxiter):
+    model = om.Group()
+
+    ivc = model.add_subsystem('ivc', om.IndepVarComp('x'))
+
+    scenario = model.add_subsystem('scenario', om.Group(), promotes=['*'])
+    coupling = scenario.add_subsystem('coupling', Coupled(), promotes=['*'])
+    coupling.nonlinear_solver = om.NonlinearBlockGS(maxiter=maxiter)
+    coupling.linear_solver = om.LinearBlockGS(maxiter=maxiter)
+
+    post = scenario.add_subsystem('post', om.Group())
+    post.add_subsystem('comp4', CompPost())
+
+
+    model.connect('ivc.x', 'comp2.x')
+    model.connect('ivc.x', 'post.comp4.x')
+    model.connect('comp2.z', 'post.comp4.y')
+    model.connect('comp3.z', 'post.comp4.w')
+    return model
+
+class UserTestCase(unittest.TestCase):
+    def test_with_scenario_fwd(self):
+        prob = om.Problem(create_model_with_scenario(1))
+        prob.setup(mode='fwd')
+        prob.run_model()
+        totals = prob.compute_totals('post.comp4.z','ivc.x')
+        self.assertEqual(prob.model._get_subsystem('scenario.post.comp4').count, 1)
+        self.assertEqual(prob.model._get_subsystem('scenario.coupling.comp2').count, 0)
+        self.assertEqual(prob.model._get_subsystem('scenario.coupling.comp3').count, 0)
+
+    def test_with_scenario_rev(self):
+        prob = om.Problem(create_model_with_scenario(10))
+        prob.setup(mode='rev')
+        prob.run_model()
+        totals = prob.compute_totals('post.comp4.z','ivc.x')
+
+    def test_post_not_in_group_fwd(self):
+        prob = om.Problem(create_model_with_post_not_in_a_group(10))
+        prob.setup(mode='fwd')
+        prob.run_model()
+        totals = prob.compute_totals('comp4.z','ivc.x')
+
+    def test_post_not_in_group_rev(self):
+        prob = om.Problem(create_model_with_post_not_in_a_group(10))
+        prob.setup(mode='rev')
+        prob.run_model()
+        totals = prob.compute_totals('comp4.z','ivc.x')
 
 if __name__ == "__main__":
-    p, leafpath = build_nested_groups(4, om.LinearBlockGS)
-    p.setup()
-    p.run_model()
-
-    from openmdao.devtools.debug import tree
-    tree(p)
-
-    p.compute_totals(of=[leafpath + '.y'], wrt=['ivc.x'])
-
-    leaf = p.model._get_subsystem(leafpath)
-    print('ncalls:', leaf._apply_lin_count)
+    unittest.main()

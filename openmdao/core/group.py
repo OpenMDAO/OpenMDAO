@@ -2616,13 +2616,8 @@ class Group(System):
         bool
             True if _apply_linear should be called from within a parent _apply_linear.
         """
-        jac = None
-        if self._owns_approx_jac:
-            jac = self._jacobian
-        elif jac is None and self._assembled_jac is not None:
-            jac = self._assembled_jac
-        return jac is not None or not self._linear_solver.does_recursive_applies() or \
-            self._nonlinear_solver.supports['gradients']
+        return (self._owns_approx_jac and self._jacobian is not None) or \
+            self._assembled_jac is not None or not self._linear_solver.does_recursive_applies()
 
     def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
         """
