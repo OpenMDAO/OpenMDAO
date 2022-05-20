@@ -5,7 +5,8 @@
  * @property {Object} prev Previous set of coordinates.
  */
  class Dimensions {
-    static allowedProps = ['x', 'y', 'z', 'height', 'width', 'margin', 'top', 'right', 'bottom', 'left'];
+    static allowedProps = ['x', 'x1', 'x2', 'y', 'y1', 'y2', 'z', 'count',
+        'size', 'height', 'width', 'margin', 'top', 'right', 'bottom', 'left'];
 
     /**
      * Load the values into the object.
@@ -46,7 +47,9 @@
                     get: function() { return self.valAsStyleStr(prop); }
                 });
             }
-        } 
+        }
+
+        return this;
     }
 
     /**
@@ -60,6 +63,8 @@
         for (const prop of other.prev) {
             this.prev[prop] = other.prev[prop];
         }
+
+        return this;
     }
 
     /** Backup the current values for future reference. */
@@ -68,5 +73,7 @@
         for (const prop of this._managedProps) {
             this.prev[prop] = this[prop];
         }
+
+        return this;
     }
 }

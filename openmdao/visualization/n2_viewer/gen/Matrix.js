@@ -51,11 +51,16 @@ class Matrix {
         d3.select("#arrow").attr("markerWidth", markerSize).attr("markerHeight", markerSize);
         d3.select("#offgridArrow").attr("markerWidth", markerSize * 2).attr("markerHeight", markerSize);
 
-        CellRenderer.updateDims(this.nodeSize.width, this.nodeSize.height);
+        this._init();
+        
         this.updateLevelOfDetailThreshold(layout.size.matrix.height);
 
         this._buildGrid();
         this._setupVariableBoxesAndGridLines();
+    }
+
+    _init() {
+        CellRenderer.updateDims(this.nodeSize.width, this.nodeSize.height);
     }
 
     get cellDims() { return CellRenderer.dims; }
@@ -311,9 +316,13 @@ class Matrix {
             if (box.startI == box.stopI) continue;
 
             const curNode = this.diagNodes[box.startI];
-            if (!curNode.parent) { throw "Parent not found in box."; }
+            if (!curNode.boxAncestor()) { throw "Ancestor not found in box."; }
 
-            box.obj = curNode.parent;
+            box.obj = curNode.boxAncestor();
+            if (box.obj.draw.varBoxDims) {
+                box.obj.draw.varBoxDims.preserve().count = 1 + box.stopI - box.startI;
+            }
+
             i = box.stopI;
             this._variableBoxInfo.push(box);
         }

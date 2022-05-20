@@ -13,12 +13,13 @@ class CellRenderer {
         this.id = 'cellShape_' + id; // To ensure it doesn't start with a number
     }
 
-    static updateDims(baseWidth, baseHeight) {
+    static updateDims(baseWidth, baseHeight, pcntSize = 0.6) {
         if (!CellRenderer.dims) {
             CellRenderer.prevDims = {
                 "size": {
                     "width": 0,
-                    "height": 0
+                    "height": 0,
+                    "percent": pcntSize
                 },
                 "bottomRight": {
                     "x": 0,
@@ -40,7 +41,8 @@ class CellRenderer {
         CellRenderer.dims = {
             "size": {
                 "width": baseWidth,
-                "height": baseHeight
+                "height": baseHeight,
+                "percent": pcntSize
             },
             "bottomRight": {
                 "x": baseWidth * .5,
@@ -119,8 +121,8 @@ class ScalarBase extends CellRenderer {
             .transition(sharedTransition);
             
         return d3Elem
-            .attr("rx", dims.bottomRight.x * .6)
-            .attr("ry", dims.bottomRight.y * .6);
+            .attr("rx", dims.bottomRight.x * dims.size.percent)
+            .attr("ry", dims.bottomRight.y * dims.size.percent);
     }
 
     /** 
@@ -164,10 +166,10 @@ class VectorBase extends CellRenderer {
             .transition(sharedTransition);
 
         const ret = d3Elem
-            .attr("x", dims.topLeft.x * .6)
-            .attr("y", dims.topLeft.y * .6)
-            .attr("width", dims.bottomRight.x * 1.2)
-            .attr("height", dims.bottomRight.y * 1.2);
+            .attr("x", dims.topLeft.x * dims.size.percent)
+            .attr("y", dims.topLeft.y * dims.size.percent)
+            .attr("width", dims.bottomRight.x * dims.size.percent * 2)
+            .attr("height", dims.bottomRight.y * dims.size.percent * 2);
 
 
         return ret;
@@ -313,10 +315,10 @@ class GroupBase extends CellRenderer {
         this._updateBorder(dims, d3Group, border);
 
         return d3Elem
-            .attr("x", dims.topLeft.x * .6)
-            .attr("y", dims.topLeft.y * .6)
-            .attr("width", dims.size.width * .6)
-            .attr("height", dims.size.height * .6);
+            .attr("x", dims.topLeft.x * dims.size.percent)
+            .attr("y", dims.topLeft.y * dims.size.percent)
+            .attr("width", dims.size.width * dims.size.percent)
+            .attr("height", dims.size.height * dims.size.percent);
     }
 
     /** 
