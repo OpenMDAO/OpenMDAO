@@ -1,4 +1,5 @@
 """Define MPI version of the scaling report tests."""
+import os
 import unittest
 
 import  openmdao.core.tests.test_scaling_report as NonMPI
@@ -8,6 +9,7 @@ class TestDriverScalingReportMPI(NonMPI.TestDriverScalingReport):
     N_PROCS = 2
 
 
+@unittest.skipIf(os.environ.get("GITHUB_ACTION"), "Unreliable on GitHub Actions workflows.")
 class TestDriverScalingReport2MPI(NonMPI.TestDriverScalingReport2):
     N_PROCS = 2
 
