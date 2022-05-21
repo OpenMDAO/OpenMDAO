@@ -36,19 +36,19 @@ _ABS_BOUNDS_TOL = 1.0E-4
 #
 # from https://jfly.uni-koeln.de/color/ some colorblind friendly colors
 _out_of_bounds_color_text = 'rgb(213, 94, 0)'
-_out_of_bounds_color_plot = (0.83529, 0.36862, 0.)
-_in_bounds_color = (0., 0.61960, 0.45098)
+_out_of_bounds_plot_color = (0.83529, 0.36862, 0.)
+_in_bounds_plot_color = (0., 0.61960, 0.45098)
 _out_of_bound_hatch_pattern = 'xxxxx'
 _out_of_bound_hatch_color = (0., 0., 0.)
 
-_plot_padding = 0.2
+_plot_padding_fraction = 0.2
 _equality_constraint_tolerance = 1.0E-6
 _plot_marker_size = 0.1
 _plot_value_linewidth = 0.5
 _value_plot_color = 'black'
 _plot_dpi = 150
 _plot_pad_inches = 0
-_font_size = 4
+_font_size = 7
 
 # plt.style.use('default')
 
@@ -220,341 +220,6 @@ def _make_opt_value_table(driver):
     return html
 
 
-def _desvar_sparkline(ax, meta, val):
-    """
-    Plot to matplotlib a visual showing the values of the desvar and also showing bounds.
-
-    Parameters
-    ----------
-    ax : Matplotlib Axes instance
-        Contains most of the figure elements.
-    meta : Matplotlib Axes instance
-        The metadata associated with the design variable or constraint.
-    val : np.array
-        The value of the design variable or constraint.
-    """
-    indices = np.s_[...] if meta['indices'] is None else meta['indices']()
-
-    _val = np.asarray(val).ravel()
-
-    # get array for the lower and upper bounds
-    if isinstance(meta['lower'], float):
-        _lower = (meta['lower'] * np.ones_like(val)[indices]).ravel()
-    else:
-        _lower = np.asarray(meta['lower']).ravel()
-
-    if isinstance(meta['upper'], float):
-        _upper = (meta['upper'] * np.ones_like(val)[indices]).ravel()
-    else:
-        _upper = np.asarray(meta['upper']).ravel()
-
-    # Get the x values and their range
-    ar = np.arange(_val.size)
-    x_min = 0
-    x_max = val.size - 1
-
-    _lower, _lower_no_inf_min, _lower_no_inf_max = _get_bound_array_min_max(_lower, indices)
-    _upper, _upper_no_inf_min, _upper_no_inf_max = _get_bound_array_min_max(_upper, indices)
-
-    # get y min and max
-    y_min = min(_lower_no_inf_min, _upper_no_inf_min, np.min(_val))
-    y_max = max(_lower_no_inf_max, _upper_no_inf_max, np.max(_val))
-
-    # add a little to the top and bottom of the plot
-    yrange = y_max - y_min
-    ymin_plot = y_min - yrange * _plot_padding
-    ymax_plot = y_max + yrange * _plot_padding
-
-    xrange = x_max - x_min
-    xmin_plot = x_min - xrange * _plot_padding
-    xmax_plot = x_max + xrange * _plot_padding
-
-    # set plot limits
-    ax.set_xlim([xmin_plot, xmax_plot])
-    ax.set_ylim([ymin_plot, ymax_plot])
-
-    # set ticks
-    ax.set_xticks([x_min, x_max])
-    ax.set_yticks([y_min, y_max])
-
-    # plot actual values
-    ax.plot(ar, _val, '-o', markersize=_plot_marker_size, color=_value_plot_color,
-            linewidth=_plot_value_linewidth)
-
-    # Need to do this because of a bug in matplotlib. If the upper or lowers include INF_BOUND
-    #  it affects how the other side of the fill_between is drawn
-    _lower = np.clip(_lower, ymin_plot, ymax_plot)
-    _upper = np.clip(_upper, ymin_plot, ymax_plot)
-
-    # plot lower area, if exists
-    if not (isinstance(meta['lower'], float) and meta['lower'] == -INF_BOUND):
-        ax.fill_between(ar, ymin_plot, _lower, color=_out_of_bounds_color_plot,
-                        hatch=_out_of_bound_hatch_pattern, alpha=0.1)
-        ax.plot(ar, _lower, color=_out_of_bounds_color_plot, linewidth=_plot_value_linewidth)
-
-    # plot upper area, if exists
-    if not (isinstance(meta['upper'], float) and meta['upper'] == INF_BOUND):
-        ax.fill_between(ar, _upper, ymax_plot, color=_out_of_bounds_color_plot,
-                        hatch=_out_of_bound_hatch_pattern, alpha=0.1)
-        ax.plot(ar, _upper, color=_out_of_bounds_color_plot, linewidth=_plot_value_linewidth)
-
-    # Plot area where bounds are satisfied
-    ax.fill_between(ar, _lower, _upper, color=_in_bounds_color, alpha=0.3)
-
-
-def _ineq_constraint_sparkline(ax, meta, val):
-    """
-    Plot to matplotlib a visual showing the values of the constraint and also showing bounds.
-
-    Parameters
-    ----------
-    ax : Matplotlib Axes instance
-        Contains most of the figure elements.
-    meta : Matplotlib Axes instance
-        The metadata associated with the design variable or constraint.
-    val : np.array
-        The value of the design variable or constraint.
-    """
-    if isinstance(meta['lower'], float) and meta['lower'] == -INF_BOUND and \
-            isinstance(meta['upper'], float) and meta['upper'] == INF_BOUND:
-        raise ValueError("Upper, and lower bounds cannot both be None")
-
-    indices = np.s_[...] if meta['indices'] is None else meta['indices']()
-
-    # Get x values, range, and plot ranges
-    x_min = 0
-    x_max = val.size - 1
-
-    # Get y values
-    _val = np.asarray(val).ravel()
-    ar = np.arange(_val.size)
-
-    if isinstance(meta['lower'], float):
-        _lower = (meta['lower'] * np.ones_like(val)[indices]).ravel()
-    else:
-        _lower = np.asarray(meta['lower']).ravel()
-
-    if isinstance(meta['upper'], float):
-        _upper = (meta['upper'] * np.ones_like(val)[indices]).ravel()
-    else:
-        _upper = np.asarray(meta['upper']).ravel()
-
-    _lower, _lower_no_inf_min, _lower_no_inf_max = _get_bound_array_min_max(_lower, indices)
-    _upper, _upper_no_inf_min, _upper_no_inf_max = _get_bound_array_min_max(_upper, indices)
-
-    _has_lower = not (isinstance(meta['lower'], float) and meta['lower'] == -INF_BOUND)
-    _has_upper = not (isinstance(meta['upper'], float) and meta['upper'] == INF_BOUND)
-
-    # get min and max across val, lower, and upper
-    y_min = min(np.min(_val), _lower_no_inf_min, _upper_no_inf_min)
-    y_max = max(np.max(_val), _lower_no_inf_max, _upper_no_inf_max)
-
-    # x and y ranges
-    xrange = x_max - x_min
-    xmin_plot = x_min - xrange * _plot_padding
-    xmax_plot = x_max + xrange * _plot_padding
-
-    yrange = y_max - y_min
-    ymin_plot = y_min - yrange * _plot_padding
-    ymax_plot = y_max + yrange * _plot_padding
-
-    ax.set_xlim([xmin_plot, xmax_plot])
-    ax.set_ylim([ymin_plot, ymax_plot])
-
-    ax.set_yticks([y_min, y_max])
-    ax.set_xticks([x_min, x_max])
-
-    # plot area for lower and upper constraints
-    if _has_lower:
-        ax.fill_between(ar, ymin_plot, _lower, color=_out_of_bounds_color_plot, alpha=0.1,
-                        hatch=_out_of_bound_hatch_pattern)
-        ax.plot(ar, _lower,  color=_out_of_bounds_color_plot, linewidth=_plot_value_linewidth)
-
-    if _has_upper:
-        ax.fill_between(ar, _upper, ymax_plot, color=_out_of_bounds_color_plot, alpha=0.1,
-                        hatch=_out_of_bound_hatch_pattern)
-        ax.plot(ar, _upper,  color=_out_of_bounds_color_plot, linewidth=_plot_value_linewidth)
-
-    # plot area where bounds are satisfied
-    ax.fill_between(ar, _lower, _upper, color=_in_bounds_color, alpha=0.1)
-
-    # plot the actual values
-    ax.plot(ar, _val, '-o', markersize=_plot_marker_size, color=_value_plot_color,
-            linewidth=_plot_value_linewidth)
-
-
-def _eq_constraint_sparkline(ax, meta, val):
-    indices = np.s_[...] if meta['indices'] is None else meta['indices']
-
-    _val = np.asarray(val).ravel()
-
-    if 'equals' not in meta:
-        _equals = None
-    elif isinstance(meta['equals'], float):
-        _equals = (meta['equals'] * np.ones_like(val)[indices]).ravel()
-    else:
-        _equals = np.asarray(meta['equals']).ravel()
-
-    ar = np.arange(val.size)
-
-    # Plot the lower/upper/equals lines
-    x_min = ar - 0.5
-    x_max = x_min + 1
-
-    # Color the points based on whether they satisfy the equality constraint
-    err = _val - _equals
-    colors = []
-    for e in err.ravel():
-        if np.abs(e) < _equality_constraint_tolerance:
-            colors.append(_in_bounds_color)   #
-        else:
-            colors.append(_out_of_bounds_color_plot)   # _out_of_bounds_color_plot
-
-    y_min = min(np.min(_val), np.min(_equals))
-    y_max = max(np.max(_val), np.max(_equals))
-    yrange = y_max - y_min
-    ymin_plot = y_min - yrange * _plot_padding
-    ymax_plot = y_max + yrange * _plot_padding
-
-    ax.set_xlim([x_min[0], x_max[-1]])
-
-    ax.set_xticklabels([x_min, x_max], fontsize=_font_size)
-    ax.set_yticklabels([y_min, y_max], fontsize=_font_size)
-
-    ax.set_ylim([ymin_plot, ymax_plot])
-
-    # plot the constraint as a line
-    ax.plot(ar, _equals, color=_value_plot_color, linewidth=_plot_value_linewidth)
-    # plot the actual values as dots colored by whether they satisfy the constraint
-    ax.scatter(ar, _val, color=colors, s=10)
-
-
-def _sparkline(kind, meta, val, width=300):
-    """
-    Given the metadata and value of a design variable or constraint, make an html-embeddable
-    sparkline.
-
-    Parameters
-    ----------
-    kind : str
-        One of 'desvar' or 'constraint' to specify which type of sparkline is being made.
-        This has a slight impact on how the bounds are plotted.
-    meta : dict-like
-        The metadata associated with the design variable or constraint.
-    val : np.array
-        The value of the design variable or constraint.
-    width : int
-        The width of the figure in the returned HTML tag.
-
-    Returns
-    -------
-    str
-        An HTML image tag containing the encoded sparkline image.
-
-    """
-    # Prepare the matplotlib figure/axes
-    _backend = mpl.get_backend()  # Save it so we can set it back at the end
-    mpl.use('Agg')
-
-    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(3, .5), tight_layout=False, dpi=_plot_dpi)
-
-    # fig.set_size_inches(3, .5)
-    # fig.set_size_inches(2.5, .3)
-
-    # plt.tight_layout()
-
-
-    # fig.subplots_adjust(left=0.25)
-
-
-    # settings across all plots
-    ax.tick_params(axis='y', labelsize=7)
-    ax.tick_params(axis='x', labelsize=7)
-    ax.yaxis.set_major_formatter(mpl.ticker.FormatStrFormatter('%5.3e'))
-    fig.patch.set_alpha(0.0)  # So that the figures are transparent
-
-    if kind == 'desvar':
-        _desvar_sparkline(ax, meta, val)
-    elif 'equals' not in meta or meta['equals'] is None:
-        _ineq_constraint_sparkline(ax, meta, val)
-    else:
-        _eq_constraint_sparkline(ax, meta, val)
-
-
-    tmpfile = io.BytesIO()
-    fig.savefig(tmpfile, format='png', bbox_inches='tight', pad_inches = _plot_pad_inches)
-    encoded = base64.b64encode(tmpfile.getvalue()).decode('utf-8')
-    html = f'<img width={width} src=\'data:image/png;base64,{encoded}\'>'
-
-    mpl.use(_backend)  # set it back
-    plt.close()
-
-    return html
-
-
-def _constraint_plot(kind, meta, val, width=300):
-    """
-    Given the metadata and value of a design variable or constraint, make an html-embeddable
-    constraint plot. Only for scalars
-
-    Parameters
-    ----------
-    kind : str
-        One of 'desvar' or 'constraint' to specify which type of sparkline is being made.
-        This has a slight impact on how the bounds are plotted.
-    meta : dict-like
-        The metadata associated with the design variable or constraint.
-    val : np.array
-        The value of the design variable or constraint.
-    width : int
-        The width of the figure in the returned HTML tag.
-
-    Returns
-    -------
-    str
-        An HTML image tag containing the encoded sparkline image.
-    """
-    if not (np.isscalar(val) or val.shape == (1,)):
-        raise ValueError("Value for the _constraint_plot function must be a scalar")
-
-    if kind == 'desvar' and meta['upper'] == INF_BOUND and meta['lower'] == -INF_BOUND:
-        return   # nothing to plot
-
-    # Prepare the matplotlib figure/axes
-    equals = meta['equals'] if 'equals' in meta else None
-
-    if equals is not None:
-        _relative_diff_from_bound = 1e-4
-
-        if abs(val - equals) < _relative_diff_from_bound:
-            html = '<span class="equality-constraint equality-constraint-satisfied">&#10003;</span>'
-        else:
-            html = '<span class="equality-constraint equality-constraint-violated">&#10007;</span>'
-        return html
-
-    _backend = mpl.get_backend()
-    # plt.style.use('default')
-    # plt.autoscale(False)
-    mpl.use('Agg')
-
-    # fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(3, .4))
-    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(2.0, .2), dpi=_plot_dpi)
-    # fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(2.5, .6))
-
-    var_bounds_plot(kind, ax, float(val), meta['lower'], meta['upper'])
-    tmpfile = io.BytesIO()
-    fig.savefig(tmpfile, format='png', transparent=True, bbox_inches='tight',
-                pad_inches = _plot_pad_inches)
-    encoded = base64.b64encode(tmpfile.getvalue()).decode('utf-8')
-
-    html = f'<img width={width} src=\'data:image/png;base64,{encoded}\'>'
-
-    mpl.use(_backend)
-    plt.close()
-
-    return html
-
-
 def _make_obj_table(objs_meta, objs_vals,
                     cols=['size', 'index', 'val', 'ref', 'ref0', 'adder', 'scaler', 'units']):
     _col_names = cols if cols is not None else []
@@ -592,6 +257,26 @@ def _make_obj_table(objs_meta, objs_vals,
 def _make_dvcons_table(meta_dict, vals_dict, kind,
                        cols=['lower', 'upper', 'ref', 'ref0', 'adder', 'scaler', 'units', 'min',
                              'max', 'visual']):
+    """
+    Make a table of info about either design variables or constraints.
+
+    Parameters
+    ----------
+    meta_dict : dict
+        Dictionary of metadata about the variables.
+    vals_dict : dict
+        Dictionary of values for the variables.
+    kind : str, must be 'desvar' or 'constraint'
+        Indicates whether table is for 'desvar' or 'constraint'.
+    cols : list
+        List of columns to be displayed in the table.
+
+    Returns
+    -------
+    str
+        An HTML image tag containing the table holding the info about the variable.
+
+    """
     _col_names = cols if cols is not None else []
     col_names = ['name', 'alias', 'size'] + _col_names
 
@@ -688,6 +373,348 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
 
     return tabulate(rows, headers='keys', tablefmt='unsafehtml', floatfmt='.4e', stralign='center',
                     numalign='left')
+
+
+def _sparkline(kind, meta, val, width=300):
+    """
+    Given the metadata and value of a design variable or constraint, make an html-embeddable
+    sparkline.
+
+    Parameters
+    ----------
+    kind : str
+        One of 'desvar' or 'constraint' to specify which type of sparkline is being made.
+        This has a slight impact on how the bounds are plotted.
+    meta : dict-like
+        The metadata associated with the design variable or constraint.
+    val : np.array
+        The value of the design variable or constraint.
+    width : int
+        The width of the figure in the returned HTML tag.
+
+    Returns
+    -------
+    str
+        An HTML image tag containing the encoded sparkline image.
+    """
+    # Prepare the matplotlib figure/axes
+    _backend = mpl.get_backend()  # Save it so we can set it back at the end
+    mpl.use('Agg')
+
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(3, .5), tight_layout=False, dpi=_plot_dpi)
+
+    # settings across all plots
+    ax.yaxis.set_major_formatter(mpl.ticker.FormatStrFormatter('%5.3e'))
+    ax.tick_params(axis='x', labelsize=_font_size)
+    ax.tick_params(axis='y', labelsize=_font_size)
+
+    if kind == 'desvar':
+        _desvar_sparkline(ax, meta, val)
+    elif 'equals' not in meta or meta['equals'] is None:
+        _ineq_constraint_sparkline(ax, meta, val)
+    else:
+        _eq_constraint_sparkline(ax, meta, val)
+
+    tmpfile = io.BytesIO()
+    fig.patch.set_alpha(0.0)  # So that the figures are transparent
+    fig.savefig(tmpfile, format='png', bbox_inches='tight', pad_inches = _plot_pad_inches)
+    encoded = base64.b64encode(tmpfile.getvalue()).decode('utf-8')
+    html = f'<img width={width} src=\'data:image/png;base64,{encoded}\'>'
+
+    mpl.use(_backend)  # set it back
+    plt.close()
+
+    return html
+
+
+def _desvar_sparkline(ax, meta, val):
+    """
+    Using matplotlib plot a visual showing the values of the desvar and also showing any bounds.
+
+    Parameters
+    ----------
+    ax : Matplotlib Axes instance
+        Contains most of the figure elements.
+    meta : Matplotlib Axes instance
+        The metadata associated with the design variable.
+    val : np.array
+        The value of the design variable.
+    """
+    indices = np.s_[...] if meta['indices'] is None else meta['indices']()
+
+    _val = np.asarray(val).ravel()
+
+    # get array for the lower and upper bounds
+    if isinstance(meta['lower'], float):
+        _lower = (meta['lower'] * np.ones_like(val)[indices]).ravel()
+    else:
+        _lower = np.asarray(meta['lower']).ravel()
+
+    if isinstance(meta['upper'], float):
+        _upper = (meta['upper'] * np.ones_like(val)[indices]).ravel()
+    else:
+        _upper = np.asarray(meta['upper']).ravel()
+
+    # Get the x values and their range
+    ar = np.arange(_val.size)
+    x_min = 0
+    x_max = val.size - 1
+
+    _lower, _lower_no_inf_min, _lower_no_inf_max = _get_bound_array_min_max(_lower, indices)
+    _upper, _upper_no_inf_min, _upper_no_inf_max = _get_bound_array_min_max(_upper, indices)
+
+    # get y min and max
+    y_min = min(_lower_no_inf_min, _upper_no_inf_min, np.min(_val))
+    y_max = max(_lower_no_inf_max, _upper_no_inf_max, np.max(_val))
+
+    # add a little to the top and bottom of the plot
+    yrange = y_max - y_min
+    ymin_plot = y_min - yrange * _plot_padding_fraction
+    ymax_plot = y_max + yrange * _plot_padding_fraction
+
+    xrange = x_max - x_min
+    xmin_plot = x_min - xrange * _plot_padding_fraction
+    xmax_plot = x_max + xrange * _plot_padding_fraction
+
+    # set plot limits
+    ax.set_xlim([xmin_plot, xmax_plot])
+    ax.set_ylim([ymin_plot, ymax_plot])
+
+    # set ticks
+    ax.set_xticks([x_min, x_max])
+    ax.set_yticks([y_min, y_max])
+
+    # plot actual values
+    ax.plot(ar, _val, '-o', markersize=_plot_marker_size, color=_value_plot_color,
+            linewidth=_plot_value_linewidth)
+
+    # Need to do this because of a bug in matplotlib. If the upper or lowers include INF_BOUND
+    #  it affects how the other side of the fill_between is drawn
+    _lower = np.clip(_lower, ymin_plot, ymax_plot)
+    _upper = np.clip(_upper, ymin_plot, ymax_plot)
+
+    # plot lower area, if exists
+    if not (isinstance(meta['lower'], float) and meta['lower'] == -INF_BOUND):
+        ax.fill_between(ar, ymin_plot, _lower, color=_out_of_bounds_plot_color,
+                        hatch=_out_of_bound_hatch_pattern, alpha=0.1)
+        ax.plot(ar, _lower, color=_out_of_bounds_plot_color, linewidth=_plot_value_linewidth)
+
+    # plot upper area, if exists
+    if not (isinstance(meta['upper'], float) and meta['upper'] == INF_BOUND):
+        ax.fill_between(ar, _upper, ymax_plot, color=_out_of_bounds_plot_color,
+                        hatch=_out_of_bound_hatch_pattern, alpha=0.1)
+        ax.plot(ar, _upper, color=_out_of_bounds_plot_color, linewidth=_plot_value_linewidth)
+
+    # Plot area where bounds are satisfied
+    ax.fill_between(ar, _lower, _upper, color=_in_bounds_plot_color, alpha=0.3)
+
+
+def _ineq_constraint_sparkline(ax, meta, val):
+    """
+    Plot to matplotlib a visual showing the values of the variables and the bounds on it.
+
+    Parameters
+    ----------
+    ax : Matplotlib Axes instance
+        Contains most of the figure elements.
+    meta : Matplotlib Axes instance
+        The metadata associated with the variable, including info about the constraint.
+    val : np.array
+        The value of the variable.
+    """
+    if isinstance(meta['lower'], float) and meta['lower'] == -INF_BOUND and \
+            isinstance(meta['upper'], float) and meta['upper'] == INF_BOUND:
+        raise ValueError("Upper and lower bounds cannot both be None")
+
+    indices = np.s_[...] if meta['indices'] is None else meta['indices']()
+
+    # Get x values, range, and plot ranges
+    x_min = 0
+    x_max = val.size - 1
+
+    # Get y values
+    _val = np.asarray(val).ravel()
+    ar = np.arange(_val.size)
+
+    # Get lower and upper arrays
+    if isinstance(meta['lower'], float):
+        _lower = (meta['lower'] * np.ones_like(val)[indices]).ravel()
+    else:
+        _lower = np.asarray(meta['lower']).ravel()
+
+    if isinstance(meta['upper'], float):
+        _upper = (meta['upper'] * np.ones_like(val)[indices]).ravel()
+    else:
+        _upper = np.asarray(meta['upper']).ravel()
+
+    _lower, _lower_no_inf_min, _lower_no_inf_max = _get_bound_array_min_max(_lower, indices)
+    _upper, _upper_no_inf_min, _upper_no_inf_max = _get_bound_array_min_max(_upper, indices)
+
+    _has_lower = not (isinstance(meta['lower'], float) and meta['lower'] == -INF_BOUND)
+    _has_upper = not (isinstance(meta['upper'], float) and meta['upper'] == INF_BOUND)
+
+    # get min and max across val, lower, and upper
+    y_min = min(np.min(_val), _lower_no_inf_min, _upper_no_inf_min)
+    y_max = max(np.max(_val), _lower_no_inf_max, _upper_no_inf_max)
+
+    # x and y ranges
+    xrange = x_max - x_min
+    xmin_plot = x_min - xrange * _plot_padding_fraction
+    xmax_plot = x_max + xrange * _plot_padding_fraction
+
+    yrange = y_max - y_min
+    ymin_plot = y_min - yrange * _plot_padding_fraction
+    ymax_plot = y_max + yrange * _plot_padding_fraction
+
+    # set plot axes settings
+    ax.set_xlim([xmin_plot, xmax_plot])
+    ax.set_ylim([ymin_plot, ymax_plot])
+
+    ax.set_yticks([y_min, y_max])
+    ax.set_xticks([x_min, x_max])
+
+    # plot area for lower and upper constraints
+    if _has_lower:
+        ax.fill_between(ar, ymin_plot, _lower, color=_out_of_bounds_plot_color, alpha=0.1,
+                        hatch=_out_of_bound_hatch_pattern)
+        ax.plot(ar, _lower,  color=_out_of_bounds_plot_color, linewidth=_plot_value_linewidth)
+
+    if _has_upper:
+        ax.fill_between(ar, _upper, ymax_plot, color=_out_of_bounds_plot_color, alpha=0.1,
+                        hatch=_out_of_bound_hatch_pattern)
+        ax.plot(ar, _upper,  color=_out_of_bounds_plot_color, linewidth=_plot_value_linewidth)
+
+    # plot area where bounds are satisfied
+    ax.fill_between(ar, _lower, _upper, color=_in_bounds_plot_color, alpha=0.1)
+
+    # plot the actual values
+    ax.plot(ar, _val, '-o', markersize=_plot_marker_size, color=_value_plot_color,
+            linewidth=_plot_value_linewidth)
+
+
+def _eq_constraint_sparkline(ax, meta, val):
+    """
+    Plot to matplotlib a visual showing the values of the equality constraint and also the value
+    of the constrained variable.
+
+    Parameters
+    ----------
+    ax : Matplotlib Axes instance
+        Contains most of the figure elements.
+    meta : Matplotlib Axes instance
+        The metadata associated with the variables, including info about the constraint.
+    val : np.array
+        The value of the variable.
+    """
+    indices = np.s_[...] if meta['indices'] is None else meta['indices']
+
+    # get value array flattened
+    _val = np.asarray(val).ravel()
+
+    # get equal constraint array
+    if 'equals' not in meta:
+        raise ValueError("Equality constraint sparkline cannot be "
+                         "drawn without equality constraint value")
+    elif isinstance(meta['equals'], float):
+        _equals = (meta['equals'] * np.ones_like(val)[indices]).ravel()
+    else:
+        _equals = np.asarray(meta['equals']).ravel()
+
+    # get x coordinate array and info
+    ar = np.arange(val.size)
+    x_min = 0
+    x_max = val.size - 1
+    xrange = x_max - x_min
+    xmin_plot = x_min - xrange * _plot_padding_fraction
+    xmax_plot = x_max + xrange * _plot_padding_fraction
+    ax.set_xlim([xmin_plot, xmax_plot])
+    ax.set_xticks([x_min, x_max])
+
+    # Get y coordinate plotting info
+    y_min = min(np.min(_val), np.min(_equals))
+    y_max = max(np.max(_val), np.max(_equals))
+    yrange = y_max - y_min
+    ymin_plot = y_min - yrange * _plot_padding_fraction
+    ymax_plot = y_max + yrange * _plot_padding_fraction
+    ax.set_ylim([ymin_plot, ymax_plot])
+    ax.set_yticks([y_min, y_max])
+
+    # plot the constraint as a line
+    ax.plot(ar, _equals, color=_value_plot_color, linewidth=_plot_value_linewidth)
+
+    # plot the actual values as dots colored by whether they satisfy the constraint
+    # Color the value points based on whether they satisfy the equality constraint
+    err = _val - _equals
+    colors = []
+    for e in err:
+        if np.abs(e) < _equality_constraint_tolerance:
+            colors.append(_in_bounds_plot_color)
+        else:
+            colors.append(_out_of_bounds_plot_color)
+    ax.scatter(ar, _val, color=colors, s=10)
+
+
+def _constraint_plot(kind, meta, val, width=300):
+    """
+    Given the metadata and value of a design variable or constraint, make an html-embeddable
+    constraint plot. Only for scalars
+
+    Parameters
+    ----------
+    kind : str
+        One of 'desvar' or 'constraint' to specify which type of sparkline is being made.
+        This has a slight impact on how the bounds are plotted.
+    meta : dict-like
+        The metadata associated with the design variable or constraint.
+    val : np.array
+        The value of the design variable or constraint.
+    width : int
+        The width of the figure in the returned HTML tag.
+
+    Returns
+    -------
+    str
+        An HTML image tag containing the encoded sparkline image.
+    """
+    if not (np.isscalar(val) or val.shape == (1,)):
+        raise ValueError("Value for the _constraint_plot function must be a scalar")
+
+    if kind == 'desvar' and meta['upper'] == INF_BOUND and meta['lower'] == -INF_BOUND:
+        return   # nothing to plot
+
+    # Prepare the matplotlib figure/axes
+    equals = meta['equals'] if 'equals' in meta else None
+
+    if equals is not None:
+        _relative_diff_from_bound = 1e-4
+
+        if abs(val - equals) < _relative_diff_from_bound:
+            html = '<span class="equality-constraint equality-constraint-satisfied">&#10003;</span>'
+        else:
+            html = '<span class="equality-constraint equality-constraint-violated">&#10007;</span>'
+        return html
+
+    _backend = mpl.get_backend()
+    # plt.style.use('default')
+    # plt.autoscale(False)
+    mpl.use('Agg')
+
+    # fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(3, .4))
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(2.0, .2), dpi=_plot_dpi)
+    # fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(2.5, .6))
+
+    var_bounds_plot(kind, ax, float(val), meta['lower'], meta['upper'])
+    tmpfile = io.BytesIO()
+    fig.savefig(tmpfile, format='png', transparent=True, bbox_inches='tight',
+                pad_inches = _plot_pad_inches)
+    encoded = base64.b64encode(tmpfile.getvalue()).decode('utf-8')
+
+    html = f'<img width={width} src=\'data:image/png;base64,{encoded}\'>'
+
+    mpl.use(_backend)
+    plt.close()
+
+    return html
 
 
 def _prom_name_dict(d, abs2prom):

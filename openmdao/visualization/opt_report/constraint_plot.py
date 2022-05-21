@@ -10,11 +10,11 @@ import numpy as np
 from openmdao.core.constants import INF_BOUND
 
 # https://jfly.uni-koeln.de/color/
-# _in_bound_color = 'green'
-_in_bound_color = (0., 0.61960, 0.45098,0.2)
-# _out_of_bound_color = 'red'
-_out_of_bound_color = (0.83529,0.36862,0.)
-# _out_of_bound_color = 'white'
+# _in_bounds_plot_color = 'green'
+_in_bounds_plot_color = (0., 0.61960, 0.45098,0.2)
+# _out_of_bounds_plot_color = 'red'
+_out_of_bounds_plot_color = (0.83529,0.36862,0.)
+# _out_of_bounds_plot_color = 'white'
 _plot_x_max = 1.0
 _plot_y_max = 1.0
 _plot_y_margin = 0.2
@@ -92,12 +92,12 @@ def var_bounds_plot(kind, ax, value, lower, upper):
         if abs(value - lower) < _relative_diff_from_bound:
             pointer_plot_coord = _plot_x_max / 2
             _draw_bound_highlight(ax, _plot_x_max / 2)
-            pointer_color = _in_bound_color
+            pointer_color = _in_bounds_plot_color
         elif value >= lower:
             pointer_plot_coord = 3. * _plot_x_max / 4
-            pointer_color = _in_bound_color
+            pointer_color = _in_bounds_plot_color
         else:
-            pointer_color = _out_of_bound_color
+            pointer_color = _out_of_bounds_plot_color
             pointer_plot_coord = 1. * _plot_x_max / 4
         _draw_pointer_and_label(ax, pointer_plot_coord, pointer_color, value)
         return
@@ -110,13 +110,13 @@ def var_bounds_plot(kind, ax, value, lower, upper):
         if abs(value - upper) < _relative_diff_from_bound:
             pointer_plot_coord = _plot_x_max / 2
             _draw_bound_highlight(ax, _plot_x_max / 2)
-            pointer_color = _in_bound_color
+            pointer_color = _in_bounds_plot_color
         elif value <= upper:
             pointer_plot_coord = 1. * _plot_x_max / 4
-            pointer_color = _in_bound_color
+            pointer_color = _in_bounds_plot_color
         else:
             pointer_plot_coord = 3. * _plot_x_max / 4
-            pointer_color = _out_of_bound_color
+            pointer_color = _out_of_bounds_plot_color
 
         _draw_pointer_and_label(ax, pointer_plot_coord, pointer_color, value)
         return
@@ -162,7 +162,7 @@ def var_bounds_plot(kind, ax, value, lower, upper):
         pointer_plot_coord = _plot_x_max
     else:
         pointer_plot_coord = value_in_plot_coord
-    pointer_color = _in_bound_color if (lower <= value <= upper) else _out_of_bound_color
+    pointer_color = _in_bounds_plot_color if (lower <= value <= upper) else _out_of_bounds_plot_color
     _draw_pointer_and_label(ax, pointer_plot_coord, pointer_color, value)
 
 def _val_to_plot_coord(value, lower, upper):
@@ -174,10 +174,10 @@ def _val_to_plot_coord(value, lower, upper):
 # A series of functions used to draw parts of the scalar constraints visual
 def _draw_in_or_out_bound_section(ax, x_left, width, is_in_bound):
     if is_in_bound:
-        color = _in_bound_color
+        color = _in_bounds_plot_color
         hatch=None
     else:
-        color = _out_of_bound_color
+        color = _out_of_bounds_plot_color
         hatch = _out_of_bound_hatch_pattern
     rectangle = patches.Rectangle((x_left, 0), width, _plot_y_max, facecolor=color, hatch=hatch)
     ax.add_patch(rectangle)
@@ -197,7 +197,7 @@ def _draw_ellipsis(ax, x_left):
     for i in [1,2,3]:
         circle = patches.Ellipse((x_left + i * _lower_plot / 12., _ellipsis_x_offset),
                                  _ellipse_width, _ellipse_height,
-                                 facecolor=_out_of_bound_color)
+                                 facecolor=_out_of_bounds_plot_color)
         ax.add_patch(circle)
 
 def _draw_boundary_label(ax, pointer_plot_coord, s):
