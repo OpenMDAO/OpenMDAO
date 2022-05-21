@@ -69,14 +69,11 @@ def var_bounds_plot(kind, ax, value, lower, upper):
         raise ValueError("Upper and lower bounds cannot all be None for a constraint")
 
     # Basic plot setup
-    # plt.rcParams["figure.autolayout"] = True   # do not do this!!
-    # plt.rcParams['font.size'] = _font_size
-    # plt.rcParams['hatch.color'] = _out_of_bound_hatch_color
     plt.rcParams['hatch.linewidth'] = _out_of_bound_hatch_width  # can't seem to do this any other
     #                                                              way. Cannot control hatch
     #                                                              pattern in Rectangle with
     #                                                              set_linewidth
-    plt.axis('off')
+    ax.set_axis_off()
     ax.set_xlim([-_pointer_half_width, _plot_x_max + _pointer_half_width])
     ax.set_ylim(-_pointer_height - _text_height - _plot_y_margin,
                 _plot_y_max + _text_height + _plot_y_margin)
@@ -84,7 +81,7 @@ def var_bounds_plot(kind, ax, value, lower, upper):
     func_val_to_plot_coord = partial(_val_to_plot_coord, lower=lower, upper=upper)
     value_in_plot_coord = func_val_to_plot_coord(value)
 
-    if upper == INF_BOUND:  # so there is a lower bound
+    if upper == INF_BOUND:  # there is a lower bound
         _draw_in_or_out_bound_section(ax, 0, _plot_x_max / 2, False)
         _draw_in_or_out_bound_section(ax, _plot_x_max / 2, _plot_x_max / 2, True)
         _draw_boundary_label(ax, _plot_x_max / 2, f"lower={lower:5.2f}")
@@ -102,58 +99,53 @@ def var_bounds_plot(kind, ax, value, lower, upper):
         _draw_pointer_and_label(ax, pointer_plot_coord, pointer_color, value)
         return
 
-    if lower == -INF_BOUND:  # so there is an upper bound
+    if lower == -INF_BOUND:  # there is an upper bound
         _draw_in_or_out_bound_section(ax, 0, _plot_x_max / 2, True)
         _draw_in_or_out_bound_section(ax, _plot_x_max / 2, _plot_x_max / 2, False)
         _draw_boundary_label(ax, _plot_x_max / 2, f"upper={upper:5.2f}")
 
-        if abs(value - upper) < _relative_diff_from_bound:
+        if abs(value - upper) < _relative_diff_from_bound:  # value is close to bound
             pointer_plot_coord = _plot_x_max / 2
             _draw_bound_highlight(ax, _plot_x_max / 2)
             pointer_color = _in_bounds_plot_color
-        elif value <= upper:
+        elif value <= upper:  # value satisfies bound
             pointer_plot_coord = 1. * _plot_x_max / 4
             pointer_color = _in_bounds_plot_color
-        else:
+        else:  # value violates the bound
             pointer_plot_coord = 3. * _plot_x_max / 4
             pointer_color = _out_of_bounds_plot_color
 
         _draw_pointer_and_label(ax, pointer_plot_coord, pointer_color, value)
         return
 
-    # in bounds is always the same
+    # If we get this far, there are both lower and upper bounds
+
+    # in bounds visual is always the same
     _draw_in_or_out_bound_section(ax, _lower_plot, _upper_plot - _lower_plot, True)
 
-    # below bound
+    # draw below bound
     if value_in_plot_coord >= 0.0:
         _draw_in_or_out_bound_section(ax, 0, _lower_plot, False)
-    else:
+    else:  # value is off to the left of the plot
         _draw_in_or_out_bound_section(ax, _lower_plot / 3., 2 * _lower_plot / 3., False)
         _draw_ellipsis(ax, 0.0)
 
-    # upper bound
+    # draw upper bound
     if value_in_plot_coord <= _plot_x_max:
         _draw_in_or_out_bound_section(ax, _upper_plot, _lower_plot, False)
-    else:
+    else:  # value is off to the right of the plot
         _draw_in_or_out_bound_section(ax, _upper_plot, 2 * _lower_plot / 3., False)
         _draw_ellipsis(ax, _upper_plot + 2 * _lower_plot / 3)
 
-    # upper and lower labels
+    # draw upper and lower labels
     _draw_boundary_label(ax, func_val_to_plot_coord(lower), str(lower))
     _draw_boundary_label(ax, func_val_to_plot_coord(upper), str(upper))
 
     # add highlight if value near a bound
-    if upper != INF_BOUND and lower != -INF_BOUND:
-        hightlight_near_bound = abs(value - lower) / abs(upper - lower) < _relative_diff_from_bound
-    elif upper != INF_BOUND:
-        hightlight_near_bound = abs(value - upper) < _relative_diff_from_bound
-    elif lower != -INF_BOUND:
-        hightlight_near_bound = abs(value - lower) < _relative_diff_from_bound
-    else:
-        hightlight_near_bound = False
-
-    if hightlight_near_bound:
+    if abs(value - lower) / abs(upper - lower) < _relative_diff_from_bound:
         _draw_bound_highlight(ax, func_val_to_plot_coord(lower))
+    elif abs(value - upper) / abs(upper - lower) < _relative_diff_from_bound:
+        _draw_bound_highlight(ax, func_val_to_plot_coord(upper))
 
     # pointer and pointer label
     if value_in_plot_coord < 0.0:
@@ -164,12 +156,6 @@ def var_bounds_plot(kind, ax, value, lower, upper):
         pointer_plot_coord = value_in_plot_coord
     pointer_color = _in_bounds_plot_color if (lower <= value <= upper) else _out_of_bounds_plot_color
     _draw_pointer_and_label(ax, pointer_plot_coord, pointer_color, value)
-
-def _val_to_plot_coord(value, lower, upper):
-    # need to get function that maps actual values to 0.0 to 1.0
-    # and where lower maps to 1./3 and upper to 2/3
-    plot_coord = 1./3. + (value - lower) / (upper - lower) * 1./3.
-    return plot_coord
 
 # A series of functions used to draw parts of the scalar constraints visual
 def _draw_in_or_out_bound_section(ax, x_left, width, is_in_bound):
@@ -219,4 +205,10 @@ def _draw_pointer_and_label(ax, pointer_plot_coord, pointer_color, value):
     ax.add_patch(p)
     plt.text(pointer_plot_coord, -_pointer_height - _text_height, f"{value:5.2f}",
              horizontalalignment='center', verticalalignment='top', size=_font_size)
+
+def _val_to_plot_coord(value, lower, upper):
+    # need to get function that maps actual values to 0.0 to 1.0
+    # and where lower maps to 1./3 and upper to 2/3
+    plot_coord = 1./3. + (value - lower) / (upper - lower) * 1./3.
+    return plot_coord
 
