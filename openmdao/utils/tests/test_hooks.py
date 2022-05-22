@@ -2,13 +2,14 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
+import openmdao.core.problem
 import openmdao.utils.hooks as hooks
 from openmdao.utils.assert_utils import assert_warning
 
 
 def make_hook(name):
-    def hook_func(prob):
-        prob.calls.append(name)
+    def hook_func(obj):
+        obj.calls.append(name)
     return hook_func
 
 
@@ -25,8 +26,11 @@ def hooks_active(f):
 
 
 class HooksTestCase(unittest.TestCase):
-    def build_model(self):
-        prob = om.Problem()
+    def setUp(self):
+        openmdao.core.problem._problem_names = []  # need to reset these to simulate separate runs
+
+    def build_model(self, name='problem1'):
+        prob = om.Problem(name=name)
         prob.calls = []
         model = prob.model
 
@@ -109,6 +113,84 @@ class HooksTestCase(unittest.TestCase):
                                       'post_final', 'post_final2',
                                       'post_final', 'post_final2',
                                      ])
+
+    @hooks_active
+    def test_multiwrap_mixed_None_inst(self):
+        pre_final = make_hook('pre_final')
+        post_final = make_hook('post_final')
+        hooks._register_hook('final_setup', 'Problem', pre=pre_final, post=post_final)
+        hooks._register_hook('final_setup', 'Problem', inst_id='problem1', ncalls=2,
+                             pre=make_hook('pre_final1'), post=make_hook('post_final1'))
+        hooks._register_hook('final_setup', 'Problem', inst_id='problem2',
+                             pre=make_hook('pre_final2'), post=make_hook('post_final2'))
+
+        probs = [self.build_model(f"problem{i+1}") for i in range(2)]
+        for prob in probs:
+            prob.calls = []
+            for i in range(3):
+                prob.run_model()
+
+        self.assertEqual(probs[0].calls, ['pre_final', 'pre_final1', 'post_final', 'post_final1', 'pre_final', 'pre_final1', 'post_final', 'post_final1', 'pre_final', 'post_final'])
+        self.assertEqual(probs[1].calls, ['pre_final', 'pre_final2', 'post_final', 'post_final2', 'pre_final', 'pre_final2', 'post_final', 'post_final2', 'pre_final', 'pre_final2', 'post_final', 'post_final2'])
+
+        hooks._unregister_hook('final_setup', 'Problem', pre=pre_final, post=False)
+
+        for prob in probs:
+            prob.calls = []
+            for i in range(3):
+                prob.run_model()
+
+        self.assertEqual(probs[0].calls, ['post_final', 'post_final', 'post_final'])
+        self.assertEqual(probs[1].calls, ['pre_final2', 'post_final', 'post_final2', 'pre_final2', 'post_final', 'post_final2', 'pre_final2', 'post_final', 'post_final2'])
+
+        hooks._unregister_hook('final_setup', 'Problem', pre=True, post=False)
+
+        for prob in probs:
+            prob.calls = []
+            for i in range(3):
+                prob.run_model()
+
+        self.assertEqual(probs[0].calls, ['post_final', 'post_final', 'post_final'])
+        self.assertEqual(probs[1].calls, ['post_final', 'post_final2', 'post_final', 'post_final2', 'post_final', 'post_final2'])
+
+    @hooks_active
+    def test_multiwrap_mixed_inst_None(self):
+        pre_final = make_hook('pre_final')
+        post_final = make_hook('post_final')
+        hooks._register_hook('final_setup', 'Problem', inst_id='problem1', ncalls=2,
+                             pre=make_hook('pre_final1'), post=make_hook('post_final1'))
+        hooks._register_hook('final_setup', 'Problem', inst_id='problem2',
+                             pre=make_hook('pre_final2'), post=make_hook('post_final2'))
+        hooks._register_hook('final_setup', 'Problem', pre=pre_final, post=post_final)
+
+        probs = [self.build_model(f"problem{i+1}") for i in range(2)]
+        for prob in probs:
+            prob.calls = []
+            for i in range(3):
+                prob.run_model()
+
+        self.assertEqual(probs[0].calls, ['pre_final1', 'pre_final', 'post_final1', 'post_final', 'pre_final1', 'pre_final', 'post_final1', 'post_final', 'pre_final', 'post_final'])
+        self.assertEqual(probs[1].calls, ['pre_final2', 'pre_final', 'post_final2', 'post_final', 'pre_final2', 'pre_final', 'post_final2', 'post_final', 'pre_final2', 'pre_final', 'post_final2', 'post_final'])
+
+        hooks._unregister_hook('final_setup', 'Problem', pre=pre_final, post=False)
+
+        for prob in probs:
+            prob.calls = []
+            for i in range(3):
+                prob.run_model()
+
+        self.assertEqual(probs[0].calls, ['post_final', 'post_final', 'post_final'])
+        self.assertEqual(probs[1].calls, ['pre_final2', 'post_final2', 'post_final', 'pre_final2', 'post_final2', 'post_final', 'pre_final2', 'post_final2', 'post_final'])
+
+        hooks._unregister_hook('final_setup', 'Problem', pre=True, post=False)
+
+        for prob in probs:
+            prob.calls = []
+            for i in range(3):
+                prob.run_model()
+
+        self.assertEqual(probs[0].calls, ['post_final', 'post_final', 'post_final'])
+        self.assertEqual(probs[1].calls, ['post_final2', 'post_final', 'post_final2', 'post_final', 'post_final2', 'post_final'])
 
     @hooks_active
     def test_problem_hooks(self):

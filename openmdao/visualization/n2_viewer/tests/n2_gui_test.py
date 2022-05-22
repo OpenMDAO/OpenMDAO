@@ -289,7 +289,7 @@ n2_gui_test_scripts = {
             "desc": "Check the number of cells in the N2 Matrix",
             "test": "count",
             "selector": "g#n2elements > g.n2cell",
-            "count": 39
+            "count": 36
         },
     ],
     "bug_arrow": [
@@ -668,7 +668,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Verify size of model tree",
             "test": "count",
-            "selector": "g#tree > g.partition_group",
+            "selector": "g#tree > g.model_tree_grp",
             "count": 6
         },
         {
@@ -680,7 +680,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Verify size of model tree",
             "test": "count",
-            "selector": "g#tree > g.partition_group",
+            "selector": "g#tree > g.model_tree_grp",
             "count": 10
         },
         {
@@ -895,7 +895,7 @@ class n2_gui_test_case(_GuiTestCase):
 
     async def resize_window(self, options):
         """
-        Drag an edge/corner of an N2WindowResizable and check that the size changed
+        Drag an edge/corner of a WindowResizable obj and check that the size changed
         or didn't change as expected.
         """
         self.log_test(options['desc'] if 'desc' in options else

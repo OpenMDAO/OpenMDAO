@@ -804,5 +804,72 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         p.run_model()
         np.testing.assert_allclose(p.get_val('indeps.x'), p.get_val('comp.x'))
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestDynShapesEmptyError(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_empty_error(self):
+        # before the fix, this test raised an exception during setup
+
+        # Input vector on root to be broadcast
+        in_vec = np.arange(3)
+        vec_len = len(in_vec)
+        class BCastComp(om.ExplicitComponent):
+            """
+            Broadcast a vector from the root to all other processors.
+            The output of this component is a serial vector.
+            """
+
+            def setup(self):
+                # Distributed input, only one proc will have non-empty vector
+                self.add_input('in_dist', shape_by_conn=True, distributed=True)
+
+                # Serial Output (every processor has the same output vector)
+                self.add_output('out_serial', shape=vec_len)
+
+            def compute(self, inputs, outputs):
+                # Root processor broadcasts values to everyone else
+                outputs['out_serial'] = self.comm.bcast(inputs['in_dist'], root=0)
+
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                if mode == 'fwd':
+                    if 'out_serial' in d_outputs:
+                        if 'in_dist' in d_inputs:
+                            d_outputs['out_serial'] += self.comm.bcast(d_inputs['in_dist'], root=0)
+
+                else:  # 'rev'
+                    if 'out_serial' in d_outputs:
+                        if 'in_dist' in d_inputs:
+                            if self.comm.rank == 0:
+                                d_inputs['in_dist'] += d_outputs['out_serial']
+
+        class Model(om.Group):
+            """
+            Simple group to hold problem components
+            """
+
+            def setup(self):
+                # Create a distributed source for the distributed input.
+                ivc = om.IndepVarComp()
+                # Root processor gets input vector
+                if self.comm.rank == 0:
+                    ivc.add_output('x_dist', val=in_vec, shape=vec_len, distributed=True)
+                # Every other proc has empty input
+                else:
+                    ivc.add_output('x_dist', shape=0, distributed=True)
+
+                self.add_subsystem("indep", ivc)
+                self.add_subsystem("bcast", BCastComp())
+
+                self.connect('indep.x_dist', 'bcast.in_dist')
+
+                self.add_design_var('indep.x_dist')
+                self.add_constraint('bcast.out_serial', lower=0.0)
+
+        prob = om.Problem(Model())
+        prob.setup(force_alloc_complex=True, mode='rev')
+        prob.run_model()
+
+
 if __name__ == "__main__":
     unittest.main()

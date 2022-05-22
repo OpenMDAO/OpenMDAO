@@ -1,4 +1,68 @@
 ***********************************
+# Release Notes for OpenMDAO 3.18.0
+
+May 05, 2022
+
+OpenMDAO 3.18.0 adds some enhanced MPI capability to OpenMDAO, and includes several bug fixes and internal cleanup.
+
+The implementation of [POEM 065](https://github.com/OpenMDAO/POEMs/blob/master/POEM_065.md) allows users to specify
+`proc_group` for subsystems in ParallelGroups. This enables the grouping of less computationally expensive subsystems onto
+fewer processors to achieve better balancing.
+
+We also recently discovered that `math.prod` in the standard Python library as of 3.8 is over an order of magnitude
+faster than `numpy.prod` for reasonably small arrays. Since this function is frequently used to determine sizes given 
+the shape of a variable in OpenMDAO-related tools, we've updated the `shape_to_len` function to take advantage of it 
+and encourage users to use this implementation over `numpy.prod`.
+
+The generalization of the N2 diagram also continues in this release, with a goal of allowing its use in other contexts.
+
+## New Deprecations
+
+- None
+
+## Backwards Incompatible API Changes
+
+- None
+
+## Backwards Incompatible Non-API Changes
+
+- None
+
+## New Features
+
+- Implemented [POEM 065](https://github.com/OpenMDAO/POEMs/blob/master/POEM_065.md), allowing user to specify `proc_group` and `proc_weight` for subsystems. [#2487](https://github.com/OpenMDAO/OpenMDAO/pull/2487)
+- Allow pyoptsparse `opt_prob` to be printed before optimization with `print_opt_prob` option. [#2492](https://github.com/OpenMDAO/OpenMDAO/pull/2492)
+- Updated `shape_to_len` and made it call `math.prod` if Python >= 3.8. [#2512](https://github.com/OpenMDAO/OpenMDAO/pull/2512)
+
+## Bug Fixes
+
+- Fixed a bug in ExecComp where the value was not saved as a Numpy array, causing issues with the N2 diagram. [#2482](https://github.com/OpenMDAO/OpenMDAO/pull/2482)
+- Fixed formatting of options table in notebooks. [#2485](https://github.com/OpenMDAO/OpenMDAO/pull/2485)
+- Fixed indexer.py such that sizes created using numpy.prod are always integers. [#2485](https://github.com/OpenMDAO/OpenMDAO/pull/2486)
+- Fixed a few bugs related to discrete variables. [#2495](https://github.com/OpenMDAO/OpenMDAO/pull/2495)
+- Aligned the population initialization of the SimpleGA and DifferentialEvolution drivers. [#2499](https://github.com/OpenMDAO/OpenMDAO/pull/2499)
+- Fixed an issue where an exception was being raised when dynamic sizing was used with distributed arrays having a local size of zero. [#2503](https://github.com/OpenMDAO/OpenMDAO/pull/2503)
+- Fixed an issue where reverse slicing for `src_indices` (`om.slicer[::-1]`) was not working. [#2505](https://github.com/OpenMDAO/OpenMDAO/pull/2505)
+- Added a fix to handle more than just `ImportError` in pyOptSparseDriver. [#2508](https://github.com/OpenMDAO/OpenMDAO/pull/2508)
+- Added a missing comma to test dependencies in setup.py. [#2513](https://github.com/OpenMDAO/OpenMDAO/pull/2513)
+- Fixed infinite recursion when running `openmdao scaling` when coloring is active. [#2515](https://github.com/OpenMDAO/OpenMDAO/pull/2515)
+- Added a fix for a bug where complex step around an implicit component containing a Newton solver would discard the imaginary part. [#2517](https://github.com/OpenMDAO/OpenMDAO/pull/2517)
+- Fixed a bug in which calling run_model from within run_driver would cause the case_prefix to be lost. [#2520](https://github.com/OpenMDAO/OpenMDAO/pull/2520)
+
+## Miscellaneous
+
+- Added generalized versions of Diagram, Layout classes for the N2 and updated to D3 v7.3. [#2484](https://github.com/OpenMDAO/OpenMDAO/pull/2484)
+- Moved MPI scaling report test to its own file to address CI issues. [#2489](https://github.com/OpenMDAO/OpenMDAO/pull/2489)
+- Enable triggering of Dymos tests after a successful push to OpenMDAO. [#2490](https://github.com/OpenMDAO/OpenMDAO/pull/2490)
+- Added generalized Style, Arrow, Window, Search, Toolbar, SymbolType and UserInterface classes for N2. [#2493](https://github.com/OpenMDAO/OpenMDAO/pull/2493)
+- Added 2022 Development Roadmap [#2496](https://github.com/OpenMDAO/OpenMDAO/pull/2496)
+- Added generalized Matrix and Legend classes for N2. [#2500](https://github.com/OpenMDAO/OpenMDAO/pull/2500)
+- Changed a few test tolerances to avoid sporadic failures on Python 3.7 test environment. [#2501](https://github.com/OpenMDAO/OpenMDAO/pull/2501)
+- Cleaned up dependencies. [#2502](https://github.com/OpenMDAO/OpenMDAO/pull/2502)
+- Added scripts to create and test a generic N2 model and to build an N2 screenshot for the help screen. [#2510](https://github.com/OpenMDAO/OpenMDAO/pull/2510)
+- Fixed text formatting in notebook describing parallel groups. [#2519](https://github.com/OpenMDAO/OpenMDAO/pull/2519)
+
+***********************************
 # Release Notes for OpenMDAO 3.17.0
 
 March 21, 2022

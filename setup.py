@@ -18,9 +18,8 @@ optional_dependencies = {
         'numpydoc>=1.1',
         'tabulate',
         'jupyter-book',
-        'jupyter-sphinx==0.3.1',
-        'sphinx-sitemap',
-        'jinja2<3.1'
+        'jupyter-sphinx',
+        'sphinx-sitemap'
     ],
     'notebooks': [
         'notebook',
@@ -39,10 +38,11 @@ optional_dependencies = {
         'numpydoc>=1.1',
         'pycodestyle>=2.4.0',
         'pydocstyle==2.0.0',
-        'testflo>=1.3.6'
+        'testflo>=1.3.6',
         'websockets>8',
         'aiounittest',
-        'playwright>=1.20'
+        'playwright>=1.20',
+        'num2words'
     ]
 }
 
@@ -117,6 +117,7 @@ setup(
         'openmdao.visualization',
         'openmdao.visualization.case_viewer',
         'openmdao.visualization.connection_viewer',
+        'openmdao.visualization.timing_viewer',
         'openmdao.visualization.scaling_viewer',
         'openmdao.visualization.n2_viewer',
         'openmdao.visualization.meta_model_viewer',
@@ -135,10 +136,14 @@ setup(
             'style/*',
             'tests/*.js',
             'tests/*.json',
+            'tests/*.html',
             'tests/gui_test_models/*.py',
             '*.html'
         ],
         'openmdao.visualization.connection_viewer': [
+            '*.html',
+        ],
+        'openmdao.visualization.timing_viewer': [
             '*.html',
         ],
         'openmdao.visualization.scaling_viewer': [

@@ -9,7 +9,6 @@ from collections import defaultdict
 from itertools import chain
 from enum import IntEnum
 
-import re
 from fnmatch import fnmatchcase
 
 from numbers import Integral
@@ -28,7 +27,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
 from openmdao.utils.variable_table import write_var_table
-from openmdao.utils.array_utils import evenly_distrib_idxs
+from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len
 from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
@@ -38,7 +37,7 @@ from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, Promot
     UnusedOptionWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, \
-        _is_slicer_op
+        conditional_error
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -549,7 +548,7 @@ class System(object):
         return f"<class {type(self).__name__}>"
 
     def _get_inst_id(self):
-        return self.pathname
+        return self.pathname if self.pathname is not None else ''
 
     def abs_name_iter(self, iotype, local=True, cont=True, discrete=False):
         """
@@ -3090,24 +3089,23 @@ class System(object):
                     # This is an output name, most likely a manual indepvarcomp.
                     abs_name = pro2abs_out[name][0]
                     out[abs_name] = data
-                    out[abs_name]['source'] = abs_name
-                    out[abs_name]['distributed'] = \
-                        abs_name in abs2meta_out and abs2meta_out[abs_name]['distributed']
+                    data['source'] = abs_name
+                    dist = abs_name in abs2meta_out and abs2meta_out[abs_name]['distributed']
+                    data['orig'] = (name, None)
 
                 else:  # assume an input name else KeyError
 
                     # Design variable on an auto_ivc input, so use connected output name.
                     in_abs = pro2abs_in[name][0]
-                    ivc_path = conns[in_abs]
-                    distrib = ivc_path in abs2meta_out and abs2meta_out[ivc_path]['distributed']
+                    data['source'] = source = conns[in_abs]
+                    dist = source in abs2meta_out and abs2meta_out[source]['distributed']
                     if use_prom_ivc:
                         out[name] = data
-                        out[name]['source'] = ivc_path
-                        out[name]['distributed'] = distrib
                     else:
-                        out[ivc_path] = data
-                        out[ivc_path]['source'] = ivc_path
-                        out[ivc_path]['distributed'] = distrib
+                        out[source] = data
+                    data['orig'] = (None, name)
+
+                data['distributed'] = dist
 
         except KeyError as err:
             msg = "{}: Output not found for design variable {}."
@@ -3181,11 +3179,15 @@ class System(object):
                                 out[name] = meta
 
         if out and self is model:
-            for var in out:
-                if var in abs2meta_out:
-                    if "openmdao:allow_desvar" not in abs2meta_out[var]['tags']:
-                        raise RuntimeError(f"Design variable '{var}' is not an IndepVarComp or "
-                                           f"ImplicitComp output.")
+            for var, outmeta in out.items():
+                if var in abs2meta_out and "openmdao:allow_desvar" not in abs2meta_out[var]['tags']:
+                    src, tgt = outmeta['orig']
+                    if src is None:
+                        conditional_error(f"Design variable '{tgt}' is connected to '{var}', but "
+                                          f"'{var}' is not an IndepVarComp or ImplicitComp output.")
+                    else:
+                        conditional_error(f"Design variable '{src}' is not an IndepVarComp or "
+                                          "ImplicitComp output.")
 
         return out
 
@@ -5432,7 +5434,7 @@ class System(object):
         high_dims = meta['shape'][1:]
         with multi_proc_exception_check(self.comm):
             if high_dims:
-                high_size = np.prod(high_dims)
+                high_size = shape_to_len(high_dims)
 
                 dim_size_match = bool(global_size % high_size == 0)
                 if dim_size_match is False:

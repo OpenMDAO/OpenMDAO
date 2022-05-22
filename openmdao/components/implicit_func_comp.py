@@ -1,5 +1,7 @@
 """Define the ImplicitFuncComp class."""
 
+import sys
+import traceback
 from itertools import chain
 import numpy as np
 from openmdao.core.implicitcomponent import ImplicitComponent
@@ -7,13 +9,17 @@ from openmdao.core.constants import INT_DTYPE
 import openmdao.func_api as omf
 from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore, _add_options, \
     jac_forward, jac_reverse, _get_tangents
+from openmdao.utils.array_utils import shape_to_len
 
 try:
     import jax
     from jax import jit, jacfwd, jacrev
     from jax.config import config
     config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
-except ImportError:
+except Exception:
+    _, err, tb = sys.exc_info()
+    if not isinstance(err, ImportError):
+        traceback.print_tb(tb)
     jax = None
 
 
@@ -235,7 +241,7 @@ class ImplicitFuncComp(ImplicitComponent):
             outvals = tuple(self._outputs.values())
             tangents = self._get_tangents(outvals, 'rev', coloring)
             if coloring is not None:
-                j = [np.asarray(a).reshape((a.shape[0], np.prod(a.shape[1:], dtype=INT_DTYPE)))
+                j = [np.asarray(a).reshape((a.shape[0], shape_to_len(a.shape[1:])))
                      for a in jac_reverse(self._apply_nonlinear_func_jax, argnums,
                                           tangents)(*invals)]
                 j = coloring.expand_jac(np.hstack(self._reorder_col_chunks(j)), 'rev')
@@ -246,7 +252,7 @@ class ImplicitFuncComp(ImplicitComponent):
                     if a.ndim < 2:
                         a = a.reshape((a.size, 1))
                     else:
-                        a = a.reshape((a.shape[0], np.prod(a.shape[1:], dtype=INT_DTYPE)))
+                        a = a.reshape((a.shape[0], shape_to_len(a.shape[1:])))
                     j.append(a)
                 j = np.hstack(self._reorder_col_chunks(j)).reshape((osize, isize))
         else:
@@ -254,7 +260,7 @@ class ImplicitFuncComp(ImplicitComponent):
                 tangents = self._get_tangents(invals, 'fwd', coloring, argnums,
                                               trans=self._get_jac2func_inds(self._inputs,
                                                                             self._outputs))
-                j = [np.asarray(a).reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1]))
+                j = [np.asarray(a).reshape((shape_to_len(a.shape[:-1]), a.shape[-1]))
                      for a in jac_forward(self._apply_nonlinear_func_jax, argnums,
                                           tangents)(*invals)]
                 j = coloring.expand_jac(np.vstack(j), 'fwd')
@@ -266,7 +272,7 @@ class ImplicitFuncComp(ImplicitComponent):
                     if a.ndim < 2:
                         a = a.reshape((1, a.size))
                     else:
-                        a = a.reshape((np.prod(a.shape[:-1], dtype=INT_DTYPE), a.shape[-1]))
+                        a = a.reshape((shape_to_len(a.shape[:-1]), a.shape[-1]))
                     j.append(a)
                 j = self._reorder_cols(np.vstack(j).reshape((osize, isize)))
 
@@ -362,7 +368,7 @@ class ImplicitFuncComp(ImplicitComponent):
             start = end = 0
             for n, meta in self._apply_nonlinear_func._inputs.items():
                 if 'is_option' not in meta:
-                    end += np.prod(meta['shape'], dtype=INT_DTYPE)
+                    end += shape_to_len(meta['shape'])
                     indict[n] = inds[start:end]
                     start = end
 

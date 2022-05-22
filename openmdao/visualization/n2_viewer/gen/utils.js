@@ -64,9 +64,7 @@ Array.isPopulatedArray = function (arr) {
     return (Array.isArray(arr) && arr.length > 0);
 };
 
-const inputRegex = /^(input|unconnected_input|autoivc_input)$/;
-const inputOrOutputRegex = /^(output|input|unconnected_input|autoivc_input)$/;
-
+/** Preserve D3 prototypes so transitions can be disabled for complex diagrams */
 d3.selection.prototype.originalFuncs = {
     'transition': d3.selection.prototype.transition,
     'duration': d3.selection.prototype.duration,
@@ -74,16 +72,10 @@ d3.selection.prototype.originalFuncs = {
 };
 d3.selection.prototype.transitionAllowed = true;
 
+/** Useful dummy function */
 function returnThis() { return this; }
 
-function startTimer(label) {
-    if (DebugFlags.timings) console.time(label);
-}
-
-function stopTimer(label) {
-    if (DebugFlags.timings) console.timeEnd(label);
-}
-
+/** Log info to the console if debugging is enabled */
 function debugInfo() {
     if (DebugFlags.info) console.log(...arguments);
 }
@@ -105,24 +97,33 @@ function testThis(testThis, className, funcName) {
             ": 'this' is an instance of '" + thisClass +
             "'; expected '" + className + "'.");
     }
-
-    // console.log(className + '.' + funcName + ": 'this' IS an instance of the " + className + " class.");
 }
 
-/** UUID generator based on crypto API */
+/**
+ * UUID generator based on crypto API
+ * @returns {String} UUID in a format such as '400042c1-2d83-445b-9e84-104f7befdc68'
+ */
 function uuidv4() {
     return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
         (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
     );
 }
 
-/** Delete all properties in the object without destroying the actual object */
+/**
+ * Delete all properties in the object without destroying the actual object.
+ * @param {Object} obj The object to operate on.
+ */
 function wipeObj(obj) {
     for (const prop in obj) {
         if (obj.hasOwnProperty(prop)) delete obj[prop];
     }
 }
 
+/**
+ * Determine if an HTML DOM element is truly visible.
+ * @param {HTMLElement} elem Reference to the element to check.
+ * @returns {Boolean} True is the element can be seen.
+ */
 function visible(elem) {
     return !!( elem.offsetWidth || elem.offsetHeight || elem.getClientRects().length );
 }

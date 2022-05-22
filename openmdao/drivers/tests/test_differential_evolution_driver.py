@@ -636,8 +636,8 @@ class TestConstrainedDifferentialEvolution(unittest.TestCase):
 
         p.run_driver()
 
-        assert_near_equal(p.get_val('exec.z')[0], 187.24998293, tolerance=1e-6)
-        assert_near_equal(p.get_val('exec.z')[-1], 187.24998293, tolerance=1e-6)
+        assert_near_equal(p.get_val('exec.z')[0], 100.0, tolerance=1e-6)
+        assert_near_equal(p.get_val('exec.z')[-1], 100.0, tolerance=1e-6)
 
     def test_same_cons_and_obj(self):
 

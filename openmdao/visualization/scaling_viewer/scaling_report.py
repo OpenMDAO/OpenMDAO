@@ -6,7 +6,6 @@ import functools
 
 import numpy as np
 
-import openmdao
 from openmdao.core.constants import _SetupStatus, INF_BOUND
 import openmdao.utils.coloring as coloring_mod
 import openmdao.utils.hooks as hooks
@@ -40,7 +39,7 @@ def _getdef(val, unset):
 def _get_val_and_size(val, unset=''):
     # return val (or max abs val) and the size of the value
     val = _getdef(val, unset)
-    if np.isscalar(val) or val.size == 1:
+    if np.ndim(val) == 0 or val.size == 1:
         return [val, 1]
     return [np.max(np.abs(val)), val.size]
 
@@ -204,7 +203,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
 
     model = driver._problem().model
 
-    mod_meta = model._var_allprocs_abs2meta['output']
+    mod_meta = model._var_allprocs_abs2meta['output'].copy()  # shallow copy
     mod_meta.update(model._var_allprocs_discrete['output'])
 
     discretes = {'dvs': [], 'con': [], 'obj': []}
@@ -388,11 +387,13 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
         # save old totals
         save = driver._total_jac
         driver._total_jac = None
+        prob = driver._problem()
 
         coloring = driver._get_static_coloring()
         if coloring_mod._use_total_sparsity:
             if coloring is None and driver._coloring_info['dynamic']:
-                coloring = coloring_mod.dynamic_total_coloring(driver)
+                coloring = coloring_mod.dynamic_total_coloring(driver,
+                                                               run_model=prob._run_counter < 0)
 
         # assemble data for jacobian visualization
         data['oflabels'] = driver._get_ordered_nl_responses()
@@ -563,6 +564,10 @@ def _scaling_cmd(options, user_args):
     # register an atexit function to check if scaling report was triggered during the script
     import atexit
     atexit.register(functools.partial(_exitfunc, options.problem))
+
+    from openmdao.utils.reports_system import _register_cmdline_report
+    # tell report system not to duplicate effort
+    _register_cmdline_report('scaling')
 
     ignore_errors(True)
     _load_and_exec(options.file[0], user_args)

@@ -156,7 +156,7 @@ class Group(System):
     ----------
     _mpi_proc_allocator : ProcAllocator
         Object used to allocate MPI processes to subsystems.
-    _proc_info : dict of subsys_name: (min_procs, max_procs, weight)
+    _proc_info : dict of subsys_name: (min_procs, max_procs, weight, proc_group)
         Information used to determine MPI process allocation to subsystems.
     _subgroups_myproc : list
         List of local subgroups.
@@ -412,7 +412,7 @@ class Group(System):
                 src_indices = meta_in['src_indices']
 
                 if src_indices is not None:
-                    if not (np.isscalar(ref) and np.isscalar(ref0)):
+                    if not (np.ndim(ref) == 0 and np.ndim(ref0) == 0):
                         # TODO: if either ref or ref0 are not scalar and the output is
                         # distributed, we need to do a scatter
                         # to obtain the values needed due to global src_indices
@@ -448,6 +448,7 @@ class Group(System):
                     a0 = ref0
                     a1 = ref - ref0
 
+                    # No unit conversion, only scaling. Just send the scale factors.
                     scale_factors[abs_in] = {
                         'input': (a0, a1),
                     }
@@ -457,27 +458,14 @@ class Group(System):
                     a0 = ref0
                     a1 = ref - ref0
 
-                    if a1 == 1.0:
-                        # No solver scaling, just unit conversion.
-                        # Note: a case like ref=3, ref0=2 is safe to treat as unscaled for the
-                        # linear vectors because the "scaler" is 1.0.
-                        a0 = (ref0 + offset) * factor
-                        a1 = (ref - ref0) * factor
+                    # Send both unit scaling and solver scaling. Linear input vectors need to
+                    # treat them differently in reverse mode.
+                    scale_factors[abs_in] = {
+                        'input': (a0, a1, factor, offset),
+                    }
 
-                        scale_factors[abs_in] = {
-                            'input': (a0, a1),
-                        }
-
-                    else:
-                        # When we have unit conversion and solver scaling, we need to track them
-                        # independently during reverse mode linear solves, so save the unit
-                        # conversion factors too, and let the root vector sort it out.
-                        scale_factors[abs_in] = {
-                            'input': (a0, a1, factor, offset),
-                        }
-
-                        # For adder allocation check.
-                        a0 = (ref0 + offset) * factor
+                    # For adder allocation check.
+                    a0 = (ref0 + offset) * factor
 
                 # Check whether we need to allocate an adder for the input vector.
                 if np.any(np.asarray(a0)):
@@ -595,7 +583,7 @@ class Group(System):
 
             # Define local subsystems
             if (self._mpi_proc_allocator.parallel and
-                    not (np.sum([minp for minp, _, _ in proc_info]) <= comm.size)):
+                    not (np.sum([minp for minp, _, _, _ in proc_info]) <= comm.size)):
                 # reorder the subsystems_allprocs based on which procs they live on. If we don't
                 # do this, we can get ordering mismatches in some of our data structures.
                 new_allsubs = {}
@@ -1599,14 +1587,13 @@ class Group(System):
         conn_list.extend(abs_in2out.items())
         global_abs_in2out.update(abs_in2out)
 
-        for subsys in self._subsystems_myproc:
-            if isinstance(subsys, Group):
-                if subsys.name in new_conns:
-                    subsys._setup_global_connections(conns=new_conns[subsys.name])
-                else:
-                    subsys._setup_global_connections()
-                global_abs_in2out.update(subsys._conn_global_abs_in2out)
-                conn_list.extend(subsys._conn_global_abs_in2out.items())
+        for subgroup in self._subgroups_myproc:
+            if subgroup.name in new_conns:
+                subgroup._setup_global_connections(conns=new_conns[subgroup.name])
+            else:
+                subgroup._setup_global_connections()
+            global_abs_in2out.update(subgroup._conn_global_abs_in2out)
+            conn_list.extend(subgroup._conn_global_abs_in2out.items())
 
         if len(conn_list) > len(global_abs_in2out):
             dupes = [n for n, val in Counter(tgt for tgt, src in conn_list).items() if val > 1]
@@ -2008,17 +1995,25 @@ class Group(System):
                         # initial dimensions of indices shape must be same shape as target
                         for idx_d, inp_d in zip(src_indices.indexed_src_shape, in_shape):
                             if idx_d != inp_d:
-                                msg = f"{self.msginfo}: The source indices " + \
-                                      f"{meta_in['src_indices']} do not specify a " + \
-                                      f"valid shape for the connection '{abs_out}' to " + \
-                                      f"'{abs_in}'. The target shape is " + \
-                                      f"{in_shape} but indices are shape " + \
-                                      f"{src_indices.indexed_src_shape}."
+                                msg = (f"{self.msginfo}: The source indices "
+                                       f"{meta_in['src_indices']} do not specify a "
+                                       f"valid shape for the connection '{abs_out}' to "
+                                       f"'{abs_in}'. The target shape is "
+                                       f"{in_shape} but indices are shape "
+                                       f"{src_indices.indexed_src_shape}.")
                                 if self._raise_connection_errors:
                                     raise ValueError(msg)
                                 else:
                                     issue_warning(msg, category=SetupWarning)
                                     continue
+                        else:
+                            msg = (f"{self.msginfo}: src_indices shape "
+                                   f"{src_indices.indexed_src_shape} does not match {abs_in} shape "
+                                   f"{in_shape}.")
+                            if self._raise_connection_errors:
+                                raise ValueError(msg)
+                            else:
+                                issue_warning(msg, category=SetupWarning)
 
                     # any remaining dimension of indices must match shape of source
                     if not src_indices._flat_src and (len(src_indices.indexed_src_shape) >
@@ -2033,15 +2028,6 @@ class Group(System):
                         else:
                             issue_warning(msg, category=SetupWarning)
                             continue
-
-                    if src_indices.indexed_src_size != shape_to_len(in_shape):
-                        msg = f"{self.msginfo}: src_indices shape " + \
-                              f"{src_indices.indexed_src_shape} does not match {abs_in} shape " + \
-                              f"{in_shape}."
-                        if self._raise_connection_errors:
-                            raise ValueError(msg)
-                        else:
-                            issue_warning(msg, category=SetupWarning)
 
     def _set_subsys_connection_errors(self, val=True):
         """
@@ -2246,12 +2232,6 @@ class Group(System):
                     lst.extend(inputs)
                 raise err.__class__(f"{self.msginfo}: When promoting {sorted(lst)}: {err}")
 
-            if flat_src_indices and _is_slicer_op(src_indices):
-                promoted = inputs if inputs else any
-                issue_warning(f"When promoting {promoted}, slice src_indices were "
-                              "specified, so flat_src_indices is ignored.", prefix=self.msginfo,
-                              category=UnusedOptionWarning)
-
         subsys = getattr(self, subsys_name)
         if any:
             subsys._var_promotes['any'].extend((a, prominfo) for a in any)
@@ -2278,7 +2258,7 @@ class Group(System):
 
     def add_subsystem(self, name, subsys, promotes=None,
                       promotes_inputs=None, promotes_outputs=None,
-                      min_procs=1, max_procs=None, proc_weight=1.0):
+                      min_procs=1, max_procs=None, proc_weight=1.0, proc_group=None):
         """
         Add a subsystem.
 
@@ -2311,6 +2291,12 @@ class Group(System):
         proc_weight : float
             Weight given to the subsystem when allocating available MPI processes
             to all subsystems.  Default is 1.0.
+        proc_group : str or None
+            Name of a processor group such that any system with that processor group name
+            within the same parent group will be allocated on the same mpi process(es).
+            If this is not None, then any other systems sharing the same proc_group must
+            have identical values of min_procs, max_procs, and proc_weight or an exception
+            will be raised.
 
         Returns
         -------
@@ -2334,6 +2320,10 @@ class Group(System):
             # replacing a subsystem is ok (e.g. resetup) but no other attribute
             raise RuntimeError("%s: Can't add subsystem '%s' because an attribute with that name "
                                "already exits." % (self.msginfo, name))
+
+        if proc_group is not None and not isinstance(proc_group, str):
+            raise TypeError(f"{self.msginfo}: proc_group must be a str or None, but is of type "
+                            f"'{type(proc_group).__name__}'.")
 
         match = namecheck_rgx.match(name)
         if match is None or match.group() != name:
@@ -2381,7 +2371,7 @@ class Group(System):
             raise TypeError("%s: proc_weight must be a float > 0. but (%s) was given." %
                             (self.msginfo, proc_weight))
 
-        self._proc_info[name] = (min_procs, max_procs, proc_weight)
+        self._proc_info[name] = (min_procs, max_procs, proc_weight, proc_group)
 
         setattr(self, name, subsys)
 
@@ -3337,7 +3327,7 @@ class Group(System):
             else:
                 if val is None:
                     val = value
-                elif np.isscalar(value):
+                elif np.ndim(value) == 0:
                     if val.size > 1:
                         raise ValueError(f"Shape of input '{tgt}', (), doesn't match shape "
                                          f"{val.shape}.")

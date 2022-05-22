@@ -1,15 +1,10 @@
-"""Define the units/scaling tests."""
+"""Define the scaling report tests."""
 import unittest
-from copy import deepcopy
 
 import numpy as np
-
 import openmdao.api as om
-from openmdao.core.driver import Driver
-from openmdao.utils.testing_utils import use_tempdirs
 
-from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
-from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayDense
+from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.assert_utils import assert_near_equal
 
 
@@ -150,6 +145,10 @@ class TestDriverScalingReport(unittest.TestCase):
         data = p.driver.scaling_report(show_browser=False)
         self._check_data(data, expected)
 
+
+@use_tempdirs
+class TestDriverScalingReport2(unittest.TestCase):
+
     def test_unconstrained(self):
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
@@ -165,18 +164,14 @@ class TestDriverScalingReport(unittest.TestCase):
         prob.model.connect('indeps.y', 'paraboloid.y')
 
         # setup the optimization
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'COBYLA'
+        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA')
 
         prob.model.add_design_var('indeps.x', lower=-50, upper=50)
         prob.model.add_design_var('indeps.y', lower=-50, upper=50)
         prob.model.add_objective('paraboloid.f_xy', index=0)
 
-        print("setup start", flush=True)
         prob.setup()
-        print("setup done", flush=True)
         prob.run_driver()
-        print("run_driver done", flush=True)
 
         # minimum value
         assert_near_equal(prob['paraboloid.f_xy'], -27.33333, 1e-6)
@@ -186,10 +181,11 @@ class TestDriverScalingReport(unittest.TestCase):
         assert_near_equal(prob['indeps.y'], -7.33333, 1e-4)
 
         # just make sure this doesn't raise an exception
-        print("scaling report start", flush=True)
         prob.driver.scaling_report(show_browser=False)
-        print("scaling report done", flush=True)
 
+
+@use_tempdirs
+class TestDriverScalingReport3(unittest.TestCase):
     def test_setup_message(self):
         x_train = np.arange(0., 10.)
         y_train = np.arange(10., 20.)
@@ -236,6 +232,7 @@ class TestDriverScalingReport(unittest.TestCase):
         p.driver.scaling_report(show_browser=False)
 
 
+@use_tempdirs
 class TestDiscreteScalingReport(unittest.TestCase):
 
     def test_scaling_report(self):
@@ -285,9 +282,47 @@ class TestDiscreteScalingReport(unittest.TestCase):
         # generate scaling report
         prob.driver.scaling_report(show_browser=False)
 
+    def test_bug_2494(self):
+        # see Issue #2494, bug in scaling_report was causing damaging side effect
+        class OMGroup(om.Group):
+            def setup(self):
+                ivc = self.add_subsystem("indep_vars", om.IndepVarComp(), promotes=["*"])
+                ivc.add_output("length", val=0.0, desc="Length")
+                ivc.add_output("width",val=0.0, desc="Width")
 
-class TestDriverScalingReportMPI(TestDriverScalingReport):
-    N_PROCS=2
+                self.add_subsystem("comp",OMComponent(),  promotes=["*"])
+
+        class OMComponent(om.ExplicitComponent):
+            def setup(self):
+                self.add_discrete_input("definition", val=1, desc="Flag")
+                self.add_input("length", val=0.0, desc="Length")
+                self.add_input("width", val=0.0, desc="Width")
+
+                self.add_output("area", val=0.0, desc="Area")
+
+            def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+                if discrete_inputs['definition'] == 0:
+                    outputs["area"] = inputs['length'] * inputs['width']
+                else:
+                    outputs["area"] = 2.* inputs['length'] * inputs['width']
+
+        myopt = om.Problem(model=OMGroup(), driver=om.ScipyOptimizeDriver())
+
+        myopt.model.approx_totals(method="fd")
+        myopt.model.add_objective("area")
+        myopt.model.add_design_var("length",lower=0,upper=10)
+
+        myopt.setup()
+
+        myopt["width"] = 3.
+        myopt["length"] = 2.
+        myopt.run_driver()
+
+        # generate scaling report
+        myopt.driver.scaling_report(show_browser=False)
+
+        # verify access to discrete value
+        self.assertEqual(myopt["definition"], 1)
 
 
 if __name__ == '__main__':

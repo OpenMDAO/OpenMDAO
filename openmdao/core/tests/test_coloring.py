@@ -260,6 +260,10 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
 @use_tempdirs
 class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
+    def setUp(self):
+        # make sure no default reports run because they'll mess up run counts
+        om.clear_reports() 
+
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_total_coloring_snopt_auto(self):
         # first, run w/o coloring
@@ -570,6 +574,9 @@ class SimulColoringRecordingTestCase(unittest.TestCase):
 @use_tempdirs
 class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
     """Reverse coloring tests for pyoptsparse."""
+    def setUp(self):
+        # make sure no default reports run because they'll mess up run counts
+        om.clear_reports() 
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_rev_simul_coloring_snopt(self):
@@ -629,6 +636,10 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
 
 @use_tempdirs
 class SimulColoringScipyTestCase(unittest.TestCase):
+
+    def setUp(self):
+        # make sure no default reports run because they'll mess up run counts
+        om.clear_reports() 
 
     def test_bad_mode(self):
         p_color_fwd = run_opt(om.ScipyOptimizeDriver, 'fwd', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
@@ -884,6 +895,10 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 @use_tempdirs
 class SimulColoringRevScipyTestCase(unittest.TestCase):
     """Rev mode coloring tests."""
+
+    def setUp(self):
+        # make sure no default reports run because they'll mess up run counts
+        om.clear_reports() 
 
     def test_summary(self):
         p_color = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)

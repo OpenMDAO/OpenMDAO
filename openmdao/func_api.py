@@ -2,6 +2,8 @@
 API to associate metadata with and retrieve metadata from function objects.
 """
 
+import sys
+import traceback
 from numbers import Number
 import ast
 import inspect
@@ -13,7 +15,10 @@ from contextlib import contextmanager
 try:
     import jax
     import jax.numpy as jnp
-except ImportError:
+except Exception:
+    _, err, tb = sys.exc_info()
+    if not isinstance(err, ImportError):
+        traceback.print_tb(tb)
     jax = None
 
 

@@ -7,7 +7,7 @@ import numpy as np
 
 from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm, \
     InterpAlgorithmSemi, InterpAlgorithmFixed
-from openmdao.utils.array_utils import abs_complex, dv_abs_complex
+from openmdao.utils.array_utils import abs_complex, dv_abs_complex, shape_to_len
 
 
 def abs_smooth_complex(x, delta_x):
@@ -253,7 +253,7 @@ class InterpAkima(InterpAlgorithm):
                 n_this = high_idx - low_idx
                 nshape = list(values.shape[:-1])
                 nshape.append(n_this)
-                n_flat = np.prod(nshape)
+                n_flat = shape_to_len(nshape)
                 deriv_dv = np.eye(n_flat, dtype=dtype)
 
                 new_shape = []
@@ -1365,7 +1365,7 @@ class Interp1DAkima(InterpAlgorithmFixed):
         """
         # If we only have 1 point, use the non-vectorized implementation, which has faster
         # bracketing than the numpy version.
-        return np.prod(x.shape) > self.dim
+        return shape_to_len(x.shape) > self.dim
 
     def interpolate(self, x, idx):
         """

@@ -20,6 +20,9 @@ class HtmlPreprocessor():
         The file to begin processing from.
     output_filename : str
         The path to the newly merged HTML file.
+    start_path : str
+        Directory path that all other paths are relative to. Defaults to the path
+        that the start_filename is found in.
     allow_overwrite : bool
         If true, overwrite the output file if it exists.
     var_dict : dict
@@ -86,26 +89,29 @@ class HtmlPreprocessor():
     comment-ending characters will not be replaced.
 
     All paths in the directives are relative to the directory that the start file
-    is located in unless it is absolute.
+    is located in (or if start_path was specified) unless it is absolute.
 
     Nothing is written until every directive has been successfully processed.
     """
 
-    def __init__(self, start_filename: str, output_filename: str, allow_overwrite=False,
-                 var_dict: dict = None, json_dumps_default=None, verbose=False):
+    def __init__(self, start_filename: str, output_filename: str, start_path: str = None,
+                 allow_overwrite=False, var_dict: dict = None, json_dumps_default=None,
+                 verbose=False):
         """
         Configure the preprocessor and validate file paths.
         """
         self._start_path = Path(start_filename)
+
         if self._start_path.is_file() is False:
-            raise FileNotFoundError(f"Error: {start_filename} not found")
+            raise FileNotFoundError(f"Error: {self._start_path} not found")
 
         output_path = Path(output_filename)
         if output_path.is_file() and not allow_overwrite:
             raise FileExistsError(f"Error: {output_filename} already exists")
 
         self._start_filename = start_filename
-        self._start_dirname = self._start_path.resolve().parent
+        self._start_dirname = \
+            self._start_path.resolve().parent if start_path is None else Path(start_path)
         self._output_filename = output_filename
         self._allow_overwrite = allow_overwrite
         self._var_dict = var_dict

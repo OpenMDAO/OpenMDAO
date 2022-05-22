@@ -150,7 +150,7 @@ class Problem(object):
         If _UNDEFINED, the OPENMDAO_REPORTS variable is used. Defaults to _UNDEFINED.
         If given, reports should override OPENMDAO_REPORTS. If boolean, enable/disable all reports.
         Since none is acceptable in the environment variable, a value of reports=None
-        is equivalent to reports=False. Otherwise, reports may be a sequence of
+        is equivalent to reports=False. Otherwise, reports may be a comma separated sequence of
         strings giving the names of the reports to run.
     _reports_dir : str, _UNDEFINED
         Directory in which to place the reports.
@@ -348,8 +348,6 @@ class Problem(object):
 
         # Vector not setup, so we need to pull values from saved metadata request.
         else:
-            proms = self.model._var_allprocs_prom2abs_list
-            meta = self.model._var_abs2meta
             try:
                 conns = self.model._conn_abs_in2out
             except AttributeError:
@@ -362,12 +360,22 @@ class Problem(object):
             abs_name = abs_names[0]
             vars_to_gather = self._metadata['vars_to_gather']
 
+            meta = self.model._var_abs2meta
             io = 'output' if abs_name in meta['output'] else 'input'
             if abs_name in meta[io]:
                 if abs_name in conns:
                     val = meta['output'][conns[abs_name]]['val']
                 else:
                     val = meta[io][abs_name]['val']
+            else:
+                # not found in real outputs or inputs, try discretes
+                meta = self.model._var_discrete
+                io = 'output' if abs_name in meta['output'] else 'input'
+                if abs_name in meta[io]:
+                    if abs_name in conns:
+                        val = meta['output'][conns[abs_name]]['val']
+                    else:
+                        val = meta[io][abs_name]['val']
 
             if get_remote and abs_name in vars_to_gather:
                 owner = vars_to_gather[abs_name]
@@ -684,7 +692,8 @@ class Problem(object):
         Parameters
         ----------
         case_prefix : str or None
-            Prefix to prepend to coordinates when recording.
+            Prefix to prepend to coordinates when recording.  None means keep the preexisting
+            prefix.
 
         reset_iter_counts : bool
             If True and model has been run previously, reset all iteration counters.
@@ -693,24 +702,27 @@ class Problem(object):
             raise RuntimeError(self.msginfo +
                                ": The `setup` method must be called before `run_model`.")
 
-        if case_prefix:
+        old_prefix = self._recording_iter.prefix
+
+        if case_prefix is not None:
             if not isinstance(case_prefix, str):
                 raise TypeError(self.msginfo + ": The 'case_prefix' argument should be a string.")
             self._recording_iter.prefix = case_prefix
-        else:
-            self._recording_iter.prefix = None
 
-        if self.model.iter_count > 0 and reset_iter_counts:
-            self.driver.iter_count = 0
-            self.model._reset_iter_counts()
+        try:
+            if self.model.iter_count > 0 and reset_iter_counts:
+                self.driver.iter_count = 0
+                self.model._reset_iter_counts()
 
-        self.final_setup()
+            self.final_setup()
 
-        self._run_counter += 1
-        record_model_options(self, self._run_counter)
+            self._run_counter += 1
+            record_model_options(self, self._run_counter)
 
-        self.model._clear_iprint()
-        self.model.run_solve_nonlinear()
+            self.model._clear_iprint()
+            self.model.run_solve_nonlinear()
+        finally:
+            self._recording_iter.prefix = old_prefix
 
     def run_driver(self, case_prefix=None, reset_iter_counts=True):
         """
@@ -719,7 +731,8 @@ class Problem(object):
         Parameters
         ----------
         case_prefix : str or None
-            Prefix to prepend to coordinates when recording.
+            Prefix to prepend to coordinates when recording.  None means keep the preexisting
+            prefix.
 
         reset_iter_counts : bool
             If True and model has been run previously, reset all iteration counters.
@@ -733,29 +746,31 @@ class Problem(object):
             raise RuntimeError(self.msginfo +
                                ": The `setup` method must be called before `run_driver`.")
 
-        if case_prefix:
+        old_prefix = self._recording_iter.prefix
+
+        if case_prefix is not None:
             if not isinstance(case_prefix, str):
                 raise TypeError(self.msginfo + ": The 'case_prefix' argument should be a string.")
             self._recording_iter.prefix = case_prefix
-        else:
-            self._recording_iter.prefix = None
 
-        if self.model.iter_count > 0 and reset_iter_counts:
-            self.driver.iter_count = 0
-            self.model._reset_iter_counts()
+        try:
+            if self.model.iter_count > 0 and reset_iter_counts:
+                self.driver.iter_count = 0
+                self.model._reset_iter_counts()
 
-        self.final_setup()
+            self.final_setup()
 
-        self._run_counter += 1
-        record_model_options(self, self._run_counter)
+            self._run_counter += 1
+            record_model_options(self, self._run_counter)
 
-        self.model._clear_iprint()
-        self.driver._pre_run()  # for keeping track of data for reporting
-        driver_run_result = self.driver.run()
-        self.driver._post_run()  # for keeping track of data for reporting
+            self.model._clear_iprint()
+            self.driver._pre_run()  # for keeping track of data for reporting
+            driver_run_result = self.driver.run()
+            self.driver._post_run()  # for keeping track of data for reporting
 
-        return driver_run_result
-        # return self.driver.run()
+            return driver_run_result
+        finally:
+            self._recording_iter.prefix = old_prefix
 
     def compute_jacvec_product(self, of, wrt, mode, seed):
         """
