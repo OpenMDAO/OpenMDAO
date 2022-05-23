@@ -456,8 +456,11 @@ class Case(object):
         list
             List of input names and other optional information about those inputs.
         """
-        meta = self._abs2meta
+        abs2meta = self._abs2meta
         inputs = []
+
+        # string to display when an attribute is not available (e.g. for a discrete)
+        NA = 'Unavailable'
 
         if values is not None:
             issue_warning("'value' is deprecated and will be removed in 4.0. "
@@ -478,8 +481,10 @@ class Case(object):
             np_precision = print_options['precision']
 
             for var_name in self.inputs.absolute_names():
+                meta = abs2meta[var_name]
+
                 # Filter based on tags
-                if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
+                if tags and not (make_set(tags) & make_set(meta['tags'])):
                     continue
 
                 var_name_prom = self._abs2prom['input'][var_name]
@@ -503,11 +508,14 @@ class Case(object):
                 if prom_name:
                     var_meta['prom_name'] = var_name_prom
                 if units:
-                    var_meta['units'] = meta[var_name]['units']
+                    var_meta['units'] = meta.get('units', NA)
                 if shape:
-                    var_meta['shape'] = val.shape
+                    try:
+                        var_meta['shape'] = val.shape
+                    except AttributeError:
+                        var_meta['shape'] = NA
                 if desc:
-                    var_meta['desc'] = meta[var_name]['desc']
+                    var_meta['desc'] = meta['desc']
 
                 inputs.append((var_name, var_meta))
 
@@ -607,9 +615,12 @@ class Case(object):
         list
             List of output names and other optional information about those outputs.
         """
-        meta = self._abs2meta
+        abs2meta = self._abs2meta
         expl_outputs = []
         impl_outputs = []
+
+        # string to display when an attribute is not available (e.g. for a discrete)
+        NA = 'Unavailable'
 
         if values is not None:
             issue_warning("'value' is deprecated and will be removed in 4.0. "
@@ -632,8 +643,10 @@ class Case(object):
             if not list_autoivcs and var_name.startswith('_auto_ivc.'):
                 continue
 
+            meta = abs2meta[var_name]
+
             # Filter based on tags
-            if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
+            if tags and not (make_set(tags) & make_set(meta['tags'])):
                 continue
 
             var_name_prom = self._abs2prom['output'][var_name]
@@ -666,19 +679,22 @@ class Case(object):
             if residuals:
                 var_meta['resids'] = resids
             if units:
-                var_meta['units'] = meta[var_name]['units']
+                var_meta['units'] = meta.get('units', NA)
             if shape:
-                var_meta['shape'] = val.shape
+                try:
+                    var_meta['shape'] = val.shape
+                except AttributeError:
+                    var_meta['shape'] = NA
             if bounds:
-                var_meta['lower'] = meta[var_name]['lower']
-                var_meta['upper'] = meta[var_name]['upper']
+                var_meta['lower'] = meta.get('lower', NA)
+                var_meta['upper'] = meta.get('upper', NA)
             if scaling:
-                var_meta['ref'] = meta[var_name]['ref']
-                var_meta['ref0'] = meta[var_name]['ref0']
-                var_meta['res_ref'] = meta[var_name]['res_ref']
+                var_meta['ref'] = meta.get('ref', NA)
+                var_meta['ref0'] = meta.get('ref0', NA)
+                var_meta['res_ref'] = meta.get('res_ref', NA)
             if desc:
-                var_meta['desc'] = meta[var_name]['desc']
-            if meta[var_name]['explicit']:
+                var_meta['desc'] = meta['desc']
+            if meta['explicit']:
                 expl_outputs.append((var_name, var_meta))
             else:
                 impl_outputs.append((var_name, var_meta))
