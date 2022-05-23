@@ -380,7 +380,9 @@ class ProcTestCase1(unittest.TestCase):
 
 
 class MyParaboloid(Paraboloid):
-    """ Use matrix-vector product."""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._comp_jvp_count = 0
 
     def setup_partials(self):
         pass
@@ -390,6 +392,8 @@ class MyParaboloid(Paraboloid):
         pass
 
     def compute_jacvec_product(self, inputs, dinputs, doutputs, mode):
+        self._comp_jvp_count += 1
+
         x = inputs['x'][0]
         y = inputs['y'][0]
 
@@ -432,6 +436,8 @@ def execute_model1(mode):
     assert_check_totals(prob.check_totals(method='cs', out_stream=None))
     assert_check_partials(prob.check_partials(method='cs', out_stream=None))
 
+    return prob, comp
+
 
 def execute_model2(mode):
     prob = om.Problem()
@@ -461,20 +467,34 @@ def execute_model2(mode):
     assert_check_totals(prob.check_totals(method='cs', out_stream=None))
     assert_check_partials(prob.check_partials(method='cs', out_stream=None))
 
+    return prob, comp
+
 
 class TestRecursiveApplyFix(unittest.TestCase):
 
     def test_matrix_free_explicit_fwd(self):
-        execute_model1('fwd')
+        prob, comp = execute_model1('fwd')
+        comp._comp_jvp_count = 0
+        J = prob.compute_totals()
+        self.assertEqual(comp._comp_jvp_count, 1)
 
     def test_matrix_free_explicit_rev(self):
-        execute_model1('rev')
+        prob, comp = execute_model1('rev')
+        comp._comp_jvp_count = 0
+        J = prob.compute_totals()
+        self.assertEqual(comp._comp_jvp_count, 1)
 
     def test_matrix_free_explicit2_fwd(self):
-        execute_model2('fwd')
+        prob, comp = execute_model2('fwd')
+        comp._comp_jvp_count = 0
+        J = prob.compute_totals()
+        self.assertEqual(comp._comp_jvp_count, 1)
 
     def test_matrix_free_explicit2_rev(self):
-        execute_model2('rev')
+        prob, comp = execute_model2('rev')
+        comp._comp_jvp_count = 0
+        J = prob.compute_totals()
+        self.assertEqual(comp._comp_jvp_count, 1)
 
 
 class _ApplyLinearCounter(om.ExecComp):

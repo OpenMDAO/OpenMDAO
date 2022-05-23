@@ -508,7 +508,7 @@ class DefaultVector(Vector):
         """
         Given some indices, return a dict mapping variable name to corresponding local indices.
 
-        This is meant to be used for debugging.
+        This is slow and is meant to be used only for debugging or maybe error messages.
 
         Parameters
         ----------
@@ -520,16 +520,16 @@ class DefaultVector(Vector):
         dict
             Mapping of variable name to a list of local indices into that variable.
         """
-        names = defaultdict(list)
+        name2inds = defaultdict(list)
         start = end = 0
         for name, arr in self._views_flat.items():
             end += arr.size
             for idx in idxs:
                 if start <= idx < end:
-                    names[name].append(idx - start)
+                    name2inds[name].append(idx - start)
             start = end
 
-        return names
+        return name2inds
 
     def __getstate__(self):
         """

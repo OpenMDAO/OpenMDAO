@@ -98,7 +98,7 @@ class LinearBlockGS(BlockLinearSolver):
             delta_d_n = d_out_vec.asarray(copy=True)
 
         if mode == 'fwd':
-            par_off = system._dresiduals._root_offset
+            parent_offset = system._dresiduals._root_offset
 
             for subsys, _ in system._subsystems_allprocs.values():
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
@@ -112,8 +112,8 @@ class LinearBlockGS(BlockLinearSolver):
                 b_vec = subsys._dresiduals
 
                 scope_out, scope_in = system._get_matvec_scope(subsys)
-                scope_out = self._scope_union(self._scope_out, scope_out)
-                scope_in = self._scope_union(self._scope_in, scope_in)
+                scope_out = self._vars_union(self._scope_out, scope_out)
+                scope_in = self._vars_union(self._scope_in, scope_in)
 
                 if subsys._iter_call_apply_linear():
                     subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
@@ -121,7 +121,7 @@ class LinearBlockGS(BlockLinearSolver):
                     b_vec.set_val(0.0)
 
                 b_vec *= -1.0
-                off = b_vec._root_offset - par_off
+                off = b_vec._root_offset - parent_offset
                 b_vec += self._rhs_vec[off:off + len(b_vec)]
 
                 subsys._solve_linear(mode, self._rel_systems, scope_out, scope_in)
@@ -132,7 +132,7 @@ class LinearBlockGS(BlockLinearSolver):
             else:
                 subsystems = list(system._subsystems_allprocs.values())
                 subsystems.reverse()
-            par_off = system._doutputs._root_offset
+            parent_offset = system._doutputs._root_offset
 
             for subsys, _ in subsystems:
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
@@ -145,12 +145,12 @@ class LinearBlockGS(BlockLinearSolver):
                     system._transfer('linear', mode, subsys.name)
 
                     b_vec *= -1.0
-                    off = b_vec._root_offset - par_off
+                    off = b_vec._root_offset - parent_offset
                     b_vec += self._rhs_vec[off:off + len(b_vec)]
 
                     scope_out, scope_in = system._get_matvec_scope(subsys)
-                    scope_out = self._scope_union(self._scope_out, scope_out)
-                    scope_in = self._scope_union(self._scope_in, scope_in)
+                    scope_out = self._vars_union(self._scope_out, scope_out)
+                    scope_in = self._vars_union(self._scope_in, scope_in)
 
                     subsys._solve_linear(mode, self._rel_systems, scope_out, scope_in)
 

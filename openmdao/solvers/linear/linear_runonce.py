@@ -37,6 +37,7 @@ class LinearRunOnce(LinearBlockGS):
         # Single iteration of GS
         self._single_iteration()
 
+        # reset after solve is done
         self._scope_in = self._scope_out = _UNDEFINED
 
     def _declare_options(self):

@@ -1044,15 +1044,21 @@ class BlockLinearSolver(LinearSolver):
         else:
             self._rhs_vec = self._rhs_vec.real
 
-    def _scope_union(self, scope1, scope2):
+    def _vars_union(self, slv_vars, sys_vars):
         """
         Return the union of the two 'set's of variables.
 
+        The first 'set' comes from the this solver and the second from the set of variables
+        from the current System that are relevent to the current matrix vector product. Note
+        that this is called separately for input and output variables.
+
+        Also handles cases where incoming variables are _UNDEFINED or None instead of sets.
+
         Parameters
         ----------
-        scope1 : set, None, or _UNDEFINED
+        slv_vars : set, None, or _UNDEFINED
             First variable set.
-        scope2 : set, None, or _UNDEFINED
+        sys_vars : set, None, or _UNDEFINED
             Second variable set.
 
         Returns
@@ -1060,11 +1066,11 @@ class BlockLinearSolver(LinearSolver):
         set, None, or _UNDEFINED
             The combined variable 'set'.
         """
-        if scope1 is None or scope2 is None:
+        if slv_vars is None or sys_vars is None:
             return None
-        if scope1 is _UNDEFINED:
-            return scope2
-        return scope2.union(scope1)
+        if slv_vars is _UNDEFINED:
+            return sys_vars
+        return sys_vars.union(slv_vars)
 
     def _run_apply(self, init=False):
         """
@@ -1075,8 +1081,8 @@ class BlockLinearSolver(LinearSolver):
         try:
             scope_out, scope_in = system._get_matvec_scope()
             system._apply_linear(self._assembled_jac, self._rel_systems, self._mode,
-                                 self._scope_union(self._scope_out, scope_out),
-                                 self._scope_union(self._scope_in, scope_in))
+                                 self._vars_union(self._scope_out, scope_out),
+                                 self._vars_union(self._scope_in, scope_in))
         finally:
             self._recording_iter.pop()
 
@@ -1151,4 +1157,5 @@ class BlockLinearSolver(LinearSolver):
         self._rel_systems = rel_systems
         self._mode = mode
         self._solve()
+
         self._scope_out = self._scope_in = _UNDEFINED  # reset after solve is done

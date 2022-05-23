@@ -115,4 +115,4 @@ class TestLinOpCaching(unittest.TestCase):
         execute_model2('rev')
 
 if __name__ == '__main__':
-    execute_model1('fwd')
+    unittest.main()
