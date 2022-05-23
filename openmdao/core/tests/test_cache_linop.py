@@ -7,7 +7,9 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 
 
 class MyParaboloid(Paraboloid):
-    """ Use matrix-vector product."""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._comp_jvp_count = 0
 
     def setup_partials(self):
         pass
@@ -17,6 +19,8 @@ class MyParaboloid(Paraboloid):
         pass
 
     def compute_jacvec_product(self, inputs, dinputs, doutputs, mode):
+        self._comp_jvp_count += 1
+
         x = inputs['x'][0]
         y = inputs['y'][0]
 
@@ -59,6 +63,10 @@ def execute_model1(mode):
     assert_check_totals(prob.check_totals(method='cs', out_stream=None))
     assert_check_partials(prob.check_partials(method='cs', out_stream=None))
 
+    comp._comp_jvp_count = 0
+    J = prob.compute_totals()
+    assert comp._comp_jvp_count == 1, f"compute_jacvec_product count should be 1 but was {comp._comp_jvp_count}"
+
 
 def execute_model2(mode):
     prob = om.Problem()
@@ -88,6 +96,9 @@ def execute_model2(mode):
     assert_check_totals(prob.check_totals(method='cs', out_stream=None))
     assert_check_partials(prob.check_partials(method='cs', out_stream=None))
 
+    comp._comp_jvp_count = 0
+    J = prob.compute_totals()
+    assert comp._comp_jvp_count == 1, f"compute_jacvec_product count should be 1 but was {comp._comp_jvp_count}"
 
 class TestLinOpCaching(unittest.TestCase):
 

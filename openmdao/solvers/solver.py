@@ -1148,9 +1148,7 @@ class BlockLinearSolver(LinearSolver):
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
         """
-        # self._system().pindent(self._system().pathname, "LINEAR SOLVE")
         self._rel_systems = rel_systems
         self._mode = mode
         self._solve()
         self._scope_out = self._scope_in = _UNDEFINED  # reset after solve is done
-        # self._system().pindent(self._system().pathname, "LINEAR SOLVE done")

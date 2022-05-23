@@ -4071,7 +4071,7 @@ class System(object):
 
     def _iter_call_apply_linear(self):
         """
-        Return whether to call _apply_linear on this Group from within parent _apply_linear.
+        Return whether to call _apply_linear on this System from within parent _apply_linear.
 
         Returns
         -------
@@ -5560,45 +5560,3 @@ class System(object):
             tarr -= toffset
 
         return sarr, tarr, tsize, has_dist_data
-
-    def tree_depth(self):
-        """
-        Return the depth of this System in its System tree.
-
-        Returns
-        -------
-        int
-            The depth of this System within its System tree.
-        """
-        if self.pathname:
-            return len(self.pathname.split('.'))
-        return 0
-
-    def tree_indent(self, tabsize=3):
-        """
-        Return a string of spaces to provide proper indentation of output based on pathname.
-
-        Parameters
-        ----------
-        tabsize : int
-            The size of one 'tab' of depth.  Total indent is tabsize * depth.
-
-        Returns
-        -------
-        str
-            The string of spaces.
-        """
-        return ' ' * (tabsize * self.tree_depth())
-
-    def pindent(self, *args, **kwargs):
-        """
-        Print using the given args at an indent level determined by our pathname.
-
-        Parameters
-        ----------
-        *args : tuple
-            Positional args.
-        **kwargs : dict
-            Named args.
-        """
-        print(self.tree_indent(), *args, **kwargs)

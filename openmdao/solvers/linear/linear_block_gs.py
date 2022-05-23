@@ -70,10 +70,7 @@ class LinearBlockGS(BlockLinearSolver):
                 self._delta_d_n_1 = self._system()._dresiduals.asarray(copy=True)
             self._theta_n_1 = 1.0
 
-        # self._system().pindent(self._system().pathname, "ITER_INITIALIZE")
-        ret = super()._iter_initialize()
-        # self._system().pindent(self._system().pathname, "ITER_INITIALIZE done")
-        return ret
+        return super()._iter_initialize()
 
     def _single_iteration(self):
         """

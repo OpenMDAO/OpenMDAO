@@ -2638,7 +2638,6 @@ class Group(System):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        # self.pindent(f"{self.pathname}._apply_linear")
         if self._owns_approx_jac:
             jac = self._jacobian
         elif jac is None and self._assembled_jac is not None:
@@ -2685,7 +2684,6 @@ class Group(System):
         scope_in : set, None, or _UNDEFINED
             Inputs relevant to possible lower level calls to _apply_linear on Components.
         """
-        # self.pindent(f"{self.pathname}._solve_linear")
         if self._owns_approx_jac:
             # No subsolves if we are approximating our jacobian. Instead, we behave like an
             # ExplicitComponent and pass on the values in the derivatives vectors.
@@ -2715,8 +2713,6 @@ class Group(System):
         else:
             self._linear_solver._set_matvec_scope(scope_out, scope_in)
             self._linear_solver.solve(mode, rel_systems)
-
-        # self.pindent(f"{self.pathname}._solve_linear DONE")
 
     def _linearize(self, jac, sub_do_ln=True):
         """
