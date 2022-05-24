@@ -1,5 +1,5 @@
 """
-Generate report on the results of the optimization
+Generate report on the results of the optimization.
 """
 import base64
 import datetime
@@ -83,7 +83,7 @@ _pointer_half_width = 0.04
 _pointer_height = 0.4
 _text_height = 0.3
 _pointer_line_width = 0.05
-_near_bound_highlight_half_width  = 0.05
+_near_bound_highlight_half_width = 0.05
 _near_bound_highlight_half_width_y_min = 0.0
 _near_bound_highlight_half_width_y_max = _plot_y_max
 _near_bound_highlight_alpha = 0.7
@@ -164,7 +164,6 @@ def opt_report(prob, outfile=None):
                 else:
                     continue
 
-
             cons_vals[prom_name] = prob.driver.get_constraint_values(driver_scaling=driver_scaling)[
                 abs_name]
 
@@ -187,10 +186,6 @@ def opt_report(prob, outfile=None):
 
     with open(os.path.join(this_dir, _optimizer_report_template), 'r') as f:
         template = f.read()
-
-    test_filename, test_class, test_function = get_unittest_info()
-
-    outfile = f"/Users/hschilli/Documents/OpenMDAO/dev/I2474-optimization-report/all_opt_reports/{test_filename}_{test_class}_{test_function}.html"
 
     with open(outfile, 'w') as f:
         s = template.format(title=prob._name, header=header_html, objs=objs_html,
@@ -328,8 +323,6 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
 
     for name, meta in meta_dict.items():
 
-
-
         row = {}
 
         if meta['ref0'] is None and meta['ref'] is None and meta['scaler'] is None and \
@@ -341,17 +334,11 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
         if alias:
             name = meta['name']
 
-
         # the scipy optimizer when using COBYLA creates constraints under the hood
         #  but the values are not given by the driver, so use this as a sign that this
         #  variable should be skipped
         if name not in vals_dict:
             continue
-
-
-
-
-
 
         for col_name in col_names:
             if col_name == 'name':
@@ -420,7 +407,8 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
             elif col_name in ['ref', 'ref0']:
                 if meta[col_name] is not None:
                     derived_val = np.mean(meta[col_name])
-                    row[col_name] = _indicate_value_is_derived_from_array(derived_val, meta[col_name])
+                    row[col_name] = _indicate_value_is_derived_from_array(derived_val,
+                                                                          meta[col_name])
                 else:
                     row[col_name] = 'None'
             else:
@@ -434,8 +422,7 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
 
 def _sparkline(kind, meta, val, width=300):
     """
-    Given the metadata and value of a design variable or constraint, make an html-embeddable
-    sparkline.
+    Given the metadata & value of design variable or constraint, make an html-embeddable sparkline.
 
     Parameters
     ----------
@@ -467,16 +454,15 @@ def _sparkline(kind, meta, val, width=300):
     ax.tick_params(axis='y', labelsize=_sparkline_font_size)
 
     if kind == 'desvar':
-        _desvar_sparkline(ax, meta, val)
+        _desvar_or_ineq_constraint_sparkline(ax, meta, val)
     elif 'equals' not in meta or meta['equals'] is None:
-        # _ineq_constraint_sparkline(ax, meta, val)
-        _desvar_sparkline(ax, meta, val)
+        _desvar_or_ineq_constraint_sparkline(ax, meta, val)
     else:
         _eq_constraint_sparkline(ax, meta, val)
 
     tmpfile = io.BytesIO()
     fig.patch.set_alpha(0.0)  # So that the figures are transparent
-    fig.savefig(tmpfile, format='png', bbox_inches='tight', pad_inches = _plot_pad_inches)
+    fig.savefig(tmpfile, format='png', bbox_inches='tight', pad_inches=_plot_pad_inches)
     encoded = base64.b64encode(tmpfile.getvalue()).decode('utf-8')
     html = f'<img width={width} src=\'data:image/png;base64,{encoded}\'>'
 
@@ -486,9 +472,9 @@ def _sparkline(kind, meta, val, width=300):
     return html
 
 
-def _desvar_sparkline(ax, meta, val):
+def _desvar_or_ineq_constraint_sparkline(ax, meta, val):
     """
-    Using matplotlib plot a visual showing the values of the desvar and also showing any bounds.
+    Use matplotlib plot a visual showing the values of the desvar or constraint and any bounds.
 
     Parameters
     ----------
@@ -567,94 +553,10 @@ def _desvar_sparkline(ax, meta, val):
     # Plot area where bounds are satisfied
     ax.fill_between(ar, _lower, _upper, color=_in_bounds_plot_color, alpha=_in_bounds_plot_alpha)
 
-#
-# def _ineq_constraint_sparkline(ax, meta, val):
-#     """
-#     Plot to matplotlib a visual showing the values of the variables and the bounds on it.
-#
-#     Parameters
-#     ----------
-#     ax : Matplotlib Axes instance
-#         Contains most of the figure elements.
-#     meta : Matplotlib Axes instance
-#         The metadata associated with the variable, including info about the constraint.
-#     val : np.array
-#         The value of the variable.
-#     """
-#     if isinstance(meta['lower'], float) and meta['lower'] == -INF_BOUND and \
-#             isinstance(meta['upper'], float) and meta['upper'] == INF_BOUND:
-#         raise ValueError("Upper and lower bounds cannot both be None")
-#
-#     indices = np.s_[...] if meta['indices'] is None else meta['indices']()
-#
-#     # Get y values
-#     _val = np.asarray(val).ravel()
-#
-#     # Get x values, range, and plot ranges
-#     ar = np.arange(_val.size)
-#     x_min = 0
-#     x_max = val.size - 1
-#
-#     # Get lower and upper arrays
-#     if isinstance(meta['lower'], float):
-#         _lower = (meta['lower'] * np.ones_like(val)[indices]).ravel()
-#     else:
-#         _lower = np.asarray(meta['lower']).ravel()
-#
-#     if isinstance(meta['upper'], float):
-#         _upper = (meta['upper'] * np.ones_like(val)[indices]).ravel()
-#     else:
-#         _upper = np.asarray(meta['upper']).ravel()
-#
-#     _lower, _lower_no_inf_min, _lower_no_inf_max = _get_bound_array_min_max(_lower, indices)
-#     _upper, _upper_no_inf_min, _upper_no_inf_max = _get_bound_array_min_max(_upper, indices)
-#
-#     # get min and max across val, lower, and upper
-#     y_min = min(np.min(_val), _lower_no_inf_min, _upper_no_inf_min)
-#     y_max = max(np.max(_val), _lower_no_inf_max, _upper_no_inf_max)
-#
-#     # x and y ranges
-#     xrange = x_max - x_min
-#     xmin_plot = x_min - xrange * _plot_padding_fraction
-#     xmax_plot = x_max + xrange * _plot_padding_fraction
-#
-#     yrange = y_max - y_min
-#     ymin_plot = y_min - yrange * _plot_padding_fraction
-#     ymax_plot = y_max + yrange * _plot_padding_fraction
-#
-#     # set plot axes settings
-#     ax.set_xlim([xmin_plot, xmax_plot])
-#     ax.set_ylim([ymin_plot, ymax_plot])
-#
-#     ax.set_yticks([y_min, y_max])
-#     ax.set_xticks([x_min, x_max])
-#
-#     _has_lower = not (isinstance(meta['lower'], float) and meta['lower'] == -INF_BOUND)
-#     _has_upper = not (isinstance(meta['upper'], float) and meta['upper'] == INF_BOUND)
-#
-#     # plot area for lower and upper constraints
-#     if _has_lower:
-#         ax.fill_between(ar, ymin_plot, _lower, color=_out_of_bounds_plot_color, alpha=_out_of_bounds_plot_alpha,
-#                         hatch=_out_of_bounds_hatch_pattern)
-#         ax.plot(ar, _lower,  color=_out_of_bounds_plot_color, linewidth=_plot_value_linewidth)
-#
-#     if _has_upper:
-#         ax.fill_between(ar, _upper, ymax_plot, color=_out_of_bounds_plot_color, alpha=_out_of_bounds_plot_alpha,
-#                         hatch=_out_of_bounds_hatch_pattern)
-#         ax.plot(ar, _upper,  color=_out_of_bounds_plot_color, linewidth=_plot_value_linewidth)
-#
-#     # plot area where bounds are satisfied
-#     ax.fill_between(ar, _lower, _upper, color=_in_bounds_plot_color, alpha=_in_bounds_plot_alpha)
-#
-#     # plot the actual values
-#     ax.plot(ar, _val, '-o', markersize=_plot_marker_size, color=_value_plot_color,
-#             linewidth=_plot_value_linewidth)
-
 
 def _eq_constraint_sparkline(ax, meta, val):
     """
-    Plot to matplotlib a visual showing the values of the equality constraint and also the value
-    of the constrained variable.
+    Plot to matplotlib a visual showing the values of the equality constraint and also the value.
 
     Parameters
     ----------
@@ -715,8 +617,9 @@ def _eq_constraint_sparkline(ax, meta, val):
 
 def _constraint_plot(kind, meta, val, width=300):
     """
-    Given the metadata and value of a design variable or constraint, make an html-embeddable
-    constraint plot. Only for scalars
+    Given the metadata and value of a design variable or constraint, make an html-embeddable plot.
+
+    Only for scalars
 
     Parameters
     ----------
@@ -774,7 +677,7 @@ def _constraint_plot(kind, meta, val, width=300):
     var_bounds_plot(kind, ax, float(val), meta['lower'], meta['upper'])
     tmpfile = io.BytesIO()
     fig.savefig(tmpfile, format='png', transparent=True, bbox_inches='tight',
-                pad_inches = _plot_pad_inches)
+                pad_inches=_plot_pad_inches)
     encoded = base64.b64encode(tmpfile.getvalue()).decode('utf-8')
 
     html = f'<img width={width} src=\'data:image/png;base64,{encoded}\'>'
@@ -787,6 +690,8 @@ def _constraint_plot(kind, meta, val, width=300):
 
 def _prom_name_dict(d, abs2prom):
     """
+    Convert values in dict to use promoted names.
+
     Parameters
     ----------
     d : dict
@@ -813,6 +718,8 @@ def _prom_name_dict(d, abs2prom):
 
 def _indicate_value_is_derived_from_array(derived_value, original_value):
     """
+    Given a value or bound, & its derived value for use in report, format the output for the tables.
+
     Parameters
     ----------
     derived_value : float
@@ -835,6 +742,8 @@ def _indicate_value_is_derived_from_array(derived_value, original_value):
 
 def _get_bound_array_min_max(bounds, indices):
     """
+    Given a bounds (either lower or upper) & indices, return the full array bounds, min,& max.
+
     Parameters
     ----------
     bounds : float
@@ -880,6 +789,8 @@ def var_bounds_plot(kind, ax, value, lower, upper):
     ----------
     kind : str
         One of 'desvar' or 'constraint' to specify which type of plot is being made.
+    ax : Matplotlib Axes instance
+        Contains most of the figure elements.
     value : float
         The design var value.
     lower : float or None
@@ -887,7 +798,6 @@ def var_bounds_plot(kind, ax, value, lower, upper):
     upper : float or None
         Upper constraint.
     """
-
     # must handle 5 cases if both upper and lower are given:
     #  - value much less than lower
     #  - value a little less than lower
@@ -896,7 +806,6 @@ def var_bounds_plot(kind, ax, value, lower, upper):
     #  - value much greater than upper
 
     # also need to handle one-sided constraints where only one of lower and upper is given
-
     if kind == 'constraint' and upper == INF_BOUND and lower == -INF_BOUND:
         raise ValueError("Upper and lower bounds cannot all be None for a constraint")
 
@@ -989,7 +898,8 @@ def var_bounds_plot(kind, ax, value, lower, upper):
         pointer_plot_coord = _plot_x_max
     else:
         pointer_plot_coord = value_in_plot_coord
-    pointer_color = _in_bounds_plot_color if (lower <= value <= upper) else _out_of_bounds_plot_color
+    pointer_color = _in_bounds_plot_color if (lower <= value <= upper) \
+        else _out_of_bounds_plot_color
     _draw_pointer_and_label(ax, pointer_plot_coord, pointer_color, value)
 
 
@@ -997,7 +907,7 @@ def var_bounds_plot(kind, ax, value, lower, upper):
 def _draw_in_or_out_bound_section(ax, x_left, width, is_in_bound):
     if is_in_bound:
         color = _in_bounds_plot_color
-        hatch=None
+        hatch = None
         alpha = _in_bounds_plot_alpha
     else:
         color = _out_of_bounds_plot_color
@@ -1020,19 +930,21 @@ def _draw_bound_highlight(ax, x):
 def _draw_ellipsis(ax, x_left):
     # Draw three dots as an ellipsis to show that the value is beyond
     #   either the left or right edge of the plot
-    for i in [1,2,3]:
+    for i in [1, 2, 3]:
         circle = patches.Ellipse((x_left + i * _lower_plot / 12., _ellipsis_x_offset),
                                  _ellipse_width, _ellipse_height,
                                  facecolor=_out_of_bounds_plot_color)
         ax.add_patch(circle)
 
+
 def _draw_boundary_label(ax, pointer_plot_coord, s):
     ax.text(pointer_plot_coord, _plot_y_max + _text_height,
-             s,
-             horizontalalignment='center',
-             verticalalignment='bottom',
+            s,
+            horizontalalignment='center',
+            verticalalignment='bottom',
             size=_scalar_visual_font_size
             )
+
 
 def _draw_pointer_and_label(ax, pointer_plot_coord, pointer_color, value):
     pts = np.array([
@@ -1043,13 +955,14 @@ def _draw_pointer_and_label(ax, pointer_plot_coord, pointer_color, value):
     p = patches.Polygon(pts, closed=True, facecolor=pointer_color, edgecolor='black',
                         linewidth=_pointer_line_width)
     ax.add_patch(p)
-    plt.text(pointer_plot_coord, -_pointer_height - _text_height, f"{value:{_variable_label_format}}".strip(),
+    plt.text(pointer_plot_coord, -_pointer_height - _text_height,
+             f"{value:{_variable_label_format}}".strip(),
              horizontalalignment='center', verticalalignment='top', size=_scalar_visual_font_size)
+
 
 def _val_to_plot_coord(value, lower, upper):
     # need to get function that maps actual values to 0.0 to 1.0
     # and where lower maps to 1./3 and upper to 2/3
     # Used with Python's functools to make a Python function out of this
-    plot_coord = 1./3. + (value - lower) / (upper - lower) * 1./3.
+    plot_coord = 1. / 3. + (value - lower) / (upper - lower) * 1. / 3.
     return plot_coord
-

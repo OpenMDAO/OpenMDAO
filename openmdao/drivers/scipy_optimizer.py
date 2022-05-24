@@ -227,10 +227,26 @@ class ScipyOptimizeDriver(Driver):
                     self._cons[name]['linear'] = True
 
     def get_driver_objective_calls(self):
+        """
+        Return number of objective evaluations made during a driver run.
+
+        Returns
+        -------
+        int
+            Number of objective evaluations made during a driver run.
+        """
         nfev = self.result.nfev if self.result else 0
         return nfev
 
     def get_driver_derivative_calls(self):
+        """
+        Return number of derivative evaluations made during a driver run.
+
+        Returns
+        -------
+        int
+            Number of derivative evaluations made during a driver run.
+        """
         if self.result and hasattr(self.result, 'njev'):
             njev = self.result.njev
         else:
@@ -238,6 +254,14 @@ class ScipyOptimizeDriver(Driver):
         return njev
 
     def get_exit_status(self):
+        """
+        Return exit status of driver run.
+
+        Returns
+        -------
+        str
+            String indicating result of driver run.
+        """
         return 'FAIL' if self.fail else 'SUCCESS'
 
     # def _post_run(self):
@@ -255,9 +279,6 @@ class ScipyOptimizeDriver(Driver):
         bool
             Failure flag; True if failed to converge, False is successful.
         """
-
-
-
         problem = self._problem()
         opt = self.options['optimizer']
         model = problem.model
@@ -575,7 +596,6 @@ class ScipyOptimizeDriver(Driver):
                 print('Optimization Complete (success not known)')
                 print(result.message)
                 print('-' * 35)
-
 
         return self.fail
 

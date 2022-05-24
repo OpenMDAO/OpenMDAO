@@ -19,7 +19,8 @@ from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
 
-# @use_tempdirs
+
+@use_tempdirs
 class TestOptimizationReport(unittest.TestCase):
 
     def setup_problem_and_run_driver(self, driver,
@@ -170,7 +171,7 @@ class TestOptimizationReport(unittest.TestCase):
         # at the visuals for the scalar variable, 'x'.
         # Includes commented out code
         # that can be uncommented to see how the visuals for scalars look for the many situations.
-        # Only run final_setup so we can set where the values of the desvars are and they won't
+        # Only run final_setup, so we can set where the values of the desvars are, and they won't
         # change when running the driver.
         prob = self.setup_sellar_problem()
         model = prob.model

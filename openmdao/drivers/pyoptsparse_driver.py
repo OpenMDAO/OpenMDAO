@@ -276,12 +276,36 @@ class pyOptSparseDriver(Driver):
                 self.options._dict['user_teriminate_signal']['val']
 
     def get_driver_objective_calls(self):
+        """
+        Return number of objective evaluations made during a driver run.
+
+        Returns
+        -------
+        int
+            Number of objective evaluations made during a driver run.
+        """
         return self.pyopt_solution.userObjCalls if self.pyopt_solution else None
 
     def get_driver_derivative_calls(self):
+        """
+        Return number of derivative evaluations made during a driver run.
+
+        Returns
+        -------
+        int
+            Number of derivative evaluations made during a driver run.
+        """
         return self.pyopt_solution.userSensCalls if self.pyopt_solution else None
 
     def get_exit_status(self):
+        """
+        Return exit status of driver run.
+
+        Returns
+        -------
+        str
+            String indicating result of driver run.
+        """
         return 'FAIL' if self.fail else 'SUCCESS'
 
     def run(self):
@@ -556,7 +580,6 @@ class pyOptSparseDriver(Driver):
         if sigusr is not None:
             signal.signal(sigusr, self._signal_cache)
             self._signal_cache = None   # to prevent memory leak test from failing
-
 
         return self.fail
 

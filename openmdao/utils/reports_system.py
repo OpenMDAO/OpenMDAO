@@ -358,16 +358,13 @@ def _run_optimizer_report_enclosing():
 
 run_optimizer_report = _run_optimizer_report_enclosing()
 
-
-
-
 _default_reports = {
     'n2': (run_n2_report, 'N2 diagram', 'Problem', 'final_setup', 'post', _default_n2_filename,
            None),
     'scaling': (run_scaling_report, 'Driver scaling report', 'Driver', '_compute_totals', 'post',
                 _default_scaling_filename, None),
     'optimizer': (run_optimizer_report, 'Optimizer report', 'Driver', '_post_run', 'post',
-                _default_optimizer_report_filename, None),
+                  _default_optimizer_report_filename, None),
 }
 
 

@@ -84,6 +84,8 @@ class Driver(object):
         Keyed by sources and aliases.
     _total_jac : _TotalJacInfo or None
         Cached total jacobian handling object.
+    opt_result : dict
+        Dictionary containing information for use in the optimization report.
     """
 
     def __init__(self, **kwargs):
@@ -174,7 +176,6 @@ class Driver(object):
 
         self._declare_options()
         self.options.update(kwargs)
-
 
         self.opt_result = {
             'runtime': 0.0,
@@ -605,13 +606,37 @@ class Driver(object):
         return val
 
     def get_driver_iter_count(self):
+        """
+        Return driver iterations made during a driver run.
+
+        Returns
+        -------
+        int
+            Number of driver iterations made during a driver run.
+        """
         return self.iter_count
 
     def get_driver_objective_calls(self):
-        return 1 #  TODO ????
+        """
+        Return number of objective evaluations made during a driver run.
+
+        Returns
+        -------
+        int
+            Number of objective evaluations made during a driver run.
+        """
+        return 1
 
     def get_driver_derivative_calls(self):
-        return 1 #  TODO ????
+        """
+        Return number of derivative evaluations made during a driver run.
+
+        Returns
+        -------
+        int
+            Number of derivative evaluations made during a driver run.
+        """
+        return 1
 
     def get_design_var_values(self, get_remote=True, driver_scaling=True):
         """
@@ -825,6 +850,14 @@ class Driver(object):
         return response_size, desvar_size
 
     def get_exit_status(self):
+        """
+        Return exit status of driver run.
+
+        Returns
+        -------
+        str
+            String indicating result of driver run.
+        """
         return 'SUCCESS'
 
     def _pre_run(self):
@@ -856,9 +889,7 @@ class Driver(object):
         with RecordingDebugging(self._get_name(), self.iter_count, self):
             self._problem().model.run_solve_nonlinear()
 
-        end_time = time.time()
-        # self.opt_result['runtime'] = end_time - start_time
-        # self.opt_result['exit_status'] = 'SUCCESS'
+        # end_time = time.time()
 
         self.iter_count += 1
         return False
