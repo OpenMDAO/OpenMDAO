@@ -9,7 +9,7 @@ additional MPI capability.
 import sys
 import json
 import signal
-from distutils.version import LooseVersion
+from packaging import version
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -346,7 +346,7 @@ class pyOptSparseDriver(Driver):
                                  lower=meta['lower'], upper=meta['upper'])
 
         if not hasattr(pyoptsparse, '__version__') or \
-           LooseVersion(pyoptsparse.__version__) < LooseVersion('2.5.1'):
+           version.parse(pyoptsparse.__version__) < version.parse('2.5.1'):
             opt_prob.finalizeDesignVariables()
         else:
             opt_prob.finalize()

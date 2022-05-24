@@ -657,8 +657,8 @@ class ExplCompTestCase(unittest.TestCase):
             'threshold': 1000,
         }
 
-        from distutils.version import LooseVersion
-        if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+        from packaging import version
+        if version.parse(np.__version__) >= version.parse("1.14"):
             opts['legacy'] = '1.13'
 
         with printoptions(**opts):

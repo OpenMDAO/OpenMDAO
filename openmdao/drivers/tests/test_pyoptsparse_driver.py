@@ -3,7 +3,7 @@
 import copy
 import unittest
 
-from distutils.version import LooseVersion
+from packaging import version
 
 import numpy as np
 
@@ -1751,7 +1751,7 @@ class TestPyoptSparse(unittest.TestCase):
 
     # Travis testing core dumps on many of the machines. Probabaly a build problem with the NSGA source.
     # Limiting this to the single travis 1.14 machine for now.
-    @unittest.skipUnless(LooseVersion(np.__version__) >= LooseVersion("1.13"), "numpy >= 1.13 is required.")
+    @unittest.skipUnless(version.parse(np.__version__) >= version.parse("1.13"), "numpy >= 1.13 is required.")
     def test_initial_run_NSGA2(self):
         _, local_opt = set_pyoptsparse_opt('NSGA2')
         if local_opt != 'NSGA2':
@@ -1833,7 +1833,7 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertNotEqual(comp.visited_points[1], 1.0)
 
     # Seems to be a bug in numpy 1.12, fixed in later versions.
-    @unittest.skipUnless(LooseVersion(np.__version__) >= LooseVersion("1.13"), "numpy >= 1.13 is required.")
+    @unittest.skipUnless(version.parse(np.__version__) >= version.parse("1.13"), "numpy >= 1.13 is required.")
     def test_initial_run_ALPSO(self):
         _, local_opt = set_pyoptsparse_opt('ALPSO')
         if local_opt != 'ALPSO':
@@ -1945,7 +1945,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         import pyoptsparse
         if not hasattr(pyoptsparse, '__version__') or \
-           LooseVersion(pyoptsparse.__version__) < LooseVersion('1.1.0'):
+           version.parse(pyoptsparse.__version__) < version.parse('1.1.0'):
             raise unittest.SkipTest("pyoptsparse needs to be updated to 1.1.0")
 
         class ParaboloidSIG(om.ExplicitComponent):
