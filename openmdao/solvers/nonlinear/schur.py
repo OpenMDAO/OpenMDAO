@@ -243,29 +243,32 @@ class SchurSolver(NonlinearSolver):
         J21 = my_asm_jac["group2.comp2.x2", "group2.comp2.x1"][0]
         J22 = my_asm_jac["group2.comp2.x2", "group2.comp2.x2"][0]
 
-        R1 = system._residuals['group1.x1'][0]
+        # the R1 should already be zero from the solve subsystems call
+        # R1 = system._residuals['group1.x1'][0]
         R2 = system._residuals['group2.x2'][0]
 
         # compute the RHS for x2
-        rhs2 = -R2 + J21 * (1. / J11) * R1
+        # because R1 is zero, we dont need to add its contribution here!
+        rhs2 = -R2  # + J21 * (1. / J11) * R1
 
         # compute the LHS for x2
+        # this is the tricky bit, we need to modify the jacobian of the system we are solving for,
+        # using the information from the other subsystem (J11) and their coupling (J12 and J21)
         lhs2 = J22 - J21 * (1. / J11) * J12
 
         # update for x2
+        # this will be replaced by a solve linear call
         dx2 = rhs2 / lhs2
 
         # RHS for x1
-        rhs1 = -R1 - J12 * dx2
-        lhs1 = J11
+        # again, no need to solve for x1, we want to purely rely on the subsystem solve  for that
+        # rhs1 = -R1 - J12 * dx2
+        # lhs1 = J11
+        # dx1 = rhs1 / lhs1
+        # system._outputs["group1.x1"] += dx1
 
-        dx1 = rhs1 / lhs1
-
-        # take the updates
-        system._outputs["group1.x1"] += dx1
+        # take the update for x2. this will include a line search as well!
         system._outputs["group2.x2"] += dx2
-
-        # quit()
 
         # # invert the jacobian
         # self._linearize()
@@ -274,7 +277,6 @@ class SchurSolver(NonlinearSolver):
         # self.linear_solver.solve(['linear'], 'fwd')
 
         # # instead of solving it directly, we do a schur complement thing!
-
 
         # # take the update
         # if self.linesearch:
