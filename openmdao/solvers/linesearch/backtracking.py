@@ -347,7 +347,6 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         Perform the operations in the iteration loop.
         """
         self._analysis_error_raised = False
-        system = self._system()
 
         # Hybrid newton support.
         if self._do_subsolve and self._iter_count > 0:
