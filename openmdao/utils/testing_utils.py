@@ -1,7 +1,8 @@
 """Define utils for use in testing."""
-import json
-import functools
 import builtins
+import functools
+import inspect
+import json
 
 import numpy as np
 
@@ -212,3 +213,36 @@ class MissingImports(object):
             Traceback object.
         """
         builtins.__import__ = self._cached_import
+
+
+def get_unittest_info():
+    """
+    Get the name of the unittest file, class, and function this code is being run under.
+
+    Returns
+    -------
+    test_filename: str
+        The filename containing the unittest being run.
+    test_class: str
+        The class containing the unittest being run.
+    test_function: str
+        The name of the unittest function being run.
+    """
+    function_file_class_str = None
+
+    current_stack = inspect.stack()
+    for stack_frame in current_stack:
+        if stack_frame.function.startswith('test_'):  # TODO should do this in a more robust way
+            if 'self' in stack_frame.frame.f_locals:
+                function_file_class_str = str(stack_frame.frame.f_locals['self'])
+                break
+
+    if function_file_class_str:
+        test_function, the_rest = function_file_class_str.split(' ')
+        filename_and_test_class = the_rest[1:-1].split('.')
+        test_filename = filename_and_test_class[-2]
+        test_class = filename_and_test_class[-1]
+    else:
+        test_filename = test_class = test_function = ""
+
+    return test_filename, test_class, test_function
