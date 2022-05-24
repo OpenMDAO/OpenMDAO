@@ -59,7 +59,7 @@ class BroydenSolver(NonlinearSolver):
         Flag that becomes True when Broyden detects it needs to recompute the inverse Jacobian.
     """
 
-    SOLVER = 'BROYDEN'
+    SOLVER = 'NL: Broyden'
 
     def __init__(self, **kwargs):
         """
