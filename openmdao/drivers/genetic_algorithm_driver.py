@@ -511,6 +511,8 @@ class SimpleGADriver(Driver):
                     elif (con['equals'] is not None) and np.any(np.abs(con['equals']) < almost_inf):
                         diff = val - con['equals']
                         violation = np.absolute(diff)
+                    else:
+                        violation = np.zeros(val.shape)
                     constraint_violations = np.hstack((constraint_violations, violation))
                 fun = obj + penalty * sum(np.power(constraint_violations, exponent))
             # Record after getting obj to assure they have

@@ -667,6 +667,35 @@ class TestConstrainedDifferentialEvolution(unittest.TestCase):
         assert_near_equal(p.get_val('exec.z')[0], -900)
         assert_near_equal(p.get_val('exec.z')[50], -1000)
 
+    def test_inf_constraints(self):
+        from openmdao.core.constants import INF_BOUND
+
+        prob = om.Problem()
+        prob.model.add_subsystem('parab', Paraboloid(), promotes_inputs=['x', 'y'])
+
+        # define the component whose output will be constrained
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
+
+        # Design variables 'x' and 'y' span components, so we need to provide a common initial
+        # value for them.
+        prob.model.set_input_defaults('x', 3.0)
+        prob.model.set_input_defaults('y', -4.0)
+
+        # setup the optimization
+        prob.driver = om.DifferentialEvolutionDriver()
+
+        prob.model.add_design_var('x', lower=-INF_BOUND, upper=INF_BOUND)
+        prob.model.add_design_var('y', lower=-INF_BOUND, upper=INF_BOUND)
+        prob.model.add_objective('parab.f_xy')
+
+        # to add the constraint to the model
+        prob.model.add_constraint('const.g', lower=-INF_BOUND, upper=INF_BOUND)
+
+        prob.setup()
+
+        # just check that it doesn't fail due to INF_BOUNDs
+        prob.run_driver()
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITestDifferentialEvolution(unittest.TestCase):
