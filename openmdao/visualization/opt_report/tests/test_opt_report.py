@@ -76,10 +76,19 @@ class TestOptimizationReport(unittest.TestCase):
                                           )
         opt_report(self.prob)
 
-    def test_opt_report_scipyopt(self):
+    def test_opt_report_scipyopt_SLSQP(self):
         self.setup_problem_and_run_driver(om.ScipyOptimizeDriver,
                                           vars_lower=-50, vars_upper=50.,
                                           cons_lower=0, cons_upper=10.,
+                                          optimizer='SLSQP',
+                                          )
+        opt_report(self.prob)
+
+    def test_opt_report_scipyopt_COBYLA(self):
+        self.setup_problem_and_run_driver(om.ScipyOptimizeDriver,
+                                          vars_lower=-50, vars_upper=50.,
+                                          cons_lower=0, cons_upper=10.,
+                                          optimizer='COBYLA',
                                           )
         opt_report(self.prob)
 
