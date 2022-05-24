@@ -833,8 +833,12 @@ class Driver(object):
     def _post_run(self):
         self.opt_result['runtime'] = time.time() - self._start_time
         self.opt_result['iter_count'] = self.iter_count
-        self.opt_result['obj_calls'] = self.get_driver_objective_calls()
-        self.opt_result['deriv_calls'] = self.get_driver_derivative_calls()
+        objective_calls = self.get_driver_objective_calls()
+        if objective_calls:
+            self.opt_result['obj_calls'] = objective_calls if objective_calls else 'Unknown'
+        derivative_calls = self.get_driver_derivative_calls()
+        if derivative_calls:
+            self.opt_result['deriv_calls'] = derivative_calls if derivative_calls else 'Unknown'
         self.opt_result['exit_status'] = self.get_exit_status()
 
     def run(self):
