@@ -8,7 +8,6 @@ from numpy import ndim
 
 from openmdao.utils.name_maps import prom_name2abs_name
 from openmdao.utils.indexer import Indexer, indexer
-from openmdao.utils.array_utils import array_hash
 
 
 _full_slice = slice(None)
@@ -424,8 +423,8 @@ class Vector(object):
         root_vector : <Vector> or None
             the root's vector instance or None, if we are at the root.
         """
-        raise NotImplementedError('_initialize_data not defined for vector type %s' %
-                                  type(self).__name__)
+        raise NotImplementedError('_initialize_data not defined for vector type '
+                                  f'{type(self).__name__}')
 
     def _initialize_views(self):
         """
@@ -433,8 +432,8 @@ class Vector(object):
 
         Must be implemented by the subclass.
         """
-        raise NotImplementedError('_initialize_views not defined for vector type %s' %
-                                  type(self).__name__)
+        raise NotImplementedError('_initialize_views not defined for vector type '
+                                  f'{type(self).__name__}')
 
     def __iadd__(self, vec):
         """
@@ -447,8 +446,7 @@ class Vector(object):
         vec : <Vector>
             vector to add to self.
         """
-        raise NotImplementedError('__iadd__ not defined for vector type %s' %
-                                  type(self).__name__)
+        raise NotImplementedError(f'__iadd__ not defined for vector type {type(self).__name__}')
 
     def __isub__(self, vec):
         """
@@ -461,8 +459,7 @@ class Vector(object):
         vec : <Vector>
             vector to subtract from self.
         """
-        raise NotImplementedError('__isub__ not defined for vector type %s' %
-                                  type(self).__name__)
+        raise NotImplementedError(f'__isub__ not defined for vector type {type(self).__name__}')
 
     def __imul__(self, val):
         """
@@ -475,8 +472,7 @@ class Vector(object):
         val : int or float
             scalar to multiply self.
         """
-        raise NotImplementedError('__imul__ not defined for vector type %s' %
-                                  type(self).__name__)
+        raise NotImplementedError(f'__imul__ not defined for vector type {type(self).__name__}')
 
     def add_scal_vec(self, val, vec):
         """
@@ -491,8 +487,8 @@ class Vector(object):
         vec : <Vector>
             This vector times val is added to self.
         """
-        raise NotImplementedError('add_scale_vec not defined for vector type %s' %
-                                  type(self).__name__)
+        raise NotImplementedError('add_scale_vec not defined for vector type '
+                                  f'{ype(self).__name__}')
 
     def asarray(self, copy=False):
         """
@@ -510,8 +506,7 @@ class Vector(object):
         ndarray
             Array representation of this vector.
         """
-        raise NotImplementedError('asarray not defined for vector type %s' %
-                                  type(self).__name__)
+        raise NotImplementedError(f'asarray not defined for vector type {type(self).__name__}')
         return None  # silence lint warning
 
     def iscomplex(self):
@@ -525,8 +520,7 @@ class Vector(object):
         bool
             True if this vector contains complex values.
         """
-        raise NotImplementedError('iscomplex not defined for vector type %s' %
-                                  type(self).__name__)
+        raise NotImplementedError(f'iscomplex not defined for vector type {type(self).__name__}')
         return False  # silence lint warning
 
     def set_vec(self, vec):
@@ -540,8 +534,7 @@ class Vector(object):
         vec : <Vector>
             The vector whose values self is set to.
         """
-        raise NotImplementedError('set_vec not defined for vector type %s' %
-                                  type(self).__name__)
+        raise NotImplementedError(f'set_vec not defined for vector type {type(self).__name__}')
 
     def set_val(self, val, idxs=_full_slice):
         """
@@ -556,8 +549,7 @@ class Vector(object):
         idxs : int or slice or tuple of ints and/or slices
             The locations where the data array should be updated.
         """
-        raise NotImplementedError('set_arr not defined for vector type %s' %
-                                  type(self).__name__)
+        raise NotImplementedError(f'set_arr not defined for vector type {type(self).__name__}')
 
     def set_vals(self, vals):
         """
@@ -660,8 +652,7 @@ class Vector(object):
         vec : <Vector>
             The incoming vector being dotted with self.
         """
-        raise NotImplementedError('dot not defined for vector type %s' %
-                                  type(self).__name__)
+        raise NotImplementedError(f'dot not defined for vector type {type(self).__name__}')
 
     def get_norm(self):
         """
@@ -674,16 +665,15 @@ class Vector(object):
         float
             Norm of this vector.
         """
-        raise NotImplementedError('get_norm not defined for vector type %s' %
-                                  type(self).__name__)
+        raise NotImplementedError(f'get_norm not defined for vector type {type(self).__name__}')
         return None  # silence lint warning about missing return value.
 
     def _in_matvec_context(self):
         """
         Return True if this vector is inside of a matvec_context.
         """
-        raise NotImplementedError('_in_matvec_context not defined for vector type %s' %
-                                  type(self).__name__)
+        raise NotImplementedError('_in_matvec_context not defined for vector type '
+                                  f'{type(self).__name__}')
 
     def set_complex_step_mode(self, active):
         """
@@ -710,7 +700,5 @@ class Vector(object):
         str
             The hash string.
         """
-        if self._data.size == 0:
-            return ''
-        # we must use self._data here because the hashing alg requires array to be C-contiguous
-        return array_hash(self._data, alg)
+        raise NotImplementedError(f'get_hash not defined for vector type {type(self).__name__}')
+        return ''  # silence lint warning about missing return value.

@@ -2568,16 +2568,18 @@ class Group(System):
             self._residuals.set_complex_step_mode(False)
             self._outputs.set_complex_step_mode(False)
 
-        if self._discrete_inputs or self._discrete_outputs:
-            self.guess_nonlinear(self._inputs, self._outputs, self._residuals,
-                                 self._discrete_inputs, self._discrete_outputs)
-        else:
-            self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
+        try:
+            if self._discrete_inputs or self._discrete_outputs:
+                self.guess_nonlinear(self._inputs, self._outputs, self._residuals,
+                                     self._discrete_inputs, self._discrete_outputs)
+            else:
+                self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
+        finally:
 
-        if complex_step:
-            self._inputs.set_complex_step_mode(True)
-            self._residuals.set_complex_step_mode(True)
-            self._outputs.set_complex_step_mode(True)
+            if complex_step:
+                self._inputs.set_complex_step_mode(True)
+                self._residuals.set_complex_step_mode(True)
+                self._outputs.set_complex_step_mode(True)
 
     def guess_nonlinear(self, inputs, outputs, residuals,
                         discrete_inputs=None, discrete_outputs=None):

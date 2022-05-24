@@ -1,9 +1,11 @@
 """Define the default Vector class."""
 from collections import defaultdict
+import hashlib
 import numpy as np
 
 from openmdao.vectors.vector import Vector, _full_slice
 from openmdao.vectors.default_transfer import DefaultTransfer
+from openmdao.utils.array_utils import array_hash
 
 
 class DefaultVector(Vector):
@@ -548,3 +550,22 @@ class DefaultVector(Vector):
         if '_system' in state:
             del state['_system']
         return state
+
+    def get_hash(self, alg=hashlib.sha1):
+        """
+        Return a hash string for the array contained in this Vector.
+
+        Parameters
+        ----------
+        alg : function
+            Algorithm used to generate the hash.  Default is hashlib.sha1.
+
+        Returns
+        -------
+        str
+            The hash string.
+        """
+        if self._data.size == 0:
+            return ''
+        # we must use self._data here because the hashing alg requires array to be C-contiguous
+        return array_hash(self._data, alg)
