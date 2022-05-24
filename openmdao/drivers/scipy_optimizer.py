@@ -231,7 +231,10 @@ class ScipyOptimizeDriver(Driver):
         return nfev
 
     def get_driver_derivative_calls(self):
-        njev = self.result.njev if self.result else 0
+        if self.result and hasattr(self.result, 'njev'):
+            njev = self.result.njev
+        else:
+            njev = None
         return njev
 
     def get_exit_status(self):
