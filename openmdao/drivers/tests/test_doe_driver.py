@@ -438,8 +438,8 @@ class TestDOEDriver(unittest.TestCase):
             for case in cases:
                 writer.writerow([np.ones((2, 2)) * val for _, val in case])
 
-        from packaging import version
-        if version.parse(np.__version__) >= version.parse("1.14"):
+        from packaging.version import Version
+        if Version(np.__version__) >= Version("1.14"):
             opts = {'legacy': '1.13'}
         else:
             opts = {}

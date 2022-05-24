@@ -5,7 +5,7 @@ from io import StringIO
 import sys
 import unittest
 import time
-from packaging import version
+from packaging.version import Version
 
 import numpy as np
 
@@ -499,7 +499,7 @@ class PartialDependGroup(om.Group):
 
 # This one hangs on Travis for numpy 1.12 and we can't reproduce the error anywhere where we can
 # debug it, so we're skipping it for numpy 1.12.
-@unittest.skipUnless(MPI and PETScVector and parse(np.__version__) >= version.parse("1.13"),
+@unittest.skipUnless(MPI and PETScVector and Version(np.__version__) >= Version("1.13"),
                      "MPI, PETSc, and numpy >= 1.13 are required.")
 class ParDerivColorFeatureTestCase(unittest.TestCase):
     N_PROCS = 2

@@ -10,7 +10,7 @@ from numpy.testing import assert_almost_equal
 import scipy
 from io import StringIO
 
-from packaging import version
+from packaging.version import Version
 
 try:
     from parameterized import parameterized
@@ -278,7 +278,7 @@ _ufunc_test_data = {
 
 
 # 'factorial' will raise a RuntimeError or a deprecation warning depending on scipy version
-if version.parse(scipy.__version__) >= version.parse("1.5.0"):
+if Version(scipy.__version__) >= Version("1.5.0"):
     _ufunc_test_data['factorial'] = {
         'str': 'f=factorial(x)',
         'args': {'f': {'val': np.zeros(6)},

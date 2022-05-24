@@ -2985,8 +2985,8 @@ class TestSqliteCaseReader(unittest.TestCase):
             'threshold': 1000,
         }
 
-        from packaging import version
-        if version.parse(np.__version__) >= version.parse("1.14"):
+        from packaging.version import Version
+        if Version(np.__version__) >= Version("1.14"):
             opts['legacy'] = '1.13'
 
         with printoptions(**opts):
