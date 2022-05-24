@@ -228,12 +228,60 @@ class SchurSolver(NonlinearSolver):
         if (my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac):
             my_asm_jac._update(system)
 
-        # take the update
-        if self.linesearch:
-            self.linesearch._do_subsolve = do_subsolve
-            self.linesearch.solve()
-        else:
-            system._outputs += system._vectors['output']['linear']
+        print("States:")
+        print("x1:", system._outputs['group1.x1'], "x2:", system._outputs['group2.x2'])
+
+        print("Residuals:")
+        print("x1:", system._residuals['group1.x1'], "x2:", system._residuals['group2.x2'])
+
+        print("Full Jacobian:")
+        print(my_asm_jac["group1.comp1.x1", "group1.comp1.x1"], my_asm_jac["group1.comp1.x1", "group1.comp1.x2"])
+        print(my_asm_jac["group2.comp2.x2", "group2.comp2.x1"], my_asm_jac["group2.comp2.x2", "group2.comp2.x2"])
+
+        J11 = my_asm_jac["group1.comp1.x1", "group1.comp1.x1"][0]
+        J12 = my_asm_jac["group1.comp1.x1", "group1.comp1.x2"][0]
+        J21 = my_asm_jac["group2.comp2.x2", "group2.comp2.x1"][0]
+        J22 = my_asm_jac["group2.comp2.x2", "group2.comp2.x2"][0]
+
+        R1 = system._residuals['group1.x1'][0]
+        R2 = system._residuals['group2.x2'][0]
+
+        # compute the RHS for x2
+        rhs2 = -R2 + J21 * (1. / J11) * R1
+
+        # compute the LHS for x2
+        lhs2 = J22 - J21 * (1. / J11) * J12
+
+        # update for x2
+        dx2 = rhs2 / lhs2
+
+        # RHS for x1
+        rhs1 = -R1 - J12 * dx2
+        lhs1 = J11
+
+        dx1 = rhs1 / lhs1
+
+        # take the updates
+        system._outputs["group1.x1"] += dx1
+        system._outputs["group2.x2"] += dx2
+
+        # quit()
+
+        # # invert the jacobian
+        # self._linearize()
+
+        # # solve for the newton update
+        # self.linear_solver.solve(['linear'], 'fwd')
+
+        # # instead of solving it directly, we do a schur complement thing!
+
+
+        # # take the update
+        # if self.linesearch:
+        #     self.linesearch._do_subsolve = do_subsolve
+        #     self.linesearch.solve()
+        # else:
+        #     system._outputs += system._vectors['output']['linear']
 
         self._solver_info.pop()
 
