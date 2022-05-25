@@ -366,6 +366,8 @@ class Group(System):
             scope_out = frozenset()
 
             # All inputs connected to an output in this system but not in excl_sub
+            # allins is used to filter out discrete variables that might be found in
+            # self._conn_global_abs_in2out.
             allins = self._var_allprocs_abs2meta['input']
             exvars = excl_sub._var_allprocs_abs2idx
             scope_in = frozenset(abs_in for abs_in, abs_out in self._conn_global_abs_in2out.items()
