@@ -353,9 +353,8 @@ class Group(System):
             pass
 
         if excl_sub is None:
-            # All outputs (including remote ones). A value of None will be interpreted as
-            # 'all locals'.
-            scope_out = frozenset(self._var_allprocs_abs2meta['output']) if MPI else None
+            # A value of None will be interpreted as 'all outputs'.
+            scope_out = None
 
             # All inputs connected to an output in this system
             scope_in = frozenset(self._conn_global_abs_in2out).intersection(

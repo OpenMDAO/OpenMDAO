@@ -1066,7 +1066,7 @@ class BlockLinearSolver(LinearSolver):
         set, None, or _UNDEFINED
             The combined variable 'set'.
         """
-        if slv_vars is None or sys_vars is None:
+        if sys_vars is None or slv_vars is None:
             return None
         if slv_vars is _UNDEFINED:
             return sys_vars
