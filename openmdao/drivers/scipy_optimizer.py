@@ -3,7 +3,6 @@ OpenMDAO Wrapper for the scipy.optimize.minimize family of local optimizers.
 """
 
 import sys
-import time
 from distutils.version import LooseVersion
 
 import numpy as np
@@ -263,12 +262,6 @@ class ScipyOptimizeDriver(Driver):
             String indicating result of driver run.
         """
         return 'FAIL' if self.fail else 'SUCCESS'
-
-    # def _post_run(self):
-    #     super()._post_run()
-    #     self.opt_result['obj_calls'] = self.result.nfev if self.result else 0
-    #     self.opt_result['deriv_calls'] = self.result.njev if self.result else 0
-    #     self.opt_result['exit_status'] = 'FAIL' if self.fail else 'SUCCESS'
 
     def run(self):
         """

@@ -458,7 +458,7 @@ class TestReportsSystem(unittest.TestCase):
                          f'The scaling report file, {str(path)}, was found but should not have')
 
 
-# @use_tempdirs
+@use_tempdirs
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestReportsSystemMPI(unittest.TestCase):
     N_PROCS = 2

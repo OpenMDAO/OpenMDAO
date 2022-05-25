@@ -355,9 +355,8 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
                 min_val = min(vals_dict[name])  # get min. Could be an array
                 # Rounding to match float precision to numpy precision
                 min_val_as_str = _indicate_value_is_derived_from_array(min_val, vals_dict[name])
-                comp = ( vals_dict[name] - meta['lower']) < _ABS_BOUNDS_TOL
+                comp = (vals_dict[name] - meta['lower']) < _ABS_BOUNDS_TOL
                 if np.any(comp):
-                # if np.any(min_val < np.min(meta['lower']) - _ABS_BOUNDS_TOL):
                     row[col_name] = \
                         f'<span style="color:{_out_of_bounds_color_text}">({min_val_as_str})</span>'
                 else:
@@ -366,9 +365,8 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
                 max_val = max(vals_dict[name])
                 max_val_as_str = _indicate_value_is_derived_from_array(max_val, vals_dict[name])
                 # Rounding to match float precision to numpy precision
-                comp = ( meta['upper'] - vals_dict[name] ) < _ABS_BOUNDS_TOL
+                comp = (meta['upper'] - vals_dict[name] ) < _ABS_BOUNDS_TOL
                 if np.any(comp):
-                # if np.any(max_val > meta['upper'] + _ABS_BOUNDS_TOL):
                     row[col_name] = \
                         f'<span style="color:{_out_of_bounds_color_text}">({max_val_as_str})</span>'
                 else:
