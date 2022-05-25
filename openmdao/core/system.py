@@ -752,7 +752,7 @@ class System(object):
                 root_vectors[key][vec_name] = self._vector_class(vec_name, key, self,
                                                                  alloc_complex=alloc_complex)
 
-        if 'linear' in vectypes:
+        if self._use_derivatives:
             root_vectors['input']['linear']._scaling_nl_vec = \
                 root_vectors['input']['nonlinear']._scaling
 
@@ -1827,7 +1827,7 @@ class System(object):
                 vectors[kind][vec_name] = vector_class(
                     vec_name, kind, self, rootvec, alloc_complex=vec_alloc_complex)
 
-        if 'linear' in vectypes:
+        if self._use_derivatives:
             vectors['input']['linear']._scaling_nl_vec = vectors['input']['nonlinear']._scaling
 
         self._inputs = vectors['input']['nonlinear']

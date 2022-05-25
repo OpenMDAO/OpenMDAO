@@ -114,15 +114,14 @@ class LinearBlockGS(BlockLinearSolver):
                 scope_out, scope_in = system._get_matvec_scope(subsys)
                 scope_out = self._vars_union(self._scope_out, scope_out)
                 scope_in = self._vars_union(self._scope_in, scope_in)
+                off = b_vec._root_offset - parent_offset
 
                 if subsys._iter_call_apply_linear():
                     subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+                    b_vec *= -1.0
+                    b_vec += self._rhs_vec[off:off + len(b_vec)]
                 else:
-                    b_vec.set_val(0.0)
-
-                b_vec *= -1.0
-                off = b_vec._root_offset - parent_offset
-                b_vec += self._rhs_vec[off:off + len(b_vec)]
+                    b_vec.set_val(self._rhs_vec[off:off + len(b_vec)])
 
                 subsys._solve_linear(mode, self._rel_systems, scope_out, scope_in)
 

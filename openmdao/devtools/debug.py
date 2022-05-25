@@ -8,7 +8,6 @@ from contextlib import contextmanager
 from collections import Counter
 
 from openmdao.utils.mpi import MPI
-from openmdao.utils.general_utils import env_truthy
 from openmdao.core.constants import _SetupStatus
 from openmdao.utils.om_warnings import issue_warning, MPIWarning
 
