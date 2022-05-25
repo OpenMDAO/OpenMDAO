@@ -112,6 +112,13 @@ class LinearBlockGS(BlockLinearSolver):
                 b_vec = subsys._dresiduals
 
                 scope_out, scope_in = system._get_matvec_scope(subsys)
+                # we use _vars_union to combine relevant variables from the current solve
+                # with those of the subsystem solve, because for recursive block linear solves
+                # we'll be skipping a direct call to _apply_linear and instead counting on
+                # _apply_linear to be called once at the bottom of the recursive block linear
+                # solve on the component, using the full set of relevant variables from the
+                # top group in the block linear solve and all intervening groups (assuming all
+                # of those groups are doing block linear solves).
                 scope_out = self._vars_union(self._scope_out, scope_out)
                 scope_in = self._vars_union(self._scope_in, scope_in)
                 off = b_vec._root_offset - parent_offset
