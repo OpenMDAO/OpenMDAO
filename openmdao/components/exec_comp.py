@@ -901,8 +901,8 @@ except ImportError:
 else:
     _import_functs(scipy.special, _expr_dict, names=['erf', 'erfc'])
 
-    from distutils.version import LooseVersion
-    if LooseVersion(scipy.__version__) >= LooseVersion("1.5.0"):
+    from packaging.version import Version
+    if Version(scipy.__version__) >= Version("1.5.0"):
         def factorial(*args):
             """
             Raise a RuntimeError stating that the factorial function is not supported.

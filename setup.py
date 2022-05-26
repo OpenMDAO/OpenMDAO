@@ -179,7 +179,8 @@ setup(
         'pyDOE2',
         'pyparsing',
         'scipy',
-        'requests'
+        'requests',
+        'packaging'
     ],
     entry_points={
         'console_scripts': [

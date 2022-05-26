@@ -1,7 +1,7 @@
 """ Unit tests for the Driver base class."""
 
 
-from distutils.version import LooseVersion
+from packaging.version import Version
 from io import StringIO
 import sys
 import unittest
@@ -364,7 +364,7 @@ class TestDriver(unittest.TestCase):
 
         try:
             # formatting has changed in numpy 1.14 and beyond.
-            if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+            if Version(np.__version__) >= Version("1.14"):
                 with printoptions(precision=2, legacy="1.13"):
                     prob.run_driver()
             else:
@@ -416,7 +416,7 @@ class TestDriver(unittest.TestCase):
 
         try:
             # formatting has changed in numpy 1.14 and beyond.
-            if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+            if Version(np.__version__) >= Version("1.14"):
                 with printoptions(precision=2, legacy="1.13"):
                     prob.run_driver()
             else:
@@ -448,7 +448,7 @@ class TestDriver(unittest.TestCase):
 
         try:
             # formatting has changed in numpy 1.14 and beyond.
-            if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+            if Version(np.__version__) >= Version("1.14"):
                 with printoptions(precision=2, legacy="1.13"):
                     prob.run_driver()
             else:

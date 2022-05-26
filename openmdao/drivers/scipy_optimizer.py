@@ -3,7 +3,7 @@ OpenMDAO Wrapper for the scipy.optimize.minimize family of local optimizers.
 """
 
 import sys
-from distutils.version import LooseVersion
+from packaging.version import Version
 
 import numpy as np
 from scipy import __version__ as scipy_version
@@ -19,7 +19,7 @@ from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 # Optimizers in scipy.minimize
 _optimizers = {'Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
                'TNC', 'COBYLA', 'SLSQP'}
-if LooseVersion(scipy_version) >= LooseVersion("1.1"):  # Only available in newer versions
+if Version(scipy_version) >= Version("1.1"):  # Only available in newer versions
     _optimizers.add('trust-constr')
 
 # For 'basinhopping' and 'shgo' gradients are used only in the local minimization
@@ -32,7 +32,7 @@ _constraint_optimizers = {'COBYLA', 'SLSQP', 'trust-constr', 'shgo'}
 _constraint_grad_optimizers = _gradient_optimizers & _constraint_optimizers
 _eq_constraint_optimizers = {'SLSQP', 'trust-constr'}
 _global_optimizers = {'differential_evolution', 'basinhopping'}
-if LooseVersion(scipy_version) >= LooseVersion("1.2"):  # Only available in newer versions
+if Version(scipy_version) >= Version("1.2"):  # Only available in newer versions
     _global_optimizers |= {'shgo', 'dual_annealing'}
 
 # Global optimizers and optimizers in minimize
