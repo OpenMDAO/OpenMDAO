@@ -55,7 +55,7 @@ jobs:
           # oldest supported versions
           - NAME: Oldest
             PY: 3.7
-            NUMPY: 1.17
+            NUMPY: 1.19.1
             SCIPY: 1.2
             PETSc: 3.10.2
             PYOPTSPARSE: 'v1.2'
