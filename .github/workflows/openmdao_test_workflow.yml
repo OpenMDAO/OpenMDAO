@@ -325,8 +325,8 @@ jobs:
           # baseline versions
           - NAME: Baseline
             PY: 3
-            NUMPY: 1.18
-            SCIPY: 1.4
+            NUMPY: 1.21
+            SCIPY: 1.6
 
     name: Windows ${{ matrix.NAME }}
 
