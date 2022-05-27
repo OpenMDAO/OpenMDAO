@@ -103,12 +103,12 @@ jobs:
         run: |
           conda install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
 
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
 
           echo "============================================================="
           echo "Install OpenMDAO"
           echo "============================================================="
-          pip install .${{ matrix.OPTIONAL }}
+          python -m pip install .${{ matrix.OPTIONAL }}
 
       - name: Install jax
         if: matrix.JAX
@@ -117,8 +117,7 @@ jobs:
           echo "============================================================="
           echo "Install jax"
           echo "============================================================="
-          pip install jax
-          pip install jaxlib
+          python -m pip install jax jaxlib
 
       - name: Install libscotch
         if: matrix.name == 'Oldest'
@@ -197,13 +196,22 @@ jobs:
           echo "============================================================="
           echo "Install additional packages for testing/coverage"
           echo "============================================================="
-          pip install psutil objgraph git+https://github.com/mdolab/pyxdsm
+          python -m pip install psutil objgraph git+https://github.com/mdolab/pyxdsm
 
       - name: Display conda info
         shell: bash -l {0}
         run: |
           conda info
           conda list
+
+      - name: Audit dependencies
+        shell: bash -l {0}
+        run: |
+          python -m pip install pip-audit
+          echo "============================================================="
+          echo "Scan environment for packages with known vulnerabilities"
+          echo "============================================================="
+          python -m pip-audit
 
       - name: Run tests
         shell: bash -l {0}
@@ -226,7 +234,7 @@ jobs:
           echo "Submit coverage"
           echo "============================================================="
           cp $HOME/.coverage .
-          pip install coveralls
+          python -m pip install coveralls
           SITE_DIR=`python -c 'import site; print(site.getsitepackages()[-1])'`
           coveralls --basedir $SITE_DIR
 
@@ -290,12 +298,12 @@ jobs:
         id: bandit
         shell: bash -l {0}
         run: |
-          pip install bandit
+          python -m pip install bandit
           echo "============================================================="
           echo "Run bandit scan for high/medium severity issues"
           echo "============================================================="
           cd $GITHUB_WORKSPACE
-          bandit -c bandit.yml -ll -r openmdao
+          python -m bandit -c bandit.yml -ll -r openmdao
 
       - name: Notify slack
         uses: act10ns/slack@v1
@@ -351,12 +359,12 @@ jobs:
         run: |
           conda install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
 
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
 
           echo "============================================================="
           echo "Install OpenMDAO"
           echo "============================================================="
-          pip install .[all]
+          python -m pip install .[all]
 
       - name: Install optional dependencies
         shell: pwsh
@@ -364,7 +372,7 @@ jobs:
           echo "============================================================="
           echo "Install additional packages for testing/coverage"
           echo "============================================================="
-          pip install psutil objgraph git+https://github.com/mdolab/pyxdsm
+          python -m pip install psutil objgraph git+https://github.com/mdolab/pyxdsm
 
       - name: Display conda info
         shell: pwsh
@@ -393,7 +401,7 @@ jobs:
           echo "Submit coverage"
           echo "============================================================="
           copy $HOME\.coverage .
-          pip install coveralls
+          python -m pip install coveralls
           $SITE_DIR=python -c "import site; print(site.getsitepackages()[-1].replace('lib\\site-', 'Lib\\site-'))"
           coveralls --basedir $SITE_DIR
 
