@@ -1,7 +1,7 @@
 """A module containing various configuration checks for an OpenMDAO Problem."""
 
 from collections import defaultdict
-from distutils.version import LooseVersion
+from packaging.version import Version
 
 import numpy as np
 import pickle
@@ -24,7 +24,7 @@ from openmdao.utils.om_warnings import issue_warning, SetupWarning
 _UNSET = object()
 
 # numpy default print options changed in 1.14
-if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+if Version(np.__version__) >= Version("1.14"):
     _npy_print_opts = {'legacy': '1.13'}
 else:
     _npy_print_opts = {}

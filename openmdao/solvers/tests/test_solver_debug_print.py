@@ -7,7 +7,7 @@ import shutil
 import tempfile
 
 import unittest
-from distutils.version import LooseVersion
+from packaging.version import Version
 from io import StringIO
 
 import numpy as np
@@ -124,7 +124,7 @@ class TestNonlinearSolvers(unittest.TestCase):
 
         opts = {}
         # formatting has changed in numpy 1.14 and beyond.
-        if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+        if Version(np.__version__) >= Version("1.14"):
             opts["legacy"] = '1.13'
 
         with printoptions(**opts):
@@ -170,7 +170,7 @@ class TestNonlinearSolvers(unittest.TestCase):
 
         opts = {}
         # formatting has changed in numpy 1.14 and beyond.
-        if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+        if Version(np.__version__) >= Version("1.14"):
             opts["legacy"] = '1.13'
 
         with printoptions(**opts):

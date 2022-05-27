@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 from io import StringIO
 
-from distutils.version import LooseVersion
+from packaging.version import Version
 
 import openmdao.api as om
 
@@ -257,7 +257,7 @@ class DistributedListVarsTest(unittest.TestCase):
     def test_parallel_list_vars(self):
         print_opts = {'linewidth': 1024, 'precision': 1}
 
-        if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+        if Version(np.__version__) >= Version("1.14"):
             print_opts['legacy'] = '1.13'
 
         prob = om.Problem(FanOutGrouped())
@@ -411,7 +411,7 @@ class DistributedListVarsTest(unittest.TestCase):
     def test_distribcomp_list_vars(self):
         print_opts = {'linewidth': 1024}
 
-        if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+        if Version(np.__version__) >= Version("1.14"):
             print_opts['legacy'] = '1.13'
 
         size = 15

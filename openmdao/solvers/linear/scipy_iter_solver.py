@@ -1,6 +1,6 @@
 """Define the scipy iterative solver class."""
 
-from distutils.version import LooseVersion
+from packaging.version import Version
 import numpy as np
 import scipy
 from scipy.sparse.linalg import LinearOperator, gmres
@@ -219,7 +219,7 @@ class ScipyKrylov(LinearSolver):
 
         self._iter_count = 0
         if solver is gmres:
-            if LooseVersion(scipy.__version__) < LooseVersion("1.1"):
+            if Version(scipy.__version__) < Version("1.1"):
                 x, info = solver(linop, b_vec.asarray(True), M=M, restart=restart,
                                  x0=x_vec_combined, maxiter=maxiter, tol=atol,
                                  callback=self._monitor)
