@@ -1,3 +1,4 @@
+import os
 import unittest
 
 import numpy as np
@@ -19,8 +20,13 @@ from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
 
+try:
+    from tabulate import tabulate
+except ImportError:
+    tabulate = None
 
 @use_tempdirs
+@unittest.skipIf(tabulate is None, reason="package 'tabulate' is not installed")
 class TestOptimizationReport(unittest.TestCase):
 
     def setup_problem_and_run_driver(self, driver,
@@ -29,10 +35,9 @@ class TestOptimizationReport(unittest.TestCase):
                                      final_setup_only=False,
                                      optimizer=None
                                      ):
-        # build a simple model that can be used for testing the reports with different Drivers
+        # build a simple model that can be used for testing opt reports with different optimizers
         self.prob = prob = om.Problem()
         prob.model.add_subsystem('parab', Paraboloid(), promotes_inputs=['x', 'y'])
-
         prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
 
         prob.model.set_input_defaults('x', 3.0)
@@ -68,6 +73,15 @@ class TestOptimizationReport(unittest.TestCase):
         prob.model.add_objective('obj')
 
         return prob
+
+    def test_opt_report_check_file_created(self):
+        self.setup_problem_and_run_driver(Driver,
+                                          vars_lower=-50, vars_upper=50.,
+                                          cons_lower=-1,
+                                          )
+        opt_report(self.prob)
+        report_filepath = f"reports/{self.prob._name}/opt_report.html"
+        self.assertTrue(os.path.exists(report_filepath))
 
     # First test all the different Drivers
     def test_opt_report_run_once_driver(self):

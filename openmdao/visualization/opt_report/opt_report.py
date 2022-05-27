@@ -11,10 +11,8 @@ import time
 
 import numpy as np
 import matplotlib as mpl
-
-from matplotlib import pyplot as plt, patches
-
-from openmdao.utils.testing_utils import get_unittest_info
+from matplotlib import pyplot as plt
+from matplotlib import patches
 
 try:
     from tabulate import tabulate
@@ -32,16 +30,17 @@ _optimizer_report_template = 'opt_report_template.html'
 MAX_VARNAME_LENGTH = 48
 
 # value tolerances
-_ABS_BOUNDS_TOL = 1.0E-4
+_bounds_tolerance = 1.0E-4
+_near_bounds_tolerance = 1.0E-4
 _equality_constraint_tolerance = 1e-4
 
 # Colors
-# from https://jfly.uni-koeln.de/color/ some colorblind friendly colors
-_out_of_bounds_color_text = 'rgb(213, 94, 0)'
+#     from https://jfly.uni-koeln.de/color/ some colorblind friendly colors
+_out_of_bounds_test_color = 'rgb(213, 94, 0)'
 _out_of_bounds_plot_color = (0.83529, 0.36862, 0.)
 _out_of_bounds_plot_alpha = 0.2
 
-_out_of_bounds_hatch_pattern = 'xxxxx'
+_out_of_bounds_plot_hatch_pattern = 'xxxxx'
 _out_of_bounds_constraint_visual_hatch_pattern = 'xxxxxxxxx'
 
 _out_of_bounds_hatch_color = (0., 0., 0.)
@@ -52,18 +51,16 @@ _in_bounds_plot_alpha = 0.2
 _in_bounds_constraint_visual_alpha = 0.2
 
 _value_plot_color = 'black'
+_plot_marker_size = 0.1
+_plot_value_linewidth = 0.5
+_equality_constraint_dot_size = 3
 
-# overall image parameters
+# overall image parameters and layout
 _sparkline_figsize = (3, .5)
 _scalar_visual_figsize = (2.0, .2)
 _plot_dpi = 150
 _plot_pad_inches = 0
-
-# plotting layout
 _plot_padding_fraction = 0.2
-_plot_marker_size = 0.1
-_plot_value_linewidth = 0.5
-_equality_constraint_dot_size = 3
 
 # Font sizes
 _sparkline_font_size = 7
@@ -88,7 +85,7 @@ _near_bound_highlight_half_width_y_min = 0.0
 _near_bound_highlight_half_width_y_max = _plot_y_max
 _near_bound_highlight_alpha = 0.7
 _equality_bound_width = 0.01
-# For the ellipsis that are used then scalar is way outside of bounds
+# For the ellipsis that are displayed when scalar is way outside of bounds
 _ellipsis_x_offset = 0.2
 _ellipse_width = 0.01
 _ellipse_height = 0.15
@@ -110,10 +107,36 @@ def opt_report(prob, outfile=None):
     if MPI and MPI.COMM_WORLD.rank != 0:
         return
 
-    driver_scaling = True
-
     if not outfile:
         outfile = _default_optimizer_report_filename
+
+    if not tabulate:
+        s = '''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Optimization Report - Unable to Generate</title>
+</head>
+<body>
+
+<p>The optimization report requires the tabulate package but it is not currently installed.</p>
+
+<p>To install the tablulate module:</p>
+
+<code>
+pip install tabulate
+</code>
+
+</body>
+</html>
+        '''
+        with open(outfile, 'w') as f:
+            f.write(s)
+
+        return
+
+    driver_scaling = True
 
     # Collect data from the problem
     abs2prom = prob.model._var_abs2prom
@@ -154,9 +177,6 @@ def opt_report(prob, outfile=None):
                 else:
                     raise ValueError("Absolute name of var was expected to be the alias")  # TODO ??
             else:
-                # prom_name = abs2prom['input'][abs_name] if abs_name in abs2prom['input'] else \
-                #             abs2prom['output'][abs_name]
-
                 if abs_name in abs2prom['input']:
                     prom_name = abs2prom['input'][abs_name]
                 elif abs_name in abs2prom['output']:
@@ -164,8 +184,8 @@ def opt_report(prob, outfile=None):
                 else:
                     continue
 
-            cons_vals[prom_name] = prob.driver.get_constraint_values(driver_scaling=driver_scaling)[
-                abs_name]
+            cons_vals[prom_name] = \
+                prob.driver.get_constraint_values(driver_scaling=driver_scaling)[abs_name]
 
     header_html = _make_header_table(prob)
 
@@ -242,7 +262,7 @@ def _make_opt_value_table(driver):
     Returns
     -------
     str
-        HTML table that displays optimizer settings info.
+        HTML table that displays driver settings info.
     """
     opt_settings = []
     for key, meta in driver.options.items():
@@ -260,6 +280,23 @@ def _make_opt_value_table(driver):
 
 def _make_obj_table(objs_meta, objs_vals,
                     cols=['size', 'index', 'val', 'ref', 'ref0', 'adder', 'scaler', 'units']):
+    """
+    Make a table of info about the objective.
+
+    Parameters
+    ----------
+    objs_meta : dict
+        Dictionary of metadata about the objectives.
+    objs_vals : dict
+        Dictionary of values for the objectives.
+    cols : list
+        List of columns to be displayed in the table.
+
+    Returns
+    -------
+    str
+        An HTML image tag containing the table holding the info about the variable.
+    """
     _col_names = cols if cols is not None else []
     col_names = ['name'] + _col_names
 
@@ -313,7 +350,6 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
     -------
     str
         An HTML image tag containing the table holding the info about the variable.
-
     """
     _col_names = cols if cols is not None else []
     col_names = ['name', 'alias', 'size'] + _col_names
@@ -334,8 +370,8 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
         if alias:
             name = meta['name']
 
-        # the scipy optimizer when using COBYLA creates constraints under the hood
-        #  but the values are not given by the driver, so use this as a sign that this
+        # the scipy optimizer, when using COBYLA, creates constraints under the hood.
+        #  But the values are not given by the driver, so use this as a sign that this
         #  variable should be skipped
         if name not in vals_dict:
             continue
@@ -353,22 +389,20 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
                 row[col_name] = _indicate_value_is_derived_from_array(mean_val, vals_dict[name])
             elif col_name == 'min':
                 min_val = min(vals_dict[name])  # get min. Could be an array
-                # Rounding to match float precision to numpy precision
                 min_val_as_str = _indicate_value_is_derived_from_array(min_val, vals_dict[name])
-                comp = (vals_dict[name] - meta['lower']) < _ABS_BOUNDS_TOL
+                comp = (vals_dict[name] - meta['lower']) < _bounds_tolerance
                 if np.any(comp):
                     row[col_name] = \
-                        f'<span style="color:{_out_of_bounds_color_text}">({min_val_as_str})</span>'
+                        f'<span style="color:{_out_of_bounds_test_color}">({min_val_as_str})</span>'
                 else:
                     row[col_name] = min_val_as_str
             elif col_name == 'max':
                 max_val = max(vals_dict[name])
                 max_val_as_str = _indicate_value_is_derived_from_array(max_val, vals_dict[name])
-                # Rounding to match float precision to numpy precision
-                comp = (meta['upper'] - vals_dict[name] ) < _ABS_BOUNDS_TOL
+                comp = (meta['upper'] - vals_dict[name]) < _bounds_tolerance
                 if np.any(comp):
                     row[col_name] = \
-                        f'<span style="color:{_out_of_bounds_color_text}">({max_val_as_str})</span>'
+                        f'<span style="color:{_out_of_bounds_test_color}">({max_val_as_str})</span>'
                 else:
                     row[col_name] = max_val_as_str
             elif col_name == 'lower':
@@ -399,10 +433,11 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
                     else:
                         row[col_name] = meta_dict[name][col_name]
             elif col_name == 'visual':
-                if meta['size'] > 1:
-                    row['visual'] = _sparkline(meta=meta, val=vals_dict[name], kind=kind)
-                else:
+                val = vals_dict[name]
+                if np.isscalar(val) or val.shape == (1,):
                     row['visual'] = _constraint_plot(meta=meta, val=vals_dict[name], kind=kind)
+                else:
+                    row['visual'] = _sparkline(meta=meta, val=vals_dict[name], kind=kind)
             elif col_name == 'size':
                 row[col_name] = int(meta[col_name])  # sometimes size in the meta data is a numpy
                 # array so tabulate does different formatting for that
@@ -455,12 +490,17 @@ def _sparkline(kind, meta, val, width=300):
     ax.tick_params(axis='x', labelsize=_sparkline_font_size)
     ax.tick_params(axis='y', labelsize=_sparkline_font_size)
 
-    if kind == 'desvar':
-        _desvar_or_ineq_constraint_sparkline(ax, meta, val)
-    elif 'equals' not in meta or meta['equals'] is None:
-        _desvar_or_ineq_constraint_sparkline(ax, meta, val)
-    else:
-        _eq_constraint_sparkline(ax, meta, val)
+    try:
+        if kind == 'desvar':
+            _desvar_or_ineq_constraint_sparkline(ax, meta, val)
+        elif 'equals' not in meta or meta['equals'] is None:
+            _desvar_or_ineq_constraint_sparkline(ax, meta, val)
+        else:
+            _eq_constraint_sparkline(ax, meta, val)
+    except (ValueError, IndexError):
+        mpl.use(_backend)  # set it back
+        plt.close()
+        return '<span class="plot-unavailable">Plot unavailable</span>'
 
     tmpfile = io.BytesIO()
     fig.patch.set_alpha(0.0)  # So that the figures are transparent
@@ -476,13 +516,13 @@ def _sparkline(kind, meta, val, width=300):
 
 def _desvar_or_ineq_constraint_sparkline(ax, meta, val):
     """
-    Use matplotlib plot a visual showing the values of the desvar or constraint and any bounds.
+    Use matplotlib to plot a visual showing the values of the desvar or constraint and any bounds.
 
     Parameters
     ----------
     ax : Matplotlib Axes instance
         Contains most of the figure elements.
-    meta : Matplotlib Axes instance
+    meta : dict
         The metadata associated with the design variable.
     val : np.array
         The value of the design variable.
@@ -543,13 +583,13 @@ def _desvar_or_ineq_constraint_sparkline(ax, meta, val):
     # plot lower area, if exists
     if not (isinstance(meta['lower'], float) and meta['lower'] == -INF_BOUND):
         ax.fill_between(ar, ymin_plot, _lower, color=_out_of_bounds_plot_color,
-                        hatch=_out_of_bounds_hatch_pattern, alpha=_out_of_bounds_plot_alpha)
+                        hatch=_out_of_bounds_plot_hatch_pattern, alpha=_out_of_bounds_plot_alpha)
         ax.plot(ar, _lower, color=_out_of_bounds_plot_color, linewidth=_plot_value_linewidth)
 
     # plot upper area, if exists
     if not (isinstance(meta['upper'], float) and meta['upper'] == INF_BOUND):
         ax.fill_between(ar, _upper, ymax_plot, color=_out_of_bounds_plot_color,
-                        hatch=_out_of_bounds_hatch_pattern, alpha=_out_of_bounds_plot_alpha)
+                        hatch=_out_of_bounds_plot_hatch_pattern, alpha=_out_of_bounds_plot_alpha)
         ax.plot(ar, _upper, color=_out_of_bounds_plot_color, linewidth=_plot_value_linewidth)
 
     # Plot area where bounds are satisfied
@@ -564,7 +604,7 @@ def _eq_constraint_sparkline(ax, meta, val):
     ----------
     ax : Matplotlib Axes instance
         Contains most of the figure elements.
-    meta : Matplotlib Axes instance
+    meta : dict
         The metadata associated with the variables, including info about the constraint.
     val : np.array
         The value of the variable.
@@ -606,7 +646,6 @@ def _eq_constraint_sparkline(ax, meta, val):
     ax.plot(ar, _equals, color=_value_plot_color, linewidth=_plot_value_linewidth)
 
     # plot the actual values as dots colored by whether they satisfy the constraint
-    # Color the value points based on whether they satisfy the equality constraint
     err = _val - _equals
     colors = []
     for e in err:
@@ -641,7 +680,8 @@ def _constraint_plot(kind, meta, val, width=300):
         An HTML image tag containing the encoded sparkline image.
     """
     if not (np.isscalar(val) or val.shape == (1,)):
-        raise ValueError("Value for the _constraint_plot function must be a scalar")
+        raise ValueError("Value for the _constraint_plot function must be a "
+                         f"scalar. Variable {meta['name']} is not a scalar")
 
     if kind == 'desvar' and meta['upper'] == INF_BOUND and meta['lower'] == -INF_BOUND:
         return   # nothing to plot
@@ -670,8 +710,6 @@ def _constraint_plot(kind, meta, val, width=300):
         return html
 
     _backend = mpl.get_backend()
-    # plt.style.use('default')
-    # plt.autoscale(False)
     mpl.use('Agg')
 
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=_scalar_visual_figsize, dpi=_plot_dpi)
@@ -831,7 +869,7 @@ def var_bounds_plot(kind, ax, value, lower, upper):
         _draw_boundary_label(ax, _plot_x_max / 2,
                              "lower = " + f"{lower:{_variable_label_format}}".strip())
 
-        if abs(value - lower) < _ABS_BOUNDS_TOL:
+        if abs(value - lower) < _near_bounds_tolerance:
             pointer_plot_coord = _plot_x_max / 2
             _draw_bound_highlight(ax, _plot_x_max / 2)
             pointer_color = _in_bounds_plot_color
@@ -850,7 +888,7 @@ def var_bounds_plot(kind, ax, value, lower, upper):
         _draw_boundary_label(ax, _plot_x_max / 2,
                              "upper = " + f"{upper:{_variable_label_format}}".strip())
 
-        if abs(value - upper) < _ABS_BOUNDS_TOL:  # value is close to bound
+        if abs(value - upper) < _near_bounds_tolerance:  # value is close to bound
             pointer_plot_coord = _plot_x_max / 2
             _draw_bound_highlight(ax, _plot_x_max / 2)
             pointer_color = _in_bounds_plot_color
@@ -888,9 +926,9 @@ def var_bounds_plot(kind, ax, value, lower, upper):
     _draw_boundary_label(ax, func_val_to_plot_coord(upper), str(upper))
 
     # add highlight if value near a bound
-    if abs(value - lower) / abs(upper - lower) < _ABS_BOUNDS_TOL:
+    if abs(value - lower) / abs(upper - lower) < _near_bounds_tolerance:
         _draw_bound_highlight(ax, func_val_to_plot_coord(lower))
-    elif abs(value - upper) / abs(upper - lower) < _ABS_BOUNDS_TOL:
+    elif abs(value - upper) / abs(upper - lower) < _near_bounds_tolerance:
         _draw_bound_highlight(ax, func_val_to_plot_coord(upper))
 
     # pointer and pointer label
