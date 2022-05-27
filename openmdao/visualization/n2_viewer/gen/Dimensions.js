@@ -6,7 +6,8 @@
  */
  class Dimensions {
     static allowedProps = ['x', 'x1', 'x2', 'y', 'y1', 'y2', 'z', 'count',
-        'size', 'height', 'width', 'margin', 'top', 'right', 'bottom', 'left'];
+        'size', 'height', 'width', 'margin', 'top', 'right', 'bottom', 'left',
+        'start', 'stop'];
 
     /**
      * Load the values into the object.
@@ -21,6 +22,19 @@
     /** Return the property value as a string with the unit appended. */
     valAsStyleStr(propName) {
         return `${this[propName]}${this.unit}`;
+    }
+
+    /**
+     * Find managed properties in object and copy their values.
+     * @param {Object} obj Object to search for properties.
+     * @returns Reference to this.
+     */
+    set(obj) {
+        for (const prop of this._managedProps) {
+            if (prop in obj) this[prop] = obj[prop];
+        }
+
+        return this;
     }
 
     /**

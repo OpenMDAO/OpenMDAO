@@ -280,14 +280,18 @@ class Matrix {
         }
     }
 
-    /** Determine the size of the boxes that will enclose the variables of each group. */
-    _setupVariableBoxesAndGridLines() {
+    /**
+     * Determine which "box" a diagonal node is in based on common ancestors.
+     * @param {Number} [ancestorLevel=2] The nth ancestor to compare.
+     * @returns {Array} Box dimensions of the box containing each diagonal node.
+     */
+    _boxInfo(ancestorLevel = 2) {
         let currentBox = {
             "startI": 0,
             "stopI": 0
         };
 
-        this._boxInfo = [currentBox];
+        const boxInfo = [currentBox];
 
         // Find which variable box each of the variables belong in,
         // while finding the bounds of that box. Top and bottom
@@ -296,7 +300,7 @@ class Matrix {
             const curNode = this.diagNodes[ri];
             const startINode = this.diagNodes[currentBox.startI];
 
-            if (startINode.boxAncestor() === curNode.boxAncestor()) {
+            if (startINode.boxAncestor(ancestorLevel) === curNode.boxAncestor(ancestorLevel)) {
                 ++currentBox.stopI;
             }
             else {
@@ -305,14 +309,21 @@ class Matrix {
                     "stopI": ri
                 };
             }
-            this._boxInfo.push(currentBox);
+            boxInfo.push(currentBox);
         }
 
-        // Step through this._boxInfo[] and record one set of dimensions
+        return boxInfo;
+    }
+
+    /** Determine the size of the boxes that will enclose the variables of each group. */
+    _setupVariableBoxesAndGridLines() {
+        const boxInfo = this._boxInfo();
+
+        // Step through boxInfo[] and record one set of dimensions
         // for each box in this._variableBoxInfo[].
         this._variableBoxInfo = [];
-        for (let i = 0; i < this._boxInfo.length; ++i) {
-            const box = this._boxInfo[i];
+        for (let i = 0; i < boxInfo.length; ++i) {
+            const box = boxInfo[i];
             if (box.startI == box.stopI) continue;
 
             const curNode = this.diagNodes[box.startI];
@@ -549,14 +560,12 @@ class Matrix {
             )
     }
 
+    _preDraw(dims) {
+
+    }
+
     /** Add all the visible elements to the matrix. */
     draw() {
-        const size = this.layout.size;
-        d3.select("#n2MatrixClip > rect")
-            .transition(sharedTransition)
-            .attr('width', size.matrix.width + size.svgMargin * 2)
-            .attr('height', size.matrix.height + size.svgMargin * 2);
-
         // Dimensions used to calculate cell geometry and gridlines
         const cellDims = new Dimensions(
             { // Current cell geometry:
@@ -574,6 +583,14 @@ class Matrix {
             }
         );
 
+        const size = this.layout.size;
+
+        d3.select("#n2MatrixClip > rect")
+            .transition(sharedTransition)
+            .attr('width', size.matrix.width + size.svgMargin * 2)
+            .attr('height', size.matrix.height + size.svgMargin * 2);
+
+        this._preDraw(cellDims);
         this._drawCells(cellDims);
 
         if (!this.tooMuchDetail()) {
