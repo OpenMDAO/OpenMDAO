@@ -8,7 +8,7 @@ from openmdao.solvers.solver import NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import ContainsAll
-
+import scipy
 
 class SchurSolver(NonlinearSolver):
     """
@@ -236,13 +236,14 @@ class SchurSolver(NonlinearSolver):
         print("x1:", system._residuals['group1.x1'], "x2:", system._residuals['group2.x2'])
 
         print("Full Jacobian:")
-        print(my_asm_jac["group1.comp1.x1", "group1.comp1.x1"], my_asm_jac["group1.comp1.x1", "group1.comp1.x2"])
-        print(my_asm_jac["group2.comp2.x2", "group2.comp2.x1"], my_asm_jac["group2.comp2.x2", "group2.comp2.x2"])
+        print(my_asm_jac._int_mtx._matrix.todense())
+        # print(my_asm_jac["group1.comp1.x1", "group1.comp1.x1"], my_asm_jac["group1.comp1.x1", "group1.comp1.x2"])
+        # print(my_asm_jac["group2.comp2.x2", "group2.comp2.x1"], my_asm_jac["group2.comp2.x2", "group2.comp2.x2"])
 
-        J11 = my_asm_jac["group1.comp1.x1", "group1.comp1.x1"][0]
-        J12 = my_asm_jac["group1.comp1.x1", "group1.comp1.x2"][0]
-        J21 = my_asm_jac["group2.comp2.x2", "group2.comp2.x1"][0]
-        J22 = my_asm_jac["group2.comp2.x2", "group2.comp2.x2"][0]
+        # J11 = my_asm_jac["group1.comp1.x1", "group1.comp1.x1"][0]
+        # J12 = my_asm_jac["group1.comp1.x1", "group1.comp1.x2"][0]
+        # J21 = my_asm_jac["group2.comp2.x2", "group2.comp2.x1"][0]
+        # J22 = my_asm_jac["group2.comp2.x2", "group2.comp2.x2"][0]
 
         # extract the first and second subsystems
         subsys1, _ = system._subsystems_allprocs["group1"]
@@ -276,7 +277,7 @@ class SchurSolver(NonlinearSolver):
         # set the ovec to zeros
         ovec.set_val(np.zeros(len(ovec)))
 
-        for var in vars_to_solve:
+        for ii, var in enumerate(vars_to_solve):
             # set the linear seed of the variable we want to solve for in subsys 2
             ovec[f"{subsys2.name}.{var}"] = 1.0
 
@@ -286,18 +287,18 @@ class SchurSolver(NonlinearSolver):
             # run the jac-vec computation in the first subsystem
             scope_out, scope_in = system._get_scope(subsys1)
             subsys1._apply_linear(None, ["linear"], ContainsAll(), "fwd", scope_out, scope_in)
-            print(subsys1._vectors['residual']['linear'].asarray())
+            print(f"B[:,{ii}]                    =", subsys1._vectors['residual']['linear'].asarray())
 
             # using the result from this jac-vec product, solve the RHS for this subsystem
             subsys1._solve_linear(["linear"], "fwd", ContainsAll())
-            print(system._vectors['output']['linear'].asarray())
+            print(f"A^-1 B[:,{ii}]               =", subsys1._vectors['output']['linear'].asarray())
 
             # do another mat-mult with the solution of this linear system, we want to get the final
             # jacobian using the schur method here, so we will need to do a bit more math
 
             # first negate the vector from the linear solve
             subsys1._vectors['output']['linear'] *= -1.
-            print(system._vectors['output']['linear'].asarray())
+            print("seed for C | D            =", system._vectors['output']['linear'].asarray())
 
             # finally, set the seed of the variable to 1 as well to get the diagonal contribution
             # system._vectors["output"]["linear"][f"{subsys2.name}.{var}"]
@@ -311,123 +312,47 @@ class SchurSolver(NonlinearSolver):
             system._apply_linear(None, ["linear"], ContainsAll(), "fwd", scope_out, scope_in)
 
             # the result is the final jacobian for this using the schur complement method
-            print(system._vectors['residual']['linear'].asarray())
+            print(f"D[:,{ii}] - C A^-1 B[:,{ii}]    =", subsys2._vectors['residual']['linear'].asarray())
 
-            # put this value into the jacobian
-            # use slices here?
-            schur_jac[0, :] = system._vectors['residual']['linear'][f"{subsys2.name}.{var}"]
+            # put this value into the jacobian.
+            schur_jac[:, ii] = system._vectors['residual']['linear'][f"{subsys2.name}.{var}"]
 
-            # quit()
-
-            # set back the seed to zero for future use
+            # set back the seed to zero for the next vector
             ovec[f"{subsys2.name}.{var}"] = 0.0
 
-        # using the jacobian
+        # put back the vectors
+        rvec.set_val(r_data)
+        ovec.set_val(o_data)
 
-        #
+        # we now have the schur complement of the jacobian for the second component.
+        # do a newton update with it!
+        subsys2._vectors['residual']['linear'].set_vec(subsys2._residuals)
+        subsys2._vectors['residual']['linear'] *= -1.0
 
+        d_subsys2 = scipy.linalg.solve(schur_jac, subsys2._vectors['residual']['linear'].asarray())
 
-        # for subsys, _ in system._subsystems_allprocs.values():
-        #     # only work with group 1 now
-        #     if subsys.name == "group1":
-        #         scope_out, scope_in = system._get_scope(subsys)
+        print("update vector:", d_subsys2)
 
-        #         print(scope_in, scope_out)
-        #         vec_names = ["linear"]
+        # # the R1 should already be zero from the solve subsystems call
+        # # R1 = system._residuals['group1.x1'][0]
+        # R2 = system._residuals['group2.x2'][0]
 
-        #         bvec = system._vectors['residual']['linear']
-        #         xvec = system._vectors['output']['linear']
-        #         # First make a backup of the vectors
-        #         b_data = bvec.asarray(copy=True)
-        #         x_data = xvec.asarray(copy=True)
+        # # compute the RHS for x2
+        # # because R1 is zero, we dont need to add its contribution here!
+        # rhs2 = -R2  # + J21 * (1. / J11) * R1
 
-        #         # print(subsys._vectors["residual"]["linear"].get_slice_dict())
-        #         # quit()
+        # # compute the LHS for x2
+        # # this is the tricky bit, we need to modify the jacobian of the system we are solving for,
+        # # using the information from the other subsystem (J11) and their coupling (J12 and J21)
+        # lhs2 = J22 - J21 * (1. / J11) * J12
 
-        #         bvec["group2.comp2.x2"] = 12
+        # # print(lhs2, schur_jac)
 
-        #         seed = np.zeros(2)
-        #         seed[1] = 1.
-        #         xvec.set_val(seed)
-
-        #         for vec_name in vec_names:
-        #             # must always do the transfer on all procs even if subsys not local
-        #             system._transfer(vec_name, "fwd", subsys.name)
-
-
-        #         nmtx = 2
-        #         mtx = np.empty((nmtx, nmtx), dtype=b_data.dtype)
-
-        #         subsys._apply_linear(None, vec_names, ["comp1"], "fwd", scope_out, scope_in)
-
-        #         # put new value in out_vec
-        #         mtx[:, 1] = bvec.asarray()
-
-        #         # Restore the backed-up vectors
-        #         bvec.set_val(b_data)
-        #         xvec.set_val(x_data)
-
-        #         print(mtx)
-
-        #         print(subsys.name)
+        # # update for x2
+        # # this will be replaced by a solve linear call
+        # dx2 = rhs2 / lhs2
 
         # quit()
-
-        # see if we can get J12 w/o accessing the asm jac
-        # bvec = system._vectors['residual']['linear']
-        # xvec = system._vectors['output']['linear']
-
-        # # First make a backup of the vectors
-        # b_data = bvec.asarray(copy=True)
-        # x_data = xvec.asarray(copy=True)
-
-        # nmtx = 2
-        # seed = np.zeros(x_data.size)
-        # mtx = np.empty((nmtx, nmtx), dtype=b_data.dtype)
-        # scope_out, scope_in = system._get_scope()
-        # print(scope_in, scope_out)
-        # vnames = ['linear']
-
-        # # how would this work?
-        # ii = 1
-        # seed[ii] = 1.
-        # xvec.set_val(seed)
-
-        # # apply linear
-        # system._apply_linear(my_asm_jac, vnames, ["group1"], 'fwd', scope_out=set(["group1.comp1.x1"]), scope_in=set(["group1.comp1.x2"]))
-
-        # # put new value in out_vec
-        # mtx[:, ii] = bvec.asarray()
-
-        # # Restore the backed-up vectors
-        # bvec.set_val(b_data)
-        # xvec.set_val(x_data)
-
-        # print(mtx)
-
-        # quit()
-
-        # my_J12 = system.group1._apply_linear()
-
-        # the R1 should already be zero from the solve subsystems call
-        # R1 = system._residuals['group1.x1'][0]
-        R2 = system._residuals['group2.x2'][0]
-
-        # compute the RHS for x2
-        # because R1 is zero, we dont need to add its contribution here!
-        rhs2 = -R2  # + J21 * (1. / J11) * R1
-
-        # compute the LHS for x2
-        # this is the tricky bit, we need to modify the jacobian of the system we are solving for,
-        # using the information from the other subsystem (J11) and their coupling (J12 and J21)
-        lhs2 = J22 - J21 * (1. / J11) * J12
-
-        print(lhs2, schur_jac)
-        quit()
-
-        # update for x2
-        # this will be replaced by a solve linear call
-        dx2 = rhs2 / lhs2
 
         # RHS for x1
         # again, no need to solve for x1, we want to purely rely on the subsystem solve  for that
@@ -437,22 +362,18 @@ class SchurSolver(NonlinearSolver):
         # system._outputs["group1.x1"] += dx1
 
         # take the update for x2. this will include a line search as well!
-        system._outputs["group2.x2"] += dx2
+        # system._outputs["group2.x2"] += dx2
 
-        # # invert the jacobian
-        # self._linearize()
-
-        # # solve for the newton update
-        # self.linear_solver.solve(['linear'], 'fwd')
-
-        # # instead of solving it directly, we do a schur complement thing!
-
-        # # take the update
+        # take the update
         # if self.linesearch:
         #     self.linesearch._do_subsolve = do_subsolve
         #     self.linesearch.solve()
         # else:
         #     system._outputs += system._vectors['output']['linear']
+
+        # loop over the variables just to be safe with the ordering
+        for ii, var in enumerate(vars_to_solve):
+            system._outputs[f"{subsys2.name}.{var}"] += d_subsys2[ii]
 
         self._solver_info.pop()
 
