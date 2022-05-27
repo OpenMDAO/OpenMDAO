@@ -230,12 +230,12 @@ class SchurSolver(NonlinearSolver):
             my_asm_jac._update(system)
 
         print("States:")
-        print("x1:", system._outputs['group1.x1'], "x2:", system._outputs['group2.x2'])
+        print(system._outputs.asarray())
 
-        print("Residuals:")
-        print("x1:", system._residuals['group1.x1'], "x2:", system._residuals['group2.x2'])
+        print("\nResiduals:")
+        print(system._residuals.asarray())
 
-        print("Full Jacobian:")
+        print("\nFull Jacobian:")
         print(my_asm_jac._int_mtx._matrix.todense())
         # print(my_asm_jac["group1.comp1.x1", "group1.comp1.x1"], my_asm_jac["group1.comp1.x1", "group1.comp1.x2"])
         # print(my_asm_jac["group2.comp2.x2", "group2.comp2.x1"], my_asm_jac["group2.comp2.x2", "group2.comp2.x2"])
@@ -257,6 +257,7 @@ class SchurSolver(NonlinearSolver):
         # list of variables we solve for here. this should include all variables in
         # subsys2 ideally because we dont do anything else for this subsystem here
         vars_to_solve = [*subsys2_outputs.keys()]
+        # print(vars_to_solve)
 
         # total size of the jacobian
         n_vars = 0
@@ -265,7 +266,7 @@ class SchurSolver(NonlinearSolver):
 
         # initialize the schur complement jacobian for these variables
         # TODO better way to get the dtype?
-        schur_jac = np.empty((n_vars, n_vars), dtype=system._vectors['residual']['linear'].asarray(copy=True).dtype)
+        schur_jac = np.zeros((n_vars, n_vars), dtype=system._vectors['residual']['linear'].asarray(copy=True).dtype)
 
         # backup the vectors we are working with
         rvec = system._vectors['residual']['linear']
@@ -315,7 +316,7 @@ class SchurSolver(NonlinearSolver):
             print(f"D[:,{ii}] - C A^-1 B[:,{ii}]    =", subsys2._vectors['residual']['linear'].asarray())
 
             # put this value into the jacobian.
-            schur_jac[:, ii] = system._vectors['residual']['linear'][f"{subsys2.name}.{var}"]
+            schur_jac[:, ii] = subsys2._vectors['residual']['linear'].asarray()
 
             # set back the seed to zero for the next vector
             ovec[f"{subsys2.name}.{var}"] = 0.0
@@ -328,6 +329,8 @@ class SchurSolver(NonlinearSolver):
         # do a newton update with it!
         subsys2._vectors['residual']['linear'].set_vec(subsys2._residuals)
         subsys2._vectors['residual']['linear'] *= -1.0
+
+        print("Schur Jacobian:\n", schur_jac)
 
         d_subsys2 = scipy.linalg.solve(schur_jac, subsys2._vectors['residual']['linear'].asarray())
 
