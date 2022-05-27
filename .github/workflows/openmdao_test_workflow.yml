@@ -211,7 +211,7 @@ jobs:
           echo "============================================================="
           echo "Scan environment for packages with known vulnerabilities"
           echo "============================================================="
-          python -m pip-audit
+          python -m pip_audit
 
       - name: Run tests
         shell: bash -l {0}
