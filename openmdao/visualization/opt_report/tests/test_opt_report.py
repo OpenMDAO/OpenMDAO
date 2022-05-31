@@ -15,7 +15,8 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 from openmdao.utils.mpi import MPI
 from openmdao.utils.testing_utils import use_tempdirs
 
-from openmdao.visualization.opt_report.opt_report import opt_report
+from openmdao.visualization.opt_report.opt_report import opt_report, \
+    _default_optimizer_report_filename
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
@@ -80,8 +81,7 @@ class TestOptimizationReport(unittest.TestCase):
                                           cons_lower=-1,
                                           )
         opt_report(self.prob)
-        report_filepath = f"reports/{self.prob._name}/opt_report.html"
-        self.assertTrue(os.path.exists(report_filepath))
+        self.assertTrue(os.path.exists(_default_optimizer_report_filename))
 
     # First test all the different Drivers
     def test_opt_report_run_once_driver(self):
