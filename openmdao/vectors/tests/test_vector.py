@@ -56,6 +56,30 @@ class TestVector(unittest.TestCase):
 
         self.assertEqual(p.model._residuals.dot(p.model._outputs), 9.)
 
+    def test_get_hash(self):
+        p = om.Problem()
+        comp = om.IndepVarComp()
+        comp.add_output('v1', val=np.ones(10))
+        p.model.add_subsystem('des_var', comp, promotes=['*'])
+        p.setup()
+        p.final_setup()
+
+        rnd = np.random.random(10)
+        p.model.des_var._outputs.set_val(rnd)
+        hash1 = p.model.des_var._outputs.get_hash()
+
+        rnd[3] += 1e-10
+        p.model.des_var._outputs.set_val(rnd)
+        hash2 = p.model.des_var._outputs.get_hash()
+
+        self.assertNotEqual(hash1, hash2)
+
+        rnd[3] -= 1e-10
+        p.model.des_var._outputs.set_val(rnd)
+        hash3 = p.model.des_var._outputs.get_hash()
+
+        self.assertEqual(hash1, hash3)
+
 
 A = np.array([[1.0, 8.0, 0.0], [-1.0, 10.0, 2.0], [3.0, 100.5, 1.0]])
 
