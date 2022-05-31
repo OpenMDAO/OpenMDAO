@@ -13,13 +13,10 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
 from openmdao.utils.mpi import MPI
-from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.utils.testing_utils import use_tempdirs, require_pyoptsparse
 
 from openmdao.visualization.opt_report.opt_report import opt_report, \
     _default_optimizer_report_filename
-from openmdao.utils.general_utils import set_pyoptsparse_opt
-
-OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
 
 try:
     from tabulate import tabulate
@@ -107,7 +104,7 @@ class TestOptimizationReport(unittest.TestCase):
                                           )
         opt_report(self.prob)
 
-    @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
+    @require_pyoptsparse('SNOPT')
     def test_opt_report_pyoptsparse_snopt(self):
         self.setup_problem_and_run_driver(om.pyOptSparseDriver,
                                           vars_lower=-50, vars_upper=50.,
@@ -116,6 +113,7 @@ class TestOptimizationReport(unittest.TestCase):
                                           )
         opt_report(self.prob)
 
+    @require_pyoptsparse('SLSQP')
     def test_opt_report_pyoptsparse_SLSQP(self):
         self.setup_problem_and_run_driver(om.pyOptSparseDriver,
                                           vars_lower=-50, vars_upper=50.,
@@ -162,6 +160,7 @@ class TestOptimizationReport(unittest.TestCase):
     #  force the creation of reports with different visuals for the desvars and constraints
     #  as bounds are violated and satisfied
 
+    @require_pyoptsparse('SLSQP')
     def test_opt_report_array_desvars(self):
         # test the calculations and plotting when there is a desvar that is an array
         prob = self.setup_sellar_problem()
@@ -180,6 +179,7 @@ class TestOptimizationReport(unittest.TestCase):
         prob.run_driver()
         opt_report(prob)
 
+    @require_pyoptsparse('SLSQP')
     def test_opt_report_scalar_desvars(self):
         # Same test as test_opt_report_array_desvars but the goal is to look
         # at the visuals for the scalar variable, 'x'.
@@ -208,6 +208,7 @@ class TestOptimizationReport(unittest.TestCase):
         prob.final_setup()
         opt_report(prob)
 
+    @require_pyoptsparse('SLSQP')
     def test_opt_report_scalar_desvars_way_out_of_bounds(self):
         # test the visual where the desvar so far out of bounds that the visual
         # is drawn differently using ellipsis to indicate that the value is from being
@@ -225,6 +226,7 @@ class TestOptimizationReport(unittest.TestCase):
         prob.final_setup()
         opt_report(prob)
 
+    @require_pyoptsparse('SLSQP')
     def test_opt_report_scalar_constraint(self):
         # test the visual of the constraints
         prob = self.setup_sellar_problem()
