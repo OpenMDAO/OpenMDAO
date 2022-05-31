@@ -327,7 +327,7 @@ class Matrix {
             if (box.startI == box.stopI) continue;
 
             const curNode = this.diagNodes[box.startI];
-            if (!curNode.boxAncestor()) { throw "Ancestor not found in box."; }
+            if (!curNode.boxAncestor()) { continue; throw "Ancestor not found in box."; }
 
             box.obj = curNode.boxAncestor();
             if (box.obj.draw.varBoxDims) {
