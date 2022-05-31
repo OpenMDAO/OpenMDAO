@@ -15,8 +15,7 @@ from openmdao.visualization.scaling_viewer.scaling_report import _default_scalin
 from openmdao.core.constants import _UNDEFINED
 from openmdao.core.problem import Problem
 from openmdao.core.driver import Driver
-from openmdao.visualization.opt_report.opt_report import opt_report, \
-    _default_optimizer_report_filename
+import openmdao.visualization.opt_report.opt_report as opt_report_mod
 
 # Keeping track of the registered reports
 _Report = namedtuple('Report', 'func desc class_name inst_id method pre_or_post report_filename')
@@ -349,7 +348,7 @@ def _run_optimizer_report_enclosing():
         if _is_rank_0(prob):
             pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
 
-        opt_report(prob, outfile=optimizer_reports_filepath)
+        opt_report_mod.opt_report(prob, outfile=optimizer_reports_filepath)
 
     run_optimizer_report_inner.calls = defaultdict(int)
     return run_optimizer_report_inner
@@ -363,7 +362,7 @@ _default_reports = {
     'scaling': (run_scaling_report, 'Driver scaling report', 'Driver', '_compute_totals', 'post',
                 _default_scaling_filename, None),
     'optimizer': (run_optimizer_report, 'Optimizer report', 'Driver', '_post_run', 'post',
-                  _default_optimizer_report_filename, None),
+                  opt_report_mod._default_optimizer_report_filename, None),
 }
 
 
