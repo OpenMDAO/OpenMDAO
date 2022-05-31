@@ -878,8 +878,6 @@ class Driver(object):
         with RecordingDebugging(self._get_name(), self.iter_count, self):
             self._problem().model.run_solve_nonlinear()
 
-        # end_time = time.time()
-
         self.iter_count += 1
         return False
 
