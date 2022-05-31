@@ -12,12 +12,11 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook, _unregister_hook
 from openmdao.visualization.n2_viewer.n2_viewer import n2, _default_n2_filename
 from openmdao.visualization.scaling_viewer.scaling_report import _default_scaling_filename
-from openmdao.visualization.opt_report.opt_report import _default_optimizer_report_filename
 from openmdao.core.constants import _UNDEFINED
 from openmdao.core.problem import Problem
 from openmdao.core.driver import Driver
-from openmdao.visualization.opt_report.opt_report import opt_report
-
+from openmdao.visualization.opt_report.opt_report import opt_report, \
+    _default_optimizer_report_filename
 
 # Keeping track of the registered reports
 _Report = namedtuple('Report', 'func desc class_name inst_id method pre_or_post report_filename')
