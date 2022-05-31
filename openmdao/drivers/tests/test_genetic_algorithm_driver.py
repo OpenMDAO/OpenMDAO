@@ -6,7 +6,11 @@ import os
 import numpy as np
 
 import openmdao.api as om
+
+from openmdao.core.constants import INF_BOUND
+
 from openmdao.drivers.genetic_algorithm_driver import GeneticAlgorithm
+
 from openmdao.test_suite.components.branin import Branin, BraninDiscrete
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.paraboloid_distributed import DistParab
@@ -16,6 +20,11 @@ from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
 from openmdao.utils.general_utils import run_driver
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.assert_utils import assert_near_equal
+try:
+    from parameterized import parameterized
+except ImportError:
+    from openmdao.utils.assert_utils import SkipParameterized as parameterized
+
 from openmdao.utils.mpi import MPI
 
 try:
@@ -24,6 +33,19 @@ except ImportError:
     PETScVector = None
 
 extra_prints = False  # enable printing results
+
+
+def _test_func_name(func, num, param):
+    args = []
+    for p in param.args:
+        if p and p == INF_BOUND:
+            args.append('INF_BOUND')
+        elif p and p == -INF_BOUND:
+            args.append('-INF_BOUND')
+        else:
+            args.append(str(p))
+    return func.__name__ + '_' + '_'.join(args)
+
 
 class TestSimpleGA(unittest.TestCase):
 
@@ -393,17 +415,15 @@ class TestSimpleGA(unittest.TestCase):
         np.testing.assert_array_almost_equal(prob['indeps.x'], -5)
         np.testing.assert_array_almost_equal(prob['indeps.y'], [3, 1])
 
-    def test_SimpleGADriver_missing_objective(self):
+    def test_missing_objective(self):
         prob = om.Problem()
         model = prob.model
 
         model.add_subsystem('x', om.IndepVarComp('x', 2.0), promotes=['*'])
         model.add_subsystem('f_x', Paraboloid(), promotes=['*'])
+        model.add_design_var('x', lower=-50, upper=50)
 
         prob.driver = om.SimpleGADriver()
-
-        prob.model.add_design_var('x', lower=0)
-        prob.model.add_constraint('x', lower=0)
 
         prob.setup()
 
@@ -415,6 +435,46 @@ class TestSimpleGA(unittest.TestCase):
         msg = "Driver requires objective to be declared"
 
         self.assertEqual(exception.args[0], msg)
+
+    @parameterized.expand([
+        (None, None),
+        (INF_BOUND, INF_BOUND),
+        (None, INF_BOUND),
+        (None, -INF_BOUND),
+        (INF_BOUND, None),
+        (-INF_BOUND, None),
+    ],
+    name_func=_test_func_name)
+    def test_inf_desvar(self, lower, upper):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('x', om.IndepVarComp('x', 2.0), promotes=['*'])
+        model.add_subsystem('f_x', Paraboloid(), promotes=['*'])
+
+        model.add_objective('f_xy')
+        model.add_design_var('x', lower=lower, upper=upper)
+
+        prob.driver = om.SimpleGADriver()
+
+        prob.setup()
+
+        with self.assertRaises(ValueError) as err:
+            prob.final_setup()
+
+        # A value of None for lower and upper is changed to +/- INF_BOUND in add_design_var()
+        if lower == None:
+            lower = -INF_BOUND
+        if upper == None:
+            upper = INF_BOUND
+
+        msg = ("Invalid bounds for design variable 'x.x'. When using "
+               "SimpleGADriver, values for both 'lower' and 'upper' "
+               f"must be specified between +/-INF_BOUND ({INF_BOUND}), "
+               f"but they are: lower={lower}, upper={upper}.")
+
+        self.maxDiff = None
+        self.assertEqual(err.exception.args[0], msg)
 
     def test_vectorized_constraints(self):
         prob = om.Problem()
@@ -867,6 +927,49 @@ class TestConstrainedSimpleGA(unittest.TestCase):
 
         assert_near_equal(p.get_val('exec.z')[0], -300)
         assert_near_equal(p.get_val('exec.z')[50], -400)
+
+    @parameterized.expand([
+        (None, -INF_BOUND, INF_BOUND),
+        (INF_BOUND, None, None),
+        (-INF_BOUND, None, None),
+    ],
+    name_func=_test_func_name)
+    def test_inf_constraints(self, equals, lower, upper):
+        # define paraboloid problem with constraint
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('parab', Paraboloid(), promotes_inputs=['x', 'y'])
+        model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
+        model.set_input_defaults('x', 3.0)
+        model.set_input_defaults('y', -4.0)
+
+        # setup the optimization
+        prob.driver = om.SimpleGADriver()
+        model.add_objective('parab.f_xy')
+        model.add_design_var('x', lower=-50, upper=50)
+        model.add_design_var('y', lower=-50, upper=50)
+        model.add_constraint('const.g', equals=equals, lower=lower, upper=upper)
+
+        prob.setup()
+
+        with self.assertRaises(ValueError) as err:
+            prob.final_setup()
+
+        # A value of None for lower and upper is changed to +/- INF_BOUND in add_constraint()
+        if lower == None:
+            lower = -INF_BOUND
+        if upper == None:
+            upper = INF_BOUND
+
+        msg = ("Invalid bounds for constraint 'const.g'. "
+               "When using SimpleGADriver, the value for 'equals', "
+               "'lower' or 'upper' must be specified between "
+               f"+/-INF_BOUND ({INF_BOUND}), but they are: "
+               f"equals={equals}, lower={lower}, upper={upper}.")
+
+        self.maxDiff = None
+        self.assertEqual(err.exception.args[0], msg)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

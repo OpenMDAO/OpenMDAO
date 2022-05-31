@@ -129,6 +129,29 @@ class DifferentialEvolutionDriver(Driver):
         """
         super()._setup_driver(problem)
 
+        # check design vars and constraints for invalid bounds
+        for name, meta in self._designvars.items():
+            lower, upper = meta['lower'], meta['upper']
+            for param in (lower, upper):
+                if param is None or np.all(np.abs(param) >= INF_BOUND):
+                    msg = (f"Invalid bounds for design variable '{name}'. When using "
+                           f"{self.__class__.__name__}, values for both 'lower' and 'upper' "
+                           f"must be specified between +/-INF_BOUND ({INF_BOUND}), "
+                           f"but they are: lower={lower}, upper={upper}.")
+                    raise ValueError(msg)
+
+        for name, meta in self._cons.items():
+            equals, lower, upper = meta['equals'], meta['lower'], meta['upper']
+            if ((equals is None or np.all(np.abs(equals) >= INF_BOUND)) and
+               (lower is None or np.all(np.abs(lower) >= INF_BOUND)) and
+               (upper is None or np.all(np.abs(upper) >= INF_BOUND))):
+                msg = (f"Invalid bounds for constraint '{name}'. "
+                       f"When using {self.__class__.__name__}, the value for 'equals', "
+                       f"'lower' or 'upper' must be specified between +/-INF_BOUND "
+                       f"({INF_BOUND}), but they are: "
+                       f"equals={equals}, lower={lower}, upper={upper}.")
+                raise ValueError(msg)
+
         model_mpi = None
         comm = problem.comm
         if self._concurrent_pop_size > 0:
