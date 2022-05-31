@@ -10,9 +10,14 @@ import sys
 import time
 
 import numpy as np
-import matplotlib as mpl
-from matplotlib import pyplot as plt
-from matplotlib import patches
+
+try:
+    import matplotlib as mpl
+    from matplotlib import pyplot as plt
+    from matplotlib import patches
+except ImportError:
+    mpl = None
+
 
 try:
     from tabulate import tabulate
@@ -433,11 +438,15 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
                     else:
                         row[col_name] = meta_dict[name][col_name]
             elif col_name == 'visual':
-                val = vals_dict[name]
-                if np.isscalar(val) or val.shape == (1,):
-                    row['visual'] = _constraint_plot(meta=meta, val=vals_dict[name], kind=kind)
+                if mpl:
+                    val = vals_dict[name]
+                    if np.isscalar(val) or val.shape == (1,):
+                        row['visual'] = _constraint_plot(meta=meta, val=vals_dict[name], kind=kind)
+                    else:
+                        row['visual'] = _sparkline(meta=meta, val=vals_dict[name], kind=kind)
                 else:
-                    row['visual'] = _sparkline(meta=meta, val=vals_dict[name], kind=kind)
+                    row['visual'] = \
+                        '<span class="plot-unavailable">Visuals require matplotlib</span>'
             elif col_name == 'size':
                 row[col_name] = int(meta[col_name])  # sometimes size in the meta data is a numpy
                 # array so tabulate does different formatting for that
