@@ -507,6 +507,10 @@ class TestReportsSystemMPI(unittest.TestCase):
 
         prob.run_driver()
 
+        # Only test on rank 0
+        if MPI and MPI.COMM_WORLD.rank != 0:
+            return
+
         # get the path to the problem subdirectory
         problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
 
@@ -514,7 +518,6 @@ class TestReportsSystemMPI(unittest.TestCase):
         self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
-
         path = pathlib.Path(problem_reports_dir).joinpath(self.optimizer_report_filename)
         self.assertTrue(path.is_file(), f'The optimizer report file, {str(path)}, was not found')
 
