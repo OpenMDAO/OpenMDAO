@@ -605,17 +605,6 @@ class Driver(object):
 
         return val
 
-    def get_driver_iter_count(self):
-        """
-        Return driver iterations made during a driver run.
-
-        Returns
-        -------
-        int
-            Number of driver iterations made during a driver run.
-        """
-        return self.iter_count
-
     def get_driver_objective_calls(self):
         """
         Return number of objective evaluations made during a driver run.
