@@ -1,7 +1,7 @@
 import unittest
 from io import StringIO
 
-from openmdao.api import Problem, Group, ParallelGroup, ExecComp, IndepVarComp, NonlinearRunOnce, LinearRunOnce, NewtonSolver
+from openmdao.api import Problem, Group, ParallelGroup, ExecComp, IndepVarComp, NonlinearRunOnce, LinearRunOnce, NewtonSolver, ImplicitComponent
 from openmdao.utils.mpi import MPI
 from openmdao.utils.find_cite import find_citations, print_citations
 
@@ -9,6 +9,10 @@ try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
     PETScVector = None
+
+
+class MyImplComp(ImplicitComponent):
+    pass
 
 
 class TestFindCite(unittest.TestCase):
@@ -22,12 +26,10 @@ class TestFindCite(unittest.TestCase):
         p.model.linear_solver.cite = "foobar linear_solver"
 
         indeps = p.model.add_subsystem('indeps', IndepVarComp('x', 10), promotes=['*'])
-        indeps.linear_solver = LinearRunOnce()
 
-        ec = p.model.add_subsystem('ec', ExecComp('y = 2+3*x'), promotes=['*'])
-        # note using newton here makes no sense in reality, but its fine for this test since we never run the model
+        ec = p.model.add_subsystem('ec', MyImplComp(), promotes=['*'])
         ec.nonlinear_solver = NewtonSolver()
-        ec.cite = "foobar exec comp"
+        ec.cite = "foobar impl comp"
 
         self.prob = p
 
@@ -67,10 +69,10 @@ class TestFindCite(unittest.TestCase):
             self.fail('Citation for LinearRunOnce class expected')
 
         try:
-            cite = citations[ExecComp]
-            self.assertEqual('foobar exec comp', cite)
+            cite = citations[MyImplComp]
+            self.assertEqual('foobar impl comp', cite)
         except KeyError:
-            self.fail('Citation for ExecComp class expected')
+            self.fail('Citation for MyImplComp class expected')
 
 
     def test_print_citations(self):
@@ -99,8 +101,8 @@ Class: <class 'openmdao.solvers.nonlinear.nonlinear_runonce.NonlinearRunOnce'>
     foobar nonlinear_solver
 Class: <class 'openmdao.solvers.linear.linear_runonce.LinearRunOnce'>
     foobar linear_solver
-Class: <class 'openmdao.components.exec_comp.ExecComp'>
-    foobar exec comp"""
+Class: <class 'openmdao.utils.tests.test_find_citations.MyImplComp'>
+    foobar impl comp"""
 
         self.assertEqual(expected, dest.getvalue().strip())
 
@@ -143,14 +145,12 @@ class TestFindCitePar(unittest.TestCase):
         p.model.linear_solver.cite = "foobar linear_solver"
 
         indeps = p.model.add_subsystem('indeps', IndepVarComp('x', 10), promotes=['*'])
-        indeps.linear_solver = LinearRunOnce()
 
         par = p.model.add_subsystem('par', ParallelGroup(), promotes=['*'])
 
-        ec = par.add_subsystem('ec', ExecComp('y = 2+3*x'), promotes=['*'])
-        # note using newton here makes no sense in reality, but its fine for this test since we never run the model
+        ec = p.model.add_subsystem('ec', MyImplComp(), promotes=['*'])
         ec.nonlinear_solver = NewtonSolver()
-        ec.cite = "foobar exec comp"
+        ec.cite = "foobar impl comp"
         c2 = par.add_subsystem('c2', ExecComp('y2=x'), promotes=['*'])
         c2.cite = 'foobar exec comp'
 
@@ -194,10 +194,10 @@ class TestFindCitePar(unittest.TestCase):
             self.fail('Citation for LinearRunOnce class expected')
 
         try:
-            cite = citations[ExecComp]
-            self.assertEqual('foobar exec comp', cite)
+            cite = citations[MyImplComp]
+            self.assertEqual('foobar impl comp', cite)
         except KeyError:
-            self.fail('Citation for ExecComp class expected')
+            self.fail('Citation for MyImplComp class expected')
 
         try:
             cite = citations[PETScVector]
