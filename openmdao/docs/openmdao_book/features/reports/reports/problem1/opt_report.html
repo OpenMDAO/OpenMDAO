@@ -1,0 +1,107 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+
+<title>OpenMDAO Optimization Report for Problem problem1</title>
+
+<!-- CSS style to set alternate table
+row using color -->
+<style>
+    body {
+        font: normal 10px Verdana, Arial, sans-serif;
+    }
+
+    table {
+        border-collapse: collapse;
+        width: 90%;
+    }
+
+    th {
+      background-color: SlateGray;
+      color: white;
+      }
+
+    th, td {
+        text-align: left;
+        padding: 8px;
+    }
+
+    tr:nth-child(even) {
+        background-color: LightGray;
+    }
+
+    tr:nth-child(odd) {
+        background-color: GhostWhite;
+    }
+
+    span.equality-constraint {
+        font-size: 25px;
+     }
+    span.equality-constraint-satisfied {
+        font-size: 25px;
+        color: green;
+     }
+    span.equality-constraint-violated {
+        font-size: 25px;
+        color: red;
+     }
+</style>
+</head>
+
+<body>
+<h1>OpenMDAO Optimization Report for Problem problem1 (All values are in unscaled, physical units)</h1>
+<table>
+<tbody>
+<tr><td>Problem:                    </td><td>problem1                                                                                </td></tr>
+<tr><td>Script:                     </td><td>/Users/hschilli/anaconda/envs/py38mpi4/lib/python3.8/site-packages/ipykernel_launcher.py</td></tr>
+<tr><td>Optimizer:                  </td><td>ScipyOptimize_SLSQP                                                                     </td></tr>
+<tr><td>Number of driver iterations:</td><td>3                                                                                       </td></tr>
+<tr><td>Number of objective calls:  </td><td>2                                                                                       </td></tr>
+<tr><td>Number of derivative calls: </td><td>2                                                                                       </td></tr>
+<tr><td>Execution start time:       </td><td>2022-06-01 11:02:58                                                                     </td></tr>
+<tr><td>Wall clock run time:        </td><td>00 hours 00 minutes 00 seconds 11.0 milliseconds                                        </td></tr>
+<tr><td>Exit status:                </td><td>SUCCESS                                                                                 </td></tr>
+</tbody>
+</table>
+<h2>Objectives</h2>
+<table>
+<thead>
+<tr><th>name  </th><th>val       </th><th>ref       </th><th>ref0      </th><th>adder  </th><th>scaler  </th><th>units  </th></tr>
+</thead>
+<tbody>
+<tr><td>f_xy  </td><td>1.7000e+01</td><td>1.0000e+00</td><td>0.0000e+00</td><td>       </td><td>        </td><td>       </td></tr>
+</tbody>
+</table>
+<h2>Design Variables</h2>
+<table>
+<thead>
+<tr><th style="text-align: center;"> name </th><th style="text-align: center;"> alias </th><th>size  </th><th style="text-align: center;">                         min                         </th><th style="text-align: center;">                     max                      </th><th>mean      </th><th>lower  </th><th>upper  </th><th style="text-align: center;"> equals </th><th>ref  </th><th>ref0  </th><th style="text-align: center;"> units </th><th style="text-align: center;">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     visual                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     </th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: center;">  x   </td><td style="text-align: center;">       </td><td>1     </td><td style="text-align: center;">                          1                          </td><td style="text-align: center;"><span style="color:rgb(213, 94, 0)">(1)</span></td><td>1.0000e+00</td><td>0      </td><td>1      </td><td style="text-align: center;">        </td><td>1    </td><td>0     </td><td style="text-align: center;">       </td><td style="text-align: center;">                                                                                                                                                                                                                                                                        <img width=300 src='data:image/png;base64,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'>                                                                                                                                                                                                                                                                        </td></tr>
+<tr><td style="text-align: center;">  y   </td><td style="text-align: center;">       </td><td>1     </td><td style="text-align: center;"><span style="color:rgb(213, 94, 0)">(3.38e-14)</span></td><td style="text-align: center;">                   3.38e-14                   </td><td>3.3800e-14</td><td>0      </td><td>1      </td><td style="text-align: center;">        </td><td>1    </td><td>0     </td><td style="text-align: center;">       </td><td style="text-align: center;"><img width=300 src='data:image/png;base64,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'></td></tr>
+</tbody>
+</table>
+<h2>Constraints</h2>
+
+<h2>Optimizer settings</h2>
+
+<table>
+<thead>
+<tr><th>Setting              </th><th>Val  </th><th>Description                                                                                                                                           </th></tr>
+</thead>
+<tbody>
+<tr><td>debug_print          </td><td>[]   </td><td>List of what type of Driver variables to print at each iteration.                                                                                     </td></tr>
+<tr><td>optimizer            </td><td>SLSQP</td><td>Name of optimizer to use                                                                                                                              </td></tr>
+<tr><td>tol                  </td><td>1e-06</td><td>Tolerance for termination. For detailed control, use solver-specific options.                                                                         </td></tr>
+<tr><td>maxiter              </td><td>200  </td><td>Maximum number of iterations.                                                                                                                         </td></tr>
+<tr><td>disp                 </td><td>True </td><td>Set to False to prevent printing of Scipy convergence messages                                                                                        </td></tr>
+<tr><td>singular_jac_behavior</td><td>warn </td><td>Defines behavior of a zero row/col check after first call tocompute_totals:error - raise an error.warn - raise a warning.ignore - don&#x27;t perform check.</td></tr>
+<tr><td>singular_jac_tol     </td><td>1e-16</td><td>Tolerance for zero row/column check.                                                                                                                  </td></tr>
+</tbody>
+</table>
+</body>
+
+</html>
