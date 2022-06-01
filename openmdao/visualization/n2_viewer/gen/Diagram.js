@@ -264,6 +264,8 @@ class Diagram {
         const enterSelection = enter
             .append("g")
             .attr("class", d => `model_tree_grp ${self.style.getNodeClass(d)}`)
+            .attr("transform", d =>
+                `translate(${scale.prev.x(d.draw.dims.prev.x)},${scale.prev.y(d.draw.dims.prev.y)})`)
             .on("click", (e,d) => self.leftClickSelector(e, d))
             .on("contextmenu", function(e,d) {
                 if (e.altKey) {
