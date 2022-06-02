@@ -3,6 +3,7 @@ import unittest
 import pathlib
 import sys
 import os
+import functools
 from io import StringIO
 
 import openmdao.api as om
@@ -12,8 +13,8 @@ import openmdao.core.problem
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.assert_utils import assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.utils.reports_system import set_default_reports_dir, _reports_dir, register_report, \
-    list_reports, clear_reports, run_n2_report, setup_default_reports, report_function
+from openmdao.utils.reports_system import set_reports_dir, _reports_dir, register_report, \
+    list_reports, clear_reports, run_n2_report, setup_reports, get_reports_dir
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
 from openmdao.utils.tests.test_hooks import hooks_active
@@ -47,7 +48,7 @@ class TestReportsSystem(unittest.TestCase):
         # But we need to remember whether it was set so we can restore it
         self.testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
         clear_reports()
-        set_default_reports_dir(_reports_dir)
+        set_reports_dir(_reports_dir)
 
         self.count = 0
 
@@ -116,7 +117,7 @@ class TestReportsSystem(unittest.TestCase):
 
     @hooks_active
     def test_report_generation_basic(self):
-        setup_default_reports()
+        setup_reports()
         prob = self.setup_and_run_simple_problem()
 
         # get the path to the problem subdirectory
@@ -131,7 +132,7 @@ class TestReportsSystem(unittest.TestCase):
     @unittest.skipUnless(OPTIMIZER, "This test requires pyOptSparseDriver.")
     def test_report_generation_basic_pyoptsparse(self):
         # Just to try a different driver
-        setup_default_reports()
+        setup_reports()
         prob = self.setup_and_run_simple_problem(driver=pyOptSparseDriver(optimizer='SLSQP'))
 
         # get the path to the problem subdirectory
@@ -145,7 +146,7 @@ class TestReportsSystem(unittest.TestCase):
     @hooks_active
     def test_report_generation_basic_doedriver(self):
         # Test a driver that does not generate scaling report
-        setup_default_reports()
+        setup_reports()
         prob = self.setup_and_run_simple_problem(driver=om.DOEDriver(om.PlackettBurmanGenerator()))
 
         problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
@@ -159,7 +160,7 @@ class TestReportsSystem(unittest.TestCase):
 
     @hooks_active
     def test_report_generation_list_reports(self):
-        setup_default_reports()  # So it sees the OPENMDAO_REPORTS var
+        setup_reports()  # So it sees the OPENMDAO_REPORTS var
         stdout = sys.stdout
         strout = StringIO()
         sys.stdout = strout
@@ -179,7 +180,7 @@ class TestReportsSystem(unittest.TestCase):
         # test use of the OPENMDAO_REPORTS variable to turn off reporting
         os.environ['OPENMDAO_REPORTS'] = 'false'
         clear_reports()
-        setup_default_reports()  # So it sees the OPENMDAO_REPORTS var
+        setup_reports()  # So it sees the OPENMDAO_REPORTS var
 
         prob = self.setup_and_run_simple_problem()
 
@@ -198,7 +199,7 @@ class TestReportsSystem(unittest.TestCase):
         # test use of the OPENMDAO_REPORTS variable to turn off selected reports
         os.environ['OPENMDAO_REPORTS'] = 'n2'
         clear_reports()
-        setup_default_reports()  # So it sees the OPENMDAO_REPORTS var
+        setup_reports()  # So it sees the OPENMDAO_REPORTS var
 
         prob = self.setup_and_run_simple_problem()
 
@@ -213,7 +214,7 @@ class TestReportsSystem(unittest.TestCase):
 
     @hooks_active
     def test_report_generation_set_reports_dir_using_env_var(self):
-        setup_default_reports()  # So it sees the OPENMDAO_REPORTS var
+        setup_reports()  # So it sees the OPENMDAO_REPORTS var
         # test use of setting a custom reports directory other than the default of "."
         custom_dir = 'custom_reports_dir'
         os.environ['OPENMDAO_REPORTS_DIR'] = custom_dir
@@ -231,14 +232,17 @@ class TestReportsSystem(unittest.TestCase):
 
     @hooks_active
     def test_report_generation_user_defined_report(self):
-        setup_default_reports()  # So it sees the OPENMDAO_REPORTS var
         user_report_filename = 'user_report.txt'
+        os.environ['OPENMDAO_REPORTS'] = 'User defined report'
 
-        # @report_function(user_report_filename)
-        @report_function()
-        def user_defined_report(prob, report_filepath):
-            with open(report_filepath, "w") as f:
+        # # @report_function(user_report_filename)
+        # @report_function()
+        def user_defined_report(prob, report_filename):
+            path = pathlib.Path(os.getcwd()).joinpath(_reports_dir, prob._name, report_filename)
+            with open(path, "w") as f:
                 f.write(f"Do some reporting on the Problem, {prob._name}\n")
+
+        #user_defined_report = functools.partial(user_defined_rep, user_report_filename)
 
         # register_report("User defined report", user_defined_report,
         #                 "user defined report description",
@@ -247,26 +251,29 @@ class TestReportsSystem(unittest.TestCase):
                         "user defined report description",
                         'Problem', 'setup', 'pre', user_report_filename)
 
+        pathlib.Path(_reports_dir).joinpath(prob._name).mkdir(parents=True, exist_ok=True)
+
+        setup_reports()  # So it sees the OPENMDAO_REPORTS var
+
         prob = self.setup_and_run_simple_problem()
 
-        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
+        path = pathlib.Path(_reports_dir).joinpath(prob._name, user_report_filename)
 
-        path = pathlib.Path(problem_reports_dir).joinpath(user_report_filename)
         self.assertTrue(path.is_file(), f'The user defined report file, {str(path)} was not found')
 
     @hooks_active
     def test_report_generation_various_locations(self):
         # the reports can be generated pre and post for setup, final_setup, and run_driver
         # check those all work
-        setup_default_reports()  # So it sees the OPENMDAO_REPORTS var
+        setup_reports()  # So it sees the OPENMDAO_REPORTS var
 
         self.count = 0
 
         # A simple report
         user_report_filename = 'user_defined_{count}.txt'
 
-        # @report_function(user_report_filename)
-        @report_function()
+        # # @report_function(user_report_filename)
+        # @report_function()
         def user_defined_report(prob, report_filepath):
             report_filepath = report_filepath.format(count=self.count)
             with open(report_filepath, "w") as f:
@@ -294,7 +301,7 @@ class TestReportsSystem(unittest.TestCase):
 
     @hooks_active
     def test_report_generation_multiple_problems(self):
-        setup_default_reports()  # So it sees the OPENMDAO_REPORTS var
+        setup_reports()  # So it sees the OPENMDAO_REPORTS var
         probname, subprobname = self.setup_and_run_model_with_subproblem()
 
         # The multiple problem code only runs model so no scaling reports to look for
@@ -308,11 +315,14 @@ class TestReportsSystem(unittest.TestCase):
         # test the ability to register a report with a specific Problem name rather
         #   than have the report run for all Problems
 
+        os.environ['OPENMDAO_REPORTS'] = 'n2_report'
+
         # to simplify things, just do n2.
         clear_reports()
         register_report("n2_report", run_n2_report, 'N2 diagram', 'Problem', 'final_setup', 'post',
                         self.n2_filename,
                         inst_id='problem2')
+        setup_reports()
 
         probname, subprobname = self.setup_and_run_model_with_subproblem()
 
@@ -331,10 +341,10 @@ class TestReportsSystem(unittest.TestCase):
     @hooks_active
     def test_report_generation_test_TESTFLO_RUNNING(self):
         # need to do this here again even though it is done in setup, because otherwise
-        # setup_default_reports won't see environment variable, TESTFLO_RUNNING
+        # setup_reports won't see environment variable, TESTFLO_RUNNING
         os.environ['TESTFLO_RUNNING'] = 'true'
         clear_reports()
-        setup_default_reports()
+        setup_reports()
 
         prob = self.setup_and_run_simple_problem()
 
@@ -349,7 +359,7 @@ class TestReportsSystem(unittest.TestCase):
 
     @hooks_active
     def test_report_generation_basic_problem_reports_argument_false(self):
-        setup_default_reports()
+        setup_reports()
 
         prob = self.setup_and_run_simple_problem(reports=False)
 
@@ -364,7 +374,7 @@ class TestReportsSystem(unittest.TestCase):
 
     @hooks_active
     def test_report_generation_basic_problem_reports_argument_none(self):
-        setup_default_reports()
+        setup_reports()
 
         prob = self.setup_and_run_simple_problem(reports=None)
 
@@ -380,7 +390,7 @@ class TestReportsSystem(unittest.TestCase):
 
     @hooks_active
     def test_report_generation_basic_problem_reports_argument_n2_only(self):
-        setup_default_reports()
+        setup_reports()
         prob = self.setup_and_run_simple_problem(reports='n2')
 
         # get the path to the problem subdirectory
@@ -394,7 +404,7 @@ class TestReportsSystem(unittest.TestCase):
 
     @hooks_active
     def test_report_generation_basic_problem_reports_argument_n2_and_scaling(self):
-        setup_default_reports()
+        setup_reports()
         prob = self.setup_and_run_simple_problem(reports='n2,scaling')
 
         # get the path to the problem subdirectory
@@ -407,7 +417,7 @@ class TestReportsSystem(unittest.TestCase):
 
     @hooks_active
     def test_report_generation_problem_reports_argument_multiple_problems(self):
-        setup_default_reports()
+        setup_reports()
         _, _ = self.setup_and_run_model_with_subproblem(prob2_reports=None)
 
         # Only problem1 reports should have been generated
@@ -426,7 +436,7 @@ class TestReportsSystem(unittest.TestCase):
 
     @hooks_active
     def test_report_generation_basic_problem_reports_dir_argument(self):
-        setup_default_reports()
+        setup_reports()
 
         custom_reports_dir = 'user_dir'
 
@@ -462,7 +472,7 @@ class TestReportsSystemMPI(unittest.TestCase):
         # But we need to remember whether it was set so we can restore it
         self.testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
         clear_reports()
-        set_default_reports_dir(_reports_dir)
+        set_reports_dir(_reports_dir)
 
         self.count = 0  # used to keep a count of reports generated
 
@@ -473,7 +483,7 @@ class TestReportsSystemMPI(unittest.TestCase):
 
     @hooks_active
     def test_reports_system_mpi_basic(self):  # example taken from TestScipyOptimizeDriverMPI
-        setup_default_reports()
+        setup_reports()
 
         prob = om.Problem()
         prob.model = SellarMDA()

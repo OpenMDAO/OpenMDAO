@@ -77,10 +77,10 @@ def _setup_hooks(obj):
         for instmeta in instmetas:
             for funcname, fmeta in instmeta.items():
                 method = getattr(obj, funcname, None)
-                # if _hook_ attr is present, we've already wrapped this method.  We don't need
+                # if _hashook_ attr is present, we've already wrapped this method.  We don't need
                 # to combine pre/post hook data for inst and None hooks here because it has
                 # already been done earlier (in register_hook/_get_hook_list_iters).
-                if method is not None and not hasattr(method, '_hook_'):
+                if method is not None and not hasattr(method, '_hashook_'):
                     setattr(obj, funcname, _hook_decorator(method, obj, fmeta))
 
 
@@ -97,12 +97,21 @@ def _run_hooks(hooks, inst):
     """
     for hookmeta in hooks:
         hook, ncalls, ex, kwargs, _ = hookmeta
-        if ncalls is None or ncalls > 0:
+        if ncalls is None:
             hook(inst, **kwargs)
             if ex:
                 sys.exit()
-            if ncalls is not None:
-                hookmeta[1] -= 1
+        else:
+            inst_id = inst._get_inst_id()
+            if inst_id not in ncalls:
+                # must have been registered with 'None', meaning all instances, so get initial value
+                ncalls[inst_id] = ncalls[None]
+
+            if ncalls[inst_id] > 0:
+                hook(inst, **kwargs)
+                if ex:
+                    sys.exit()
+                ncalls[inst_id] -= 1
 
 
 def _hook_decorator(f, inst, hookmeta):
@@ -127,7 +136,7 @@ def _hook_decorator(f, inst, hookmeta):
         _run_hooks(post_hooks, inst)
         return ret
 
-    execute_hooks._hook_ = True  # to prevent multiple decoration of same function
+    execute_hooks._hashook_ = True  # to prevent multiple decoration of same function
 
     return wraps(f)(execute_hooks)
 
@@ -222,9 +231,11 @@ def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=
 
     for pre_hooks, post_hooks in _get_hook_list_iters(class_name, inst_id, fname):
         if pre is not None and (ncalls is None or ncalls > 0):
-            pre_hooks.append([pre, ncalls, exit and post is None, kwargs, inst_id])
+            ncallsdict = {inst_id: ncalls} if ncalls is not None else ncalls
+            pre_hooks.append([pre, ncallsdict, exit and post is None, kwargs, inst_id])
         if post is not None and (ncalls is None or ncalls > 0):
-            post_hooks.append([post, ncalls, exit, kwargs, inst_id])
+            ncallsdict = {inst_id: ncalls} if ncalls is not None else ncalls
+            post_hooks.append([post, ncallsdict, exit, kwargs, inst_id])
 
 
 def _remove_hook(to_remove, hooks, class_name, fname, hook_loc, inst_id):
