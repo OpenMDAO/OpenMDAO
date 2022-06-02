@@ -27,6 +27,8 @@ except ImportError:
 from openmdao.core.problem import Problem
 from openmdao.core.constants import INF_BOUND
 from openmdao.utils.mpi import MPI
+from openmdao.utils.om_warnings import issue_warning, DriverWarning
+
 
 # Report file constants
 _default_optimizer_report_filename = 'opt_report.html'
@@ -108,6 +110,12 @@ def opt_report(prob, outfile=None):
         The path to the HTML file to be written.  If None (default), write to the default report
         output path.
     """
+    if not prob.driver.supports['optimization'] :
+        driver_class = type(prob.driver).__name__
+        issue_warning(f"The optimizer report is not applicable for the {driver_class} Driver "
+                      "which does not support optimization", category=DriverWarning)
+        return
+
     # if MPI is active only display one copy of the viewer
     if MPI and MPI.COMM_WORLD.rank != 0:
         return

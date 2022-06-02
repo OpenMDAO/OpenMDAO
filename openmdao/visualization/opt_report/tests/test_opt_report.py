@@ -11,8 +11,10 @@ from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDens
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
+from openmdao.utils.assert_utils import assert_warning
 
 from openmdao.utils.mpi import MPI
+from openmdao.utils.om_warnings import DriverWarning
 from openmdao.utils.testing_utils import use_tempdirs, require_pyoptsparse
 
 from openmdao.visualization.opt_report.opt_report import opt_report, \
@@ -95,6 +97,36 @@ class TestOptimizationReport(unittest.TestCase):
                                           optimizer='SLSQP',
                                           )
         opt_report(self.prob)
+
+    def test_opt_report_scipyopt_DOE(self):
+        # no report should be generated for this
+        import openmdao.api as om
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        model.add_design_var('x', lower=-10, upper=10)
+        model.add_design_var('y', lower=-10, upper=10)
+        model.add_objective('f_xy')
+
+        prob.driver = om.DOEDriver(om.UniformGenerator(num_samples=5))
+
+        prob.setup()
+
+        prob.set_val('x', 0.0)
+        prob.set_val('y', 0.0)
+
+        prob.run_driver()
+        prob.cleanup()
+
+        expected_warning_msg = "The optimizer report is not applicable for the DOEDriver Driver " \
+                               "which does not support optimization"
+        with assert_warning(DriverWarning, expected_warning_msg):
+            opt_report(prob)
+        self.assertFalse(os.path.exists(_default_optimizer_report_filename))
 
     def test_opt_report_scipyopt_COBYLA(self):
         self.setup_problem_and_run_driver(om.ScipyOptimizeDriver,
