@@ -62,6 +62,7 @@ class DOEDriver(Driver):
 
         # What we don't support
         self.supports['distributed_design_vars'] = False
+        self.supports['optimization'] = False
         self.supports._read_only = True
 
         if generator is not None:
