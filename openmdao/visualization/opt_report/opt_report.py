@@ -110,7 +110,7 @@ def opt_report(prob, outfile=None):
         The path to the HTML file to be written.  If None (default), write to the default report
         output path.
     """
-    if not prob.driver.supports['optimization'] :
+    if not prob.driver.supports['optimization']:
         driver_class = type(prob.driver).__name__
         issue_warning(f"The optimizer report is not applicable for the {driver_class} Driver "
                       "which does not support optimization", category=DriverWarning)
