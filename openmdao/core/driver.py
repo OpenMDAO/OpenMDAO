@@ -174,9 +174,6 @@ class Driver(object):
         self._declare_options()
         self.options.update(kwargs)
 
-        # Want to allow the setting of hooks on Drivers
-        _setup_hooks(self)
-
     def _get_inst_id(self):
         if self._problem is None:
             return None
@@ -236,6 +233,17 @@ class Driver(object):
         """
         return comm
 
+    def _set_problem(self, problem):
+        """
+        Set a reference to the containing Problem.
+
+        Parameters
+        ----------
+        problem : <Problem>
+            Reference to the containing problem.
+        """
+        self._problem = weakref.ref(problem)
+
     def _setup_driver(self, problem):
         """
         Prepare the driver for execution.
@@ -247,7 +255,6 @@ class Driver(object):
         problem : <Problem>
             Pointer to the containing problem.
         """
-        self._problem = weakref.ref(problem)
         model = problem.model
 
         self._total_jac = None
@@ -1196,6 +1203,24 @@ class Driver(object):
                 print()
 
         sys.stdout.flush()
+
+    def get_reports_dir(self):
+        """
+        Get the path to the directory where the report files should go.
+
+        If it doesn't exist, it will be created.
+
+        Parameters
+        ----------
+        obj : Problem, Driver, Solver, or System
+            The report will be run in the context of this Problem or the Problem this object belongs to.
+
+        Returns
+        -------
+        str
+            The path to the directory where reports should be written.
+        """
+        return self._problem().get_reports_dir()
 
 
 class RecordingDebugging(Recording):

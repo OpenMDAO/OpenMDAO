@@ -4,6 +4,7 @@ import sys
 import pprint
 import os
 import weakref
+import pathlib
 
 from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
@@ -14,37 +15,38 @@ from io import StringIO
 import numpy as np
 import scipy.sparse as sparse
 
+from openmdao.core.constants import _SetupStatus
 from openmdao.core.component import Component
-from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.core.driver import Driver, record_iteration
 from openmdao.core.group import Group, System
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
+from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.solvers.solver import SolverInfo
+from openmdao.vectors.vector import _full_slice
+from openmdao.vectors.default_vector import DefaultVector
 from openmdao.error_checking.check_config import _default_checks, _all_checks, \
     _all_non_redundant_checks
 from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data, \
     record_model_options
-from openmdao.utils.record_util import create_local_meta
-from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable, \
-    _find_dict_meta
 from openmdao.utils.mpi import MPI, FakeComm, multi_proc_exception_check, check_mpi_env
 from openmdao.utils.name_maps import name2abs_names
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import simplify_unit
-from openmdao.core.constants import _SetupStatus
 from openmdao.utils.name_maps import abs_key2rel_key
-from openmdao.vectors.vector import _full_slice
-from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.logger_utils import get_logger, TestLogger
-import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.hooks import _setup_hooks
 from openmdao.utils.indexer import indexer
+from openmdao.utils.record_util import create_local_meta
+from openmdao.utils.reports_system import get_reports_dir, get_reports_to_activate, activate_reports
+from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable, \
+    _find_dict_meta
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
+import openmdao.utils.coloring as coloring_mod
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -93,10 +95,6 @@ class Problem(object):
         Since none is acceptable in the environment variable, a value of reports=None
         is equivalent to reports=False. Otherwise, reports may be a sequence of
         strings giving the names of the reports to run.
-    reports_dir : str, _UNDEFINED
-        Directory in which to place the reports.
-        If _UNDEFINED, the OPENMDAO_REPORTS_DIR variable is used. Defaults to _UNDEFINED.
-        If given, reports_dir overrides OPENMDAO_REPORTS_DIR.
     **options : named args
         All remaining named args are converted to options.
 
@@ -106,7 +104,7 @@ class Problem(object):
         Pointer to the top-level <System> object (root node in the tree).
     comm : MPI.Comm or <FakeComm>
         The global communicator.
-    driver : <Driver>
+    _driver : <Driver>
         Slot for the driver. The default driver is `Driver`, which just runs
         the model once.
     _mode : 'fwd' or 'rev'
@@ -146,24 +144,18 @@ class Problem(object):
         The number of times run_driver or run_model has been called.
     _warned : bool
         Bool to check if `value` deprecation warning has occured yet
-    _reports : str, bool, None, _UNDEFINED
-        If _UNDEFINED, the OPENMDAO_REPORTS variable is used. Defaults to _UNDEFINED.
-        If given, reports should override OPENMDAO_REPORTS. If boolean, enable/disable all reports.
-        Since none is acceptable in the environment variable, a value of reports=None
-        is equivalent to reports=False. Otherwise, reports may be a comma separated sequence of
-        strings giving the names of the reports to run.
-    _reports_dir : str, _UNDEFINED
-        Directory in which to place the reports.
-        If _UNDEFINED, the OPENMDAO_REPORTS_DIR variable is used. Defaults to _UNDEFINED.
-        If given, reports_dir overrides OPENMDAO_REPORTS_DIR.
     """
 
-    def __init__(self, model=None, driver=None, comm=None, name=None,
-                 reports=_UNDEFINED, reports_dir=_UNDEFINED, **options):
+    def __init__(self, model=None, driver=None, comm=None, name=None, reports=_UNDEFINED,
+                 **options):
         """
         Initialize attributes.
         """
         global _problem_names
+
+        # ensure that default reports (n2, scaling) are imported
+        import openmdao.visualization.n2_viewer.n2_viewer
+        import openmdao.visualization.scaling_viewer.scaling_report
 
         self.cite = CITATION
 
@@ -227,9 +219,6 @@ class Problem(object):
         self._system_options_recorded = False
         self._rec_mgr = RecordingManager()
 
-        self._reports = reports
-        self._reports_dir = reports_dir
-
         # General options
         self.options = OptionsDictionary(parent_name=type(self).__name__)
         self.options.declare('coloring_dir', types=str,
@@ -276,7 +265,10 @@ class Problem(object):
                                        desc='Patterns for vars to exclude in recording '
                                             '(processed post-includes). Uses fnmatch wildcards')
 
-        # So Problem can have hooks attached to its methods
+        # register hooks for any reports
+        activate_reports(get_reports_to_activate(reports), self)
+
+        # So Problem and driver can have hooks attached to their methods
         _setup_hooks(self)
 
     def _get_var_abs_name(self, name):
@@ -295,6 +287,22 @@ class Problem(object):
                                                                                       abs_names))
 
         raise KeyError('{}: Variable "{}" not found.'.format(self.msginfo, name))
+
+    @property
+    def driver(self):
+        """
+        Get the nonlinear solver for this system.
+        """
+        return self._driver
+
+    @driver.setter
+    def driver(self, driver):
+        """
+        Set this system's nonlinear solver.
+        """
+        self._driver = driver
+        driver._set_problem(self)
+        _setup_hooks(self.driver)
 
     @property
     def msginfo(self):
@@ -1026,6 +1034,7 @@ class Problem(object):
                                      # src_indices are applied to the variable somewhere.
             'raise_connection_errors': True,  # If False, connection related errors in setup will
                                               # be converted to warnings.
+            'reports_dir': self.get_reports_dir(),  # directory where reports will be written
         }
         model._setup(model_comm, mode, self._metadata)
 
@@ -2189,6 +2198,28 @@ class Problem(object):
 
         self.model._set_complex_step_mode(active)
 
+    def get_reports_dir(self):
+        """
+        Get the path to the directory where the report files should go.
+
+        If it doesn't exist, it will be created.
+
+        Parameters
+        ----------
+        obj : Problem, Driver, Solver, or System
+            The report will be run in the context of this Problem or the Problem this object belongs to.
+
+        Returns
+        -------
+        str
+            The path to the directory where reports should be written.
+        """
+        reports_dirpath = pathlib.Path(get_reports_dir()).joinpath(f'{self._name}')
+
+        if self.comm.rank == 0:
+            pathlib.Path(reports_dirpath).mkdir(parents=True, exist_ok=True)
+
+        return reports_dirpath
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
                               compact_print, system_list, global_options, totals=False,

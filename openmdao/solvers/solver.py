@@ -503,6 +503,24 @@ class Solver(object):
                 "distributed component."
             raise RuntimeError(msg.format(type(self).__name__, s.msginfo))
 
+    def get_reports_dir(self):
+        """
+        Get the path to the directory where the report files should go.
+
+        If it doesn't exist, it will be created.
+
+        Parameters
+        ----------
+        obj : Problem, Driver, Solver, or System
+            The report will be run in the context of this Problem or the Problem this object belongs to.
+
+        Returns
+        -------
+        str
+            The path to the directory where reports should be written.
+        """
+        return self._system().get_reports_dir()
+
 
 class NonlinearSolver(Solver):
     """

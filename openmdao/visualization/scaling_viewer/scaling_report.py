@@ -3,6 +3,7 @@
 import os
 import json
 import functools
+import pathlib
 
 import numpy as np
 
@@ -14,6 +15,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import ignore_errors, default_noraise
 from openmdao.utils.file_utils import _load_and_exec
+from openmdao.utils.reports_system import register_report
 
 _default_scaling_filename = 'driver_scaling_report.html'
 
@@ -571,3 +573,25 @@ def _scaling_cmd(options, user_args):
 
     ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
+
+
+
+# scaling report definition
+def _run_scaling_report(driver, report_filename=None):
+
+    prob = driver._problem()
+    scaling_filepath = str(pathlib.Path(prob.get_reports_dir()).joinpath(report_filename))
+
+    try:
+        prob.driver.scaling_report(outfile=scaling_filepath, show_browser=False)
+
+    # Need to handle the coloring and scaling reports which can fail in this way
+    #   because total Jacobian can't be computed
+    except RuntimeError as err:
+        if str(err) != "Can't compute total derivatives unless " \
+                       "both 'of' or 'wrt' variables have been specified.":
+            raise err
+
+
+register_report('scaling', _run_scaling_report, 'Driver scaling report', 'Driver',
+                '_compute_totals', 'post', _default_scaling_filename)

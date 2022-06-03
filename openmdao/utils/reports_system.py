@@ -2,35 +2,47 @@
 Utility functions related to the reporting system which generates reports by default for all runs.
 """
 
-from collections import namedtuple, defaultdict
-from functools import wraps
-import pathlib
+from collections import namedtuple
 import sys
 import os
 
+from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook, _unregister_hook
-from openmdao.visualization.n2_viewer.n2_viewer import n2, _default_n2_filename
-from openmdao.visualization.scaling_viewer.scaling_report import _default_scaling_filename
-from openmdao.core.constants import _UNDEFINED
-from openmdao.core.problem import Problem
-from openmdao.core.driver import Driver
 from openmdao.utils.om_warnings import issue_warning
 
 # Keeping track of the registered reports
 _Report = namedtuple('Report',
                      'func desc class_name inst_id condition method pre_or_post report_filename')
 _reports_registry = {}
-_default_reports = ['n2', 'scaling']
+_default_reports = ['scaling', 'n2']  # ['n2', 'scaling']
 _active_reports = set()  # these reports will actually run (assuming their hook funcs are triggered)
 _cmdline_reports = set()  # cmdline reports can be registered here to prevent default reports
 
-_reports_dir = './reports'  # the default location for the reports
+_reports_dir = os.environ.get('OPENMDAO_REPORTS_DIR', './reports')  # top dir for the reports
+
+_falsey = {'0', 'false', 'off', "none", ""}
 
 
 def _register_cmdline_report(name):
     global _cmdline_reports
     _cmdline_reports.add(name)
+
+
+def reports_active():
+    """
+    Return True if reports are active globally.
+
+    Returns
+    -------
+    bool
+        Return True if reports are active.
+    """
+    if 'TESTFLO_RUNNING' in os.environ:
+        return False
+
+    return not os.environ.get('OPENMDAO_REPORTS', 'true').lower() in _falsey
+
 
 
 def register_report(name, func, desc, class_name, method, pre_or_post, filename, inst_id=None,
@@ -73,7 +85,7 @@ def register_report(name, func, desc, class_name, method, pre_or_post, filename,
                                       pre_or_post, filename)
 
 
-def activate_report(name):
+def activate_report(name, instance=None):
     """
     Activate a report that has been registered with the reporting system.
 
@@ -81,27 +93,57 @@ def activate_report(name):
     ----------
     name : str
         Name of report. Report names must be unique across all reports.
+    instance : object or None
+        If not None, report will be activated only for this instance, assuming the instance
+        in the reports_registry is either None or matching.
     """
     global _reports_registry, _active_reports
 
-    if name in _active_reports:
-        raise ValueError(f"A report with the name {name} is already active.")
     if name not in _reports_registry:
         raise ValueError(f"No report with the name {name} is registered.")
     if name in _cmdline_reports:
         return  # skip it if it's already being run from the command line
 
-    func, _, class_name, inst_id, cond, method, pre_or_post, report_filename = \
+    if not reports_active():
+        return
+
+    inst_id = None if instance is None else instance._get_inst_id()
+
+    func, _, class_name, inst_id, report_cond, method, pre_or_post, report_filename = \
         _reports_registry[name]
+
+    if instance is not None and report_cond is not None and not report_cond(instance):
+        return  # condition violated for this instance
+
+    if name in _active_reports:
+        raise ValueError(f"A report with the name {name} is already active.")
+
+    if pre_or_post == 'pre':
+        _register_hook(method, class_name, pre=func, inst_id=inst_id, ncalls=1,
+                       report_filename=report_filename)
+    else:  # post
+        _register_hook(method, class_name, post=func, inst_id=inst_id, ncalls=1,
+                       report_filename=report_filename)
 
     _active_reports.add(name)
 
-    if pre_or_post == 'pre':
-        _register_hook(method, class_name, pre=func, inst_id=inst_id, ncalls=1, condition=cond,
-                       report_filename=report_filename)
-    else:  # post
-        _register_hook(method, class_name, post=func, inst_id=inst_id, ncalls=1, condition=cond,
-                       report_filename=report_filename)
+
+def activate_reports(reports, instance=None):
+    """
+    Activate multiple reports that have been registered with the reporting system.
+
+    Parameters
+    ----------
+    reports : iter of str
+        Names of reports. Report names must be unique across all reports.
+    instance : object or None
+        If not None, reports will be activated only for this instance.
+    """
+    for report_name in reports:
+        if report_name in _reports_registry:
+            activate_report(report_name, instance)
+        else:
+            issue_warning(f"Report '{report_name}' not found in reports registry.")
 
 
 def list_reports(out_stream=None):
@@ -177,44 +219,64 @@ def list_reports(out_stream=None):
 
 def set_reports_dir(reports_dir_path):
     """
-    Set the path to where the reports should go. By default, they go into the current directory.
+    Set the path to the top level reports directory. Defaults to './reports'.
 
     Parameters
     ----------
     reports_dir_path : str
-        Path to where the report directories should go.
+        Path to the top level reports directory.
     """
     global _reports_dir
     _reports_dir = reports_dir_path
 
 
-def get_reports_dir(prob):
+def get_reports_dir():
     """
-    Get the path to the directory where the report files should go.
-
-    If it doesn't exist, it will be created.
-
-    Parameters
-    ----------
-    prob : OpenMDAO Problem object
-        The report will be run on this Problem.
+    Get the path to the top level reports directory. Defaults to './reports'.
 
     Returns
     -------
     str
-        The path to the directory where reports should be written.
+        Path to the top level reports directory.
     """
-    if prob._reports_dir is not _UNDEFINED:
-        reports_dir = prob._reports_dir
-    else:
-        reports_dir = os.environ.get('OPENMDAO_REPORTS_DIR', _reports_dir)
+    return _reports_dir
 
-    problem_reports_dirpath = pathlib.Path(reports_dir).joinpath(f'{prob._name}')
 
-    if prob.comm.rank == 0:
-        pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
+def _reports2list(reports, defaults):
+    if reports in [True, _UNDEFINED]:
+        return defaults
+    if not reports:  # False or None or empty iter
+        return []
 
-    return problem_reports_dirpath
+    if isinstance(reports, str):
+        low = reports.lower()
+        if low in _falsey:
+            return []
+        if low in ['1', 'true', 'on', 'yes']:
+            return defaults
+        if low == 'all':
+            return list(_reports_registry)  # activate all registered reports
+
+        return [s.strip() for s in reports.split(',') if s.strip()]
+
+    return list(reports)
+
+
+def get_reports_to_activate(reports=_UNDEFINED):
+    """
+    Get the list of names of reports that should be activated.
+
+    Returns
+    -------
+    list of str
+        List of report names.
+    """
+    reps_env = os.environ.get('OPENMDAO_REPORTS', 'true')
+    env_list = _reports2list(reps_env, _default_reports[:])
+    if not env_list:
+        return ()  # do not do any reports globally, regardless of the value of reports
+
+    return _reports2list(reports, env_list)
 
 
 def clear_report_registry():
@@ -222,7 +284,6 @@ def clear_report_registry():
     Clear all of the reports from the registry.
     """
     global _reports_registry
-
     _reports_registry = {}
 
 
@@ -241,90 +302,3 @@ def clear_reports():
             _unregister_hook(method, class_name, inst_id=inst_id, post=func)
 
     _active_reports = set()
-
-
-def _should_report_run(reports, report_name):
-    # Utility function that checks the _reports attribute on Problem
-    #   to determine whether the report named "report_name" should be run
-    if isinstance(reports, str):
-        for r in reports.split(','):
-            if report_name == r.strip():
-                return True
-        else:
-            return False
-    elif isinstance(reports, bool):
-        return reports
-    elif reports is None:
-        return False
-
-    return True
-
-
-# N2 report definition
-def _run_n2_report(prob, report_filename=None):
-
-    n2_filepath = str(pathlib.Path(get_reports_dir(prob)).joinpath(report_filename))
-    try:
-        n2(prob, show_browser=False, outfile=n2_filepath, display_in_notebook=False)
-    except RuntimeError as err:
-        # We ignore this error
-        if str(err) != "Can't compute total derivatives unless " \
-                       "both 'of' or 'wrt' variables have been specified.":
-            raise err
-
-
-# scaling report definition
-def _run_scaling_report(driver, report_filename=None):
-
-    prob = driver._problem()
-    scaling_filepath = str(pathlib.Path(get_reports_dir(prob)).joinpath(report_filename))
-
-    try:
-        prob.driver.scaling_report(outfile=scaling_filepath, show_browser=False)
-
-    # Need to handle the coloring and scaling reports which can fail in this way
-    #   because total Jacobian can't be computed
-    except RuntimeError as err:
-        if str(err) != "Can't compute total derivatives unless " \
-                       "both 'of' or 'wrt' variables have been specified.":
-            raise err
-
-
-def _do_n2(prob):
-    return _should_report_run(prob._reports, 'n2')
-
-
-def _do_scaling(driver):
-    return _should_report_run(driver._problem()._reports, 'scaling')
-
-
-register_report('n2', _run_n2_report, 'N2 diagram', 'Problem', 'final_setup', 'post',
-                _default_n2_filename, None, condition=_do_n2)
-register_report('scaling', _run_scaling_report, 'Driver scaling report', 'Driver',
-                '_compute_totals', 'post', _default_scaling_filename, None, condition=_do_scaling)
-
-
-def setup_reports():
-    """
-    Set up the active reports for an OpenMDAO run.
-    """
-    if 'TESTFLO_RUNNING' in os.environ:
-        return
-
-    reps = os.environ.get('OPENMDAO_REPORTS', 'true').lower()
-    if reps in ['0', 'false', 'off', "none", ""]:
-        return  # do not do any reports
-
-    if reps in ['1', 'true', 'on', "all"]:
-        reports_on = _default_reports[:]
-    else:
-        reports_on = [s.strip() for s in os.environ['OPENMDAO_REPORTS'].split(',') if s.strip()]
-
-    for report_name in reports_on:
-        if report_name in _reports_registry:
-            activate_report(report_name)
-        else:
-            issue_warning(f"Report '{report_name}' not found in reports registry.")
-
-
-setup_reports()

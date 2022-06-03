@@ -4223,6 +4223,24 @@ class System(object):
                 if hasattr(nl, 'linesearch') and nl.linesearch:
                     nl.linesearch._iter_count = 0
 
+    def get_reports_dir(self):
+        """
+        Get the path to the directory where the report files should go.
+
+        If it doesn't exist, it will be created.
+
+        Parameters
+        ----------
+        obj : Problem, Driver, Solver, or System
+            The report will be run in the context of this Problem or the Problem this object belongs to.
+
+        Returns
+        -------
+        str
+            The path to the directory where reports should be written.
+        """
+        return self._problem_meta['reports_dir']
+
     def _set_finite_difference_mode(self, active):
         """
         Turn on or off finite difference mode.
