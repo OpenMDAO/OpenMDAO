@@ -96,7 +96,11 @@ def _run_hooks(hooks, inst):
         Object instance to pass to hook functions.
     """
     for hookmeta in hooks:
-        hook, ncalls, ex, kwargs, _ = hookmeta
+        hook, ncalls, ex, kwargs, _, condition = hookmeta
+        if not (condition is None or condition(inst)):
+            # condition wasn't met, so skip the hook execution
+            continue
+
         if ncalls is None:
             hook(inst, **kwargs)
             if ex:
@@ -105,13 +109,14 @@ def _run_hooks(hooks, inst):
             inst_id = inst._get_inst_id()
             if inst_id not in ncalls:
                 # must have been registered with 'None', meaning all instances, so get initial value
+                # for this instance
                 ncalls[inst_id] = ncalls[None]
 
             if ncalls[inst_id] > 0:
+                ncalls[inst_id] -= 1
                 hook(inst, **kwargs)
                 if ex:
                     sys.exit()
-                ncalls[inst_id] -= 1
 
 
 def _hook_decorator(f, inst, hookmeta):
@@ -199,7 +204,7 @@ def _get_hook_list_iters(class_name, inst_id, fname):
 
 
 def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=None, exit=False,
-                   **kwargs):
+                   condition=None, **kwargs):
     """
     Register a hook function.
 
@@ -223,6 +228,10 @@ def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=
     exit : bool
         If True, run sys.exit() after calling the hook function.  If post is registered, this
         affects only post, else it will affect pre.
+    condition : function
+        A function taking an instance argument that returns True if the hook should execute.
+        The check is performed at hook execution time, i.e. it can't prevent the hook from
+        being created, but can prevent it from executing when triggered.
     **kwargs : dict of keyword arguments
         Keyword arguments that will be passed to the hook function.
     """
@@ -232,10 +241,10 @@ def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=
     for pre_hooks, post_hooks in _get_hook_list_iters(class_name, inst_id, fname):
         if pre is not None and (ncalls is None or ncalls > 0):
             ncallsdict = {inst_id: ncalls} if ncalls is not None else ncalls
-            pre_hooks.append([pre, ncallsdict, exit and post is None, kwargs, inst_id])
+            pre_hooks.append([pre, ncallsdict, exit and post is None, kwargs, inst_id, condition])
         if post is not None and (ncalls is None or ncalls > 0):
             ncallsdict = {inst_id: ncalls} if ncalls is not None else ncalls
-            post_hooks.append([post, ncallsdict, exit, kwargs, inst_id])
+            post_hooks.append([post, ncallsdict, exit, kwargs, inst_id, condition])
 
 
 def _remove_hook(to_remove, hooks, class_name, fname, hook_loc, inst_id):
@@ -264,7 +273,7 @@ def _remove_hook(to_remove, hooks, class_name, fname, hook_loc, inst_id):
             hooks[:] = []
         else:
             for hook in hooks:
-                p, _, _, _, iid = hook
+                p, _, _, _, iid, _ = hook
                 if p is to_remove and iid == inst_id:
                     hooks.remove(hook)
                     break

@@ -263,5 +263,26 @@ class HooksTestCase(unittest.TestCase):
         self.assertEqual(prob['comp.x'], x0)
         self.assertEqual(prob['comp.y'], y0)
 
+    @hooks_active
+    def test_condition(self):
+        def chk_foobar(problem):
+            return problem._foobar > 0
+
+        hooks._register_hook('final_setup', 'Problem', pre=make_hook('pre_final'), post=make_hook('post_final'), condition=chk_foobar)
+        hooks._register_hook('final_setup', 'Problem', pre=make_hook('pre_final2'), post=make_hook('post_final2'))
+
+        prob = self.build_model()
+        prob._foobar = 1
+        prob.run_model()
+        prob._foobar = 0
+        prob.run_model()
+        prob._foobar = 1
+        prob.run_model()
+
+        self.assertEqual(prob.calls, ['pre_final', 'pre_final2', 'post_final', 'post_final2',
+                                      'pre_final2', 'post_final2',
+                                      'pre_final', 'pre_final2', 'post_final', 'post_final2',
+                                     ])
+
 if __name__ == '__main__':
     unittest.main()

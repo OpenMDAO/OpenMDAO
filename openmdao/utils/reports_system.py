@@ -18,7 +18,8 @@ from openmdao.core.driver import Driver
 from openmdao.utils.om_warnings import issue_warning
 
 # Keeping track of the registered reports
-_Report = namedtuple('Report', 'func desc class_name inst_id method pre_or_post report_filename')
+_Report = namedtuple('Report',
+                     'func desc class_name inst_id condition method pre_or_post report_filename')
 _reports_registry = {}
 _default_reports = ['n2', 'scaling']
 _active_reports = set()  # these reports will actually run (assuming their hook funcs are triggered)
@@ -32,40 +33,8 @@ def _register_cmdline_report(name):
     _cmdline_reports.add(name)
 
 
-# def report_function():
-#     """
-#     Decorate report functions. Handles getting the file path to where the report is written.
-
-#     Returns
-#     -------
-#     function
-#         The wrapper function.
-#     """
-#     def decorate(f):
-#         @wraps(f)
-#         def _wrapper(inst, **kwargs):
-#             if isinstance(inst, Problem):
-#                 prob = inst
-#             elif isinstance(inst, Driver):
-#                 prob = inst._problem()
-#             else:
-#                 raise ValueError("User defined reports currently can only be registered "
-#                                  "on Problems and Drivers")
-
-#             problem_reports_dirpath = get_reports_dir(prob)
-#             if prob.comm.rank == 0:
-#                 pathlib.Path(problem_reports_dirpath).mkdir(parents=True, exist_ok=True)
-
-#             report_filename = kwargs['report_filename']
-#             user_defined_report_filepath = \
-#                 str(pathlib.Path(problem_reports_dirpath).joinpath(report_filename))
-
-#             f(inst, user_defined_report_filepath)
-#         return _wrapper
-#     return decorate
-
-
-def register_report(name, func, desc, class_name, method, pre_or_post, filename, inst_id=None):
+def register_report(name, func, desc, class_name, method, pre_or_post, filename, inst_id=None,
+                    condition=None):
     """
     Register a report with the reporting system.
 
@@ -88,6 +57,9 @@ def register_report(name, func, desc, class_name, method, pre_or_post, filename,
     inst_id : str or None
         Either the instance ID of an OpenMDAO object (e.g. Problem, Driver) or None.
         If None, then this report will be run for all objects of type class_name.
+    condition : function or None
+        Function taking the instance as an arg that returns True if the report should run for
+        that instance.
     """
     global _reports_registry
 
@@ -97,9 +69,8 @@ def register_report(name, func, desc, class_name, method, pre_or_post, filename,
         raise ValueError("The argument 'pre_or_post' can only have values of 'pre' or 'post', "
                          f"but {pre_or_post} was given")
 
-    _reports_registry[name] = _Report(func, desc, class_name, inst_id, method, pre_or_post,
-                                      filename)
-
+    _reports_registry[name] = _Report(func, desc, class_name, inst_id, condition, method,
+                                      pre_or_post, filename)
 
 
 def activate_report(name):
@@ -120,13 +91,16 @@ def activate_report(name):
     if name in _cmdline_reports:
         return  # skip it if it's already being run from the command line
 
-    func, _, class_name, inst_id, method, pre_or_post, report_filename = _reports_registry[name]
+    func, _, class_name, inst_id, cond, method, pre_or_post, report_filename = \
+        _reports_registry[name]
+
     _active_reports.add(name)
+
     if pre_or_post == 'pre':
-        _register_hook(method, class_name, pre=func, inst_id=inst_id, ncalls=1,
+        _register_hook(method, class_name, pre=func, inst_id=inst_id, ncalls=1, condition=cond,
                        report_filename=report_filename)
     else:  # post
-        _register_hook(method, class_name, post=func, inst_id=inst_id, ncalls=1,
+        _register_hook(method, class_name, post=func, inst_id=inst_id, ncalls=1, condition=cond,
                        report_filename=report_filename)
 
 
@@ -260,7 +234,7 @@ def clear_reports():
 
     # need to remove the hooks
     for name in _active_reports:
-        func, _, class_name, inst_id, method, pre_or_post, _ = _reports_registry[name]
+        func, _, class_name, inst_id, _, method, pre_or_post, _ = _reports_registry[name]
         if pre_or_post == "pre":
             _unregister_hook(method, class_name, inst_id=inst_id, pre=func)
         else:
@@ -287,7 +261,7 @@ def _should_report_run(reports, report_name):
 
 
 # N2 report definition
-def run_n2_report(prob, report_filename=None):
+def _run_n2_report(prob, report_filename=None):
 
     n2_filepath = str(pathlib.Path(get_reports_dir(prob)).joinpath(report_filename))
     try:
@@ -295,12 +269,12 @@ def run_n2_report(prob, report_filename=None):
     except RuntimeError as err:
         # We ignore this error
         if str(err) != "Can't compute total derivatives unless " \
-                        "both 'of' or 'wrt' variables have been specified.":
+                       "both 'of' or 'wrt' variables have been specified.":
             raise err
 
 
 # scaling report definition
-def run_scaling_report(driver, report_filename=None):
+def _run_scaling_report(driver, report_filename=None):
 
     prob = driver._problem()
     scaling_filepath = str(pathlib.Path(get_reports_dir(prob)).joinpath(report_filename))
@@ -312,14 +286,22 @@ def run_scaling_report(driver, report_filename=None):
     #   because total Jacobian can't be computed
     except RuntimeError as err:
         if str(err) != "Can't compute total derivatives unless " \
-                        "both 'of' or 'wrt' variables have been specified.":
+                       "both 'of' or 'wrt' variables have been specified.":
             raise err
 
 
-register_report('n2', run_n2_report, 'N2 diagram', 'Problem', 'final_setup', 'post',
-                _default_n2_filename, None)
-register_report('scaling', run_scaling_report, 'Driver scaling report', 'Driver', '_compute_totals',
-                'post', _default_scaling_filename, None)
+def _do_n2(prob):
+    return _should_report_run(prob._reports, 'n2')
+
+
+def _do_scaling(driver):
+    return _should_report_run(driver._problem()._reports, 'scaling')
+
+
+register_report('n2', _run_n2_report, 'N2 diagram', 'Problem', 'final_setup', 'post',
+                _default_n2_filename, None, condition=_do_n2)
+register_report('scaling', _run_scaling_report, 'Driver scaling report', 'Driver',
+                '_compute_totals', 'post', _default_scaling_filename, None, condition=_do_scaling)
 
 
 def setup_reports():

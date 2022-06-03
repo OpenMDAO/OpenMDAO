@@ -14,7 +14,7 @@ from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.assert_utils import assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.reports_system import set_reports_dir, _reports_dir, register_report, \
-    list_reports, clear_reports, run_n2_report, setup_reports, get_reports_dir
+    list_reports, clear_reports, run_n2_report, setup_reports, get_reports_dir, activate_report
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
 from openmdao.utils.tests.test_hooks import hooks_active
@@ -238,7 +238,7 @@ class TestReportsSystem(unittest.TestCase):
         # # @report_function(user_report_filename)
         # @report_function()
         def user_defined_report(prob, report_filename):
-            path = pathlib.Path(os.getcwd()).joinpath(_reports_dir, prob._name, report_filename)
+            path = pathlib.Path(get_reports_dir(prob)).joinpath(report_filename)
             with open(path, "w") as f:
                 f.write(f"Do some reporting on the Problem, {prob._name}\n")
 
@@ -251,7 +251,7 @@ class TestReportsSystem(unittest.TestCase):
                         "user defined report description",
                         'Problem', 'setup', 'pre', user_report_filename)
 
-        pathlib.Path(_reports_dir).joinpath(prob._name).mkdir(parents=True, exist_ok=True)
+        #pathlib.Path(_reports_dir).joinpath(prob._name).mkdir(parents=True, exist_ok=True)
 
         setup_reports()  # So it sees the OPENMDAO_REPORTS var
 
@@ -274,27 +274,27 @@ class TestReportsSystem(unittest.TestCase):
 
         # # @report_function(user_report_filename)
         # @report_function()
-        def user_defined_report(prob, report_filepath):
-            report_filepath = report_filepath.format(count=self.count)
+        def user_defined_report(prob, report_filename):
+            report_filepath = pathlib.Path(get_reports_dir(prob)).joinpath(report_filename.format(count=self.count))
             with open(report_filepath, "w") as f:
                 f.write(f"Do some reporting on the Problem, {prob._name}\n")
             self.count += 1
 
         for method in ['setup', 'final_setup', 'run_driver']:
             for pre_or_post in ['pre', 'post']:
-                register_report(f"User defined report {method} {pre_or_post}", user_defined_report,
+                repname = f"User defined report {method} {pre_or_post}"
+                register_report(repname, user_defined_report,
                                 "user defined report", 'Problem', method, pre_or_post,
                                 user_report_filename)
+                activate_report(repname)
 
         prob = self.setup_and_run_simple_problem()
-
-        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
 
         self.count = 0
         for _ in ['setup', 'final_setup', 'run_driver']:
             for _ in ['pre', 'post']:
                 user_report_filename = f"user_defined_{self.count}.txt"
-                path = pathlib.Path(problem_reports_dir).joinpath(user_report_filename)
+                path = pathlib.Path(get_reports_dir(prob)).joinpath(user_report_filename)
                 self.assertTrue(path.is_file(),
                                 f'The user defined report file, {str(path)} was not found')
                 self.count += 1
