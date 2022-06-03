@@ -19,7 +19,7 @@ class OmDiagram extends Diagram {
         super(modelJSON, false);
 
         // Solver tree initial dimensions are the same as the model tree
-        this.dims.size.solverTree = structuredClone(this.dims.size.partitionTree);
+        this.dims.size.solverTree = {...this.dims.size.partitionTree};
 
         this._init();
     }

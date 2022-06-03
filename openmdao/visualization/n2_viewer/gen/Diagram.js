@@ -39,7 +39,7 @@ class Diagram {
         this.manuallyResized = false; // If the diagram has been sized by the user
 
         // Assign this way because defaultDims is read-only.
-        this.dims = structuredClone(defaultDims);
+        this.dims = {...defaultDims};
 
         this._referenceD3Elements();
         this.transitionStartDelay = transitionDefaults.startDelay;
