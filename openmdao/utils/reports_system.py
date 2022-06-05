@@ -5,6 +5,7 @@ Utility functions related to the reporting system which generates reports by def
 from collections import namedtuple
 import sys
 import os
+import inspect
 
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.mpi import MPI
@@ -100,7 +101,8 @@ def activate_report(name, instance=None):
     global _reports_registry, _active_reports
 
     if name not in _reports_registry:
-        raise ValueError(f"No report with the name {name} is registered.")
+        issue_warning(f"No report with the name {name} is registered.")
+        return
     if name in _cmdline_reports:
         return  # skip it if it's already being run from the command line
 
@@ -109,14 +111,15 @@ def activate_report(name, instance=None):
 
     inst_id = None if instance is None else instance._get_inst_id()
 
-    func, _, class_name, inst_id, report_cond, method, pre_or_post, report_filename = \
+    func, _, class_name, _inst_id, report_cond, method, pre_or_post, report_filename = \
         _reports_registry[name]
 
     if instance is not None and report_cond is not None and not report_cond(instance):
         return  # condition violated for this instance
 
-    if name in _active_reports:
-        raise ValueError(f"A report with the name {name} is already active.")
+    if (name, inst_id) in _active_reports:
+        raise ValueError(f"A report with the name '{name}' for instance '{inst_id}' is already "
+                         "active.")
 
     if pre_or_post == 'pre':
         _register_hook(method, class_name, pre=func, inst_id=inst_id, ncalls=1,
@@ -125,25 +128,29 @@ def activate_report(name, instance=None):
         _register_hook(method, class_name, post=func, inst_id=inst_id, ncalls=1,
                        report_filename=report_filename)
 
-    _active_reports.add(name)
+    _active_reports.add((name, inst_id))
 
 
-def activate_reports(reports, instance=None):
+def activate_reports(reports, instance):
     """
-    Activate multiple reports that have been registered with the reporting system.
+    Activate any matching reports.
 
     Parameters
     ----------
-    reports : iter of str
-        Names of reports. Report names must be unique across all reports.
-    instance : object or None
-        If not None, reports will be activated only for this instance.
+    reports : list of str
+        List of report names that should be active.  These names come down from the Problem
+        and some may refer to Problem reports while others may refer to Driver reports.
     """
-    for report_name in reports:
-        if report_name in _reports_registry:
-            activate_report(report_name, instance)
-        else:
-            issue_warning(f"Report '{report_name}' not found in reports registry.")
+    cnames = {c.__name__ for c in inspect.getmro(instance.__class__)}
+    for name in reports:
+        try:
+            class_name = _reports_registry[name][2]
+        except KeyError:
+            issue_warning(f"Report with name '{name}' not found in reports registry.")
+            continue
+
+        if class_name in cnames:  # report corresponds to our class
+            activate_report(name, instance)
 
 
 def list_reports(out_stream=None):
@@ -273,9 +280,6 @@ def get_reports_to_activate(reports=_UNDEFINED):
     """
     reps_env = os.environ.get('OPENMDAO_REPORTS', 'true')
     env_list = _reports2list(reps_env, _default_reports[:])
-    if not env_list:
-        return ()  # do not do any reports globally, regardless of the value of reports
-
     return _reports2list(reports, env_list)
 
 
@@ -287,18 +291,27 @@ def clear_report_registry():
     _reports_registry = {}
 
 
-def clear_reports():
+def clear_reports(instance=None):
     """
     Clear all of the currently active reports.
     """
     global _active_reports, _reports_registry
 
+    inst_id = None if instance is None else instance._get_inst_id()
+
+    to_remove = set()
+
     # need to remove the hooks
-    for name in _active_reports:
-        func, _, class_name, inst_id, _, method, pre_or_post, _ = _reports_registry[name]
+    for name, active_inst_id in _active_reports:
+        if instance is None:
+            inst_id = active_inst_id
+        elif inst_id != active_inst_id:
+            continue
+        func, _, class_name, _, _, method, pre_or_post, _ = _reports_registry[name]
         if pre_or_post == "pre":
             _unregister_hook(method, class_name, inst_id=inst_id, pre=func)
         else:
             _unregister_hook(method, class_name, inst_id=inst_id, post=func)
+        to_remove.add((name, active_inst_id))
 
-    _active_reports = set()
+    _active_reports -= to_remove

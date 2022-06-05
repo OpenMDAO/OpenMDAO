@@ -5,6 +5,7 @@ import pprint
 import os
 import weakref
 import pathlib
+import inspect
 
 from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
@@ -41,7 +42,8 @@ from openmdao.utils.logger_utils import get_logger, TestLogger
 from openmdao.utils.hooks import _setup_hooks
 from openmdao.utils.indexer import indexer
 from openmdao.utils.record_util import create_local_meta
-from openmdao.utils.reports_system import get_reports_dir, get_reports_to_activate, activate_reports
+from openmdao.utils.reports_system import get_reports_dir, get_reports_to_activate, \
+    activate_reports, clear_reports
 from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable, \
     _find_dict_meta
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
@@ -153,9 +155,13 @@ class Problem(object):
         """
         global _problem_names
 
+        self._driver = None
+
         # ensure that default reports (n2, scaling) are imported
         import openmdao.visualization.n2_viewer.n2_viewer
         import openmdao.visualization.scaling_viewer.scaling_report
+
+        self._reports = get_reports_to_activate(reports)
 
         self.cite = CITATION
 
@@ -266,10 +272,13 @@ class Problem(object):
                                             '(processed post-includes). Uses fnmatch wildcards')
 
         # register hooks for any reports
-        activate_reports(get_reports_to_activate(reports), self)
+        self._setup_reports()
 
         # So Problem and driver can have hooks attached to their methods
         _setup_hooks(self)
+
+    def _setup_reports(self):
+        activate_reports(self._reports, self)
 
     def _get_var_abs_name(self, name):
         if name in self.model._var_allprocs_abs2meta:
@@ -300,9 +309,13 @@ class Problem(object):
         """
         Set this system's nonlinear solver.
         """
+        if self._driver is not None:
+            # remove any driver reports
+            clear_reports(self._driver)
         self._driver = driver
         driver._set_problem(self)
-        _setup_hooks(self.driver)
+        activate_reports(self._reports, driver)
+        _setup_hooks(driver)
 
     @property
     def msginfo(self):

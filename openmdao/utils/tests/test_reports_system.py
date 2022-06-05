@@ -241,7 +241,7 @@ class TestReportsSystem(unittest.TestCase):
         # # @report_function(user_report_filename)
         # @report_function()
         def user_defined_report(prob, report_filename):
-            path = pathlib.Path(get_reports_dir(prob)).joinpath(report_filename)
+            path = pathlib.Path(prob.get_reports_dir()).joinpath(report_filename)
             with open(path, "w") as f:
                 f.write(f"Do some reporting on the Problem, {prob._name}\n")
 
@@ -278,7 +278,7 @@ class TestReportsSystem(unittest.TestCase):
         # # @report_function(user_report_filename)
         # @report_function()
         def user_defined_report(prob, report_filename):
-            report_filepath = pathlib.Path(get_reports_dir(prob)).joinpath(report_filename.format(count=self.count))
+            report_filepath = pathlib.Path(prob.get_reports_dir()).joinpath(report_filename.format(count=self.count))
             with open(report_filepath, "w") as f:
                 f.write(f"Do some reporting on the Problem, {prob._name}\n")
             self.count += 1
@@ -297,7 +297,7 @@ class TestReportsSystem(unittest.TestCase):
         for _ in ['setup', 'final_setup', 'run_driver']:
             for _ in ['pre', 'post']:
                 user_report_filename = f"user_defined_{self.count}.txt"
-                path = pathlib.Path(get_reports_dir(prob)).joinpath(user_report_filename)
+                path = pathlib.Path(prob.get_reports_dir()).joinpath(user_report_filename)
                 self.assertTrue(path.is_file(),
                                 f'The user defined report file, {str(path)} was not found')
                 self.count += 1
