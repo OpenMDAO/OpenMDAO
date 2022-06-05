@@ -1145,6 +1145,20 @@ class ExplCompTestCase(unittest.TestCase):
         self.assertEqual(prob.model.cycle.d1.iter_count_apply, 10)
         self.assertEqual(prob.model.cycle.d2.iter_count_apply, 10)
 
+    def test_set_solvers(self):
+        rc = RectangleComp()
+        with self.assertRaises(Exception) as cm:
+            rc.linear_solver = om.LinearBlockGS()
+
+        self.assertEqual(cm.exception.args[0],
+                         "<class RectangleComp>: Explicit components don't support linear solvers.")
+
+        with self.assertRaises(Exception) as cm:
+            rc.nonlinear_solver = om.NonlinearBlockGS()
+
+        self.assertEqual(cm.exception.args[0],
+                         "<class RectangleComp>: Explicit components don't support nonlinear solvers.")
+
 
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestMPIExplComp(unittest.TestCase):

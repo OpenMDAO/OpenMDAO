@@ -40,6 +40,34 @@ class ExplicitComponent(Component):
         self._has_compute_partials = overrides_method('compute_partials', self, ExplicitComponent)
         self.options.undeclare('assembled_jac_type')
 
+    @property
+    def nonlinear_solver(self):
+        """
+        Get the nonlinear solver for this system.
+        """
+        return self._nonlinear_solver
+
+    @nonlinear_solver.setter
+    def nonlinear_solver(self, solver):
+        """
+        Raise an exception.
+        """
+        raise RuntimeError(f"{self.msginfo}: Explicit components don't support nonlinear solvers.")
+
+    @property
+    def linear_solver(self):
+        """
+        Get the linear solver for this system.
+        """
+        return self._linear_solver
+
+    @linear_solver.setter
+    def linear_solver(self, solver):
+        """
+        Raise an exception.
+        """
+        raise RuntimeError(f"{self.msginfo}: Explicit components don't support linear solvers.")
+
     def _configure(self):
         """
         Configure this system to assign children settings and detect if matrix_free.
