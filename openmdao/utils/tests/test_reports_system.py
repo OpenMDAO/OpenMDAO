@@ -30,9 +30,6 @@ OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
-from openmdao.utils.units import NumberDict, PhysicalUnit, _find_unit, import_library, \
-    add_unit, add_offset_unit, unit_conversion, get_conversion, simplify_unit
-
 @use_tempdirs
 class TestReportsSystem(unittest.TestCase):
 
