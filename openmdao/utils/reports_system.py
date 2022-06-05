@@ -45,7 +45,6 @@ def reports_active():
     return not os.environ.get('OPENMDAO_REPORTS', 'true').lower() in _falsey
 
 
-
 def register_report(name, func, desc, class_name, method, pre_or_post, filename, inst_id=None,
                     condition=None):
     """
@@ -113,6 +112,13 @@ def activate_report(name, instance=None):
 
     func, _, class_name, _inst_id, report_cond, method, pre_or_post, report_filename = \
         _reports_registry[name]
+
+    # handle case where report was registered for a specific inst_id
+    if _inst_id is not None:
+        if inst_id is None:
+            inst_id = _inst_id
+        elif inst_id != _inst_id:
+            return
 
     if instance is not None and report_cond is not None and not report_cond(instance):
         return  # condition violated for this instance
@@ -235,6 +241,17 @@ def set_reports_dir(reports_dir_path):
     """
     global _reports_dir
     _reports_dir = reports_dir_path
+
+
+def _reset_reports_dir():
+    """
+    Reset the path to the top level reports directory from the environment or to './reports'.
+
+    This is used during testing, where environment variables are sometimes modified during
+    the test.
+    """
+    global _reports_dir
+    _reports_dir = os.environ.get('OPENMDAO_REPORTS_DIR', './reports')
 
 
 def get_reports_dir():

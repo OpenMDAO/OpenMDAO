@@ -106,7 +106,7 @@ class Problem(object):
         Pointer to the top-level <System> object (root node in the tree).
     comm : MPI.Comm or <FakeComm>
         The global communicator.
-    _driver : <Driver>
+    driver : <Driver>
         Slot for the driver. The default driver is `Driver`, which just runs
         the model once.
     _mode : 'fwd' or 'rev'
@@ -2220,7 +2220,8 @@ class Problem(object):
         Parameters
         ----------
         obj : Problem, Driver, Solver, or System
-            The report will be run in the context of this Problem or the Problem this object belongs to.
+            The report will be run in the context of this Problem or the Problem this object
+            belongs to.
 
         Returns
         -------
@@ -2233,6 +2234,7 @@ class Problem(object):
             pathlib.Path(reports_dirpath).mkdir(parents=True, exist_ok=True)
 
         return reports_dirpath
+
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
                               compact_print, system_list, global_options, totals=False,

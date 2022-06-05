@@ -17,19 +17,15 @@ import sys
 # 'fname'.
 _hooks = {}
 
-# classes found here are known to contain no hooks within themselves or their ancestors
-_hook_skip_classes = set()
-
 # global switch that turns hook machinery on/off. Need it on in general for the default
 # reporting system
 use_hooks = True
 
 
 def _reset_all_hooks():
-    global _hooks, _hook_skip_classes
+    global _hooks
 
     _hooks = {}
-    _hook_skip_classes = set()
 
 
 def _setup_hooks(obj):
@@ -41,13 +37,13 @@ def _setup_hooks(obj):
     obj : object
         The object whose methods may be wrapped.
     """
-    global _hooks, _hook_skip_classes
+    global _hooks
 
     # _setup_hooks should be called after 'obj' can return a valid name from _get_inst_id().
     # For example, in Problem, it can happen in __init__, but in Component and Group it shouldn't
     # happen until _setup_procs because that's the earliest point where the component/group has a
     # valid pathname.
-    if use_hooks and obj.__class__ not in _hook_skip_classes:
+    if use_hooks:
 
         classes = inspect.getmro(obj.__class__)
         for c in classes:
@@ -55,8 +51,6 @@ def _setup_hooks(obj):
                 classmeta = _hooks[c.__name__]
                 break
         else:
-            # didn't find any matching hooks for this class or any base class, so skip in future
-            _hook_skip_classes.update(classes)
             return
 
         # any object where we register hooks must define the '_get_inst_id' method.

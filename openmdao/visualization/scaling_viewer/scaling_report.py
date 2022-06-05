@@ -575,7 +575,6 @@ def _scaling_cmd(options, user_args):
     _load_and_exec(options.file[0], user_args)
 
 
-
 # scaling report definition
 def _run_scaling_report(driver, report_filename=None):
 
