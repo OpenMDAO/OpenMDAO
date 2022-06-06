@@ -248,7 +248,7 @@ class SchurSolver(NonlinearSolver):
             print(subsys2._outputs.asarray())
 
             print("\nResiduals:")
-            print(subsys2._residuals.asarray())
+            print(subsys2._residuals.asarray(), flush=True)
 
         # ideally, we are solving for all outputs in subsys2
         # so this will be our jacobian size
@@ -292,13 +292,13 @@ class SchurSolver(NonlinearSolver):
             if system.comm.rank == 0:
                 print(f"\nComputing Jacobian columns for {var}")
                 print(f"B[:,{ii}]                    =", subsys1._vectors['residual']['linear'].asarray())
-                print(f"|B[:,{ii}]|                  =", np.linalg.norm(subsys1._vectors['residual']['linear'].asarray()))
+                print(f"|B[:,{ii}]|                  =", np.linalg.norm(subsys1._vectors['residual']['linear'].asarray()), flush=True)
 
             # using the result from this jac-vec product, solve the RHS for this subsystem
             subsys1._solve_linear(["linear"], "fwd", ContainsAll())
             if system.comm.rank == 0:
                 print(f"A^-1 B[:,{ii}]               =", subsys1._vectors['output']['linear'].asarray())
-                print(f"|A^-1 B[:,{ii}]|             =", np.linalg.norm(subsys1._vectors['output']['linear'].asarray()))
+                print(f"|A^-1 B[:,{ii}]|             =", np.linalg.norm(subsys1._vectors['output']['linear'].asarray()), flush=True)
 
             # do another mat-mult with the solution of this linear system, we want to get the final
             # jacobian using the schur method here, so we will need to do a bit more math
@@ -306,7 +306,7 @@ class SchurSolver(NonlinearSolver):
             # first negate the vector from the linear solve
             subsys1._vectors['output']['linear'] *= -1.
             if system.comm.rank == 0:
-                print("seed for C | D            =", system._vectors['output']['linear'].asarray())
+                print("seed for C | D            =", system._vectors['output']['linear'].asarray(), flush=True)
 
             # finally, set the seed of the variable to 1 as well to get the diagonal contribution
             # system._vectors["output"]["linear"][f"{subsys2.name}.{var}"]
@@ -321,7 +321,7 @@ class SchurSolver(NonlinearSolver):
 
             # the result is the final jacobian for this using the schur complement method
             if system.comm.rank == 0:
-                print(f"D[:,{ii}] - C A^-1 B[:,{ii}]    =", subsys2._vectors['residual']['linear'].asarray())
+                print(f"D[:,{ii}] - C A^-1 B[:,{ii}]    =", subsys2._vectors['residual']['linear'].asarray(), flush=True)
 
             # quit()
 
@@ -365,7 +365,7 @@ class SchurSolver(NonlinearSolver):
         d_subsys2 = scipy.linalg.solve(schur_jac, subsys2._vectors['residual']['linear'].asarray())
 
         if system.comm.rank == 0:
-            print("update vector:", d_subsys2)
+            print("update vector:", d_subsys2, flush=True)
 
         # # the R1 should already be zero from the solve subsystems call
         # # R1 = system._residuals['group1.x1'][0]
