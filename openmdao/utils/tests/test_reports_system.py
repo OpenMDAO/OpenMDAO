@@ -60,7 +60,7 @@ class TestReportsSystem(unittest.TestCase):
     def setup_and_run_simple_problem(self, driver=None, reports=_UNDEFINED, reports_dir=_UNDEFINED):
         if reports_dir is not _UNDEFINED:
             set_reports_dir(reports_dir)
-            
+
         prob = om.Problem(reports=reports)
         model = prob.model
 
@@ -210,12 +210,46 @@ class TestReportsSystem(unittest.TestCase):
                          f'The scaling report file, {str(path)}, was found but should not have')
 
     @hooks_active
+    def test_report_generation_selected_reports_override_env_var(self):
+        # test use of problem reports to override OPENMDAO_REPORTS
+        os.environ['OPENMDAO_REPORTS'] = 'n2'
+        clear_reports()
+
+        prob = self.setup_and_run_simple_problem(reports=['n2', 'scaling'])
+
+        # See if the report files exist and if they have the right names
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
+
+        path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
+        self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
+        self.assertTrue(path.is_file(), f'The scaling report file, {str(path)} was not found')
+
+    @hooks_active
+    def test_report_generation_selected_reports_override_env_var2(self):
+        # test use of problem reports to override OPENMDAO_REPORTS
+        os.environ['OPENMDAO_REPORTS'] = 'n2,scaling'
+        clear_reports()
+
+        prob = self.setup_and_run_simple_problem(reports=False)
+
+        # See if the report files exist and if they have the right names
+        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
+
+        path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
+        self.assertFalse(path.is_file(),
+                         f'The N2 report file, {str(path)}, was found but should not have')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
+        self.assertFalse(path.is_file(),
+                         f'The scaling report file, {str(path)}, was found but should not have')
+
+    @hooks_active
     def test_report_generation_set_reports_dir_using_env_var(self):
         # test use of setting a custom reports directory other than the default of "."
         custom_dir = 'custom_reports_dir'
         os.environ['OPENMDAO_REPORTS_DIR'] = custom_dir
         _reset_reports_dir()  # this will use current value of OPENMDAO_REPORTS_DIR
-        
+
         prob = self.setup_and_run_simple_problem()
 
         # See if the report files exist and if they have the right names
