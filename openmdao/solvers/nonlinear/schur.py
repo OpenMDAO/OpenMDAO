@@ -340,9 +340,27 @@ class SchurSolver(NonlinearSolver):
         subsys2._vectors['residual']['linear'].set_vec(subsys2._residuals)
         subsys2._vectors['residual']['linear'] *= -1.0
 
+        # custom_jac = np.zeros((3,3))
+        # custom_jac[0, :] = np.array([
+        #     -0.00940017,
+        #     -0.00261924,
+        #     0.1737319
+        # ])
+        # custom_jac[1, :] = np.array([
+        #     -0.00152532,
+        #     -0.00149961,
+        #     7.83679413e-05
+        # ])
+        # custom_jac[2, :] = np.array([
+        #     -2.43617362,
+        #     -0.5398966,
+        #     -45.166525
+        # ])
+
         if system.comm.rank == 0:
             print("Schur Jacobian:\n", schur_jac, flush=True)
-        system.comm.barrier()
+            # print("My    Jacobian:\n", custom_jac, flush=True)
+        # system.comm.barrier()
 
         d_subsys2 = scipy.linalg.solve(schur_jac, subsys2._vectors['residual']['linear'].asarray())
 
