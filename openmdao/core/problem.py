@@ -106,7 +106,7 @@ class Problem(object):
         Pointer to the top-level <System> object (root node in the tree).
     comm : MPI.Comm or <FakeComm>
         The global communicator.
-    driver : <Driver>
+    _driver : <Driver>
         Slot for the driver. The default driver is `Driver`, which just runs
         the model once.
     _mode : 'fwd' or 'rev'
@@ -128,6 +128,8 @@ class Problem(object):
         Dictionary with problem recording options.
     _rec_mgr : <RecordingManager>
         Object that manages all recorders added to this problem.
+    _reports : list of str
+        Names of reports to activate for this Problem.
     _check : bool
         If True, call check_config at the end of final_setup.
     _filtered_vars_to_record : dict
@@ -207,12 +209,14 @@ class Problem(object):
                             ": The value provided for 'model' is not a valid System.")
 
         if driver is None:
-            self.driver = Driver()
-        elif isinstance(driver, Driver):
-            self.driver = driver
-        else:
+            driver = Driver()
+        elif not isinstance(driver, Driver):
             raise TypeError(self.msginfo +
                             ": The value provided for 'driver' is not a valid Driver.")
+
+        # can't use driver property here without causing a lint error, so just do it manually
+        self._update_reports(driver)
+        self._driver = driver
 
         self.comm = comm
 
@@ -304,18 +308,26 @@ class Problem(object):
         """
         return self._driver
 
+    def _update_reports(self, driver):
+        if self._driver is not None:
+            # remove any driver reports
+            clear_reports(self._driver)
+        driver._set_problem(self)
+        activate_reports(self._reports, driver)
+        _setup_hooks(driver)
+
     @driver.setter
     def driver(self, driver):
         """
         Set this system's nonlinear solver.
+
+        Parameters
+        ----------
+        driver : <Driver>
+            Driver to be set to our _driver attribute.
         """
-        if self._driver is not None:
-            # remove any driver reports
-            clear_reports(self._driver)
+        self._update_reports(driver)
         self._driver = driver
-        driver._set_problem(self)
-        activate_reports(self._reports, driver)
-        _setup_hooks(driver)
 
     @property
     def msginfo(self):
@@ -2216,12 +2228,6 @@ class Problem(object):
         Get the path to the directory where the report files should go.
 
         If it doesn't exist, it will be created.
-
-        Parameters
-        ----------
-        obj : Problem, Driver, Solver, or System
-            The report will be run in the context of this Problem or the Problem this object
-            belongs to.
 
         Returns
         -------

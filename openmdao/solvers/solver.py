@@ -509,12 +509,6 @@ class Solver(object):
 
         If it doesn't exist, it will be created.
 
-        Parameters
-        ----------
-        obj : Problem, Driver, Solver, or System
-            The report will be run in the context of this Problem or the Problem this object
-            belongs to.
-
         Returns
         -------
         str

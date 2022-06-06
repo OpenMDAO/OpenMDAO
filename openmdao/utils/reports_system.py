@@ -146,6 +146,8 @@ def activate_reports(reports, instance):
     reports : list of str
         List of report names that should be active.  These names come down from the Problem
         and some may refer to Problem reports while others may refer to Driver reports.
+    instance : object
+        The reports will be activated for this instance.
     """
     cnames = {c.__name__ for c in inspect.getmro(instance.__class__)}
     for name in reports:
@@ -290,6 +292,11 @@ def get_reports_to_activate(reports=_UNDEFINED):
     """
     Get the list of names of reports that should be activated.
 
+    Parameters
+    ----------
+    reports : str, list of str, _UNDEFINED, or None
+        Indicates which report(s) are to be activated.
+
     Returns
     -------
     list of str
@@ -311,6 +318,11 @@ def clear_report_registry():
 def clear_reports(instance=None):
     """
     Clear all of the currently active reports.
+
+    Parameters
+    ----------
+    instance : object or None
+        If not None, only clear reports for this instance.
     """
     global _active_reports, _reports_registry
 
