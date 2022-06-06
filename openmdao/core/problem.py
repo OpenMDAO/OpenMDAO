@@ -5,7 +5,6 @@ import pprint
 import os
 import weakref
 import pathlib
-import inspect
 
 from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase

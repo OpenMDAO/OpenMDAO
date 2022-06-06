@@ -8,7 +8,7 @@ import weakref
 import numpy as np
 
 from openmdao.core.total_jac import _TotalJacInfo
-from openmdao.core.constants import INT_DTYPE
+from openmdao.core.constants import INT_DTYPE, _SetupStatus
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
@@ -920,7 +920,8 @@ class Driver(object):
         """
         Record an iteration of the current Driver.
         """
-        if self._problem:
+        status = -1 if self._problem is None else self._problem()._metadata['setup_status']
+        if status >= _SetupStatus.POST_FINAL_SETUP:
             record_iteration(self, self._problem(), self._get_name())
         else:
             raise RuntimeError(f'{self.msginfo} attempted to record iteration but '
@@ -1124,12 +1125,12 @@ class Driver(object):
         from openmdao.visualization.scaling_viewer.scaling_report import view_driver_scaling
 
         # Run the model if it hasn't been run yet.
-        try:
-            prob = self._problem()
-        except TypeError:
+        status = -1 if self._problem is None else self._problem()._metadata['setup_status']
+        if status < _SetupStatus.POST_FINAL_SETUP:
             raise RuntimeError("Either 'run_model' or 'final_setup' must be called before the "
                                "scaling report can be generated.")
 
+        prob = self._problem()
         if prob._run_counter < 0:
             prob.run_model()
 
