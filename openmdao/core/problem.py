@@ -41,8 +41,8 @@ from openmdao.utils.logger_utils import get_logger, TestLogger
 from openmdao.utils.hooks import _setup_hooks
 from openmdao.utils.indexer import indexer
 from openmdao.utils.record_util import create_local_meta
-from openmdao.utils.reports_system import get_reports_dir, get_reports_to_activate, \
-    activate_reports, clear_reports
+from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
+    clear_reports, get_reports_dir, _load_report_plugins
 from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable, \
     _find_dict_meta
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
@@ -61,6 +61,7 @@ _contains_all = ContainsAll()
 # Used for naming Problems when no explicit name is given
 # Also handles sub problems
 _problem_names = []
+
 
 CITATION = """@article{openmdao_2019,
     Author={Justin S. Gray and John T. Hwang and Joaquim R. R. A.
@@ -156,11 +157,9 @@ class Problem(object):
         """
         global _problem_names
 
-        self._driver = None
+        _load_report_plugins()
 
-        # ensure that default reports (n2, scaling) are imported
-        import openmdao.visualization.n2_viewer.n2_viewer
-        import openmdao.visualization.scaling_viewer.scaling_report
+        self._driver = None
 
         self._reports = get_reports_to_activate(reports)
 
@@ -309,7 +308,7 @@ class Problem(object):
 
     def _update_reports(self, driver):
         if self._driver is not None:
-            # remove any driver reports
+            # remove any reports on previous driver
             clear_reports(self._driver)
         driver._set_problem(self)
         activate_reports(self._reports, driver)

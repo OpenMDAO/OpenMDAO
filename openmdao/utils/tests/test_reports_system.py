@@ -34,7 +34,6 @@ if OPTIMIZER:
 
 @use_tempdirs
 class TestReportsSystem(unittest.TestCase):
-
     def setUp(self):
         self.n2_filename = _default_n2_filename
         self.scaling_filename = _default_scaling_filename

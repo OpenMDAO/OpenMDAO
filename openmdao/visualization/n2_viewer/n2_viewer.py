@@ -622,5 +622,6 @@ def _run_n2_report(prob, report_filename=None):
             raise err
 
 
-register_report('n2', _run_n2_report, 'N2 diagram', 'Problem', 'final_setup', 'post',
-                _default_n2_filename)
+def _n2_report_register():
+    register_report('n2', _run_n2_report, 'N2 diagram', 'Problem', 'final_setup', 'post',
+                    _default_n2_filename)

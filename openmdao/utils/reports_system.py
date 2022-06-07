@@ -7,6 +7,11 @@ import sys
 import os
 import inspect
 
+try:
+    import pkg_resources
+except ImportError:
+    pkg_resources = None
+
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook, _unregister_hook
@@ -22,7 +27,10 @@ _cmdline_reports = set()  # cmdline reports can be registered here to prevent de
 
 _reports_dir = os.environ.get('OPENMDAO_REPORTS_DIR', './reports')  # top dir for the reports
 
+_truthy = {'1', 'true', 'on', 'yes'}
 _falsey = {'0', 'false', 'off', "none", ""}
+
+_plugins_loaded = False  # use this to ensure plugins only loaded once
 
 
 def _register_cmdline_report(name):
@@ -39,10 +47,7 @@ def reports_active():
     bool
         Return True if reports are active.
     """
-    if 'TESTFLO_RUNNING' in os.environ:
-        return False
-
-    return not os.environ.get('OPENMDAO_REPORTS', 'true').lower() in _falsey
+    return 'TESTFLO_RUNNING' not in os.environ
 
 
 def register_report(name, func, desc, class_name, method, pre_or_post, filename, inst_id=None,
@@ -117,7 +122,7 @@ def activate_report(name, instance=None):
     if _inst_id is not None:
         if inst_id is None:
             inst_id = _inst_id
-        elif inst_id != _inst_id:
+        elif inst_id != _inst_id:  # registered inst_id doesn't match current instance
             return
 
     if instance is not None and report_cond is not None and not report_cond(instance):
@@ -171,6 +176,9 @@ def list_reports(out_stream=None):
         Where to send report info.
     """
     global _reports_registry
+
+    # if we haven't created any Problem instances, the registry could still be uninitialized
+    _load_report_plugins()
 
     if not out_stream:
         out_stream = sys.stdout
@@ -278,7 +286,7 @@ def _reports2list(reports, defaults):
         low = reports.lower()
         if low in _falsey:
             return []
-        if low in ['1', 'true', 'on', 'yes']:
+        if low in _truthy:
             return defaults
         if low == 'all':
             return list(_reports_registry)  # activate all registered reports
@@ -344,3 +352,26 @@ def clear_reports(instance=None):
         to_remove.add((name, active_inst_id))
 
     _active_reports -= to_remove
+
+
+def _load_report_plugins():
+    """
+    Load all 'openmdao_report' entry points and run them to register their plugins.
+    """
+    global _plugins_loaded
+    if _plugins_loaded:
+        return
+
+    _plugins_loaded = True
+
+    if pkg_resources is None:
+        issue_warning("The pkg_resources package wasn't found, so report plugins can't be loaded.")
+        # manually register all built-in reports so they still work in this case
+        from openmdao.visualization.n2_viewer.n2_viewer import _n2_report_register
+        _n2_report_register()
+        from openmdao.visualization.scaling_viewer.scaling_report import _scaling_report_register
+        _scaling_report_register()
+    else:
+        for ep in pkg_resources.iter_entry_points(group='openmdao_report'):
+            func = ep.load()
+            func()  # this runs the '*_register' function to register the report

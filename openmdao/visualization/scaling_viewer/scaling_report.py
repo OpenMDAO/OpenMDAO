@@ -592,5 +592,6 @@ def _run_scaling_report(driver, report_filename=None):
             raise err
 
 
-register_report('scaling', _run_scaling_report, 'Driver scaling report', 'Driver',
-                '_compute_totals', 'post', _default_scaling_filename)
+def _scaling_report_register():
+    register_report('scaling', _run_scaling_report, 'Driver scaling report', 'Driver',
+                    '_compute_totals', 'post', _default_scaling_filename)
