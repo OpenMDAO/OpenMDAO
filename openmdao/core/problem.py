@@ -157,10 +157,10 @@ class Problem(object):
         """
         global _problem_names
 
+        # this function doesn't do anything after the first call
         _load_report_plugins()
 
         self._driver = None
-
         self._reports = get_reports_to_activate(reports)
 
         self.cite = CITATION
@@ -281,6 +281,22 @@ class Problem(object):
 
     def _setup_reports(self):
         activate_reports(self._reports, self)
+
+    def _has_active_report(self, name):
+        """
+        Return True if named report is active for this Problem.
+
+        Parameters
+        ----------
+        name : str
+            Name of the report.
+
+        Returns
+        -------
+        bool
+            True if the named report is active for this Problem.
+        """
+        return name in self._reports
 
     def _get_var_abs_name(self, name):
         if name in self.model._var_allprocs_abs2meta:
@@ -2234,7 +2250,7 @@ class Problem(object):
         """
         reports_dirpath = pathlib.Path(get_reports_dir()).joinpath(f'{self._name}')
 
-        if self.comm.rank == 0:
+        if self.comm.rank == 0 and self._reports:
             pathlib.Path(reports_dirpath).mkdir(parents=True, exist_ok=True)
 
         return reports_dirpath

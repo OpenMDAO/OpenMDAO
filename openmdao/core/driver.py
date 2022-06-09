@@ -82,6 +82,8 @@ class Driver(object):
         Keyed by sources and aliases.
     _total_jac : _TotalJacInfo or None
         Cached total jacobian handling object.
+    _total_jac_linear : _TotalJacInfo or None
+        Cached linear total jacobian handling object.
     """
 
     def __init__(self, **kwargs):
@@ -167,6 +169,7 @@ class Driver(object):
         self._total_jac_sparsity = None
         self._res_subjacs = {}
         self._total_jac = None
+        self._total_jac_linear = None
 
         self.fail = False
 
@@ -885,8 +888,12 @@ class Driver(object):
                     total_jac = _TotalJacInfo(problem, of, wrt, use_abs_names,
                                               return_format, approx=True, debug_print=debug_print)
 
-                    # Don't cache linear constraint jacobian
-                    if not total_jac.has_lin_cons:
+                    if total_jac.has_lin_cons:
+                        # if we're doing a scaling report, cache the linear total jacobian so we
+                        # don't have to recreate it
+                        if problem._has_active_report('scaling'):
+                            self._total_jac_linear = total_jac
+                    else:
                         self._total_jac = total_jac
 
                     totals = total_jac.compute_totals_approx(initialize=True)
@@ -900,8 +907,12 @@ class Driver(object):
                 total_jac = _TotalJacInfo(problem, of, wrt, use_abs_names, return_format,
                                           debug_print=debug_print)
 
-                # don't cache linear constraint jacobian
-                if not total_jac.has_lin_cons:
+                if total_jac.has_lin_cons:
+                    # if we're doing a scaling report, cache the linear total jacobian so we
+                    # don't have to recreate it
+                    if problem._has_active_report('scaling'):
+                        self._total_jac_linear = total_jac
+                else:
                     self._total_jac = total_jac
 
             self._recording_iter.push(('_compute_totals', 0))

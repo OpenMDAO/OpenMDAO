@@ -248,6 +248,14 @@ def set_reports_dir(reports_dir_path):
     _reports_dir = reports_dir_path
 
 
+# TODO: remove these once dymos has been updated to current reports system API
+set_default_reports_dir = set_reports_dir
+run_n2_report = lambda x: None
+setup_default_reports = lambda : None
+report_function = lambda x: None
+# -----------------------------------------
+
+
 def _reset_reports_dir():
     """
     Reset the path to the top level reports directory from the environment or to './reports'.
