@@ -19,10 +19,10 @@ from openmdao.utils.general_utils import _src_or_alias_dict, \
     _src_name_iter, _src_or_alias_item_iter
 import openmdao.utils.hooks as hooks
 from openmdao.utils.mpi import MPI
-from openmdao.utils.file_utils import _load_and_exec
+from openmdao.utils.file_utils import _load_and_exec, image2html
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
-from openmdao.devtools.memory import mem_usage
 from openmdao.utils.reports_system import register_report
+from openmdao.devtools.memory import mem_usage
 
 
 CITATIONS = """
@@ -1995,6 +1995,11 @@ def _run_total_coloring_report(driver):
         prob = driver._problem()
         path = str(pathlib.Path(prob.get_reports_dir()).joinpath(_default_coloring_imagefile))
         coloring.display(show=False, fname=path)
+
+        # now create html file that wraps the image file
+        htmlpath = str(pathlib.Path(prob.get_reports_dir()).joinpath("coloring.html"))
+        with open(htmlpath, 'w') as f:
+            f.write(image2html(_default_coloring_imagefile, title="blah blah foo foo"))
 
 
 # entry point for coloring report

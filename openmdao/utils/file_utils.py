@@ -279,3 +279,88 @@ else:
     else:
         def _iter_entry_points(group):
             yield from pkg_resources.iter_entry_points(group)
+
+
+def text2html(text, title='', style=None):
+    """
+    Wrap the given text for display as an html file.
+
+    Parameters
+    ----------
+    text : str
+        Text to be displayed.
+    title : str
+        Title to display above text.
+    style : str or None
+        If not None, use as the contents of the style block for the enclosing <pre> tag.
+    """
+    if style is None:
+        style = """
+            display: block;
+            font-family: monospace;
+            font-size: 1.5em;
+            white-space: pre;
+            margin: 1em 0;
+        """
+    return """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <style>
+        .center {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            width: 80%;
+        }
+        h2 {text-align: center;}
+        pre {""" + style + """
+        }
+    </style>
+</head>
+<body>
+<h2>""" + title + """</h2>
+<pre class="center">
+""" + text + """
+</pre>
+</body>
+</html>
+"""
+
+
+def image2html(imagefile, title='', alt=''):
+    """
+    Wrap the given image for display as an html file.
+
+    Returns an html syntax string that can be written to a file.
+
+    Parameters
+    ----------
+    imagefile : str
+        Name of image file to be displayed.
+    title : str
+        The page title.
+    alt : str
+        alt text for the image.
+    """
+    return """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <style>
+        h2 {text-align: center;}
+        .center {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            width: 80%;
+        }
+    </style>
+</head>
+<body>
+<h2>""" + title + "</h2>" + f"""
+<img src="{imagefile}" alt="{alt}" class="center"></img>
+
+</body>
+</html>
+"""
