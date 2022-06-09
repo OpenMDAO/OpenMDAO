@@ -19,10 +19,6 @@ else:
     except Exception:
         pass  # in case they're using an old version of coverage
 
-try:
-    import pkg_resources
-except ImportError:
-    pkg_resources = None
 
 import openmdao.utils.hooks as hooks
 from openmdao.visualization.n2_viewer.n2_viewer import n2
@@ -56,7 +52,7 @@ from openmdao.utils.coloring import _total_coloring_setup_parser, _total_colorin
     _partial_coloring_setup_parser, _partial_coloring_cmd, \
     _view_coloring_setup_parser, _view_coloring_exec
 from openmdao.utils.scaffold import _scaffold_setup_parser, _scaffold_exec
-from openmdao.utils.file_utils import _load_and_exec, _to_filename
+from openmdao.utils.file_utils import _load_and_exec, _to_filename, _iter_entry_points
 from openmdao.utils.entry_points import _list_installed_setup_parser, _list_installed_cmd, \
     split_ep, _compute_entry_points_setup_parser, _compute_entry_points_exec, \
         _find_plugins_setup_parser, _find_plugins_exec
@@ -540,32 +536,29 @@ def openmdao_cmd():
         parser_setup_func(subp)
         subp.set_defaults(executor=executor)
 
-    if pkg_resources is None:
-        print("\npkg_resources was not found, so no plugin entry points can be loaded.\n")
-    else:
-        # now add any plugin openmdao commands
-        epdict = {}
-        for ep in pkg_resources.iter_entry_points(group='openmdao_command'):
-            cmd, module, target = split_ep(ep)
-            # don't let plugins override the builtin commands
-            if cmd in _command_map:
-                raise RuntimeError("openmdao plugin command '{}' defined in {} conflicts with "
-                                   "builtin command '{}'.".format(cmd, module, cmd))
-            elif cmd in epdict:
-                raise RuntimeError("openmdao plugin command '{}' defined in {} conflicts with a "
-                                   "another plugin command defined in {}."
-                                   .format(cmd, module, epdict[cmd][1]))
-            epdict[cmd] = (ep, module)
+    # now add any plugin openmdao commands
+    epdict = {}
+    for ep in _iter_entry_points('openmdao_command'):
+        cmd, module, target = split_ep(ep)
+        # don't let plugins override the builtin commands
+        if cmd in _command_map:
+            raise RuntimeError("openmdao plugin command '{}' defined in {} conflicts with "
+                               "builtin command '{}'.".format(cmd, module, cmd))
+        elif cmd in epdict:
+            raise RuntimeError("openmdao plugin command '{}' defined in {} conflicts with a "
+                               "another plugin command defined in {}."
+                               .format(cmd, module, epdict[cmd][1]))
+        epdict[cmd] = (ep, module)
 
-        # sort commands by module and then by command name so commands from plugins will
-        # be grouped together.
-        for cmd, (ep, module) in sorted(epdict.items(), key=lambda x: x[1][1] + x[0]):
-            func = ep.load()
-            parser_setup_func, executor, help_str = func()
-            pkg = module.split('.', 1)[0]
-            subp = subs.add_parser(cmd, help='(%s plugin) ' % pkg + help_str)
-            parser_setup_func(subp)
-            subp.set_defaults(executor=executor)
+    # sort commands by module and then by command name so commands from plugins will
+    # be grouped together.
+    for cmd, (ep, module) in sorted(epdict.items(), key=lambda x: x[1][1] + x[0]):
+        func = ep.load()
+        parser_setup_func, executor, help_str = func()
+        pkg = module.split('.', 1)[0]
+        subp = subs.add_parser(cmd, help='(%s plugin) ' % pkg + help_str)
+        parser_setup_func(subp)
+        subp.set_defaults(executor=executor)
 
     # handle case where someone just runs `openmdao <script> [dashed-args]`
     args = [a for a in sys.argv[1:] if not a.startswith('-')]

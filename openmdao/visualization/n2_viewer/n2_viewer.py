@@ -610,7 +610,7 @@ def n2(data_source, outfile=_default_n2_filename, case_id=None, show_browser=Tru
 
 
 # N2 report definition
-def _run_n2_report(prob, report_filename=None):
+def _run_n2_report(prob, report_filename=_default_n2_filename):
 
     n2_filepath = str(pathlib.Path(prob.get_reports_dir()).joinpath(report_filename))
     try:
@@ -623,5 +623,4 @@ def _run_n2_report(prob, report_filename=None):
 
 
 def _n2_report_register():
-    register_report('n2', _run_n2_report, 'N2 diagram', 'Problem', 'final_setup', 'post',
-                    _default_n2_filename)
+    register_report('n2', _run_n2_report, 'N2 diagram', 'Problem', 'final_setup', 'post')

@@ -5,7 +5,6 @@ Utilities for working with files.
 import sys
 import os
 import importlib
-import unittest
 from inspect import getmembers, isclass, ismethod, isfunction
 from fnmatch import fnmatch
 from os.path import join, basename, dirname, isfile, split, splitext, abspath, expanduser
@@ -252,3 +251,31 @@ def _run_test_func(mod, funcpath):
     else:
         funcname = parts[0]
         return getattr(mod, funcname)()
+
+
+if sys.version_info >= (3, 8):
+    from importlib.metadata import entry_points
+
+    def _iter_entry_points(group):
+        eps = entry_points()
+        # there seems to be a bug currently where entry points can show up more than
+        # once in the iterator, so keep track of the ones we've already seen.
+        # TODO: revisit later to see if we can remove the check
+        seen = set()
+        if group in eps:
+            for ep in eps[group]:
+                if ep.name not in seen:
+                    seen.add(ep.name)
+                    yield ep
+else:
+    try:
+        import pkg_resources
+    except ImportError:
+        def _iter_entry_points(group):
+            issue_warning("Can't retrieve entry points because pkg_resources is not installed. "
+                          "Either install it using 'pip install setuptools' or upgrade to python "
+                          "3.8 or newer.")
+            return ()
+    else:
+        def _iter_entry_points(group):
+            yield from pkg_resources.iter_entry_points(group)

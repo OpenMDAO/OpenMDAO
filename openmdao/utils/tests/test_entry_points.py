@@ -5,7 +5,7 @@ import inspect
 from os.path import dirname, abspath, splitext
 
 from openmdao.utils.entry_points import list_installed, _filtered_ep_iter, _allowed_types, \
-    compute_entry_points, _epgroup_bases
+    compute_entry_points, _epgroup_bases, split_ep
 from openmdao.utils.file_utils import files_iter
 
 from openmdao.api import Group, SurrogateModel
@@ -51,7 +51,7 @@ class TestEntryPoints(unittest.TestCase):
         for epgroup in _allowed_types.values():
             registered_eps[epgroup] = reg = set()
             for ep, name, module, target in _filtered_ep_iter(epgroup, includes=['openmdao']):
-                reg.add(str(ep).split('=', 1)[1].strip())
+                reg.add(f"{module}:{target}")
 
         found_eps = compute_entry_points('openmdao',
                                          dir_excludes=('test_suite', 'docs'),

@@ -20,6 +20,7 @@ from openmdao.utils.array_utils import sizes2offsets
 from openmdao.vectors.vector import _full_slice
 from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation
+import openmdao.utils.coloring as c_mod
 
 
 class Driver(object):
@@ -1215,6 +1216,40 @@ class Driver(object):
             The path to the directory where reports should be written.
         """
         return self._problem().get_reports_dir()
+
+    def _get_coloring(self, run_model=None):
+        """
+        Get the total coloring for this driver.
+
+        If necessary, dynamically generate it.
+
+        Parameters
+        ----------
+        run_model : bool or None
+            If False, don't run model, else use problem _run_counter to decide.
+
+        Returns
+        -------
+        Coloring or None
+            Coloring object, possible loaded from a file or dynamically generated, or None
+        """
+        if c_mod._use_total_sparsity:
+            coloring = None
+            if self._coloring_info['coloring'] is None and self._coloring_info['dynamic']:
+                coloring = c_mod.dynamic_total_coloring(self, run_model=run_model,
+                                                        fname=self._get_total_coloring_fname())
+
+            if coloring is not None:
+                # if the improvement wasn't large enough, don't use coloring
+                pct = coloring._solves_info()[1]
+                info = self._coloring_info
+                if info['min_improve_pct'] > pct:
+                    info['coloring'] = info['static'] = None
+                    msg = f"Coloring was deactivated.  Improvement of {pct:.1f}% was less " \
+                          f"than min allowed ({info['min_improve_pct']:.1f}%)."
+                    issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
+
+            return coloring
 
 
 class RecordingDebugging(Recording):

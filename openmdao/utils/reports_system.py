@@ -7,21 +7,17 @@ import sys
 import os
 import inspect
 
-try:
-    import pkg_resources
-except ImportError:
-    pkg_resources = None
-
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook, _unregister_hook
 from openmdao.utils.om_warnings import issue_warning
+from openmdao.utils.file_utils import _iter_entry_points
 
 # Keeping track of the registered reports
 _Report = namedtuple('Report',
                      'func desc class_name inst_id condition method pre_or_post report_filename')
 _reports_registry = {}
-_default_reports = ['scaling', 'n2']  # ['n2', 'scaling']
+_default_reports = ['scaling', 'total_coloring', 'n2']
 _active_reports = set()  # these reports will actually run (assuming their hook funcs are triggered)
 _cmdline_reports = set()  # cmdline reports can be registered here to prevent default reports
 
@@ -50,7 +46,7 @@ def reports_active():
     return 'TESTFLO_RUNNING' not in os.environ
 
 
-def register_report(name, func, desc, class_name, method, pre_or_post, filename, inst_id=None,
+def register_report(name, func, desc, class_name, method, pre_or_post, filename=None, inst_id=None,
                     condition=None):
     """
     Register a report with the reporting system.
@@ -69,7 +65,7 @@ def register_report(name, func, desc, class_name, method, pre_or_post, filename,
         In which method of class_name should this be run.
     pre_or_post : str
         Valid values are 'pre' and 'post'. Indicates when to run the report in the method.
-    filename : str
+    filename : str or None
         Name of file to use when saving the report.
     inst_id : str or None
         Either the instance ID of an OpenMDAO object (e.g. Problem, Driver) or None.
@@ -132,12 +128,15 @@ def activate_report(name, instance=None):
         raise ValueError(f"A report with the name '{name}' for instance '{inst_id}' is already "
                          "active.")
 
+    if report_filename is not None:
+        kwargs = {'report_filename': report_filename}
+    else:
+        kwargs = {}
+
     if pre_or_post == 'pre':
-        _register_hook(method, class_name, pre=func, inst_id=inst_id, ncalls=1,
-                       report_filename=report_filename)
+        _register_hook(method, class_name, pre=func, inst_id=inst_id, ncalls=1, **kwargs)
     else:  # post
-        _register_hook(method, class_name, post=func, inst_id=inst_id, ncalls=1,
-                       report_filename=report_filename)
+        _register_hook(method, class_name, post=func, inst_id=inst_id, ncalls=1, **kwargs)
 
     _active_reports.add((name, inst_id))
 
@@ -183,7 +182,7 @@ def list_reports(out_stream=None):
     if not out_stream:
         out_stream = sys.stdout
 
-    column_names = ['name', 'desc', 'class_name', 'inst_id', 'method', 'pre_or_post', 'func']
+    column_names = ['name', 'desc', 'class_name', 'method', 'pre_or_post']
     column_widths = {}
     # Determine the column widths of the data fields by finding the max width for all rows
     # First for the headers
@@ -203,7 +202,7 @@ def list_reports(out_stream=None):
                     val = str(val)
             column_widths[column_name] = max(column_widths[column_name], len(val))
 
-    out_stream.write("\nHere are the reports available:\n\n")
+    out_stream.write("\nHere are the available reports:\n\n")
 
     column_header = ''
     column_dashes = ''
@@ -225,11 +224,7 @@ def list_reports(out_stream=None):
             if column_name == 'name':
                 val = name
             else:
-                val = getattr(report, column_name)
-                if column_name == 'func':
-                    val = val.__name__
-                else:
-                    val = str(val)
+                val = str(getattr(report, column_name))
             val_formatted = f"{val:<{column_widths[column_name]}}"
             report_info += val_formatted
             if i < len(column_names) - 1:
@@ -359,19 +354,11 @@ def _load_report_plugins():
     Load all 'openmdao_report' entry points and run them to register their plugins.
     """
     global _plugins_loaded
-    if _plugins_loaded:
+    if _plugins_loaded:  # make sure we only run this once
         return
 
     _plugins_loaded = True
 
-    if pkg_resources is None:
-        issue_warning("The pkg_resources package wasn't found, so report plugins can't be loaded.")
-        # manually register all built-in reports so they still work in this case
-        from openmdao.visualization.n2_viewer.n2_viewer import _n2_report_register
-        _n2_report_register()
-        from openmdao.visualization.scaling_viewer.scaling_report import _scaling_report_register
-        _scaling_report_register()
-    else:
-        for ep in pkg_resources.iter_entry_points(group='openmdao_report'):
-            func = ep.load()
-            func()  # this runs the '*_register' function to register the report
+    for ep in _iter_entry_points('openmdao_report'):
+        register_func = ep.load()
+        register_func()  # this runs the function that calls register_report

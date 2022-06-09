@@ -7,27 +7,23 @@ import traceback
 from collections import defaultdict
 import itertools
 from importlib import import_module
-from os.path import join, basename, dirname, isfile, split, splitext, abspath, expanduser
+from os.path import dirname, abspath
 from inspect import getmembers, isclass
 import textwrap
 
-from openmdao.utils.file_utils import package_iter, get_module_path
+from openmdao.utils.file_utils import package_iter, get_module_path, _iter_entry_points
+from openmdao.utils.om_warnings import issue_warning
+
 from openmdao.core.component import Component
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.driver import Driver
-from openmdao.solvers.solver import Solver, LinearSolver, NonlinearSolver, BlockLinearSolver
+from openmdao.solvers.solver import LinearSolver, NonlinearSolver, BlockLinearSolver
 from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case_recorder import CaseRecorder
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
 from openmdao.solvers.linesearch.backtracking import LinesearchSolver
-
-
-try:
-    import pkg_resources
-except ImportError:
-    pkg_resources = None
 
 
 _epgroup_bases = {
@@ -62,7 +58,11 @@ def split_ep(entry_point):
     tuple
         (entry_point_name, module_name, target_name).
     """
+    # entry point could come from either pkg_resources or importlib.metadata and their EntryPoint
+    # classes have different APIs
     epstr = str(entry_point)
+    if epstr.startswith('EntryPoint'):  # from importlib.metadata
+        epstr = f"{entry_point.name} = {entry_point.value}"
     name, rest = epstr.split('=', 1)
     name = name.strip()
     module, target = rest.strip().split(':', 1)
@@ -89,7 +89,7 @@ def _filtered_ep_iter(epgroup, includes=None, excludes=()):
     """
     if excludes is None:
         excludes = ()
-    for ep in pkg_resources.iter_entry_points(group=epgroup):
+    for ep in _iter_entry_points(epgroup):
         name, module, target = split_ep(ep)
         for ex in excludes:
             if module.startswith(ex + '.'):
@@ -131,7 +131,6 @@ def compute_entry_points(package, dir_excludes=(), outstream=sys.stdout):
 
     groups = defaultdict(list)
 
-    pkgpath = package + '.'
     try:
         pkg = import_module(package)
     except Exception:
@@ -159,7 +158,7 @@ def compute_entry_points(package, dir_excludes=(), outstream=sys.stdout):
                         groups[epgroup].append((modpath, cname))
                         break
 
-    if outstream is None:
+    if outstream is not None:
         def printfunc(*args, **kwargs):
             pass
     else:
@@ -171,10 +170,10 @@ def compute_entry_points(package, dir_excludes=(), outstream=sys.stdout):
     printfunc("entry_points={", file=outstream)
     for g, eps in sorted(groups.items(), key=lambda x: x[0]):
         dct[g] = eplist = []
-        printfunc("    '{}': [".format(g), file=outstream)
+        printfunc(f"    '{g}': [", file=outstream)
         for modpath, cname in sorted(eps, key=lambda x: x[0] + x[1]):
-            eplist.append("{} = {}:{}".format(cname.lower(), modpath, cname))
-            printfunc("        '{}',".format(eplist[-1]), file=outstream)
+            eplist.append(f"{cname.lower()} = {modpath}:{cname}")
+            printfunc(f"        '{eplist[-1]}',", file=outstream)
         printfunc("    ],", file=outstream)
     printfunc("}", file=outstream)
 
@@ -298,9 +297,6 @@ def list_installed(types=None, includes=None, excludes=(), show_docs=False):
     dict
         Nested dict of the form  dct[eptype][target] = (name, module, docs).
     """
-    if pkg_resources is None:
-        raise RuntimeError("You must install pkg_resources in order to list installed types.")
-
     if not types:
         types = list(_allowed_types)
 

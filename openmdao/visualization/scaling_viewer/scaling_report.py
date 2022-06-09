@@ -389,13 +389,8 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
         # save old totals
         save = driver._total_jac
         driver._total_jac = None
-        prob = driver._problem()
 
-        coloring = driver._get_static_coloring()
-        if coloring_mod._use_total_sparsity:
-            if coloring is None and driver._coloring_info['dynamic']:
-                coloring = coloring_mod.dynamic_total_coloring(driver,
-                                                               run_model=prob._run_counter < 0)
+        coloring = driver._get_coloring()
 
         # assemble data for jacobian visualization
         data['oflabels'] = driver._get_ordered_nl_responses()
@@ -576,7 +571,7 @@ def _scaling_cmd(options, user_args):
 
 
 # scaling report definition
-def _run_scaling_report(driver, report_filename=None):
+def _run_scaling_report(driver, report_filename=_default_scaling_filename):
 
     prob = driver._problem()
     scaling_filepath = str(pathlib.Path(prob.get_reports_dir()).joinpath(report_filename))
@@ -585,7 +580,7 @@ def _run_scaling_report(driver, report_filename=None):
         prob.driver.scaling_report(outfile=scaling_filepath, show_browser=False)
 
     # Need to handle the coloring and scaling reports which can fail in this way
-    #   because total Jacobian can't be computed
+    # because total Jacobian can't be computed
     except RuntimeError as err:
         if str(err) != "Can't compute total derivatives unless " \
                        "both 'of' or 'wrt' variables have been specified.":
@@ -594,4 +589,4 @@ def _run_scaling_report(driver, report_filename=None):
 
 def _scaling_report_register():
     register_report('scaling', _run_scaling_report, 'Driver scaling report', 'Driver',
-                    '_compute_totals', 'post', _default_scaling_filename)
+                    '_compute_totals', 'post')

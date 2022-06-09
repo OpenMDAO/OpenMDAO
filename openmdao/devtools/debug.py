@@ -2,6 +2,7 @@
 
 
 import sys
+import pathlib
 
 import numpy as np
 from contextlib import contextmanager
@@ -13,6 +14,7 @@ from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.mpi import MPI
 from openmdao.core.constants import _SetupStatus
 from openmdao.utils.om_warnings import issue_warning, MPIWarning
+from openmdao.utils.reports_system import register_report
 
 
 class _NoColor(object):
@@ -347,6 +349,16 @@ def config_summary(problem, stream=sys.stdout):
         else:
             nlstr.append(slvname)
     printer("Nonlinear Solvers: [{}]".format(', '.join(nlstr)))
+
+
+def _summary_report(prob):
+    path = str(pathlib.Path(prob.get_reports_dir()).joinpath('summary.txt'))
+    with open(path, 'w') as f:
+        config_summary(prob, f)
+
+
+def _summary_report_register():
+    register_report('summary', _summary_report, 'Model Summary', 'Problem', 'final_setup', 'post')
 
 
 @contextmanager
