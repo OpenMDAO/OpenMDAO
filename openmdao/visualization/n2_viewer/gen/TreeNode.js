@@ -451,17 +451,30 @@ class FilterCapableNode extends TreeNode {
         }
     }
 
-    /** Add ourselves to the corrent parental filter */
+    /** Add ourselves to the correct parental filter */
     addSelfToFilter() {
         if (this.isInput()) { this.parent.filter.inputs.add(this); }
         else if (this.isOutput()) { this.parent.filter.outputs.add(this); }
     }
 
-    /** Remove ourselves from the corrent parental filter */
+    /** Remove ourselves from the correct parental filter */
     removeSelfFromFilter() {
         if (this.isInput()) { this.parent.filter.inputs.del(this); }
         else if (this.isOutput()) { this.parent.filter.outputs.del(this); }
     }
+
+    getFilterList() { return [ this.filter.inputs, this.filter.outputs]; }
+
+    wipeFilters() {
+        this.filter.inputs.wipe();
+        this.filter.outputs.wipe();
+    }
+
+    addToFilter(node) {
+        if (node.isInput()) { this.filter.inputs.add(child); }
+        else { this.filter.outputs.add(child); }
+    }
+
 
     /**
      * Filter ourselves based on the supplied filter state.
