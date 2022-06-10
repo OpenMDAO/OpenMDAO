@@ -297,7 +297,7 @@ class Diagram {
         // Add a label
         enterSelection
             .append("text")
-            .text(self.layout.getText.bind(self.layout))
+            .text(d => d.getTextName())
             .style('visibility', 'hidden')
             .attr("dy", ".35em")
             .attr("transform", d => {

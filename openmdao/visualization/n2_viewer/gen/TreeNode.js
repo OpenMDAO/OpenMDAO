@@ -315,7 +315,7 @@ class FilterNode extends TreeNode {
     }
 
     getTextName() {
-        return `Filtered ${this.suffix[0].toUpperCase() + this.suffix[0].slice(1)}`;
+        return `Filtered ${this.suffix[0].toUpperCase() + this.suffix.slice(1)}`;
     }
 
     /**
@@ -477,10 +477,9 @@ class FilterCapableNode extends TreeNode {
     }
 
     addToFilter(node) {
-        if (node.isInput()) { this.filter.inputs.add(child); }
-        else { this.filter.outputs.add(child); }
+        if (node.isInput()) { this.filter.inputs.add(node); }
+        else { this.filter.outputs.add(node); }
     }
-
 
     /**
      * Filter ourselves based on the supplied filter state.

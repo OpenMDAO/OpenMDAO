@@ -43,8 +43,8 @@ class ChildSelectDialog extends WindowDraggable {
             if (!child.isInputOrOutput()) { continue; }
             foundVariables = true;
 
-            // Use Layout.getText() because Auto-IVC variable names are not usually descriptive.
-            const varName = this.diag.layout.getText(child);
+            // Use getTextName() because Auto-IVC variable names are not usually descriptive.
+            const varName = child.getTextName();
             this.varNames[varName] = child;
             this.varNameArr.push(varName)
 
