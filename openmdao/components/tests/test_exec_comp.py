@@ -1439,6 +1439,25 @@ class TestExecComp(unittest.TestCase):
                               f"with type {type(val)}, but it should be a numpy array.")
 
 
+    def test_constants(self):
+        prob = om.Problem()
+        C1 = prob.model.add_subsystem('C1', om.ExecComp('x = a + b', a={'val': 6, 'constant':True}))
+
+        prob.setup()
+
+        # Conclude setup but don't run model.
+        prob.final_setup()
+
+        self.assertFalse('a' in C1._inputs)
+        self.assertTrue('b' in C1._inputs)
+        self.assertTrue('x' in C1._outputs)
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(C1._outputs['x'], 7.0, 0.00001)
+
+
 class TestFunctionRegistration(unittest.TestCase):
 
     # These 2 tests don't run normally unless you run testflo with a -m "featuretest_*"

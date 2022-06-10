@@ -18,10 +18,11 @@ VAR_RGX = re.compile(r'([.]*[_a-zA-Z]\w*[ ]*\(?)')
 # Names of metadata entries allowed for ExecComp variables.
 _allowed_meta = {'value', 'val', 'shape', 'units', 'res_units', 'desc',
                  'ref', 'ref0', 'res_ref', 'lower', 'upper', 'src_indices',
-                 'flat_src_indices', 'tags', 'shape_by_conn', 'copy_shape'}
+                 'flat_src_indices', 'tags', 'shape_by_conn', 'copy_shape', 'constant'}
 
 # Names that are not allowed for input or output variables (keywords for options)
-_disallowed_names = {'has_diag_partials', 'units', 'shape', 'shape_by_conn', 'run_root_only'}
+_disallowed_names = {'has_diag_partials', 'units', 'shape', 'shape_by_conn', 'run_root_only',
+                     'constant'}
 
 
 def check_option(option, value):
@@ -219,6 +220,8 @@ class ExecComp(ExplicitComponent):
         self._manual_decl_partials = False
         self._no_check_partials = True
 
+        self._constants = {}
+
     def initialize(self):
         """
         Declare options.
@@ -308,7 +311,7 @@ class ExecComp(ExplicitComponent):
         allvars = set()
 
         self._exprs_info = exprs_info = [(self._parse_for_out_vars(expr.split('=', 1)[0]),
-                                          self._parse_for_names(expr)) for expr in exprs]
+                                          self._parse_for_names(expr,kwargs)) for expr in exprs]
 
         self._requires_fd = {}
 
@@ -334,6 +337,12 @@ class ExecComp(ExplicitComponent):
 
         # make sure all kwargs are legit
         for arg, val in kwargs.items():
+
+
+            if 'constant' in val and val['constant'] :
+                self._constants[arg] = val['val']
+                continue  # TODO should still do some checking here!
+
             if arg not in allvars:
                 raise RuntimeError("%s: arg '%s' in call to ExecComp() "
                                    "does not refer to any variable in the "
@@ -441,7 +450,8 @@ class ExecComp(ExplicitComponent):
                 if var in outs:
                     current_meta = self.add_output(var, val, **meta)
                 else:
-                    current_meta = self.add_input(var, val, **meta)
+                    if not meta.get('constant', False):
+                        current_meta = self.add_input(var, val, **meta)
 
             if var not in init_vals:
                 init_vals[var] = current_meta['val']
@@ -512,9 +522,16 @@ class ExecComp(ExplicitComponent):
                                 "function or constant." % (self.msginfo, v))
         return vnames
 
-    def _parse_for_names(self, s):
+    def _parse_for_names(self, s, kwargs):
         names = [x.strip() for x in re.findall(VAR_RGX, s) if not x.startswith('.')]
-        vnames = set([n for n in names if not n.endswith('(')])
+        # vnames = set([n for n in names if not n.endswith('(')])
+        vnames = set()
+        for n in names:
+            if n.endswith('('):
+                continue
+            if n in kwargs and 'constant' in kwargs[n] and kwargs[n]['constant'] :
+                continue
+            vnames.add(n)
         fnames = [n[:-1] for n in names if n[-1] == '(']
         to_remove = []
         for v in vnames:
@@ -618,7 +635,7 @@ class ExecComp(ExplicitComponent):
                         else:
                             decl_partials(of=out, wrt=inp)
 
-        super()._setup_partials()
+        # super()._setup_partials()
         if self._manual_decl_partials:
             undeclared = []
             for i, (outs, tup) in enumerate(self._exprs_info):
@@ -652,7 +669,9 @@ class ExecComp(ExplicitComponent):
         """
         for i, expr in enumerate(self._codes):
             try:
-                exec(expr, _expr_dict, _IODict(outputs, inputs))  # nosec: limited to _expr_dict
+                #  input and output are vectors
+                # exec(expr, _expr_dict, _IODict(outputs, inputs))  # nosec: limited to _expr_dict
+                exec(expr, _expr_dict, _IODict(outputs, inputs, self._constants))  # nosec: limited to _expr_dict
             except Exception as err:
                 raise RuntimeError(f"{self.msginfo}: Error occurred evaluating '{self._exprs[i]}':"
                                    f"\n{err}")
@@ -818,9 +837,11 @@ class _IODict(object):
         The inputs object to be wrapped.
     _outputs : dict-like
         The outputs object to be wrapped.
+    _constants : dict-like
+        The constants object to be wrapped.
     """
 
-    def __init__(self, outputs, inputs):
+    def __init__(self, outputs, inputs, constants):
         """
         Create the dict wrapper.
 
@@ -831,21 +852,29 @@ class _IODict(object):
 
         inputs : dict-like
             The inputs object to be wrapped.
+
+        constants : dict-like
+            The constants object to be wrapped.
         """
         self._outputs = outputs
         self._inputs = inputs
+        self._constants = constants
 
     def __getitem__(self, name):
         try:
             return self._inputs[name]
         except KeyError:
-            return self._outputs[name]
+            try:
+                return self._outputs[name]
+            except:
+                return self._constants[name]
+
 
     def __setitem__(self, name, value):
         self._outputs[name] = value
 
     def __contains__(self, name):
-        return name in self._outputs or name in self._inputs
+        return name in self._outputs or name in self._inputs or name in self._constants
 
 
 def _import_functs(mod, dct, names=None):
