@@ -728,7 +728,6 @@ def _check_report_register():
                     'final_setup', 'post')
 
 
-
 def _check_config_cmd(options, user_args):
     """
     Return the post_setup hook function for 'openmdao check'.

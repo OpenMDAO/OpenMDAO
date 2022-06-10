@@ -348,7 +348,7 @@ def image2html(imagefile, title='', alt=''):
     title : str
         The page title.
     alt : str
-        alt text for the image.
+        Set the alt text for the image.
 
     Returns
     -------

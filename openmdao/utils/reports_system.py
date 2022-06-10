@@ -249,10 +249,19 @@ def set_reports_dir(reports_dir_path):
 
 
 # TODO: remove these once dymos has been updated to current reports system API
+def _run_n2_report(x):
+    pass
+
+
+def _setup_default_reports():
+    pass
+
+
+report_function = _run_n2_report
+setup_default_reports = _setup_default_reports
 set_default_reports_dir = set_reports_dir
-run_n2_report = lambda x: None
-setup_default_reports = lambda : None
-report_function = lambda x: None
+
+
 # -----------------------------------------
 
 
