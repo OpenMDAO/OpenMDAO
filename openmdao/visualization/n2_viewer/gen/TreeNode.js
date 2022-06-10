@@ -284,6 +284,8 @@ class TreeNode {
         this.draw.hidden = state.hidden;
         this.filterSelf(state.filtered);
     }
+
+    getTextName() { return this.name; }
 }
 
 /**
@@ -310,6 +312,10 @@ class FilterNode extends TreeNode {
         this.hide();
         this.minimize();
         this.suffix = suffix;
+    }
+
+    getTextName() {
+        return `Filtered ${this.suffix[0].toUpperCase() + this.suffix[0].slice(1)}`;
     }
 
     /**
