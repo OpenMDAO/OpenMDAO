@@ -42,7 +42,7 @@ from openmdao.utils.hooks import _setup_hooks
 from openmdao.utils.indexer import indexer
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
-    clear_reports, get_reports_dir, _load_report_plugins
+    clear_reports, get_reports_dir, _load_report_plugins, _active_reports
 from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable, \
     _find_dict_meta
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
@@ -1151,7 +1151,7 @@ class Problem(object):
             self._metadata['setup_status'] = _SetupStatus.POST_FINAL_SETUP
             self._set_initial_conditions()
 
-        if self._check:
+        if self._check and 'checks' not in self._reports:
             if self._check is True:
                 checks = _default_checks
             else:

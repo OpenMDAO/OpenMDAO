@@ -285,6 +285,8 @@ def text2html(text, title='', style=None):
     """
     Wrap the given text for display as an html file.
 
+    Returns an html syntax string that can be written to a file.
+
     Parameters
     ----------
     text : str
@@ -293,6 +295,11 @@ def text2html(text, title='', style=None):
         Title to display above text.
     style : str or None
         If not None, use as the contents of the style block for the enclosing <pre> tag.
+
+    Returns
+    -------
+    str
+        Content string to create an html file.
     """
     if style is None:
         style = """
@@ -320,7 +327,7 @@ def text2html(text, title='', style=None):
 </head>
 <body>
 <h2>""" + title + """</h2>
-<pre class="center">
+<pre>
 """ + text + """
 </pre>
 </body>
@@ -342,6 +349,11 @@ def image2html(imagefile, title='', alt=''):
         The page title.
     alt : str
         alt text for the image.
+
+    Returns
+    -------
+    str
+        Content string to create an html file.
     """
     return """
 <!DOCTYPE html>
