@@ -56,6 +56,7 @@ from openmdao.utils.file_utils import _load_and_exec, _to_filename, _iter_entry_
 from openmdao.utils.entry_points import _list_installed_setup_parser, _list_installed_cmd, \
     split_ep, _compute_entry_points_setup_parser, _compute_entry_points_exec, \
         _find_plugins_setup_parser, _find_plugins_exec
+from openmdao.utils.reports_system import _list_reports_setup_parser, _list_reports_cmd
 from openmdao.utils.general_utils import ignore_errors
 from openmdao.utils.om_warnings import warn_deprecation
 
@@ -481,6 +482,8 @@ _command_map = {
                      'Generate total timings of calls to particular object instances.'),
     'list_installed': (_list_installed_setup_parser, _list_installed_cmd,
                        'List installed types recognized by OpenMDAO.'),
+    'list_reports': (_list_reports_setup_parser, _list_reports_cmd,
+                     'List available reports.'),
     'mem': (_mem_prof_setup_parser, _mem_prof_exec,
             'Profile memory used by OpenMDAO related functions.'),
     'mempost': (_mempost_setup_parser, _mempost_exec, 'Post-process memory profile output.'),
@@ -489,6 +492,7 @@ _command_map = {
                          'Compute coloring(s) for specified partial jacobians.'),
     'scaffold': (_scaffold_setup_parser, _scaffold_exec,
                  'Generate a simple scaffold for a component.'),
+    'scaling': (_scaling_setup_parser, _scaling_cmd, 'View driver scaling report.'),
     'summary': (_config_summary_setup_parser, _config_summary_cmd,
                 'Print a short top-level summary of the problem.'),
     'timing': (_timing_setup_parser, _timing_cmd, 'Collect timing information for all systems.'),
@@ -502,7 +506,6 @@ _command_map = {
     'view_dyn_shapes': (_view_dyn_shapes_setup_parser, _view_dyn_shapes_cmd,
                         'View the dynamic shape dependency graph.'),
     'view_mm': (_meta_model_parser, _meta_model_cmd, "View a metamodel."),
-    'scaling': (_scaling_setup_parser, _scaling_cmd, 'View driver scaling report.'),
 }
 
 

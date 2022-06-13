@@ -235,6 +235,37 @@ def list_reports(out_stream=None):
     out_stream.write('\n')
 
 
+def _list_reports_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao list_reports' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('-o', action='store', dest='outfile',
+                        help='Send list of reports to this file.')
+
+
+def _list_reports_cmd(options, user_args):
+    """
+    Return the post_setup hook function for 'openmdao list_reports'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+    user_args : list of str
+        Args to be passed to the user script.
+    """
+    if options.outfile is None:
+        list_reports()
+    else:
+        with open(options.outfile, 'w') as f:
+            list_reports(f)
+
+
 def set_reports_dir(reports_dir_path):
     """
     Set the path to the top level reports directory. Defaults to './reports'.
@@ -248,6 +279,7 @@ def set_reports_dir(reports_dir_path):
     _reports_dir = reports_dir_path
 
 
+# -----------------------------------------
 # TODO: remove these once dymos has been updated to current reports system API
 def _run_n2_report(x):
     pass
