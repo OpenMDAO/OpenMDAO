@@ -318,7 +318,7 @@ class Problem(object):
     @property
     def driver(self):
         """
-        Get the nonlinear solver for this system.
+        Get the Driver for this Problem.
         """
         return self._driver
 
@@ -333,7 +333,7 @@ class Problem(object):
     @driver.setter
     def driver(self, driver):
         """
-        Set this system's nonlinear solver.
+        Set this Problem's Driver.
 
         Parameters
         ----------

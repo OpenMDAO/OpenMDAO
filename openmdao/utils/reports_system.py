@@ -166,12 +166,14 @@ def activate_reports(reports, instance):
             activate_report(name, instance)
 
 
-def list_reports(out_stream=None):
+def list_reports(default=False, out_stream=None):
     """
     Write table of information about reports currently registered in the reporting system.
 
     Parameters
     ----------
+    default : bool
+        If True, list only the default reports.
     out_stream : file-like object
         Where to send report info.
     """
@@ -191,8 +193,13 @@ def list_reports(out_stream=None):
     for column_name in column_names:
         column_widths[column_name] = len(column_name)
 
+    if default:
+        reg = {r: _reports_registry[r] for r in _default_reports}
+    else:
+        reg = _reports_registry
+
     # Now for the values
-    for name, report in _reports_registry.items():
+    for name, report in reg.items():
         for column_name in column_names:
             if column_name == 'name':
                 val = name
@@ -218,7 +225,7 @@ def list_reports(out_stream=None):
     out_stream.write(column_header + '\n')
     out_stream.write(column_dashes + '\n')
 
-    for name, report in _reports_registry.items():
+    for name, report in reg.items():
         report_info = ''
         for i, column_name in enumerate(column_names):
             if column_name == 'name':
@@ -244,7 +251,9 @@ def _list_reports_setup_parser(parser):
     parser : argparse subparser
         The parser we're adding options to.
     """
-    parser.add_argument('-o', action='store', dest='outfile',
+    parser.add_argument('-d', '--default', action='store_true', dest='dflt',
+                        help="List only the default reports.")
+    parser.add_argument('-o', '--outfile', action='store', dest='outfile',
                         help='Send list of reports to this file.')
 
 
@@ -260,10 +269,10 @@ def _list_reports_cmd(options, user_args):
         Args to be passed to the user script.
     """
     if options.outfile is None:
-        list_reports()
+        list_reports(options.dflt)
     else:
         with open(options.outfile, 'w') as f:
-            list_reports(f)
+            list_reports(options.dflt, f)
 
 
 def set_reports_dir(reports_dir_path):
