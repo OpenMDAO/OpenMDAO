@@ -717,14 +717,16 @@ def _run_check_report(prob):
         print('-' * 30, f'Checking {c}', '-' * 30, file=s)
         _all_checks[c](prob, _Log2File(s))
 
-    path = pathlib.Path(prob.get_reports_dir()).joinpath('checks.html')
-    with open(path, 'w') as f:
-        f.write(text2html(s.getvalue()))
+    output = s.getvalue()
+    if output:
+        path = pathlib.Path(prob.get_reports_dir()).joinpath('checks.html')
+        with open(path, 'w') as f:
+            f.write(text2html(output))
 
 
 # entry point for check report
 def _check_report_register():
-    register_report('checks', _run_check_report, 'Config Checks', 'Problem',
+    register_report('checks', _run_check_report, 'Config checks', 'Problem',
                     'final_setup', 'post')
 
 

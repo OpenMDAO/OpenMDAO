@@ -2,6 +2,7 @@ import unittest
 import os
 import importlib
 import inspect
+import types
 from os.path import dirname, abspath, splitext
 
 from openmdao.utils.entry_points import list_installed, _filtered_ep_iter, _allowed_types, \
@@ -58,17 +59,38 @@ class TestEntryPoints(unittest.TestCase):
                                          outstream=None)
 
         for epgroup in _allowed_types.values():
+            if epgroup == 'openmdao_report':
+                continue
             reg = registered_eps.get(epgroup, set())
-            found = [f.split('=', 1)[1].strip() for f in found_eps.get(epgroup, [])]
+            found = [':'.join(split_ep(f)[1:]) for f in found_eps.get(epgroup, [])]
             # exclude any private classes
             found = set(f for f in found if not f.rsplit(':', 1)[-1].startswith('_'))
 
             missing = sorted(found - reg - skip)
             extra = sorted(reg - found - skip)
             if missing:
-                self.fail("For entry point group '{}', the following EPs are missing: {}.".format(epgroup, missing))
+                self.fail(f"For entry point group '{epgroup}', the following EPs are missing: {sorted(missing)}.")
             if extra:
-                self.fail("For entry point group '{}', the following extra EPs were found: {}.".format(epgroup, extra))
+                self.fail(f"For entry point group '{epgroup}', the following extra EPs were found: {sorted(extra)}.")
+
+        # check that all registered reports point to actual funtions
+        badep = set()
+        for fullpath in registered_eps.get('openmdao_report', ()):
+            modpath, _, funcname = fullpath.partition(':')
+            try:
+                mod = importlib.import_module(modpath)
+            except ImportError:
+                badep.add(fullpath)
+                continue
+
+            f = getattr(mod, funcname, None)
+            if f is None or not isinstance(f, types.FunctionType):
+                badep.add(fullpath)
+
+        if badep:
+            self.fail("For entry point group 'openmdao_report', the following EPs either couldn't "
+                      f"be found or are not functions: {sorted(badep)}.")
+
 
 if __name__ == "__main__":
     unittest.main()

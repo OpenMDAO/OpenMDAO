@@ -2004,7 +2004,7 @@ def _run_total_coloring_report(driver):
 
 # entry point for coloring report
 def _total_coloring_report_register():
-    register_report('total_coloring', _run_total_coloring_report, 'Total Coloring', 'Driver',
+    register_report('total_coloring', _run_total_coloring_report, 'Total coloring', 'Driver',
                     '_get_coloring', 'post')
 
 

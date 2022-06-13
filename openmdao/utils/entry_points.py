@@ -39,6 +39,7 @@ _epgroup_bases = {
 
 _allowed_types = {g.split('_', 1)[1]: g for g in _epgroup_bases.values()}
 _allowed_types['command'] = 'openmdao_command'
+_allowed_types['report'] = 'openmdao_report'
 
 _github_topics = {k: v.replace('_', '-') for k, v in _allowed_types.items()}
 _github_topics['openmdao'] = 'openmdao'
@@ -158,7 +159,7 @@ def compute_entry_points(package, dir_excludes=(), outstream=sys.stdout):
                         groups[epgroup].append((modpath, cname))
                         break
 
-    if outstream is not None:
+    if outstream is None:
         def printfunc(*args, **kwargs):
             pass
     else:

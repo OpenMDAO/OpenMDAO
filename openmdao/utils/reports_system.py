@@ -14,8 +14,9 @@ from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.file_utils import _iter_entry_points
 
 # Keeping track of the registered reports
-_Report = namedtuple('Report',
-                     'func desc class_name inst_id condition method pre_or_post report_filename')
+_Report = namedtuple(
+    'Report', 'func description class_name inst_id condition method pre_or_post report_filename'
+)
 _reports_registry = {}
 _default_reports = ['scaling', 'total_coloring', 'n2']
 _active_reports = set()  # these reports will actually run (assuming their hook funcs are triggered)
@@ -177,12 +178,13 @@ def list_reports(out_stream=None):
     global _reports_registry
 
     # if we haven't created any Problem instances, the registry could still be uninitialized
+    # if it *has* already been initialized, this call will do nothing.
     _load_report_plugins()
 
     if not out_stream:
         out_stream = sys.stdout
 
-    column_names = ['name', 'desc', 'class_name', 'method', 'pre_or_post']
+    column_names = ['name', 'description', 'class name', 'method', 'pre or post']
     column_widths = {}
     # Determine the column widths of the data fields by finding the max width for all rows
     # First for the headers
@@ -195,14 +197,12 @@ def list_reports(out_stream=None):
             if column_name == 'name':
                 val = name
             else:
-                val = getattr(report, column_name)
+                val = getattr(report, column_name.replace(' ', '_'))
                 if column_name == 'func':
                     val = val.__name__
                 else:
                     val = str(val)
             column_widths[column_name] = max(column_widths[column_name], len(val))
-
-    out_stream.write("\nHere are the available reports:\n\n")
 
     column_header = ''
     column_dashes = ''
@@ -224,7 +224,7 @@ def list_reports(out_stream=None):
             if column_name == 'name':
                 val = name
             else:
-                val = str(getattr(report, column_name))
+                val = str(getattr(report, column_name.replace(' ', '_')))
             val_formatted = f"{val:<{column_widths[column_name]}}"
             report_info += val_formatted
             if i < len(column_names) - 1:
@@ -292,7 +292,6 @@ def _setup_default_reports():
 report_function = _run_n2_report
 setup_default_reports = _setup_default_reports
 set_default_reports_dir = set_reports_dir
-
 
 # -----------------------------------------
 

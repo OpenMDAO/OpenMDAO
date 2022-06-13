@@ -362,7 +362,7 @@ def _summary_report(prob):
 
 
 def _summary_report_register():
-    register_report('summary', _summary_report, 'Model Summary', 'Problem', 'final_setup', 'post')
+    register_report('summary', _summary_report, 'Model summary', 'Problem', 'final_setup', 'post')
 
 
 @contextmanager
