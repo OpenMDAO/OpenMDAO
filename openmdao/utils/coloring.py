@@ -1997,9 +1997,9 @@ def _run_total_coloring_report(driver):
         coloring.display(show=False, fname=path)
 
         # now create html file that wraps the image file
-        htmlpath = str(pathlib.Path(prob.get_reports_dir()).joinpath("coloring.html"))
+        htmlpath = str(pathlib.Path(prob.get_reports_dir()).joinpath("total_coloring.html"))
         with open(htmlpath, 'w') as f:
-            f.write(image2html(_default_coloring_imagefile, title="blah blah foo foo"))
+            f.write(image2html(_default_coloring_imagefile))
 
 
 # entry point for coloring report

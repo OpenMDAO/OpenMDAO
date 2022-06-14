@@ -6,12 +6,14 @@ from collections import namedtuple
 import sys
 import os
 import inspect
+import functools
 
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook, _unregister_hook
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.file_utils import _iter_entry_points
+from openmdao.utils.webview import webview
 
 # Keeping track of the registered reports
 _Report = namedtuple(
@@ -275,6 +277,52 @@ def _list_reports_cmd(options, user_args):
             list_reports(options.dflt, f)
 
 
+def view_reports(probname=None):
+    """
+    Pop up a browser to view specified reports.
+
+    Parameters
+    ----------
+    probname : str or None
+        If not None, view only reports for the specified Problem, else view all reports.
+    """
+    if probname is None:
+        tdir = _reports_dir
+    else:
+        tdir = os.path.join(_reports_dir, probname)
+
+    gen_index_file(tdir)
+
+    webview(os.path.join(tdir, 'index.html'))
+
+
+def _view_reports_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao view_reports' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('-p', '--problem', action='store', dest='problem',
+                        help='View reports only for the specified Problem.')
+
+
+def _view_reports_cmd(options, user_args):
+    """
+    View completed reports via the 'openmdao view_reports' command.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+    user_args : list of str
+        Args to be passed to the user script.
+    """
+    view_reports(options.problem)
+
+
 def set_reports_dir(reports_dir_path):
     """
     Set the path to the top level reports directory. Defaults to './reports'.
@@ -419,3 +467,65 @@ def _load_report_plugins():
     for ep in _iter_entry_points('openmdao_report'):
         register_func = ep.load()
         register_func()  # this runs the function that calls register_report
+
+
+def _add_dir_to_tree(dirpath, lines):
+    """
+    Create nested lists of directories with links to files.
+
+    Parameters
+    ----------
+    dirpath : str
+        Starting directory.
+    lines : list of str
+        List of lines in the final html.
+    """
+    lines.append(f'<li><span class="caret">{os.path.basename(dirpath)}</span>')
+    lines.append(f'<ul>')
+
+    for f in os.listdir(dirpath):
+        path = os.path.join(dirpath, f)
+        if os.path.isdir(path):
+            _add_dir_to_tree(path, lines)
+        elif f.endswith('.html') and f != 'index.html':
+            lines.append(f'<li> <a href="file:///{path}">{f}</a> </li>')
+
+    lines.append('</ul></li>')
+
+
+def gen_index_file(reports_dir):
+    """
+    Generate an index.html file that will have links to all of the reports.
+
+    Parameters
+    ----------
+    reports_dir : str
+        The top directory containing the reports.
+    """
+    reports_dir = os.path.abspath(reports_dir)
+
+    parts = [
+        """
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+        <meta charset="utf-8">
+        <style>
+            /* Remove default bullets */
+            ul {
+               list-style-type: none;
+            }
+        </style>
+        </head>
+        <body>
+        """
+    ]
+
+    lines = ['<ul>']
+    _add_dir_to_tree(reports_dir, lines)
+
+    parts.append('\n'.join(lines))
+    parts.append('</body>\n</html>')
+
+    with open(os.path.join(reports_dir, 'index.html'), 'w') as f:
+        f.write('\n'.join(parts))

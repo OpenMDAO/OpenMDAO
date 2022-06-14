@@ -56,7 +56,8 @@ from openmdao.utils.file_utils import _load_and_exec, _to_filename, _iter_entry_
 from openmdao.utils.entry_points import _list_installed_setup_parser, _list_installed_cmd, \
     split_ep, _compute_entry_points_setup_parser, _compute_entry_points_exec, \
         _find_plugins_setup_parser, _find_plugins_exec
-from openmdao.utils.reports_system import _list_reports_setup_parser, _list_reports_cmd
+from openmdao.utils.reports_system import _list_reports_setup_parser, _list_reports_cmd, \
+    _view_reports_setup_parser, _view_reports_cmd
 from openmdao.utils.general_utils import ignore_errors
 from openmdao.utils.om_warnings import warn_deprecation
 
@@ -506,6 +507,8 @@ _command_map = {
     'view_dyn_shapes': (_view_dyn_shapes_setup_parser, _view_dyn_shapes_cmd,
                         'View the dynamic shape dependency graph.'),
     'view_mm': (_meta_model_parser, _meta_model_cmd, "View a metamodel."),
+    'view_reports': (_view_reports_setup_parser, _view_reports_cmd,
+                     'View existing reports.'),
 }
 
 
