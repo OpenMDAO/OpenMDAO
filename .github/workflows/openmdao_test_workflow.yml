@@ -124,9 +124,8 @@ jobs:
         shell: bash -l {0}
         run: |
           echo "============================================================="
-          echo "Install libscotch"
+          echo "Install dependencies for Oldest"
           echo "============================================================="
-          echo sudo apt-get install -y libscotch-6.0
           conda install -c conda-forge openmpi=4.0
 
       - name: Install PETSc
