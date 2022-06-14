@@ -20,7 +20,7 @@ except ImportError:
 import openmdao.api as om
 from openmdao.components.exec_comp import _expr_dict, _temporary_expr_dict
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_warning
-from openmdao.utils.om_warnings import OMDeprecationWarning
+from openmdao.utils.om_warnings import OMDeprecationWarning, SetupWarning
 
 _ufunc_test_data = {
     'min': {
@@ -1439,13 +1439,11 @@ class TestExecComp(unittest.TestCase):
                               f"with type {type(val)}, but it should be a numpy array.")
 
 
-    def test_constants(self):
+    def test_constants_simple(self):
         prob = om.Problem()
         C1 = prob.model.add_subsystem('C1', om.ExecComp('x = a + b', a={'val': 6, 'constant':True}))
 
         prob.setup()
-
-        # Conclude setup but don't run model.
         prob.final_setup()
 
         self.assertFalse('a' in C1._inputs)
@@ -1456,6 +1454,78 @@ class TestExecComp(unittest.TestCase):
         prob.run_model()
 
         assert_near_equal(C1._outputs['x'], 7.0, 0.00001)
+
+    def test_constants_val_not_given(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('C1', om.ExecComp('x = a + b', a={'constant':True}))
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.setup()
+            self.assertEqual(str(cm.exception), "C1' <class ExecComp>: arg 'a' in call to ExecComp() is a constant but no value is given")
+
+    def test_constants_units_given(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('C1', om.ExecComp('x = a + b', a={'constant':True, 'val': 6, 'units': 'ft'}))
+
+        expected_warning_msg = "'C1' <class ExecComp>: arg 'a' in call to " \
+                               "ExecComp() is a constant. The units will be ignored"
+        with assert_warning(SetupWarning, expected_warning_msg):
+            prob.setup()
+
+    def test_constants_shape_given(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('C1', om.ExecComp('x = a + b', a={'constant':True, 'val': 6, 'shape': (1,)}))
+
+        expected_warning_msg = "'C1' <class ExecComp>: arg 'a' in call to " \
+                               "ExecComp() is a constant. The shape will be ignored"
+        with assert_warning(SetupWarning, expected_warning_msg):
+            prob.setup()
+
+    def test_constants_set_constant_false(self):
+        prob = om.Problem()
+        C1 = prob.model.add_subsystem('C1', om.ExecComp('x = a + b', a={'val': 6, 'constant':False}))
+
+        prob.setup()
+
+        # Conclude setup but don't run model.
+        prob.final_setup()
+
+        self.assertTrue('a' in C1._inputs)
+        self.assertTrue('b' in C1._inputs)
+        self.assertTrue('x' in C1._outputs)
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(C1._outputs['x'], 7.0, 0.00001)
+
+    def test_constants_multiple_equations(self):
+        prob = om.Problem()
+        model = prob.model
+        comp = om.ExecComp(['y1=2.0*x1+a', 'y2=3.0*x2-a'], x1=1.0, x2=2.0, a={'val': 6, 'constant':True})
+        model.add_subsystem('comp', comp)
+        prob.setup()
+        prob.run_model()
+
+        assert_near_equal(comp._outputs['y1'], 8.0, 0.00001)
+        assert_near_equal(comp._outputs['y2'], 0.0, 0.00001)
+
+    def test_constants_arrays(self):
+        prob = om.Problem()
+        model = prob.model
+
+        comp = model.add_subsystem('comp', om.ExecComp('y=x+a',
+                                                       y={'shape': (3,), 'val': np.zeros(3)},
+
+                                                x=np.array([1., 2., 3.]),
+                                                a={ 'val': np.array([1., 2., 3.]), 'constant':True}))
+
+        prob.setup()
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(comp._outputs['y'], 2.0 * np.array([1., 2., 3.]), 0.00001)
 
 
 class TestFunctionRegistration(unittest.TestCase):

@@ -10,7 +10,8 @@ from openmdao.core.constants import INT_DTYPE
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.units import valid_units
 from openmdao.utils import cs_safe
-from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
+    SetupWarning
 
 # regex to check for variable names.
 VAR_RGX = re.compile(r'([.]*[_a-zA-Z]\w*[ ]*\(?)')
@@ -103,6 +104,9 @@ class ExecComp(ExplicitComponent):
     _requires_fd : dict
         Contains a mapping of 'of' variables to a tuple of the form (wrts, functs) for those
         'of' variables that require finite difference to be used to compute their derivatives.
+    _constants : dict of dicts
+        Constants defined in the expressions. The key is the name of the constant and the value
+        is a dict of metadata.
     """
 
     def __init__(self, exprs=[], **kwargs):
@@ -311,7 +315,7 @@ class ExecComp(ExplicitComponent):
         allvars = set()
 
         self._exprs_info = exprs_info = [(self._parse_for_out_vars(expr.split('=', 1)[0]),
-                                          self._parse_for_names(expr,kwargs)) for expr in exprs]
+                                          self._parse_for_names(expr, **kwargs)) for expr in exprs]
 
         self._requires_fd = {}
 
@@ -338,8 +342,16 @@ class ExecComp(ExplicitComponent):
         # make sure all kwargs are legit
         for arg, val in kwargs.items():
 
+            if isinstance(val, dict) and 'constant' in val and val['constant']:
+                if 'val' not in val:
+                    raise RuntimeError(f"{self.msginfo}: arg '{arg}' in call to ExecComp() "
+                                       "is a constant but no value is given")
+                for ignored_meta in ['units', 'shape']:
+                    if ignored_meta in val:
+                        issue_warning(f"arg '{arg}' in call to ExecComp() "
+                                      f"is a constant. The {ignored_meta} will be ignored",
+                                      prefix=self.msginfo, category=SetupWarning)
 
-            if 'constant' in val and val['constant'] :
                 self._constants[arg] = val['val']
                 continue  # TODO should still do some checking here!
 
@@ -450,8 +462,9 @@ class ExecComp(ExplicitComponent):
                 if var in outs:
                     current_meta = self.add_output(var, val, **meta)
                 else:
-                    if not meta.get('constant', False):
-                        current_meta = self.add_input(var, val, **meta)
+                    if 'constant' in meta:
+                        meta.pop('constant', None)
+                    current_meta = self.add_input(var, val, **meta)
 
             if var not in init_vals:
                 init_vals[var] = current_meta['val']
@@ -522,14 +535,14 @@ class ExecComp(ExplicitComponent):
                                 "function or constant." % (self.msginfo, v))
         return vnames
 
-    def _parse_for_names(self, s, kwargs):
+    def _parse_for_names(self, s, **kwargs):
         names = [x.strip() for x in re.findall(VAR_RGX, s) if not x.startswith('.')]
-        # vnames = set([n for n in names if not n.endswith('(')])
         vnames = set()
         for n in names:
             if n.endswith('('):
                 continue
-            if n in kwargs and 'constant' in kwargs[n] and kwargs[n]['constant'] :
+            if n in kwargs and isinstance(kwargs[n], dict) and 'constant' in kwargs[n] \
+                    and kwargs[n]['constant']:
                 continue
             vnames.add(n)
         fnames = [n[:-1] for n in names if n[-1] == '(']
@@ -635,7 +648,7 @@ class ExecComp(ExplicitComponent):
                         else:
                             decl_partials(of=out, wrt=inp)
 
-        # super()._setup_partials()
+        super()._setup_partials()
         if self._manual_decl_partials:
             undeclared = []
             for i, (outs, tup) in enumerate(self._exprs_info):
@@ -669,9 +682,9 @@ class ExecComp(ExplicitComponent):
         """
         for i, expr in enumerate(self._codes):
             try:
-                #  input and output are vectors
-                # exec(expr, _expr_dict, _IODict(outputs, inputs))  # nosec: limited to _expr_dict
-                exec(expr, _expr_dict, _IODict(outputs, inputs, self._constants))  # nosec: limited to _expr_dict
+                #  inputs, outputs, and _constants are vectors
+                exec(expr, _expr_dict, _IODict(outputs, inputs, self._constants))  # nosec:
+                # limited to _expr_dict
             except Exception as err:
                 raise RuntimeError(f"{self.msginfo}: Error occurred evaluating '{self._exprs[i]}':"
                                    f"\n{err}")
@@ -866,9 +879,8 @@ class _IODict(object):
         except KeyError:
             try:
                 return self._outputs[name]
-            except:
+            except KeyError:
                 return self._constants[name]
-
 
     def __setitem__(self, name, value):
         self._outputs[name] = value
