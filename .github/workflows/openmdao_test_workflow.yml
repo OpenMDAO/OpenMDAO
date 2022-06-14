@@ -21,11 +21,10 @@ jobs:
         include:
           # baseline versions
           - NAME: Baseline
-            PY: 3.8
-            NUMPY: 1.18
-            SCIPY: 1.4
-            MPI4PY: '3.0'
-            PETSc: 3.12
+            PY: '3.10'
+            NUMPY: 1.22
+            SCIPY: 1.7
+            PETSc: 3.16
             PYOPTSPARSE: 'v2.1.5'
             SNOPT: 7.7
             OPTIONAL: '[all]'
@@ -40,7 +39,7 @@ jobs:
             NUMPY: 1
             SCIPY: 1
             PETSc: 3
-            PYOPTSPARSE: 'v2.6.2'
+            PYOPTSPARSE: 'main'
             SNOPT: 7.7
             OPTIONAL: '[all]'
 
@@ -54,10 +53,11 @@ jobs:
 
           # oldest supported versions
           - NAME: Oldest
-            PY: 3.7
+            PY: 3.8
             NUMPY: 1.21
-            SCIPY: 1.2
-            PETSc: 3.10.2
+            SCIPY: 1.7
+            MPI4PY: '3.0'
+            PETSc: 3.12
             PYOPTSPARSE: 'v1.2'
             SNOPT: 7.2
             OPTIONAL: '[all]'
@@ -119,14 +119,15 @@ jobs:
           echo "============================================================="
           python -m pip install jax jaxlib
 
-      - name: Install libscotch
+      - name: Install dependencies for Oldest
         if: matrix.name == 'Oldest'
         shell: bash -l {0}
         run: |
           echo "============================================================="
           echo "Install libscotch"
           echo "============================================================="
-          sudo apt-get install -y libscotch-6.0
+          echo sudo apt-get install -y libscotch-6.0
+          conda install -c conda-forge openmpi=4.0
 
       - name: Install PETSc
         if: matrix.PETSc
@@ -140,6 +141,13 @@ jobs:
           else
             conda install -c conda-forge mpi4py petsc=${{ matrix.PETSc }} petsc4py -q -y
           fi
+          echo "-----------------------"
+          echo "Quick test of mpi4py:"
+          mpirun -n 2 python -c "from mpi4py import MPI; print(f'Rank: {MPI.COMM_WORLD.rank}')"
+          echo "-----------------------"
+          echo "Quick test of petsc4py:"
+          mpirun -n 2 python -c "import numpy; from mpi4py import MPI; comm = MPI.COMM_WORLD; import petsc4py; petsc4py.init(); x = petsc4py.PETSc.Vec().createWithArray(numpy.ones(5)*comm.rank, comm=comm);  print(x.getArray())"
+          echo "-----------------------"
           echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> $GITHUB_ENV
 
       - name: Install pyOptSparse
@@ -169,20 +177,25 @@ jobs:
               echo "  > Secure copying SNOPT 7.7 over SSH"
               mkdir SNOPT
               scp -qr ${{ secrets.SNOPT_LOCATION_77 }} SNOPT
-              ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}" -s SNOPT/src
+              ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}" -s SNOPT/src -d
 
             elif [[ "${{ matrix.SNOPT }}" == "7.2" && "${{ secrets.SNOPT_LOCATION_72 }}" ]]; then
               echo "  > Secure copying SNOPT 7.2 over SSH"
               mkdir SNOPT
               scp -qr ${{ secrets.SNOPT_LOCATION_72 }} SNOPT
-              ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}" -s SNOPT/source
+              ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}" -s SNOPT/source -d
 
             else
               if [[ "${{ matrix.SNOPT }}" ]]; then
                 echo "SNOPT version ${{ matrix.SNOPT }} was requested but source is not available"
               fi
-              ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}"
+              ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}" -d
             fi
+
+            echo "--------------------------"
+            echo "Quick test of pyoptsparse:"
+            testflo -v build*/pyoptsparse/ --show_skipped
+            echo "--------------------------"
 
             cd ..
 
