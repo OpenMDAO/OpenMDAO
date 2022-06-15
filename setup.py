@@ -17,7 +17,7 @@ optional_dependencies = {
         'ipyparallel',
         'numpydoc>=1.1',
         'tabulate',
-        'jupyter-book',
+        'jupyter-book<0.13',
         'jupyter-sphinx',
         'sphinx-sitemap'
     ],
