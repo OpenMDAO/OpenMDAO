@@ -34,6 +34,8 @@ class HtmlPreprocessor():
 
     Attributes
     ----------
+    _start_path : Path
+        A Path object to help with testing functions for the provided start_filename.
     _start_filename : str
         The path to the file to begin processing from, normally an HTML file.
     _search_path : Path
@@ -129,7 +131,7 @@ class HtmlPreprocessor():
 
         self.msg("HtmlProcessor object created.")
 
-    def find_file(self, filename:str) -> str:
+    def find_file(self, filename: str) -> str:
         """
         Check specified locations for the provided filename.
 
@@ -152,7 +154,7 @@ class HtmlPreprocessor():
                 test_path = Path(path / filename)
                 if test_path.is_file():
                     return test_path
-        
+
         raise FileNotFoundError(f"Error: {filename} not found")
 
     def load_file(self, filename: str, rlvl=0, binary=False, allow_dup=False) -> str:
