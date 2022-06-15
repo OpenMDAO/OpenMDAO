@@ -17,7 +17,7 @@ from openmdao.utils.webview import webview
 
 # Keeping track of the registered reports
 _Report = namedtuple(
-    'Report', 'func description class_name inst_id condition method pre_or_post report_filename'
+    'Report', 'func description class_name inst_id method pre_or_post report_filename'
 )
 _reports_registry = {}
 _default_reports = ['scaling', 'total_coloring', 'n2']
@@ -49,8 +49,7 @@ def reports_active():
     return 'TESTFLO_RUNNING' not in os.environ
 
 
-def register_report(name, func, desc, class_name, method, pre_or_post, filename=None, inst_id=None,
-                    condition=None):
+def register_report(name, func, desc, class_name, method, pre_or_post, filename=None, inst_id=None):
     """
     Register a report with the reporting system.
 
@@ -73,9 +72,6 @@ def register_report(name, func, desc, class_name, method, pre_or_post, filename=
     inst_id : str or None
         Either the instance ID of an OpenMDAO object (e.g. Problem, Driver) or None.
         If None, then this report will be run for all objects of type class_name.
-    condition : function or None
-        Function taking the instance as an arg that returns True if the report should run for
-        that instance.
     """
     global _reports_registry
 
@@ -85,8 +81,8 @@ def register_report(name, func, desc, class_name, method, pre_or_post, filename=
         raise ValueError("The argument 'pre_or_post' can only have values of 'pre' or 'post', "
                          f"but {pre_or_post} was given")
 
-    _reports_registry[name] = _Report(func, desc, class_name, inst_id, condition, method,
-                                      pre_or_post, filename)
+    _reports_registry[name] = _Report(func, desc, class_name, inst_id, method, pre_or_post,
+                                      filename)
 
 
 def activate_report(name, instance=None):
@@ -114,7 +110,7 @@ def activate_report(name, instance=None):
 
     inst_id = None if instance is None else instance._get_inst_id()
 
-    func, _, class_name, _inst_id, report_cond, method, pre_or_post, report_filename = \
+    func, _, class_name, _inst_id, method, pre_or_post, report_filename = \
         _reports_registry[name]
 
     # handle case where report was registered for a specific inst_id
@@ -123,9 +119,6 @@ def activate_report(name, instance=None):
             inst_id = _inst_id
         elif inst_id != _inst_id:  # registered inst_id doesn't match current instance
             return
-
-    if instance is not None and report_cond is not None and not report_cond(instance):
-        return  # condition violated for this instance
 
     if (name, inst_id) in _active_reports:
         raise ValueError(f"A report with the name '{name}' for instance '{inst_id}' is already "
@@ -444,7 +437,7 @@ def clear_reports(instance=None):
             inst_id = active_inst_id
         elif inst_id != active_inst_id:
             continue
-        func, _, class_name, _, _, method, pre_or_post, _ = _reports_registry[name]
+        func, _, class_name, _, method, pre_or_post, _ = _reports_registry[name]
         if pre_or_post == "pre":
             _unregister_hook(method, class_name, inst_id=inst_id, pre=func)
         else:
