@@ -1634,22 +1634,41 @@ class Group(System):
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
         all_abs2meta_in = self._var_allprocs_abs2meta['input']
 
-        def copy_var_meta(from_var, to_var, distrib_sizes):
+        def get_group_input_shape(prom, gshapes):
+            if prom in gshapes:
+                return gshapes[prom]
+
+            if prom in self._group_inputs:
+                for d in self._group_inputs[prom]:
+                    if 'src_shape' in d:
+                        return d['src_shape']
+                    elif 'val' in d:
+                        return  np.asarray(d['val']).shape
+
+        def copy_var_meta(from_var, to_var, distrib_sizes, gshapes):
             # copy size/shape info from from_var's metadata to to_var's metadata
 
-            from_io = 'output' if from_var in all_abs2meta_out else 'input'
-            to_io = 'output' if to_var in all_abs2meta_out else 'input'
-
-            # transfer shape/size info from from_var to to_var
-            all_from_meta = self._var_allprocs_abs2meta[from_io][from_var]
-            all_to_meta = self._var_allprocs_abs2meta[to_io][to_var]
-            to_meta = self._var_abs2meta[to_io].get(to_var, {})
+            if to_var.startswith('#'):
+                return
 
             nprocs = self.comm.size
+            to_io = 'output' if to_var in all_abs2meta_out else 'input'
 
-            from_dist = nprocs > 1 and all_from_meta['distributed']
-            from_size = all_from_meta['size']
-            from_shape = all_from_meta['shape']
+            if from_var.startswith('#'):
+                from_dist = False
+                from_shape = gshapes[from_var[1:]]
+                from_size = shape_to_len(from_shape)
+            else:
+                from_io = 'output' if from_var in all_abs2meta_out else 'input'
+
+                # transfer shape/size info from from_var to to_var
+                all_from_meta = self._var_allprocs_abs2meta[from_io][from_var]
+                from_dist = nprocs > 1 and all_from_meta['distributed']
+                from_size = all_from_meta['size']
+                from_shape = all_from_meta['shape']
+
+            all_to_meta = self._var_allprocs_abs2meta[to_io][to_var]
+            to_meta = self._var_abs2meta[to_io].get(to_var, {})
 
             to_dist = nprocs > 1 and all_to_meta['distributed']
 
@@ -1701,6 +1720,7 @@ class Group(System):
         dist_sz = {}  # local distrib sizes
         my_abs2meta_out = self._var_abs2meta['output']
         my_abs2meta_in = self._var_abs2meta['input']
+        grp_shapes = {}
 
         # find all variables that have an unknown shape (across all procs) and connect them
         # to other unknown and known shape variables to form an undirected graph.
@@ -1721,8 +1741,21 @@ class Group(System):
                                 if all_abs2meta_in[inp]['shape'] is not None:
                                     knowns.add(inp)
                         elif not meta['copy_shape']:
-                            raise RuntimeError(f"{self.msginfo}: 'shape_by_conn' was set for "
-                                               f"unconnected variable '{name}'.")
+                            # check to see if we can get shape from _group_inputs
+                            fail = True
+                            if io == 'input':
+                                prom = all_abs2prom_in[name]
+                                grp_shape = get_group_input_shape(prom, grp_shapes)
+                                if grp_shape is not None:
+                                    # use '#' to designate this as an entry that's not a variable
+                                    gnode = f"#{prom}"
+                                    graph.add_edge(gnode, name)
+                                    knowns.add(gnode)
+                                    grp_shapes[prom] = grp_shape
+                                    fail = False
+                            if fail:
+                                raise RuntimeError(f"{self.msginfo}: 'shape_by_conn' was set for "
+                                                   f"unconnected variable '{name}'.")
 
                 if meta['copy_shape']:
                     # variable whose shape is being copied must be on the same component, and
@@ -1776,25 +1809,33 @@ class Group(System):
             stack = [sorted(comp_knowns)[0]]  # sort to keep error messages consistent
             while stack:
                 known = stack.pop()
-                known_a2m = all_abs2meta_in if known in all_abs2meta_in else all_abs2meta_out
-                known_shape = known_a2m[known]['shape']
-                known_dist = known_a2m[known]['distributed']
+                if known.startswith('#'):  # it's a non-variable node (group default input)
+                    known_shape = grp_shapes[known[1:]]
+                    known_dist = False
+                else:
+                    known_a2m = all_abs2meta_in if known in all_abs2meta_in else all_abs2meta_out
+                    known_shape = known_a2m[known]['shape']
+                    known_dist = known_a2m[known]['distributed']
                 for node in graph.neighbors(known):
                     if node in seen:
-                        a2m = all_abs2meta_in if node in all_abs2meta_in else all_abs2meta_out
-                        # check to see if shapes agree
-                        if a2m[node]['shape'] != known_shape:
+                        if node.startswith('#'):
+                            shape = grp_shapes[node[1:]]
+                            dist = False
+                        else:
+                            a2m = all_abs2meta_in if node in all_abs2meta_in else all_abs2meta_out
+                            shape = a2m[node]['shape']
                             dist = a2m[node]['distributed']
-                            # can't compare shapes if one is dist and other is not. The mismatch
-                            # will be caught later in setup_connections in that case.
-                            if not (dist ^ known_dist):
-                                conditional_error(f"{self.msginfo}: Shape mismatch,  "
-                                                  f"{a2m[node]['shape']} vs. "
-                                                  f"{known_shape} for variable '{node}' during "
-                                                  "dynamic shape determination.")
+
+                        # check to see if shapes agree
+                        # can't compare shapes if one is dist and other is not. The mismatch
+                        # will be caught later in setup_connections in that case.
+                        if shape != known_shape and not (dist ^ known_dist):
+                            conditional_error(f"{self.msginfo}: Shape mismatch, {shape} vs. "
+                                              f"{known_shape} for variable '{node}' during "
+                                              "dynamic shape determination.")
                     else:
                         # transfer the known shape info to the unshaped variable
-                        copy_var_meta(known, node, distrib_sizes)
+                        copy_var_meta(known, node, distrib_sizes, grp_shapes)
                         seen.add(node)
                         stack.append(node)
 
