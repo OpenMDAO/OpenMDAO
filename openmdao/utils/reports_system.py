@@ -340,6 +340,7 @@ def _setup_default_reports():
 
 
 report_function = _run_n2_report
+run_n2_report = _run_n2_report
 setup_default_reports = _setup_default_reports
 set_default_reports_dir = set_reports_dir
 

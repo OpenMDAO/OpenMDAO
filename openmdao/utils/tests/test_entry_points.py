@@ -73,7 +73,7 @@ class TestEntryPoints(unittest.TestCase):
             if extra:
                 self.fail(f"For entry point group '{epgroup}', the following extra EPs were found: {sorted(extra)}.")
 
-        # check that all registered reports point to actual funtions
+        # check that all registered reports point to actual functions
         badep = set()
         for fullpath in registered_eps.get('openmdao_report', ()):
             modpath, _, funcname = fullpath.partition(':')
