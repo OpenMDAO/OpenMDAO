@@ -1643,7 +1643,7 @@ class Group(System):
                     if 'src_shape' in d:
                         return d['src_shape']
                     elif 'val' in d:
-                        return  np.asarray(d['val']).shape
+                        return np.asarray(d['val']).shape
 
         def copy_var_meta(from_var, to_var, distrib_sizes, gshapes):
             # copy size/shape info from from_var's metadata to to_var's metadata
@@ -1753,6 +1753,16 @@ class Group(System):
                                     knowns.add(gnode)
                                     grp_shapes[prom] = grp_shape
                                     fail = False
+                                else:  # see if there are any connected inputs with known shape
+                                    for n in self._var_allprocs_prom2abs_list['input'][prom]:
+                                        if n != name:
+                                            m = all_abs2meta_in[n]
+                                            if not m['distributed'] and not m['has_src_indices']:
+                                                if not m['shape_by_conn'] and not m['copy_shape']:
+                                                    fail = False
+                                                    knowns.add(n)
+                                                    graph.add_edge(n, name)
+                                                    break
                             if fail:
                                 raise RuntimeError(f"{self.msginfo}: 'shape_by_conn' was set for "
                                                    f"unconnected variable '{name}'.")
