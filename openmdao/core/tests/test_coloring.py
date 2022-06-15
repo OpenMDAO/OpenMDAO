@@ -90,7 +90,7 @@ class DynPartialsComp(om.ExplicitComponent):
 
 def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True,
             recorder=None, has_lin_constraint=True, has_diag_partials=True, partial_coloring=False,
-            use_vois=True, auto_ivc=False, con_alias=False, **options):
+            use_vois=True, auto_ivc=False, con_alias=False, check=False, **options):
 
     p = om.Problem(model=CounterGroup())
 
@@ -248,7 +248,7 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
     if recorder:
         p.driver.add_recorder(recorder)
 
-    p.setup(mode=mode, derivatives=derivs)
+    p.setup(mode=mode, derivatives=derivs, check=check)
     if use_vois:
         p.run_driver()
     else:
@@ -262,7 +262,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
     def setUp(self):
         # make sure no default reports run because they'll mess up run counts
-        om.clear_reports() 
+        om.clear_reports()
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_total_coloring_snopt_auto(self):
@@ -576,7 +576,7 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
     """Reverse coloring tests for pyoptsparse."""
     def setUp(self):
         # make sure no default reports run because they'll mess up run counts
-        om.clear_reports() 
+        om.clear_reports()
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_rev_simul_coloring_snopt(self):
@@ -639,7 +639,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 
     def setUp(self):
         # make sure no default reports run because they'll mess up run counts
-        om.clear_reports() 
+        om.clear_reports()
 
     def test_bad_mode(self):
         p_color_fwd = run_opt(om.ScipyOptimizeDriver, 'fwd', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
@@ -898,7 +898,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
 
     def setUp(self):
         # make sure no default reports run because they'll mess up run counts
-        om.clear_reports() 
+        om.clear_reports()
 
     def test_summary(self):
         p_color = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)

@@ -263,22 +263,22 @@ class TestReportsSystem(unittest.TestCase):
     @hooks_active
     def test_report_generation_user_defined_report(self):
         user_report_filename = 'user_report.txt'
-        os.environ['OPENMDAO_REPORTS'] = 'User defined report'
+        os.environ['OPENMDAO_REPORTS'] = 'User report'
 
         def user_defined_report(prob, report_filename):
             path = pathlib.Path(prob.get_reports_dir()).joinpath(report_filename)
             with open(path, "w") as f:
                 f.write(f"Do some reporting on the Problem, {prob._name}\n")
 
-        register_report("User defined report", user_defined_report,
-                        "user defined report description",
+        register_report("User report", user_defined_report,
+                        "user report description",
                         'Problem', 'setup', 'pre', user_report_filename)
 
         prob = self.setup_and_run_simple_problem()
 
         path = pathlib.Path(_reports_dir).joinpath(prob._name, user_report_filename)
 
-        self.assertTrue(path.is_file(), f'The user defined report file, {str(path)} was not found')
+        self.assertTrue(path.is_file(), f'The user report file, {str(path)} was not found')
 
     @hooks_active
     def test_report_generation_various_locations(self):

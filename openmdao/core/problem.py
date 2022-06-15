@@ -274,13 +274,10 @@ class Problem(object):
                                             '(processed post-includes). Uses fnmatch wildcards')
 
         # register hooks for any reports
-        self._setup_reports()
+        activate_reports(self._reports, self)
 
         # So Problem and driver can have hooks attached to their methods
         _setup_hooks(self)
-
-    def _setup_reports(self):
-        activate_reports(self._reports, self)
 
     def _has_active_report(self, name):
         """
