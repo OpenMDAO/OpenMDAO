@@ -24,7 +24,7 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len
 from openmdao.utils.general_utils import common_subpath, \
-    conditional_error, _is_slicer_op, convert_src_inds, \
+    conditional_error, convert_src_inds, \
     shape2tuple, get_connection_owner, conditional_error
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
@@ -34,7 +34,6 @@ from openmdao.utils.indexer import indexer, Indexer
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     SetupWarning, PromotionWarning, MPIWarning
 from openmdao.core.constants import _SetupStatus
-from openmdao.utils.om_warnings import warn_deprecation
 
 # regex to check for valid names.
 import re

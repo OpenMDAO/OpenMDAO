@@ -531,7 +531,7 @@ def _get_viewer_data(data_source, case_id=None):
 
 
 def n2(data_source, outfile=_default_n2_filename, case_id=None, show_browser=True, embeddable=False,
-       title=None, use_declare_partial_info=False, display_in_notebook=True):
+       title=None, display_in_notebook=True):
     """
     Generate an HTML file containing a tree viewer.
 
@@ -553,9 +553,6 @@ def n2(data_source, outfile=_default_n2_filename, case_id=None, show_browser=Tru
         and <head> tags. If False, gives a single, standalone HTML file for viewing.
     title : str, optional
         The title for the diagram. Used in the HTML title.
-    use_declare_partial_info : ignored
-        This option is no longer used because it is now always true.
-        Still present for backwards compatibility.
     display_in_notebook : bool, optional
         If True, display the N2 diagram in the notebook, if this is called from a notebook.
         Defaults to True.
@@ -568,10 +565,6 @@ def n2(data_source, outfile=_default_n2_filename, case_id=None, show_browser=Tru
 
     options = {}
     model_data['options'] = options
-
-    if use_declare_partial_info:
-        warn_deprecation("'use_declare_partial_info' is now the"
-                         " default and the option is ignored.")
 
     import openmdao
     openmdao_dir = os.path.dirname(inspect.getfile(openmdao))

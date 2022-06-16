@@ -890,20 +890,6 @@ class Problem(object):
         else:
             record_iteration(self, self, case_name)
 
-    def record_iteration(self, case_name):
-        """
-        Record the variables at the Problem level.
-
-        Parameters
-        ----------
-        case_name : str
-            Name used to identify this Problem case.
-        """
-        warn_deprecation("'Problem.record_iteration' has been deprecated. "
-                         "Use 'Problem.record' instead.")
-
-        record_iteration(self, self, case_name)
-
     def _get_recorder_metadata(self, case_name):
         """
         Return metadata from the latest iteration for use in the recorder.

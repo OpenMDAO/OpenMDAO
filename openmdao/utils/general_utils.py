@@ -2,7 +2,6 @@
 import os
 import re
 import sys
-import warnings
 import unittest
 from contextlib import contextmanager
 from fnmatch import fnmatchcase
@@ -14,7 +13,7 @@ from collections.abc import Iterable
 import numpy as np
 
 from openmdao.core.constants import INF_BOUND
-from openmdao.utils.om_warnings import issue_warning, _warn_simple_format, warn_deprecation
+from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.array_utils import shape_to_len
 
 # Certain command line tools can make use of this to allow visualization of models when errors
@@ -112,29 +111,6 @@ def ignore_errors_context(flag=True):
         yield
     finally:
         ignore_errors(save)
-
-
-def simple_warning(msg, category=UserWarning, stacklevel=2):
-    """
-    Display a simple warning message without the annoying extra line showing the warning call.
-
-    Parameters
-    ----------
-    msg : str
-        The warning message.
-    category : class
-        The warning class.
-    stacklevel : int
-        Number of levels up the stack to identify as the warning location.
-    """
-    warn_deprecation('simple_warning is deprecated. '
-                     'Use openmdao.utils.om_warnings.issue_warning instead.')
-    old_format = warnings.formatwarning
-    warnings.formatwarning = _warn_simple_format
-    try:
-        warnings.warn(msg, category, stacklevel)
-    finally:
-        warnings.formatwarning = old_format
 
 
 def ensure_compatible(name, value, shape=None, indices=None):

@@ -300,18 +300,6 @@ class TestSystem(unittest.TestCase):
         with assert_warning(OMDeprecationWarning, msg):
             self.assertEqual(meta['comp.a']['value'], 1)
 
-    def test_recording_options_deprecated(self):
-        prob = Problem()
-        msg = "The recording option, record_model_metadata, on System is deprecated. " \
-              "Recording of model metadata will always be done"
-        with assert_warning(OMDeprecationWarning, msg):
-            prob.model.recording_options['record_model_metadata'] = True
-
-        msg = "The recording option, record_metadata, on System is deprecated. " \
-              "Recording of metadata will always be done"
-        with assert_warning(OMDeprecationWarning, msg):
-            prob.model.recording_options['record_metadata'] = True
-
     def test_setup_check_group(self):
 
         class CustomGroup(Group):

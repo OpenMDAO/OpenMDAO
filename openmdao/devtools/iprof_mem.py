@@ -286,7 +286,6 @@ def _process_parts(parts, qual_cache):
 
 
 def postprocess_memtrace_tree(fname, min_mem=1.0, show_colors=True, rank=0, stream=sys.stdout):
-    from openmdao.utils.general_utils import simple_warning
     cprint, Fore, Back, Style = _get_color_printer(stream, show_colors, rank=rank)
 
     info = {}
@@ -397,7 +396,6 @@ def postprocess_memtrace_tree(fname, min_mem=1.0, show_colors=True, rank=0, stre
 
 
 def postprocess_memtrace_flat(fname, min_mem=1.0, show_colors=True, rank=0, stream=sys.stdout):
-    from openmdao.utils.general_utils import simple_warning
     cprint, Fore, Back, Style = _get_color_printer(stream, show_colors, rank=rank)
 
     info = {}
