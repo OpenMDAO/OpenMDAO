@@ -886,7 +886,7 @@ class PGroup(om.Group):
         self.add_subsystem('comp2', DynShpComp(), promotes_inputs=['x'])
 
     def configure(self):
-        self.set_input_defaults('x', src_shape=(2, ))  #  val=np.array([1, 2]),
+        self.set_input_defaults('x', src_shape=(2, ))
 
 
 class TestDynShapesWithInputConns(unittest.TestCase):
@@ -920,6 +920,42 @@ class TestDynShapesWithInputConns(unittest.TestCase):
 
         assert_near_equal(prob['sub.comp1.y'], np.ones(2) * 21.)
         assert_near_equal(prob['sub.comp2.y'], np.ones(2) * 21.)
+
+    def test_shape_from_conn_input_mismatch(self):
+        prob = om.Problem()
+        sub = prob.model.add_subsystem('sub', om.Group())
+        comp1 = sub.add_subsystem('comp1', om.ExecComp('y=3*x', x={'shape_by_conn': True}, y={'copy_shape': 'x'}),
+                                  promotes_inputs=['x'])
+        comp2 = sub.add_subsystem('comp2', om.ExecComp('y=3*x', x=np.ones(2), y=np.zeros(2)),
+                                  promotes_inputs=['x'])
+        comp3 = sub.add_subsystem('comp3', om.ExecComp('y=3*x', x=np.ones(3), y=np.zeros(3)),
+                                  promotes_inputs=['x'])
+
+        with self.assertRaises(ValueError) as cm:
+            prob.setup()
+
+        # just make sure we still get a clear error msg
+
+        msg = "Shape of input 'sub.comp3.x', (3,), doesn't match shape (2,)."
+        self.assertEqual(cm.exception.args[0], msg)
+
+    def test_shape_from_conn_input_mismatch_group_inputs(self):
+        prob = om.Problem()
+        sub = prob.model.add_subsystem('sub', om.Group())
+        comp1 = sub.add_subsystem('comp1', om.ExecComp('y=3*x', x={'shape_by_conn': True}, y={'copy_shape': 'x'}),
+                                  promotes_inputs=['x'])
+        comp2 = sub.add_subsystem('comp2', om.ExecComp('y=3*x', x=np.ones(2), y=np.zeros(2)),
+                                  promotes_inputs=['x'])
+
+        sub.set_input_defaults('x', src_shape=(3, ))
+
+        with self.assertRaises(ValueError) as cm:
+            prob.setup()
+
+        # just make sure we still get a clear error msg
+
+        msg = "Shape of input 'sub.comp2.x', (2,), doesn't match shape (3,)."
+        self.assertEqual(cm.exception.args[0], msg)
 
 
 if __name__ == "__main__":
