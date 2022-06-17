@@ -24,12 +24,26 @@ class OmTreeNode extends FilterCapableNode {
         // Solver names may be empty, so set them to "None" instead.
         if (this.linear_solver == "") this.linear_solver = "None";
         if (this.nonlinear_solver == "") this.nonlinear_solver = "None";
-        if (this.isComponent()) this.draw.boxChildren = true;
         if (exists(this.parentComponent)) this.parentComponent = parent;
     }
 
     get absPathName() { return this.path; }
     set absPathName(newName) { this.path = newName; return newName; }
+
+    getTextName() {
+        let retVal = this.name;
+
+        if (this.name == '_auto_ivc') {
+            retVal = 'Auto-IVC';
+        }
+        else if (this.isFilter()) {
+            retVal = super.getTextName();
+        }
+        else if (this.path.match(/^_auto_ivc.*/) && this.promotedName !== undefined) {
+            retVal = this.promotedName;
+        }
+        return retVal;
+    }
 
     _newDisplayData() { return new OmNodeDisplayData(); }
 

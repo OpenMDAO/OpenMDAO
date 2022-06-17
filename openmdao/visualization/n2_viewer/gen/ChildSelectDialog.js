@@ -43,8 +43,8 @@ class ChildSelectDialog extends WindowDraggable {
             if (!child.isInputOrOutput()) { continue; }
             foundVariables = true;
 
-            // Use Layout.getText() because Auto-IVC variable names are not usually descriptive.
-            const varName = this.diag.layout.getText(child);
+            // Use getTextName() because Auto-IVC variable names are not usually descriptive.
+            const varName = child.getTextName();
             this.varNames[varName] = child;
             this.varNameArr.push(varName)
 
@@ -137,9 +137,9 @@ class ChildSelectDialog extends WindowDraggable {
         this.hiddenVars = [];
         this.existingHiddenVars = false;
 
-        for (const iotype of ['inputs', 'outputs']) {
-            if (this.node.filter[iotype].count > 0) {
-                for (const child of this.node.filter[iotype].children) {
+        for (const filter of this.node.getFilterList()) {
+            if (filter.count > 0) {
+                for (const child of filter.children) {
                     this.hiddenVars.push(child);
                 };
                 this.existingHiddenVars = true;
@@ -231,12 +231,10 @@ class ChildSelectDialog extends WindowDraggable {
             this.diag.ui.addBackButtonHistory();
 
             this.node.searchTerm = this.searchTerm;
-            this.node.filter.inputs.wipe();
-            this.node.filter.outputs.wipe();
+            this.node.wipeFilters();
 
             for (const child of this.hiddenVars) {
-                if (child.isInput()) { this.node.filter.inputs.add(child); }
-                else { this.node.filter.outputs.add(child); }
+                this.node.addToFilter(child);
             }
             
             if (this.node.draw.minimized) {

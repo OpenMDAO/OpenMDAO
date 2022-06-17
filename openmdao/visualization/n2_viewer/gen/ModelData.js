@@ -37,7 +37,7 @@ class ModelData {
         this._init(modelJSON);
 
         this.root = this.tree = modelJSON.tree = this._adoptNodes(modelJSON.tree);
-        this._setParentsAndDepth(this.root, null, 1);
+        this._setDepth(this.root, 1);
 
         for (const conn of this.conns) {
             this.connObjs.push(this._newConnectionObj(conn));
@@ -107,14 +107,12 @@ class ModelData {
     }
 
    /**
-     * Sets parents and depth of all nodes, and determine max depth.
+     * Sets depth of all nodes and determines max depth.
      * @param {TreeNode} node Item to process.
-     * @param {TreeNode} parent Parent of node, null for root node.
      * @param {number} depth Numerical level of ancestry.
      */
-    _setParentsAndDepth(node, parent, depth) {
+    _setDepth(node, depth) {
         node.depth = depth;
-        node.parent = parent;
         node.id = this.nodeIds.length;
         this.nodeIds.push(node);
 
@@ -133,7 +131,7 @@ class ModelData {
         if (node.hasChildren()) {
             node.numDescendants = node.children.length;
             for (const child of node.children) {
-                this._setParentsAndDepth(child, node, depth + 1);
+                this._setDepth(child, depth + 1);
                 node.numDescendants += child.numDescendants;
 
                 // Add absolute pathnames of children to a set for quick searching

@@ -20,9 +20,8 @@ class HtmlPreprocessor():
         The file to begin processing from.
     output_filename : str
         The path to the newly merged HTML file.
-    start_path : str
-        Directory path that all other paths are relative to. Defaults to the path
-        that the start_filename is found in.
+    search_path : str[]
+        List of directory names to search for files.
     allow_overwrite : bool
         If true, overwrite the output file if it exists.
     var_dict : dict
@@ -35,12 +34,12 @@ class HtmlPreprocessor():
 
     Attributes
     ----------
+    _start_path : Path
+        A Path object to help with testing functions for the provided start_filename.
     _start_filename : str
         The path to the file to begin processing from, normally an HTML file.
-    _start_path : Path
-        Path object used to determine relative paths for subsequent directives.
-    _start_dirname : str
-        The absolute path of the directory containing the start_file.
+    _search_path : Path
+        List of Path objects to search for included files.
     _output_filename : str
         The path to the newly merged HTML file.
     _var_dict : dict
@@ -94,7 +93,7 @@ class HtmlPreprocessor():
     Nothing is written until every directive has been successfully processed.
     """
 
-    def __init__(self, start_filename: str, output_filename: str, start_path: str = None,
+    def __init__(self, start_filename: str, output_filename: str, search_path=[],
                  allow_overwrite=False, var_dict: dict = None, json_dumps_default=None,
                  verbose=False):
         """
@@ -105,13 +104,21 @@ class HtmlPreprocessor():
         if self._start_path.is_file() is False:
             raise FileNotFoundError(f"Error: {self._start_path} not found")
 
+        self._search_path = []
+        for path_name in search_path:
+            self._search_path.append(Path(path_name))
+
+        # Put location of start file after manually-specified paths:
+        self._search_path.append(self._start_path.resolve().parent)
+
+        # Current folder:
+        self._search_path.append(Path('.'))
+
         output_path = Path(output_filename)
         if output_path.is_file() and not allow_overwrite:
             raise FileExistsError(f"Error: {output_filename} already exists")
 
         self._start_filename = start_filename
-        self._start_dirname = \
-            self._start_path.resolve().parent if start_path is None else Path(start_path)
         self._output_filename = output_filename
         self._allow_overwrite = allow_overwrite
         self._var_dict = var_dict
@@ -123,6 +130,32 @@ class HtmlPreprocessor():
         self._loaded_filenames = []
 
         self.msg("HtmlProcessor object created.")
+
+    def find_file(self, filename: str) -> str:
+        """
+        Check specified locations for the provided filename.
+
+        Parameters
+        ----------
+        filename : str
+            The path to the text file to locate.
+
+        Returns
+        -------
+        str
+            The full path to the existing file if found.
+        """
+        file_path = Path(filename)
+        if file_path.is_absolute():
+            if file_path.is_file():
+                return filename
+        else:
+            for path in self._search_path:
+                test_path = Path(path / filename)
+                if test_path.is_file():
+                    return test_path
+
+        raise FileNotFoundError(f"Error: {filename} not found")
 
     def load_file(self, filename: str, rlvl=0, binary=False, allow_dup=False) -> str:
         """
@@ -144,8 +177,7 @@ class HtmlPreprocessor():
         str
             The complete contents of the file.
         """
-        path = Path(filename)
-        pathname = filename if path.is_absolute() else self._start_dirname / filename
+        pathname = self.find_file(filename)
 
         if pathname in self._loaded_filenames and not allow_dup:
             self.msg(f"Ignoring previously-loaded file {filename}.", rlvl)

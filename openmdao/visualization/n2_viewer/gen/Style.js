@@ -85,11 +85,11 @@ class Style {
             '#tree > g.minimized > text': {
                 'fill': Style.color.collapsedText,
             },
-            'text': {
+            /* 'text': {
                 //'dominant-baseline: middle',
                 //'dy: .35em',
-            },
-            '#svgId g.model_tree_grp > text': {
+            }, */
+            'g.model_tree_grp > text': {
                 'text-anchor': 'end',
                 'pointer-events': 'none',
                 'font-family': 'helvetica, sans-serif',
@@ -113,10 +113,7 @@ class Style {
             '.horiz_line, .vert_line': {
                 'stroke': Style.color.gridline,
             },
-            "g.model_tree_grp > rect[id$='_FILTER_inputs'] + text": {
-                'font-style': 'italic'
-            },
-            "g.model_tree_grp > rect[id$='_FILTER_outputs'] + text": {
+            "g.model_tree_grp > rect[id*='_FILTER_'] + text": {
                 'font-style': 'italic'
             },
             'g.variable_box > rect': {

@@ -62,14 +62,13 @@ class OmModelData extends ModelData {
     }
 
     /**
-     * Sets parents and depth of all nodes, and determine max depth. Flags the
+     * Sets depth of all nodes determine max depth. Flags the
      * parent node as implicit if the node itself is implicit.
      * @param {OmTreeNode} node Item to process.
-     * @param {OmTreeNode} parent Parent of node, null for root node.
      * @param {number} depth Numerical level of ancestry.
      */
-     _setParentsAndDepth(node, parent, depth) {
-        super._setParentsAndDepth(node, parent, depth);
+     _setDepth(node, depth) {
+        super._setDepth(node, depth);
 
         if (this.abs2prom.input[node.path] !== undefined) {
             node.promotedName = this.abs2prom.input[node.path];
@@ -94,7 +93,7 @@ class OmModelData extends ModelData {
             this.maxSystemDepth = Math.max(depth, this.maxSystemDepth);
         }
 
-        if (parent && node.implicit) { parent.implicit = true; }
+        if (node.parent && node.implicit) { parent.implicit = true; }
     }
 
     /**

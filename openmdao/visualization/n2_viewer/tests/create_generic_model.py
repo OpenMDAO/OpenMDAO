@@ -77,5 +77,5 @@ openmdao_dir = os.path.dirname(inspect.getfile(openmdao))
 vis_dir = os.path.join(openmdao_dir, "visualization/n2_viewer")
 
 HtmlPreprocessor(os.path.join(vis_dir, "tests/gen_test.html"), default_output_filename,
-                    start_path=vis_dir, allow_overwrite=True, var_dict=html_vars,
+                    search_path=[vis_dir], allow_overwrite=True, var_dict=html_vars,
                     verbose=False).run()

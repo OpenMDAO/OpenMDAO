@@ -39,7 +39,7 @@ class Diagram {
         this.manuallyResized = false; // If the diagram has been sized by the user
 
         // Assign this way because defaultDims is read-only.
-        this.dims = structuredClone(defaultDims);
+        this.dims = {...defaultDims};
 
         this._referenceD3Elements();
         this.transitionStartDelay = transitionDefaults.startDelay;
@@ -264,6 +264,8 @@ class Diagram {
         const enterSelection = enter
             .append("g")
             .attr("class", d => `model_tree_grp ${self.style.getNodeClass(d)}`)
+            .attr("transform", d =>
+                `translate(${scale.prev.x(d.draw.dims.prev.x)},${scale.prev.y(d.draw.dims.prev.y)})`)
             .on("click", (e,d) => self.leftClickSelector(e, d))
             .on("contextmenu", function(e,d) {
                 if (e.altKey) {
@@ -295,7 +297,7 @@ class Diagram {
         // Add a label
         enterSelection
             .append("text")
-            .text(self.layout.getText.bind(self.layout))
+            .text(d => d.getTextName())
             .style('visibility', 'hidden')
             .attr("dy", ".35em")
             .attr("transform", d => {
