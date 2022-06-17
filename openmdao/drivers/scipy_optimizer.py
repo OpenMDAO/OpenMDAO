@@ -422,20 +422,7 @@ class ScipyOptimizeDriver(Driver):
             hess = None
 
         # compute dynamic simul deriv coloring if option is set
-        if coloring_mod._use_total_sparsity:
-            if ((self._coloring_info['coloring'] is None and self._coloring_info['dynamic'])):
-                coloring_mod.dynamic_total_coloring(self, run_model=False,
-                                                    fname=self._get_total_coloring_fname())
-
-                # if the improvement wasn't large enough, turn coloring off
-                info = self._coloring_info
-                if info['coloring'] is not None:
-                    pct = info['coloring']._solves_info()[-1]
-                    if info['min_improve_pct'] > pct:
-                        info['coloring'] = info['static'] = None
-                        msg = f"Coloring was deactivated.  Improvement of {pct:.1f}% was less " \
-                              f"than min allowed ({info['min_improve_pct']:.1f}%)."
-                        issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
+        coloring = self._get_coloring(run_model=False)
 
         # optimize
         try:

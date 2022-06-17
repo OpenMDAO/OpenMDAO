@@ -153,15 +153,11 @@ class System(object):
     Base class for all systems in OpenMDAO.
 
     Never instantiated; subclassed by <Group> or <Component>.
-    All subclasses have their attributes defined here.
 
     In attribute names:
-        abs / abs_name: absolute, unpromoted variable name, seen from root (unique).
-        rel / rel_name: relative, unpromoted variable name, seen from current system (unique).
-        prom / prom_name: relative, promoted variable name, seen from current system (non-unique).
-        idx: global variable index among variables on all procs (I/O indices separate).
-        my_idx: index among variables in this system, on this processor (I/O indices separate).
-        io: indicates explicitly that input and output variables are combined in the same dict.
+        abs: absolute, unpromoted variable name, seen from root (unique).
+        rel: relative, unpromoted variable name, seen from current system (unique).
+        prom: relative, promoted variable name, seen from current system (non-unique for inputs).
 
     Parameters
     ----------
@@ -4209,6 +4205,19 @@ class System(object):
                 nl._iter_count = 0
                 if hasattr(nl, 'linesearch') and nl.linesearch:
                     nl.linesearch._iter_count = 0
+
+    def get_reports_dir(self):
+        """
+        Get the path to the directory where the report files should go.
+
+        If it doesn't exist, it will be created.
+
+        Returns
+        -------
+        str
+            The path to the directory where reports should be written.
+        """
+        return self._problem_meta['reports_dir']
 
     def _set_finite_difference_mode(self, active):
         """

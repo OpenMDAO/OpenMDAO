@@ -1,8 +1,9 @@
 """Code for generating N2 diagram."""
 import inspect
 import os
-import networkx as nx
+import pathlib
 
+import networkx as nx
 import numpy as np
 
 from openmdao.components.exec_comp import ExecComp
@@ -24,6 +25,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.notebook_utils import notebook, display, HTML, IFrame, colab
 from openmdao.visualization.htmlpp import HtmlPreprocessor
 from openmdao.utils.om_warnings import issue_warning, warn_deprecation
+from openmdao.utils.reports_system import register_report
 from openmdao.core.constants import _UNDEFINED
 from openmdao import __version__ as openmdao_version
 
@@ -598,3 +600,20 @@ def n2(data_source, outfile=_default_n2_filename, case_id=None, show_browser=Tru
         # open it up in the browser
         from openmdao.utils.webview import webview
         webview(outfile)
+
+
+# N2 report definition
+def _run_n2_report(prob, report_filename=_default_n2_filename):
+
+    n2_filepath = str(pathlib.Path(prob.get_reports_dir()).joinpath(report_filename))
+    try:
+        n2(prob, show_browser=False, outfile=n2_filepath, display_in_notebook=False)
+    except RuntimeError as err:
+        # We ignore this error
+        if str(err) != "Can't compute total derivatives unless " \
+                       "both 'of' or 'wrt' variables have been specified.":
+            raise err
+
+
+def _n2_report_register():
+    register_report('n2', _run_n2_report, 'N2 diagram', 'Problem', 'final_setup', 'post')

@@ -5,6 +5,7 @@ import os
 import time
 import pickle
 import traceback
+import pathlib
 from itertools import combinations
 from contextlib import contextmanager
 from pprint import pprint
@@ -16,12 +17,11 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.general_utils import _src_or_alias_dict, \
     _src_name_iter, _src_or_alias_item_iter
-from openmdao.utils.array_utils import array_viz
 import openmdao.utils.hooks as hooks
 from openmdao.utils.mpi import MPI
-from openmdao.utils.file_utils import _load_and_exec
+from openmdao.utils.file_utils import _load_and_exec, image2html
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
-from openmdao.utils.name_maps import key2abs_key
+from openmdao.utils.reports_system import register_report
 from openmdao.devtools.memory import mem_usage
 
 
@@ -60,7 +60,7 @@ _force_dyn_coloring = False
 # path or system pathname
 _STD_COLORING_FNAME = object()
 
-_default_coloring_imagefile = 'jacobian_to_compute_coloring.png'
+_default_coloring_imagefile = 'coloring.png'
 
 # default values related to the computation of a sparsity matrix
 _DEF_COMP_SPARSITY_ARGS = {
@@ -1987,6 +1987,25 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
         driver._setup_tot_jac_sparsity(coloring)
 
     return coloring
+
+
+def _run_total_coloring_report(driver):
+    coloring = driver._coloring_info['coloring']
+    if coloring is not None:
+        prob = driver._problem()
+        path = str(pathlib.Path(prob.get_reports_dir()).joinpath(_default_coloring_imagefile))
+        coloring.display(show=False, fname=path)
+
+        # now create html file that wraps the image file
+        htmlpath = str(pathlib.Path(prob.get_reports_dir()).joinpath("total_coloring.html"))
+        with open(htmlpath, 'w') as f:
+            f.write(image2html(_default_coloring_imagefile))
+
+
+# entry point for coloring report
+def _total_coloring_report_register():
+    register_report('total_coloring', _run_total_coloring_report, 'Total coloring', 'Driver',
+                    '_get_coloring', 'post')
 
 
 def _total_coloring_setup_parser(parser):

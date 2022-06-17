@@ -250,6 +250,14 @@ setup(
             'armijogoldsteinls=openmdao.solvers.linesearch.backtracking:ArmijoGoldsteinLS',
             'boundsenforcels=openmdao.solvers.linesearch.backtracking:BoundsEnforceLS',
         ],
+        'openmdao_report': [
+            'n2=openmdao.visualization.n2_viewer.n2_viewer:_n2_report_register',
+            'scaling=openmdao.visualization.scaling_viewer.scaling_report:_scaling_report_register',
+            'total_coloring=openmdao.utils.coloring:_total_coloring_report_register',
+            'summary=openmdao.devtools.debug:_summary_report_register',
+            'connections=openmdao.visualization.connection_viewer.viewconns:_connections_report_register',
+            'checks=openmdao.error_checking.check_config:_check_report_register',
+        ],
         'openmdao_surrogate_model': [
             'krigingsurrogate=openmdao.surrogate_models.kriging:KrigingSurrogate',
             'nearestneighbor=openmdao.surrogate_models.nearest_neighbor:NearestNeighbor',

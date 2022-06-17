@@ -263,5 +263,6 @@ class HooksTestCase(unittest.TestCase):
         self.assertEqual(prob['comp.x'], x0)
         self.assertEqual(prob['comp.y'], y0)
 
+
 if __name__ == '__main__':
     unittest.main()
