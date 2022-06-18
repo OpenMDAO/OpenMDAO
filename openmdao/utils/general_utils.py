@@ -117,6 +117,7 @@ def ignore_errors_context(flag=True):
 def simple_warning(msg, category=UserWarning, stacklevel=2):
     """
     Display a simple warning message without the annoying extra line showing the warning call.
+
     Parameters
     ----------
     msg : str
