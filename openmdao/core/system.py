@@ -397,19 +397,6 @@ class System(object):
                                        desc='Set to True to record outputs at the system level')
         self.recording_options.declare('record_residuals', types=bool, default=True,
                                        desc='Set to True to record residuals at the system level')
-        self.recording_options.declare('record_metadata', types=bool,
-                                       desc='Deprecated. Recording of metadata will always be done',
-                                       default=True,
-                                       deprecation="The recording option, record_metadata, "
-                                       "on System is "
-                                       "deprecated. Recording of metadata will always be done")
-        self.recording_options.declare('record_model_metadata', types=bool,
-                                       desc='Deprecated. Recording of model metadata will always '
-                                       'be done',
-                                       deprecation="The recording option, record_model_metadata, "
-                                       "on System is deprecated. Recording of model metadata will "
-                                       "always be done",
-                                       default=True)
         self.recording_options.declare('includes', types=list, default=['*'],
                                        desc='Patterns for variables to include in recording. \
                                        Uses fnmatch wildcards')

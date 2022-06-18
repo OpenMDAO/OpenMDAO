@@ -5,7 +5,6 @@ import numpy as np
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.general_utils import make_set, ensure_compatible
-from openmdao.utils.om_warnings import warn_deprecation
 
 
 class IndepVarComp(ExplicitComponent):
@@ -109,8 +108,7 @@ class IndepVarComp(ExplicitComponent):
 
         super()._configure_check()
 
-    def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=None, ref0=None, res_ref=None, tags=None,
+    def add_output(self, name, val=1.0, shape=None, units=None, desc='', tags=None,
                    shape_by_conn=False, copy_shape=None, distributed=None):
         """
         Add an independent variable to this component.
@@ -127,20 +125,8 @@ class IndepVarComp(ExplicitComponent):
         units : str or None
             Units in which the output variables will be provided to the component during execution.
             Default is None, which means it has no units.
-        res_units : None
-            This argument is deprecated because it was unused.
         desc : str
             Description of the variable.
-        lower : None
-            This argument is deprecated because it was unused.
-        upper : None
-            This argument is deprecated because it was unused.
-        ref : None
-            This argument is deprecated because it was unused.
-        ref0 : None
-            This argument is deprecated because it was unused.
-        res_ref : None
-            This argument is deprecated because it was unused.
         tags : str or list of strs
             User defined tags that can be used to filter what gets listed when calling
             list_outputs.
@@ -158,45 +144,13 @@ class IndepVarComp(ExplicitComponent):
         dict
             Metadata for added variable.
         """
-        if res_units is not None:
-            warn_deprecation(f"{self.msginfo}: The 'res_units' argument was used when adding "
-                             f"output '{name}'. This argument has been deprecated and will be "
-                             "removed in a future version.")
-        if lower is not None:
-            warn_deprecation(f"{self.msginfo}: The 'lower' argument was used when adding "
-                             f"output '{name}'. This argument has been deprecated and will be "
-                             "removed in a future version.")
-        if upper is not None:
-            warn_deprecation(f"{self.msginfo}: The 'upper' argument was used when adding "
-                             f"output '{name}'. This argument has been deprecated and will be "
-                             "removed in a future version.")
-        if ref0 is not None:
-            warn_deprecation(f"{self.msginfo}: The 'ref0' argument was used when adding "
-                             f"output '{name}'. This argument has been deprecated and will be "
-                             "removed in a future version.")
-        if res_ref is not None:
-            warn_deprecation(f"{self.msginfo}: The 'res_ref' argument was used when adding "
-                             f"output '{name}'. This argument has been deprecated and will be "
-                             "removed in a future version.")
-        if ref is not None:
-            warn_deprecation(f"{self.msginfo}: The 'ref' argument was used when adding "
-                             f"output '{name}'. This argument has been deprecated and will be "
-                             "removed in a future version.")
-
-        ref = 1.0
-        ref0 = 0.0
-
-        if res_ref is None:
-            res_ref = ref
-
         if tags is None:
             tags = {'indep_var', 'openmdao:allow_desvar'}
         else:
             tags = make_set(tags) | {'indep_var', 'openmdao:allow_desvar'}
 
-        kwargs = {'shape': shape, 'units': units, 'res_units': res_units, 'desc': desc,
-                  'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
-                  'res_ref': res_ref, 'tags': tags, 'shape_by_conn': shape_by_conn,
+        kwargs = {'shape': shape, 'units': units, 'desc': desc,
+                  'tags': tags, 'shape_by_conn': shape_by_conn,
                   'copy_shape': copy_shape, 'distributed': distributed,
                   }
         return super().add_output(name, val, **kwargs)

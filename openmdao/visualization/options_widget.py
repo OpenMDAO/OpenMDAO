@@ -11,7 +11,7 @@ except Exception:
     widgets = None
 
 from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.general_utils import simple_warning
+from openmdao.utils.general_utils import issue_warning
 
 
 class OptionsWidget(object):
@@ -29,8 +29,8 @@ class OptionsWidget(object):
         Initialize.
         """
         if widgets is None:
-            simple_warning(f"ipywidgets is required to use {self.__class__.__name__}."
-                           "To install it run `pip install openmdao[notebooks]`.")
+            issue_warning(f"ipywidgets is required to use {self.__class__.__name__}."
+                          "To install it run `pip install openmdao[notebooks]`.")
             return
 
         _dict = opts._dict

@@ -1,12 +1,9 @@
 """Define the ImplicitComponent class."""
 
-import numpy as np
-
 from openmdao.core.component import Component
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import make_set
-from openmdao.utils.om_warnings import warn_deprecation
+
 
 _inst_functs = ['apply_linear']
 

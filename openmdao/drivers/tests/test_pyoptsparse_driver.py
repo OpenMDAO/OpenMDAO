@@ -3091,18 +3091,6 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         prob.driver.options['optimizer'] = "SNOPT"
         prob.driver.options['user_terminate_signal'] = signal.SIGUSR1
 
-    def test_options_deprecated(self):
-        # Not a feature test.
-        prob = om.Problem()
-        model = prob.model
-
-        prob.driver = om.pyOptSparseDriver()
-        prob.driver.options['optimizer'] = "SNOPT"
-
-        msg = "The option 'user_teriminate_signal' was misspelled and will be deprecated. Please use 'user_terminate_signal' instead."
-        with assert_warning(OMDeprecationWarning, msg):
-            prob.driver.options['user_teriminate_signal'] = None
-
 
 class MatMultCompExact(om.ExplicitComponent):
     def __init__(self, mat, sparse=False, **kwargs):

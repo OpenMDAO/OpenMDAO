@@ -19,7 +19,7 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import sizes2offsets
 from openmdao.vectors.vector import _full_slice
 from openmdao.utils.indexer import indexer
-from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 import openmdao.utils.coloring as c_mod
 
 
@@ -111,19 +111,12 @@ class Driver(object):
         # Case recording options
         self.recording_options = OptionsDictionary(parent_name=type(self).__name__)
 
-        self.recording_options.declare('record_model_metadata', types=bool, default=True,
-                                       desc='Deprecated. Recording of model metadata will always '
-                                            'be done',
-                                       deprecation="The recording option, record_model_metadata, "
-                                                   "on Driver is deprecated. Recording of model "
-                                                   "metadata will always be done")
         self.recording_options.declare('record_desvars', types=bool, default=True,
                                        desc='Set to True to record design variables at the '
                                             'driver level')
         self.recording_options.declare('record_responses', types=bool, default=False,
                                        desc='Set True to record constraints and objectives at the '
                                             'driver level')
-
         self.recording_options.declare('record_objectives', types=bool, default=True,
                                        desc='Set to True to record objectives at the driver level')
         self.recording_options.declare('record_constraints', types=bool, default=True,
@@ -836,7 +829,7 @@ class Driver(object):
     def _recording_iter(self):
         return self._problem()._metadata['recording_iter']
 
-    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=None,
+    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict',
                         use_abs_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
@@ -855,8 +848,6 @@ class Driver(object):
             Format to return the derivatives. Default is a 'flat_dict', which
             returns them in a dictionary whose keys are tuples of form (of, wrt). For
             the scipy optimizer, 'array' is also supported.
-        global_names : bool
-            Deprecated.  Use 'use_abs_names' instead.
         use_abs_names : bool
             Set to True when passing in absolute names to skip some translation steps.
 
@@ -874,11 +865,6 @@ class Driver(object):
             header = 'Driver total derivatives for iteration: ' + str(self.iter_count)
             print(header)
             print(len(header) * '-' + '\n')
-
-        if global_names is not None:
-            warn_deprecation("'global_names' is deprecated in calls to _compute_totals. "
-                             "Use 'use_abs_names' instead.")
-            use_abs_names = global_names
 
         if problem.model._owns_approx_jac:
             self._recording_iter.push(('_compute_totals_approx', 0))

@@ -8,7 +8,6 @@ from openmdao.core.problem import Problem
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import check_path
-from openmdao.utils.om_warnings import warn_deprecation
 
 
 # default pickle protocol version for serialization
@@ -141,18 +140,6 @@ class CaseRecorder(object):
                 # default to just record on rank 0
                 self._record_on_proc = comm.rank == 0
                 self._recording_ranks = [0]
-
-    def record_metadata(self, recording_requester):
-        """
-        Route the record_metadata call to the proper method.
-
-        Parameters
-        ----------
-        recording_requester : object
-            The object that would like to record its metadata.
-        """
-        warn_deprecation("The 'record_metadata' function is deprecated. "
-                         "All system and solver options are recorded automatically.")
 
     def _get_metadata_system(self, system):
         """

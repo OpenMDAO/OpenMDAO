@@ -59,7 +59,6 @@ from openmdao.utils.entry_points import _list_installed_setup_parser, _list_inst
 from openmdao.utils.reports_system import _list_reports_setup_parser, _list_reports_cmd, \
     _view_reports_setup_parser, _view_reports_cmd
 from openmdao.utils.general_utils import ignore_errors
-from openmdao.utils.om_warnings import warn_deprecation
 
 
 def _n2_setup_parser(parser):
@@ -83,9 +82,6 @@ def _n2_setup_parser(parser):
                         help="create embeddable version.")
     parser.add_argument('--title', default=None,
                         action='store', dest='title', help='diagram title.')
-    parser.add_argument('--use_declare_partial_info', action='store_true',
-                        dest='use_declare_partial_info',
-                        help="ignored, now always true.")
 
 
 def _n2_cmd(options, user_args):
@@ -105,10 +101,6 @@ def _n2_cmd(options, user_args):
         # the file is a python script, run as a post_setup hook
         def _noraise(prob):
             prob.model._raise_connection_errors = False
-
-        if options.use_declare_partial_info:
-            warn_deprecation("'--use_declare_partial_info' is now the"
-                             " default and the option is ignored.")
 
         def _viewmod(prob):
             n2(prob, outfile=options.outfile, show_browser=not options.no_browser,

@@ -216,12 +216,6 @@ class pyOptSparseDriver(Driver):
                              desc='Print the opt problem summary before running the optimization')
         self.options.declare('print_results', types=bool, default=True,
                              desc='Print pyOpt results if True')
-        self.options.declare('gradient method', default='openmdao',
-                             values={'openmdao', 'pyopt_fd', 'snopt_fd'},
-                             desc='Finite difference implementation to use',
-                             deprecation=(f"'gradient method' is not a valid python name and will "
-                                          "raise an exception in a future release.  Use "
-                                          "'gradient_method' instead.", 'gradient_method'))
         self.options.declare('gradient_method', default='openmdao',
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},
                              desc='Finite difference implementation to use')
@@ -237,14 +231,6 @@ class pyOptSparseDriver(Driver):
                              "ignore - don't perform check.")
         self.options.declare('singular_jac_tol', default=1e-16,
                              desc='Tolerance for zero row/column check.')
-
-        # Deprecated option
-        self.options.declare('user_teriminate_signal', default=None, allow_none=True,
-                             desc='OS signal that triggers a clean user-termination. Only SNOPT'
-                             'supports this option.',
-                             deprecation=("The option 'user_teriminate_signal' was misspelled and "
-                                          "will be deprecated. Please use 'user_terminate_signal' "
-                                          "instead.", 'user_terminate_signal'))
 
     def _setup_driver(self, problem):
         """
@@ -269,11 +255,6 @@ class pyOptSparseDriver(Driver):
                                ' multiple objectives.'.format(self.options['optimizer']))
 
         self._setup_tot_jac_sparsity()
-
-        # Handle deprecated option.
-        if self.options._dict['user_teriminate_signal']['val'] is not None:
-            self.options['user_terminate_signal'] = \
-                self.options._dict['user_teriminate_signal']['val']
 
     def run(self):
         """

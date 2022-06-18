@@ -156,9 +156,8 @@ class TestDriver(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        with assert_warning(OMDeprecationWarning, "'global_names' is deprecated in calls to _compute_totals. Use 'use_abs_names' instead."):
-            derivs = prob.driver._compute_totals(of=['comp.y1'], wrt=['px.x'], global_names=True,
-                                                 return_format='dict')
+        derivs = prob.driver._compute_totals(of=['comp.y1'], wrt=['px.x'], use_abs_names=True,
+                                             return_format='dict')
 
         oscale = np.array([1.0/(7.0-5.2), 1.0/(11.0-6.3)])
         iscale = np.array([2.0-0.5, 3.0-1.5])
@@ -480,13 +479,6 @@ class TestDriver(unittest.TestCase):
 
         msg = "Discrete design variables are not supported by this driver: p.xI"
         self.assertEqual(str(context.exception), msg)
-
-    def test_driver_recording_options_deprecated(self):
-        prob = om.Problem()
-        msg = "The recording option, record_model_metadata, on Driver is deprecated. " \
-              "Recording of model metadata will always be done"
-        with assert_warning(OMDeprecationWarning, msg):
-            prob.driver.recording_options['record_model_metadata'] = True
 
     def test_units_basic(self):
         prob = om.Problem()
