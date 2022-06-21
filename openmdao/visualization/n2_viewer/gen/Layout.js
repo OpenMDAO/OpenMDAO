@@ -144,28 +144,6 @@ class Layout {
         return width;
     }
 
-    /** Determine the text associated with the node. Normally its name,
-     * but can be changed if promoted.
-     * @param {TreeNode} node The item to operate on.
-     * @return {String} The selected text.
-     */
-    getText(node) {
-        let retVal = node.name;
-
-        if (node.name == '_auto_ivc') {
-            retVal = 'Auto-IVC';
-        }
-        else if (node.isFilter()) {
-            if (node.name.match(/.*_FILTER_inputs$/)) retVal = 'Filtered Inputs';
-            else retVal = 'Filtered Outputs';
-        }
-        else if (node.path.match(/^_auto_ivc.*/) && node.promotedName !== undefined) {
-            retVal = node.promotedName;
-        }
-
-        return retVal;
-    }
-
     /**
      * Determine text widths for all descendents of the specified node.
      * @param {TreeNode} [node = this.zoomedElement] Item to begin looking from.
@@ -173,7 +151,7 @@ class Layout {
     _updateTextWidths(node = this.zoomedElement) {
         if (node.draw.hidden) return;
 
-        node.draw.nameWidthPx = this._getTextWidth(this.getText(node)) + 2 *
+        node.draw.nameWidthPx = this._getTextWidth(node.getTextName()) + 2 *
             this.size.rightTextMargin;
 
         if (node.hasChildren() && !node.draw.minimized) {

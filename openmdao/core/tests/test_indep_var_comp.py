@@ -237,39 +237,6 @@ class TestIndepVarComp(unittest.TestCase):
         self.assertEqual(len(prob.get_val('num_x')), 4)
         self.assertEqual(prob.get_val('val_y'), 2.5)
 
-    def test_ivc_deprecations(self):
-        msg = "'p1' <class IndepVarComp>: The '{}' argument was used when adding output '{}'. " + \
-              "This argument has been deprecated and will be removed in a future version."
-
-        prob = om.Problem()
-
-        indep = prob.model.add_subsystem('p1', om.IndepVarComp())
-
-        # ref, ref0
-        with assert_warnings([(OMDeprecationWarning, msg.format('ref', 'a')),
-                              (OMDeprecationWarning, msg.format('ref0', 'a'))]):
-            indep.add_output('a', 12., ref=0.0, ref0=1.)
-
-        # res_units
-        with assert_warning(OMDeprecationWarning, msg.format('res_units', 'b')):
-            indep.add_output('b', 12., res_units='m')
-
-        # upper
-        with assert_warning(OMDeprecationWarning, msg.format('upper', 'c')):
-            indep.add_output('c', 12., upper=1.)
-
-        # lower
-        with assert_warning(OMDeprecationWarning, msg.format('lower', 'd')):
-            indep.add_output('d', 12., lower=1.)
-
-        # res_ref
-        with assert_warning(OMDeprecationWarning, msg.format('res_ref', 'e')):
-            indep.add_output('e', 12., res_ref=1.)
-
-        # res_ref
-        with assert_warning(OMDeprecationWarning, msg.format('ref', 'f')):
-            indep.add_output('f', 12., ref=2.)
-
 
 if __name__ == '__main__':
     unittest.main()

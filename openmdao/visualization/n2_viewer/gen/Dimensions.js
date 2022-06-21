@@ -5,7 +5,9 @@
  * @property {Object} prev Previous set of coordinates.
  */
  class Dimensions {
-    static allowedProps = ['x', 'y', 'z', 'height', 'width', 'margin', 'top', 'right', 'bottom', 'left'];
+    static allowedProps = ['x', 'x1', 'x2', 'y', 'y1', 'y2', 'z', 'count',
+        'size', 'height', 'width', 'margin', 'top', 'right', 'bottom', 'left',
+        'start', 'stop'];
 
     /**
      * Load the values into the object.
@@ -20,6 +22,19 @@
     /** Return the property value as a string with the unit appended. */
     valAsStyleStr(propName) {
         return `${this[propName]}${this.unit}`;
+    }
+
+    /**
+     * Find managed properties in object and copy their values.
+     * @param {Object} obj Object to search for properties.
+     * @returns Reference to this.
+     */
+    set(obj) {
+        for (const prop of this._managedProps) {
+            if (prop in obj) this[prop] = obj[prop];
+        }
+
+        return this;
     }
 
     /**
@@ -46,7 +61,9 @@
                     get: function() { return self.valAsStyleStr(prop); }
                 });
             }
-        } 
+        }
+
+        return this;
     }
 
     /**
@@ -60,6 +77,8 @@
         for (const prop of other.prev) {
             this.prev[prop] = other.prev[prop];
         }
+
+        return this;
     }
 
     /** Backup the current values for future reference. */
@@ -68,5 +87,7 @@
         for (const prop of this._managedProps) {
             this.prev[prop] = this[prop];
         }
+
+        return this;
     }
 }

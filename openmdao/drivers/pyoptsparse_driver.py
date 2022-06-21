@@ -9,7 +9,7 @@ additional MPI capability.
 import sys
 import json
 import signal
-from distutils.version import LooseVersion
+from packaging.version import Version
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -216,12 +216,6 @@ class pyOptSparseDriver(Driver):
                              desc='Print the opt problem summary before running the optimization')
         self.options.declare('print_results', types=bool, default=True,
                              desc='Print pyOpt results if True')
-        self.options.declare('gradient method', default='openmdao',
-                             values={'openmdao', 'pyopt_fd', 'snopt_fd'},
-                             desc='Finite difference implementation to use',
-                             deprecation=(f"'gradient method' is not a valid python name and will "
-                                          "raise an exception in a future release.  Use "
-                                          "'gradient_method' instead.", 'gradient_method'))
         self.options.declare('gradient_method', default='openmdao',
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},
                              desc='Finite difference implementation to use')
@@ -237,14 +231,6 @@ class pyOptSparseDriver(Driver):
                              "ignore - don't perform check.")
         self.options.declare('singular_jac_tol', default=1e-16,
                              desc='Tolerance for zero row/column check.')
-
-        # Deprecated option
-        self.options.declare('user_teriminate_signal', default=None, allow_none=True,
-                             desc='OS signal that triggers a clean user-termination. Only SNOPT'
-                             'supports this option.',
-                             deprecation=("The option 'user_teriminate_signal' was misspelled and "
-                                          "will be deprecated. Please use 'user_terminate_signal' "
-                                          "instead.", 'user_terminate_signal'))
 
     def _setup_driver(self, problem):
         """
@@ -269,11 +255,6 @@ class pyOptSparseDriver(Driver):
                                ' multiple objectives.'.format(self.options['optimizer']))
 
         self._setup_tot_jac_sparsity()
-
-        # Handle deprecated option.
-        if self.options._dict['user_teriminate_signal']['val'] is not None:
-            self.options['user_terminate_signal'] = \
-                self.options._dict['user_teriminate_signal']['val']
 
     def run(self):
         """
@@ -314,21 +295,7 @@ class pyOptSparseDriver(Driver):
             self.iter_count += 1
 
         # compute dynamic simul deriv coloring or just sparsity if option is set
-        if c_mod._use_total_sparsity:
-            coloring = None
-            if self._coloring_info['coloring'] is None and self._coloring_info['dynamic']:
-                coloring = c_mod.dynamic_total_coloring(self, run_model=not model_ran,
-                                                        fname=self._get_total_coloring_fname())
-
-            if coloring is not None:
-                # if the improvement wasn't large enough, don't use coloring
-                pct = coloring._solves_info()[-1]
-                info = self._coloring_info
-                if info['min_improve_pct'] > pct:
-                    info['coloring'] = info['static'] = None
-                    msg = f"Coloring was deactivated.  Improvement of {pct:.1f}% was less " \
-                          f"than min allowed ({info['min_improve_pct']:.1f}%)."
-                    issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
+        coloring = self._get_coloring(run_model=not model_ran)
 
         comm = None if isinstance(problem.comm, FakeComm) else problem.comm
         opt_prob = Optimization(self.options['title'], WeakMethodWrapper(self, '_objfunc'),
@@ -346,7 +313,7 @@ class pyOptSparseDriver(Driver):
                                  lower=meta['lower'], upper=meta['upper'])
 
         if not hasattr(pyoptsparse, '__version__') or \
-           LooseVersion(pyoptsparse.__version__) < LooseVersion('2.5.1'):
+           Version(pyoptsparse.__version__) < Version('2.5.1'):
             opt_prob.finalizeDesignVariables()
         else:
             opt_prob.finalize()

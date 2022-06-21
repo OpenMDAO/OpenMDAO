@@ -1,4 +1,4 @@
-from distutils.version import LooseVersion
+from packaging.version import Version
 import unittest
 
 import scipy
@@ -209,7 +209,7 @@ class TestBetzLimit(unittest.TestCase):
         assert_near_equal(prob['a'], 0.33333, 1e-4)
 
         # There is a bug in scipy version < 1.0 that causes this value to be wrong.
-        if LooseVersion(scipy.__version__) >= LooseVersion("1.0"):
+        if Version(scipy.__version__) >= Version("1.0"):
             assert_near_equal(prob['Area'], 1.0, 1e-4)
 
     def test_betz_with_var_tags(self):

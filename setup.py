@@ -17,7 +17,7 @@ optional_dependencies = {
         'ipyparallel',
         'numpydoc>=1.1',
         'tabulate',
-        'jupyter-book',
+        'jupyter-book<0.13',
         'jupyter-sphinx',
         'sphinx-sitemap'
     ],
@@ -179,7 +179,8 @@ setup(
         'pyDOE2',
         'pyparsing',
         'scipy',
-        'requests'
+        'requests',
+        'packaging'
     ],
     entry_points={
         'console_scripts': [
@@ -248,6 +249,14 @@ setup(
             'nonlinearrunonce=openmdao.solvers.nonlinear.nonlinear_runonce:NonlinearRunOnce',
             'armijogoldsteinls=openmdao.solvers.linesearch.backtracking:ArmijoGoldsteinLS',
             'boundsenforcels=openmdao.solvers.linesearch.backtracking:BoundsEnforceLS',
+        ],
+        'openmdao_report': [
+            'n2=openmdao.visualization.n2_viewer.n2_viewer:_n2_report_register',
+            'scaling=openmdao.visualization.scaling_viewer.scaling_report:_scaling_report_register',
+            'total_coloring=openmdao.utils.coloring:_total_coloring_report_register',
+            'summary=openmdao.devtools.debug:_summary_report_register',
+            'connections=openmdao.visualization.connection_viewer.viewconns:_connections_report_register',
+            'checks=openmdao.error_checking.check_config:_check_report_register',
         ],
         'openmdao_surrogate_model': [
             'krigingsurrogate=openmdao.surrogate_models.kriging:KrigingSurrogate',

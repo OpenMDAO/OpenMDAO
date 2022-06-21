@@ -2088,10 +2088,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        msg = "'Problem.record_iteration' has been deprecated. Use 'Problem.record' instead."
-
-        with assert_warning(OMDeprecationWarning, msg):
-            prob.record_iteration('final')
+        prob.record('final')
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
@@ -2661,17 +2658,6 @@ class TestSqliteRecorder(unittest.TestCase):
             prob.record('initial')
 
         prob.cleanup()
-
-    def test_deprecation(self):
-        # this is not technically part of the user-facing API, but
-        # could have been used in a custom recording implementation
-        from openmdao.recorders.recording_manager import RecordingManager
-
-        rec_mgr = RecordingManager()
-        msg = "The 'record_metadata' function is deprecated. " \
-              "All system and solver options are recorded automatically."
-        with assert_warning(OMDeprecationWarning, msg):
-            rec_mgr.record_metadata(None)
 
     def test_cobyla_constraints(self):
         """

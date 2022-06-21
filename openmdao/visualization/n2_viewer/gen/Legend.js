@@ -123,13 +123,13 @@ class Legend extends WindowDraggable {
      * @param {Object} item Contains the name and color of the item
      * @param {Object} container The div to append into
      */
-    _addItem(item, container) {
+    _addItem(item, container, cssClass = '') {
         const newDiv = container
             .append('div')
             .attr('class', 'legend-box-container');
 
         newDiv.append('div')
-            .attr('class', 'legend-box')
+            .attr('class', `legend-box ${cssClass}`)
             .style('background-color', item.color);
 
         newDiv.append('p')

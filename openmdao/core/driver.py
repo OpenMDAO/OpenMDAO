@@ -8,7 +8,7 @@ import weakref
 import numpy as np
 
 from openmdao.core.total_jac import _TotalJacInfo
-from openmdao.core.constants import INT_DTYPE
+from openmdao.core.constants import INT_DTYPE, _SetupStatus
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
@@ -19,9 +19,8 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import sizes2offsets
 from openmdao.vectors.vector import _full_slice
 from openmdao.utils.indexer import indexer
-from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, MPIWarning, \
-    warn_deprecation
-from openmdao.utils.hooks import _setup_hooks
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
+import openmdao.utils.coloring as c_mod
 
 
 class Driver(object):
@@ -83,6 +82,8 @@ class Driver(object):
         Keyed by sources and aliases.
     _total_jac : _TotalJacInfo or None
         Cached total jacobian handling object.
+    _total_jac_linear : _TotalJacInfo or None
+        Cached linear total jacobian handling object.
     """
 
     def __init__(self, **kwargs):
@@ -110,19 +111,12 @@ class Driver(object):
         # Case recording options
         self.recording_options = OptionsDictionary(parent_name=type(self).__name__)
 
-        self.recording_options.declare('record_model_metadata', types=bool, default=True,
-                                       desc='Deprecated. Recording of model metadata will always '
-                                            'be done',
-                                       deprecation="The recording option, record_model_metadata, "
-                                                   "on Driver is deprecated. Recording of model "
-                                                   "metadata will always be done")
         self.recording_options.declare('record_desvars', types=bool, default=True,
                                        desc='Set to True to record design variables at the '
                                             'driver level')
         self.recording_options.declare('record_responses', types=bool, default=False,
                                        desc='Set True to record constraints and objectives at the '
                                             'driver level')
-
         self.recording_options.declare('record_objectives', types=bool, default=True,
                                        desc='Set to True to record objectives at the driver level')
         self.recording_options.declare('record_constraints', types=bool, default=True,
@@ -168,14 +162,12 @@ class Driver(object):
         self._total_jac_sparsity = None
         self._res_subjacs = {}
         self._total_jac = None
+        self._total_jac_linear = None
 
         self.fail = False
 
         self._declare_options()
         self.options.update(kwargs)
-
-        # Want to allow the setting of hooks on Drivers
-        _setup_hooks(self)
 
     def _get_inst_id(self):
         if self._problem is None:
@@ -236,6 +228,17 @@ class Driver(object):
         """
         return comm
 
+    def _set_problem(self, problem):
+        """
+        Set a reference to the containing Problem.
+
+        Parameters
+        ----------
+        problem : <Problem>
+            Reference to the containing problem.
+        """
+        self._problem = weakref.ref(problem)
+
     def _setup_driver(self, problem):
         """
         Prepare the driver for execution.
@@ -247,7 +250,6 @@ class Driver(object):
         problem : <Problem>
             Pointer to the containing problem.
         """
-        self._problem = weakref.ref(problem)
         model = problem.model
 
         self._total_jac = None
@@ -827,7 +829,7 @@ class Driver(object):
     def _recording_iter(self):
         return self._problem()._metadata['recording_iter']
 
-    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=None,
+    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict',
                         use_abs_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
@@ -846,8 +848,6 @@ class Driver(object):
             Format to return the derivatives. Default is a 'flat_dict', which
             returns them in a dictionary whose keys are tuples of form (of, wrt). For
             the scipy optimizer, 'array' is also supported.
-        global_names : bool
-            Deprecated.  Use 'use_abs_names' instead.
         use_abs_names : bool
             Set to True when passing in absolute names to skip some translation steps.
 
@@ -866,11 +866,6 @@ class Driver(object):
             print(header)
             print(len(header) * '-' + '\n')
 
-        if global_names is not None:
-            warn_deprecation("'global_names' is deprecated in calls to _compute_totals. "
-                             "Use 'use_abs_names' instead.")
-            use_abs_names = global_names
-
         if problem.model._owns_approx_jac:
             self._recording_iter.push(('_compute_totals_approx', 0))
 
@@ -879,8 +874,12 @@ class Driver(object):
                     total_jac = _TotalJacInfo(problem, of, wrt, use_abs_names,
                                               return_format, approx=True, debug_print=debug_print)
 
-                    # Don't cache linear constraint jacobian
-                    if not total_jac.has_lin_cons:
+                    if total_jac.has_lin_cons:
+                        # if we're doing a scaling report, cache the linear total jacobian so we
+                        # don't have to recreate it
+                        if problem._has_active_report('scaling'):
+                            self._total_jac_linear = total_jac
+                    else:
                         self._total_jac = total_jac
 
                     totals = total_jac.compute_totals_approx(initialize=True)
@@ -894,8 +893,12 @@ class Driver(object):
                 total_jac = _TotalJacInfo(problem, of, wrt, use_abs_names, return_format,
                                           debug_print=debug_print)
 
-                # don't cache linear constraint jacobian
-                if not total_jac.has_lin_cons:
+                if total_jac.has_lin_cons:
+                    # if we're doing a scaling report, cache the linear total jacobian so we
+                    # don't have to recreate it
+                    if problem._has_active_report('scaling'):
+                        self._total_jac_linear = total_jac
+                else:
                     self._total_jac = total_jac
 
             self._recording_iter.push(('_compute_totals', 0))
@@ -915,7 +918,8 @@ class Driver(object):
         """
         Record an iteration of the current Driver.
         """
-        if self._problem:
+        status = -1 if self._problem is None else self._problem()._metadata['setup_status']
+        if status >= _SetupStatus.POST_FINAL_SETUP:
             record_iteration(self, self._problem(), self._get_name())
         else:
             raise RuntimeError(f'{self.msginfo} attempted to record iteration but '
@@ -1119,12 +1123,12 @@ class Driver(object):
         from openmdao.visualization.scaling_viewer.scaling_report import view_driver_scaling
 
         # Run the model if it hasn't been run yet.
-        try:
-            prob = self._problem()
-        except TypeError:
+        status = -1 if self._problem is None else self._problem()._metadata['setup_status']
+        if status < _SetupStatus.POST_FINAL_SETUP:
             raise RuntimeError("Either 'run_model' or 'final_setup' must be called before the "
                                "scaling report can be generated.")
 
+        prob = self._problem()
         if prob._run_counter < 0:
             prob.run_model()
 
@@ -1196,6 +1200,53 @@ class Driver(object):
                 print()
 
         sys.stdout.flush()
+
+    def get_reports_dir(self):
+        """
+        Get the path to the directory where the report files should go.
+
+        If it doesn't exist, it will be created.
+
+        Returns
+        -------
+        str
+            The path to the directory where reports should be written.
+        """
+        return self._problem().get_reports_dir()
+
+    def _get_coloring(self, run_model=None):
+        """
+        Get the total coloring for this driver.
+
+        If necessary, dynamically generate it.
+
+        Parameters
+        ----------
+        run_model : bool or None
+            If False, don't run model, else use problem _run_counter to decide.
+
+        Returns
+        -------
+        Coloring or None
+            Coloring object, possible loaded from a file or dynamically generated, or None
+        """
+        if c_mod._use_total_sparsity:
+            coloring = None
+            if self._coloring_info['coloring'] is None and self._coloring_info['dynamic']:
+                coloring = c_mod.dynamic_total_coloring(self, run_model=run_model,
+                                                        fname=self._get_total_coloring_fname())
+
+            if coloring is not None:
+                # if the improvement wasn't large enough, don't use coloring
+                pct = coloring._solves_info()[1]
+                info = self._coloring_info
+                if info['min_improve_pct'] > pct:
+                    info['coloring'] = info['static'] = None
+                    msg = f"Coloring was deactivated.  Improvement of {pct:.1f}% was less " \
+                          f"than min allowed ({info['min_improve_pct']:.1f}%)."
+                    issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
+
+            return coloring
 
 
 class RecordingDebugging(Recording):

@@ -468,14 +468,16 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     def test_reading_solver_metadata(self):
         prob = SellarProblem(linear_solver=om.LinearBlockGS())
-        prob.setup()
 
         prob.model.nonlinear_solver.add_recorder(self.recorder)
+        
+        # add an implicitcomp so we can verify that nonlinear solver metadata is saved
+        # at component level
+        lscomp = prob.model.add_subsystem('lscomp', om.LinearSystemComp())
+        lscomp.nonlinear_solver = om.NonlinearBlockGS(maxiter=5)
+        lscomp.nonlinear_solver.add_recorder(self.recorder)
 
-        d1 = prob.model.d1  # SellarDis1withDerivatives (an ExplicitComponent)
-        d1.nonlinear_solver = om.NonlinearBlockGS(maxiter=5)
-        d1.nonlinear_solver.add_recorder(self.recorder)
-
+        prob.setup()
         prob.run_driver()
         prob.cleanup()
 
@@ -483,9 +485,9 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(
             sorted(metadata.keys()),
-            ['d1.NonlinearBlockGS', 'root.LinearBlockGS', 'root.NonlinearBlockGS']
+            ['lscomp.NonlinearBlockGS', 'root.LinearBlockGS', 'root.NonlinearBlockGS']
         )
-        self.assertEqual(metadata['d1.NonlinearBlockGS']['solver_options']['maxiter'], 5)
+        self.assertEqual(metadata['lscomp.NonlinearBlockGS']['solver_options']['maxiter'], 5)
         self.assertEqual(metadata['root.LinearBlockGS']['solver_options']['maxiter'], 10)
         self.assertEqual(metadata['root.NonlinearBlockGS']['solver_options']['maxiter'], 10)
 
@@ -1018,7 +1020,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.setup()
 
         d1 = prob.model.d1  # SellarDis1withDerivatives (an ExplicitComp)
-        d1.nonlinear_solver = om.NonlinearBlockGS(maxiter=5)
         d1.add_recorder(self.recorder)
 
         prob.run_driver()
@@ -1196,7 +1197,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.setup()
 
         d1 = prob.model.d1  # SellarDis1withDerivatives (an ExplicitComp)
-        d1.nonlinear_solver = om.NonlinearBlockGS(maxiter=5)
         d1.add_recorder(self.recorder)
 
         prob.run_driver()
@@ -1328,7 +1328,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.setup()
 
         d1 = prob.model.d1  # SellarDis1withDerivatives (an ExplicitComp)
-        d1.nonlinear_solver = om.NonlinearBlockGS(maxiter=5)
         d1.add_recorder(self.recorder)
 
         prob.run_driver()
@@ -2985,8 +2984,8 @@ class TestSqliteCaseReader(unittest.TestCase):
             'threshold': 1000,
         }
 
-        from distutils.version import LooseVersion
-        if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+        from packaging.version import Version
+        if Version(np.__version__) >= Version("1.14"):
             opts['legacy'] = '1.13'
 
         with printoptions(**opts):
@@ -3741,7 +3740,6 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob.setup()
 
         d1 = prob.model.d1
-        d1.nonlinear_solver = om.NonlinearBlockGS(maxiter=5)
         d1.add_recorder(recorder)
 
         prob.run_driver()

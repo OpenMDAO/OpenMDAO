@@ -3,8 +3,6 @@ RecordingManager class definition.
 """
 import time
 
-from openmdao.utils.om_warnings import warn_deprecation
-
 
 class RecordingManager(object):
     """
@@ -104,18 +102,6 @@ class RecordingManager(object):
         for recorder in self._recorders:
             recorder.record_iteration(recording_requester, data, metadata)
 
-    def record_metadata(self, recording_requester):
-        """
-        Call record_metadata for all recorders.
-
-        Parameters
-        ----------
-        recording_requester : object
-            The object that needs its metadata recorded.
-        """
-        warn_deprecation("The 'record_metadata' function is deprecated. "
-                         "All system and solver options are recorded automatically.")
-
     def record_derivatives(self, recording_requester, data, metadata):
         """
         Call record_derivatives on all recorders.
@@ -209,20 +195,6 @@ def record_viewer_data(problem):
         viewer_data.pop('abs2prom', None)  # abs2prom already recorded in metadata table
         for recorder in recorders:
             recorder.record_viewer_data(viewer_data)
-
-
-def record_system_options(problem):
-    """
-    Record the system options for all systems in the model.
-
-    Parameters
-    ----------
-    problem : Problem
-        The problem for which all its systems' options are to be recorded.
-    """
-    warn_deprecation("The 'record_system_options' function is deprecated. "
-                     "Use 'record_model_options' instead.")
-    record_model_options(problem)
 
 
 def record_model_options(problem, run_number):

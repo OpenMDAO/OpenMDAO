@@ -8,5 +8,5 @@ from openmdao.core.tests.test_coloring import run_opt
 
 if __name__ == '__main__':
     p_color = run_opt(ScipyOptimizeDriver, COLOR_TYPE, optimizer='SLSQP', disp=False,
-                      dynamic_total_coloring=True, partial_coloring=True)
+                      dynamic_total_coloring=True, partial_coloring=True, check='all')
 

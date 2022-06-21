@@ -150,15 +150,10 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             self._input_size += input_size
         surrogate_input_names.append((name, input_size))
 
-        train_name = f'train:{name}'
-        good_name = f'train_{name}'
-        self.options.declare(train_name, default=None, desc='Training data for %s' % name,
-                             deprecation=(f"The option '{train_name}' has been deprecated because "
-                                          f"it's not a valid python name.  Use '{good_name}' "
-                                          "instead.", good_name))
-        self.options.declare(good_name, default=None, desc='Training data for %s' % name)
+        train_name = f'train_{name}'
+        self.options.declare(train_name, default=None, desc='Training data for %s' % name)
         if training_data is not None:
-            self.options[good_name] = training_data
+            self.options[train_name] = training_data
 
         return metadata
 
@@ -213,16 +208,11 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         else:
             metadata['default_surrogate'] = True
 
-        train_name = f'train:{name}'
-        good_name = f'train_{name}'
-        self.options.declare(train_name, default=None, desc='Training data for %s' % name,
-                             deprecation=(f"The option '{train_name}' has been deprecated because "
-                                          f"it's not a valid python name.  Use '{good_name}' "
-                                          "instead.", good_name))
-        self.options.declare(good_name, default=None, desc='Training data for %s' % name)
+        train_name = f'train_{name}'
+        self.options.declare(train_name, default=None, desc='Training data for %s' % name)
 
         if training_data is not None:
-            self.options[good_name] = training_data
+            self.options[train_name] = training_data
 
         return metadata
 

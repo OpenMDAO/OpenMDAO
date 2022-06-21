@@ -3,9 +3,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.test_suite.components.sellar_feature import SellarMDA
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
-from openmdao.utils.om_warnings import OMDeprecationWarning
+from openmdao.utils.assert_utils import assert_near_equal
 
 from openmdao.utils.mpi import MPI
 if MPI:
@@ -449,7 +447,7 @@ class TestDynShapes(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        msg = "<model> <class Group>: Shape mismatch,  (3, 2) vs. (4, 2) for variable 'sink.x2' during dynamic shape determination."
+        msg = "<model> <class Group>: Shape mismatch, (3, 2) vs. (4, 2) for variable 'sink.x2' during dynamic shape determination."
         self.assertEqual(str(cm.exception), msg)
 
     def test_baseline_conn_inputs(self):
@@ -869,6 +867,95 @@ class TestDynShapesEmptyError(unittest.TestCase):
         prob = om.Problem(Model())
         prob.setup(force_alloc_complex=True, mode='rev')
         prob.run_model()
+
+
+class DynShpComp(om.ExplicitComponent):
+
+    def setup(self):
+        self.add_input('x', units='ft', shape_by_conn=True)
+        self.add_output('y', copy_shape='x', units='ft')
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = 3. * inputs['x']
+
+
+class PGroup(om.Group):
+
+    def setup(self):
+        self.add_subsystem('comp1', DynShpComp(), promotes_inputs=['x'])
+        self.add_subsystem('comp2', DynShpComp(), promotes_inputs=['x'])
+
+    def configure(self):
+        self.set_input_defaults('x', src_shape=(2, ))
+
+
+class TestDynShapesWithInputConns(unittest.TestCase):
+    # this tests the retrieval of shape info from a set_input_defaults call during
+    # dynamic shape determination, which happens *before* group input defaults have
+    # been fully processed.
+    def test_group_input_defaults(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('sub', PGroup())
+
+        prob.setup()
+
+        prob['sub.x'] = np.ones(2) * 7.
+        prob.run_model()
+
+        assert_near_equal(prob['sub.comp1.y'], np.ones(2) * 21.)
+        assert_near_equal(prob['sub.comp2.y'], np.ones(2) * 21.)
+
+    def test_shape_from_conn_input(self):
+        prob = om.Problem()
+        sub = prob.model.add_subsystem('sub', om.Group())
+        comp1 = sub.add_subsystem('comp1', om.ExecComp('y=3*x', x={'shape_by_conn': True}, y={'copy_shape': 'x'}),
+                                  promotes_inputs=['x'])
+        comp2 = sub.add_subsystem('comp2', om.ExecComp('y=3*x', x=np.ones(2), y=np.zeros(2)),
+                                  promotes_inputs=['x'])
+
+        prob.setup()
+
+        prob['sub.x'] = np.ones(2) * 7.
+        prob.run_model()
+
+        assert_near_equal(prob['sub.comp1.y'], np.ones(2) * 21.)
+        assert_near_equal(prob['sub.comp2.y'], np.ones(2) * 21.)
+
+    def test_shape_from_conn_input_mismatch(self):
+        prob = om.Problem()
+        sub = prob.model.add_subsystem('sub', om.Group())
+        comp1 = sub.add_subsystem('comp1', om.ExecComp('y=3*x', x={'shape_by_conn': True}, y={'copy_shape': 'x'}),
+                                  promotes_inputs=['x'])
+        comp2 = sub.add_subsystem('comp2', om.ExecComp('y=3*x', x=np.ones(2), y=np.zeros(2)),
+                                  promotes_inputs=['x'])
+        comp3 = sub.add_subsystem('comp3', om.ExecComp('y=3*x', x=np.ones(3), y=np.zeros(3)),
+                                  promotes_inputs=['x'])
+
+        with self.assertRaises(ValueError) as cm:
+            prob.setup()
+
+        # just make sure we still get a clear error msg
+
+        msg = "Shape of input 'sub.comp3.x', (3,), doesn't match shape (2,)."
+        self.assertEqual(cm.exception.args[0], msg)
+
+    def test_shape_from_conn_input_mismatch_group_inputs(self):
+        prob = om.Problem()
+        sub = prob.model.add_subsystem('sub', om.Group())
+        comp1 = sub.add_subsystem('comp1', om.ExecComp('y=3*x', x={'shape_by_conn': True}, y={'copy_shape': 'x'}),
+                                  promotes_inputs=['x'])
+        comp2 = sub.add_subsystem('comp2', om.ExecComp('y=3*x', x=np.ones(2), y=np.zeros(2)),
+                                  promotes_inputs=['x'])
+
+        sub.set_input_defaults('x', src_shape=(3, ))
+
+        with self.assertRaises(ValueError) as cm:
+            prob.setup()
+
+        # just make sure we still get a clear error msg
+
+        msg = "Shape of input 'sub.comp2.x', (2,), doesn't match shape (3,)."
+        self.assertEqual(cm.exception.args[0], msg)
 
 
 if __name__ == "__main__":

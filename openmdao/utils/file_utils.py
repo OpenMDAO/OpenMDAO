@@ -5,7 +5,6 @@ Utilities for working with files.
 import sys
 import os
 import importlib
-import unittest
 from inspect import getmembers, isclass, ismethod, isfunction
 from fnmatch import fnmatch
 from os.path import join, basename, dirname, isfile, split, splitext, abspath, expanduser
@@ -252,3 +251,128 @@ def _run_test_func(mod, funcpath):
     else:
         funcname = parts[0]
         return getattr(mod, funcname)()
+
+
+if sys.version_info >= (3, 8):
+    from importlib.metadata import entry_points
+
+    def _iter_entry_points(group):
+        eps = entry_points()
+        # there seems to be a bug currently where entry points can show up more than
+        # once in the iterator, so keep track of the ones we've already seen.
+        # TODO: revisit later to see if we can remove the check
+        seen = set()
+        if group in eps:
+            for ep in eps[group]:
+                if ep.name not in seen:
+                    seen.add(ep.name)
+                    yield ep
+else:
+    try:
+        import pkg_resources
+    except ImportError:
+        def _iter_entry_points(group):
+            issue_warning("Can't retrieve entry points because pkg_resources is not installed. "
+                          "Either install it using 'pip install setuptools' or upgrade to python "
+                          "3.8 or newer.")
+            return ()
+    else:
+        def _iter_entry_points(group):
+            yield from pkg_resources.iter_entry_points(group)
+
+
+def text2html(text, title='', style=None):
+    """
+    Wrap the given text for display as an html file.
+
+    Returns an html syntax string that can be written to a file.
+
+    Parameters
+    ----------
+    text : str
+        Text to be displayed.
+    title : str
+        Title to display above text.
+    style : str or None
+        If not None, use as the contents of the style block for the enclosing <pre> tag.
+
+    Returns
+    -------
+    str
+        Content string to create an html file.
+    """
+    if style is None:
+        style = """
+            display: block;
+            font-family: monospace;
+            font-size: 1.5em;
+            white-space: pre;
+            margin: 1em 0;
+        """
+    return """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <style>
+        .center {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            width: 90%;
+        }
+        h2 {text-align: center;}
+        pre {""" + style + """
+        }
+    </style>
+</head>
+<body>
+<h2>""" + title + """</h2>
+<pre>
+""" + text + """
+</pre>
+</body>
+</html>
+"""
+
+
+def image2html(imagefile, title='', alt=''):
+    """
+    Wrap the given image for display as an html file.
+
+    Returns an html syntax string that can be written to a file.
+
+    Parameters
+    ----------
+    imagefile : str
+        Name of image file to be displayed.
+    title : str
+        The page title.
+    alt : str
+        Set the alt text for the image.
+
+    Returns
+    -------
+    str
+        Content string to create an html file.
+    """
+    return """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <style>
+        h2 {text-align: center;}
+        .center {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            width: 80%;
+        }
+    </style>
+</head>
+<body>
+<h2>""" + title + "</h2>" + f"""
+<img src="{imagefile}" alt="{alt}" class="center"></img>
+
+</body>
+</html>
+"""

@@ -183,12 +183,6 @@ class Solver(object):
                                        desc='Set to True to record outputs at the solver level')
         self.recording_options.declare('record_solver_residuals', types=bool, default=False,
                                        desc='Set to True to record residuals at the solver level')
-        self.recording_options.declare('record_metadata', types=bool, desc='Deprecated. Recording '
-                                       'of metadata will always be done',
-                                       deprecation="The recording option, record_metadata, on "
-                                       "Solver is "
-                                       "deprecated. Recording of metadata will always be done",
-                                       default=True)
         self.recording_options.declare('includes', types=list, default=['*'],
                                        desc="Patterns for variables to include in recording. \
                                        Paths are relative to solver's Group. \
@@ -501,6 +495,19 @@ class Solver(object):
             msg = "{} linear solver in {} cannot be used in or above a ParallelGroup or a " + \
                 "distributed component."
             raise RuntimeError(msg.format(type(self).__name__, s.msginfo))
+
+    def get_reports_dir(self):
+        """
+        Get the path to the directory where the report files should go.
+
+        If it doesn't exist, it will be created.
+
+        Returns
+        -------
+        str
+            The path to the directory where reports should be written.
+        """
+        return self._system().get_reports_dir()
 
 
 class NonlinearSolver(Solver):
