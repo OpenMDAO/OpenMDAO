@@ -1,7 +1,9 @@
 """Define the LinearBlockGS class."""
 
+import sys
 import numpy as np
 
+from openmdao.core.constants import _UNDEFINED
 from openmdao.solvers.solver import BlockLinearSolver
 
 
@@ -63,9 +65,9 @@ class LinearBlockGS(BlockLinearSolver):
         """
         if self.options['use_aitken']:
             if self._mode == 'fwd':
-                self._delta_d_n_1 = self._system()._vectors['output']['linear'].asarray(copy=True)
+                self._delta_d_n_1 = self._system()._doutputs.asarray(copy=True)
             else:
-                self._delta_d_n_1 = self._system()._vectors['residual']['linear'].asarray(copy=True)
+                self._delta_d_n_1 = self._system()._dresiduals.asarray(copy=True)
             self._theta_n_1 = 1.0
 
         return super()._iter_initialize()
@@ -88,14 +90,16 @@ class LinearBlockGS(BlockLinearSolver):
 
             # store a copy of the outputs, used to compute the change in outputs later
             if self._mode == 'fwd':
-                d_out_vec = system._vectors['output']['linear']
+                d_out_vec = system._doutputs
             else:
-                d_out_vec = system._vectors['residual']['linear']
+                d_out_vec = system._dresiduals
 
             d_n = d_out_vec.asarray(copy=True)
             delta_d_n = d_out_vec.asarray(copy=True)
 
         if mode == 'fwd':
+            parent_offset = system._dresiduals._root_offset
+
             for subsys, _ in system._subsystems_allprocs.values():
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
                     continue
@@ -105,42 +109,71 @@ class LinearBlockGS(BlockLinearSolver):
                 if not subsys._is_local:
                     continue
 
-                scope_out, scope_in = system._get_scope(subsys)
-                subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
-                b_vec = system._vectors['residual']['linear']
-                b_vec *= -1.0
-                b_vec += self._rhs_vec
-                subsys._solve_linear(mode, self._rel_systems)
+                b_vec = subsys._dresiduals
+
+                scope_out, scope_in = system._get_matvec_scope(subsys)
+                # we use _vars_union to combine relevant variables from the current solve
+                # with those of the subsystem solve, because for recursive block linear solves
+                # we'll be skipping a direct call to _apply_linear and instead counting on
+                # _apply_linear to be called once at the bottom of the recursive block linear
+                # solve on the component, using the full set of relevant variables from the
+                # top group in the block linear solve and all intervening groups (assuming all
+                # of those groups are doing block linear solves).
+                scope_out = self._vars_union(self._scope_out, scope_out)
+                scope_in = self._vars_union(self._scope_in, scope_in)
+                off = b_vec._root_offset - parent_offset
+
+                if subsys._iter_call_apply_linear():
+                    subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+                    b_vec *= -1.0
+                    b_vec += self._rhs_vec[off:off + len(b_vec)]
+                else:
+                    b_vec.set_val(self._rhs_vec[off:off + len(b_vec)])
+
+                subsys._solve_linear(mode, self._rel_systems, scope_out, scope_in)
 
         else:  # rev
-            subsystems = list(system._subsystems_allprocs)
-            subsystems.reverse()
-            for sname in subsystems:
-                subsys, _ = system._subsystems_allprocs[sname]
+            if sys.version_info >= (3, 8):
+                subsystems = reversed(system._subsystems_allprocs.values())
+            else:
+                subsystems = list(system._subsystems_allprocs.values())
+                subsystems.reverse()
+            parent_offset = system._doutputs._root_offset
 
+            for subsys, _ in subsystems:
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
                     continue
 
                 if subsys._is_local:
-                    b_vec = system._vectors['output']['linear']
+                    b_vec = subsys._doutputs
                     b_vec.set_val(0.0)
-                    system._transfer('linear', mode, sname)
-                    b_vec *= -1.0
-                    b_vec += self._rhs_vec
 
-                    subsys._solve_linear(mode, self._rel_systems)
-                    scope_out, scope_in = system._get_scope(subsys)
-                    subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+                    system._transfer('linear', mode, subsys.name)
+
+                    b_vec *= -1.0
+                    off = b_vec._root_offset - parent_offset
+                    b_vec += self._rhs_vec[off:off + len(b_vec)]
+
+                    scope_out, scope_in = system._get_matvec_scope(subsys)
+                    scope_out = self._vars_union(self._scope_out, scope_out)
+                    scope_in = self._vars_union(self._scope_in, scope_in)
+
+                    subsys._solve_linear(mode, self._rel_systems, scope_out, scope_in)
+
+                    if subsys._iter_call_apply_linear():
+                        subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+                    else:
+                        b_vec.set_val(0.0)
                 else:   # subsys not local
-                    system._transfer('linear', mode, sname)
+                    system._transfer('linear', mode, subsys.name)
 
         if use_aitken:
             if self._mode == 'fwd':
-                d_resid_vec = system._vectors['residual']['linear']
-                d_out_vec = system._vectors['output']['linear']
+                d_resid_vec = system._dresiduals
+                d_out_vec = system._doutputs
             else:
-                d_resid_vec = system._vectors['output']['linear']
-                d_out_vec = system._vectors['residual']['linear']
+                d_resid_vec = system._doutputs
+                d_out_vec = system._dresiduals
 
             theta_n = self.options['aitken_initial_factor']
 

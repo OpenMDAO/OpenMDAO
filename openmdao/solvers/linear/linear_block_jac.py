@@ -23,31 +23,44 @@ class LinearBlockJac(BlockLinearSolver):
 
         subs = [s for s in system._subsystems_myproc
                 if self._rel_systems is None or s.pathname in self._rel_systems]
+        scopelist = [None] * len(subs)
 
         if mode == 'fwd':
             system._transfer('linear', mode)
 
-            for subsys in subs:
-                scope_out, scope_in = system._get_scope(subsys)
-                subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+            for i, subsys in enumerate(subs):
+                scope_out, scope_in = system._get_matvec_scope(subsys)
+                scope_out = self._vars_union(self._scope_out, scope_out)
+                scope_in = self._vars_union(self._scope_in, scope_in)
+                scopelist[i] = (scope_out, scope_in)
+                if subsys._iter_call_apply_linear():
+                    subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+                else:
+                    subsys._dresiduals.set_val(0.0)
 
-            b_vec = system._vectors['residual']['linear']
-            b_vec *= -1.0
-            b_vec += self._rhs_vec
+            system._dresiduals *= -1.0
+            system._dresiduals += self._rhs_vec
 
-            for subsys in subs:
-                subsys._solve_linear(mode, self._rel_systems)
+            for i, subsys in enumerate(subs):
+                scope_out, scope_in = scopelist[i]
+                subsys._solve_linear(mode, self._rel_systems, scope_out, scope_in)
 
         else:  # rev
-            for subsys in subs:
-                scope_out, scope_in = system._get_scope(subsys)
-                subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+            for i, subsys in enumerate(subs):
+                scope_out, scope_in = system._get_matvec_scope(subsys)
+                scope_out = self._vars_union(self._scope_out, scope_out)
+                scope_in = self._vars_union(self._scope_in, scope_in)
+                scopelist[i] = (scope_out, scope_in)
+                if subsys._iter_call_apply_linear():
+                    subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+                else:
+                    subsys._doutputs.set_val(0.0)
 
             system._transfer('linear', mode)
 
-            b_vec = system._vectors['output']['linear']
-            b_vec *= -1.0
-            b_vec += self._rhs_vec
+            system._doutputs *= -1.0
+            system._doutputs += self._rhs_vec
 
-            for subsys in subs:
-                subsys._solve_linear(mode, self._rel_systems)
+            for i, subsys in enumerate(subs):
+                scope_out, scope_in = scopelist[i]
+                subsys._solve_linear(mode, self._rel_systems, scope_out, scope_in)

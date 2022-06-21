@@ -37,7 +37,7 @@ from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, Promot
     UnusedOptionWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, \
-        conditional_error
+        conditional_error, env_truthy
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -259,11 +259,17 @@ class System(object):
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         Dictionaries of vectors keyed by vec_name.
     _inputs : <Vector>
-        The inputs vector; points to _vectors['input']['nonlinear'].
+        The nonlinear inputs vector.
     _outputs : <Vector>
-        The outputs vector; points to _vectors['output']['nonlinear'].
+        The nonlinear outputs vector.
     _residuals : <Vector>
-        The residuals vector; points to _vectors['residual']['nonlinear'].
+        The nonlinear residuals vector.
+    _dinputs : <Vector>
+        The linear inputs vector.
+    _doutputs : <Vector>
+        The linear outputs vector.
+    _dresiduals : <Vector>
+        The linear residuals vector.
     _nonlinear_solver : <NonlinearSolver>
         Nonlinear solver to be used for solve_nonlinear.
     _linear_solver : <LinearSolver>
@@ -440,11 +446,14 @@ class System(object):
 
         self._full_comm = None
 
-        self._vectors = {'input': {}, 'output': {}, 'residual': {}}
+        self._vectors = {}
 
         self._inputs = None
         self._outputs = None
         self._residuals = None
+        self._dinputs = None
+        self._doutputs = None
+        self._dresiduals = None
         self._discrete_inputs = None
         self._discrete_outputs = None
 
@@ -714,9 +723,9 @@ class System(object):
         if self._vector_class is None:
             self._vector_class = self._local_vector_class
 
-        for vec_name in ('nonlinear', 'linear'):
-            sizes = self._var_sizes['output']
-            ncol = 1
+        vectypes = ('nonlinear', 'linear') if self._use_derivatives else ('nonlinear',)
+
+        for vec_name in vectypes:
             if vec_name == 'nonlinear':
                 alloc_complex = nl_alloc_complex
             else:
@@ -726,7 +735,7 @@ class System(object):
                 root_vectors[key][vec_name] = self._vector_class(vec_name, key, self,
                                                                  alloc_complex=alloc_complex)
 
-        if 'linear' in root_vectors['input']:
+        if self._use_derivatives:
             root_vectors['input']['linear']._scaling_nl_vec = \
                 root_vectors['input']['nonlinear']._scaling
 
@@ -1675,8 +1684,6 @@ class System(object):
         Compute unit conversions for driver variables.
         """
         abs2meta = self._var_allprocs_abs2meta['output']
-        pro2abs = self._var_allprocs_prom2abs_list['output']
-        pro2abs_in = self._var_allprocs_prom2abs_list['input']
 
         dv = self._design_vars
         for name, meta in dv.items():
@@ -1791,8 +1798,9 @@ class System(object):
             self._vector_class = self._local_vector_class
 
         vector_class = self._vector_class
+        vectypes = ('nonlinear', 'linear') if self._use_derivatives else ('nonlinear',)
 
-        for vec_name in ('nonlinear', 'linear'):
+        for vec_name in vectypes:
 
             # Only allocate complex in the vectors we need.
             vec_alloc_complex = root_vectors['output'][vec_name]._alloc_complex
@@ -1802,12 +1810,17 @@ class System(object):
                 vectors[kind][vec_name] = vector_class(
                     vec_name, kind, self, rootvec, alloc_complex=vec_alloc_complex)
 
-        if 'linear' in vectors['input']:
+        if self._use_derivatives:
             vectors['input']['linear']._scaling_nl_vec = vectors['input']['nonlinear']._scaling
 
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']
         self._residuals = vectors['residual']['nonlinear']
+
+        if self._use_derivatives:
+            self._dinputs = vectors['input']['linear']
+            self._doutputs = vectors['output']['linear']
+            self._dresiduals = vectors['residual']['linear']
 
         for subsys in self._subsystems_myproc:
             subsys._scale_factors = self._scale_factors
@@ -2087,7 +2100,7 @@ class System(object):
 
         return maps
 
-    def _get_scope(self):
+    def _get_matvec_scope(self):
         """
         Find the input and output variables that are needed for a particular matvec product.
 
@@ -2099,7 +2112,7 @@ class System(object):
         try:
             return self._scope_cache[None]
         except KeyError:
-            self._scope_cache[None] = (frozenset(self._var_abs2meta['output']), _empty_frozen_set)
+            self._scope_cache[None] = (None, _empty_frozen_set)
             return self._scope_cache[None]
 
     @contextmanager
@@ -2194,9 +2207,9 @@ class System(object):
             with variables relevant to the current matrix vector product.
 
         """
-        d_inputs = self._vectors['input']['linear']
-        d_outputs = self._vectors['output']['linear']
-        d_residuals = self._vectors['residual']['linear']
+        d_inputs = self._dinputs
+        d_outputs = self._doutputs
+        d_residuals = self._dresiduals
 
         if clear:
             if mode == 'fwd':
@@ -2212,9 +2225,9 @@ class System(object):
             old_outs = d_outputs._names
 
             if scope_out is not None:
-                d_outputs._names = scope_out.intersection(d_outputs._abs_iter())
+                d_outputs._names = scope_out.intersection(old_outs)
             if scope_in is not None:
-                d_inputs._names = scope_in.intersection(d_inputs._abs_iter())
+                d_inputs._names = scope_in.intersection(old_ins)
 
             try:
                 yield d_inputs, d_outputs, d_residuals
@@ -2289,9 +2302,7 @@ class System(object):
             raise RuntimeError("{}: Cannot get vectors because setup has not yet been "
                                "called.".format(self.msginfo))
 
-        return (self._vectors['input']['linear'],
-                self._vectors['output']['linear'],
-                self._vectors['residual']['linear'])
+        return (self._dinputs, self._doutputs, self._dresiduals)
 
     def _get_var_offsets(self):
         """
@@ -3073,20 +3084,20 @@ class System(object):
                     abs_name = pro2abs_out[name][0]
                     out[abs_name] = data
                     data['source'] = abs_name
-                    dist = abs_name in abs2meta_out and abs2meta_out[abs_name]['distributed']
                     data['orig'] = (name, None)
+                    dist = abs_name in abs2meta_out and abs2meta_out[abs_name]['distributed']
 
                 else:  # assume an input name else KeyError
 
                     # Design variable on an auto_ivc input, so use connected output name.
                     in_abs = pro2abs_in[name][0]
                     data['source'] = source = conns[in_abs]
+                    data['orig'] = (None, name)
                     dist = source in abs2meta_out and abs2meta_out[source]['distributed']
                     if use_prom_ivc:
                         out[name] = data
                     else:
                         out[source] = data
-                    data['orig'] = (None, name)
 
                 data['distributed'] = dist
 
@@ -4041,6 +4052,17 @@ class System(object):
         """
         pass
 
+    def _iter_call_apply_linear(self):
+        """
+        Return whether to call _apply_linear on this System from within parent _apply_linear.
+
+        Returns
+        -------
+        bool
+            True if _apply_linear should be called from within a parent _apply_linear.
+        """
+        return True
+
     def _apply_linear(self, jac, rel_systems, mode, scope_in=None, scope_out=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
@@ -4062,7 +4084,7 @@ class System(object):
         """
         raise NotImplementedError(self.msginfo + ": _apply_linear has not been overridden")
 
-    def _solve_linear(self, mode, rel_systems):
+    def _solve_linear(self, mode, rel_systems, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
@@ -4072,6 +4094,10 @@ class System(object):
             'fwd' or 'rev'.
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
+        scope_out : set, None, or _UNDEFINED
+            Outputs relevant to possible lower level calls to _apply_linear on Components.
+        scope_in : set, None, or _UNDEFINED
+            Inputs relevant to possible lower level calls to _apply_linear on Components.
         """
         pass
 
@@ -4250,10 +4276,10 @@ class System(object):
             sub._outputs.set_complex_step_mode(active)
             sub._residuals.set_complex_step_mode(active)
 
-            if sub._vectors['output']['linear']._alloc_complex:
-                sub._vectors['output']['linear'].set_complex_step_mode(active)
-                sub._vectors['input']['linear'].set_complex_step_mode(active)
-                sub._vectors['residual']['linear'].set_complex_step_mode(active)
+            if sub._doutputs._alloc_complex:
+                sub._doutputs.set_complex_step_mode(active)
+                sub._dinputs.set_complex_step_mode(active)
+                sub._dresiduals.set_complex_step_mode(active)
 
                 if sub.linear_solver:
                     sub.linear_solver._set_complex_step_mode(active)
@@ -5121,12 +5147,13 @@ class System(object):
         for tgt, src in conns.items():
             if src not in graph:
                 graph.add_node(src, type_='out')
+
             graph.add_node(tgt, type_='in')
 
-            src_sys = src.rsplit('.', 1)[0]
+            src_sys, _, _ = src.rpartition('.')
             graph.add_edge(src_sys, src)
 
-            tgt_sys = tgt.rsplit('.', 1)[0]
+            tgt_sys, _, _ = tgt.rpartition('.')
             graph.add_edge(tgt, tgt_sys)
 
             graph.add_edge(src, tgt)

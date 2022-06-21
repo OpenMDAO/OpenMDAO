@@ -98,7 +98,7 @@ class TestSubsystemConfigError(unittest.TestCase):
             top.setup()
 
         self.assertEqual(str(cm.exception),
-                         "<model> <class SimpleGroup>: Cannot call add_subsystem in the configure method")
+                         "<model> <class SimpleGroup>: Cannot call add_subsystem in the configure method.")
 
 class SlicerComp(om.ExplicitComponent):
     def setup(self):
@@ -1321,7 +1321,7 @@ class TestGroup(unittest.TestCase):
         model.add_subsystem('C1', SimpleGroup())
         model.add_subsystem('C2', SimpleGroup())
 
-        msg = "'C1' <class SimpleGroup>: Cannot call set_order in the configure method"
+        msg = "'C1' <class SimpleGroup>: Cannot call set_order in the configure method."
         with self.assertRaises(RuntimeError) as cm:
             prob.setup()
 

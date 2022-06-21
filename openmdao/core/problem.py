@@ -1369,15 +1369,15 @@ class Problem(object):
                         print_reverse = True
                         local_opts = comp._get_check_partial_options()
 
-                        dstate = comp._vectors['output']['linear']
+                        dstate = comp._doutputs
                         if mode == 'fwd':
-                            dinputs = comp._vectors['input']['linear']
-                            doutputs = comp._vectors['residual']['linear']
+                            dinputs = comp._dinputs
+                            doutputs = comp._dresiduals
                             in_list = wrt_list
                             out_list = of_list
                         else:
-                            dinputs = comp._vectors['residual']['linear']
-                            doutputs = comp._vectors['input']['linear']
+                            dinputs = comp._dresiduals
+                            doutputs = comp._dinputs
                             in_list = of_list
                             out_list = wrt_list
 
@@ -1430,8 +1430,6 @@ class Problem(object):
                                 dinputs.set_val(0.0)
                                 dstate.set_val(0.0)
 
-                                # Dictionary access returns a scalar for 1d input, and we
-                                # need a vector for clean code, so use _views_flat.
                                 if directional:
                                     flat_view[:] = perturb
                                 elif idx is not None:

@@ -1,6 +1,7 @@
 """Define the ImplicitComponent class."""
 
 from openmdao.core.component import Component
+from openmdao.core.constants import _UNDEFINED
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.class_util import overrides_method
 
@@ -205,7 +206,7 @@ class ImplicitComponent(Component):
                 finally:
                     d_inputs.read_only = d_outputs.read_only = d_residuals.read_only = False
 
-    def _solve_linear(self, mode, rel_systems):
+    def _solve_linear(self, mode, rel_systems, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
@@ -215,13 +216,18 @@ class ImplicitComponent(Component):
             'fwd' or 'rev'.
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
+        scope_out : set, None, or _UNDEFINED
+            Outputs relevant to possible lower level calls to _apply_linear on Components.
+        scope_in : set, None, or _UNDEFINED
+            Inputs relevant to possible lower level calls to _apply_linear on Components.
         """
         if self._linear_solver is not None:
+            self._linear_solver._set_matvec_scope(scope_out, scope_in)
             self._linear_solver.solve(mode, rel_systems)
 
         else:
-            d_outputs = self._vectors['output']['linear']
-            d_residuals = self._vectors['residual']['linear']
+            d_outputs = self._doutputs
+            d_residuals = self._dresiduals
 
             with self._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
                 # set appropriate vectors to read_only to help prevent user error

@@ -1,5 +1,6 @@
 """Define the LinearRunOnce class."""
 
+from openmdao.core.constants import _UNDEFINED
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
 
 
@@ -26,7 +27,7 @@ class LinearRunOnce(LinearBlockGS):
         mode : str
             'fwd' or 'rev'.
         rel_systems : set of str
-            Names of systems relevant to the current solve.
+            Set of names of relevant systems based on the current linear solve.
         """
         self._mode = mode
         self._rel_systems = rel_systems
@@ -35,6 +36,9 @@ class LinearRunOnce(LinearBlockGS):
 
         # Single iteration of GS
         self._single_iteration()
+
+        # reset after solve is done
+        self._scope_in = self._scope_out = _UNDEFINED
 
     def _declare_options(self):
         """

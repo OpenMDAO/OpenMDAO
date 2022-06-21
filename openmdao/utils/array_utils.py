@@ -4,6 +4,7 @@ Utils for dealing with arrays.
 import sys
 from itertools import product
 from copy import copy
+import hashlib
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -592,3 +593,24 @@ def identity_column_iter(column):
         column[i - 1] = 0
         column[i] = 1
         yield column
+
+
+def array_hash(arr, alg=hashlib.sha1):
+    """
+    Return a hash of the given numpy array.
+
+    arr must be C-contiguous.
+
+    Parameters
+    ----------
+    arr : ndarray
+        The array to be hashed.
+    alg : hashing algorithm
+        Algorithm defaults to hashlib.sha1.
+
+    Returns
+    -------
+    str
+        The computed hash.
+    """
+    return alg(arr.view(np.uint8)).hexdigest()

@@ -227,12 +227,12 @@ class _TotalJacInfo(object):
         self.input_meta = {'fwd': design_vars, 'rev': responses}
         self.output_meta = {'fwd': responses, 'rev': design_vars}
         self.input_vec = {
-            'fwd': model._vectors['residual']['linear'],
-            'rev': model._vectors['output']['linear']
+            'fwd': model._dresiduals,
+            'rev': model._doutputs
         }
         self.output_vec = {
-            'fwd': model._vectors['output']['linear'],
-            'rev': model._vectors['residual']['linear']
+            'fwd': model._doutputs,
+            'rev': model._dresiduals
         }
         self._dist_driver_vars = driver._dist_driver_vars
 
@@ -809,7 +809,7 @@ class _TotalJacInfo(object):
         inds = []
         jac_inds = []
         sizes = model._var_sizes['output']
-        slices = model._vectors['output']['linear'].get_slice_dict()
+        slices = model._doutputs.get_slice_dict()
         abs2idx = model._var_allprocs_abs2idx
         jstart = jend = 0
 
@@ -1016,14 +1016,12 @@ class _TotalJacInfo(object):
         for tup in zip(*idxs):
             yield tup, self.par_deriv_input_setter, self.par_deriv_jac_setter, imeta
 
-    def _zero_vecs(self, vecname, mode):
-        vecs = self.model._vectors
-
+    def _zero_vecs(self, mode):
         # clean out vectors from last solve
-        vecs['output'][vecname].set_val(0.0)
-        vecs['residual'][vecname].set_val(0.0)
+        self.model._doutputs.set_val(0.0)
+        self.model._dresiduals.set_val(0.0)
         if mode == 'rev':
-            vecs['input'][vecname].set_val(0.0)
+            self.model._dinputs.set_val(0.0)
 
     #
     # input setter functions
@@ -1052,7 +1050,7 @@ class _TotalJacInfo(object):
         """
         _, rel_systems, cache_lin_sol = self.in_idx_map[mode][idx]
 
-        self._zero_vecs('linear', mode)
+        self._zero_vecs(mode)
 
         loc_idx = self.in_loc_idxs[mode][idx]
         if loc_idx >= 0:
@@ -1088,7 +1086,7 @@ class _TotalJacInfo(object):
         if itermeta is None:
             return self.single_input_setter(inds[0], None, mode)
 
-        self._zero_vecs('linear', mode)
+        self._zero_vecs(mode)
 
         self.input_vec[mode].set_val(itermeta['seeds'], itermeta['local_in_idxs'])
 
@@ -1327,8 +1325,9 @@ class _TotalJacInfo(object):
         model = self.model
         # Prepare model for calculation by cleaning out the derivatives vectors.
         model._vectors['input']['linear'].set_val(0.0)
-        model._vectors['output']['linear'].set_val(0.0)
-        model._vectors['residual']['linear'].set_val(0.0)
+        model._dinputs.set_val(0.0)
+        model._doutputs.set_val(0.0)
+        model._dresiduals.set_val(0.0)
 
         # Linearize Model
         model._tot_jac = self
@@ -1426,11 +1425,10 @@ class _TotalJacInfo(object):
         return_format = self.return_format
         debug_print = self.debug_print
 
-        # Prepare model for calculation by cleaning out the derivatives
-        # vectors.
-        model._vectors['input']['linear'].set_val(0.0)
-        model._vectors['output']['linear'].set_val(0.0)
-        model._vectors['residual']['linear'].set_val(0.0)
+        # Prepare model for calculation by cleaning out the derivatives vectors.
+        model._dinputs.set_val(0.0)
+        model._doutputs.set_val(0.0)
+        model._dresiduals.set_val(0.0)
 
         # Solve for derivs with the approximation_scheme.
         # This cuts out the middleman by grabbing the Jacobian directly after linearization.

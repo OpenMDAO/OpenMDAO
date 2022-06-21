@@ -10,6 +10,7 @@ import weakref
 import numpy as np
 
 from openmdao.core.analysis_error import AnalysisError
+from openmdao.core.constants import _UNDEFINED
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
@@ -17,8 +18,6 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.om_warnings import issue_warning, SolverWarning
 from openmdao.core.component import Component
-
-_emptyset = set()
 
 
 class SolverInfo(object):
@@ -786,6 +785,10 @@ class LinearSolver(Solver):
         Names of systems relevant to the current solve.
     _assembled_jac : AssembledJacobian or None
         If not None, the AssembledJacobian instance used by this solver.
+    _scope_in : set or None or _UNDEFINED
+        Relevant input variables for the current matrix vector product.
+    _scope_out : set or None or _UNDEFINED
+        Relevant output variables for the current matrix vector product.
     """
 
     def __init__(self, **kwargs):
@@ -794,7 +797,26 @@ class LinearSolver(Solver):
         """
         self._rel_systems = None
         self._assembled_jac = None
+        self._scope_out = _UNDEFINED
+        self._scope_in = _UNDEFINED
+
         super().__init__(**kwargs)
+
+    def does_recursive_applies(self):
+        """
+        Return False.
+
+        By default, assume linear solvers don't do recursive apply_linear calls.
+
+        Returns
+        -------
+        bool
+            True if solver makes recursive apply_linear calls on its subsystems.
+        """
+        return False
+
+    def _set_matvec_scope(self, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
+        pass
 
     def _assembled_jac_solver_iter(self):
         """
@@ -932,7 +954,7 @@ class LinearSolver(Solver):
         self._recording_iter.push(('_run_apply', 0))
 
         system = self._system()
-        scope_out, scope_in = system._get_scope()
+        scope_out, scope_in = system._get_matvec_scope()
 
         try:
             system._apply_linear(self._assembled_jac, self._rel_systems,
@@ -949,7 +971,20 @@ class BlockLinearSolver(LinearSolver):
     ----------
     **kwargs : dict
         Options dictionary.
+
+    Attributes
+    ----------
+    _rhs_vec : ndarray
+        Contains the values of the linear resids (fwd) or outputs (rev) saved at the beginning
+        of the linear solve.
     """
+
+    def __init__(self, **kwargs):
+        """
+        Initialize attributes.
+        """
+        super().__init__(**kwargs)
+        self._rhs_vec = None
 
     def _declare_options(self):
         """
@@ -957,6 +992,19 @@ class BlockLinearSolver(LinearSolver):
         """
         super()._declare_options()
         self.supports['assembled_jac'] = False
+
+    def does_recursive_applies(self):
+        """
+        Return True.
+
+        Block linear solvers make recursive apply_linear calls.
+
+        Returns
+        -------
+        bool
+            True if solver makes recursive apply_linear calls on its subsystems.
+        """
+        return True
 
     def _setup_solvers(self, system, depth):
         """
@@ -976,16 +1024,16 @@ class BlockLinearSolver(LinearSolver):
     def _create_rhs_vec(self):
         system = self._system()
         if self._mode == 'fwd':
-            self._rhs_vec = system._vectors['residual']['linear'].asarray(True)
+            self._rhs_vec = system._dresiduals.asarray(True)
         else:
-            self._rhs_vec = system._vectors['output']['linear'].asarray(True)
+            self._rhs_vec = system._doutputs.asarray(True)
 
     def _update_rhs_vec(self):
-        system = self._system()
         if self._mode == 'fwd':
-            self._rhs_vec[:] = system._vectors['residual']['linear'].asarray()
+            self._rhs_vec[:] = self._system()._dresiduals.asarray()
         else:
-            self._rhs_vec[:] = system._vectors['output']['linear'].asarray()
+            self._rhs_vec[:] = self._system()._doutputs.asarray()
+        # print("Updating RHS vec to", self._rhs_vec)
 
     def _set_complex_step_mode(self, active):
         """
@@ -1003,6 +1051,48 @@ class BlockLinearSolver(LinearSolver):
         else:
             self._rhs_vec = self._rhs_vec.real
 
+    def _vars_union(self, slv_vars, sys_vars):
+        """
+        Return the union of the two 'set's of variables.
+
+        The first 'set' comes from the this solver and the second from the set of variables
+        from the current System that are relevent to the current matrix vector product. Note
+        that this is called separately for input and output variables.
+
+        Also handles cases where incoming variables are _UNDEFINED or None instead of sets.
+
+        Parameters
+        ----------
+        slv_vars : set, None, or _UNDEFINED
+            First variable set.
+        sys_vars : set, None, or _UNDEFINED
+            Second variable set.
+
+        Returns
+        -------
+        set, None, or _UNDEFINED
+            The combined variable 'set'.
+        """
+        if sys_vars is None or slv_vars is None:
+            return None
+        if slv_vars is _UNDEFINED:
+            return sys_vars
+        return sys_vars.union(slv_vars)
+
+    def _run_apply(self, init=False):
+        """
+        Run the apply_linear method on the system.
+        """
+        system = self._system()
+        self._recording_iter.push(('_run_apply', 0))
+        try:
+            scope_out, scope_in = system._get_matvec_scope()
+            system._apply_linear(self._assembled_jac, self._rel_systems, self._mode,
+                                 self._vars_union(self._scope_out, scope_out),
+                                 self._vars_union(self._scope_in, scope_in))
+        finally:
+            self._recording_iter.pop()
+
     def _iter_initialize(self):
         """
         Perform any necessary pre-processing operations.
@@ -1015,11 +1105,12 @@ class BlockLinearSolver(LinearSolver):
             error at the first iteration.
         """
         self._update_rhs_vec()
+
         if self.options['maxiter'] > 1:
             self._run_apply()
             norm = self._iter_get_norm()
         else:
-            norm = 1.0
+            return 1.0, 1.0
         norm0 = norm if norm != 0.0 else 1.0
         return norm0, norm
 
@@ -1035,15 +1126,29 @@ class BlockLinearSolver(LinearSolver):
         float
             norm.
         """
-        system = self._system()
-
         if self._mode == 'fwd':
-            b_vecs = system._vectors['residual']['linear']
+            b_vec = self._system()._dresiduals
         else:  # rev
-            b_vecs = system._vectors['output']['linear']
+            b_vec = self._system()._doutputs
 
-        b_vecs -= self._rhs_vec
-        return b_vecs.get_norm()
+        b_vec -= self._rhs_vec  # compute Ax - rhs
+        norm = b_vec.get_norm()
+        b_vec += self._rhs_vec  # revert b_vec back to original value
+        return norm
+
+    def _set_matvec_scope(self, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
+        """
+        Set the relevant variables for the current matrix vector product.
+
+        Parameters
+        ----------
+        scope_out : set, None, or _UNDEFINED
+            Outputs relevant to possible lower level calls to _apply_linear on Components.
+        scope_in : set, None, or _UNDEFINED
+            Inputs relevant to possible lower level calls to _apply_linear on Components.
+        """
+        self._scope_out = scope_out
+        self._scope_in = scope_in
 
     def solve(self, mode, rel_systems=None):
         """
@@ -1059,3 +1164,5 @@ class BlockLinearSolver(LinearSolver):
         self._rel_systems = rel_systems
         self._mode = mode
         self._solve()
+
+        self._scope_out = self._scope_in = _UNDEFINED  # reset after solve is done

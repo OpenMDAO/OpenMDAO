@@ -107,6 +107,7 @@ def _setup_func_group():
     global func_group, base_classes
 
     from openmdao.core.system import System
+    from openmdao.core.group import Group
     from openmdao.core.component import Component
     from openmdao.core.explicitcomponent import ExplicitComponent
     from openmdao.core.problem import Problem
@@ -121,7 +122,7 @@ def _setup_func_group():
     from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
 
     for class_ in [System, ExplicitComponent, Problem, Driver, _TotalJacInfo, Solver, LinearSolver,
-                   NewtonSolver, Jacobian, Matrix, DefaultVector, DefaultTransfer]:
+                   NewtonSolver, Jacobian, Matrix, DefaultVector, DefaultTransfer, Group]:
         base_classes[class_.__name__] = class_
 
 
@@ -170,6 +171,16 @@ def _setup_func_group():
             ('_update', (Jacobian,)),
             ('_apply', (Jacobian,)),
             ('_initialize', (Jacobian,)),
+            ('compute_totals', (_TotalJacInfo, Problem, Driver)),
+            ('compute_totals_approx', (_TotalJacInfo,)),
+            ('compute_jacvec_product', (System,)),
+        ],
+        'apply_linear': [
+            ('_transfer', (Group,)),
+            ('_apply_linear', (System,)),
+            ('_solve_linear', (System,)),
+            ('apply_linear', (System,)),
+            ('solve_linear', (System,)),
             ('compute_totals', (_TotalJacInfo, Problem, Driver)),
             ('compute_totals_approx', (_TotalJacInfo,)),
             ('compute_jacvec_product', (System,)),

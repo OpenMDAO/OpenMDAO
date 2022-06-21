@@ -230,8 +230,8 @@ class DirectSolver(LinearSolver):
             Jacobian matrix.
         """
         system = self._system()
-        bvec = system._vectors['residual']['linear']
-        xvec = system._vectors['output']['linear']
+        bvec = system._dresiduals
+        xvec = system._doutputs
 
         # First make a backup of the vectors
         b_data = bvec.asarray(copy=True)
@@ -240,7 +240,7 @@ class DirectSolver(LinearSolver):
         nmtx = x_data.size
         seed = np.zeros(x_data.size)
         mtx = np.empty((nmtx, nmtx), dtype=b_data.dtype)
-        scope_out, scope_in = system._get_scope()
+        scope_out, scope_in = system._get_matvec_scope()
 
         # Assemble the Jacobian by running the identity matrix through apply_linear
         for i, seed in enumerate(identity_column_iter(seed)):
@@ -420,11 +420,9 @@ class DirectSolver(LinearSolver):
             Names of systems relevant to the current solve.
         """
         system = self._system()
-        iproc = system.comm.rank
-        nproc = system.comm.size
 
-        d_residuals = system._vectors['residual']['linear']
-        d_outputs = system._vectors['output']['linear']
+        d_residuals = system._dresiduals
+        d_outputs = system._doutputs
 
         # assign x and b vectors based on mode
         if mode == 'fwd':

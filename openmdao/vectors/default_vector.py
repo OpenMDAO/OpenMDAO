@@ -1,8 +1,11 @@
 """Define the default Vector class."""
+from collections import defaultdict
+import hashlib
 import numpy as np
 
 from openmdao.vectors.vector import Vector, _full_slice
 from openmdao.vectors.default_transfer import DefaultTransfer
+from openmdao.utils.array_utils import array_hash
 
 
 class DefaultVector(Vector):
@@ -81,6 +84,7 @@ class DefaultVector(Vector):
             myslice = slice(0, 0)
 
         data = root_vec._data[myslice]
+        self._root_offset = myslice.start
 
         scaling = None
         if self._do_scaling:
@@ -138,6 +142,7 @@ class DefaultVector(Vector):
         system = self._system()
         io = self._typ
         kind = self._kind
+        islinear = self._name == 'linear'
 
         do_scaling = self._do_scaling
         if do_scaling:
@@ -165,7 +170,7 @@ class DefaultVector(Vector):
                     # to handle the unit and solver scaling in opposite directions in reverse mode.
                     a0, a1, factor, offset = factor_tuple
 
-                    if self._name == 'linear':
+                    if islinear:
                         scale0 = None
                         scale1 = factor / a1
                     else:
@@ -184,7 +189,7 @@ class DefaultVector(Vector):
 
             start = end
 
-        self._names = frozenset(views)
+        self._names = frozenset(views) if islinear else views
         self._len = end
 
     def _in_matvec_context(self):
@@ -501,6 +506,33 @@ class DefaultVector(Vector):
 
         return self._slices
 
+    def idxs2nameloc(self, idxs):
+        """
+        Given some indices, return a dict mapping variable name to corresponding local indices.
+
+        This is slow and is meant to be used only for debugging or maybe error messages.
+
+        Parameters
+        ----------
+        idxs : list of int
+            Vector indices to be converted to local indices for each corresponding variable.
+
+        Returns
+        -------
+        dict
+            Mapping of variable name to a list of local indices into that variable.
+        """
+        name2inds = defaultdict(list)
+        start = end = 0
+        for name, arr in self._views_flat.items():
+            end += arr.size
+            for idx in idxs:
+                if start <= idx < end:
+                    name2inds[name].append(idx - start)
+            start = end
+
+        return name2inds
+
     def __getstate__(self):
         """
         Return state as a dict.
@@ -518,3 +550,22 @@ class DefaultVector(Vector):
         if '_system' in state:
             del state['_system']
         return state
+
+    def get_hash(self, alg=hashlib.sha1):
+        """
+        Return a hash string for the array contained in this Vector.
+
+        Parameters
+        ----------
+        alg : function
+            Algorithm used to generate the hash.  Default is hashlib.sha1.
+
+        Returns
+        -------
+        str
+            The hash string.
+        """
+        if self._data.size == 0:
+            return ''
+        # we must use self._data here because the hashing alg requires array to be C-contiguous
+        return array_hash(self._data, alg)

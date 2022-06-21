@@ -9,9 +9,6 @@ import numpy as np
 from contextlib import contextmanager
 from collections import Counter
 
-from openmdao.core.problem import Problem
-from openmdao.core.group import Group
-from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.constants import _SetupStatus
 from openmdao.utils.mpi import MPI
 from openmdao.utils.om_warnings import issue_warning, MPIWarning
@@ -93,6 +90,10 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
     stream : File-like
         Where dump output will go.
     """
+    from openmdao.core.problem import Problem
+    from openmdao.core.group import Group
+    from openmdao.core.implicitcomponent import ImplicitComponent
+
     cprint, Fore, Back, Style = _get_color_printer(stream, show_colors, rank=rank)
 
     tab = 0
@@ -218,6 +219,8 @@ def config_summary(problem, stream=sys.stdout):
     stream : File-like
         Where the output will be written.
     """
+    from openmdao.core.group import Group
+
     model = problem.model
     meta = model._var_allprocs_abs2meta
     locsystems = list(model.system_iter(recurse=True, include_self=True))

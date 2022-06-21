@@ -107,7 +107,6 @@ class AssembledJacobian(Jacobian):
         self._int_mtx = int_mtx = self._matrix_class(system.comm, True)
         ext_mtx = self._matrix_class(system.comm, False)
 
-        iproc = system.comm.rank
         out_ranges = self._out_ranges
         in_ranges = self._in_ranges
 
@@ -175,7 +174,7 @@ class AssembledJacobian(Jacobian):
         int_mtx._build(out_size, out_size, system)
 
         if ext_mtx._submats:
-            ext_mtx._build(out_size, len(system._vectors['input']['linear']))
+            ext_mtx._build(out_size, len(system._dinputs))
         else:
             ext_mtx = None
 
@@ -231,7 +230,6 @@ class AssembledJacobian(Jacobian):
         for s in system.system_iter(recurse=True, include_self=True, typ=Component):
             for res_abs_name, res_meta in s._var_abs2meta['output'].items():
                 res_offset = np.sum(sizes[iproc, :abs2idx[res_abs_name]])
-                res_size = res_meta['size']
 
                 for in_abs_name in s._var_abs2meta['input']:
                     if in_abs_name not in conns:  # unconnected input
@@ -245,8 +243,7 @@ class AssembledJacobian(Jacobian):
                                             in_offset[in_abs_name] - ranges[2], None, info['shape'])
 
         if ext_mtx._submats:
-            ext_mtx._build(len(system._vectors['output']['linear']),
-                           len(system._vectors['input']['linear']))
+            ext_mtx._build(len(system._doutputs), len(system._dinputs))
         else:
             ext_mtx = None
 

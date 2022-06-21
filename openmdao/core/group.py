@@ -323,7 +323,7 @@ class Group(System):
         else:
             dct[name] = [meta]
 
-    def _get_scope(self, excl_sub=None):
+    def _get_matvec_scope(self, excl_sub=None):
         """
         Find the input and output variables that are needed for a particular matvec product.
 
@@ -343,17 +343,17 @@ class Group(System):
             cache_key = excl_sub.pathname
 
         try:
-            io_vars = self._scope_cache[cache_key]
+            iovars, excl = self._scope_cache[cache_key]
 
             # Make sure they're the same subsystem instance before returning
-            if io_vars[2] is excl_sub:
-                return (io_vars[:2])
+            if excl is excl_sub:
+                return iovars
         except KeyError:
             pass
 
         if excl_sub is None:
-            # All outputs
-            scope_out = frozenset(self._var_allprocs_abs2meta['output'])
+            # A value of None will be interpreted as 'all outputs'.
+            scope_out = None
 
             # All inputs connected to an output in this system
             scope_in = frozenset(self._conn_global_abs_in2out).intersection(
@@ -364,19 +364,17 @@ class Group(System):
             scope_out = frozenset()
 
             # All inputs connected to an output in this system but not in excl_sub
-            scope_in = set()
-            for abs_in in self._var_allprocs_abs2meta['input']:
-                if abs_in in self._conn_global_abs_in2out:
-                    abs_out = self._conn_global_abs_in2out[abs_in]
-
-                    if abs_out not in excl_sub._var_allprocs_abs2idx:
-                        scope_in.add(abs_in)
-            scope_in = frozenset(scope_in)
+            # allins is used to filter out discrete variables that might be found in
+            # self._conn_global_abs_in2out.
+            allins = self._var_allprocs_abs2meta['input']
+            exvars = excl_sub._var_allprocs_abs2idx
+            scope_in = frozenset(abs_in for abs_in, abs_out in self._conn_global_abs_in2out.items()
+                                 if abs_out not in exvars and abs_in in allins)
 
         # Use the pathname as the dict key instead of the object itself. When
         # the object is used as the key, memory leaks result from multiple
         # calls to setup().
-        self._scope_cache[cache_key] = (scope_out, scope_in, excl_sub)
+        self._scope_cache[cache_key] = ((scope_out, scope_in), excl_sub)
         return scope_out, scope_in
 
     def _compute_root_scale_factors(self):
@@ -1891,9 +1889,6 @@ class Group(System):
         # to True for this Group if units are defined and different, or if
         # ref or ref0 are defined for the output.
         for abs_in, abs_out in global_abs_in2out.items():
-            if abs_in[:path_len] != path_dot or abs_out[:path_len] != path_dot:
-                continue
-
             # Check that they are in different subsystems of this system.
             out_subsys = abs_out[path_len:].split('.', 1)[0]
             in_subsys = abs_in[path_len:].split('.', 1)[0]
@@ -2356,20 +2351,24 @@ class Group(System):
             same time, and get the reference back.
         """
         if self._setup_procs_finished:
-            raise RuntimeError("%s: Cannot call add_subsystem in "
-                               "the configure method" % (self.msginfo))
+            raise RuntimeError(f"{self.msginfo}: Cannot call add_subsystem in "
+                               "the configure method.")
 
         if inspect.isclass(subsys):
-            raise TypeError("%s: Subsystem '%s' should be an instance, but a %s class object was "
-                            "found." % (self.msginfo, name, subsys.__name__))
+            raise TypeError(f"{self.msginfo}: Subsystem '{name}' should be an instance, but a "
+                            f"{subsys.__name__} class object was found.")
 
         if name in self._subsystems_allprocs or name in self._static_subsystems_allprocs:
-            raise RuntimeError("%s: Subsystem name '%s' is already used." % (self.msginfo, name))
+            raise RuntimeError(f"{self.msginfo}: Subsystem name '{name}' is already used.")
 
         if hasattr(self, name) and not isinstance(getattr(self, name), System):
             # replacing a subsystem is ok (e.g. resetup) but no other attribute
-            raise RuntimeError("%s: Can't add subsystem '%s' because an attribute with that name "
-                               "already exits." % (self.msginfo, name))
+            raise RuntimeError(f"{self.msginfo}: Can't add subsystem '{name}' because an attribute "
+                               f"with that name already exits.")
+
+        if not isinstance(subsys, System):
+            raise TypeError(f"{self.msginfo}: Subsystem '{name}' should be a System instance, but "
+                            f"an instance of type {type(subsys).__name__} was found.")
 
         if proc_group is not None and not isinstance(proc_group, str):
             raise TypeError(f"{self.msginfo}: proc_group must be a str or None, but is of type "
@@ -2377,15 +2376,15 @@ class Group(System):
 
         match = namecheck_rgx.match(name)
         if match is None or match.group() != name:
-            raise NameError("%s: '%s' is not a valid sub-system name." % (self.msginfo, name))
+            raise NameError(f"{self.msginfo}: '{name}' is not a valid sub-system name.")
 
         subsys.name = subsys.pathname = name
 
         if isinstance(promotes, str) or \
            isinstance(promotes_inputs, str) or \
            isinstance(promotes_outputs, str):
-            raise RuntimeError("%s: promotes must be an iterator of strings and/or tuples."
-                               % self.msginfo)
+            raise RuntimeError(f"{self.msginfo}: promotes must be an iterator of strings and/or "
+                               "tuples.")
 
         prominfo = None
 
@@ -2412,14 +2411,14 @@ class Group(System):
         subsystems_allprocs[subsys.name] = _SysInfo(subsys, len(subsystems_allprocs))
 
         if not isinstance(min_procs, int) or min_procs < 1:
-            raise TypeError("%s: min_procs must be an int > 0 but (%s) was given." %
-                            (self.msginfo, min_procs))
+            raise TypeError(f"{self.msginfo}: min_procs must be an int > 0 but ({min_procs}) was "
+                            "given.")
         if max_procs is not None and (not isinstance(max_procs, int) or max_procs < min_procs):
-            raise TypeError("%s: max_procs must be None or an int >= min_procs but (%s) was given."
-                            % (self.msginfo, max_procs))
+            raise TypeError(f"{self.msginfo}: max_procs must be None or an int >= min_procs but "
+                            f"({max_procs}) was given.")
         if isinstance(proc_weight, Number) and proc_weight < 0:
-            raise TypeError("%s: proc_weight must be a float > 0. but (%s) was given." %
-                            (self.msginfo, proc_weight))
+            raise TypeError(f"{self.msginfo}: proc_weight must be a float > 0. but ({proc_weight}) "
+                            "was given.")
 
         self._proc_info[name] = (min_procs, max_procs, proc_weight, proc_group)
 
@@ -2500,7 +2499,7 @@ class Group(System):
         """
         if self._problem_meta is not None and \
                 self._problem_meta['setup_status'] == _SetupStatus.POST_CONFIGURE:
-            raise RuntimeError("%s: Cannot call set_order in the configure method" % (self.msginfo))
+            raise RuntimeError(f"{self.msginfo}: Cannot call set_order in the configure method.")
 
         # Make sure the new_order is valid. It must contain all subsystems
         # in this model.
@@ -2620,16 +2619,18 @@ class Group(System):
             self._residuals.set_complex_step_mode(False)
             self._outputs.set_complex_step_mode(False)
 
-        if self._discrete_inputs or self._discrete_outputs:
-            self.guess_nonlinear(self._inputs, self._outputs, self._residuals,
-                                 self._discrete_inputs, self._discrete_outputs)
-        else:
-            self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
+        try:
+            if self._discrete_inputs or self._discrete_outputs:
+                self.guess_nonlinear(self._inputs, self._outputs, self._residuals,
+                                     self._discrete_inputs, self._discrete_outputs)
+            else:
+                self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
+        finally:
 
-        if complex_step:
-            self._inputs.set_complex_step_mode(True)
-            self._residuals.set_complex_step_mode(True)
-            self._outputs.set_complex_step_mode(True)
+            if complex_step:
+                self._inputs.set_complex_step_mode(True)
+                self._residuals.set_complex_step_mode(True)
+                self._outputs.set_complex_step_mode(True)
 
     def guess_nonlinear(self, inputs, outputs, residuals,
                         discrete_inputs=None, discrete_outputs=None):
@@ -2652,6 +2653,24 @@ class Group(System):
             If not None, dict containing discrete output values.
         """
         pass
+
+    def _iter_call_apply_linear(self):
+        """
+        Return whether to call _apply_linear on this Group from within linear block GS/Jac.
+
+        Linear block solvers call _apply_linear then _solve_linear (fwd) or _solve_linear then
+        _apply_linear (rev) during an iteration.  This will tell those solvers whether they
+        should call _apply_linear on this group when they're calling _apply_linear on their
+        subsystems.  Note that _apply_linear will still be called from within a subsystem's
+        _solve_linear.
+
+        Returns
+        -------
+        bool
+            True if _apply_linear should be called from within a parent _apply_linear.
+        """
+        return (self._owns_approx_jac and self._jacobian is not None) or \
+            self._assembled_jac is not None or not self._linear_solver.does_recursive_applies()
 
     def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
         """
@@ -2683,15 +2702,13 @@ class Group(System):
                 jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
         # Apply recursion
         else:
-            if rel_systems is not None:
-                irrelevant_subs = [s for s in self._subsystems_myproc
-                                   if s.pathname not in rel_systems]
             if mode == 'fwd':
                 self._transfer('linear', mode)
                 if rel_systems is not None:
-                    for s in irrelevant_subs:
-                        # zero out dvecs of irrelevant subsystems
-                        s._vectors['residual']['linear'].set_val(0.0)
+                    for s in self._subsystems_myproc:
+                        if s.pathname not in rel_systems:
+                            # zero out dvecs of irrelevant subsystems
+                            s._dresiduals.set_val(0.0)
 
             for subsys in self._subsystems_myproc:
                 if rel_systems is None or subsys.pathname in rel_systems:
@@ -2700,11 +2717,12 @@ class Group(System):
             if mode == 'rev':
                 self._transfer('linear', mode)
                 if rel_systems is not None:
-                    for s in irrelevant_subs:
-                        # zero out dvecs of irrelevant subsystems
-                        s._vectors['output']['linear'].set_val(0.0)
+                    for s in self._subsystems_myproc:
+                        if s.pathname not in rel_systems:
+                            # zero out dvecs of irrelevant subsystems
+                            s._doutputs.set_val(0.0)
 
-    def _solve_linear(self, mode, rel_systems):
+    def _solve_linear(self, mode, rel_systems, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
@@ -2714,12 +2732,16 @@ class Group(System):
             'fwd' or 'rev'.
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
+        scope_out : set, None, or _UNDEFINED
+            Outputs relevant to possible lower level calls to _apply_linear on Components.
+        scope_in : set, None, or _UNDEFINED
+            Inputs relevant to possible lower level calls to _apply_linear on Components.
         """
         if self._owns_approx_jac:
             # No subsolves if we are approximating our jacobian. Instead, we behave like an
             # ExplicitComponent and pass on the values in the derivatives vectors.
-            d_outputs = self._vectors['output']['linear']
-            d_residuals = self._vectors['residual']['linear']
+            d_outputs = self._doutputs
+            d_residuals = self._dresiduals
 
             if mode == 'fwd':
                 if self._has_resid_scaling:
@@ -2742,6 +2764,7 @@ class Group(System):
                 d_residuals *= -1.0
 
         else:
+            self._linear_solver._set_matvec_scope(scope_out, scope_in)
             self._linear_solver.solve(mode, rel_systems)
 
     def _linearize(self, jac, sub_do_ln=True):
@@ -3229,7 +3252,7 @@ class Group(System):
         else:
             systems = [s.name for s in self._subsystems_myproc]
 
-        if not comps_only and self.comm.size > 1:
+        if not comps_only and self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             systems = set()
             for slist in self.comm.allgather(systems):
                 systems.update(slist)
