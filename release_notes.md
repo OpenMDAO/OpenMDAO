@@ -1,4 +1,47 @@
 ***********************************
+# Release Notes for OpenMDAO 3.19.0
+
+June 29, 2022
+
+OpenMDAO 3.19.0 removes some long-standing deprecations, continues the addition of faster interpolants, fixes a few bugs, and includes various code cleanup tasks.
+
+## New Deprecations
+
+- None
+
+## Backwards Incompatible API Changes
+
+- Various two-word OptionsDictionary entries, which cannot be provided as arguments because they are not valid python names, have been removed. A number of various other existing deprecations have been removed. See [#2551](https://github.com/OpenMDAO/OpenMDAO/pull/2551)
+
+## Backwards Incompatible Non-API Changes
+
+- None
+
+## New Features
+
+- Added 1D and 2D Lagrange2 and Lagrange3 methods [#2527](https://github.com/OpenMDAO/OpenMDAO/pull/2527)
+- Added ability to let users specify constants in ExecComp expressions [#2547](https://github.com/OpenMDAO/OpenMDAO/pull/2547)
+- Added various reporting system updates [#2548](https://github.com/OpenMDAO/OpenMDAO/pull/2548)
+- Various deprecation changes [#2551](https://github.com/OpenMDAO/OpenMDAO/pull/2551)
+
+## Bug Fixes
+
+- Cleanup of test_scaling_report_mpi.py because importing TestScalingReport causes testflo to run both the non-mpi and the MPI versions of the TestCase when processing this file. [#2525](https://github.com/OpenMDAO/OpenMDAO/pull/2525)
+- Fixed a bug in which reverse-mode derivatives were not computed correctly for models that contained both unit conversion and solver scaling. [#2526](https://github.com/OpenMDAO/OpenMDAO/pull/2526)
+- Handle unavailable attributes in Case.list_outputs (allows discrete variables). [#2529](https://github.com/OpenMDAO/OpenMDAO/pull/2529)
+- Update GA & DE drivers to handle INF_BOUND on constraints [#2533](https://github.com/OpenMDAO/OpenMDAO/pull/2533)
+- Added exception when user attempts to add a solver to ExplicitComponent [#2538](https://github.com/OpenMDAO/OpenMDAO/pull/2538)
+- Made minor fixes to generic model diagram code [#2549](https://github.com/OpenMDAO/OpenMDAO/pull/2549)
+- Made dynamic sizing use info from group input defaults [#2550](https://github.com/OpenMDAO/OpenMDAO/pull/2550)
+
+## Miscellaneous
+
+- Replace distutils.LooseVersion with packaging Version [#2532](https://github.com/OpenMDAO/OpenMDAO/pull/2532)
+- Refactor of _apply_linear/_solve_linear and block linear solvers [#2534](https://github.com/OpenMDAO/OpenMDAO/pull/2534)
+- Added pip-audit to github workflow [#2536](https://github.com/OpenMDAO/OpenMDAO/pull/2536)
+- Updated dependency versions in the GitHub workflow [#2546](https://github.com/OpenMDAO/OpenMDAO/pull/2546)
+
+***********************************
 # Release Notes for OpenMDAO 3.18.0
 
 May 05, 2022
