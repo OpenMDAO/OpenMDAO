@@ -149,6 +149,7 @@ class ScipyOptimizeDriver(Driver):
         self.iter_count = 0
         self._check_jac = False
         self._exc_info = None
+        self._total_jac_format = 'array'
 
         self.cite = CITATIONS
 
@@ -400,7 +401,7 @@ class ScipyOptimizeDriver(Driver):
             # precalculate gradients of linear constraints
             if lincons:
                 self._lincongrad_cache = self._compute_totals(of=lincons, wrt=self._dvlist,
-                                                              return_format='array')
+                                                              return_format=self._total_jac_format)
             else:
                 self._lincongrad_cache = None
 
@@ -685,7 +686,7 @@ class ScipyOptimizeDriver(Driver):
         """
         try:
             grad = self._compute_totals(of=self._obj_and_nlcons, wrt=self._dvlist,
-                                        return_format='array')
+                                        return_format=self._total_jac_format)
             self._grad_cache = grad
 
             # First time through, check for zero row/col.

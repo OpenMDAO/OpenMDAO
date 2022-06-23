@@ -201,6 +201,7 @@ class pyOptSparseDriver(Driver):
         self._in_user_function = False
         self._check_jac = False
         self._exc_info = None
+        self._total_jac_format = 'dict'
 
         self.cite = CITATIONS
 
@@ -327,7 +328,8 @@ class pyOptSparseDriver(Driver):
         # Calculate and save derivatives for any linear constraints.
         lcons = [key for (key, con) in con_meta.items() if con['linear']]
         if len(lcons) > 0:
-            _lin_jacs = self._compute_totals(of=lcons, wrt=indep_list, return_format='dict')
+            _lin_jacs = self._compute_totals(of=lcons, wrt=indep_list,
+                                             return_format=self._total_jac_format)
             # convert all of our linear constraint jacs to COO format. Otherwise pyoptsparse will
             # do it for us and we'll end up with a fully dense COO matrix and very slow evaluation
             # of linear constraints!
@@ -635,7 +637,7 @@ class pyOptSparseDriver(Driver):
                 self._in_user_function = True
                 sens_dict = self._compute_totals(of=self._quantities,
                                                  wrt=self._indep_list,
-                                                 return_format='dict')
+                                                 return_format=self._total_jac_format)
 
                 # First time through, check for zero row/col.
                 if self._check_jac:

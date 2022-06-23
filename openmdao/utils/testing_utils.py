@@ -145,6 +145,7 @@ class set_env_vars(object):
     envs : dict
         Saved mapping of environment var name to value.
     """
+
     def __init__(self, **envs):
         """
         Initialize attributes.
@@ -152,7 +153,14 @@ class set_env_vars(object):
         self.envs = envs
 
     def __call__(self, fnc):
+        """
+        Apply the decorator.
 
+        Parameters
+        ----------
+        fnc : function
+            The function being wrapped.
+        """
         def wrap(*args, **kwargs):
             saved = {}
             news = set()
