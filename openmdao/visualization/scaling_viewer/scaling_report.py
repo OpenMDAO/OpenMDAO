@@ -395,8 +395,8 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
 
         if driver._total_jac is None:
             # this call updates driver._total_jac
-            totals = driver._compute_totals(of=data['oflabels'], wrt=data['wrtlabels'],
-                                            return_format=driver._total_jac_format)
+            driver._compute_totals(of=data['oflabels'], wrt=data['wrtlabels'],
+                                   return_format=driver._total_jac_format)
         totals = driver._total_jac.J
 
         data['linear'] = lindata = {}
