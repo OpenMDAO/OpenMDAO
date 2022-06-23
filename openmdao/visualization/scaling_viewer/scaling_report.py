@@ -397,7 +397,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
             # this call updates driver._total_jac
             driver._compute_totals(of=data['oflabels'], wrt=data['wrtlabels'],
                                    return_format=driver._total_jac_format)
-        totals = driver._total_jac.J
+        totals = driver._total_jac.J  # .J is always an array even if return format != 'array'
 
         data['linear'] = lindata = {}
         lindata['oflabels'] = [n for n, meta in driver._cons.items() if meta['linear']]
