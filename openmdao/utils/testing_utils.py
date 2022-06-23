@@ -166,11 +166,12 @@ class set_env_vars(object):
             news = set()
             try:
                 for k, v in self.envs.items():
-                    os.environ[k] = v  # will raise exception if v is not a string
                     if k in os.environ:
                         saved[k] = os.environ[k]
                     else:
                         news.add(k)
+
+                    os.environ[k] = v  # will raise exception if v is not a string
 
                 return fnc(*args, **kwargs)
             finally:
