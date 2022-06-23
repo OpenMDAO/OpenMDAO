@@ -266,7 +266,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
     # turn off TESTFLO_RUNNING so that reports will be active, in order to detect a bug
     # when scaling report and coloring are both active.
-    @set_env_vars(TESTFLO_RUNNING='0')
+    @set_env_vars(TESTFLO_RUNNING='0', OPENMDAO_REPORTS='scaling')
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_total_coloring_snopt_auto(self):
         # first, run w/o coloring
