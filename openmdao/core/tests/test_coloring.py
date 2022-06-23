@@ -21,7 +21,7 @@ from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.array_utils import array_viz
 from openmdao.utils.coloring import _compute_coloring, compute_total_coloring, Coloring
 from openmdao.utils.mpi import MPI
-from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.utils.testing_utils import use_tempdirs, set_env_vars
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder
 from openmdao.utils.general_utils import run_driver
 
@@ -264,6 +264,9 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         # make sure no default reports run because they'll mess up run counts
         om.clear_reports()
 
+    # turn off TESTFLO_RUNNING so that reports will be active, in order to detect a bug
+    # when scaling report and coloring are both active.
+    @set_env_vars(TESTFLO_RUNNING='0')
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_total_coloring_snopt_auto(self):
         # first, run w/o coloring
