@@ -25,7 +25,7 @@ jobs:
             NUMPY: 1.22
             SCIPY: 1.7
             PETSc: 3.16
-            PYOPTSPARSE: 'v2.1.5'
+            PYOPTSPARSE: 'v2.8.3'
             SNOPT: 7.7
             OPTIONAL: '[all]'
             JAX: True
@@ -54,7 +54,7 @@ jobs:
           # oldest supported versions
           - NAME: Oldest
             PY: 3.8
-            NUMPY: 1.21
+            NUMPY: 1.22
             SCIPY: 1.7
             MPI4PY: '3.0'
             PETSc: 3.12
@@ -337,7 +337,7 @@ jobs:
           # baseline versions
           - NAME: Baseline
             PY: 3
-            NUMPY: 1.21
+            NUMPY: 1.22
             SCIPY: 1.6
 
     name: Windows ${{ matrix.NAME }}
