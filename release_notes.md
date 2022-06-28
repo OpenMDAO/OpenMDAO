@@ -33,6 +33,7 @@ OpenMDAO 3.19.0 removes some long-standing deprecations, continues the addition 
 - Added exception when user attempts to add a solver to ExplicitComponent [#2538](https://github.com/OpenMDAO/OpenMDAO/pull/2538)
 - Made minor fixes to generic model diagram code [#2549](https://github.com/OpenMDAO/OpenMDAO/pull/2549)
 - Made dynamic sizing use info from group input defaults [#2550](https://github.com/OpenMDAO/OpenMDAO/pull/2550)
+- Fixed a bug when pyoptsparse was used with coloring and scaling report [#2553](https://github.com/OpenMDAO/OpenMDAO/pull/2553)
 
 ## Miscellaneous
 
@@ -40,6 +41,8 @@ OpenMDAO 3.19.0 removes some long-standing deprecations, continues the addition 
 - Refactor of _apply_linear/_solve_linear and block linear solvers [#2534](https://github.com/OpenMDAO/OpenMDAO/pull/2534)
 - Added pip-audit to github workflow [#2536](https://github.com/OpenMDAO/OpenMDAO/pull/2536)
 - Updated dependency versions in the GitHub workflow [#2546](https://github.com/OpenMDAO/OpenMDAO/pull/2546)
+- Updated Numpy and pyOptSparse versions in GitHub workflow [#2554](https://github.com/OpenMDAO/OpenMDAO/pull/2554)
+- Remove use of deprecated 'asscalar' in unit test [#2556](https://github.com/OpenMDAO/OpenMDAO/pull/2556)
 
 ***********************************
 # Release Notes for OpenMDAO 3.18.0
@@ -53,8 +56,8 @@ The implementation of [POEM 065](https://github.com/OpenMDAO/POEMs/blob/master/P
 fewer processors to achieve better balancing.
 
 We also recently discovered that `math.prod` in the standard Python library as of 3.8 is over an order of magnitude
-faster than `numpy.prod` for reasonably small arrays. Since this function is frequently used to determine sizes given 
-the shape of a variable in OpenMDAO-related tools, we've updated the `shape_to_len` function to take advantage of it 
+faster than `numpy.prod` for reasonably small arrays. Since this function is frequently used to determine sizes given
+the shape of a variable in OpenMDAO-related tools, we've updated the `shape_to_len` function to take advantage of it
 and encourage users to use this implementation over `numpy.prod`.
 
 The generalization of the N2 diagram also continues in this release, with a goal of allowing its use in other contexts.
@@ -457,7 +460,7 @@ It fixes the known issue from 3.10.0 in which the derivatives of serial outputs 
 ## Backwards Incompatible API Changes:
 
 - None
- 
+
 ## Backwards Incompatible NON-API Changes:
 
 - None
@@ -1390,57 +1393,57 @@ None
 
 February 27, 2020
 
-Note: This is the last release of OpenMDAO 2.X. Updating to this release will be a 
+Note: This is the last release of OpenMDAO 2.X. Updating to this release will be a
 critical step in preparing for the OpenMDAO 3.X releases
 
 
-## Backwards Incompatible API Changes: 
+## Backwards Incompatible API Changes:
 
 - <POEM 004> AkimaSplineComp and BsplineComp have been deprecated, replaced with SplineComp
 
 - <POEM 008>
-  - The user is now required to set a value for the solver option `solve_subsystems` 
-    on Newton and Broyden solvers. Previously the default was `False`, but you will now get 
-    a deprecation warning if this value is not explicitly set. 
+  - The user is now required to set a value for the solver option `solve_subsystems`
+    on Newton and Broyden solvers. Previously the default was `False`, but you will now get
+    a deprecation warning if this value is not explicitly set.
 
-- Specification of `includes` and `excludes` for solver case recording options 
-  has been changed to use promoted names relative to the location of that solver in the model. 
+- Specification of `includes` and `excludes` for solver case recording options
+  has been changed to use promoted names relative to the location of that solver in the model.
 
-## Backwards Incompatible NON-API Changes: 
+## Backwards Incompatible NON-API Changes:
 
-Note: These changes are not technically API related, but 
-still may cause your results to differ when upgrading. 
+Note: These changes are not technically API related, but
+still may cause your results to differ when upgrading.
 
-- <POEM 012> The old implementation of KrigingSurrogate was hard coded to the 
-  `gesdd` method for inverses. The method is now an option, but we've changed 
-  the default to `gesvd` because its more numerically stable. 
-  This might introduce slight numerical changes to the Kriging fits. 
+- <POEM 012> The old implementation of KrigingSurrogate was hard coded to the
+  `gesdd` method for inverses. The method is now an option, but we've changed
+  the default to `gesvd` because its more numerically stable.
+  This might introduce slight numerical changes to the Kriging fits.
 
-- Refactor of how reverse mode derivative solves work for parallel components 
-  that may require the removal of reduce calls in some components that were 
-  needed previously 
+- Refactor of how reverse mode derivative solves work for parallel components
+  that may require the removal of reduce calls in some components that were
+  needed previously
 
 - Change to the way SimpleGA does crossover to be more correct (was basically just mutuation before)
 
 
 ## New Features:
 
-- <POEM 002> users can now manually terminate an optimization using operating system signals 
+- <POEM 002> users can now manually terminate an optimization using operating system signals
 
-- <POEM 003> 
-  - users can now add I/O, connections, and promotions in configure 
+- <POEM 003>
+  - users can now add I/O, connections, and promotions in configure
   - new API method added to groups to allow promotions after a subsystem has already been added
 
-- <POEM 004> SplineComp was added to the standard component library, 
+- <POEM 004> SplineComp was added to the standard component library,
   and you can also import the interpolation algorithms to use in your own components
 
-- <POEM 005> OpenMDAO plugin system has been defined, so users can now publish their own plugins on github. 
+- <POEM 005> OpenMDAO plugin system has been defined, so users can now publish their own plugins on github.
   several utilities added to openmdao command line tools related to plugins
 
-- <POEM 007> ExternalCodeComp and ExternalCodeImplicitComp can now accept strings 
-  (previously a lists of strings was required) for `command`, `command_apply`, and `command_solve`. 
+- <POEM 007> ExternalCodeComp and ExternalCodeImplicitComp can now accept strings
+  (previously a lists of strings was required) for `command`, `command_apply`, and `command_solve`.
 
-- <POEM 010> User can now mark some options as `recordable=False` as an alternative to 
+- <POEM 010> User can now mark some options as `recordable=False` as an alternative to
   using `system.recording_options['options_exclude']`
 
 - <POEM 012> KrigingSurrogate now has a new option `lapack_driver` to determine how an inverse is computed
@@ -1448,22 +1451,22 @@ still may cause your results to differ when upgrading.
 
 - Slight improvements to the metamodel viewer output
 
-- Improvement to the bidirectional Jacobian coloring so it will fall back to 
+- Improvement to the bidirectional Jacobian coloring so it will fall back to
   pure forward or reverse if thats faster
 
 - Users can now set the shape for outputs of `BalanceComp` and `EqConstraintsComp`
 
-- Improvements to `debug_print` for driver related to reporting which derivatives 
+- Improvements to `debug_print` for driver related to reporting which derivatives
   are being computed when coloring is active
 
 - The N2 viewer now works for models that are run in parallel (i.e. if you're using mpi to call python)
 
-- `list_inputs` and `list_outputs` both have arguments for including local_size and 
+- `list_inputs` and `list_outputs` both have arguments for including local_size and
   global_size of distributed outputs in their reports
 
 
-## Bug Fixes: 
-- Fixed a hang in SimpleGA driver related to mpi calls 
+## Bug Fixes:
+- Fixed a hang in SimpleGA driver related to mpi calls
 - Fixed a bug in SimpleGA related to setting a vector of constraints
 - Various bug-fixes to allow running with Python 3.8
 - Fixed a bug in ScipyOptimizer/Cobyla related to objective and dv scaling
@@ -1497,48 +1500,48 @@ October 1, 2019
 ## New Features:
 
 - better detection of when you're running under MPI, and new environment variable to forcibly disable MPI
-- users can now issue connections from within the `configure` method on group 
+- users can now issue connections from within the `configure` method on group
   (this is useful if you wanted to be able to interrogate your children before issuing connections)
 - significant overhead reduction due to switching from 'np.add.at' to 'np.bincount' for some matrix-vector
   products and data transfers.
 
-- `openmdao` command line tool: 
+- `openmdao` command line tool:
     - new `openmdao scaffold` command line tool to quickly bootstrap component and group files
     - `openmdao summary` command gives more data including number of constraints
-    - `openmdao tree` command now uses different colors for implicit and explicit components and 
+    - `openmdao tree` command now uses different colors for implicit and explicit components and
       includes sizes of inputs and outputs
     - the `openmdao --help` tool gives better formatted help now
 
-- CaseRecording: 
+- CaseRecording:
     - Case objects now have a `name` attribute to make identifying them simpler
     - Case objects now support __getitem__ (i.e. <case>[<some_var>]) and the
       get_val/set_val methods to directly mimic the problem interface
-    - list_inputs and list_outputs methods on Case objects now support optional includes and excludes patterns     
+    - list_inputs and list_outputs methods on Case objects now support optional includes and excludes patterns
 
-- Documentation:    
+- Documentation:
     - added documentation for the list_inputs and list_outputs method on the Case object
     - added example use of implicit component for add_discrete_input docs
     - some minor cleanup to the cantilever beam optimization example to remove some unused code
 
-- Derivatives: 
+- Derivatives:
     - slightly different method of computing the total derivative sparsity pattern has been implemented
       that should be a bit more robust (but YMMV)
     - the partials object passed into `linearize` and `compute_partials` methods on implicit
       and explicit component respectively can now be iterated on like a true dictionary
 
-- Solvers: 
-    - a true Goldstein condition was added to the ArmijoGoldstein line search 
+- Solvers:
+    - a true Goldstein condition was added to the ArmijoGoldstein line search
       (you can now choose if you want Armijo or Goldstein) *** Peter Onodi ***
-    - DirectSolver now works under MPI 
+    - DirectSolver now works under MPI
       (but be warned that it might be very slow to use it this way, because it does a lot of MPI communication!!!)
     - BroydenSolver now works in parallel
-    - improved error message when you have a nonconverged solver 
+    - improved error message when you have a nonconverged solver
     - improved error message when solver failure is due to Nan or Inf
 
-- Components: 
+- Components:
     - list_inputs and list_outputs methods on System objects now support optional includes and excludes patterns
     - variables can now have tags added as additional meta-data when they are declared,
-      which can then be used to filter the output from list_inputs and list_ouputs 
+      which can then be used to filter the output from list_inputs and list_ouputs
     - significant speed improvements and increased surrogate options for StructuredMetaModel
     - improved error message when required options are not provided to a component during instantiation
     - user gets a clear error msg if they try to use `np.` or `numpy.` namespaces inside ExecComp strings
@@ -1549,17 +1552,17 @@ October 1, 2019
 
 - Problem
     - user can set specific slices of variables using the set_val method on problem
-    - added problem.compute_jacvec_prod function for matrix-free total derivative products. 
+    - added problem.compute_jacvec_prod function for matrix-free total derivative products.
       Useful for wrapping for loops around an OpenMDAO problem and propagating derivatives through it.
 
 - Visualization
     - minor reformatting of the N2 menu to make better use of vertical screen space
     - new visualziation tool for examining the surrogates in StructuredMetaModelComp and UnstructuredMetaModelComp
-    - improved `openmdao view_connections` functionality for better filtering and toggling between 
+    - improved `openmdao view_connections` functionality for better filtering and toggling between
       promoted and absolute names
     - component names can now optionally be shown on the diagonal for XDSM diagrams *** Peter Onodi ***
 
-## Backwards Incompatible API Changes: 
+## Backwards Incompatible API Changes:
 - `openmdao view_model` has been deprecated, use `openmdao n2` instead
 - `vectorize` argument to ExecComp has been deprecated, use `has_diag_partials` instead
 - changed NewtonSolver option from `err_on_maxiter` to `err_on_non_converge` (old option deprecated)
@@ -1569,7 +1572,7 @@ October 1, 2019
 ## Bug Fixes:
 - `prom_name=True` now works with list_outputs on CaseReader (it was broken before)
 - fixed a corner case where N2 diagram wasn't listing certain variables as connected, even though they were
-- fixed a bug in check_totals when the FD-norm is zero 
+- fixed a bug in check_totals when the FD-norm is zero
 - fixed corner case bug where assembled jacobians for implicit components were not working correctly
 - fixed a problem with Aitken acceleration in parallel for NonlinearBlockGaussSeidel solver
 - fixed DOE driver bug where vars were recorded in driver_scaled form.
@@ -1585,19 +1588,19 @@ June 27, 2019
 
 ## Bug Fixes:
 - Fixed a bug in PETScVector norm calculation, which was totally wrong for serial models combined
-  with distributed ones 
+  with distributed ones
 - Fixed a bug with the solver debug_print option when output file already existed
-- Fixed the incorrect Shockley diode equation in the Circuit example 
-- Fixed a few small bugs in group level FD  
+- Fixed the incorrect Shockley diode equation in the Circuit example
+- Fixed a few small bugs in group level FD
 
 ## New Features:
 - Stopped reporting a warning for a corner case regarding promoted inputs that are connected inside
-  their owning group, because everyone hated it! 
-- Optional normalization of input variables to multifi_cokriging 
-- New matplotlib based sparsity matrix viewer for coloring of partial and total derivatives 
+  their owning group, because everyone hated it!
+- Optional normalization of input variables to multifi_cokriging
+- New matplotlib based sparsity matrix viewer for coloring of partial and total derivatives
 - Preferred import style now changed to `import openmdao.api as om`
-- Discrete variables now show up when calling the list_input/list_output functions 
-- Discrete variables now show up in view_model 
+- Discrete variables now show up when calling the list_input/list_output functions
+- Discrete variables now show up in view_model
 - ScipyOptimizeDriver now raises an exception when the objective is missing
 - A legend can be optionally added to the XDSM diagram. Not shown by default.
   *** contributed by Peter Onodi ***
@@ -1621,19 +1624,19 @@ May 28, 2019
 - Significant improvement to documentation search functionality
   (by default, only searches the feature docs and user guide now)
 
-- Derivatives: 
+- Derivatives:
     - Improved support for full-model complex-step when models have guess_nonlinear methods defined
-    - **Experimental** FD and CS based coloring methods for partial derivative approximation 
+    - **Experimental** FD and CS based coloring methods for partial derivative approximation
       Valuable for efficiently using FD/CS on vectorized (or very sparse) components
 
-- Solvers: 
+- Solvers:
     - `Solver failed to converge` message now includes solver path name to make it more clear what failed
     - Improved pathname information in the singular matrix error from DirectSolver
     - Directsolver has an improved error message when it detects identical rows or columns in Jacobian
     - NonlinearGaussSeidel solver now accounts for residual scaling in its convergence criterion
     - New naming scheme for solver debug print files (the old scheme was making names so long it caused OSErrors)
 
-- Components: 
+- Components:
     - ExecComp now allows unit=<something> and shape=<something> arguments that apply to all variables in the expression
     - New AkimaSpline component with derivatives with respect to training data inputs
 
@@ -1646,22 +1649,22 @@ May 28, 2019
   *** contributed by Peter Onodi ***
   *** uses XDSMjs v0.6.0 by Rémi Lafage (https://github.com/OneraHub/XDSMjs) ***
 
-## Backwards Incompatible API Changes: 
+## Backwards Incompatible API Changes:
 - New APIs for total derivative coloring that are more consistent with partial derivative coloring
   (previous APIs are deprecated and coloring files generated with the previous API will not work)
-- The API for providing a guess function to the BalanceComp has changed. 
+- The API for providing a guess function to the BalanceComp has changed.
   guess_function is now passed into BalanceComp as an init argument
-- Changed the N2 diagram json data formatting to make the file size smaller 
+- Changed the N2 diagram json data formatting to make the file size smaller
   You can't use older case record databases to generate an N2 diagram with latest version
-- All component methods related to execution now include `discrete_inputs` and `discrete_outputs` arguments 
+- All component methods related to execution now include `discrete_inputs` and `discrete_outputs` arguments
   when a component is defined with discrete i/o. (if no discrete i/o is defined, the API remains unchanged)
-  (includes `solve_nonlinear`, `apply_nonlinear`, `linearize`, `apply_linear`, `compute`, `compute_jac_vec_product`, `guess_nonlinear`) 
-- The internal Driver API has changed, a driver should execute the model with `run_solve_nonlinear` to ensure that proper scaling operations occur 
+  (includes `solve_nonlinear`, `apply_nonlinear`, `linearize`, `apply_linear`, `compute`, `compute_jac_vec_product`, `guess_nonlinear`)
+- The internal Driver API has changed, a driver should execute the model with `run_solve_nonlinear` to ensure that proper scaling operations occur
 
 ## Bug Fixes:
 - CaseRecorder was reporting incorrect values of scaled variables (analysis was correct, only case record output was wrong)
 - the problem level `record_iteration` method was not properly respecting the `includes` specification
-- ExecComp problem when vectorize=True, but only shape was defined. 
+- ExecComp problem when vectorize=True, but only shape was defined.
 - Incorrect memory allocation in parallel components when local size of output went to 0
 - Multidimensional `src_indices` were not working correctly with assembled Jacobians
 - Fixed problem with genetic algorithm not working with vector design variables *** contributed by jennirinker ***
