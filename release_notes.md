@@ -11,7 +11,7 @@ OpenMDAO 3.19.0 removes some long-standing deprecations, continues the addition 
 
 ## Backwards Incompatible API Changes
 
-- Various two-word OptionsDictionary entries, which cannot be provided as arguments because they are not valid python names, have been removed. A number of various other existing deprecations have been removed. See [#2551](https://github.com/OpenMDAO/OpenMDAO/pull/2551)
+- Various two-word OptionsDictionary entries, which cannot be provided as arguments because they are not valid python names, have been removed. A number of other existing deprecations have been removed. See [#2551](https://github.com/OpenMDAO/OpenMDAO/pull/2551)
 
 ## Backwards Incompatible Non-API Changes
 
