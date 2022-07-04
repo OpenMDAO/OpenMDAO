@@ -25,7 +25,7 @@ jobs:
             NUMPY: 1.22
             SCIPY: 1.7
             PETSc: 3.16
-            PYOPTSPARSE: 'v2.1.5'
+            PYOPTSPARSE: 'v2.8.3'
             SNOPT: 7.7
             OPTIONAL: '[all]'
             JAX: True
@@ -54,7 +54,7 @@ jobs:
           # oldest supported versions
           - NAME: Oldest
             PY: 3.8
-            NUMPY: 1.21
+            NUMPY: 1.22
             SCIPY: 1.7
             MPI4PY: '3.0'
             PETSc: 3.12
@@ -216,6 +216,18 @@ jobs:
           conda info
           conda list
 
+          echo "============================================================="
+          echo "Check installed versions of Python, Numpy and Scipy"
+          echo "============================================================="
+          python -c "import sys; assert str(sys.version).startswith(str(${{ matrix.PY }})), \
+                    f'Python version {sys.version} is not the requested version (${{ matrix.PY }})'"
+
+          python -c "import numpy; assert str(numpy.__version__).startswith(str(${{ matrix.NUMPY }})), \
+                    f'Numpy version {numpy.__version__} is not the requested version (${{ matrix.NUMPY }})'"
+
+          python -c "import scipy; assert str(scipy.__version__).startswith(str(${{ matrix.SCIPY }})), \
+                    f'Scipy version {scipy.__version__} is not the requested version (${{ matrix.SCIPY }})'"
+
       - name: Audit dependencies
         shell: bash -l {0}
         run: |
@@ -337,7 +349,7 @@ jobs:
           # baseline versions
           - NAME: Baseline
             PY: 3
-            NUMPY: 1.21
+            NUMPY: 1.22
             SCIPY: 1.6
 
     name: Windows ${{ matrix.NAME }}

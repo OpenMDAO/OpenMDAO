@@ -2,6 +2,7 @@
 import json
 import functools
 import builtins
+import os
 
 import numpy as np
 
@@ -128,6 +129,60 @@ def require_pyoptsparse(optimizer=None):
 
         return obj
     return decorator
+
+
+class set_env_vars(object):
+    """
+    Decorate a function to temporarily set some environment variables.
+
+    Parameters
+    ----------
+    **envs : dict
+        Keyword args corresponding to environment variables to set.
+
+    Attributes
+    ----------
+    envs : dict
+        Saved mapping of environment var name to value.
+    """
+
+    def __init__(self, **envs):
+        """
+        Initialize attributes.
+        """
+        self.envs = envs
+
+    def __call__(self, fnc):
+        """
+        Apply the decorator.
+
+        Parameters
+        ----------
+        fnc : function
+            The function being wrapped.
+        """
+        def wrap(*args, **kwargs):
+            saved = {}
+            news = set()
+            try:
+                for k, v in self.envs.items():
+                    if k in os.environ:
+                        saved[k] = os.environ[k]
+                    else:
+                        news.add(k)
+
+                    os.environ[k] = v  # will raise exception if v is not a string
+
+                return fnc(*args, **kwargs)
+            finally:
+                # put environment back as it was
+                for name in news:
+                    if name in os.environ:
+                        del os.environ[name]
+                for k, v in saved.items():
+                    os.environ[k] = v
+
+        return wrap
 
 
 class _ModelViewerDataTreeEncoder(json.JSONEncoder):

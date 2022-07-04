@@ -3532,7 +3532,7 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         case = cr.get_case(system_cases[0])
         self.assertEqual(list(case.inputs.keys()), ['x', 'y1', 'y2', 'z'])
 
-        assert_near_equal([np.asscalar(case['y1']) for case in cr.get_cases('root.obj_cmp')],
+        assert_near_equal([case['y1'].item() for case in cr.get_cases('root.obj_cmp')],
                           [25.6, 25.6, 8.33, 4.17, 3.30, 3.18, 3.16,
                            3.16, 3.16, 3.16, 3.16, 3.16, 3.16, 3.16],
                           tolerance=1e-1)

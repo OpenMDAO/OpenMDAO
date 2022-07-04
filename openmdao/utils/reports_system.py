@@ -47,7 +47,7 @@ def reports_active():
     bool
         Return True if reports are active.
     """
-    return 'TESTFLO_RUNNING' not in os.environ
+    return os.environ.get('TESTFLO_RUNNING', '').lower() not in ('1', 'true')
 
 
 def register_report(name, func, desc, class_name, method, pre_or_post, filename=None, inst_id=None):
