@@ -10,11 +10,9 @@ from scipy import __version__ as scipy_version
 from scipy.optimize import minimize
 
 from openmdao.core.constants import INF_BOUND
-import openmdao.utils.coloring as coloring_mod
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.class_util import WeakMethodWrapper
 from openmdao.utils.mpi import MPI
-from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 
 # Optimizers in scipy.minimize
 _optimizers = {'Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
@@ -224,6 +222,44 @@ class ScipyOptimizeDriver(Driver):
                     self._cons[name] = meta.copy()
                     self._cons[name]['equals'] = None
                     self._cons[name]['linear'] = True
+
+    def get_driver_objective_calls(self):
+        """
+        Return number of objective evaluations made during a driver run.
+
+        Returns
+        -------
+        int
+            Number of objective evaluations made during a driver run.
+        """
+        nfev = self.result.nfev if self.result else 0
+        return nfev
+
+    def get_driver_derivative_calls(self):
+        """
+        Return number of derivative evaluations made during a driver run.
+
+        Returns
+        -------
+        int
+            Number of derivative evaluations made during a driver run.
+        """
+        if self.result and hasattr(self.result, 'njev'):
+            njev = self.result.njev
+        else:
+            njev = None
+        return njev
+
+    def get_exit_status(self):
+        """
+        Return exit status of driver run.
+
+        Returns
+        -------
+        str
+            String indicating result of driver run.
+        """
+        return 'FAIL' if self.fail else 'SUCCESS'
 
     def run(self):
         """

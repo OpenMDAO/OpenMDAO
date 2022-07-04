@@ -239,6 +239,39 @@ class DifferentialEvolutionDriver(Driver):
         """
         return "DifferentialEvolution"
 
+    def get_driver_objective_calls(self):
+        """
+        Return number of objective evaluations made during a driver run.
+
+        Returns
+        -------
+        int
+            Number of objective evaluations made during a driver run.
+        """
+        return self._nfit
+
+    def get_driver_derivative_calls(self):
+        """
+        Return number of derivative evaluations made during a driver run.
+
+        Returns
+        -------
+        int
+            Number of derivative evaluations made during a driver run.
+        """
+        return 0
+
+    def get_exit_status(self):
+        """
+        Return exit status of driver run.
+
+        Returns
+        -------
+        str
+            String indicating result of driver run.
+        """
+        return 'SUCCESS'
+
     def run(self):
         """
         Execute the genetic algorithm.
@@ -283,9 +316,9 @@ class DifferentialEvolutionDriver(Driver):
         if pop_size == 0:
             pop_size = 20 * count
 
-        desvar_new, obj, nfit = ga.execute_ga(x0, lower_bound, upper_bound,
-                                              pop_size, max_gen,
-                                              self._randomstate, F, Pc)
+        desvar_new, obj, self._nfit = ga.execute_ga(x0, lower_bound, upper_bound,
+                                                    pop_size, max_gen,
+                                                    self._randomstate, F, Pc)
 
         # Pull optimal parameters back into framework and re-run, so that
         # framework is left in the right final state

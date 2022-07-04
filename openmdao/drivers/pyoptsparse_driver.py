@@ -220,7 +220,7 @@ class pyOptSparseDriver(Driver):
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},
                              desc='Finite difference implementation to use')
         self.options.declare('user_terminate_signal', default=DEFAULT_SIGNAL, allow_none=True,
-                             desc='OS signal that triggers a clean user-termination. Only SNOPT'
+                             desc='OS signal that triggers a clean user-termination. Only SNOPT '
                              'supports this option.')
         self.options.declare('singular_jac_behavior', default='warn',
                              values=['error', 'warn', 'ignore'],
@@ -255,6 +255,39 @@ class pyOptSparseDriver(Driver):
                                ' multiple objectives.'.format(self.options['optimizer']))
 
         self._setup_tot_jac_sparsity()
+
+    def get_driver_objective_calls(self):
+        """
+        Return number of objective evaluations made during a driver run.
+
+        Returns
+        -------
+        int
+            Number of objective evaluations made during a driver run.
+        """
+        return self.pyopt_solution.userObjCalls if self.pyopt_solution else None
+
+    def get_driver_derivative_calls(self):
+        """
+        Return number of derivative evaluations made during a driver run.
+
+        Returns
+        -------
+        int
+            Number of derivative evaluations made during a driver run.
+        """
+        return self.pyopt_solution.userSensCalls if self.pyopt_solution else None
+
+    def get_exit_status(self):
+        """
+        Return exit status of driver run.
+
+        Returns
+        -------
+        str
+            String indicating result of driver run.
+        """
+        return 'FAIL' if self.fail else 'SUCCESS'
 
     def run(self):
         """

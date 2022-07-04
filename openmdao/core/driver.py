@@ -2,6 +2,7 @@
 from itertools import chain
 import pprint
 import sys
+import time
 import os
 import weakref
 
@@ -11,6 +12,7 @@ from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import INT_DTYPE, _SetupStatus
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.utils.hooks import _setup_hooks
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.general_utils import _src_name_iter
 from openmdao.utils.mpi import MPI
@@ -84,6 +86,8 @@ class Driver(object):
         Cached total jacobian handling object.
     _total_jac_linear : _TotalJacInfo or None
         Cached linear total jacobian handling object.
+    opt_result : dict
+        Dictionary containing information for use in the optimization report.
     """
 
     def __init__(self, **kwargs):
@@ -153,6 +157,7 @@ class Driver(object):
         self.supports.declare('simultaneous_derivatives', types=bool, default=False)
         self.supports.declare('total_jac_sparsity', types=bool, default=False)
         self.supports.declare('distributed_design_vars', types=bool, default=True)
+        self.supports.declare('optimization', types=bool, default=True)
 
         self.iter_count = 0
         self.cite = ""
@@ -168,6 +173,17 @@ class Driver(object):
 
         self._declare_options()
         self.options.update(kwargs)
+
+        self.opt_result = {
+            'runtime': 0.0,
+            'iter_count': 1,
+            'obj_calls': 1,
+            'deriv_calls': 1,
+            'exit_status': 'NOTRUN'
+        }
+
+        # Want to allow the setting of hooks on Drivers
+        _setup_hooks(self)
 
     def _get_inst_id(self):
         if self._problem is None:
@@ -596,6 +612,28 @@ class Driver(object):
 
         return val
 
+    def get_driver_objective_calls(self):
+        """
+        Return number of objective evaluations made during a driver run.
+
+        Returns
+        -------
+        int
+            Number of objective evaluations made during a driver run.
+        """
+        return 1
+
+    def get_driver_derivative_calls(self):
+        """
+        Return number of derivative evaluations made during a driver run.
+
+        Returns
+        -------
+        int
+            Number of derivative evaluations made during a driver run.
+        """
+        return 1
+
     def get_design_var_values(self, get_remote=True, driver_scaling=True):
         """
         Return the design variable values.
@@ -806,6 +844,31 @@ class Driver(object):
         desvar_size = sum(data['global_size'] for data in designvars.values())
 
         return response_size, desvar_size
+
+    def get_exit_status(self):
+        """
+        Return exit status of driver run.
+
+        Returns
+        -------
+        str
+            String indicating result of driver run.
+        """
+        return 'SUCCESS'
+
+    def _pre_run(self):
+        self._start_time = time.time()
+
+    def _post_run(self):
+        self.opt_result['runtime'] = time.time() - self._start_time
+        self.opt_result['iter_count'] = self.iter_count
+        objective_calls = self.get_driver_objective_calls()
+        if objective_calls:
+            self.opt_result['obj_calls'] = objective_calls if objective_calls else 'Unknown'
+        derivative_calls = self.get_driver_derivative_calls()
+        if derivative_calls:
+            self.opt_result['deriv_calls'] = derivative_calls if derivative_calls else 'Unknown'
+        self.opt_result['exit_status'] = self.get_exit_status()
 
     def run(self):
         """
