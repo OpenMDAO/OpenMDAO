@@ -121,6 +121,7 @@ setup(
         'openmdao.visualization.scaling_viewer',
         'openmdao.visualization.n2_viewer',
         'openmdao.visualization.meta_model_viewer',
+        'openmdao.visualization.opt_report',
     ],
     package_data={
         'openmdao.devtools': ['*.wpr', ],
