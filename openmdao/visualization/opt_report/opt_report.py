@@ -137,7 +137,6 @@ def opt_report(driver, outfile=None):
     print(f"in opt_report, outfilepath = {outfilepath}")
     print(f"in opt_report, os.getcwd() = {os.getcwd()}")
 
-
     if not tabulate:
         s = '''
 <!DOCTYPE html>
