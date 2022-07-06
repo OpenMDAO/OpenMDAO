@@ -129,6 +129,10 @@ class TestReportsSystem(unittest.TestCase):
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
         path = pathlib.Path(problem_reports_dir).joinpath(self.optimizer_filename)
+
+        # debugging why CI fails on this!
+        print(f"in test: os.getcwd() = {os.getcwd()}")
+        print(f"in test: str(path) = {str(path)}")
         self.assertTrue(path.is_file(), f'The optimizer report file, {str(path)}, was not found')
 
     @hooks_active
@@ -240,11 +244,11 @@ class TestReportsSystem(unittest.TestCase):
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertTrue(path.is_file(), f'The scaling report file, {str(path)} was not found')
         path = pathlib.Path(problem_reports_dir).joinpath(self.optimizer_filename)
-        self.assertTrue(path.is_file(), f'The optimizer report file, {str(path)} was not found')
+        self.assertTrue(path.is_file(), f'The optimizer report file, {str(path)}, was not found')
 
     @hooks_active
     def test_report_generation_selected_reports_override_env_var2(self):
-        # test use of problem reports to override OPENMDAO_REPORTS
+        # test use of problem reports to override OPENMDAO_REPORTS. This time with two reports
         os.environ['OPENMDAO_REPORTS'] = 'n2,scaling'
         clear_reports()
 

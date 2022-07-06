@@ -125,7 +125,7 @@ def opt_report(driver, outfile=None):
                       "which does not support optimization", category=DriverWarning)
         return
 
-    # if MPI is active only display one copy of the viewer
+    # only create report on rank 0
     if MPI and MPI.COMM_WORLD.rank != 0:
         return
 
@@ -133,6 +133,10 @@ def opt_report(driver, outfile=None):
         outfile = _default_optimizer_report_filename
 
     outfilepath = str(pathlib.Path(prob.get_reports_dir()).joinpath(outfile))
+
+    print(f"in opt_report, outfilepath = {outfilepath}")
+    print(f"in opt_report, os.getcwd() = {os.getcwd()}")
+
 
     if not tabulate:
         s = '''
