@@ -150,6 +150,9 @@ setup(
         'openmdao.visualization.scaling_viewer': [
             '*.html',
         ],
+        'openmdao.visualization.opt_report': [
+            '*.html',
+        ],
         'openmdao.visualization.meta_model_viewer': [
             'tests/known_data_point_files/*.csv',
         ],
