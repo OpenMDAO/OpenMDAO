@@ -56,8 +56,9 @@ jobs:
             PY: 3.8
             NUMPY: 1.22
             SCIPY: 1.7
+            OPENMPI: '4.0'
             MPI4PY: '3.0'
-            PETSc: 3.12
+            PETSc: 3.13
             PYOPTSPARSE: 'v1.2'
             SNOPT: 7.2
             OPTIONAL: '[all]'
@@ -92,16 +93,18 @@ jobs:
         run: |
           git fetch --prune --unshallow --tags
 
-      - name: Setup miniconda
+      - name: Setup mamba
         uses: conda-incubator/setup-miniconda@v2
         with:
-          auto-update-conda: true
           python-version: ${{ matrix.PY }}
+          mamba-version: "*"
+          channels: conda-forge,defaults
+          channel-priority: true
 
       - name: Install OpenMDAO
         shell: bash -l {0}
         run: |
-          conda install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
+          mamba install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
 
           python -m pip install --upgrade pip
 
@@ -119,15 +122,6 @@ jobs:
           echo "============================================================="
           python -m pip install jax jaxlib
 
-      - name: Install dependencies for Oldest
-        if: matrix.name == 'Oldest'
-        shell: bash -l {0}
-        run: |
-          echo "============================================================="
-          echo "Install dependencies for Oldest"
-          echo "============================================================="
-          conda install -c conda-forge openmpi=4.0
-
       - name: Install PETSc
         if: matrix.PETSc
         shell: bash -l {0}
@@ -135,10 +129,12 @@ jobs:
           echo "============================================================="
           echo "Install PETSc"
           echo "============================================================="
-          if [[ "${{ matrix.MPI4PY }}" ]]; then
-            conda install -c conda-forge mpi4py=${{ matrix.MPI4PY }} petsc=${{ matrix.PETSc }} petsc4py -q -y
+          if [[ "${{ matrix.OPENMPI }}" && "${{ matrix.MPI4PY }}" ]]; then
+            mamba install openmpi=${{ matrix.OPENMPI }} mpi4py=${{ matrix.MPI4PY }} petsc4py=${{ matrix.PETSc }} -q -y
+          elif [[ "${{ matrix.MPI4PY }}" ]]; then
+            mamba install mpi4py=${{ matrix.MPI4PY }} petsc4py=${{ matrix.PETSc }} -q -y
           else
-            conda install -c conda-forge mpi4py petsc=${{ matrix.PETSc }} petsc4py -q -y
+            mamba install mpi4py petsc4py=${{ matrix.PETSc }} -q -y
           fi
           echo "-----------------------"
           echo "Quick test of mpi4py:"
@@ -158,7 +154,7 @@ jobs:
           echo "============================================================="
 
           if [[ "${{ matrix.PYOPTSPARSE }}" == "conda-forge" ]]; then
-            conda install -c conda-forge pyoptsparse
+            mamba install pyoptsparse
             if [[ "${{ matrix.SNOPT }}" ]]; then
               echo "SNOPT ${{ matrix.SNOPT }} was requested but is not available on conda-forge"
             fi
@@ -210,11 +206,11 @@ jobs:
           echo "============================================================="
           python -m pip install psutil objgraph git+https://github.com/mdolab/pyxdsm
 
-      - name: Display conda info
+      - name: Display environmant info
         shell: bash -l {0}
         run: |
-          conda info
-          conda list
+          mamba info
+          mamba list
 
           echo "============================================================="
           echo "Check installed versions of Python, Numpy and Scipy"
@@ -348,7 +344,7 @@ jobs:
         include:
           # baseline versions
           - NAME: Baseline
-            PY: 3
+            PY: 3.9
             NUMPY: 1.22
             SCIPY: 1.6
 
@@ -372,16 +368,18 @@ jobs:
         run: |
           git fetch --prune --unshallow --tags
 
-      - name: Setup miniconda
+      - name: Setup mamba
         uses: conda-incubator/setup-miniconda@v2
         with:
-          auto-update-conda: true
           python-version: ${{ matrix.PY }}
+          mamba-version: "*"
+          channels: conda-forge,defaults
+          channel-priority: true
 
       - name: Install OpenDMAO
         shell: pwsh
         run: |
-          conda install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
+          mamba install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
 
           python -m pip install --upgrade pip
 
@@ -398,11 +396,23 @@ jobs:
           echo "============================================================="
           python -m pip install psutil objgraph git+https://github.com/mdolab/pyxdsm
 
-      - name: Display conda info
+      - name: Display environment info
         shell: pwsh
         run: |
-          conda info
-          conda list
+          mamba info
+          mamba list
+
+          echo "============================================================="
+          echo "Check installed versions of Python, Numpy and Scipy"
+          echo "============================================================="
+          python -c "import sys; assert str(sys.version).startswith(str(${{ matrix.PY }})), \
+                    f'Python version {sys.version} is not the requested version (${{ matrix.PY }})'"
+
+          python -c "import numpy; assert str(numpy.__version__).startswith(str(${{ matrix.NUMPY }})), \
+                    f'Numpy version {numpy.__version__} is not the requested version (${{ matrix.NUMPY }})'"
+
+          python -c "import scipy; assert str(scipy.__version__).startswith(str(${{ matrix.SCIPY }})), \
+                    f'Scipy version {scipy.__version__} is not the requested version (${{ matrix.SCIPY }})'"
 
       - name: Audit dependencies
         shell: bash -l {0}
