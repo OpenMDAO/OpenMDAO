@@ -1,12 +1,18 @@
-import re
-import sys
-
 from setuptools import setup
+
+from pathlib import Path
+from io import open
+
+import re
 
 __version__ = re.findall(
     r"""__version__ = ["']+([0-9\.\-dev]*)["']+""",
     open('openmdao/__init__.py').read(),
 )[0]
+
+with open(Path(__file__).parent / "README.md", encoding="utf-8") as f:
+    long_description = f.read()
+
 
 optional_dependencies = {
     'docs': [
@@ -57,11 +63,7 @@ setup(
     name='openmdao',
     version=__version__,
     description="OpenMDAO framework infrastructure",
-    long_description="""OpenMDAO is an open-source high-performance computing platform
-    for systems analysis and multidisciplinary optimization, written in Python. It
-    enables you to decompose your models, making them easier to build and maintain,
-    while still solving them in a tightly coupled manner with efficient parallel numerical methods.
-    """,
+    long_description=long_description,
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Science/Research',
@@ -72,7 +74,6 @@ setup(
         'Operating System :: Microsoft :: Windows',
         'Topic :: Scientific/Engineering',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: Implementation :: CPython',
     ],
@@ -176,7 +177,7 @@ setup(
         ],
         'openmdao': ['*/tests/*.py', '*/*/tests/*.py', '*/*/*/tests/*.py']
     },
-    python_requires=">=3.7",
+    python_requires=">=3.8",
     install_requires=[
         'networkx>=2.0',
         'numpy',
