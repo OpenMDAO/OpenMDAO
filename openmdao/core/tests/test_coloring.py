@@ -277,13 +277,15 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
-        # - coloring saves 16 solves per driver iter  (5 vs 21)
-        # - initial solve for linear constraints takes 21 in both cases (only done once)
-        # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
-        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
-        # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
-        self.assertEqual((p.model._solve_count - 21) / 21,
-                         (p_color.model._solve_count - 21 * 4) / 5)
+        p.model._solve_count = 0
+        p_color.model._solve_count = 0
+
+        J = p.driver._compute_totals()
+        J_color = p_color.driver._compute_totals()
+
+        # coloring saves 16 solves per driver iter  (5 vs 21)
+        self.assertEqual(p.model._solve_count, 21)
+        self.assertEqual(p_color.model._solve_count, 5)
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_total_coloring_snopt_auto_autoivc(self):
@@ -296,13 +298,15 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
-        # - coloring saves 16 solves per driver iter  (5 vs 21)
-        # - initial solve for linear constraints takes 21 in both cases (only done once)
-        # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
-        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
-        # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
-        self.assertEqual((p.model._solve_count - 21) / 21,
-                         (p_color.model._solve_count - 21 * 4) / 5)
+        p.model._solve_count = 0
+        p_color.model._solve_count = 0
+
+        J = p.driver._compute_totals()
+        J_color = p_color.driver._compute_totals()
+
+        # coloring saves 16 solves per driver iter  (5 vs 21)
+        self.assertEqual(p.model._solve_count, 21)
+        self.assertEqual(p_color.model._solve_count, 5)
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_total_coloring_snopt_auto_dyn_partials(self):
@@ -314,13 +318,15 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
-        # - coloring saves 16 solves per driver iter  (5 vs 21)
-        # - initial solve for linear constraints takes 21 in both cases (only done once)
-        # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
-        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
-        # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
-        self.assertEqual((p.model._solve_count - 21) / 21,
-                         (p_color.model._solve_count - 21 * 4) / 5)
+        p.model._solve_count = 0
+        p_color.model._solve_count = 0
+
+        J = p.driver._compute_totals()
+        J_color = p_color.driver._compute_totals()
+
+        # coloring saves 16 solves per driver iter  (5 vs 21)
+        self.assertEqual(p.model._solve_count, 21)
+        self.assertEqual(p_color.model._solve_count, 5)
 
         partial_coloring = p_color.model._get_subsystem('arctan_yox')._coloring_info['coloring']
         expected = [
@@ -345,16 +351,15 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
-        # - coloring saves 16 solves per driver iter  (5 vs 21)
-        # - initial solve for linear constraints takes 21 in both cases (only done once)
-        # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
-        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
-        # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
+        p.model._solve_count = 0
+        p_color.model._solve_count = 0
 
-        # This has been changed to greater or equal to 28 iterations. This change arose when updating
-        # to pyOptSparse v2.1.0 and SNOPT 7.7
-        self.assertGreaterEqual((p.model._solve_count - 21) / 21,
-                         (p_color.model._solve_count - 21 * 4) / 5)
+        J = p.driver._compute_totals()
+        J_color = p_color.driver._compute_totals()
+
+        # coloring saves 16 solves per driver iter  (5 vs 21)
+        self.assertEqual(p.model._solve_count, 21)
+        self.assertEqual(p_color.model._solve_count, 5)
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_total_coloring_snopt_auto_assembled(self):
@@ -366,13 +371,15 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
-        # - coloring saves 16 solves per driver iter  (5 vs 21)
-        # - initial solve for linear constraints takes 21 in both cases (only done once)
-        # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
-        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
-        # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
-        self.assertEqual((p.model._solve_count - 21) / 21,
-                         (p_color.model._solve_count - 21 * 4) / 5)
+        p.model._solve_count = 0
+        p_color.model._solve_count = 0
+
+        J = p.driver._compute_totals()
+        J_color = p_color.driver._compute_totals()
+
+        # coloring saves 16 solves per driver iter  (5 vs 21)
+        self.assertEqual(p.model._solve_count, 21)
+        self.assertEqual(p_color.model._solve_count, 5)
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_fwd_simul_coloring_snopt_approx_cs(self):
@@ -385,12 +392,15 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
-        # - fwd coloring saves 16 nonlinear solves per driver iter  (6 vs 22).
-        # - dynamic coloring takes 66 nonlinear solves (22 each for 3 full jacs)
-        # - (total_solves - 2) / (solves_per_iter) should be equal to
-        #       (total_color_solves - 2 - dyn_solves) / color_solves_per_iter
-        self.assertEqual((p.model._solve_nl_count - 2) / 22,
-                         (p_color.model._solve_nl_count - 2 - 66) / 6)
+        p.model._solve_nl_count = 0
+        p_color.model._solve_nl_count = 0
+
+        J = p.driver._compute_totals()
+        J_color = p_color.driver._compute_totals()
+
+        # coloring saves 16 solves per driver iter  (5 vs 21)
+        self.assertEqual(p.model._solve_nl_count, 21)
+        self.assertEqual(p_color.model._solve_nl_count, 5)
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_fwd_simul_coloring_snopt_approx_fd(self):
@@ -403,13 +413,15 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
+        p.model._solve_nl_count = 0
+        p_color.model._solve_nl_count = 0
 
-        # - fwd coloring saves 16 nonlinear solves per driver iter  (6 vs 22).
-        # - dynamic coloring takes 66 nonlinear solves (22 each for 3 full jacs)
-        # - (total_solves - 2) / (solves_per_iter) should be equal to
-        #       (total_color_solves - 2 - dyn_solves) / color_solves_per_iter
-        self.assertEqual((p.model._solve_nl_count - 2) / 22,
-                         (p_color.model._solve_nl_count - 2 - 66) / 6)
+        J = p.driver._compute_totals()
+        J_color = p_color.driver._compute_totals()
+
+        # coloring saves 16 solves per driver iter  (5 vs 21)
+        self.assertEqual(p.model._solve_nl_count, 21)
+        self.assertEqual(p_color.model._solve_nl_count, 5)
 
     def test_size_zero_array_in_component(self):
         class DynamicPartialsComp(om.ExplicitComponent):
@@ -512,13 +524,15 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         p = run_opt(pyOptSparseDriver, 'auto', optimizer='SLSQP', print_results=False)
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
 
-        # - coloring saves 16 solves per driver iter  (5 vs 21)
-        # - initial solve for linear constraints takes 21 in both cases (only done once)
-        # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
-        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
-        # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
-        self.assertEqual((p.model._solve_count - 21) / 21,
-                         (p_color.model._solve_count - 21 * 4) / 5)
+        p.model._solve_count = 0
+        p_color.model._solve_count = 0
+
+        J = p.driver._compute_totals()
+        J_color = p_color.driver._compute_totals()
+
+        # coloring saves 16 solves per driver iter  (5 vs 21)
+        self.assertEqual(p.model._solve_count, 21)
+        self.assertEqual(p_color.model._solve_count, 5)
 
         # test __repr__
         rep = repr(p_color.driver._coloring_info['coloring'])
@@ -591,13 +605,15 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
-        # - rev coloring saves 11 solves per driver iter  (11 vs 22)
-        # - initial solve for linear constraints takes 1 in both cases (only done once)
-        # - dynamic case does 3 full compute_totals to compute coloring, which adds 22 * 3 solves
-        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
-        # - where N is 1 for the uncolored case and 22 * 3 + 1 for the dynamic colored case.
-        self.assertEqual((p.model._solve_count - 1) / 22,
-                         (p_color.model._solve_count - 1 - 22 * 3) / 11)
+        p.model._solve_count = 0
+        p_color.model._solve_count = 0
+
+        J = p.driver._compute_totals()
+        J_color = p_color.driver._compute_totals()
+
+        # coloring saves 11 solves per driver iter  (11 vs 22)
+        self.assertEqual(p.model._solve_count, 22)
+        self.assertEqual(p_color.model._solve_count, 11)
 
         # improve coverage of coloring.py
         coloring = p_color.driver._coloring_info['coloring']
@@ -628,13 +644,15 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         p = run_opt(pyOptSparseDriver, 'rev', optimizer='SLSQP', print_results=False)
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
 
-        # - coloring saves 11 solves per driver iter  (11 vs 22)
-        # - initial solve for linear constraints takes 1 in both cases (only done once)
-        # - dynamic case does 3 full compute_totals to compute coloring, which adds 22 * 3 solves
-        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
-        # - where N is 1 for the uncolored case and 22 * 3 + 1 for the dynamic colored case.
-        self.assertEqual((p.model._solve_count - 1) / 22,
-                         (p_color.model._solve_count - 1 - 22 * 3) / 11)
+        p.model._solve_count = 0
+        p_color.model._solve_count = 0
+
+        J = p.driver._compute_totals()
+        J_color = p_color.driver._compute_totals()
+
+        # coloring saves 11 solves per driver iter  (11 vs 22)
+        self.assertEqual(p.model._solve_count, 22)
+        self.assertEqual(p_color.model._solve_count, 11)
 
 
 @use_tempdirs
@@ -662,13 +680,15 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
-        # - bidirectional coloring saves 16 solves per driver iter  (5 vs 21)
-        # - initial solve for linear constraints takes 21 in both cases (only done once)
-        # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
-        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
-        # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
-        self.assertEqual((p.model._solve_count - 21) / 21,
-                         (p_color.model._solve_count - 21 * 4) / 5)
+        p.model._solve_count = 0
+        p_color.model._solve_count = 0
+
+        J = p.driver._compute_totals()
+        J_color = p_color.driver._compute_totals()
+
+        # coloring saves 16 solves per driver iter  (5 vs 21)
+        self.assertEqual(p.model._solve_count, 21)
+        self.assertEqual(p_color.model._solve_count, 5)
 
     def test_dynamic_total_coloring_auto_con_alias(self):
         # This test makes sure that coloring works with aliased constraints.
@@ -680,13 +700,15 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
-        # - bidirectional coloring saves 16 solves per driver iter  (5 vs 21)
-        # - initial solve for linear constraints takes 21 in both cases (only done once)
-        # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
-        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
-        # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
-        self.assertEqual((p.model._solve_count - 21) / 21,
-                         (p_color.model._solve_count - 21 * 4) / 5)
+        p.model._solve_count = 0
+        p_color.model._solve_count = 0
+
+        J = p.driver._compute_totals()
+        J_color = p_color.driver._compute_totals()
+
+        # coloring saves 16 solves per driver iter  (5 vs 21)
+        self.assertEqual(p.model._solve_count, 21)
+        self.assertEqual(p_color.model._solve_count, 5)
 
     def test_problem_total_coloring_auto(self):
 
@@ -963,13 +985,15 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
-        # - rev coloring saves 11 solves per driver iter  (11 vs 22)
-        # - initial solve for linear constraints takes 1 in both cases (only done once)
-        # - dynamic case does 3 full compute_totals to compute coloring, which adds 22 * 3 solves
-        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
-        # - where N is 1 for the uncolored case and 22 * 3 + 1 for the dynamic colored case.
-        self.assertEqual((p.model._solve_count - 1) / 22,
-                         (p_color.model._solve_count - 1 - 22 * 3) / 11)
+        p.model._solve_count = 0
+        p_color.model._solve_count = 0
+
+        J = p.driver._compute_totals()
+        J_color = p_color.driver._compute_totals()
+
+        # coloring saves 16 solves per driver iter  (11 vs 22)
+        self.assertEqual(p.model._solve_count, 22)
+        self.assertEqual(p_color.model._solve_count, 11)
 
     def test_dynamic_total_coloring_no_derivs(self):
         with self.assertRaises(Exception) as context:
