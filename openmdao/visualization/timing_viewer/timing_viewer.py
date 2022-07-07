@@ -188,7 +188,7 @@ def view_timing(timing_file, outfile='timing_report.html', show_browser=True):
 
         jsontxt = json.dumps(data, default=default_noraise)
 
-        with open(outfile, 'w') as f:
+        with open(outfile, 'w', encoding='utf-8') as f:
             s = template.replace("<tabulator_src>", tabulator_src)
             s = s.replace("<tabulator_style>", tabulator_style)
             s = s.replace("<d3_src>", d3_src)
