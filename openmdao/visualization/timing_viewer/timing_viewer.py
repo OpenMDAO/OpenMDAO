@@ -174,21 +174,21 @@ def view_timing(timing_file, outfile='timing_report.html', show_browser=True):
         libs_dir = os.path.join(os.path.dirname(code_dir), 'common', 'libs')
         style_dir = os.path.join(os.path.dirname(code_dir), 'common', 'style')
 
-        with open(os.path.join(code_dir, viewer), "r") as f:
+        with open(os.path.join(code_dir, viewer), "r", encoding='utf-8') as f:
             template = f.read()
 
-        with open(os.path.join(libs_dir, 'tabulator.min.js'), "r") as f:
+        with open(os.path.join(libs_dir, 'tabulator.min.js'), "r", encoding='utf-8') as f:
             tabulator_src = f.read()
 
-        with open(os.path.join(style_dir, 'tabulator.min.css'), "r") as f:
+        with open(os.path.join(style_dir, 'tabulator.min.css'), "r", encoding='utf-8') as f:
             tabulator_style = f.read()
 
-        with open(os.path.join(libs_dir, 'd3.v6.min.js'), "r") as f:
+        with open(os.path.join(libs_dir, 'd3.v6.min.js'), "r", encoding='utf-8') as f:
             d3_src = f.read()
 
         jsontxt = json.dumps(data, default=default_noraise)
 
-        with open(outfile, 'w') as f:
+        with open(outfile, 'w', encoding='utf-8') as f:
             s = template.replace("<tabulator_src>", tabulator_src)
             s = s.replace("<tabulator_style>", tabulator_style)
             s = s.replace("<d3_src>", d3_src)
