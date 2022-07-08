@@ -317,6 +317,9 @@ def _unregister_hook(fname, class_name, inst_id=None, pre=True, post=True):
 
     if todel:
         for name in todel:
-            del classhooks[name]
+            try:
+                del classhooks[name]
+            except KeyError:
+                pass
         if not classhooks:  # removed last entry for this class
             del _hooks[class_name]
