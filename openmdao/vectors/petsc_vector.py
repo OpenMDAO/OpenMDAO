@@ -149,10 +149,7 @@ else:
             float
                 Norm of this vector.
             """
-            loc = np.array([np.sum(self._get_nodup() ** 2)])
-            full = np.zeros(1)
-            self._system().comm.Allreduce(loc, full, op=MPI.SUM)
-            return full ** 0.5
+            return self._system().comm.allreduce(np.sum(self._get_nodup() ** 2)) ** 0.5
 
         def dot(self, vec):
             """
