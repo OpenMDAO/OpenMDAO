@@ -138,7 +138,7 @@ else:
                 self._dup_scratch[dup_inds] = 0.0
                 return self._dup_scratch
 
-            return self._get_data().real
+            return self._get_data()
 
         def get_norm(self):
             """
