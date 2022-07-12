@@ -47,6 +47,9 @@ else:
             variables that are 'owned' by a different process. Used by certain distributed
             calculations, e.g., get_norm(), where including duplicate values would result in
             the wrong answer.
+        _dup_scratch : ndarray of float or None
+            If the array has dups, this scratch array will be created to store the de-duped
+            version.
         """
 
         TRANSFER = PETScTransfer
@@ -61,6 +64,7 @@ else:
                              alloc_complex=alloc_complex)
 
             self._dup_inds = None
+            self._dup_scratch = None
 
         def _initialize_data(self, root_vector):
             """
@@ -109,6 +113,8 @@ else:
                             dup_inds.extend(range(idx_slice.start, idx_slice.stop))
 
                     self._dup_inds = np.array(dup_inds, dtype=INT_DTYPE)
+                    if len(dup_inds) > 0:
+                        self._dup_scratch = np.empty(idx_slice.stop)
                 else:
                     self._dup_inds = np.array([], dtype=INT_DTYPE)
 
@@ -126,39 +132,24 @@ else:
                 returned without copying.
             """
             dup_inds = self._get_dup_inds()
-            has_dups = dup_inds.size > 0
 
-            if has_dups:
-                data_cache = self.asarray(copy=True)
-                data_cache[dup_inds] = 0.0
-            else:
-                data_cache = self._get_data()
+            if dup_inds.size > 0:
+                self._dup_scratch[:] = self.asarray()
+                self._dup_scratch[dup_inds] = 0.0
+                return self._dup_scratch
 
-            return data_cache
-
-        def _restore_dups(self):
-            """
-            Restore our petsc array so that it corresponds once again to our local data array.
-
-            This is done to restore the petsc array after we previously zeroed out all duplicated
-            values.
-            """
-            self._petsc.array = self._get_data()
+            return self._get_data()
 
         def get_norm(self):
             """
-            Return the norm of this vector.
+            Return the 2 norm of this vector.
 
             Returns
             -------
             float
                 Norm of this vector.
             """
-            nodup = self._get_nodup()
-            self._petsc.array = nodup.real
-            distributed_norm = self._petsc.norm()
-            self._restore_dups()
-            return distributed_norm
+            return self._system().comm.allreduce(np.sum(self._get_nodup() ** 2)) ** 0.5
 
         def dot(self, vec):
             """
@@ -174,6 +165,4 @@ else:
             float
                 The computed dot product value.
             """
-            nodup = self._get_nodup()
-            # we don't need to _resore_dups here since we don't modify _petsc.array.
-            return self._system().comm.allreduce(np.dot(nodup, vec._get_data()))
+            return self._system().comm.allreduce(np.dot(self._get_nodup(), vec._get_data()))
