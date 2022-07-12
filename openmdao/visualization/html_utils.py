@@ -325,7 +325,7 @@ def add_help(txt, diagram_filepath, header='Instructions', footer=''):
     body = write_div(content=write_paragraph(txt), cls_attr="modal-body")
     toolbar_help_header = write_div(content='Toolbar Help', cls_attr="modal-section-header")
 
-    with open(diagram_filepath, "r") as f:
+    with open(diagram_filepath, "r", encoding='utf-8') as f:
         help_diagram = f.read()
     help_diagram = write_div(content=help_diagram, cls_attr="toolbar-help")
 

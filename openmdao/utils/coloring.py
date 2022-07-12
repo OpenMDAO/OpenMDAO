@@ -699,7 +699,7 @@ class Coloring(object):
             Path to the location where the plot file should be saved.
         """
         try:
-            from matplotlib import pyplot, axes, cm
+            from matplotlib import pyplot, cm
         except ImportError:
             print("matplotlib is not installed so the coloring viewer is not available. The ascii "
                   "based coloring viewer can be accessed by calling display_txt() on the Coloring "
@@ -855,6 +855,8 @@ class Coloring(object):
             pyplot.show()
         else:
             pyplot.savefig(fname)
+
+        pyplot.close(fig)
 
     def get_dense_sparsity(self, dtype=bool):
         """
