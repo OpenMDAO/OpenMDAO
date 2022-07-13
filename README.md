@@ -18,7 +18,7 @@ framework also has a number of parallel computing features that can
 work with gradient-free optimization, mixed-integer nonlinear
 programming, and traditional design space exploration.
 
-If you are using OpenMDAO, please [cite](other/citing.ipynb) us!
+If you are using OpenMDAO, please [cite][20] us!
 
 ## Documentation
 
@@ -167,3 +167,5 @@ Documentation for the latest version can always be found [here][2], but if you w
 [18]: https://github.com/OpenMDAO/OpenMDAO/actions "Github Actions"
 
 [19]: http://openmdao.org/newdocs/versions/latest/other_useful_docs/developer_docs/doc_build.html
+
+[20]: https://openmdao.org/newdocs/versions/latest/other/citing.html

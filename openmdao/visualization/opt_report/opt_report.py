@@ -158,7 +158,7 @@ pip install tabulate
 </body>
 </html>
         '''
-        with open(outfile, 'w') as f:
+        with open(outfilepath, 'w') as f:
             f.write(s)
 
         return
