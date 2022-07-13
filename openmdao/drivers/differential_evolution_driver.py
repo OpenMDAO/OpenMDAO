@@ -261,17 +261,6 @@ class DifferentialEvolutionDriver(Driver):
         """
         return 0
 
-    def get_exit_status(self):
-        """
-        Return exit status of driver run.
-
-        Returns
-        -------
-        str
-            String indicating result of driver run.
-        """
-        return 'SUCCESS'
-
     def run(self):
         """
         Execute the genetic algorithm.

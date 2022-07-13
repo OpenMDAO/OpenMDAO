@@ -251,17 +251,6 @@ class ScipyOptimizeDriver(Driver):
             njev = None
         return njev
 
-    def get_exit_status(self):
-        """
-        Return exit status of driver run.
-
-        Returns
-        -------
-        str
-            String indicating result of driver run.
-        """
-        return 'FAIL' if self.fail else 'SUCCESS'
-
     def run(self):
         """
         Optimize the problem using selected Scipy optimizer.

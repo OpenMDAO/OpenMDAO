@@ -101,11 +101,9 @@ _ellipse_height = 0.15
 
 
 def _optimizer_report_register():
-    register_report('optimizer', opt_report, 'Summary of optimization', 'Driver', '_post_run',
-                    'post')
+    register_report('optimizer', opt_report, 'Summary of optimization', 'Driver', 'run', 'post')
 
 
-# def opt_report(prob, outfile=None):
 def opt_report(driver, outfile=None):
     """
     Write a summary of the optimization to the given file.
@@ -120,7 +118,7 @@ def opt_report(driver, outfile=None):
     """
     prob = driver._problem()
     if not driver.supports['optimization']:
-        driver_class = type(prob.driver).__name__
+        driver_class = type(driver).__name__
         issue_warning(f"The optimizer report is not applicable for the {driver_class} Driver "
                       "which does not support optimization", category=DriverWarning)
         return
@@ -178,13 +176,13 @@ pip install tabulate
     cons_meta = _prom_name_dict(prob.driver._cons, abs2prom)
 
     with prob.model._scaled_context_all():
-        for abs_name, meta in prob.driver._objs.items():
+        for abs_name, meta in driver._objs.items():
             prom_name = abs2prom['input'][abs_name] if abs_name in abs2prom['input'] else \
                 abs2prom['output'][abs_name]
-            objs_vals[prom_name] = prob.driver.get_objective_values(driver_scaling=driver_scaling)[
+            objs_vals[prom_name] = driver.get_objective_values(driver_scaling=driver_scaling)[
                 abs_name]
 
-        for abs_name, meta in prob.driver._designvars.items():
+        for abs_name, meta in driver._designvars.items():
 
             if abs_name in abs2prom['input']:
                 prom_name = abs2prom['input'][abs_name]
@@ -194,7 +192,7 @@ pip install tabulate
                 prom_name = abs_name
 
             desvars_vals[prom_name] = \
-                prob.driver.get_design_var_values(driver_scaling=driver_scaling)[abs_name]
+                driver.get_design_var_values(driver_scaling=driver_scaling)[abs_name]
 
         for abs_name, meta in prob.driver._cons.items():
             if 'alias' in meta and meta['alias'] is not None:
@@ -212,7 +210,7 @@ pip install tabulate
                     continue
 
             cons_vals[prom_name] = \
-                prob.driver.get_constraint_values(driver_scaling=driver_scaling)[abs_name]
+                driver.get_constraint_values(driver_scaling=driver_scaling)[abs_name]
 
     header_html = _make_header_table(prob)
 
@@ -227,7 +225,7 @@ pip install tabulate
                                    cols=['min', 'max', 'mean', 'lower', 'upper', 'equals', 'ref',
                                          'ref0', 'units', 'visual'])
 
-    driver_info_html = _make_opt_value_table(prob.driver)
+    driver_info_html = _make_opt_value_table(driver)
 
     this_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -237,7 +235,7 @@ pip install tabulate
     with open(outfilepath, 'w') as f:
         s = template.format(title=prob._name, header=header_html, objs=objs_html,
                             desvars=desvars_html, cons=cons_html, driver=driver_info_html,
-                            driver_class=type(prob.driver).__name__)
+                            driver_class=type(driver).__name__)
         f.write(s)
 
 

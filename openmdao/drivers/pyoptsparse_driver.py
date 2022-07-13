@@ -279,17 +279,6 @@ class pyOptSparseDriver(Driver):
         """
         return self.pyopt_solution.userSensCalls if self.pyopt_solution else None
 
-    def get_exit_status(self):
-        """
-        Return exit status of driver run.
-
-        Returns
-        -------
-        str
-            String indicating result of driver run.
-        """
-        return 'FAIL' if self.fail else 'SUCCESS'
-
     def run(self):
         """
         Excute pyOptsparse.

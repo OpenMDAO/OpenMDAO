@@ -13,7 +13,7 @@ jobs:
   ubuntu_tests:
     runs-on: ubuntu-latest
 
-    timeout-minutes: 110
+    timeout-minutes: 120
 
     strategy:
       fail-fast: false
@@ -244,7 +244,7 @@ jobs:
           echo "============================================================="
           cp .coveragerc $HOME
           cd $HOME
-          testflo -n 1 openmdao --timeout=120 --show_skipped --coverage --coverpkg openmdao --nocapture --verbose --isolated
+          testflo -n 1 openmdao --timeout=120 --show_skipped --coverage --coverpkg openmdao
 
       - name: Submit coverage
         shell: bash -l {0}
@@ -266,6 +266,8 @@ jobs:
         id: build_docs
         shell: bash -l {0}
         run: |
+          export OPENMDAO_REPORTS=0
+
           cd openmdao/docs
           if [[ "${{ secrets.SNOPT_LOCATION_72 }}" || "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
             echo "============================================================="
@@ -285,7 +287,6 @@ jobs:
           echo "============================================================="
           echo "Build the docs"
           echo "============================================================="
-          export OPENMDAO_REPORTS=0
           python build_source_docs.py
           jupyter-book build -W --keep-going openmdao_book
           python copy_build_artifacts.py
@@ -339,7 +340,7 @@ jobs:
   windows_tests:
     runs-on: windows-latest
 
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     strategy:
       fail-fast: false
