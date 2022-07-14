@@ -858,21 +858,7 @@ class Driver(object):
         str
             String indicating result of driver run.
         """
-        return 'SUCCESS'
-
-    def _pre_run(self):
-        self._start_time = time.time()
-
-    def _post_run(self):
-        self.opt_result['runtime'] = time.time() - self._start_time
-        self.opt_result['iter_count'] = self.iter_count
-        objective_calls = self.get_driver_objective_calls()
-        if objective_calls:
-            self.opt_result['obj_calls'] = objective_calls if objective_calls else 'Unknown'
-        derivative_calls = self.get_driver_derivative_calls()
-        if derivative_calls:
-            self.opt_result['deriv_calls'] = derivative_calls if derivative_calls else 'Unknown'
-        self.opt_result['exit_status'] = self.get_exit_status()
+        return 'FAIL' if self.fail else 'SUCCESS'
 
     def run(self):
         """
@@ -886,10 +872,22 @@ class Driver(object):
         bool
             Failure flag; True if failed to converge, False is successful.
         """
+        self._start_time = time.time()
+
         with RecordingDebugging(self._get_name(), self.iter_count, self):
             self._problem().model.run_solve_nonlinear()
 
         self.iter_count += 1
+
+        # save results of run
+        self.opt_result = {
+            'runtime': time.time() - self._start_time,
+            'iter_count': self.iter_count,
+            'obj_calls': self.get_driver_objective_calls(),
+            'deriv_calls': self.get_driver_derivative_calls(),
+            'exit_status': self.get_exit_status()
+        }
+
         return False
 
     @property

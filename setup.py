@@ -255,9 +255,6 @@ setup(
             'armijogoldsteinls=openmdao.solvers.linesearch.backtracking:ArmijoGoldsteinLS',
             'boundsenforcels=openmdao.solvers.linesearch.backtracking:BoundsEnforceLS',
         ],
-
-        # openmdao/visualization/opt_report/opt_report.py
-
         'openmdao_report': [
             'n2=openmdao.visualization.n2_viewer.n2_viewer:_n2_report_register',
             'scaling=openmdao.visualization.scaling_viewer.scaling_report:_scaling_report_register',

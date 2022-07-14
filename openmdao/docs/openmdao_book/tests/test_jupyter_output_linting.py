@@ -75,7 +75,7 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
                   "except ImportError:\n",
                   "    !python -m pip install openmdao[notebooks]"]
 
-        mpi_header = ['%pylab inline\n',
+        mpi_header = ['%matplotlib inline\n',
                       'from ipyparallel import Client, error\n',
                       'cluster=Client(profile="mpi")\n',
                       'view=cluster[:]\n',

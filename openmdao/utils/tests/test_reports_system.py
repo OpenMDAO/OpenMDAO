@@ -129,10 +129,6 @@ class TestReportsSystem(unittest.TestCase):
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
         path = pathlib.Path(problem_reports_dir).joinpath(self.optimizer_filename)
-
-        # debugging why CI fails on this!
-        print(f"in test: os.getcwd() = {os.getcwd()}")
-        print(f"in test: str(path) = {str(path)}")
         self.assertTrue(path.is_file(), f'The optimizer report file, {str(path)}, was not found')
 
     @hooks_active
