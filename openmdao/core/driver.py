@@ -872,21 +872,10 @@ class Driver(object):
         bool
             Failure flag; True if failed to converge, False is successful.
         """
-        self._start_time = time.time()
-
         with RecordingDebugging(self._get_name(), self.iter_count, self):
             self._problem().model.run_solve_nonlinear()
 
         self.iter_count += 1
-
-        # save results of run
-        self.opt_result = {
-            'runtime': time.time() - self._start_time,
-            'iter_count': self.iter_count,
-            'obj_calls': self.get_driver_objective_calls(),
-            'deriv_calls': self.get_driver_derivative_calls(),
-            'exit_status': self.get_exit_status()
-        }
 
         return False
 
@@ -1312,6 +1301,54 @@ class Driver(object):
                     issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
 
             return coloring
+
+
+class SaveOptResult(object):
+    """
+    A context manager that saves details about a driver run.
+
+    Parameters
+    ----------
+    driver : Driver
+        The driver.
+    """
+
+    def __init__(self, driver):
+        """
+        Initialize attributes.
+        """
+        self._driver = driver
+
+    def __enter__(self):
+        """
+        Set start time for the driver run.
+
+        Returns
+        -------
+        self : object
+            self
+        """
+        self._start_time = time.time()
+        return self
+
+    def __exit__(self, *args):
+        """
+        Save driver run information in the 'opt_result' attribute.
+
+        Parameters
+        ----------
+        *args : array
+            Solver recording requires extra args.
+        """
+        print("exiting...")
+        driver = self._driver
+        driver.opt_result = {
+            'runtime': time.time() - self._start_time,
+            'iter_count': driver.iter_count,
+            'obj_calls': driver.get_driver_objective_calls(),
+            'deriv_calls': driver.get_driver_derivative_calls(),
+            'exit_status': driver.get_exit_status()
+        }
 
 
 class RecordingDebugging(Recording):
