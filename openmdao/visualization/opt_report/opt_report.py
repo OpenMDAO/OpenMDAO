@@ -163,6 +163,14 @@ pip install tabulate
     # Collect data from the problem
     abs2prom = prob.model._var_abs2prom
 
+    def get_prom_name(abs_name):
+        if abs_name in abs2prom['input']:
+            return abs2prom['input'][abs_name]
+        elif abs_name in abs2prom['output']:
+            return abs2prom['output'][abs_name]
+        else:
+            return abs_name
+
     # Collect the entire array of array valued desvars and constraints (ignore indices)
     objs_vals = {}
     desvars_vals = {}
@@ -171,14 +179,6 @@ pip install tabulate
     objs_meta = {}
     desvars_meta = {}
     cons_meta = {}
-
-    def get_prom_name(abs_name):
-        if abs_name in abs2prom['input']:
-            return abs2prom['input'][abs_name]
-        elif abs_name in abs2prom['output']:
-            return abs2prom['output'][abs_name]
-        else:
-            return abs_name
 
     with prob.model._scaled_context_all():
         for abs_name, meta in driver._objs.items():
@@ -197,7 +197,7 @@ pip install tabulate
             if 'alias' in meta and meta['alias'] is not None:
                 # check to see if the abs_name is the alias
                 if abs_name == meta['alias']:
-                    prom_name = abs_name  # both meta and vals are keyed on the alias
+                    prom_name = abs_name  # keyed on the alias
                 else:
                     raise ValueError("Absolute name of var was expected to be the alias")  # TODO ??
             else:
