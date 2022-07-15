@@ -133,7 +133,7 @@ class TestOptimizationReport(unittest.TestCase):
                                           cons_lower=0, cons_upper=10.,
                                           optimizer='COBYLA',
                                           )
-        self.check_opt_result(expected={'deriv_calls': 0})
+        self.check_opt_result(expected={'deriv_calls': None})
         opt_report(self.prob.driver)
 
     @require_pyoptsparse('SNOPT')

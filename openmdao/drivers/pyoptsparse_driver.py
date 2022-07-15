@@ -266,7 +266,7 @@ class pyOptSparseDriver(Driver):
         int
             Number of objective evaluations made during a driver run.
         """
-        return self.pyopt_solution.userObjCalls if self.pyopt_solution else 0
+        return self.pyopt_solution.userObjCalls if self.pyopt_solution else None
 
     def get_driver_derivative_calls(self):
         """
@@ -277,7 +277,7 @@ class pyOptSparseDriver(Driver):
         int
             Number of derivative evaluations made during a driver run.
         """
-        return self.pyopt_solution.userSensCalls if self.pyopt_solution else 0
+        return self.pyopt_solution.userSensCalls if self.pyopt_solution else None
 
     def run(self):
         """
