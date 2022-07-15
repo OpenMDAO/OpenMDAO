@@ -168,26 +168,28 @@ pip install tabulate
     desvars_vals = {}
     cons_vals = {}
 
-    objs_meta = _prom_name_dict(prob.driver._objs, abs2prom)
-    desvars_meta = _prom_name_dict(prob.driver._designvars, abs2prom)
-    cons_meta = _prom_name_dict(prob.driver._cons, abs2prom)
+    objs_meta = {}
+    desvars_meta = {}
+    cons_meta = {}
+
+    def get_prom_name(abs_name):
+        if abs_name in abs2prom['input']:
+            return abs2prom['input'][abs_name]
+        elif abs_name in abs2prom['output']:
+            return abs2prom['output'][abs_name]
+        else:
+            return abs_name
 
     with prob.model._scaled_context_all():
         for abs_name, meta in driver._objs.items():
-            prom_name = abs2prom['input'][abs_name] if abs_name in abs2prom['input'] else \
-                abs2prom['output'][abs_name]
-            objs_vals[prom_name] = driver.get_objective_values(driver_scaling=driver_scaling)[
-                abs_name]
+            prom_name = get_prom_name(abs_name)
+            objs_meta[prom_name] = meta
+            objs_vals[prom_name] = \
+                driver.get_objective_values(driver_scaling=driver_scaling)[abs_name]
 
         for abs_name, meta in driver._designvars.items():
-
-            if abs_name in abs2prom['input']:
-                prom_name = abs2prom['input'][abs_name]
-            elif abs_name in abs2prom['output']:
-                prom_name = abs2prom['output'][abs_name]
-            else:
-                prom_name = abs_name
-
+            prom_name = get_prom_name(abs_name)
+            desvars_meta[prom_name] = meta
             desvars_vals[prom_name] = \
                 driver.get_design_var_values(driver_scaling=driver_scaling)[abs_name]
 
@@ -195,17 +197,12 @@ pip install tabulate
             if 'alias' in meta and meta['alias'] is not None:
                 # check to see if the abs_name is the alias
                 if abs_name == meta['alias']:
-                    prom_name = meta['name']
+                    prom_name = abs_name  # both meta and vals are keyed on the alias
                 else:
                     raise ValueError("Absolute name of var was expected to be the alias")  # TODO ??
             else:
-                if abs_name in abs2prom['input']:
-                    prom_name = abs2prom['input'][abs_name]
-                elif abs_name in abs2prom['output']:
-                    prom_name = abs2prom['output'][abs_name]
-                else:
-                    continue
-
+                prom_name = get_prom_name(abs_name)
+            cons_meta[prom_name] = meta
             cons_vals[prom_name] = \
                 driver.get_constraint_values(driver_scaling=driver_scaling)[abs_name]
 
@@ -752,34 +749,6 @@ def _constraint_plot(kind, meta, val, width=300):
     plt.close()
 
     return html
-
-
-def _prom_name_dict(d, abs2prom):
-    """
-    Convert values in dict to use promoted names.
-
-    Parameters
-    ----------
-    d : dict
-        A dictionary whose keys are absolute names, for which we want the promoted names.
-    abs2prom : dict
-        A mapping from absolute name to promoted name.
-
-    Returns
-    -------
-    dict
-        A dictionary identical to d, except the keys have been converted to promoted names.
-    """
-    ret = {}
-    for abs_name, meta in d.items():
-        if abs_name in abs2prom['input']:
-            prom_name = abs2prom['input'][abs_name]
-        elif abs_name in abs2prom['output']:
-            prom_name = abs2prom['output'][abs_name]
-        else:
-            prom_name = abs_name
-        ret[prom_name] = meta
-    return ret
 
 
 def _indicate_value_is_derived_from_array(derived_value, original_value):

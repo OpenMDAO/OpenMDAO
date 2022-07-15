@@ -47,7 +47,13 @@ class TestOptimizationReport(unittest.TestCase):
         prob.driver = driver()
 
         if optimizer:
-            self.prob.driver.options['optimizer'] = optimizer
+            driver_opts = self.prob.driver.options
+            driver_opts['optimizer'] = optimizer
+            # silence scipy & pyoptsparse
+            if 'disp' in driver_opts:
+                driver_opts['disp'] = False
+            if 'print_results' in driver_opts:
+                driver_opts['print_results'] = False
 
         prob.model.add_design_var('x', lower=vars_lower, upper=vars_upper)
         prob.model.add_design_var('y', lower=vars_lower, upper=vars_upper)
@@ -68,6 +74,7 @@ class TestOptimizationReport(unittest.TestCase):
 
         prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = "SLSQP"
+        prob.driver.options['print_results'] = False
         prob.driver.opt_settings['ACC'] = 1e-13
         prob.set_solver_print(level=0)
         prob.model.add_constraint('con2', upper=0.0)

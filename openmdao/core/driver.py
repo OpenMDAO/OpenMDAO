@@ -1340,7 +1340,6 @@ class SaveOptResult(object):
         *args : array
             Solver recording requires extra args.
         """
-        print("exiting...")
         driver = self._driver
         driver.opt_result = {
             'runtime': time.time() - self._start_time,
