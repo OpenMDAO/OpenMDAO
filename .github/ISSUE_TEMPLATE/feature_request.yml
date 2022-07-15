@@ -1,0 +1,27 @@
+name: Feature/Change request
+description: Request a new capability or change in behavior in OpenMDAO
+assignees:
+  - robfalck
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Desired capability or behavior.
+      description: Please explain what is happening and how it differs from the expected behavior.
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        OpenMDAO uses a system for enhancement proposals (POEMs) to give developers and the community a way to discuss potential changes to the code:
+        - New features
+        - API Changes
+        
+        If you're requesting a significant change, we invite you to submit a new enhancement proposal at the [https://github.com/OpenMDAO/POEMs](POEMs repository).
+        If this issue is associated with an existing POEM, such as a reference implementation, please provide the POEM number below.
+ - type: input
+    id: poem
+    attributes:
+      label: Associated POEM Number
+      description: Please provide a link to the associated POEM below, if available.
+      placeholder: '001'

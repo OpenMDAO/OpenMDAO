@@ -1,0 +1,35 @@
+name: Bug Report
+description: Submit a report if you believe you've found a bug in OpenMDAO.
+labels: ["bug"]
+assignees:
+  - robfalck
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Please explain what is happening and how it differs from the expected behavior.
+      placeholder: ''
+      value: ''
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Versions of relevant dependencies
+      description: Please provide an example of the code that triggers the unexpected behavior. If possible, we would appreciate a minimal test case that reproduces the issue. Alternatively, link to a file in another repository where the issue is demonstrated.
+      render: python
+    validations:
+      required: true
+  - type: input
+    id: openmdao-version
+    attributes:
+      label: OpenMDAO Version
+      description: What version of OpenMDAO is being used.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Relevant environment information
+      description: If applicable, please provide versions of relevant dependencies (numpy, scipy, MPI, etc).  This can be obtained from `pip freeze`.
