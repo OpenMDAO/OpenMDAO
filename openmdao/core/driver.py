@@ -183,7 +183,7 @@ class Driver(object):
             'iter_count': 1,
             'obj_calls': 1,
             'deriv_calls': 1,
-            'exit_status': 'NOTRUN'
+            'exit_status': 'NOT_RUN'
         }
 
         # Want to allow the setting of hooks on Drivers

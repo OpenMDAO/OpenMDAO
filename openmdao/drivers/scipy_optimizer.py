@@ -233,8 +233,7 @@ class ScipyOptimizeDriver(Driver):
         int
             Number of objective evaluations made during a driver run.
         """
-        nfev = self.result.nfev if self.result else 0
-        return nfev
+        return self.result.nfev if self.result else 0
 
     def get_driver_derivative_calls(self):
         """
