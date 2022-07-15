@@ -132,9 +132,6 @@ def opt_report(driver, outfile=None):
 
     outfilepath = str(pathlib.Path(prob.get_reports_dir()).joinpath(outfile))
 
-    print(f"in opt_report, outfilepath = {outfilepath}")
-    print(f"in opt_report, os.getcwd() = {os.getcwd()}")
-
     if not tabulate:
         s = '''
 <!DOCTYPE html>
@@ -229,7 +226,7 @@ pip install tabulate
 
     this_dir = os.path.dirname(os.path.abspath(__file__))
 
-    with open(os.path.join(this_dir, _optimizer_report_template), 'r') as f:
+    with open(os.path.join(this_dir, _optimizer_report_template), 'r', encoding='utf-8') as f:
         template = f.read()
 
     with open(outfilepath, 'w') as f:
