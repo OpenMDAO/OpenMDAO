@@ -180,9 +180,9 @@ class Driver(object):
 
         self.opt_result = {
             'runtime': 0.0,
-            'iter_count': 1,
-            'obj_calls': 1,
-            'deriv_calls': 1,
+            'iter_count': 0,
+            'obj_calls': 0,
+            'deriv_calls': 0,
             'exit_status': 'NOT_RUN'
         }
 
@@ -625,7 +625,7 @@ class Driver(object):
         int
             Number of objective evaluations made during a driver run.
         """
-        return 1
+        return 0
 
     def get_driver_derivative_calls(self):
         """
@@ -636,7 +636,7 @@ class Driver(object):
         int
             Number of derivative evaluations made during a driver run.
         """
-        return 1
+        return 0
 
     def get_design_var_values(self, get_remote=True, driver_scaling=True):
         """
