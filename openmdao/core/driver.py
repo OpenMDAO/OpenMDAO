@@ -1311,6 +1311,13 @@ class SaveOptResult(object):
     ----------
     driver : Driver
         The driver.
+
+    Attributes
+    ----------
+    _driver : Driver
+        The driver for which we are saving results.
+    _start_time : float
+        The start time used to compute the run time.
     """
 
     def __init__(self, driver):
