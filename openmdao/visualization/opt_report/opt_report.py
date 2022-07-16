@@ -194,15 +194,16 @@ pip install tabulate
                 driver.get_design_var_values(driver_scaling=driver_scaling)[abs_name]
 
         for abs_name, meta in prob.driver._cons.items():
+            prom_name = get_prom_name(abs_name)
+            cons_meta[prom_name] = meta
             if 'alias' in meta and meta['alias'] is not None:
                 # check to see if the abs_name is the alias
                 if abs_name == meta['alias']:
-                    prom_name = abs_name  # keyed on the alias
+                    prom_name = meta['name']
                 else:
                     raise ValueError("Absolute name of var was expected to be the alias")  # TODO ??
             else:
-                prom_name = get_prom_name(abs_name)
-            cons_meta[prom_name] = meta
+                continue
             cons_vals[prom_name] = \
                 driver.get_constraint_values(driver_scaling=driver_scaling)[abs_name]
 
