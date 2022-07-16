@@ -89,7 +89,7 @@ class TestOptimizationReport(unittest.TestCase):
             expected = {}
 
         self.assertTrue(opt_result['runtime'] > 0.0,
-                        f"Unexpected value for runtime: {opt_result['runtime']} (should be > 0.0")
+                        f"Unexpected value for runtime: {opt_result['runtime']} (should be > 0.0)")
 
         self.assertTrue(opt_result['iter_count'] == expected['iter_count'] if 'iter_count' in expected
                         else opt_result['iter_count'] >= 1,

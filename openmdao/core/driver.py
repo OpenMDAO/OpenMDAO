@@ -1330,12 +1330,17 @@ class SaveOptResult(object):
         """
         Set start time for the driver run.
 
+        This uses 'perf_counter()' which gives "the value (in fractional seconds)
+        of a performance counter, i.e. a clock with the highest available resolution
+        to measure a short duration. It does include time elapsed during sleep and
+        is system-wide."
+
         Returns
         -------
         self : object
             self
         """
-        self._start_time = time.time()
+        self._start_time = time.perf_counter()
         return self
 
     def __exit__(self, *args):
@@ -1349,7 +1354,7 @@ class SaveOptResult(object):
         """
         driver = self._driver
         driver.opt_result = {
-            'runtime': time.time() - self._start_time,
+            'runtime': time.perf_counter() - self._start_time,
             'iter_count': driver.iter_count,
             'obj_calls': driver.get_driver_objective_calls(),
             'deriv_calls': driver.get_driver_derivative_calls(),
