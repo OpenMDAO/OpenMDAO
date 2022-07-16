@@ -202,8 +202,6 @@ pip install tabulate
                     prom_name = meta['name']
                 else:
                     raise ValueError("Absolute name of var was expected to be the alias")  # TODO ??
-            else:
-                continue
             cons_vals[prom_name] = \
                 driver.get_constraint_values(driver_scaling=driver_scaling)[abs_name]
 
