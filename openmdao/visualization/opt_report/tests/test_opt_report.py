@@ -91,17 +91,13 @@ class TestOptimizationReport(unittest.TestCase):
         self.assertTrue(opt_result['runtime'] > 0.0,
                         f"Unexpected value for runtime: {opt_result['runtime']} (should be > 0.0)")
 
-        self.assertTrue(opt_result['iter_count'] == expected['iter_count'] if 'iter_count' in expected
-                        else opt_result['iter_count'] >= 1,
-                        f"Unexpected value for iter_count: {opt_result['iter_count']}")
-
-        self.assertTrue(opt_result['obj_calls'] == expected['obj_calls'] if 'obj_calls' in expected
-                        else opt_result['obj_calls'] >= 1,
-                        f"Unexpected value for obj_calls: {opt_result['obj_calls']}")
-
-        self.assertTrue(opt_result['deriv_calls'] == expected['deriv_calls'] if 'deriv_calls' in expected
-                        else opt_result['deriv_calls'] >= 1,
-                        f"Unexpected value for deriv_calls: {opt_result['deriv_calls']}")
+        for key in ['iter_count', 'obj_calls', 'deriv_calls']:
+            if key in expected:
+                self.assertTrue( opt_result[key] == expected[key] ,
+                    f"Unexpected value for {key}: {opt_result[key]}. Expected {expected[key]}")
+            else:
+                self.assertTrue( opt_result[key] >= 1,
+                    f"Unexpected value for {key}: {opt_result[key]}. Expected value to be >= 1")
 
         self.assertTrue(opt_result['exit_status'] == expected['exit_status'] if 'exit_status' in expected
                         else opt_result['exit_status'] == 'SUCCESS',
@@ -166,7 +162,6 @@ class TestOptimizationReport(unittest.TestCase):
 
     def test_opt_report_DOE(self):
         # no report should be generated for this
-        import openmdao.api as om
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = om.Problem()
