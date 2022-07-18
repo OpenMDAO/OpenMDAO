@@ -47,7 +47,13 @@ class TestOptimizationReport(unittest.TestCase):
         prob.driver = driver()
 
         if optimizer:
-            self.prob.driver.options['optimizer'] = optimizer
+            driver_opts = self.prob.driver.options
+            driver_opts['optimizer'] = optimizer
+            # silence scipy & pyoptsparse
+            if 'disp' in driver_opts:
+                driver_opts['disp'] = False
+            if 'print_results' in driver_opts:
+                driver_opts['print_results'] = False
 
         prob.model.add_design_var('x', lower=vars_lower, upper=vars_upper)
         prob.model.add_design_var('y', lower=vars_lower, upper=vars_upper)
@@ -68,12 +74,38 @@ class TestOptimizationReport(unittest.TestCase):
 
         prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = "SLSQP"
+        prob.driver.options['print_results'] = False
         prob.driver.opt_settings['ACC'] = 1e-13
         prob.set_solver_print(level=0)
         prob.model.add_constraint('con2', upper=0.0)
         prob.model.add_objective('obj')
 
         return prob
+
+    def check_opt_result(self, opt_result=None, expected=None):
+        if opt_result is None:
+            opt_result = self.prob.driver.opt_result
+        if expected is None:
+            expected = {}
+
+        self.assertTrue(opt_result['runtime'] > 0.0,
+                        f"Unexpected value for runtime: {opt_result['runtime']} (should be > 0.0)")
+
+        self.assertTrue(opt_result['iter_count'] == expected['iter_count'] if 'iter_count' in expected
+                        else opt_result['iter_count'] >= 1,
+                        f"Unexpected value for iter_count: {opt_result['iter_count']}")
+
+        self.assertTrue(opt_result['obj_calls'] == expected['obj_calls'] if 'obj_calls' in expected
+                        else opt_result['obj_calls'] >= 1,
+                        f"Unexpected value for obj_calls: {opt_result['obj_calls']}")
+
+        self.assertTrue(opt_result['deriv_calls'] == expected['deriv_calls'] if 'deriv_calls' in expected
+                        else opt_result['deriv_calls'] >= 1,
+                        f"Unexpected value for deriv_calls: {opt_result['deriv_calls']}")
+
+        self.assertTrue(opt_result['exit_status'] == expected['exit_status'] if 'exit_status' in expected
+                        else opt_result['exit_status'] == 'SUCCESS',
+                        f"Unexpected value for exit_status: {opt_result['exit_status']}")
 
     def test_opt_report_check_file_created(self):
         self.setup_problem_and_run_driver(Driver,
@@ -91,6 +123,7 @@ class TestOptimizationReport(unittest.TestCase):
                                           vars_lower=-50, vars_upper=50.,
                                           cons_lower=-1,
                                           )
+        self.check_opt_result(expected={'obj_calls': 0, 'deriv_calls': 0})
         opt_report(self.prob.driver)
 
     def test_opt_report_scipyopt_SLSQP(self):
@@ -99,9 +132,39 @@ class TestOptimizationReport(unittest.TestCase):
                                           cons_lower=0, cons_upper=10.,
                                           optimizer='SLSQP',
                                           )
+        self.check_opt_result()
         opt_report(self.prob.driver)
 
-    def test_opt_report_scipyopt_DOE(self):
+    def test_opt_report_scipyopt_COBYLA(self):
+        self.setup_problem_and_run_driver(om.ScipyOptimizeDriver,
+                                          vars_lower=-50, vars_upper=50.,
+                                          cons_lower=0, cons_upper=10.,
+                                          optimizer='COBYLA',
+                                          )
+        self.check_opt_result(expected={'deriv_calls': None})
+        opt_report(self.prob.driver)
+
+    @require_pyoptsparse('SNOPT')
+    def test_opt_report_pyoptsparse_snopt(self):
+        self.setup_problem_and_run_driver(om.pyOptSparseDriver,
+                                          vars_lower=-50, vars_upper=50.,
+                                          cons_lower=0, cons_upper=10.,
+                                          optimizer='SNOPT'
+                                          )
+        self.check_opt_result()
+        opt_report(self.prob.driver)
+
+    @require_pyoptsparse('SLSQP')
+    def test_opt_report_pyoptsparse_SLSQP(self):
+        self.setup_problem_and_run_driver(om.pyOptSparseDriver,
+                                          vars_lower=-50, vars_upper=50.,
+                                          cons_lower=0, cons_upper=10.,
+                                          optimizer='SLSQP'
+                                          )
+        self.check_opt_result()
+        opt_report(self.prob.driver)
+
+    def test_opt_report_DOE(self):
         # no report should be generated for this
         import openmdao.api as om
         from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -125,6 +188,8 @@ class TestOptimizationReport(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
+        self.check_opt_result(prob.driver.opt_result, expected={'obj_calls': 0, 'deriv_calls': 0})
+
         expected_warning_msg = "The optimizer report is not applicable for the DOEDriver Driver " \
                                "which does not support optimization"
         with assert_warning(DriverWarning, expected_warning_msg):
@@ -132,37 +197,12 @@ class TestOptimizationReport(unittest.TestCase):
         outfilepath = str(pathlib.Path(prob.get_reports_dir()).joinpath(_default_optimizer_report_filename))
         self.assertFalse(os.path.exists(outfilepath))
 
-    def test_opt_report_scipyopt_COBYLA(self):
-        self.setup_problem_and_run_driver(om.ScipyOptimizeDriver,
-                                          vars_lower=-50, vars_upper=50.,
-                                          cons_lower=0, cons_upper=10.,
-                                          optimizer='COBYLA',
-                                          )
-        opt_report(self.prob.driver)
-
-    @require_pyoptsparse('SNOPT')
-    def test_opt_report_pyoptsparse_snopt(self):
-        self.setup_problem_and_run_driver(om.pyOptSparseDriver,
-                                          vars_lower=-50, vars_upper=50.,
-                                          cons_lower=0, cons_upper=10.,
-                                          optimizer='SNOPT'
-                                          )
-        opt_report(self.prob.driver)
-
-    @require_pyoptsparse('SLSQP')
-    def test_opt_report_pyoptsparse_SLSQP(self):
-        self.setup_problem_and_run_driver(om.pyOptSparseDriver,
-                                          vars_lower=-50, vars_upper=50.,
-                                          cons_lower=0, cons_upper=10.,
-                                          optimizer='SLSQP'
-                                          )
-        opt_report(self.prob.driver)
-
     def test_opt_report_genetic_algorithm(self):
         self.setup_problem_and_run_driver(om.SimpleGADriver,
                                           vars_lower=-50, vars_upper=50.,
                                           cons_lower=0, cons_upper=10.,
                                           )
+        self.check_opt_result(expected={'deriv_calls': 0})
         opt_report(self.prob.driver)
 
     def test_opt_report_differential_evolution(self):
@@ -189,6 +229,8 @@ class TestOptimizationReport(unittest.TestCase):
         prob.set_val('exec.x', np.linspace(-10, 10, 101))
 
         prob.run_driver()
+
+        self.check_opt_result(prob.driver.opt_result, expected={'deriv_calls': 0})
         opt_report(prob.driver)
 
     # Next test all the different variations of variable types (scalar and array) for both

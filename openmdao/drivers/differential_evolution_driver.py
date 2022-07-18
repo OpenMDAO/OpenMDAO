@@ -50,6 +50,8 @@ class DifferentialEvolutionDriver(Driver):
         design variables.
     _ga : <DifferentialEvolution>
         Main genetic algorithm lies here.
+    _nfit : int
+         Number of successful function evaluations.
     _randomstate : int
         Seed-number which controls the random draws.
     """
@@ -76,6 +78,7 @@ class DifferentialEvolutionDriver(Driver):
 
         self._desvar_idx = {}
         self._ga = None
+        self._nfit = 0
 
         # random state can be set for predictability during testing
         if 'DifferentialEvolutionDriver_seed' in os.environ:

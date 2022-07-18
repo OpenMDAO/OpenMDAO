@@ -180,9 +180,9 @@ class Driver(object):
 
         self.opt_result = {
             'runtime': 0.0,
-            'iter_count': 1,
-            'obj_calls': 1,
-            'deriv_calls': 1,
+            'iter_count': 0,
+            'obj_calls': 0,
+            'deriv_calls': 0,
             'exit_status': 'NOT_RUN'
         }
 
@@ -625,7 +625,7 @@ class Driver(object):
         int
             Number of objective evaluations made during a driver run.
         """
-        return 1
+        return 0
 
     def get_driver_derivative_calls(self):
         """
@@ -636,7 +636,7 @@ class Driver(object):
         int
             Number of derivative evaluations made during a driver run.
         """
-        return 1
+        return 0
 
     def get_design_var_values(self, get_remote=True, driver_scaling=True):
         """
@@ -872,21 +872,10 @@ class Driver(object):
         bool
             Failure flag; True if failed to converge, False is successful.
         """
-        self._start_time = time.time()
-
         with RecordingDebugging(self._get_name(), self.iter_count, self):
             self._problem().model.run_solve_nonlinear()
 
         self.iter_count += 1
-
-        # save results of run
-        self.opt_result = {
-            'runtime': time.time() - self._start_time,
-            'iter_count': self.iter_count,
-            'obj_calls': self.get_driver_objective_calls(),
-            'deriv_calls': self.get_driver_derivative_calls(),
-            'exit_status': self.get_exit_status()
-        }
 
         return False
 
@@ -1312,6 +1301,65 @@ class Driver(object):
                     issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
 
             return coloring
+
+
+class SaveOptResult(object):
+    """
+    A context manager that saves details about a driver run.
+
+    Parameters
+    ----------
+    driver : Driver
+        The driver.
+
+    Attributes
+    ----------
+    _driver : Driver
+        The driver for which we are saving results.
+    _start_time : float
+        The start time used to compute the run time.
+    """
+
+    def __init__(self, driver):
+        """
+        Initialize attributes.
+        """
+        self._driver = driver
+
+    def __enter__(self):
+        """
+        Set start time for the driver run.
+
+        This uses 'perf_counter()' which gives "the value (in fractional seconds)
+        of a performance counter, i.e. a clock with the highest available resolution
+        to measure a short duration. It does include time elapsed during sleep and
+        is system-wide."
+
+        Returns
+        -------
+        self : object
+            self
+        """
+        self._start_time = time.perf_counter()
+        return self
+
+    def __exit__(self, *args):
+        """
+        Save driver run information in the 'opt_result' attribute.
+
+        Parameters
+        ----------
+        *args : array
+            Solver recording requires extra args.
+        """
+        driver = self._driver
+        driver.opt_result = {
+            'runtime': time.perf_counter() - self._start_time,
+            'iter_count': driver.iter_count,
+            'obj_calls': driver.get_driver_objective_calls(),
+            'deriv_calls': driver.get_driver_derivative_calls(),
+            'exit_status': driver.get_exit_status()
+        }
 
 
 class RecordingDebugging(Recording):

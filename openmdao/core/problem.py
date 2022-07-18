@@ -17,7 +17,7 @@ import scipy.sparse as sparse
 
 from openmdao.core.constants import _SetupStatus
 from openmdao.core.component import Component
-from openmdao.core.driver import Driver, record_iteration
+from openmdao.core.driver import Driver, record_iteration, SaveOptResult
 from openmdao.core.group import Group, System
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
@@ -808,7 +808,9 @@ class Problem(object):
             record_model_options(self, self._run_counter)
 
             self.model._clear_iprint()
-            return self.driver.run()
+
+            with SaveOptResult(self.driver):
+                return self.driver.run()
         finally:
             self._recording_iter.prefix = old_prefix
 
