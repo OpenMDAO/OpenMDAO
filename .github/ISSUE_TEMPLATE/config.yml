@@ -1,0 +1,9 @@
+
+blank_issues_enabled: true
+contact_links:
+  - name: Propose an Enhancement
+    url: https://github.com/OpenMDAO/POEMs
+    about: Enhancements and API changes should be submitted as POEMs at this repository.
+  - name: Question
+    url: https://stackoverflow.com/questions/tagged/openmdao
+    about: "Please use the #openmdao tag on stackoverflow for questions."
