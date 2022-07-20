@@ -404,6 +404,9 @@ def get_reports_to_activate(reports=_UNDEFINED):
     list of str
         List of report names.
     """
+    if not reports or not reports_active():
+        return []
+
     reps_env = os.environ.get('OPENMDAO_REPORTS', 'true')
     env_list = _reports2list(reps_env, _default_reports[:])
     return _reports2list(reports, env_list)
@@ -474,10 +477,14 @@ def _add_dir_to_tree(dirpath, lines):
     lines : list of str
         List of lines in the final html.
     """
+    files = os.listdir(dirpath)
+    if not files:
+        return
+
     lines.append(f'<li><span class="caret">{os.path.basename(dirpath)}</span>')
     lines.append(f'<ul>')
 
-    for f in os.listdir(dirpath):
+    for f in files:
         path = os.path.join(dirpath, f)
         if os.path.isdir(path):
             _add_dir_to_tree(path, lines)
