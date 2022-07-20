@@ -608,5 +608,3 @@ def gen_index_file(reports_dir):
 
     with open(os.path.join(reports_dir, 'index.html'), 'w') as f:
         f.write('\n'.join(parts))
-
-    print('\n'.join(parts))
