@@ -55,7 +55,7 @@ class OmLayout extends Layout {
         if (node.draw.hidden) return;
         super._updateTextWidths(node);
 
-        if (!node.isInputOrOutput()) {
+        if (!node.isInputOrOutput() && !node.isFilter()) {
             node.draw.nameSolverWidthPx = this._getTextWidth(node.getSolverText()) + 2 *
                 this.size.rightTextMargin;
         }
