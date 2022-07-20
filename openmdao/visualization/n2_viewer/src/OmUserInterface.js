@@ -50,16 +50,13 @@ class OmUserInterface extends UserInterface {
      */
     setSolvers(linear) {
         // Update the diagram
-        this.diag.showLinearSolverNames = linear;
+        OmTreeNode.showLinearSolverNames = linear;
 
         // update the legend
-        this.legend.toggleSolvers(this.diag.showLinearSolverNames);
+        this.legend.updateSolvers();
 
         if (this.legend.shown)
-            this.legend.show(
-                this.diag.showLinearSolverNames,
-                this.diag.style.solvers
-            );
+            this.legend.show();
         this.diag.update();
     }
 
@@ -110,7 +107,7 @@ class OmUserInterface extends UserInterface {
     saveState() {
         // Solver toggle state.
         const extraData = {
-            'showLinearSolverNames': this.diag.showLinearSolverNames,
+            'showLinearSolverNames': OmTreeNode.showLinearSolverNames,
             'showSolvers': this.diag.showSolvers,            
         }
 
