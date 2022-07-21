@@ -1,5 +1,7 @@
 """Define the Problem class and a FakeComm class for non-MPI users."""
 
+import __main__
+
 import sys
 import pprint
 import os
@@ -74,6 +76,52 @@ CITATION = """@article{openmdao_2019,
     pdf={http://openmdao.org/pubs/openmdao_overview_2019.pdf},
     note= {In Press}
     }"""
+
+
+def _get_top_script():
+    """
+    Return the absolute pathname of the top level script.
+
+    Returns
+    -------
+    Path or None
+        The absolute path, or None if it can't be resolved.
+    """
+    try:
+        return pathlib.Path(__main__.__file__).resolve()
+    except Exception:
+        # this will error out in some cases, e.g. inside of a jupyter notebook, so just
+        # return None in that case.
+        pass
+
+
+def _default_prob_name():
+    """
+    Return the default problem name.
+
+    Returns
+    -------
+    str
+        The default problem name.
+    """
+    name = _get_top_script()
+    if name is None:
+        return 'problem'
+
+    try:
+        try:
+            # shorten name a little by removing home dir from it if we can
+            name = name.relative_to(pathlib.Path.home())
+        except ValueError:
+            pass
+
+        name = name.parent.joinpath(name.stem)  # get rid of .py
+    except ValueError:
+        pass
+
+    name = str(name).replace('/', '_').replace('\\', '_')
+
+    return name
 
 
 class Problem(object):
@@ -164,28 +212,29 @@ class Problem(object):
         self._reports = get_reports_to_activate(reports)
 
         self.cite = CITATION
+        self._warned = False
 
-        # Code to give non-empty names to Problems so that they can be
-        # referenced from command line tools (e.g. check) that accept a Problem argument
+        # Set the Problem name so that it can be referenced from command line tools (e.g. check)
+        # that accept a Problem argument, and to name the corresponding reports subdirectory.
+
         if name:  # if name hasn't been used yet, use it. Otherwise, error
             if name not in _problem_names:
                 self._name = name
             else:
                 raise ValueError(f"The problem name '{name}' already exists")
         else:  # No name given: look for a name, of the form, 'problemN', that hasn't been used
-            problem_counter = len(_problem_names) + 1
-            _name = f"problem{problem_counter}"
+            problem_counter = len(_problem_names) + 1 if _problem_names else ''
+            base = _default_prob_name()
+            _name = f"{base}{problem_counter}"
             if _name in _problem_names:  # need to make it unique so append string of form '.N'
                 i = 1
                 while True:
-                    _name = f"problem{problem_counter}.{i}"
+                    _name = f"{base}{problem_counter}.{i}"
                     if _name not in _problem_names:
                         break
                     i += 1
             self._name = _name
         _problem_names.append(self._name)
-
-        self._warned = False
 
         if comm is None:
             use_mpi = check_mpi_env()

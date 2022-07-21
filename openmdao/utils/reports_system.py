@@ -6,7 +6,6 @@ from collections import namedtuple
 import sys
 import os
 import inspect
-import functools
 
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.mpi import MPI
@@ -14,6 +13,7 @@ from openmdao.utils.hooks import _register_hook, _unregister_hook
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.file_utils import _iter_entry_points
 from openmdao.utils.webview import webview
+from openmdao.utils.notebook_utils import notebook
 
 # Keeping track of the registered reports
 _Report = namedtuple(
@@ -22,7 +22,7 @@ _Report = namedtuple(
 _reports_registry = {}
 _default_reports = ['scaling', 'total_coloring', 'n2']
 _active_reports = set()  # these reports will actually run (assuming their hook funcs are triggered)
-_cmdline_reports = set()  # cmdline reports can be registered here to prevent default reports
+_cmdline_reports = set()  # cmdline reports registered here to so default reports aren't modified
 
 _reports_dir = os.environ.get('OPENMDAO_REPORTS_DIR', './reports')  # top dir for the reports
 
@@ -46,7 +46,7 @@ def reports_active():
     bool
         Return True if reports are active.
     """
-    return os.environ.get('TESTFLO_RUNNING', '').lower() not in ('1', 'true')
+    return os.environ.get('TESTFLO_RUNNING', '').lower() not in _truthy and not notebook
 
 
 def register_report(name, func, desc, class_name, method, pre_or_post, filename=None, inst_id=None):
@@ -371,6 +371,22 @@ def get_reports_dir():
 
 
 def _reports2list(reports, defaults):
+    """
+    Return a list of reports based on the value of the reports var and current default report list.
+
+    Parameters
+    ----------
+    reports : str, list, or _UNDEFINED
+        Variable indicating which reports should be active based on the current 'defaults' list.
+    defaults : list
+        List of current default reports.  This could be either the global report defaults or
+        a newer list of defaults based on previous processing.
+
+    Returns
+    -------
+    list
+        The list of reports that should be active.
+    """
     if reports in [True, _UNDEFINED]:
         return defaults
     if not reports:  # False or None or empty iter
@@ -515,31 +531,31 @@ def gen_index_file(reports_dir):
         <head>
         <meta charset="utf-8">
         <style>
-            .tree{
+            .tree {
                 --spacing : 1.5rem;
                 --radius  : 8px;
             }
 
-            .tree li{
+            .tree li {
                 display      : block;
                 position     : relative;
                 padding-left : calc(2 * var(--spacing) - var(--radius) - 2px);
             }
 
-            .tree ul{
+            .tree ul {
                 margin-left  : calc(var(--radius) - var(--spacing));
                 padding-left : 0;
             }
 
-            .tree ul li{
+            .tree ul li {
                 border-left : 2px solid #ddd;
             }
 
-            .tree ul li:last-child{
+            .tree ul li:last-child {
                 border-color : transparent;
             }
 
-            .tree ul li::before{
+            .tree ul li::before {
                 content      : '';
                 display      : block;
                 position     : absolute;
@@ -551,26 +567,26 @@ def gen_index_file(reports_dir):
                 border-width : 0 0 2px 2px;
             }
 
-            .tree summary{
+            .tree summary {
                 display : block;
                 cursor  : pointer;
             }
 
             .tree summary::marker,
-            .tree summary::-webkit-details-marker{
+            .tree summary::-webkit-details-marker {
                 display : none;
             }
 
-            .tree summary:focus{
+            .tree summary:focus {
                 outline : none;
             }
 
-            .tree summary:focus-visible{
+            .tree summary:focus-visible {
                 outline : 1px dotted #000;
             }
 
             .tree li::after,
-            .tree summary::before{
+            .tree summary::before {
                 content       : '';
                 display       : block;
                 position      : absolute;
@@ -582,7 +598,7 @@ def gen_index_file(reports_dir):
                 background    : #ddd;
             }
 
-            .tree summary::before{
+            .tree summary::before {
                 content     : '+';
                 z-index     : 1;
                 background  : #696;
@@ -591,7 +607,7 @@ def gen_index_file(reports_dir):
                 text-align  : center;
             }
 
-            .tree details[open] > summary::before{
+            .tree details[open] > summary::before {
                 content : '−';
             }
         </style>

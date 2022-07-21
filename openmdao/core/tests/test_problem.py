@@ -8,6 +8,7 @@ from io import StringIO
 import numpy as np
 
 import openmdao.api as om
+from openmdao.core.problem import _default_prob_name
 from openmdao.core.driver import Driver
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesConnected
@@ -2335,8 +2336,10 @@ class NestedProblemTestCase(unittest.TestCase):
         p.setup()
         p.run_model()  # need to do run_model in this test so sub problem is created
 
-        self.assertEqual(p._get_inst_id(), 'problem1')
-        self.assertEqual(G.nonlinear_solver._problem._get_inst_id(), 'problem2')
+        defname = _default_prob_name()
+
+        self.assertEqual(p._get_inst_id(), defname)
+        self.assertEqual(G.nonlinear_solver._problem._get_inst_id(), defname + '2')
 
         # If the second Problem uses the default name of the first
         openmdao.core.problem._problem_names = []  # need to reset these to simulate separate runs
@@ -2344,17 +2347,17 @@ class NestedProblemTestCase(unittest.TestCase):
         p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
         G = p.model.add_subsystem('G', om.Group())
         G.add_subsystem('comp', om.ExecComp('y=2*x'))
-        G.nonlinear_solver = _ProblemSolver(prob_name='problem1')
+        G.nonlinear_solver = _ProblemSolver(prob_name=defname)
         p.model.connect('indep.x', 'G.comp.x')
         p.setup()
 
         with self.assertRaises(Exception) as context:
             p.run_model()
-        self.assertEqual(str(context.exception), "The problem name 'problem1' already exists")
+        self.assertEqual(str(context.exception), f"The problem name '{defname}' already exists")
 
         # If the first Problem uses the default name of 'problem2'
         openmdao.core.problem._problem_names = []  # need to reset these to simulate separate runs
-        p = om.Problem(name='problem2')
+        p = om.Problem(name=defname + '2')
         p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
         G = p.model.add_subsystem('G', om.Group())
         G.add_subsystem('comp', om.ExecComp('y=2*x'))
@@ -2363,8 +2366,8 @@ class NestedProblemTestCase(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        self.assertEqual(p._get_inst_id(), 'problem2')
-        self.assertEqual(G.nonlinear_solver._problem._get_inst_id(), 'problem2.1')
+        self.assertEqual(p._get_inst_id(), defname + '2')
+        self.assertEqual(G.nonlinear_solver._problem._get_inst_id(),  defname + '2.1')
 
 
 class SystemInTwoProblemsTestCase(unittest.TestCase):
