@@ -17,6 +17,7 @@ from openmdao.utils.assert_utils import assert_warning
 from openmdao.utils.mpi import MPI
 from openmdao.utils.om_warnings import DriverWarning
 from openmdao.utils.testing_utils import use_tempdirs, require_pyoptsparse
+from openmdao.utils.tests.test_hooks import hooks_active
 
 from openmdao.visualization.opt_report.opt_report import opt_report, \
     _default_optimizer_report_filename
@@ -83,6 +84,9 @@ class TestOptimizationReport(unittest.TestCase):
         return prob
 
     def check_opt_result(self, opt_result=None, expected=None):
+        """
+        Check that the data in the opt_result dict is valid for the run.
+        """
         if opt_result is None:
             opt_result = self.prob.driver.opt_result
         if expected is None:
@@ -103,15 +107,50 @@ class TestOptimizationReport(unittest.TestCase):
                         else opt_result['exit_status'] == 'SUCCESS',
                         f"Unexpected value for exit_status: {opt_result['exit_status']}")
 
-    def test_opt_report_check_file_created(self):
-        self.setup_problem_and_run_driver(Driver,
-                                          vars_lower=-50, vars_upper=50.,
-                                          cons_lower=-1,
-                                          )
-        opt_report(self.prob.driver)
-        outfilepath = str(pathlib.Path(self.prob.get_reports_dir()).joinpath(_default_optimizer_report_filename))
+    def check_opt_report(self, prob=None, expected=None):
+        """
+        Parse the opt_result data from the report and verify.
+        """
+        if prob is None:
+            prob = self.prob
+        report_file_path = str(pathlib.Path(prob.get_reports_dir()).joinpath(_default_optimizer_report_filename))
 
-        self.assertTrue(os.path.exists(outfilepath))
+        check_rows = {
+            # 'runtime': '<tr><td>Wall clock run time:',
+            'iter_count':  '<tr><td>Number of driver iterations:',
+            'obj_calls':   '<tr><td>Number of objective calls:',
+            'deriv_calls': '<tr><td>Number of derivative calls:',
+            'exit_status': '<tr><td>Exit status:'
+        }
+
+        def second_cell(line):
+            """
+            get value from second cell of table row
+            """
+            value = line.split('</td><td>')[1].split('</td>')[0].strip()
+            if value == '':
+                # The report will show an empty cell when the value is 'None'
+                value = None
+            else:
+                try:
+                    value = int(value)
+                except ValueError as err:
+                    pass
+            return value
+
+        reported = {'runtime': 1}  # we won't parse/check runtime
+
+        with open(report_file_path, 'r') as f:
+            for line in f.readlines():
+                if line.startswith('<tr><td>'):
+                    for key, row in check_rows.items():
+                        if line.startswith(row):
+                            reported[key] = second_cell(line)
+                elif line.startswith('</table>'):
+                    # skip the rest of the file
+                    break
+
+        self.check_opt_result(reported, expected)
 
     # First test all the different Drivers
     def test_opt_report_run_once_driver(self):
@@ -119,8 +158,10 @@ class TestOptimizationReport(unittest.TestCase):
                                           vars_lower=-50, vars_upper=50.,
                                           cons_lower=-1,
                                           )
-        self.check_opt_result(expected={'obj_calls': 0, 'deriv_calls': 0})
-        opt_report(self.prob.driver)
+        expect = {'obj_calls': 0, 'deriv_calls': 0}
+        self.check_opt_result(expected=expect)
+        opt_report(self.prob)
+        self.check_opt_report(expected=expect)
 
     def test_opt_report_scipyopt_SLSQP(self):
         self.setup_problem_and_run_driver(om.ScipyOptimizeDriver,
@@ -129,7 +170,8 @@ class TestOptimizationReport(unittest.TestCase):
                                           optimizer='SLSQP',
                                           )
         self.check_opt_result()
-        opt_report(self.prob.driver)
+        opt_report(self.prob)
+        self.check_opt_report()
 
     def test_opt_report_scipyopt_COBYLA(self):
         self.setup_problem_and_run_driver(om.ScipyOptimizeDriver,
@@ -137,8 +179,10 @@ class TestOptimizationReport(unittest.TestCase):
                                           cons_lower=0, cons_upper=10.,
                                           optimizer='COBYLA',
                                           )
-        self.check_opt_result(expected={'deriv_calls': None})
-        opt_report(self.prob.driver)
+        expect = {'deriv_calls': None}
+        self.check_opt_result(expected=expect)
+        opt_report(self.prob)
+        self.check_opt_report(expected=expect)
 
     @require_pyoptsparse('SNOPT')
     def test_opt_report_pyoptsparse_snopt(self):
@@ -148,7 +192,8 @@ class TestOptimizationReport(unittest.TestCase):
                                           optimizer='SNOPT'
                                           )
         self.check_opt_result()
-        opt_report(self.prob.driver)
+        opt_report(self.prob)
+        self.check_opt_report()
 
     @require_pyoptsparse('SLSQP')
     def test_opt_report_pyoptsparse_SLSQP(self):
@@ -158,7 +203,8 @@ class TestOptimizationReport(unittest.TestCase):
                                           optimizer='SLSQP'
                                           )
         self.check_opt_result()
-        opt_report(self.prob.driver)
+        opt_report(self.prob)
+        self.check_opt_report()
 
     def test_opt_report_DOE(self):
         # no report should be generated for this
@@ -188,7 +234,7 @@ class TestOptimizationReport(unittest.TestCase):
         expected_warning_msg = "The optimizer report is not applicable for the DOEDriver Driver " \
                                "which does not support optimization"
         with assert_warning(DriverWarning, expected_warning_msg):
-            opt_report(prob.driver)
+            opt_report(prob)
         outfilepath = str(pathlib.Path(prob.get_reports_dir()).joinpath(_default_optimizer_report_filename))
         self.assertFalse(os.path.exists(outfilepath))
 
@@ -197,8 +243,10 @@ class TestOptimizationReport(unittest.TestCase):
                                           vars_lower=-50, vars_upper=50.,
                                           cons_lower=0, cons_upper=10.,
                                           )
-        self.check_opt_result(expected={'deriv_calls': 0})
-        opt_report(self.prob.driver)
+        expect = {'deriv_calls': 0}
+        self.check_opt_result(expected=expect)
+        opt_report(self.prob)
+        self.check_opt_report(expected=expect)
 
     def test_opt_report_differential_evolution(self):
         prob = om.Problem()
@@ -225,8 +273,10 @@ class TestOptimizationReport(unittest.TestCase):
 
         prob.run_driver()
 
-        self.check_opt_result(prob.driver.opt_result, expected={'deriv_calls': 0})
-        opt_report(prob.driver)
+        expect = {'deriv_calls': 0}
+        self.check_opt_result(prob.driver.opt_result, expected=expect)
+        opt_report(prob)
+        self.check_opt_report(prob, expected=expect)
 
     # Next test all the different variations of variable types (scalar and array) for both
     #  desvars and constraints. Also includes commented out code that can be uncommented to
@@ -250,7 +300,7 @@ class TestOptimizationReport(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
         prob.run_driver()
-        opt_report(prob.driver)
+        opt_report(prob)
 
     @require_pyoptsparse('SLSQP')
     def test_opt_report_scalar_desvars(self):
@@ -279,7 +329,7 @@ class TestOptimizationReport(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
         prob.final_setup()
-        opt_report(prob.driver)
+        opt_report(prob)
 
     @require_pyoptsparse('SLSQP')
     def test_opt_report_scalar_desvars_way_out_of_bounds(self):
@@ -297,7 +347,7 @@ class TestOptimizationReport(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
         prob.final_setup()
-        opt_report(prob.driver)
+        opt_report(prob)
 
     @require_pyoptsparse('SLSQP')
     def test_opt_report_scalar_constraint(self):
@@ -322,7 +372,7 @@ class TestOptimizationReport(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
         prob.final_setup()
-        opt_report(prob.driver)
+        opt_report(prob)
 
     def test_opt_report_scalar_equality_constraint(self):
         prob = om.Problem()
@@ -347,7 +397,7 @@ class TestOptimizationReport(unittest.TestCase):
 
         prob.setup()
         prob.final_setup()
-        opt_report(prob.driver)
+        opt_report(prob)
 
     def test_opt_report_array_constraint(self):
         size = 200  # how many items in the array
@@ -407,7 +457,7 @@ class TestOptimizationReport(unittest.TestCase):
 
         prob['x'] = np.arange(size) - 100.0
         prob.final_setup()
-        opt_report(prob.driver)
+        opt_report(prob)
 
     def test_opt_report_array_equality_constraint(self):
         prob = om.Problem()
@@ -432,7 +482,7 @@ class TestOptimizationReport(unittest.TestCase):
 
         prob.setup()
         prob.final_setup()
-        opt_report(prob.driver)
+        opt_report(prob)
 
     def test_opt_report_ref_arrays(self):
 
@@ -450,7 +500,23 @@ class TestOptimizationReport(unittest.TestCase):
 
         prob.setup()
         prob.run_driver()
-        opt_report(prob.driver)
+        opt_report(prob)
+
+    @hooks_active
+    def test_opt_report_hook(self):
+        testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
+
+        self.setup_problem_and_run_driver(om.ScipyOptimizeDriver,
+                                          vars_lower=-50, vars_upper=50.,
+                                          cons_lower=0, cons_upper=10.,
+                                          optimizer='SLSQP',)
+
+        # check that the report was run properly via the hook
+        # and has the expected opt_result data
+        self.check_opt_report()
+
+        if testflo_running is not None:
+            os.environ['TESTFLO_RUNNING'] = testflo_running
 
 
 @unittest.skipUnless(MPI, "MPI is required.")
@@ -480,4 +546,4 @@ class TestMPIScatter(unittest.TestCase):
 
         prob.setup()
         prob.run_driver()
-        opt_report(prob.driver)
+        opt_report(prob)
