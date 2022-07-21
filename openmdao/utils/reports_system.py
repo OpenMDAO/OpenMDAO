@@ -466,7 +466,7 @@ def _load_report_plugins():
         register_func()  # this runs the function that calls register_report
 
 
-def _add_dir_to_tree(dirpath, lines):
+def _add_dir_to_tree(dirpath, lines, level):
     """
     Create nested lists of directories with links to files.
 
@@ -481,13 +481,14 @@ def _add_dir_to_tree(dirpath, lines):
     if not files:
         return
 
-    lines.append(f'<li><details><summary>{os.path.basename(dirpath)}</summary>')
+    op = 'open' if level < 1 else ''
+    lines.append(f'<li><details {op}><summary>{os.path.basename(dirpath)}</summary>')
     lines.append(f'<ul>')
 
     for f in files:
         path = os.path.join(dirpath, f)
         if os.path.isdir(path):
-            _add_dir_to_tree(path, lines)
+            _add_dir_to_tree(path, lines, level + 1)
         elif f.endswith('.html') and f != 'index.html':
             lines.append(f'<li> <a href="file:///{path}">{f}</a> </li>')
 
@@ -601,7 +602,7 @@ def gen_index_file(reports_dir):
         """
     ]
     lines = ['<ul class="tree">']
-    _add_dir_to_tree(reports_dir, lines)
+    _add_dir_to_tree(reports_dir, lines, level=0)
 
     parts.append('\n'.join(lines))
     parts.append('</body>\n</html>')
