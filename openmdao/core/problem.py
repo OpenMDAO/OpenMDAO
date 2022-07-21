@@ -42,7 +42,7 @@ from openmdao.utils.hooks import _setup_hooks
 from openmdao.utils.indexer import indexer
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
-    clear_reports, get_reports_dir, _load_report_plugins, _active_reports
+    clear_reports, get_reports_dir, _load_report_plugins
 from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable, \
     _find_dict_meta
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \

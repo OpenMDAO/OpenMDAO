@@ -101,22 +101,23 @@ _ellipse_height = 0.15
 
 
 def _optimizer_report_register():
-    register_report('optimizer', opt_report, 'Summary of optimization', 'Driver', 'run', 'post')
+    register_report('optimizer', opt_report, 'Summary of optimization',
+                    'Problem', 'run_driver', 'post')
 
 
-def opt_report(driver, outfile=None):
+def opt_report(prob, outfile=None):
     """
     Write a summary of the optimization to the given file.
 
     Parameters
     ----------
-    driver : Driver
-        The Driver for which the optimization report is being generated.
+    prob : Problem
+        The Problem for which the optimization report is being generated.
     outfile : str or None
         The path to the HTML file to be written.  If None (default), write to the default report
         output path.
     """
-    prob = driver._problem()
+    driver = prob.driver
     if not driver.supports['optimization']:
         driver_class = type(driver).__name__
         issue_warning(f"The optimizer report is not applicable for the {driver_class} Driver "
