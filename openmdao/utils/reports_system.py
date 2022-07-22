@@ -13,7 +13,6 @@ from openmdao.utils.hooks import _register_hook, _unregister_hook
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.file_utils import _iter_entry_points
 from openmdao.utils.webview import webview
-from openmdao.utils.notebook_utils import notebook
 
 # Keeping track of the registered reports
 _Report = namedtuple(
@@ -46,7 +45,7 @@ def reports_active():
     bool
         Return True if reports are active.
     """
-    return os.environ.get('TESTFLO_RUNNING', '').lower() not in _truthy and not notebook
+    return os.environ.get('TESTFLO_RUNNING', '').lower() not in _truthy
 
 
 def register_report(name, func, desc, class_name, method, pre_or_post, filename=None, inst_id=None):
@@ -270,7 +269,7 @@ def _list_reports_cmd(options, user_args):
             list_reports(options.dflt, f)
 
 
-def view_reports(probname=None):
+def view_reports(probname=None, level=2):
     """
     Pop up a browser to view specified reports.
 
@@ -278,13 +277,15 @@ def view_reports(probname=None):
     ----------
     probname : str or None
         If not None, view only reports for the specified Problem, else view all reports.
+    level : int
+        Expand the reports directory tree to this level.  Default is 2.
     """
     if probname is None:
         tdir = _reports_dir
     else:
         tdir = os.path.join(_reports_dir, probname)
 
-    gen_index_file(tdir)
+    gen_index_file(tdir, level)
 
     webview(os.path.join(tdir, 'index.html'))
 
@@ -300,6 +301,8 @@ def _view_reports_setup_parser(parser):
     """
     parser.add_argument('-p', '--problem', action='store', dest='problem',
                         help='View reports only for the specified Problem.')
+    parser.add_argument('-l', '--level', action='store', dest='level', type=int, default=2,
+                        help='Expand the reports directory tree to this level. Default is 2.')
 
 
 def _view_reports_cmd(options, user_args):
@@ -313,7 +316,7 @@ def _view_reports_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    view_reports(options.problem)
+    view_reports(options.problem, level=options.level)
 
 
 def set_reports_dir(reports_dir_path):
@@ -482,7 +485,7 @@ def _load_report_plugins():
         register_func()  # this runs the function that calls register_report
 
 
-def _add_dir_to_tree(dirpath, lines, level):
+def _add_dir_to_tree(dirpath, lines, explevel, level):
     """
     Create nested lists of directories with links to files.
 
@@ -492,26 +495,30 @@ def _add_dir_to_tree(dirpath, lines, level):
         Starting directory.
     lines : list of str
         List of lines in the final html.
+    explevel : int
+        Expand the tree to this level.
+    level : int
+        The current level of the tree.
     """
     files = os.listdir(dirpath)
     if not files:
         return
 
-    op = 'open' if level < 1 else ''
+    op = 'open' if level < explevel else ''
     lines.append(f'<li><details {op}><summary>{os.path.basename(dirpath)}</summary>')
     lines.append(f'<ul>')
 
     for f in files:
         path = os.path.join(dirpath, f)
         if os.path.isdir(path):
-            _add_dir_to_tree(path, lines, level + 1)
+            _add_dir_to_tree(path, lines, explevel, level + 1)
         elif f.endswith('.html') and f != 'index.html':
             lines.append(f'<li> <a href="file:///{path}">{f}</a> </li>')
 
     lines.append('</ul></details></li>')
 
 
-def gen_index_file(reports_dir):
+def gen_index_file(reports_dir, level):
     """
     Generate an index.html file that will have links to all of the reports.
 
@@ -519,6 +526,8 @@ def gen_index_file(reports_dir):
     ----------
     reports_dir : str
         The top directory containing the reports.
+    level : int
+        Expand the reports directory tree to this level.
     """
     reports_dir = os.path.abspath(reports_dir)
 
@@ -618,7 +627,7 @@ def gen_index_file(reports_dir):
         """
     ]
     lines = ['<ul class="tree">']
-    _add_dir_to_tree(reports_dir, lines, level=0)
+    _add_dir_to_tree(reports_dir, lines, explevel=level, level=0)
 
     parts.append('\n'.join(lines))
     parts.append('</body>\n</html>')

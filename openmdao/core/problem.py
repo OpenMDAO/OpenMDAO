@@ -108,20 +108,7 @@ def _default_prob_name():
     if name is None:
         return 'problem'
 
-    try:
-        try:
-            # shorten name a little by removing home dir from it if we can
-            name = name.relative_to(pathlib.Path.home())
-        except ValueError:
-            pass
-
-        name = name.parent.joinpath(name.stem)  # get rid of .py
-    except ValueError:
-        pass
-
-    name = str(name).replace('/', '_').replace('\\', '_')
-
-    return name
+    return name.stem
 
 
 class Problem(object):
