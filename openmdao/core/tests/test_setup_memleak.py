@@ -1,6 +1,8 @@
 import unittest
 import tracemalloc
 import gc
+import os.path
+
 import openmdao.api as om
 from openmdao.test_suite.components.sellar_feature import SellarMDA
 
@@ -30,7 +32,8 @@ class TestSetupMemLeak(unittest.TestCase):
             snapshots = []
 
             for i in range(memtest):
-                prob.setup(check=False) # called here causes memory leak   
+                prob.setup(check=False) # called here causes memory leak
+                prob.set_solver_print(level=0)
                 prob.run_driver()
                 totals = prob.compute_totals("z", "x")
                 del totals
@@ -46,17 +49,18 @@ class TestSetupMemLeak(unittest.TestCase):
             for stat in top_stats:
                 tb_str = str(stat.traceback)
                 # Ignore memory allocations by tracemalloc itself, which throw things off:
-                if "/tracemalloc.py:" not in tb_str:
+                if f"{os.path.sep}tracemalloc.py:" not in tb_str:
                     total_mem += stat.size
-            
+
             mem_used.append(total_mem)
 
-        tracemalloc.stop()    
+        tracemalloc.stop()
         mem_diff = (mem_used[1] - mem_used[0])/1024
 
         self.assertLess(mem_diff, MAX_MEM_DIFF_KB,
             "Memory leak in setup(): %.1f KiB difference between %d and %d iter runs" %
                 (mem_diff, ITERS[0], ITERS[1]))
+
 
 if __name__ == '__main__':
     unittest.main()
