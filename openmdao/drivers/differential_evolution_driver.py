@@ -50,6 +50,8 @@ class DifferentialEvolutionDriver(Driver):
         design variables.
     _ga : <DifferentialEvolution>
         Main genetic algorithm lies here.
+    _nfit : int
+         Number of successful function evaluations.
     _randomstate : int
         Seed-number which controls the random draws.
     """
@@ -76,6 +78,7 @@ class DifferentialEvolutionDriver(Driver):
 
         self._desvar_idx = {}
         self._ga = None
+        self._nfit = 0
 
         # random state can be set for predictability during testing
         if 'DifferentialEvolutionDriver_seed' in os.environ:
@@ -239,6 +242,28 @@ class DifferentialEvolutionDriver(Driver):
         """
         return "DifferentialEvolution"
 
+    def get_driver_objective_calls(self):
+        """
+        Return number of objective evaluations made during a driver run.
+
+        Returns
+        -------
+        int
+            Number of objective evaluations made during a driver run.
+        """
+        return self._nfit
+
+    def get_driver_derivative_calls(self):
+        """
+        Return number of derivative evaluations made during a driver run.
+
+        Returns
+        -------
+        int
+            Number of derivative evaluations made during a driver run.
+        """
+        return 0
+
     def run(self):
         """
         Execute the genetic algorithm.
@@ -283,9 +308,9 @@ class DifferentialEvolutionDriver(Driver):
         if pop_size == 0:
             pop_size = 20 * count
 
-        desvar_new, obj, nfit = ga.execute_ga(x0, lower_bound, upper_bound,
-                                              pop_size, max_gen,
-                                              self._randomstate, F, Pc)
+        desvar_new, obj, self._nfit = ga.execute_ga(x0, lower_bound, upper_bound,
+                                                    pop_size, max_gen,
+                                                    self._randomstate, F, Pc)
 
         # Pull optimal parameters back into framework and re-run, so that
         # framework is left in the right final state

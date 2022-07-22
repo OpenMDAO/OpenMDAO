@@ -2,6 +2,7 @@
 from itertools import chain
 import pprint
 import sys
+import time
 import os
 import weakref
 
@@ -11,6 +12,7 @@ from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import INT_DTYPE, _SetupStatus
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.utils.hooks import _setup_hooks
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.general_utils import _src_name_iter
 from openmdao.utils.mpi import MPI
@@ -87,6 +89,8 @@ class Driver(object):
         Cached total jacobian handling object.
     _total_jac_linear : _TotalJacInfo or None
         Cached linear total jacobian handling object.
+    opt_result : dict
+        Dictionary containing information for use in the optimization report.
     """
 
     def __init__(self, **kwargs):
@@ -156,6 +160,7 @@ class Driver(object):
         self.supports.declare('simultaneous_derivatives', types=bool, default=False)
         self.supports.declare('total_jac_sparsity', types=bool, default=False)
         self.supports.declare('distributed_design_vars', types=bool, default=True)
+        self.supports.declare('optimization', types=bool, default=True)
 
         self.iter_count = 0
         self.cite = ""
@@ -172,6 +177,17 @@ class Driver(object):
 
         self._declare_options()
         self.options.update(kwargs)
+
+        self.opt_result = {
+            'runtime': 0.0,
+            'iter_count': 0,
+            'obj_calls': 0,
+            'deriv_calls': 0,
+            'exit_status': 'NOT_RUN'
+        }
+
+        # Want to allow the setting of hooks on Drivers
+        _setup_hooks(self)
 
     def _get_inst_id(self):
         if self._problem is None:
@@ -600,6 +616,28 @@ class Driver(object):
 
         return val
 
+    def get_driver_objective_calls(self):
+        """
+        Return number of objective evaluations made during a driver run.
+
+        Returns
+        -------
+        int
+            Number of objective evaluations made during a driver run.
+        """
+        return 0
+
+    def get_driver_derivative_calls(self):
+        """
+        Return number of derivative evaluations made during a driver run.
+
+        Returns
+        -------
+        int
+            Number of derivative evaluations made during a driver run.
+        """
+        return 0
+
     def get_design_var_values(self, get_remote=True, driver_scaling=True):
         """
         Return the design variable values.
@@ -811,6 +849,17 @@ class Driver(object):
 
         return response_size, desvar_size
 
+    def get_exit_status(self):
+        """
+        Return exit status of driver run.
+
+        Returns
+        -------
+        str
+            String indicating result of driver run.
+        """
+        return 'FAIL' if self.fail else 'SUCCESS'
+
     def run(self):
         """
         Execute this driver.
@@ -827,6 +876,7 @@ class Driver(object):
             self._problem().model.run_solve_nonlinear()
 
         self.iter_count += 1
+
         return False
 
     @property
@@ -1251,6 +1301,65 @@ class Driver(object):
                     issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
 
             return coloring
+
+
+class SaveOptResult(object):
+    """
+    A context manager that saves details about a driver run.
+
+    Parameters
+    ----------
+    driver : Driver
+        The driver.
+
+    Attributes
+    ----------
+    _driver : Driver
+        The driver for which we are saving results.
+    _start_time : float
+        The start time used to compute the run time.
+    """
+
+    def __init__(self, driver):
+        """
+        Initialize attributes.
+        """
+        self._driver = driver
+
+    def __enter__(self):
+        """
+        Set start time for the driver run.
+
+        This uses 'perf_counter()' which gives "the value (in fractional seconds)
+        of a performance counter, i.e. a clock with the highest available resolution
+        to measure a short duration. It does include time elapsed during sleep and
+        is system-wide."
+
+        Returns
+        -------
+        self : object
+            self
+        """
+        self._start_time = time.perf_counter()
+        return self
+
+    def __exit__(self, *args):
+        """
+        Save driver run information in the 'opt_result' attribute.
+
+        Parameters
+        ----------
+        *args : array
+            Solver recording requires extra args.
+        """
+        driver = self._driver
+        driver.opt_result = {
+            'runtime': time.perf_counter() - self._start_time,
+            'iter_count': driver.iter_count,
+            'obj_calls': driver.get_driver_objective_calls(),
+            'deriv_calls': driver.get_driver_derivative_calls(),
+            'exit_status': driver.get_exit_status()
+        }
 
 
 class RecordingDebugging(Recording):

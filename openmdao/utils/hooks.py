@@ -200,8 +200,6 @@ def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=
 
     Parameters
     ----------
-    hookfunc : function
-        A function to execute in the designated hook location.
     fname : str
         The name of the function where the pre and/or post hook will be applied.
     class_name : str

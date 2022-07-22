@@ -20,7 +20,7 @@ _Report = namedtuple(
     'Report', 'func description class_name inst_id method pre_or_post report_filename'
 )
 _reports_registry = {}
-_default_reports = ['scaling', 'total_coloring', 'n2']
+_default_reports = ['scaling', 'total_coloring', 'n2', 'optimizer']
 _active_reports = set()  # these reports will actually run (assuming their hook funcs are triggered)
 _cmdline_reports = set()  # cmdline reports registered here to so default reports aren't modified
 

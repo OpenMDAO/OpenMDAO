@@ -19,7 +19,7 @@ import scipy.sparse as sparse
 
 from openmdao.core.constants import _SetupStatus
 from openmdao.core.component import Component
-from openmdao.core.driver import Driver, record_iteration
+from openmdao.core.driver import Driver, record_iteration, SaveOptResult
 from openmdao.core.group import Group, System
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
@@ -44,7 +44,7 @@ from openmdao.utils.hooks import _setup_hooks
 from openmdao.utils.indexer import indexer
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
-    clear_reports, get_reports_dir, _load_report_plugins, reports_active
+    clear_reports, get_reports_dir, _load_report_plugins, _truthy
 from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable, \
     _find_dict_meta
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
@@ -105,7 +105,7 @@ def _default_prob_name():
         The default problem name.
     """
     name = _get_top_script()
-    if name is None:
+    if name is None or os.environ.get('TESTFLO_RUNNING', '0').lower() in _truthy:
         return 'problem'
 
     return name.stem
@@ -844,7 +844,9 @@ class Problem(object):
             record_model_options(self, self._run_counter)
 
             self.model._clear_iprint()
-            return self.driver.run()
+
+            with SaveOptResult(self.driver):
+                return self.driver.run()
         finally:
             self._recording_iter.prefix = old_prefix
 
@@ -2254,11 +2256,17 @@ class Problem(object):
 
         self.model._set_complex_step_mode(active)
 
-    def get_reports_dir(self):
+    def get_reports_dir(self, force=False):
         """
         Get the path to the directory where the report files should go.
 
         If it doesn't exist, it will be created.
+
+        Parameters
+        ----------
+        force : bool
+            If True, create the reports directory if it doesn't exist, even if this Problem does
+            not have any active reports. This can happen when running testflo.
 
         Returns
         -------
@@ -2267,7 +2275,7 @@ class Problem(object):
         """
         reports_dirpath = pathlib.Path(get_reports_dir()).joinpath(f'{self._name}')
 
-        if self.comm.rank == 0 and self._reports:
+        if self.comm.rank == 0 and (force or self._reports):
             pathlib.Path(reports_dirpath).mkdir(parents=True, exist_ok=True)
 
         return reports_dirpath

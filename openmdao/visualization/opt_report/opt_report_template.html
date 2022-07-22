@@ -1,0 +1,66 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+
+<title>OpenMDAO Optimization Report for Problem {title}</title>
+
+<!-- CSS style to set alternate table
+row using color -->
+<style>
+    body {{
+        font: normal 10px Verdana, Arial, sans-serif;
+    }}
+
+    table {{
+        border-collapse: collapse;
+        width: 90%;
+    }}
+
+    th {{
+      background-color: SlateGray;
+      color: white;
+      }}
+
+    th, td {{
+        text-align: left;
+        padding: 8px;
+    }}
+
+    tr:nth-child(even) {{
+        background-color: LightGray;
+    }}
+
+    tr:nth-child(odd) {{
+        background-color: GhostWhite;
+    }}
+
+    span.equality-constraint {{
+        font-size: 25px;
+     }}
+    span.equality-constraint-satisfied {{
+        font-size: 25px;
+        color: green;
+     }}
+    span.equality-constraint-violated {{
+        font-size: 25px;
+        color: red;
+     }}
+</style>
+</head>
+
+<body>
+<h1>OpenMDAO Optimization Report for Problem {title} (All values are in unscaled, physical units)</h1>
+{header}
+<h2>Objectives</h2>
+{objs}
+<h2>Design Variables</h2>
+{desvars}
+<h2>Constraints</h2>
+{cons}
+<h2>Optimizer settings</h2>
+{driver}
+</body>
+
+</html>

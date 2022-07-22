@@ -57,6 +57,8 @@ class SimpleGADriver(Driver):
         Main genetic algorithm lies here.
     _randomstate : np.random.RandomState, int
          Random state (or seed-number) which controls the seed and random draws.
+    _nfit : int
+         Number of successful function evaluations.
     """
 
     def __init__(self, **kwargs):
@@ -91,6 +93,8 @@ class SimpleGADriver(Driver):
         # Support for Parallel models.
         self._concurrent_pop_size = 0
         self._concurrent_color = 0
+
+        self._nfit = 0  # Number of successful function evaluations
 
     def _declare_options(self):
         """
@@ -263,6 +267,28 @@ class SimpleGADriver(Driver):
         """
         return "SimpleGA"
 
+    def get_driver_objective_calls(self):
+        """
+        Return number of objective evaluations made during a driver run.
+
+        Returns
+        -------
+        int
+            Number of objective evaluations made during a driver run.
+        """
+        return self._nfit
+
+    def get_driver_derivative_calls(self):
+        """
+        Return number of derivative evaluations made during a driver run.
+
+        Returns
+        -------
+        int
+            Number of derivative evaluations made during a driver run.
+        """
+        return 0
+
     def run(self):
         """
         Execute the genetic algorithm.
@@ -356,9 +382,9 @@ class SimpleGADriver(Driver):
         if pop_size == 0:
             pop_size = 4 * np.sum(bits)
 
-        desvar_new, obj, nfit = ga.execute_ga(x0, lower_bound, upper_bound, outer_bound,
-                                              bits, pop_size, max_gen,
-                                              self._randomstate, Pm, Pc)
+        desvar_new, obj, self._nfit = ga.execute_ga(x0, lower_bound, upper_bound, outer_bound,
+                                                    bits, pop_size, max_gen,
+                                                    self._randomstate, Pm, Pc)
 
         if compute_pareto:
             # Just save the non-dominated points.

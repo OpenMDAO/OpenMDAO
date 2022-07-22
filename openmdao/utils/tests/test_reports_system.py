@@ -3,7 +3,6 @@ import unittest
 import pathlib
 import sys
 import os
-import functools
 from io import StringIO
 
 import openmdao.api as om
@@ -12,7 +11,6 @@ from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.core.problem import _default_prob_name
 import openmdao.core.problem as probmod
 from openmdao.core.constants import _UNDEFINED
-from openmdao.utils.assert_utils import assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.reports_system import set_reports_dir, _reports_dir, register_report, \
     list_reports, clear_reports, _reset_reports_dir, activate_report
@@ -21,6 +19,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.tests.test_hooks import hooks_active
 from openmdao.visualization.n2_viewer.n2_viewer import _default_n2_filename, _run_n2_report
 from openmdao.visualization.scaling_viewer.scaling_report import _default_scaling_filename
+from openmdao.visualization.opt_report.opt_report import _default_optimizer_report_filename
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -38,6 +37,7 @@ class TestReportsSystem(unittest.TestCase):
     def setUp(self):
         self.n2_filename = _default_n2_filename
         self.scaling_filename = _default_scaling_filename
+        self.optimizer_filename = _default_optimizer_report_filename
 
         # set things to a known initial state for all the test runs
         probmod._problem_names = []  # need to reset these to simulate separate runs
@@ -127,6 +127,8 @@ class TestReportsSystem(unittest.TestCase):
         self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.optimizer_filename)
+        self.assertTrue(path.is_file(), f'The optimizer report file, {str(path)}, was not found')
 
     @hooks_active
     @unittest.skipUnless(OPTIMIZER, "This test requires pyOptSparseDriver.")
@@ -141,6 +143,8 @@ class TestReportsSystem(unittest.TestCase):
         self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.optimizer_filename)
+        self.assertTrue(path.is_file(), f'The optimizer report file, {str(path)}, was not found')
 
     @hooks_active
     def test_report_generation_basic_doedriver(self):
@@ -151,10 +155,13 @@ class TestReportsSystem(unittest.TestCase):
 
         path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
         self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
-        # DOEDriver won't cause the creation of a scaling report
+        # DOEDriver won't cause the creation of a scaling or optimizer report
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertFalse(path.is_file(),
                          f'The scaling report file, {str(path)}, was found but should not exist.')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.optimizer_filename)
+        self.assertFalse(path.is_file(),
+                         f'The optimizer report file, {str(path)}, was found but should not exist.')
 
     @hooks_active
     def test_report_generation_list_reports(self):
@@ -171,6 +178,8 @@ class TestReportsSystem(unittest.TestCase):
                         '"N2 diagram" expected in list_reports output but was not found')
         self.assertTrue('Driver scaling report' in output,
                         '"Driver scaling report" expected in list_reports output but was not found')
+        self.assertTrue('Summary of optimization' in output,
+                        '"Summary of optimization" expected in list_reports output but was not found')
 
     @hooks_active
     def test_report_generation_no_reports_using_env_var(self):
@@ -189,6 +198,9 @@ class TestReportsSystem(unittest.TestCase):
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertFalse(path.is_file(),
                          f'The scaling report file, {str(path)}, was found but should not exist.')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.optimizer_filename)
+        self.assertFalse(path.is_file(),
+                         f'The optimizer report file, {str(path)}, was found but should not exist.')
 
     @hooks_active
     def test_report_generation_selected_reports_using_env_var(self):
@@ -206,6 +218,9 @@ class TestReportsSystem(unittest.TestCase):
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertFalse(path.is_file(),
                          f'The scaling report file, {str(path)}, was found but should not exist.')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.optimizer_filename)
+        self.assertFalse(path.is_file(),
+                         f'The optimizer report file, {str(path)}, was found but should not exist.')
 
     @hooks_active
     def test_report_generation_selected_reports_override_env_var(self):
@@ -213,19 +228,22 @@ class TestReportsSystem(unittest.TestCase):
         os.environ['OPENMDAO_REPORTS'] = 'n2'
         clear_reports()
 
-        prob = self.setup_and_run_simple_problem(reports=['n2', 'scaling'])
+        prob = self.setup_and_run_simple_problem(reports=['optimizer', 'scaling'])
 
         # See if the report files exist and if they have the right names
         problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
 
         path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
-        self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
+        self.assertFalse(path.is_file(),
+                         f'The N2 report file, {str(path)} was found but should not exist.')
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertTrue(path.is_file(), f'The scaling report file, {str(path)} was not found')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.optimizer_filename)
+        self.assertTrue(path.is_file(), f'The optimizer report file, {str(path)}, was not found')
 
     @hooks_active
     def test_report_generation_selected_reports_override_env_var2(self):
-        # test use of problem reports to override OPENMDAO_REPORTS
+        # test use of problem reports to override OPENMDAO_REPORTS. This time with two reports
         os.environ['OPENMDAO_REPORTS'] = 'n2,scaling'
         clear_reports()
 
@@ -240,6 +258,9 @@ class TestReportsSystem(unittest.TestCase):
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertFalse(path.is_file(),
                          f'The scaling report file, {str(path)}, was found but should not exist.')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.optimizer_filename)
+        self.assertFalse(path.is_file(),
+                         f'The optimizer report file, {str(path)}, was found but should not exist.')
 
     @hooks_active
     def test_report_generation_set_reports_dir_using_env_var(self):
@@ -258,6 +279,8 @@ class TestReportsSystem(unittest.TestCase):
         self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.optimizer_filename)
+        self.assertTrue(path.is_file(), f'The optimizer report file, {str(path)}, was not found')
 
     @hooks_active
     def test_report_generation_user_defined_report(self):
@@ -318,7 +341,7 @@ class TestReportsSystem(unittest.TestCase):
     def test_report_generation_multiple_problems(self):
         probname, subprobname = self.setup_and_run_model_with_subproblem()
 
-        # The multiple problem code only runs model so no scaling reports to look for
+        # The multiple problem code only runs model so no scaling or optimizer reports to look for
         for problem_name in [probname, subprobname]:
             problem_reports_dir = pathlib.Path(_reports_dir).joinpath(f'{problem_name}')
             path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
@@ -328,7 +351,6 @@ class TestReportsSystem(unittest.TestCase):
     def test_report_generation_multiple_problems_report_specific_problem(self):
         # test the ability to register a report with a specific Problem name rather
         #   than have the report run for all Problems
-
         os.environ['OPENMDAO_REPORTS'] = 'n2_report'
 
         # to simplify things, just do n2.
@@ -370,6 +392,9 @@ class TestReportsSystem(unittest.TestCase):
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertFalse(path.is_file(),
                          f'The scaling report file, {str(path)}, was found but should not exist.')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.optimizer_filename)
+        self.assertFalse(path.is_file(),
+                         f'The optimizer report file, {str(path)}, was found but should not exist.')
 
     @hooks_active
     def test_report_generation_basic_problem_reports_argument_false(self):
@@ -383,6 +408,9 @@ class TestReportsSystem(unittest.TestCase):
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertFalse(path.is_file(),
                          f'The scaling report file, {str(path)}, was found but should not exist.')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.optimizer_filename)
+        self.assertFalse(path.is_file(),
+                         f'The optimizer report file, {str(path)}, was found but should not exist.')
 
     @hooks_active
     def test_report_generation_basic_problem_reports_argument_none(self):
@@ -397,6 +425,9 @@ class TestReportsSystem(unittest.TestCase):
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertFalse(path.is_file(),
                          f'The scaling report file, {str(path)}, was found but should not exist.')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.optimizer_filename)
+        self.assertFalse(path.is_file(),
+                         f'The optimizer report file, {str(path)}, was found but should not exist.')
 
     @hooks_active
     def test_report_generation_basic_problem_reports_argument_n2_only(self):
@@ -410,6 +441,9 @@ class TestReportsSystem(unittest.TestCase):
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertFalse(path.is_file(),
                          f'The scaling report file, {str(path)}, was found but should not exist.')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.optimizer_filename)
+        self.assertFalse(path.is_file(),
+                         f'The optimizer report file, {str(path)}, was found but should not exist.')
 
     @hooks_active
     def test_report_generation_basic_problem_reports_argument_n2_and_scaling(self):
@@ -422,6 +456,9 @@ class TestReportsSystem(unittest.TestCase):
         self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
         path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
         self.assertTrue(path.is_file(), f'The scaling report file, {str(path)} was not found')
+        path = pathlib.Path(problem_reports_dir).joinpath(self.optimizer_filename)
+        self.assertFalse(path.is_file(),
+                         f'The optimizer report file, {str(path)}, was found but should not exist.')
 
     @hooks_active
     def test_report_generation_problem_reports_argument_multiple_problems(self):
@@ -467,6 +504,7 @@ class TestReportsSystemMPI(unittest.TestCase):
     def setUp(self):
         self.n2_filename = _default_n2_filename
         self.scaling_filename = _default_scaling_filename
+        self.optimizer_filename = _default_optimizer_report_filename
 
         # set things to a known initial state for all the test runs
         probmod._problem_names = []  # need to reset these to simulate separate runs
@@ -505,13 +543,15 @@ class TestReportsSystemMPI(unittest.TestCase):
 
         prob.run_driver()
 
-        # get the path to the problem subdirectory
-        problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
+        if prob.comm.rank == 0:
+            problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob._name)
 
-        path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
-        self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
-        path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
-        self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
+            path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
+            self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
+            path = pathlib.Path(problem_reports_dir).joinpath(self.scaling_filename)
+            self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
+            path = pathlib.Path(problem_reports_dir).joinpath(self.optimizer_filename)
+            self.assertTrue(path.is_file(), f'The optimizer report file, {str(path)}, was not found')
 
 
 if __name__ == '__main__':
