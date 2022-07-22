@@ -6,6 +6,7 @@ from collections import namedtuple
 import sys
 import os
 import inspect
+from itertools import chain
 
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.mpi import MPI
@@ -500,15 +501,19 @@ def _add_dir_to_tree(dirpath, lines, explevel, level):
     level : int
         The current level of the tree.
     """
-    files = os.listdir(dirpath)
-    if not files:
+    dlist = os.listdir(dirpath)
+    if not dlist:
         return
+
+    # split into files and dirs to make page look better
+    directories = {f for f in dlist if os.path.isdir(os.path.join(dirpath, f))}
+    files = sorted(f for f in dlist if f not in directories)
 
     op = 'open' if level < explevel else ''
     lines.append(f'<li><details {op}><summary>{os.path.basename(dirpath)}</summary>')
     lines.append(f'<ul>')
 
-    for f in files:
+    for f in chain(files, sorted(directories)):
         path = os.path.join(dirpath, f)
         if os.path.isdir(path):
             _add_dir_to_tree(path, lines, explevel, level + 1)
