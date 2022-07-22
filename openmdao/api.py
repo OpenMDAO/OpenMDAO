@@ -112,6 +112,9 @@ from openmdao.utils.om_warnings import issue_warning, reset_warnings, OpenMDAOWa
     MPIWarning, UnitsWarning, SolverWarning, OMDeprecationWarning, \
     OMInvalidCheckDerivativesOptionsWarning
 
+# Utils
+from openmdao.utils.file_utils import image2html, text2html
+
 # Reports System
 from openmdao.utils.reports_system import register_report, get_reports_dir, list_reports, \
     clear_reports

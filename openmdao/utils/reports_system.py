@@ -174,7 +174,7 @@ def list_reports(default=False, out_stream=None):
     """
     global _reports_registry
 
-    # if we haven't created any Problem instances, the registry could still be uninitialized
+    # if we haven't created any Problem instances, the registry could still be uninitialized.
     # if it *has* already been initialized, this call will do nothing.
     _load_report_plugins()
 
