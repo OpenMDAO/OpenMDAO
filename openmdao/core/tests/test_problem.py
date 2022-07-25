@@ -2326,7 +2326,7 @@ class NestedProblemTestCase(unittest.TestCase):
                 return super().solve()
 
         # Initially use the default names
-        openmdao.core.problem._problem_names = []  # need to reset these to simulate separate runs
+        openmdao.core.problem._clear_problem_names()  # need to reset these to simulate separate runs
         p = om.Problem()
         p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
         G = p.model.add_subsystem('G', om.Group())
@@ -2342,7 +2342,7 @@ class NestedProblemTestCase(unittest.TestCase):
         self.assertEqual(G.nonlinear_solver._problem._get_inst_id(), defname + '2')
 
         # If the second Problem uses the default name of the first
-        openmdao.core.problem._problem_names = []  # need to reset these to simulate separate runs
+        openmdao.core.problem._clear_problem_names()  # need to reset these to simulate separate runs
         p = om.Problem()
         p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
         G = p.model.add_subsystem('G', om.Group())
@@ -2356,7 +2356,7 @@ class NestedProblemTestCase(unittest.TestCase):
         self.assertEqual(str(context.exception), f"The problem name '{defname}' already exists")
 
         # If the first Problem uses the default name of 'problem2'
-        openmdao.core.problem._problem_names = []  # need to reset these to simulate separate runs
+        openmdao.core.problem._clear_problem_names()  # need to reset these to simulate separate runs
         p = om.Problem(name=defname + '2')
         p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
         G = p.model.add_subsystem('G', om.Group())

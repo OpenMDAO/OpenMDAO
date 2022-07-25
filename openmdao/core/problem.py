@@ -60,11 +60,6 @@ from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
 _contains_all = ContainsAll()
 
-# Used for naming Problems when no explicit name is given
-# Also handles sub problems
-_problem_names = []
-
-
 CITATION = """@article{openmdao_2019,
     Author={Justin S. Gray and John T. Hwang and Joaquim R. R. A.
             Martins and Kenneth T. Moore and Bret A. Naylor},
@@ -76,6 +71,16 @@ CITATION = """@article{openmdao_2019,
     pdf={http://openmdao.org/pubs/openmdao_overview_2019.pdf},
     note= {In Press}
     }"""
+
+
+# Used for naming Problems when no explicit name is given
+# Also handles sub problems
+_problem_names = []
+
+
+def _clear_problem_names():
+    global _problem_names
+    _problem_names = []
 
 
 def _get_top_script():

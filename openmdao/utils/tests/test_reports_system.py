@@ -40,7 +40,7 @@ class TestReportsSystem(unittest.TestCase):
         self.optimizer_filename = _default_optimizer_report_filename
 
         # set things to a known initial state for all the test runs
-        probmod._problem_names = []  # need to reset these to simulate separate runs
+        probmod._clear_problem_names()  # need to reset these to simulate separate runs
         os.environ.pop('OPENMDAO_REPORTS', None)
         os.environ.pop('OPENMDAO_REPORTS_DIR', None)
         # We need to remove the TESTFLO_RUNNING environment variable for these tests to run.
@@ -507,7 +507,7 @@ class TestReportsSystemMPI(unittest.TestCase):
         self.optimizer_filename = _default_optimizer_report_filename
 
         # set things to a known initial state for all the test runs
-        probmod._problem_names = []  # need to reset these to simulate separate runs
+        probmod._clear_problem_names()  # need to reset these to simulate separate runs
 
         os.environ.pop('OPENMDAO_REPORTS', None)
         os.environ.pop('OPENMDAO_REPORTS_DIR', None)
