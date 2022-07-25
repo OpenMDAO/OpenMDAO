@@ -170,7 +170,6 @@ class OmLegend extends Legend {
         }
     }
 
-
     /** Add symbols for all of the items that were discovered */
     _setupContents() {
         super._setupContents();
@@ -183,18 +182,18 @@ class OmLegend extends Legend {
     }
 
     /**
-     * Wipe the current solvers legend area and populate with the other type.
-     * @param {Boolean} linear True to use linear solvers, false for non-linear.
+     * Wipe the current solvers legend area and populate with the current setting.
      */
-    toggleSolvers(linear) {
+    updateSolvers() {
         const solversLegendTitle = d3.select('#solvers-legend-title');
-        solversLegendTitle.text(linear ? "Linear Solvers" : "Non-Linear Solvers");
+        solversLegendTitle.text(OmTreeNode.showLinearSolverNames?
+            "Linear Solvers" : "Non-Linear Solvers");
 
         const solversLegend = d3.select('#solvers-legend');
         solversLegend.html('');
 
-        const solvers = linear ? this.linearSolvers : this.nonLinearSolvers;
-        for (let item of solvers) this._addItem(item, solversLegend);
+        const solvers = OmTreeNode.showLinearSolverNames? this.linearSolvers : this.nonLinearSolvers;
+        for (const item of solvers) this._addItem(item, solversLegend);
 
         solversLegend.style('width', solversLegend.node().scrollWidth + 'px');
     }

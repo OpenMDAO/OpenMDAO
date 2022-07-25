@@ -449,6 +449,23 @@ n2_gui_test_scripts = {
             "selector": "g#n2elements rect#cellShape_node_23.vMid",
             "arrowCount": 2
         },
+        {"test": "root"},
+        {
+            "desc": "Expand solver selector toolbar group",
+            "test": "hover",
+            "selector": "div.group-3 > div.expandable:nth-child(2)"
+        },
+        {
+            "desc": "Click on non-linear solver toolbar button",
+            "test": "click",
+            "button": "left",
+            "selector": "#non-linear-solver-button"
+        },
+        {
+            "desc": "Check that solver names have been updated",
+            "test": "hover",
+            "selector": 'g.solver_nl_nlbgs:has-text("NL: NLBGS") > rect'
+        }
     ],
     "parabaloid": [
         {

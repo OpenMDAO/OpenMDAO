@@ -17,15 +17,13 @@ class OmLayout extends Layout {
      * @param {ModelData} model The pre-processed model object.
      * @param {Object} newZoomedElement The element the new layout is based around.
      * @param {Object} dims The initial sizes for multiple tree elements.
-     * @param {Boolean} showLinearSolverNames Whether to show linear or non-linear solver names.
      * @param {Boolean} showSolvers Whether to display the solver tree.
      */
-    constructor(model, zoomedElement, dims, showLinearSolverNames, showSolvers) {
+    constructor(model, zoomedElement, dims, showSolvers) {
         super(model, zoomedElement, dims, false);
 
         this.zoomedSolverNodes = [];
         this.visibleSolverNodes = [];
-        this.showLinearSolverNames = showLinearSolverNames;
         this.showSolvers = showSolvers;
         this._init();
     }
@@ -50,22 +48,6 @@ class OmLayout extends Layout {
     }
 
     /**
-     * Return the name of the linear or non-linear solver depending
-     * on the current setting.
-     * @param {OmTreeNode} node The item to get the solver text from.
-     */
-     getSolverText(node) {
-        let solver_name = this.showLinearSolverNames ? node.linear_solver : node.nonlinear_solver;
-
-        if (!this.showLinearSolverNames && node.hasOwnProperty("solve_subsystems") && node.solve_subsystems) {
-            return solver_name + " (sub_solve)";
-        }
-        else {
-            return solver_name;
-        }
-    }
-
-    /**
      * Determine text widths for all descendents of the specified node.
      * @param {OmTreeNode} [node = this.zoomedElement] Item to begin looking from.
      */
@@ -73,8 +55,8 @@ class OmLayout extends Layout {
         if (node.draw.hidden) return;
         super._updateTextWidths(node);
 
-        if (!node.isInputOrOutput()) {
-            node.draw.nameSolverWidthPx = this._getTextWidth(this.getSolverText(node)) + 2 *
+        if (!node.isInputOrOutput() && !node.isFilter()) {
+            node.draw.nameSolverWidthPx = this._getTextWidth(node.getSolverText()) + 2 *
                 this.size.rightTextMargin;
         }
     }

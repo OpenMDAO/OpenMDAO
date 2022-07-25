@@ -145,14 +145,13 @@ class OmStyle extends Style {
 
     /**
      * Determine the name of the CSS class based on the name of the solver.
-     * @param {boolean} showLinearSolverNames Whether to use the linear or non-linear solver name.
      * @param {Object} solverNames
      * @param {string} solverNames.linear The linear solver name.
      * @param {string} solverNames.nonLinear The non-linear solver name.
      * @return {string} The CSS class of the solver, or for "other" if not found.
      */
-    getSolverClass(showLinearSolverNames, solverNames) {
-        const solverName = showLinearSolverNames? solverNames.linear : solverNames.nonLinear;
+    getSolverClass(solverNames) {
+        const solverName = OmTreeNode.showLinearSolverNames? solverNames.linear : solverNames.nonLinear;
         return this.solvers[solverName]? this.solvers[solverName].class : this.solvers.other.class;
     }
 

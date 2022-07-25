@@ -30,14 +30,11 @@ class OmDiagram extends Diagram {
 
     /** Override Diagram._newLayout() to create an OmLayout object. */
     _newLayout() {
-        if (this.showLinearSolverNames === undefined)
-            this.showLinearSolverNames = true;
 
         if (this.showSolvers === undefined)
             this.showSolvers = true;
 
-        return new OmLayout(this.model, this.zoomedElement, this.dims,
-            this.showLinearSolverNames, this.showSolvers);
+        return new OmLayout(this.model, this.zoomedElement, this.dims, this.showSolvers);
     }
 
     /** Create a new OmMatrix object. Overrides superclass method. */
@@ -55,13 +52,6 @@ class OmDiagram extends Diagram {
         this.layout = this._newLayout();
         this.ui = new OmUserInterface(this);
         this.matrix = this._newMatrix(true);
-    }
-
-    /**
-     * Switch back and forth between showing the linear or non-linear solver names.
-     */
-    toggleSolverNameType() {
-        this.showLinearSolverNames = !this.showLinearSolverNames;
     }
 
     /**
@@ -115,8 +105,8 @@ class OmDiagram extends Diagram {
         const enterSelection = enter
             .append("g")
             .attr("class", d => {
-                const solver_class = self.style.getSolverClass(self.showLinearSolverNames,
-                    { 'linear': d.linear_solver, 'nonLinear': d.nonlinear_solver });
+                const solver_class = self.style.getSolverClass({ 'linear': d.linear_solver,
+                    'nonLinear': d.nonlinear_solver });
                 return `${solver_class} solver_group ${self.style.getNodeClass(d)}`;
             })
             .on("click", (e,d) => self.leftClickSelector(e, d))
@@ -172,7 +162,7 @@ class OmDiagram extends Diagram {
 
         enterSelection // Add a label
             .append("text")
-            .text(self.layout.getSolverText.bind(self.layout))
+            .text( d => d.getSolverText())
             .style('visibility', 'hidden')
             .attr("dy", ".35em")
             .attr("transform", d => {
@@ -203,8 +193,8 @@ class OmDiagram extends Diagram {
         // New location for each group
         const mergedSelection = update
             .attr("class", d => {
-                const solver_class = self.style.getSolverClass(self.showLinearSolverNames,
-                    { 'linear': d.linear_solver, 'nonLinear': d.nonlinear_solver });
+                const solver_class = self.style.getSolverClass({ 'linear': d.linear_solver,
+                    'nonLinear': d.nonlinear_solver });
                 return `${solver_class} solver_group ${self.style.getNodeClass(d)}`;
             })
             .transition(sharedTransition)
@@ -224,6 +214,7 @@ class OmDiagram extends Diagram {
          // Move the text label
         mergedSelection
             .select("text")
+            .text( d => d.getSolverText())
             .attr("transform", d => {
                 const anchorX = d.draw.solverDims.width * treeSize.width -
                     self.layout.size.rightTextMargin;
@@ -315,7 +306,7 @@ class OmDiagram extends Diagram {
      */
      restoreSavedState(oldState) {
         // Solver toggle state.
-        this.showLinearSolverNames = oldState.showLinearSolverNames;
+        OmTreeNode.showLinearSolverNames = oldState.showLinearSolverNames;
         this.ui.setSolvers(oldState.showLinearSolverNames);
         this.showSolvers = oldState.showSolvers;
         
