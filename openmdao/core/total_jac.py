@@ -213,10 +213,15 @@ class _TotalJacInfo(object):
                 inter = discrete_outs.intersection(model._relevant[inp]['@all'][0]['output'])
                 if inter:
                     kind = 'of' if self.mode == 'rev' else 'with respect to'
-                    raise RuntimeError("Total derivative %s '%s' depends upon "
-                                       "discrete output variables %s." %
-                                       (kind, inp, sorted(inter)))
-
+                    msg = "Total derivative %s '%s' depends upon " \
+                          "discrete output variables %s." % (kind, inp, sorted(inter))
+                    if not approx:
+                        raise RuntimeError(msg)
+                    else:
+                        msg += " Since this total derivative is approximated this might " \
+                               "not be a problem."
+                        issue_warning(msg, category=DerivativesWarning)
+                        
         self.of = of
         self.wrt = wrt
         self.prom_of = prom_of
