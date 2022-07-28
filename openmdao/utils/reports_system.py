@@ -266,7 +266,7 @@ def _list_reports_cmd(options, user_args):
             list_reports(options.dflt, f)
 
 
-def view_reports(probname=None, level=2):
+def view_reports(probnames=None, level=2):
     """
     Pop up a browser to view specified reports.
 
@@ -277,12 +277,31 @@ def view_reports(probname=None, level=2):
     level : int
         Expand the reports directory tree to this level.  Default is 2.
     """
-    if probname is None:
-        tdir = _reports_dir
-    else:
-        tdir = os.path.join(_reports_dir, probname)
+    tdir = _reports_dir
+    to_match = set()
+    if probnames:
+        for probname in probnames:
+            subdir = os.path.join(_reports_dir, probname)
+            if not os.path.isdir(subdir):
+                # see if they provided script name instead of problem name
+                dname = os.path.splitext(subdir)[0]
+                if os.path.isdir(dname):
+                    subdir = dname
+                else:
+                    print(f"Can't find report dir '{subdir}'.")
+                    continue
 
-    gen_index_file(tdir, level)
+            to_match.add(subdir)
+    else:
+        to_match = set(os.listdir(tdir))
+
+    if not to_match:
+        print("No matching report dirs found.")
+        return
+
+    to_match = {os.path.basename(m) for m in to_match}
+
+    gen_index_file(tdir, level, to_match)
 
     webview(os.path.join(tdir, 'index.html'))
 
@@ -296,8 +315,8 @@ def _view_reports_setup_parser(parser):
     parser : argparse subparser
         The parser we're adding options to.
     """
-    parser.add_argument('-p', '--problem', action='store', dest='problem',
-                        help='View reports only for the specified Problem.')
+    parser.add_argument('problem', metavar='problem', nargs='*',
+                        help='View reports only for the specified Problem(s).')
     parser.add_argument('-l', '--level', action='store', dest='level', type=int, default=2,
                         help='Expand the reports directory tree to this level. Default is 2.')
 
@@ -486,7 +505,7 @@ def _load_report_plugins():
         register_func()  # this runs the function that calls register_report
 
 
-def _add_dir_to_tree(dirpath, lines, explevel, level):
+def _add_dir_to_tree(dirpath, lines, explevel, level, to_match):
     """
     Create nested lists of directories with links to files.
 
@@ -500,30 +519,38 @@ def _add_dir_to_tree(dirpath, lines, explevel, level):
         Expand the tree to this level.
     level : int
         The current level of the tree.
+    to_match : set
+        Directory names to show.
     """
     dlist = os.listdir(dirpath)
-    if not dlist:
-        return
 
     # split into files and dirs to make page look better
     directories = {f for f in dlist if os.path.isdir(os.path.join(dirpath, f))}
-    files = sorted(f for f in dlist if f not in directories)
 
-    op = 'open' if level < explevel else ''
-    lines.append(f'<li><details {op}><summary>{os.path.basename(dirpath)}</summary>')
+    files = sorted(f for f in dlist if os.path.isfile(os.path.join(dirpath, f)))
+
+    if level == 1 and os.path.basename(dirpath) not in to_match:
+        return
+    else:
+        op = 'open' if level < explevel else ''
+        lines.append(f'<li><details {op}><summary>{os.path.basename(dirpath)}</summary>')
+        if not dlist:
+            lines.append('</li>')
+            return
+
     lines.append(f'<ul>')
 
     for f in chain(files, sorted(directories)):
         path = os.path.join(dirpath, f)
         if os.path.isdir(path):
-            _add_dir_to_tree(path, lines, explevel, level + 1)
+            _add_dir_to_tree(path, lines, explevel, level + 1, to_match)
         elif f.endswith('.html') and f != 'index.html':
             lines.append(f'<li> <a href="file:///{path}">{f}</a> </li>')
 
     lines.append('</ul></details></li>')
 
 
-def gen_index_file(reports_dir, level):
+def gen_index_file(reports_dir, level, to_match):
     """
     Generate an index.html file that will have links to all of the reports.
 
@@ -533,6 +560,8 @@ def gen_index_file(reports_dir, level):
         The top directory containing the reports.
     level : int
         Expand the reports directory tree to this level.
+    to_match : set
+        Set of subdirectory names to show.
     """
     reports_dir = os.path.abspath(reports_dir)
 
@@ -632,7 +661,7 @@ def gen_index_file(reports_dir, level):
         """
     ]
     lines = ['<ul class="tree">']
-    _add_dir_to_tree(reports_dir, lines, explevel=level, level=0)
+    _add_dir_to_tree(reports_dir, lines, explevel=level, level=0, to_match=to_match)
 
     parts.append('\n'.join(lines))
     parts.append('</body>\n</html>')
