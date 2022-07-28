@@ -44,9 +44,9 @@ from openmdao.utils.hooks import _setup_hooks
 from openmdao.utils.indexer import indexer
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
-    clear_reports, get_reports_dir, _load_report_plugins, _truthy
+    clear_reports, get_reports_dir, _load_report_plugins
 from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable, \
-    _find_dict_meta
+    _find_dict_meta, env_truthy
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
@@ -110,7 +110,7 @@ def _default_prob_name():
         The default problem name.
     """
     name = _get_top_script()
-    if name is None or os.environ.get('TESTFLO_RUNNING', '0').lower() in _truthy:
+    if name is None or env_truthy('TESTFLO_RUNNING'):
         return 'problem'
 
     return name.stem

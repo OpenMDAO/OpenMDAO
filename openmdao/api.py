@@ -114,16 +114,14 @@ from openmdao.utils.om_warnings import issue_warning, reset_warnings, OpenMDAOWa
 
 # Utils
 from openmdao.utils.file_utils import image2html, text2html
+from openmdao.utils.general_utils import wing_dbg, env_truthy
+from openmdao.utils.array_utils import shape_to_len
 
 # Reports System
 from openmdao.utils.reports_system import register_report, get_reports_dir, list_reports, \
     clear_reports
 
 import os
-import builtins
-
-from openmdao.utils.general_utils import wing_dbg, env_truthy
-from openmdao.utils.array_utils import shape_to_len
 
 wing_dbg()
 
@@ -139,6 +137,7 @@ elif env_truthy('OPENMDAO_PROF_MEM'):
 
 
 if env_truthy('FLUSH_PRINT'):
+    import builtins
     _oldprint = builtins.print
 
     def _flushprint(*args, **kwargs):

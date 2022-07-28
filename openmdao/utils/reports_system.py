@@ -14,6 +14,7 @@ from openmdao.utils.hooks import _register_hook, _unregister_hook
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.file_utils import _iter_entry_points
 from openmdao.utils.webview import webview
+from openmdao.utils.general_utils import env_truthy, is_truthy
 
 # Keeping track of the registered reports
 _Report = namedtuple(
@@ -22,13 +23,8 @@ _Report = namedtuple(
 _reports_registry = {}
 _default_reports = ['scaling', 'total_coloring', 'n2', 'optimizer']
 _active_reports = set()  # these reports will actually run (assuming their hook funcs are triggered)
-_cmdline_reports = set()  # cmdline reports registered here to so default reports aren't modified
-
+_cmdline_reports = set()  # cmdline reports registered here so default reports aren't modified
 _reports_dir = os.environ.get('OPENMDAO_REPORTS_DIR', './reports')  # top dir for the reports
-
-_truthy = {'1', 'true', 'on', 'yes'}
-_falsey = {'0', 'false', 'off', "none", ""}
-
 _plugins_loaded = False  # use this to ensure plugins only loaded once
 
 
@@ -46,7 +42,7 @@ def reports_active():
     bool
         Return True if reports are active.
     """
-    return os.environ.get('TESTFLO_RUNNING', '').lower() not in _truthy
+    return not env_truthy('TESTFLO_RUNNING')
 
 
 def register_report(name, func, desc, class_name, method, pre_or_post, filename=None, inst_id=None):
@@ -393,19 +389,23 @@ def _reports2list(reports, defaults):
     """
     if reports in [True, _UNDEFINED]:
         return defaults
-    if not reports:  # False or None or empty iter
+    if not reports:
         return []
 
     if isinstance(reports, str):
         low = reports.lower()
-        if low in _falsey:
-            return []
-        if low in _truthy:
-            return defaults
         if low == 'all':
             return list(_reports_registry)  # activate all registered reports
 
-        return [s.strip() for s in reports.split(',') if s.strip()]
+        if is_truthy(low):
+            if ',' in low:
+                return [s.strip() for s in reports.split(',') if s.strip()]
+            elif reports in _reports_registry:
+                return [reports]
+            else:
+                return defaults
+        else:
+            return []
 
     return list(reports)
 
