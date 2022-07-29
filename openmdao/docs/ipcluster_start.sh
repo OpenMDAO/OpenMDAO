@@ -15,4 +15,4 @@ else
   ipython profile create --parallel --profile=mpi
 fi
 
-ipcluster start -n 4 --profile=mpi --engines='ipyparallel.cluster.launcher.MPIEngineSetLauncher' &
+ipcluster start -n 4 --profile=mpi --log-level=DEBUG  --engines='ipyparallel.cluster.launcher.MPIEngineSetLauncher' &
