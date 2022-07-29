@@ -8,6 +8,8 @@ import os
 import inspect
 from itertools import chain
 
+from numpy import isin
+
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook, _unregister_hook
@@ -272,14 +274,17 @@ def view_reports(probnames=None, level=2):
 
     Parameters
     ----------
-    probname : str or None
-        If not None, view only reports for the specified Problem, else view all reports.
+    probnames : str, iter of str, or None
+        If not None, view only reports for the specified Problem(s), else view all reports.
     level : int
         Expand the reports directory tree to this level.  Default is 2.
     """
     tdir = _reports_dir
     to_match = set()
     if probnames:
+        if isinstance(probnames, str):
+            probnames = (probnames,)
+
         for probname in probnames:
             subdir = os.path.join(_reports_dir, probname)
             if not os.path.isdir(subdir):
