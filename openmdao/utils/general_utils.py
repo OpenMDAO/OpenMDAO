@@ -911,7 +911,24 @@ def match_prom_or_abs(name, prom_name, includes=None, excludes=None):
     return False
 
 
-_falsey = {'0', 'false', 'no', ''}
+_falsey = {'0', 'false', 'no', 'off', ''}
+
+
+def is_truthy(s):
+    """
+    Return True if the given string is 'truthy'.
+
+    Parameters
+    ----------
+    s : str
+        The name string being tested.
+
+    Returns
+    -------
+    bool
+        True if the specified string is 'truthy'.
+    """
+    return s.lower() not in _falsey
 
 
 def env_truthy(env_var):
@@ -928,7 +945,7 @@ def env_truthy(env_var):
     bool
         True if the specified environment variable is 'truthy'.
     """
-    return os.environ.get(env_var, '0').lower() not in _falsey
+    return is_truthy(os.environ.get(env_var, ''))
 
 
 def common_subpath(pathnames):
