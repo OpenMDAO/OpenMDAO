@@ -263,7 +263,7 @@ class ModelData {
 
         // If variables were selectively hidden, force the variable selection
         // dialog to rebuild the hiddenVars array.
-        if (node.hasFilters()) { node.filter.inputs.wipe(); node.filter.outputs.wipe(); }
+        if (node.hasFilters()) { node.wipeFilters(); }
 
         if (!foundEntry) { // Not found, reset values to default
             node.expand();

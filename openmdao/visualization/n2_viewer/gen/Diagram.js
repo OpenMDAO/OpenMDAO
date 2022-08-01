@@ -179,10 +179,7 @@ class Diagram {
 
         // Get rid of any existing filters before processing children, as they'll
         // be populated while processing the state of each child node.
-        if (node.hasFilters()) {
-            node.filter.inputs.wipe();
-            node.filter.outputs.wipe();
-        }
+        if (node.hasFilters()) { node.wipeFilters(); }
 
         if (node.hasChildren()) {
             for (const child of node.children) {

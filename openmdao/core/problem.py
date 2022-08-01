@@ -1,5 +1,7 @@
 """Define the Problem class and a FakeComm class for non-MPI users."""
 
+import __main__
+
 import sys
 import pprint
 import os
@@ -44,7 +46,7 @@ from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
     clear_reports, get_reports_dir, _load_report_plugins
 from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable, \
-    _find_dict_meta
+    _find_dict_meta, env_truthy
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
@@ -58,11 +60,6 @@ from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
 _contains_all = ContainsAll()
 
-# Used for naming Problems when no explicit name is given
-# Also handles sub problems
-_problem_names = []
-
-
 CITATION = """@article{openmdao_2019,
     Author={Justin S. Gray and John T. Hwang and Joaquim R. R. A.
             Martins and Kenneth T. Moore and Bret A. Naylor},
@@ -74,6 +71,49 @@ CITATION = """@article{openmdao_2019,
     pdf={http://openmdao.org/pubs/openmdao_overview_2019.pdf},
     note= {In Press}
     }"""
+
+
+# Used for naming Problems when no explicit name is given
+# Also handles sub problems
+_problem_names = []
+
+
+def _clear_problem_names():
+    global _problem_names
+    _problem_names = []
+
+
+def _get_top_script():
+    """
+    Return the absolute pathname of the top level script.
+
+    Returns
+    -------
+    Path or None
+        The absolute path, or None if it can't be resolved.
+    """
+    try:
+        return pathlib.Path(__main__.__file__).resolve()
+    except Exception:
+        # this will error out in some cases, e.g. inside of a jupyter notebook, so just
+        # return None in that case.
+        pass
+
+
+def _default_prob_name():
+    """
+    Return the default problem name.
+
+    Returns
+    -------
+    str
+        The default problem name.
+    """
+    name = _get_top_script()
+    if name is None or env_truthy('TESTFLO_RUNNING'):
+        return 'problem'
+
+    return name.stem
 
 
 class Problem(object):
@@ -164,28 +204,29 @@ class Problem(object):
         self._reports = get_reports_to_activate(reports)
 
         self.cite = CITATION
+        self._warned = False
 
-        # Code to give non-empty names to Problems so that they can be
-        # referenced from command line tools (e.g. check) that accept a Problem argument
+        # Set the Problem name so that it can be referenced from command line tools (e.g. check)
+        # that accept a Problem argument, and to name the corresponding reports subdirectory.
+
         if name:  # if name hasn't been used yet, use it. Otherwise, error
             if name not in _problem_names:
                 self._name = name
             else:
                 raise ValueError(f"The problem name '{name}' already exists")
         else:  # No name given: look for a name, of the form, 'problemN', that hasn't been used
-            problem_counter = len(_problem_names) + 1
-            _name = f"problem{problem_counter}"
+            problem_counter = len(_problem_names) + 1 if _problem_names else ''
+            base = _default_prob_name()
+            _name = f"{base}{problem_counter}"
             if _name in _problem_names:  # need to make it unique so append string of form '.N'
                 i = 1
                 while True:
-                    _name = f"problem{problem_counter}.{i}"
+                    _name = f"{base}{problem_counter}.{i}"
                     if _name not in _problem_names:
                         break
                     i += 1
             self._name = _name
         _problem_names.append(self._name)
-
-        self._warned = False
 
         if comm is None:
             use_mpi = check_mpi_env()
@@ -2220,11 +2261,17 @@ class Problem(object):
 
         self.model._set_complex_step_mode(active)
 
-    def get_reports_dir(self):
+    def get_reports_dir(self, force=False):
         """
         Get the path to the directory where the report files should go.
 
         If it doesn't exist, it will be created.
+
+        Parameters
+        ----------
+        force : bool
+            If True, create the reports directory if it doesn't exist, even if this Problem does
+            not have any active reports. This can happen when running testflo.
 
         Returns
         -------
@@ -2233,7 +2280,7 @@ class Problem(object):
         """
         reports_dirpath = pathlib.Path(get_reports_dir()).joinpath(f'{self._name}')
 
-        if self.comm.rank == 0 and self._reports:
+        if self.comm.rank == 0 and (force or self._reports):
             pathlib.Path(reports_dirpath).mkdir(parents=True, exist_ok=True)
 
         return reports_dirpath
