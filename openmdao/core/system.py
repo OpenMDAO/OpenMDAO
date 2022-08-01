@@ -2413,13 +2413,11 @@ class System(object):
         if self.nonlinear_solver is not None and type_ != 'LN':
             self.nonlinear_solver._set_solver_print(level=level, type_=type_)
 
+        if self.pathname.count('.') + 1 >= depth:
+            return
+
         for subsys, _ in self._subsystems_allprocs.values():
-
-            current_depth = subsys.pathname.count('.')
-            if current_depth >= depth:
-                continue
-
-            subsys._set_solver_print(level=level, depth=depth - current_depth, type_=type_)
+            subsys._set_solver_print(level=level, depth=depth, type_=type_)
 
             if subsys._linear_solver is not None and type_ != 'NL':
                 subsys._linear_solver._set_solver_print(level=level, type_=type_)

@@ -352,9 +352,7 @@ class Solver(object):
             if prefix.endswith('precon:'):
                 solver_name = solver_name[3:]
 
-            print_str = prefix + solver_name
-            print_str += ' %d ; %.9g %.9g' % (iteration, abs_res, rel_res)
-            print(print_str)
+            print(f"{prefix}{solver_name} {iteration} ; {abs_res:.9g} {rel_res:.9g}")
 
     def _mpi_print_header(self):
         """
@@ -365,13 +363,9 @@ class Solver(object):
 
             pathname = self._system().pathname
             if pathname:
-                nchar = len(pathname)
+                eqs = len(pathname) * "="
                 prefix = self._solver_info.prefix
-                header = prefix + "\n"
-                header += prefix + nchar * "=" + "\n"
-                header += prefix + pathname + "\n"
-                header += prefix + nchar * "="
-                print(header)
+                print(f"{prefix}\n{prefix}{eqs}\n{prefix}{pathname}\n{prefix}{eqs}")
 
     def _iter_initialize(self):
         """
@@ -554,6 +548,24 @@ class NonlinearSolver(Solver):
         self.options.declare('use_cached_outputs', types=bool, default=False,
                              desc='If True, the outputs are cached after a successful solve and '
                                   'used to restart the solver in the case of a failed solve.')
+
+    def _setup_solvers(self, system, depth):
+        """
+        Assign system instance, set depth, and optionally perform setup.
+
+        Parameters
+        ----------
+        system : <System>
+            pointer to the owning system.
+        depth : int
+            depth of the current system (already incremented).
+        """
+        super()._setup_solvers(system, depth)
+        if 'use_cached_outputs' in self.options and self.options['use_cached_outputs']:
+            if not self.options['err_on_non_converge']:
+                issue_warning(f"{self.msginfo}: Caching outputs does nothing unless option "
+                              "'err_on_non_converge' is set to 'True'", category=SolverWarning)
+                self.options['use_cached_outputs'] = False  # reset so we won't waste memory
 
     def _set_complex_step_mode(self, active):
         """
@@ -756,7 +768,7 @@ class NonlinearSolver(Solver):
     def _print_exc_debug_info(self):
         coord = self._recording_iter.get_formatted_iteration_coordinate()
 
-        out_strs = ["\n# Inputs and outputs at start of iteration '%s':\n" % coord]
+        out_strs = [f"\n# Inputs and outputs at start of iteration '{coord}':\n"]
         for vec_type, views in self._err_cache.items():
             out_strs.append('\n# nonlinear %s\n' % vec_type)
             out_strs.append(pprint.pformat(views))
@@ -766,12 +778,11 @@ class NonlinearSolver(Solver):
         print(out_str)
 
         rank = MPI.COMM_WORLD.rank if MPI is not None else 0
-        filename = 'solver_errors.%d.out' % rank
+        filename = f'solver_errors.{rank}.out'
 
         with open(filename, 'a') as f:
             f.write(out_str)
-            print("Inputs and outputs at start of iteration have been "
-                  "saved to '%s'." % filename)
+            print(f"Inputs and outputs at start of iteration have been saved to '{filename}'.")
             sys.stdout.flush()
 
     def _gs_iter(self):
@@ -797,27 +808,19 @@ class NonlinearSolver(Solver):
         Cached values, if any, are from the last successful nonlinear solve, and are only used
         if the 'use_cached_outputs' option is True.
         """
-        system = self._system()
-
-        # The state caching only works if we throw an error on non-convergence, otherwise
-        # the solver will disregard the state caching options and throw a warning.
+        # The output caching only works if we throw an error on non-convergence, otherwise
+        # the solver will disregard the output caching options and throw a warning.
         if self.options['use_cached_outputs'] and self.options['maxiter'] > 1:
-            if not self.options["err_on_non_converge"]:
-                issue_warning(f"{self.msginfo}: Caching outputs does nothing unless option "
-                              "'err_on_non_converge' is set to 'True'", category=SolverWarning)
-
+            system = self._system()
             try:
                 # If we have a previous solver failure, we want to replace
-                # the states using the cache.
+                # the outputs using the cache.
                 if self._prev_fail and self._output_cache is not None:
                     system._outputs.set_val(self._output_cache)
 
-                # Run the solver
                 self.solve()
 
-                # If we make it here, the solver didn't throw an exception so there
-                # was either convergence or a stall.  Either way, the solver didn't
-                # fail so we can set the flag to False.
+                # If we make it here, the solver converged.
                 self._prev_fail = False
 
                 # Save the outputs upon a successful solve
