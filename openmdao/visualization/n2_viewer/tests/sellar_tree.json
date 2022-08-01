@@ -30,7 +30,8 @@
         "solve_subsystems": false,
         "max_sub_solves": 10,
         "cs_reconverge": true,
-        "reraise_child_analysiserror": false
+        "reraise_child_analysiserror": false,
+        "use_cached_outputs": false
     },
     "solve_subsystems": false,
     "children": [
@@ -183,7 +184,7 @@
                                 "assembled_jac_type": "csc",
                                 "distributed": false,
                                 "run_root_only": false
-                    }
+                            }
                         }
                     ],
                     "options": {
@@ -257,7 +258,7 @@
                     "options": {
                         "distributed": false,
                         "run_root_only": false
-            }
+                    }
                 },
                 {
                     "name": "d2",
@@ -314,7 +315,7 @@
                     "options": {
                         "distributed": false,
                         "run_root_only": false
-            }
+                    }
                 }
             ],
             "options": {

@@ -1,9 +1,7 @@
 """Define the base Solver, NonlinearSolver, and LinearSolver classes."""
 
-from collections import OrderedDict
 import os
 import pprint
-import re
 import sys
 import weakref
 
@@ -17,7 +15,6 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.om_warnings import issue_warning, SolverWarning
-from openmdao.core.component import Component
 
 
 class SolverInfo(object):
@@ -221,7 +218,7 @@ class Solver(object):
         """
         if self._system is None:
             return type(self).__name__
-        return '{} in {}'.format(type(self).__name__, self._system().msginfo)
+        return f"{type(self).__name__} in {self._system().msginfo}"
 
     @property
     def _recording_iter(self):
@@ -523,6 +520,10 @@ class NonlinearSolver(Solver):
     ----------
     _err_cache : dict
         Dictionary holding input and output vectors at start of iteration, if requested.
+    _output_cache : ndarray or None
+        Saved output values from last successful solve, if
+    _prev_fail : bool
+        If True, previous solve failed.
     """
 
     def __init__(self, **kwargs):
@@ -530,7 +531,9 @@ class NonlinearSolver(Solver):
         Initialize all attributes.
         """
         super().__init__(**kwargs)
-        self._err_cache = OrderedDict()
+        self._err_cache = {}
+        self._output_cache = None
+        self._prev_fail = False
 
     def _declare_options(self):
         """
@@ -548,6 +551,24 @@ class NonlinearSolver(Solver):
         self.options.declare('stall_tol', default=1e-12,
                              desc='When stall checking is enabled, the threshold below which the '
                                   'residual norm is considered unchanged.')
+        self.options.declare('use_cached_outputs', types=bool, default=False,
+                             desc='If True, the outputs are cached after a successful solve and '
+                                  'used to restart the solver in the case of a failed solve.')
+
+    def _set_complex_step_mode(self, active):
+        """
+        Turn on or off complex stepping mode.
+
+        Recurses to turn on or off complex stepping mode in all subsystems and their vectors.
+
+        Parameters
+        ----------
+        active : bool
+            Complex mode flag; set to True prior to commencing complex step.
+        """
+        # if we change the type of the outputs vector, reset the output cache
+        if self._system()._outputs._under_complex_step != active:
+            self._output_cache = None
 
     def solve(self):
         """
@@ -680,16 +701,15 @@ class NonlinearSolver(Solver):
 
         # Solver hit maxiter without meeting desired tolerances.
         # Or solver stalled.
-        elif (norm > atol and norm / norm0 > rtol) or stalled:
+        elif stalled or (norm > atol and norm / norm0 > rtol):
 
             if stalled:
                 msg = "Solver '{}' on system '{}' stalled after {} iterations."
             else:
                 msg = "Solver '{}' on system '{}' failed to converge in {} iterations."
 
-            if iprint > -1 and print_flag:
-                print(prefix + msg.format(self.SOLVER, system.pathname,
-                                          self._iter_count))
+            if print_flag and iprint > -1:
+                print(prefix + msg.format(self.SOLVER, system.pathname, self._iter_count))
 
             # Raise AnalysisError if requested.
             if self.options['err_on_non_converge']:
@@ -697,10 +717,11 @@ class NonlinearSolver(Solver):
                                                self._iter_count))
 
         # Solver converged
-        elif iprint == 1 and print_flag:
-            print(prefix + ' Converged in {} iterations'.format(self._iter_count))
-        elif iprint == 2 and print_flag:
-            print(prefix + ' Converged')
+        elif print_flag:
+            if iprint == 1:
+                print(prefix + ' Converged in {} iterations'.format(self._iter_count))
+            elif iprint == 2:
+                print(prefix + ' Converged')
 
     def _run_apply(self):
         """
@@ -768,6 +789,49 @@ class NonlinearSolver(Solver):
                     if 'reraise_child_analysiserror' not in self.options or \
                             self.options['reraise_child_analysiserror']:
                         raise err
+
+    def _solve_with_cache_check(self):
+        """
+        Solve the nonlinear system, possibly after updating output vector with cached values.
+
+        Cached values, if any, are from the last successful nonlinear solve, and are only used
+        if the 'use_cached_outputs' option is True.
+        """
+        system = self._system()
+
+        # The state caching only works if we throw an error on non-convergence, otherwise
+        # the solver will disregard the state caching options and throw a warning.
+        if self.options['use_cached_outputs'] and self.options['maxiter'] > 1:
+            if not self.options["err_on_non_converge"]:
+                issue_warning(f"{self.msginfo}: Caching outputs does nothing unless option "
+                              "'err_on_non_converge' is set to 'True'", category=SolverWarning)
+
+            try:
+                # If we have a previous solver failure, we want to replace
+                # the states using the cache.
+                if self._prev_fail and self._output_cache is not None:
+                    system._outputs.set_val(self._output_cache)
+
+                # Run the solver
+                self.solve()
+
+                # If we make it here, the solver didn't throw an exception so there
+                # was either convergence or a stall.  Either way, the solver didn't
+                # fail so we can set the flag to False.
+                self._prev_fail = False
+
+                # Save the outputs upon a successful solve
+                if self._output_cache is None:
+                    self._output_cache = system._outputs.asarray(copy=True)
+                else:
+                    self._output_cache[:] = system._outputs.asarray()
+
+            except Exception:
+                # The solver failed so we need to set the flag to True
+                self._prev_fail = True
+                raise
+        else:
+            self.solve()
 
 
 class LinearSolver(Solver):

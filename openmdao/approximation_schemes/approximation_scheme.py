@@ -536,8 +536,6 @@ class ApproximationScheme(object):
                 system._tot_jac.set_col(ic, col)
 
     def _compute_approx_col_iter(self, system, under_cs):
-        system._set_approx_mode(True)
-
         # This will either generate new approx groups or use cached ones
         approx_groups, colored_approx_groups = self._get_approx_groups(system, under_cs)
 
@@ -545,8 +543,6 @@ class ApproximationScheme(object):
             yield from self._colored_column_iter(system, colored_approx_groups)
 
         yield from self._uncolored_column_iter(system, approx_groups)
-
-        system._set_approx_mode(False)
 
     def _get_total_result(self, outarr, totarr):
         """

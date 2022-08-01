@@ -184,8 +184,6 @@ class System(object):
         When True, this system is undergoing complex step.
     under_finite_difference : bool
         When True, this system is undergoing finite differencing.
-    under_approx : bool
-        When True, this system is undergoing approximation.
     iter_count : int
         Counts the number of times this system has called _solve_nonlinear. This also
         corresponds to the number of times that the system's outputs are recorded if a recorder
@@ -466,7 +464,6 @@ class System(object):
         self._approx_subjac_keys = None
         self.matrix_free = False
 
-        self.under_approx = False
         self._owns_approx_jac = False
         self._owns_approx_jac_meta = {}
         self._owns_approx_wrt = None
@@ -4206,7 +4203,7 @@ class System(object):
 
         # All calls to _solve_nonlinear are recorded, The counter is incremented after recording.
         self.iter_count += 1
-        if not self.under_approx:
+        if not (self.under_complex_step or self.under_finite_difference):
             self.iter_count_without_approx += 1
 
     def _clear_iprint(self):
@@ -4280,32 +4277,17 @@ class System(object):
                 sub._doutputs.set_complex_step_mode(active)
                 sub._dinputs.set_complex_step_mode(active)
                 sub._dresiduals.set_complex_step_mode(active)
+                if sub.nonlinear_solver:
+                    sub.nonlinear_solver._set_complex_step_mode(active)
 
                 if sub.linear_solver:
                     sub.linear_solver._set_complex_step_mode(active)
-
-                if sub.nonlinear_solver:
-                    sub.nonlinear_solver._set_complex_step_mode(active)
 
                 if sub._owns_approx_jac:
                     sub._jacobian.set_complex_step_mode(active)
 
                 if sub._assembled_jac:
                     sub._assembled_jac.set_complex_step_mode(active)
-
-    def _set_approx_mode(self, active):
-        """
-        Turn on or off approx mode flag.
-
-        Recurses to turn on or off approx mode flag in all subsystems.
-
-        Parameters
-        ----------
-        active : bool
-            Approx mode flag; set to True prior to commencing approximation.
-        """
-        for sub in self.system_iter(include_self=True, recurse=True):
-            sub.under_approx = active
 
     def cleanup(self):
         """
