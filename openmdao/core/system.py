@@ -2620,7 +2620,7 @@ class System(object):
             try:
                 units = simplify_unit(units, msginfo=self.msginfo)
             except ValueError as e:
-                raise(ValueError(f"{str(e)[:-1]} for design_var '{name}'."))
+                raise ValueError(f"{str(e)[:-1]} for design_var '{name}'.")
 
         dv = {}
 
@@ -2764,7 +2764,7 @@ class System(object):
             try:
                 units = simplify_unit(units, msginfo=self.msginfo)
             except ValueError as e:
-                raise(ValueError(f"{str(e)[:-1]} for response '{name}'."))
+                raise ValueError(f"{str(e)[:-1]} for response '{name}'.")
 
         resp = {}
 
@@ -5521,7 +5521,7 @@ class System(object):
                 else:
                     sinds.append(jinds + voff)
                 tinds.append(range(tstart + toffset, tend + toffset))
-                assert(len(sinds[-1]) == len(tinds[-1]))
+                assert len(sinds[-1]) == len(tinds[-1])
             else:  # 'name' refers to a distributed variable
                 has_dist_data = nranks > 1
                 dtstart = dtend = tstart
@@ -5543,7 +5543,7 @@ class System(object):
                                 tinds.append(range(toffset + dtstart, toffset + dtend))
                         dtstart = dtend
                     dsstart = dsend
-                assert((len(sinds) == 0 and len(tinds) == 0) or len(sinds[-1]) == len(tinds[-1]))
+                assert (len(sinds) == 0 and len(tinds) == 0) or len(sinds[-1]) == len(tinds[-1])
 
         sarr = np.array(list(chain(*sinds)), dtype=INT_DTYPE)
         tarr = np.array(list(chain(*tinds)), dtype=INT_DTYPE)
