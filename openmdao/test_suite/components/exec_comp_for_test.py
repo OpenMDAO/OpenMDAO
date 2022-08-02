@@ -66,7 +66,7 @@ class ExecComp4Test(ExecComp):
             `Vector` containing outputs.
         """
         try:
-            if self.comm.rank in self.fail_rank and self.num_nl_solves in self.fails:
+            if (self.fail_rank == -1 or self.comm.rank in self.fail_rank) and self.num_nl_solves in self.fails:
                 if self.fail_hard:
                     raise RuntimeError("OMG, a critical error!")
                 else:
