@@ -545,7 +545,7 @@ class NonlinearSolver(Solver):
         self.options.declare('stall_tol', default=1e-12,
                              desc='When stall checking is enabled, the threshold below which the '
                                   'residual norm is considered unchanged.')
-        self.options.declare('use_cached_outputs', types=bool, default=False,
+        self.options.declare('use_cached_states', types=bool, default=False,
                              desc='If True, the outputs are cached after a successful solve and '
                                   'used to restart the solver in the case of a failed solve.')
 
@@ -561,11 +561,11 @@ class NonlinearSolver(Solver):
             depth of the current system (already incremented).
         """
         super()._setup_solvers(system, depth)
-        if 'use_cached_outputs' in self.options and self.options['use_cached_outputs']:
+        if 'use_cached_states' in self.options and self.options['use_cached_states']:
             if not self.options['err_on_non_converge']:
                 issue_warning(f"{self.msginfo}: Caching outputs does nothing unless option "
                               "'err_on_non_converge' is set to 'True'", category=SolverWarning)
-                self.options['use_cached_outputs'] = False  # reset so we won't waste memory
+                self.options['use_cached_states'] = False  # reset so we won't waste memory
 
     def _set_complex_step_mode(self, active):
         """
@@ -806,11 +806,11 @@ class NonlinearSolver(Solver):
         Solve the nonlinear system, possibly after updating output vector with cached values.
 
         Cached values, if any, are from the last successful nonlinear solve, and are only used
-        if the 'use_cached_outputs' option is True.
+        if the 'use_cached_states' option is True.
         """
         # The output caching only works if we throw an error on non-convergence, otherwise
         # the solver will disregard the output caching options and throw a warning.
-        if self.options['use_cached_outputs'] and self.options['maxiter'] > 1:
+        if self.options['use_cached_states'] and self.options['maxiter'] > 1:
             system = self._system()
             try:
                 # If we have a previous solver failure, we want to replace

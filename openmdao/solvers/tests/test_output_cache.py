@@ -120,7 +120,7 @@ class CoupledGroup(om.Group):
         solver.options["maxiter"] = 1000
         solver.options["atol"] = 1e-8
         solver.options["rtol"] = 1e-99
-        solver.options["use_cached_outputs"] = True
+        solver.options["use_cached_states"] = True
         solver.options["err_on_non_converge"] = True
         self.linear_solver = om.DirectSolver(assemble_jac=True)
 
@@ -136,7 +136,7 @@ class NLBGSGroup(om.Group):
         solver.options["maxiter"] = 1000
         solver.options["atol"] = 1e-14
         solver.options["rtol"] = 1e-99
-        solver.options["use_cached_outputs"] = True
+        solver.options["use_cached_states"] = True
         solver.options["err_on_non_converge"] = True
         self.linear_solver = om.DirectSolver(assemble_jac=True)
 

@@ -202,7 +202,7 @@ class BoundsEnforceLS(LinesearchSolver):
 
         # Remove unused options from base options here, so that users
         # attempting to set them will get KeyErrors.
-        unused_options = ("atol", "rtol", "maxiter", "err_on_non_converge", "use_cached_outputs")
+        unused_options = ("atol", "rtol", "maxiter", "err_on_non_converge", "use_cached_states")
         for unused_option in unused_options:
             opt.undeclare(unused_option)
 
