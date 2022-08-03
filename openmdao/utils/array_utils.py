@@ -145,7 +145,7 @@ def take_nth(rank, size, seq):
     ------
     generator
     """
-    assert(rank < size)
+    assert rank < size
     it = iter(seq)
     while True:
         for proc in range(size):

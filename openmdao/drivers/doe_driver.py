@@ -193,7 +193,7 @@ class DOEDriver(Driver):
                 msg = "Error assigning %s = %s: " % (dv_name, dv_val) + str(err)
             finally:
                 if msg:
-                    raise(ValueError(msg))
+                    raise ValueError(msg)
 
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             try:
