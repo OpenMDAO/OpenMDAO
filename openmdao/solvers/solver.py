@@ -564,7 +564,7 @@ class NonlinearSolver(Solver):
         if 'use_cached_states' in self.options and self.options['use_cached_states']:
             if not self.options['err_on_non_converge']:
                 issue_warning(f"{self.msginfo}: Option 'use_cached_states' does nothing "
-                              "unless option 'err_on_non_converge' is set to True.", 
+                              "unless option 'err_on_non_converge' is set to True.",
                               category=SolverWarning)
                 self.options['use_cached_states'] = False  # reset so we won't waste memory
 
