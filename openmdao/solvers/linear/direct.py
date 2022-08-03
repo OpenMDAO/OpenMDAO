@@ -89,7 +89,7 @@ def format_singular_error(system, matrix):
 
     if np.any(np.isnan(matrix)):
         # There is a nan in the matrix.
-        return(format_nan_error(system, matrix))
+        return format_nan_error(system, matrix)
 
     zero_rows = np.where(~matrix.any(axis=1))[0]
     zero_cols = np.where(~matrix.any(axis=0))[0]

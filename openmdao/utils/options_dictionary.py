@@ -219,7 +219,7 @@ class OptionsDictionary(object):
                 text.append(row[:width])
                 if not row.startswith('==='):
                     row = row[width:].rstrip()
-                    while(len(row) > 0):
+                    while len(row) > 0:
                         text.append(' ' * desc_col + row[:desc_len])
                         row = row[desc_len:]
             else:
