@@ -519,6 +519,18 @@ class System(object):
         self._raise_connection_errors = True
 
     @property
+    def under_approx(self):
+        """
+        Return True if under complex step or finite difference.
+
+        Returns
+        -------
+        bool
+            True if under CS or FD.
+        """
+        return self.under_complex_step or self.under_finite_difference
+
+    @property
     def msginfo(self):
         """
         Our instance pathname, if available, or our class name.  For use in error messages.

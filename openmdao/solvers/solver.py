@@ -808,10 +808,11 @@ class NonlinearSolver(Solver):
         Cached values, if any, are from the last successful nonlinear solve, and are only used
         if the 'use_cached_states' option is True.
         """
+        system = self._system()
         # The output caching only works if we throw an error on non-convergence, otherwise
         # the solver will disregard the output caching options and throw a warning.
-        if self.options['use_cached_states'] and self.options['maxiter'] > 1:
-            system = self._system()
+        if (self.options['use_cached_states'] and self.options['maxiter'] > 1 and
+                not system.under_approx):
             try:
                 # If we have a previous solver failure, we want to replace
                 # the outputs using the cache.

@@ -170,3 +170,18 @@ class TestOutputCache2(unittest.TestCase):
             prob.run_model()
 
         prob.model.list_outputs()
+
+
+if __name__ == '__main__':
+    p = om.Problem()
+    bal = om.BalanceComp()
+    bal.add_balance('x', val=1.0)
+    exec_comp = om.ExecComp('y=x**2')
+    p.model.add_subsystem(name='exec', subsys=exec_comp)
+    p.model.add_subsystem(name='balance', subsys=bal)
+    p.model.connect('balance.x', 'exec.x')
+    p.model.connect('exec.y', 'balance.lhs:x')
+    p.model.nonlinear_solver = om.NonlinearBlockGS()
+    p.setup()
+    p.set_val('exec.x', 2)
+    p.run_model()
