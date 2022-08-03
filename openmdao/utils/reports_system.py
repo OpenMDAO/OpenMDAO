@@ -6,7 +6,9 @@ from collections import namedtuple
 import sys
 import os
 import inspect
-import functools
+from itertools import chain
+
+from numpy import isin
 
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.mpi import MPI
@@ -14,6 +16,7 @@ from openmdao.utils.hooks import _register_hook, _unregister_hook
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.file_utils import _iter_entry_points
 from openmdao.utils.webview import webview
+from openmdao.utils.general_utils import env_truthy, is_truthy
 
 # Keeping track of the registered reports
 _Report = namedtuple(
@@ -22,13 +25,8 @@ _Report = namedtuple(
 _reports_registry = {}
 _default_reports = ['scaling', 'total_coloring', 'n2', 'optimizer']
 _active_reports = set()  # these reports will actually run (assuming their hook funcs are triggered)
-_cmdline_reports = set()  # cmdline reports can be registered here to prevent default reports
-
+_cmdline_reports = set()  # cmdline reports registered here so default reports aren't modified
 _reports_dir = os.environ.get('OPENMDAO_REPORTS_DIR', './reports')  # top dir for the reports
-
-_truthy = {'1', 'true', 'on', 'yes'}
-_falsey = {'0', 'false', 'off', "none", ""}
-
 _plugins_loaded = False  # use this to ensure plugins only loaded once
 
 
@@ -46,7 +44,7 @@ def reports_active():
     bool
         Return True if reports are active.
     """
-    return os.environ.get('TESTFLO_RUNNING', '').lower() not in ('1', 'true')
+    return not env_truthy('TESTFLO_RUNNING')
 
 
 def register_report(name, func, desc, class_name, method, pre_or_post, filename=None, inst_id=None):
@@ -174,7 +172,7 @@ def list_reports(default=False, out_stream=None):
     """
     global _reports_registry
 
-    # if we haven't created any Problem instances, the registry could still be uninitialized
+    # if we haven't created any Problem instances, the registry could still be uninitialized.
     # if it *has* already been initialized, this call will do nothing.
     _load_report_plugins()
 
@@ -270,21 +268,45 @@ def _list_reports_cmd(options, user_args):
             list_reports(options.dflt, f)
 
 
-def view_reports(probname=None):
+def view_reports(probnames=None, level=2):
     """
     Pop up a browser to view specified reports.
 
     Parameters
     ----------
-    probname : str or None
-        If not None, view only reports for the specified Problem, else view all reports.
+    probnames : str, iter of str, or None
+        If not None, view only reports for the specified Problem(s), else view all reports.
+    level : int
+        Expand the reports directory tree to this level.  Default is 2.
     """
-    if probname is None:
-        tdir = _reports_dir
-    else:
-        tdir = os.path.join(_reports_dir, probname)
+    tdir = _reports_dir
+    to_match = set()
+    if probnames:
+        if isinstance(probnames, str):
+            probnames = (probnames,)
 
-    gen_index_file(tdir)
+        for probname in probnames:
+            subdir = os.path.join(_reports_dir, probname)
+            if not os.path.isdir(subdir):
+                # see if they provided script name instead of problem name
+                dname = os.path.splitext(subdir)[0]
+                if os.path.isdir(dname):
+                    subdir = dname
+                else:
+                    print(f"Can't find report dir '{subdir}'.")
+                    continue
+
+            to_match.add(subdir)
+    else:
+        to_match = set(os.listdir(tdir))
+
+    if not to_match:
+        print("No matching report dirs found.")
+        return
+
+    to_match = {os.path.basename(m) for m in to_match}
+
+    gen_index_file(tdir, level, to_match)
 
     webview(os.path.join(tdir, 'index.html'))
 
@@ -298,8 +320,10 @@ def _view_reports_setup_parser(parser):
     parser : argparse subparser
         The parser we're adding options to.
     """
-    parser.add_argument('-p', '--problem', action='store', dest='problem',
-                        help='View reports only for the specified Problem.')
+    parser.add_argument('problem', metavar='problem', nargs='*',
+                        help='View reports only for the specified Problem(s).')
+    parser.add_argument('-l', '--level', action='store', dest='level', type=int, default=2,
+                        help='Expand the reports directory tree to this level. Default is 2.')
 
 
 def _view_reports_cmd(options, user_args):
@@ -313,7 +337,7 @@ def _view_reports_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    view_reports(options.problem)
+    view_reports(options.problem, level=options.level)
 
 
 def set_reports_dir(reports_dir_path):
@@ -371,21 +395,41 @@ def get_reports_dir():
 
 
 def _reports2list(reports, defaults):
+    """
+    Return a list of reports based on the value of the reports var and current default report list.
+
+    Parameters
+    ----------
+    reports : str, list, or _UNDEFINED
+        Variable indicating which reports should be active based on the current 'defaults' list.
+    defaults : list
+        List of current default reports.  This could be either the global report defaults or
+        a newer list of defaults based on previous processing.
+
+    Returns
+    -------
+    list
+        The list of reports that should be active.
+    """
     if reports in [True, _UNDEFINED]:
         return defaults
-    if not reports:  # False or None or empty iter
+    if not reports:
         return []
 
     if isinstance(reports, str):
         low = reports.lower()
-        if low in _falsey:
-            return []
-        if low in _truthy:
-            return defaults
         if low == 'all':
             return list(_reports_registry)  # activate all registered reports
 
-        return [s.strip() for s in reports.split(',') if s.strip()]
+        if is_truthy(low):
+            if ',' in low:
+                return [s.strip() for s in reports.split(',') if s.strip()]
+            elif reports in _reports_registry:
+                return [reports]
+            else:
+                return defaults
+        else:
+            return []
 
     return list(reports)
 
@@ -404,6 +448,9 @@ def get_reports_to_activate(reports=_UNDEFINED):
     list of str
         List of report names.
     """
+    if not reports or not reports_active():
+        return []
+
     reps_env = os.environ.get('OPENMDAO_REPORTS', 'true')
     env_list = _reports2list(reps_env, _default_reports[:])
     return _reports2list(reports, env_list)
@@ -463,7 +510,7 @@ def _load_report_plugins():
         register_func()  # this runs the function that calls register_report
 
 
-def _add_dir_to_tree(dirpath, lines):
+def _add_dir_to_tree(dirpath, lines, explevel, level, to_match):
     """
     Create nested lists of directories with links to files.
 
@@ -473,21 +520,42 @@ def _add_dir_to_tree(dirpath, lines):
         Starting directory.
     lines : list of str
         List of lines in the final html.
+    explevel : int
+        Expand the tree to this level.
+    level : int
+        The current level of the tree.
+    to_match : set
+        Directory names to show.
     """
-    lines.append(f'<li><span class="caret">{os.path.basename(dirpath)}</span>')
+    dlist = os.listdir(dirpath)
+
+    # split into files and dirs to make page look better
+    directories = {f for f in dlist if os.path.isdir(os.path.join(dirpath, f))}
+
+    files = sorted(f for f in dlist if os.path.isfile(os.path.join(dirpath, f)))
+
+    if level == 1 and os.path.basename(dirpath) not in to_match:
+        return
+    else:
+        op = 'open' if level < explevel else ''
+        lines.append(f'<li><details {op}><summary>{os.path.basename(dirpath)}</summary>')
+        if not dlist:
+            lines.append('</li>')
+            return
+
     lines.append(f'<ul>')
 
-    for f in os.listdir(dirpath):
+    for f in chain(files, sorted(directories)):
         path = os.path.join(dirpath, f)
         if os.path.isdir(path):
-            _add_dir_to_tree(path, lines)
+            _add_dir_to_tree(path, lines, explevel, level + 1, to_match)
         elif f.endswith('.html') and f != 'index.html':
             lines.append(f'<li> <a href="file:///{path}">{f}</a> </li>')
 
-    lines.append('</ul></li>')
+    lines.append('</ul></details></li>')
 
 
-def gen_index_file(reports_dir):
+def gen_index_file(reports_dir, level, to_match):
     """
     Generate an index.html file that will have links to all of the reports.
 
@@ -495,8 +563,14 @@ def gen_index_file(reports_dir):
     ----------
     reports_dir : str
         The top directory containing the reports.
+    level : int
+        Expand the reports directory tree to this level.
+    to_match : set
+        Set of subdirectory names to show.
     """
     reports_dir = os.path.abspath(reports_dir)
+
+    # tree view courtesy of: https://iamkate.com/code/tree-views/
 
     parts = [
         """
@@ -505,18 +579,94 @@ def gen_index_file(reports_dir):
         <head>
         <meta charset="utf-8">
         <style>
-            /* Remove default bullets */
-            ul {
-               list-style-type: none;
+            .tree {
+                --spacing : 1.5rem;
+                --radius  : 8px;
+            }
+
+            .tree li {
+                display      : block;
+                position     : relative;
+                padding-left : calc(2 * var(--spacing) - var(--radius) - 2px);
+            }
+
+            .tree ul {
+                margin-left  : calc(var(--radius) - var(--spacing));
+                padding-left : 0;
+            }
+
+            .tree ul li {
+                border-left : 2px solid #ddd;
+            }
+
+            .tree ul li:last-child {
+                border-color : transparent;
+            }
+
+            .tree ul li::before {
+                content      : '';
+                display      : block;
+                position     : absolute;
+                top          : calc(var(--spacing) / -2);
+                left         : -2px;
+                width        : calc(var(--spacing) + 2px);
+                height       : calc(var(--spacing) + 1px);
+                border       : solid #ddd;
+                border-width : 0 0 2px 2px;
+            }
+
+            .tree summary {
+                display : block;
+                cursor  : pointer;
+            }
+
+            .tree summary::marker,
+            .tree summary::-webkit-details-marker {
+                display : none;
+            }
+
+            .tree summary:focus {
+                outline : none;
+            }
+
+            .tree summary:focus-visible {
+                outline : 1px dotted #000;
+            }
+
+            .tree li::after,
+            .tree summary::before {
+                content       : '';
+                display       : block;
+                position      : absolute;
+                top           : calc(var(--spacing) / 2 - var(--radius));
+                left          : calc(var(--spacing) - var(--radius) - 1px);
+                width         : calc(2 * var(--radius));
+                height        : calc(2 * var(--radius));
+                border-radius : 50%;
+                background    : #ddd;
+            }
+
+            .tree summary::before {
+                content     : '+';
+                z-index     : 1;
+                background  : #696;
+                color       : #fff;
+                line-height : calc(2 * var(--radius) - 2px);
+                text-align  : center;
+            }
+
+            .tree details[open] > summary::before {
+                content : '−';
             }
         </style>
+        <script>
+        </script>
         </head>
         <body>
         """
     ]
-
-    lines = ['<ul>']
-    _add_dir_to_tree(reports_dir, lines)
+    lines = ['<ul class="tree">']
+    _add_dir_to_tree(reports_dir, lines, explevel=level, level=0, to_match=to_match)
 
     parts.append('\n'.join(lines))
     parts.append('</body>\n</html>')

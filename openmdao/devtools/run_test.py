@@ -20,6 +20,7 @@ for example:
     mpirun -n 4 run_test /foo/bar/mypackage/mypackage/mysubpackage/mymod.py:MyTestCase.test_foo
 """
 
+import os
 import sys
 import importlib
 from openmdao.utils.file_utils import get_module_path
@@ -29,8 +30,6 @@ def run_test():
     """
     Run individual test(s).
     """
-
-    sys.path.append('.')
     if len(sys.argv) > 1:
         testspec = sys.argv[1]
         parts = testspec.split(':')
@@ -44,6 +43,11 @@ def run_test():
     modpath, funcpath = parts
     if modpath.endswith('.py'):
         modpath = get_module_path(modpath)
+        if modpath is None:
+            modpath = parts[0]
+            moddir = os.path.dirname(modpath)
+            sys.path = [moddir] + sys.path
+            modpath = os.path.basename(modpath)[:-3]
 
     mod = importlib.import_module(modpath)
 

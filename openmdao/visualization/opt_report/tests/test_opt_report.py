@@ -506,19 +506,21 @@ class TestOptimizationReport(unittest.TestCase):
     def test_opt_report_hook(self):
         testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
 
-        self.setup_problem_and_run_driver(om.ScipyOptimizeDriver,
-                                          vars_lower=-50, vars_upper=50.,
-                                          cons_lower=0, cons_upper=10.,
-                                          optimizer='SLSQP',)
+        try:
+            self.setup_problem_and_run_driver(om.ScipyOptimizeDriver,
+                                            vars_lower=-50, vars_upper=50.,
+                                            cons_lower=0, cons_upper=10.,
+                                            optimizer='SLSQP',)
 
-        # check that the report was run properly via the hook
-        # and has the expected opt_result data
-        self.check_opt_report()
+            # check that the report was run properly via the hook
+            # and has the expected opt_result data
+            self.check_opt_report()
+        finally:
+            if testflo_running is not None:
+                os.environ['TESTFLO_RUNNING'] = testflo_running
 
-        if testflo_running is not None:
-            os.environ['TESTFLO_RUNNING'] = testflo_running
 
-
+@use_tempdirs
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestMPIScatter(unittest.TestCase):
     N_PROCS = 2

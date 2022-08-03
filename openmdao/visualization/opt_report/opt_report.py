@@ -131,7 +131,7 @@ def opt_report(prob, outfile=None):
     if not outfile:
         outfile = _default_optimizer_report_filename
 
-    outfilepath = str(pathlib.Path(prob.get_reports_dir()).joinpath(outfile))
+    outfilepath = pathlib.Path(prob.get_reports_dir(force=True)).joinpath(outfile)
 
     if not tabulate:
         s = '''
