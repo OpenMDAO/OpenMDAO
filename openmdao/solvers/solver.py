@@ -546,7 +546,7 @@ class NonlinearSolver(Solver):
                              desc='When stall checking is enabled, the threshold below which the '
                                   'residual norm is considered unchanged.')
         self.options.declare('use_cached_states', types=bool, default=False,
-                             desc='If True, the outputs are cached after a successful solve and '
+                             desc='If True, the states are cached after a successful solve and '
                                   'used to restart the solver in the case of a failed solve.')
 
     def _setup_solvers(self, system, depth):
@@ -563,24 +563,10 @@ class NonlinearSolver(Solver):
         super()._setup_solvers(system, depth)
         if 'use_cached_states' in self.options and self.options['use_cached_states']:
             if not self.options['err_on_non_converge']:
-                issue_warning(f"{self.msginfo}: Caching outputs does nothing unless option "
-                              "'err_on_non_converge' is set to 'True'", category=SolverWarning)
+                issue_warning(f"{self.msginfo}: Option 'use_cached_states' does nothing "
+                              "unless option 'err_on_non_converge' is set to True.", 
+                              category=SolverWarning)
                 self.options['use_cached_states'] = False  # reset so we won't waste memory
-
-    def _set_complex_step_mode(self, active):
-        """
-        Turn on or off complex stepping mode.
-
-        Recurses to turn on or off complex stepping mode in all subsystems and their vectors.
-
-        Parameters
-        ----------
-        active : bool
-            Complex mode flag; set to True prior to commencing complex step.
-        """
-        # if we change the type of the outputs vector, reset the output cache
-        if self._system()._outputs._under_complex_step != active:
-            self._output_cache = None
 
     def solve(self):
         """

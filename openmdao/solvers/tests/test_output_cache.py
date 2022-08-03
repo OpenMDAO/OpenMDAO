@@ -13,7 +13,7 @@ class SubComp1(om.ExplicitComponent):
         self.add_input("a")
         self.add_output("z")
 
-        self.declare_partials("z", "x", method="cs")
+        self.declare_partials("*", "*", method="cs")
 
     def compute(self, inputs, outputs):
         x = inputs["x"]
@@ -27,7 +27,7 @@ class SubComp2(om.ExplicitComponent):
         self.add_input("b")
         self.add_output("z")
 
-        self.declare_partials("z", "x", method="cs")
+        self.declare_partials("*", "*", method="cs")
 
     def compute(self, inputs, outputs):
         x = inputs["x"]
@@ -50,6 +50,10 @@ class TopComp(om.ImplicitComponent):
 
 
 class CoupledGroup(om.Group):
+    def __init__(self, err_on_non_converge=True, **kwargs):
+        super().__init__(**kwargs)
+        self.err_on_non_converge = err_on_non_converge
+
     def setup(self):
         self.add_subsystem("sub_comp1", SubComp1())
         self.add_subsystem("sub_comp2", SubComp2())
@@ -65,7 +69,7 @@ class CoupledGroup(om.Group):
         solver.options["atol"] = 1e-8
         solver.options["rtol"] = 1e-99
         solver.options["use_cached_states"] = True
-        solver.options["err_on_non_converge"] = True
+        solver.options["err_on_non_converge"] = self.err_on_non_converge
         self.linear_solver = om.DirectSolver(assemble_jac=True)
 
 
@@ -123,3 +127,17 @@ class TestOutputCache(unittest.TestCase):
         assert_near_equal(prob['simple.coupling.sub_comp1.z'][0], 8.51905504, 1e-6)
         assert_near_equal(prob['simple.coupling.sub_comp2.z'][0], 8.51905504, 1e-6)
         assert_near_equal(prob['simple.coupling.balance.x'][0], 6.28613102, 1e-6)
+
+    def test_warning(self):
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('coupling', CoupledGroup(err_on_non_converge=False))
+
+        prob.setup()
+
+        prob.set_val("coupling.sub_comp1.a", val=5.0)
+        prob.set_val("coupling.sub_comp2.b", val=10.0)
+
+        expected = "NewtonSolver in 'coupling' <class CoupledGroup>: Option 'use_cached_states' does nothing unless option 'err_on_non_converge' is set to True."
+        with assert_warning(om.SolverWarning, expected):
+            prob.run_model()
