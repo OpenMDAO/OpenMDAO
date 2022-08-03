@@ -45,7 +45,6 @@ class QuadraticComp(om.ImplicitComponent):
         b = inputs['b']
         c = inputs['c']
         outputs['x'] = (-b + (b ** 2 - 4 * a * c) ** 0.5) / (2 * a)
-        print(outputs['x'])
 
 
 class QuadraticLinearize(QuadraticComp):

@@ -4213,7 +4213,7 @@ class System(object):
 
         # All calls to _solve_nonlinear are recorded, The counter is incremented after recording.
         self.iter_count += 1
-        if not (self.under_complex_step or self.under_finite_difference):
+        if not self.under_approx:
             self.iter_count_without_approx += 1
 
     def _clear_iprint(self):

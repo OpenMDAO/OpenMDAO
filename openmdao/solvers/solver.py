@@ -515,7 +515,7 @@ class NonlinearSolver(Solver):
     _err_cache : dict
         Dictionary holding input and output vectors at start of iteration, if requested.
     _output_cache : ndarray or None
-        Saved output values from last successful solve, if
+        Saved output values from last successful solve, if any.
     _prev_fail : bool
         If True, previous solve failed.
     """
@@ -561,12 +561,15 @@ class NonlinearSolver(Solver):
             depth of the current system (already incremented).
         """
         super()._setup_solvers(system, depth)
+        # The state caching only works if we throw an error on non-convergence, otherwise
+        # the solver will disregard the caching option and issue a warning.
         if 'use_cached_states' in self.options and self.options['use_cached_states']:
             if not self.options['err_on_non_converge']:
                 issue_warning(f"{self.msginfo}: Option 'use_cached_states' does nothing "
                               "unless option 'err_on_non_converge' is set to True.",
                               category=SolverWarning)
-                self.options['use_cached_states'] = False  # reset so we won't waste memory
+                # reset to False so we won't waste memory allocating a cache array
+                self.options['use_cached_states'] = False
 
     def solve(self):
         """
@@ -795,8 +798,6 @@ class NonlinearSolver(Solver):
         if the 'use_cached_states' option is True.
         """
         system = self._system()
-        # The output caching only works if we throw an error on non-convergence, otherwise
-        # the solver will disregard the output caching options and throw a warning.
         if (self.options['use_cached_states'] and self.options['maxiter'] > 1 and
                 not system.under_approx):
             try:
