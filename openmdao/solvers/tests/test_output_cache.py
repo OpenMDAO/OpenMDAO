@@ -5,62 +5,6 @@ import numpy as np
 import openmdao.api as om
 
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_no_warning
-from openmdao.core.tests.test_impl_comp import QuadraticComp
-
-SIZE = 1
-
-class MyTestComp(om.ExplicitComponent):
-    def __init__(self, neg_iter=4):
-        super().__init__()
-        self.neg_iter = neg_iter
-        self.count = 0
-
-    def setup(self):
-        self.add_input('x', np.zeros(SIZE))
-        self.add_output('y', np.ones(SIZE))
-
-        self.declare_partials(of='*', wrt='*')
-
-    def compute(self, inputs, outputs):
-        self.count += 1
-        if self.count == self.neg_iter:
-            outputs['y'] = 5.
-        else:
-            outputs['y'] = inputs['x']
-
-
-class MyLogComp(om.ExplicitComponent):
-    def setup(self):
-        self.add_input('x', np.ones(SIZE))
-        self.add_output('y', np.ones(SIZE))
-
-        self.declare_partials(of='*', wrt='*')
-
-    def compute(self, inputs, outputs):
-        outputs['y'] = 3.0*np.log(inputs['x']) + inputs['x']**3
-
-
-class TestOutputCache(unittest.TestCase):
-
-    def setUp(self):
-        p = om.Problem()
-        p.model.add_subsystem('C1', MyTestComp(neg_iter=2))
-        p.model.add_subsystem('C2', QuadraticComp())
-        p.model.connect('C1.y', 'C2.c')
-        p.model.nonlinear_solver = om.NonlinearBlockGS()
-        p.model.nonlinear_solver.options['err_on_non_converge'] = True
-
-        p.setup()
-
-        p['C2.b'] = 2.
-
-        self.p = p
-
-    def test_simple_caching(self):
-        p = self.p
-        p.run_model()
-
-        print("iters:", p.model.nonlinear_solver._iter_count)
 
 
 class SubComp1(om.ExplicitComponent):
@@ -141,7 +85,7 @@ class NLBGSGroup(om.Group):
         self.linear_solver = om.DirectSolver(assemble_jac=True)
 
 
-class TestOutputCache2(unittest.TestCase):
+class TestOutputCache(unittest.TestCase):
     def test_coupled_system(self):
         prob = om.Problem()
         model = prob.model
@@ -150,8 +94,8 @@ class TestOutputCache2(unittest.TestCase):
         prob.setup()
 
         # --- Set the print levels ---
-        # prob.set_solver_print(level=-1)
-        # prob.set_solver_print(level=2, depth=1)
+        prob.set_solver_print(level=-1)
+        prob.set_solver_print(level=2, depth=1)
 
         prob.set_val("simple.coupling.sub_comp1.a", val=5.0)
         prob.set_val("simple.coupling.sub_comp2.b", val=10.0)
@@ -170,18 +114,3 @@ class TestOutputCache2(unittest.TestCase):
             prob.run_model()
 
         prob.model.list_outputs()
-
-
-if __name__ == '__main__':
-    p = om.Problem()
-    bal = om.BalanceComp()
-    bal.add_balance('x', val=1.0)
-    exec_comp = om.ExecComp('y=x**2')
-    p.model.add_subsystem(name='exec', subsys=exec_comp)
-    p.model.add_subsystem(name='balance', subsys=bal)
-    p.model.connect('balance.x', 'exec.x')
-    p.model.connect('exec.y', 'balance.lhs:x')
-    p.model.nonlinear_solver = om.NonlinearBlockGS()
-    p.setup()
-    p.set_val('exec.x', 2)
-    p.run_model()
