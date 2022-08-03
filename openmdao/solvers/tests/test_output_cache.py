@@ -94,23 +94,23 @@ class TestOutputCache(unittest.TestCase):
         prob.setup()
 
         # --- Set the print levels ---
-        prob.set_solver_print(level=-1)
-        prob.set_solver_print(level=2, depth=1)
+        # prob.set_solver_print(level=-1)
+        # prob.set_solver_print(level=2, depth=1)
 
         prob.set_val("simple.coupling.sub_comp1.a", val=5.0)
         prob.set_val("simple.coupling.sub_comp2.b", val=10.0)
 
         prob.run_model()
 
-        prob.model.list_outputs()
+        # prob.model.list_outputs()
 
         prob.set_val("simple.coupling.sub_comp1.x", val=-1.0)
 
         try:
             prob.run_model()
         except om.AnalysisError:
-            prob.set_val("simple.coupling.sub_comp1.a", val=2.0)
-            prob.set_val("simple.coupling.sub_comp2.b", val=3.0)
+            prob.set_val("simple.coupling.sub_comp1.x", val=2.0)
+            # prob.set_val("simple.coupling.sub_comp2.b", val=3.0)
             prob.run_model()
 
-        prob.model.list_outputs()
+        # prob.model.list_outputs()
