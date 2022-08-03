@@ -93,14 +93,17 @@ class TestOutputCache(unittest.TestCase):
 
         prob.setup()
 
-        # --- Set the print levels ---
         # prob.set_solver_print(level=-1)
-        # prob.set_solver_print(level=2, depth=1)
+        # prob.set_solver_print(level=2, depth=9)
 
         prob.set_val("simple.coupling.sub_comp1.a", val=5.0)
         prob.set_val("simple.coupling.sub_comp2.b", val=10.0)
 
         prob.run_model()
+
+        assert_near_equal(prob['simple.coupling.sub_comp1.z'][0], 15.66717076361843, 1e-6)
+        assert_near_equal(prob['simple.coupling.sub_comp2.z'][0], 15.66717076361843, 1e-6)
+        assert_near_equal(prob['simple.coupling.balance.x'][0], 6.6054982979676495, 1e-6)
 
         # prob.model.list_outputs()
 
@@ -110,7 +113,13 @@ class TestOutputCache(unittest.TestCase):
             prob.run_model()
         except om.AnalysisError:
             prob.set_val("simple.coupling.sub_comp1.x", val=2.0)
-            # prob.set_val("simple.coupling.sub_comp2.b", val=3.0)
+            prob.set_val("simple.coupling.sub_comp2.b", val=3.0)
             prob.run_model()
+        else:
+            self.fail("Expected AnalysisError")
 
         # prob.model.list_outputs()
+
+        assert_near_equal(prob['simple.coupling.sub_comp1.z'][0], 8.51905504, 1e-6)
+        assert_near_equal(prob['simple.coupling.sub_comp2.z'][0], 8.51905504, 1e-6)
+        assert_near_equal(prob['simple.coupling.balance.x'][0], 6.28613102, 1e-6)
