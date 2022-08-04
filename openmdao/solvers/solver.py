@@ -792,7 +792,7 @@ class NonlinearSolver(Solver):
 
     def _solve_with_cache_check(self):
         """
-        Solve the nonlinear system, possibly after updating output vector with cached values.
+        Solve the nonlinear system, possibly after updating the output vector with cached values.
 
         Cached values, if any, are from the last successful nonlinear solve, and are only used
         if the 'use_cached_states' option is True.
