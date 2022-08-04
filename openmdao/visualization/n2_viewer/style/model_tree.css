@@ -285,9 +285,9 @@ rect.outputHighlight {
 #show-error-button-container {
     visibility: hidden;
     position: absolute;
-    bottom: 17px;
+    bottom: 250px;
     right: 115px;
-    z-index:5;
+    z-index: 5;
 }
 
 #show-error-button{
