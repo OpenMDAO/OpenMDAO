@@ -265,7 +265,6 @@ class NewtonSolver(NonlinearSolver):
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
-        super()._set_complex_step_mode(active)
         if self.linear_solver is not None:
             self.linear_solver._set_complex_step_mode(active)
             if self.linear_solver._assembled_jac is not None:
