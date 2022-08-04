@@ -31,6 +31,8 @@ class ImplicitComponent(Component):
         super().__init__(**kwargs)
 
         self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
+        
+        self._declare_residuals = False
 
     def _configure(self):
         """
@@ -316,6 +318,43 @@ class ImplicitComponent(Component):
         metadata['tags'].add('openmdao:allow_desvar')
 
         return metadata
+        
+    def add_residual(self, name, shape=1.0, units=None, desc=""):
+        """
+        Add a residual variable to the component.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable in this component's namespace.
+        shape : int
+            The initial value of the variable being added in user-defined units. Default is 1.0.
+        **kwargs : dict
+            Keyword args to store.  The value corresponding to each key is a dict containing the
+            metadata for the input name that matches that key.
+
+        Returns
+        -------
+        dict
+            Metadata for added residual.
+        """
+
+        # for backwards compatibility
+        self._declare_residuals = True
+
+        # save meta data for use when allocating residuals later
+
+        return
+
+    def _setup_check(self):
+        """
+        If separate residual names have been defined, check that the total
+        number of residuals is the same as the total number of outputs.
+        """
+        if self._declare_residuals:
+            if len(self._residuals) != len(self._outputs):
+                msg = "The number of residuals ({}) does not match the number of outputs ({})."
+                raise RuntimeError(msg.format(len(self._residuals), len(self._outputs)))
 
     def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs=None,
                         discrete_outputs=None):
