@@ -7,6 +7,7 @@ import pprint
 import os
 import weakref
 import pathlib
+import functools
 
 from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
@@ -1872,6 +1873,7 @@ class Problem(object):
             Jfd = total_info.compute_totals_approx(initialize=True, progress_out_stream=out_stream)
         else:
             Jfd = total_info.compute_totals_approx(initialize=True)
+
         # reset the _owns_approx_jac flag after approximation is complete.
         if not approx:
             model._jacobian = old_jac
@@ -1881,14 +1883,11 @@ class Problem(object):
             model._subjacs_info = old_subjacs
 
         # Assemble and Return all metrics.
-        data = {}
-        data[''] = {}
+        data = {'': {}}
         resp = self.driver._responses
         # TODO key should not be fwd when exact computed in rev mode or auto
         for key, val in Jcalc.items():
-            data[''][key] = {}
-            data[''][key]['J_fwd'] = val
-            data[''][key]['J_fd'] = Jfd[key]
+            data[''][key] = {'J_fwd': val, 'J_fd': Jfd[key]}
 
             # Display whether indices were declared when response was added.
             of = key[0]
@@ -2293,51 +2292,39 @@ ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
 
 
-def _compute_deriv_errors(derivative_data, rel_error_tol, abs_error_tol, out_stream,
-                              compact_print, system_list, global_options, totals=False,
-                              indep_key=None, print_reverse=False,
-                              show_only_incorrect=False, lcons=None):
+def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
 
     nan = float('nan')
 
     def safe_norm(arr):
         return 0. if arr is None or arr.size == 0 else np.linalg.norm(arr)
 
-    if totals:
-        fd_opts = global_options['']
-    else:
-        fd_opts = global_options[sys_name][wrt]
-
-    directional = fd_opts.get('directional')
-    do_rev = not totals and matrix_free and not directional
-    do_rev_dp = not totals and matrix_free and directional
-
-    derivative_info = derivatives[of, wrt]
     # TODO total derivs may have been computed in rev mode, not fwd
     forward = derivative_info['J_fwd']
     fwd_norm = safe_norm(forward)
     try:
         fd = derivative_info['J_fd']
+        fd_norm = safe_norm(fd)
     except KeyError:
         # this can happen when a partial is not declared, which means it should be zero
-        fd = np.zeros(forward.shape)
-    fd_norm = safe_norm(fd)
+        fd = fd_norm = 0.
 
     fwd_error = safe_norm(forward - fd)
     rev_norm = None
-    if do_rev_dp:
-        fwd_rev_error = derivative_info['directional_fwd_rev']
-        rev_error = derivative_info['directional_fd_rev']
-    elif do_rev:
-        rev_error = safe_norm(reverse - fd)
-        fwd_rev_error = safe_norm(forward - reverse)
-        reverse = derivative_info.get('J_rev')
-        rev_norm = safe_norm(reverse)
+    if not totals and matrix_free:
+        if directional:
+            fwd_rev_error = derivative_info['directional_fwd_rev']
+            rev_error = derivative_info['directional_fd_rev']
+        else:
+            reverse = derivative_info.get('J_rev')
+            rev_error = safe_norm(reverse - fd)
+            fwd_rev_error = safe_norm(forward - reverse)
+            rev_norm = safe_norm(reverse)
     else:
         rev_error = fwd_rev_error = None
 
-    derivative_info['abs error'] = abs_err = ErrorTuple(fwd_error, rev_error, fwd_rev_error)
-    derivative_info['magnitude'] = magnitude = MagnitudeTuple(fwd_norm, rev_norm, fd_norm)
+    derivative_info['abs error'] = ErrorTuple(fwd_error, rev_error, fwd_rev_error)
+    derivative_info['magnitude'] = MagnitudeTuple(fwd_norm, rev_norm, fd_norm)
 
     if fd_norm == 0.:
         if fwd_norm == 0.:
@@ -2346,25 +2333,73 @@ def _compute_deriv_errors(derivative_data, rel_error_tol, abs_error_tol, out_str
         else:
             # If fd_norm is zero, let's use fwd_norm as the divisor for relative
             # check. That way we don't accidentally squelch a legitimate problem.
-            if do_rev or do_rev_dp:
-                rel_err = ErrorTuple(fwd_error / fwd_norm,
-                                        rev_error / fwd_norm,
-                                        fwd_rev_error / fwd_norm)
+            if not totals and matrix_free:
+                rel_err = ErrorTuple(fwd_error / fwd_norm, rev_error / fwd_norm,
+                                     fwd_rev_error / fwd_norm)
                 derivative_info['rel error'] = rel_err
             else:
-                derivative_info['rel error'] = rel_err = ErrorTuple(fwd_error / fwd_norm,
-                                                                    None,
-                                                                    None)
+                derivative_info['rel error'] = ErrorTuple(fwd_error / fwd_norm, None, None)
 
     else:
-        if do_rev or do_rev_dp:
-            derivative_info['rel error'] = rel_err = ErrorTuple(fwd_error / fd_norm,
-                                                                rev_error / fd_norm,
-                                                                fwd_rev_error / fd_norm)
+        if not totals and matrix_free:
+            derivative_info['rel error'] = ErrorTuple(fwd_error / fd_norm, rev_error / fd_norm,
+                                                      fwd_rev_error / fd_norm)
         else:
-            derivative_info['rel error'] = rel_err = ErrorTuple(fwd_error / fd_norm,
-                                                                None,
-                                                                None)
+            derivative_info['rel error'] = ErrorTuple(fwd_error / fd_norm, None, None)
+
+    return fd_norm
+
+
+def _errors_above_tol(deriv_info, abs_error_tol, rel_error_tol):
+    abs_err = deriv_info['abs error']
+    rel_err = deriv_info['rel error']
+
+    above_abs = above_rel = False
+
+    for error in abs_err:
+        if error is not None and not np.isnan(error) and error >= abs_error_tol:
+            above_abs = True
+            break
+
+    for error in rel_err:
+        if error is not None and not np.isnan(error) and error >= rel_error_tol:
+            above_rel = True
+            break
+
+    return above_abs, above_rel
+
+
+def _iter_derivs(derivatives, sys_name, show_only_incorrect, compact_print, global_options, totals,
+                 matrix_free, indep_key, abs_error_tol, rel_error_tol):
+
+    # Sorted keys ensures deterministic ordering
+    sorted_keys = sorted(derivatives)
+
+    for key in sorted_keys:
+        of, wrt = key
+        derivative_info = derivatives[key]
+
+        if totals:
+            fd_opts = global_options['']
+        else:
+            fd_opts = global_options[sys_name][wrt]
+        directional = fd_opts.get('directional')
+
+        fd_norm = _compute_deriv_errors(derivative_info, matrix_free, directional, totals)
+
+        # Skip printing the non-dependent keys if the derivatives are fine.
+        if not compact_print:
+            if indep_key and key in indep_key[sys_name] and fd_norm < abs_error_tol:
+                del derivatives[key]
+                continue
+
+        above_abs, above_rel = _errors_above_tol(derivative_info, abs_error_tol, rel_error_tol)
+
+        if show_only_incorrect and not (above_abs or above_rel):
+            continue
+
+        yield  key, fd_norm, fd_opts, directional, above_abs, above_rel
+
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
                               compact_print, system_list, global_options, totals=False,
@@ -2411,19 +2446,14 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}"
 
     # Keep track of the worst subjac in terms of relative error for fwd and rev
-    if not suppress_output and compact_print and not totals:
-        worst_subjac_rel_err = 0.0
-        worst_subjac = None
-
-    if not suppress_output and not totals and show_only_incorrect:
+    if not suppress_output and show_only_incorrect:
         out_stream.write('\n** Only writing information about components with '
                          'incorrect Jacobians **\n\n')
 
-    for system in system_list:
+    worst_subjac_rel_err = 0.0
+    worst_subjac = None
 
-        sys_name = system.pathname
-        sys_class_name = type(system).__name__
-        matrix_free = system.matrix_free
+    for system in system_list:
 
         # Match header to appropriate type.
         if isinstance(system, Component):
@@ -2431,7 +2461,11 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         elif isinstance(system, Group):
             sys_type = 'Group'
         else:
-            sys_type = type(system).__name__
+            raise RuntimeError(f"Object type {type(system).__name__} is not a Component or Group.")
+
+        sys_name = system.pathname
+        sys_class_name = type(system).__name__
+        matrix_free = system.matrix_free
 
         if sys_name not in derivative_data:
             msg = "No derivative data found for %s '%s'." % (sys_type, sys_name)
@@ -2443,8 +2477,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         if totals:
             sys_name = 'Full Model'
 
-        # Sorted keys ensures deterministic ordering
-        sorted_keys = sorted(derivatives.keys())
         num_bad_jacs = 0  # Keep track of number of bad derivative values for each component
 
         if not suppress_output:
@@ -2473,7 +2505,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 else:
                     max_width_of = len("'<output>'")
                     max_width_wrt = len("'<variable>'")
-                    for of, wrt in sorted_keys:
+                    for of, wrt in derivatives:
                         max_width_of = max(max_width_of, len(of) + 2)  # 2 to include quotes
                         max_width_wrt = max(max_width_wrt, len(wrt) + 2)
 
@@ -2507,24 +2539,27 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 out_buffer.write(header + '\n')
                 out_buffer.write('-' * len(header) + '\n' + '\n')
 
+        for key, fd_norm, fd_opts, directional, above_abs, above_rel in _iter_derivs(derivatives, sys_name,
+                                                               show_only_incorrect, compact_print,
+                                                               global_options, totals, matrix_free,
+                                                               indep_key,
+                                                               abs_error_tol, rel_error_tol):
+            of, wrt = key
+            derivative_info = derivatives[key]
 
-        for of, wrt in sorted_keys:
-
-
-
-            # Skip printing the dependent keys if the derivatives are fine.
-            if not compact_print and indep_key is not None:
-                rel_key = (of, wrt)
-                if rel_key in indep_key[sys_name] and fd_norm < abs_error_tol:
-                    del derivative_data[sys_name][rel_key]
-                    continue
+            do_rev = not totals and matrix_free and not directional
+            do_rev_dp = not totals and matrix_free and directional
 
             # Informative output for responses that were declared with an index.
             indices = derivative_info.get('indices')
             if indices is not None:
-                of = '{} (index size: {})'.format(of, indices)
+                of = f'{of} (index size: {indices})'
 
             if not suppress_output:
+
+                abs_err = derivative_info['abs error']
+                rel_err = derivative_info['rel error']
+                magnitude = derivative_info['magnitude']
 
                 if compact_print:
                     if totals:
@@ -2538,37 +2573,27 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         ) + '\n')
                     else:
                         error_string = ''
-                        for error in abs_err:
-                            if error is None:
-                                continue
-                            if not np.isnan(error) and error >= abs_error_tol:
-                                error_string += ' >ABS_TOL'
-                                break
+                        if above_abs:
+                            error_string += ' >ABS_TOL'
+                        if above_rel:
+                            error_string += ' >REL_TOL'
 
                         # See if this component has the greater
                         # error in the derivative computation
                         # compared to the other components so far
                         is_worst_subjac = False
-                        for i, error in enumerate(rel_err):
-                            if error is None:
-                                continue
-                            if not np.isnan(error):
-                                #  only 1st and 2d errs
-                                if i < 2 and error > worst_subjac_rel_err:
-                                    worst_subjac_rel_err = error
-                                    worst_subjac = (sys_type, sys_class_name, sys_name)
-                                    is_worst_subjac = True
-                            if not np.isnan(error) and error >= rel_error_tol:
-                                error_string += ' >REL_TOL'
-                                break
+                        for error in rel_err[:2]:
+                            if error is not None and not np.isnan(error) and error > worst_subjac_rel_err:
+                                worst_subjac_rel_err = error
+                                worst_subjac = (sys_type, sys_class_name, sys_name)
+                                is_worst_subjac = True
 
                         if error_string:  # Any error string indicates that at least one of the
                             #  derivative calcs is greater than the rel tolerance
                             num_bad_jacs += 1
 
                         if directional:
-                            wrt = "(d)'%s'" % wrt
-                            wrt_padded = pad_name(wrt, max_width_wrt, quotes=False)
+                            wrt_padded = pad_name(f"(d)'{wrt}'", max_width_wrt)
                         else:
                             wrt_padded = pad_name(wrt, max_width_wrt, quotes=True)
                         if print_reverse:
@@ -2581,15 +2606,13 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                                                 magnitude.reverse),
                                     magnitude.fd,
                                     abs_err.forward,
+                                    _format_if_not_matrix_free(matrix_free, abs_err.reverse),
                                     _format_if_not_matrix_free(matrix_free,
-                                                                abs_err.reverse),
-                                    _format_if_not_matrix_free(matrix_free,
-                                                                abs_err.forward_reverse),
+                                                               abs_err.forward_reverse),
                                     rel_err.forward,
+                                    _format_if_not_matrix_free(matrix_free, rel_err.reverse),
                                     _format_if_not_matrix_free(matrix_free,
-                                                                rel_err.reverse),
-                                    _format_if_not_matrix_free(matrix_free,
-                                                                rel_err.forward_reverse),
+                                                               rel_err.forward_reverse),
                                 )
                         else:
                             deriv_info_line = \
@@ -2608,7 +2631,9 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                             worst_subjac_line = deriv_info_line
                 else:  # not compact print
 
-                    fd_desc = "{}:{}".format(fd_opts['method'], fd_opts['form'])
+                    forward = derivative_info['J_fwd']
+
+                    fd_desc = f"{fd_opts['method']}:{fd_opts['form']}"
 
                     # Magnitudes
                     if directional:
@@ -2697,17 +2722,20 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     out_buffer.write('\n')
 
                     if not totals and matrix_free and not directional:
+                        reverse = derivative_info.get('J_rev')
                         out_buffer.write('    Raw Reverse Derivative (Jrev)\n')
                         out_buffer.write(str(reverse) + '\n')
                         out_buffer.write('\n')
 
-                    if directional:
-                        out_buffer.write('    Directional FD Derivative (Jfd)\n')
-                    else:
-                        out_buffer.write('    Raw FD Derivative (Jfd)\n')
+                    try:
+                        fd = derivative_info['J_fd']
+                    except KeyError:
+                        fd = 0.
 
-                    out_buffer.write(str(fd) + '\n')
-                    out_buffer.write('\n')
+                    if directional:
+                        out_buffer.write(f'    Directional FD Derivative (Jfd)\n{fd}\n')
+                    else:
+                        out_buffer.write(f'    Raw FD Derivative (Jfd)\n{fd}\n')
 
                     out_buffer.write(' -' * 30 + '\n')
 

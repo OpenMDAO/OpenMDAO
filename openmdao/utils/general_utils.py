@@ -494,21 +494,11 @@ def pad_name(name, pad_num=10, quotes=False):
     str
         Padded string.
     """
-    l_name = len(name)
-    quotes_len = 2 if quotes else 0
-    if l_name + quotes_len < pad_num:
-        pad = pad_num - (l_name + quotes_len)
-        if quotes:
-            pad_str = "'{name}'{sep:<{pad}}"
-        else:
-            pad_str = "{name}{sep:<{pad}}"
-        pad_name = pad_str.format(name=name, sep='', pad=pad)
-        return pad_name
+    name = f"'{name}'" if quotes else name
+    if pad_num > len(name):
+        return f"{name:<{pad_num}}"
     else:
-        if quotes:
-            return "'{0}'".format(name)
-        else:
-            return '{0}'.format(name)
+        return f'{name}'
 
 
 def run_model(prob, ignore_exception=False):
