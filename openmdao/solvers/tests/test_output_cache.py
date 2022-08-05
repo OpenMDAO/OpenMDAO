@@ -68,7 +68,7 @@ class CoupledGroup(om.Group):
         solver.options["maxiter"] = 1000
         solver.options["atol"] = 1e-8
         solver.options["rtol"] = 1e-99
-        solver.options["use_cached_states"] = True
+        solver.options["restart_from_successful"] = True
         solver.options["err_on_non_converge"] = self.err_on_non_converge
         self.linear_solver = om.DirectSolver(assemble_jac=True)
 
@@ -84,7 +84,7 @@ class NLBGSGroup(om.Group):
         solver.options["maxiter"] = 1000
         solver.options["atol"] = 1e-14
         solver.options["rtol"] = 1e-99
-        solver.options["use_cached_states"] = True
+        solver.options["restart_from_successful"] = True
         solver.options["err_on_non_converge"] = True
         self.linear_solver = om.DirectSolver(assemble_jac=True)
 
@@ -138,6 +138,6 @@ class TestOutputCache(unittest.TestCase):
         prob.set_val("coupling.sub_comp1.a", val=5.0)
         prob.set_val("coupling.sub_comp2.b", val=10.0)
 
-        expected = "NewtonSolver in 'coupling' <class CoupledGroup>: Option 'use_cached_states' does nothing unless option 'err_on_non_converge' is set to True."
+        expected = "NewtonSolver in 'coupling' <class CoupledGroup>: Option 'restart_from_successful' does nothing unless option 'err_on_non_converge' is set to True."
         with assert_warning(om.SolverWarning, expected):
             prob.run_model()

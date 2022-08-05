@@ -31,7 +31,7 @@
         "max_sub_solves": 10,
         "cs_reconverge": true,
         "reraise_child_analysiserror": false,
-        "use_cached_states": false
+        "restart_from_successful": false
     },
     "solve_subsystems": false,
     "children": [

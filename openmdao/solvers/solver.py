@@ -545,7 +545,7 @@ class NonlinearSolver(Solver):
         self.options.declare('stall_tol', default=1e-12,
                              desc='When stall checking is enabled, the threshold below which the '
                                   'residual norm is considered unchanged.')
-        self.options.declare('use_cached_states', types=bool, default=False,
+        self.options.declare('restart_from_successful', types=bool, default=False,
                              desc='If True, the states are cached after a successful solve and '
                                   'used to restart the solver in the case of a failed solve.')
 
@@ -563,13 +563,13 @@ class NonlinearSolver(Solver):
         super()._setup_solvers(system, depth)
         # The state caching only works if we throw an error on non-convergence, otherwise
         # the solver will disregard the caching option and issue a warning.
-        if 'use_cached_states' in self.options and self.options['use_cached_states']:
+        if 'restart_from_successful' in self.options and self.options['restart_from_successful']:
             if not self.options['err_on_non_converge']:
-                issue_warning(f"{self.msginfo}: Option 'use_cached_states' does nothing "
+                issue_warning(f"{self.msginfo}: Option 'restart_from_successful' does nothing "
                               "unless option 'err_on_non_converge' is set to True.",
                               category=SolverWarning)
                 # reset to False so we won't waste memory allocating a cache array
-                self.options['use_cached_states'] = False
+                self.options['restart_from_successful'] = False
 
     def solve(self):
         """
@@ -795,10 +795,10 @@ class NonlinearSolver(Solver):
         Solve the nonlinear system, possibly after updating the output vector with cached values.
 
         Cached values, if any, are from the last successful nonlinear solve, and are only used
-        if the 'use_cached_states' option is True.
+        if the 'restart_from_successful' option is True.
         """
         system = self._system()
-        if (self.options['use_cached_states'] and self.options['maxiter'] > 1 and
+        if (self.options['restart_from_successful'] and self.options['maxiter'] > 1 and
                 not system.under_approx):
             try:
                 # If we have a previous solver failure, we want to replace
