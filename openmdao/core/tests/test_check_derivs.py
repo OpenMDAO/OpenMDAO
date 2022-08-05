@@ -3720,6 +3720,68 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_near_equal(totals['a3', 'p1.widths']['abs error'][0], 0.0, 1e-6)
         assert_near_equal(totals['a4', 'p1.widths']['abs error'][0], 0.0, 1e-6)
 
+    def test_exceed_tol_show_only_incorrect(self):
+
+        prob = om.Problem()
+        top = prob.model
+        top.add_subsystem('goodcomp', MyCompGoodPartials())
+        top.add_subsystem('badcomp', MyCompBadPartials())
+        top.add_subsystem('C1', om.ExecComp('y=2.*x'))
+        top.add_subsystem('C2', om.ExecComp('y=3.*x'))
+
+        top.connect('goodcomp.y', 'C1.x')
+        top.connect('badcomp.z', 'C2.x')
+
+        top.add_objective('C1.y')
+        top.add_constraint('C2.y', lower=0)
+        top.add_design_var('goodcomp.x1')
+        top.add_design_var('goodcomp.x2')
+        top.add_design_var('badcomp.y1')
+        top.add_design_var('badcomp.y2')
+
+        prob.set_solver_print(level=0)
+        prob.setup()
+        prob.run_model()
+        prob.compute_totals()
+
+        stream = StringIO()
+        prob.check_totals(out_stream=stream, show_only_incorrect=True,)
+
+        self.assertEqual(stream.getvalue().count("'C2.y' wrt 'badcomp.y1'"), 1)
+        self.assertEqual(stream.getvalue().count("'C2.y' wrt 'badcomp.y2'"), 1)
+        self.fail("foo")
+
+    def test_compact_print_exceed_tol_show_only_incorrect(self):
+
+        prob = om.Problem()
+        top = prob.model
+        top.add_subsystem('goodcomp', MyCompGoodPartials())
+        top.add_subsystem('badcomp', MyCompBadPartials())
+        top.add_subsystem('C1', om.ExecComp('y=2.*x'))
+        top.add_subsystem('C2', om.ExecComp('y=3.*x'))
+
+        top.connect('goodcomp.y', 'C1.x')
+        top.connect('badcomp.z', 'C2.x')
+
+        top.add_objective('C1.y')
+        top.add_constraint('C2.y', lower=0)
+        top.add_design_var('goodcomp.x1')
+        top.add_design_var('goodcomp.x2')
+        top.add_design_var('badcomp.y1')
+        top.add_design_var('badcomp.y2')
+
+        prob.set_solver_print(level=0)
+        prob.setup()
+        prob.run_model()
+        prob.compute_totals()
+
+        stream = StringIO()
+        prob.check_totals(out_stream=stream, show_only_incorrect=True, compact_print=True)
+
+        self.assertEqual(stream.getvalue().count('>ABS_TOL'), 0)
+        self.assertEqual(stream.getvalue().count('>REL_TOL'), 0)
+        self.fail("foo")
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestProblemCheckTotalsMPI(unittest.TestCase):
