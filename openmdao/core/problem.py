@@ -2337,7 +2337,7 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
     else:
         if not totals and matrix_free:
             derivative_info['rel error'] = _ErrorTuple(fwd_error / fd_norm, rev_error / fd_norm,
-                                                      fwd_rev_error / fd_norm)
+                                                       fwd_rev_error / fd_norm)
         else:
             derivative_info['rel error'] = _ErrorTuple(fwd_error / fd_norm, None, None)
 
