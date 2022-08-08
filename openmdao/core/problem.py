@@ -2287,6 +2287,27 @@ _MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
 
 
 def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
+    """
+    Compute the errors between derivatives that were computed using different modes or methods.
+
+    Error information in the derivative_info dict is updated by this function.
+
+    Parameters
+    ----------
+    derivative_info : dict
+        Metadata dict corresponding to a particular (of, wrt) pair.
+    matrix_free : bool
+        True if the current dirivatives are computed in a matrix free manner.
+    directional : bool
+        True if the current dirivtives are directional.
+    totals : bool
+        True if the current derivatives are total derivatives.
+
+    Returns
+    -------
+    float
+        The norm of the FD jacobian.
+    """
 
     nan = float('nan')
 
@@ -2345,6 +2366,25 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
 
 
 def _errors_above_tol(deriv_info, abs_error_tol, rel_error_tol):
+    """
+    Return if either abs or rel tolerances are violated when comparing a group of derivatives.
+
+    Parameters
+    ----------
+    deriv_info : dict
+        Metadata dict corresponding to a particular (of, wrt) pair.
+    abs_error_tol : float
+        Absolute error tolerance.
+    rel_error_tol : float
+        Relative error tolerance.
+
+    Returns
+    -------
+    bool
+        True if absolute tolerance is violated.
+    bool
+        True if relative tolerance is violated.
+    """
     abs_err = deriv_info['abs error']
     rel_err = deriv_info['rel error']
 
@@ -2363,8 +2403,48 @@ def _errors_above_tol(deriv_info, abs_error_tol, rel_error_tol):
     return above_abs, above_rel
 
 
-def _iter_derivs(derivatives, sys_name, show_only_incorrect, compact_print, global_options, totals,
-                 matrix_free, indep_key, abs_error_tol, rel_error_tol):
+def _iter_derivs(derivatives, sys_name, show_only_incorrect, global_options, totals,
+                 matrix_free, abs_error_tol, rel_error_tol):
+    """
+    Iterate over all of the derivatives.
+
+    If show_only_incorrect is True, only the derivatives with abs or rel errors outside of
+    tolerance will be returned.
+
+    Parameters
+    ----------
+    derivatives : dict
+        Dict of metadata for derivative groups, keyed on (of, wrt) pairs.
+    sys_name : str
+        Name of the current system.
+    show_only_incorrect : bool
+        If True, yield only derivatives with errors outside of tolerance.
+    global_options : dict
+        Dictionary containing the options for the approximation.
+    totals : bool
+        Set to True if we are doing check_totals to skip a bunch of stuff.
+    matrix_free : bool
+        True if the system computes matrix free derivatives.
+    abs_error_tol : float
+        Absolute error tolerance.
+    rel_error_tol : float
+        Relative error tolerance.
+
+    Yields
+    ------
+    tuple
+        The (of, wrt) pair for the current derivatives being compared.
+    float
+        The FD norm.
+    dict
+        The FD options.
+    bool
+        True if the current derivatives are directional.
+    bool
+        True if the differences for the current derivatives are above the absolute error tolerance.
+    bool
+        True if the differences for the current derivatives are above the relative error tolerance.
+    """
 
     # Sorted keys ensures deterministic ordering
     sorted_keys = sorted(derivatives)
@@ -2380,12 +2460,6 @@ def _iter_derivs(derivatives, sys_name, show_only_incorrect, compact_print, glob
         directional = fd_opts.get('directional')
 
         fd_norm = _compute_deriv_errors(derivative_info, matrix_free, directional, totals)
-
-        # Skip printing the non-dependent keys if the derivatives are fine.
-        if not compact_print:
-            if indep_key and key in indep_key[sys_name] and fd_norm < abs_error_tol:
-                del derivatives[key]
-                continue
 
         above_abs, above_rel = _errors_above_tol(derivative_info, abs_error_tol, rel_error_tol)
 
@@ -2540,9 +2614,16 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 out_buffer.write('-' * len(header) + '\n\n')
 
         for key, fd_norm, fd_opts, directional, above_abs, above_rel in \
-                _iter_derivs(derivatives, sys_name, show_only_incorrect, compact_print,
-                             global_options, totals, matrix_free, indep_key,
+                _iter_derivs(derivatives, sys_name, show_only_incorrect,
+                             global_options, totals, matrix_free,
                              abs_error_tol, rel_error_tol):
+
+            # Skip printing the non-dependent keys if the derivatives are fine.
+            if not compact_print:
+                if indep_key and key in indep_key[sys_name] and fd_norm < abs_error_tol:
+                    del derivatives[key]
+                    continue
+
             of, wrt = key
             derivative_info = derivatives[key]
 
