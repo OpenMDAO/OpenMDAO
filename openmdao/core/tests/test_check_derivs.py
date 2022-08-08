@@ -960,9 +960,9 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.check_partials(out_stream=stream)
 
         lines = stream.getvalue().splitlines()
-        self.assertTrue('cs' in lines[5],
+        self.assertTrue('cs' in lines[6],
                         msg='Did you change the format for printing check derivs?')
-        self.assertTrue('fd' in lines[19],
+        self.assertTrue('fd' in lines[20],
                         msg='Did you change the format for printing check derivs?')
 
     def test_set_check_partial_options_invalid(self):
@@ -1333,6 +1333,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count("MyCompBadPartials"), 2)
         self.assertEqual(stream.getvalue().count("'z'        wrt 'y1'"), 2)
         self.assertEqual(stream.getvalue().count("MyCompGoodPartials"), 0)
+        
+        print(stream.getvalue())
 
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=False, show_only_incorrect=True)
@@ -1493,8 +1495,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         J = prob.check_partials(method='cs', out_stream=stream, compact_print=True)
         lines = stream.getvalue().splitlines()
 
-        self.assertEqual(lines[6][43:46], 'n/a')
-        assert_near_equal(float(lines[6][95:105]), 0.0, 1e-15)
+        self.assertEqual(lines[7][43:46], 'n/a')
+        assert_near_equal(float(lines[7][95:105]), 0.0, 1e-15)
 
     def test_directional_mixed_matrix_free(self):
 
@@ -1842,7 +1844,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         data = prob.check_partials(out_stream=stream)
         lines = stream.getvalue().splitlines()
 
-        self.assertTrue("Relative Error (Jan - Jfd) / Jan : 1." in lines[8])
+        self.assertTrue("Relative Error (Jan - Jfd) / Jan : 1." in lines[9])
 
     def test_directional_bug_implicit(self):
         # Test for bug in directional derivative direction for implicit var and matrix-free.
@@ -2859,11 +2861,11 @@ class TestProblemCheckTotals(unittest.TestCase):
         lines = stream.getvalue().splitlines()
 
         # Make sure auto-ivc sources are translated to promoted input names.
-        self.assertTrue('x' in lines[3])
+        self.assertTrue('x' in lines[4])
 
-        self.assertTrue('9.80614' in lines[4], "'9.80614' not found in '%s'" % lines[4])
         self.assertTrue('9.80614' in lines[5], "'9.80614' not found in '%s'" % lines[5])
-        self.assertTrue('cs:None' in lines[5], "'cs:None not found in '%s'" % lines[5])
+        self.assertTrue('9.80614' in lines[6], "'9.80614' not found in '%s'" % lines[6])
+        self.assertTrue('cs:None' in lines[6], "'cs:None not found in '%s'" % lines[6])
 
         assert_near_equal(totals['con_cmp2.con2', 'x']['J_fwd'], [[0.09692762]], 1e-5)
         assert_near_equal(totals['con_cmp2.con2', 'x']['J_fd'], [[0.09692762]], 1e-5)
@@ -2875,10 +2877,10 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         compact_lines = compact_stream.getvalue().splitlines()
 
-        self.assertTrue('<output>' in compact_lines[3],
+        self.assertTrue('<output>' in compact_lines[4],
             "'<output>' not found in '%s'" % compact_lines[4])
-        self.assertTrue('9.7743e+00' in compact_lines[11],
-            "'9.7743e+00' not found in '%s'" % compact_lines[11])
+        self.assertTrue('9.7743e+00' in compact_lines[12],
+            "'9.7743e+00' not found in '%s'" % compact_lines[12])
 
     def test_check_totals_show_progress(self):
         prob = om.Problem()
@@ -2944,10 +2946,10 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         lines = stream.getvalue().splitlines()
 
-        self.assertTrue('1.000' in lines[4])
         self.assertTrue('1.000' in lines[5])
-        self.assertTrue('0.000' in lines[6])
-        self.assertTrue('0.000' in lines[8])
+        self.assertTrue('1.000' in lines[6])
+        self.assertTrue('0.000' in lines[7])
+        self.assertTrue('0.000' in lines[9])
 
         assert_near_equal(totals['x', 'x']['J_fwd'], [[1.0]], 1e-5)
         assert_near_equal(totals['x', 'x']['J_fd'], [[1.0]], 1e-5)
@@ -3624,7 +3626,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         stream = StringIO()
         prob.check_totals(out_stream=stream)
         lines = stream.getvalue().splitlines()
-        self.assertTrue('index size: 1' in lines[3])
+        self.assertTrue('index size: 1' in lines[4])
 
     def test_linear_cons(self):
         # Linear constraints were mistakenly forgotten.
@@ -3647,9 +3649,9 @@ class TestProblemCheckTotals(unittest.TestCase):
         J_driver = p.check_totals(out_stream=stream)
         lines = stream.getvalue().splitlines()
 
-        self.assertTrue("Full Model: 'stuff.lcy' wrt 'x' (Linear constraint)" in lines[3])
-        self.assertTrue("Absolute Error (Jan - Jfd)" in lines[6])
-        self.assertTrue("Relative Error (Jan - Jfd) / Jfd" in lines[8])
+        self.assertTrue("Full Model: 'stuff.lcy' wrt 'x' (Linear constraint)" in lines[4])
+        self.assertTrue("Absolute Error (Jan - Jfd)" in lines[7])
+        self.assertTrue("Relative Error (Jan - Jfd) / Jfd" in lines[9])
 
         assert_near_equal(J_driver['stuff.y', 'x']['J_fwd'][0, 0], 1.0)
         assert_near_equal(J_driver['stuff.lcy', 'x']['J_fwd'][0, 0], 3.0)
@@ -3748,8 +3750,11 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         self.assertEqual(stream.getvalue().count("'C2.y' wrt 'badcomp.y1'"), 1)
         self.assertEqual(stream.getvalue().count("'C2.y' wrt 'badcomp.y2'"), 1)
-        self.fail("foo")
-
+        self.assertEqual(stream.getvalue().count("'C1.y' wrt 'goodcomp.y1'"), 0)
+        self.assertEqual(stream.getvalue().count("'C1.y' wrt 'goodcomp.y2'"), 0)
+        self.assertEqual(stream.getvalue().count("'C2.y' wrt 'goodcomp.y1'"), 0)
+        self.assertEqual(stream.getvalue().count("'C2.y' wrt 'goodcomp.y2'"), 0)
+        
     def test_compact_print_exceed_tol_show_only_incorrect(self):
 
         prob = om.Problem()

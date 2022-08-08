@@ -7,7 +7,6 @@ import pprint
 import os
 import weakref
 import pathlib
-import functools
 
 from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
@@ -47,7 +46,7 @@ from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
     clear_reports, get_reports_dir, _load_report_plugins
 from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable, \
-    _find_dict_meta, env_truthy
+    _find_dict_meta, env_truthy, add_border
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
@@ -347,12 +346,11 @@ class Problem(object):
             if len(abs_names) == 1:
                 return abs_names[0]
             else:
-                raise KeyError("{}: Using promoted name `{}' is ambiguous and matches unconnected "
-                               "inputs %s. Use absolute name to disambiguate.".format(self.msginfo,
-                                                                                      name,
-                                                                                      abs_names))
+                raise KeyError(f"{self.msginfo}: Using promoted name `{name}' is ambiguous and "
+                               f"matches unconnected inputs {sorted(abs_names)}. Use absolute name "
+                               "to disambiguate.")
 
-        raise KeyError('{}: Variable "{}" not found.'.format(self.msginfo, name))
+        raise KeyError(f'{self.msginfo}: Variable "{name}" not found.')
 
     @property
     def driver(self):
@@ -394,7 +392,7 @@ class Problem(object):
         """
         if self._name is None:
             return type(self).__name__
-        return '{} {}'.format(type(self).__name__, self._name)
+        return f'{type(self).__name__} {self._name}'
 
     def _get_inst_id(self):
         return self._name
@@ -414,8 +412,8 @@ class Problem(object):
             True if the named system or variable is local to this process.
         """
         if self._metadata is None:
-            raise RuntimeError("{}: is_local('{}') was called before setup() "
-                               "completed.".format(self.msginfo, name))
+            raise RuntimeError(f"{self.msginfo}: is_local('{name}') was called before setup() "
+                               "completed.")
 
         try:
             abs_name = self._get_var_abs_name(name)
@@ -441,7 +439,7 @@ class Problem(object):
 
             abs_names = name2abs_names(self.model, name)
             if not abs_names:
-                raise KeyError('{}: Variable "{}" not found.'.format(self.model.msginfo, name))
+                raise KeyError(f'{self.model.msginfo}: Variable "{name}" not found.')
 
             abs_name = abs_names[0]
             vars_to_gather = self._metadata['vars_to_gather']
@@ -536,7 +534,7 @@ class Problem(object):
 
         if val is _UNDEFINED:
             if get_remote:
-                raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
+                raise KeyError(f'{self.msginfo}: Variable name "{name}" not found.')
             else:
                 raise RuntimeError(f"{self.model.msginfo}: Variable '{name}' is not local to "
                                    f"rank {self.comm.rank}. You can retrieve values from "
@@ -1047,17 +1045,16 @@ class Problem(object):
         # A distributed vector type is required for MPI
         if comm.size > 1:
             if distributed_vector_class is PETScVector and PETScVector is None:
-                raise ValueError(self.msginfo +
-                                 ": Attempting to run in parallel under MPI but PETScVector "
-                                 "could not be imported.")
+                raise ValueError(f"{self.msginfo}: Attempting to run in parallel under MPI but "
+                                 "PETScVector could not be imported.")
             elif not distributed_vector_class.distributed:
-                raise ValueError("%s: The `distributed_vector_class` argument must be a "
-                                 "distributed vector class like `PETScVector` when running in "
-                                 "parallel under MPI but '%s' was specified which is not "
-                                 "distributed." % (self.msginfo, distributed_vector_class.__name__))
+                raise ValueError(f"{self.msginfo}: The `distributed_vector_class` argument must be "
+                                 "a distributed vector class like `PETScVector` when running in "
+                                 f"parallel under MPI but '{distributed_vector_class.__name__}' "
+                                 "was specified which is not distributed.")
 
         if mode not in ['fwd', 'rev', 'auto']:
-            msg = "%s: Unsupported mode: '%s'. Use either 'fwd' or 'rev'." % (self.msginfo, mode)
+            msg = f"{self.msginfo}: Unsupported mode: '{mode}'. Use either 'fwd' or 'rev'."
             raise ValueError(msg)
 
         self._mode = self._orig_mode = mode
@@ -1165,8 +1162,7 @@ class Problem(object):
 
         if self._metadata['setup_status'] == _SetupStatus.PRE_SETUP and \
                 hasattr(self.model, '_order_set') and self.model._order_set:
-            raise RuntimeError("%s: Cannot call set_order without calling "
-                               "setup after" % (self.msginfo))
+            raise RuntimeError(f"{self.msginfo}: Cannot call set_order without calling setup after")
 
         # set up recording, including any new recorders since last setup
         if self._metadata['setup_status'] >= _SetupStatus.POST_SETUP:
@@ -2127,9 +2123,7 @@ class Problem(object):
             rows.append(row)
 
         col_space = ' ' * col_spacing
-        print("-" * len(header))
-        print(header)
-        print("-" * len(header))
+        print(add_border(header, '-'))
 
         # loop through the rows finding the max widths
         max_width = {}
@@ -2140,7 +2134,7 @@ class Problem(object):
                 cell = row[col_name]
                 if isinstance(cell, np.ndarray) and cell.size > 1:
                     norm = np.linalg.norm(cell)
-                    out = '|{}|'.format(str(np.round(norm, np_precision)))
+                    out = f'|{np.round(norm, np_precision)}|'
                 else:
                     out = str(cell)
                 max_width[col_name] = max(len(out), max_width[col_name])
@@ -2162,7 +2156,7 @@ class Problem(object):
                 cell = row[col_name]
                 if isinstance(cell, np.ndarray) and cell.size > 1:
                     norm = np.linalg.norm(cell)
-                    out = '|{}|'.format(str(np.round(norm, np_precision)))
+                    out = f'|{np.round(norm, np_precision)}|'
                     have_array_values.append(col_name)
                 else:
                     out = str(cell)
@@ -2172,7 +2166,7 @@ class Problem(object):
             if print_arrays:
                 left_column_width = max_width['name']
                 for col_name in have_array_values:
-                    print("{}{}:".format((left_column_width + col_spacing) * ' ', col_name))
+                    print(f"{col_name:>{left_column_width + col_spacing}}:")
                     cell = row[col_name]
                     out_str = pprint.pformat(cell)
                     indented_lines = [(left_column_width + col_spacing) * ' ' +
@@ -2194,16 +2188,16 @@ class Problem(object):
         if inputs:
             for name in inputs.absolute_names():
                 if name not in self.model._var_abs2prom['input']:
-                    raise KeyError("{}: Input variable, '{}', recorded in the case is not "
-                                   "found in the model".format(self.msginfo, name))
+                    raise KeyError(f"{self.msginfo}: Input variable, '{name}', recorded in the "
+                                   "case is not found in the model")
                 self[name] = inputs[name]
 
         outputs = case.outputs if case.outputs is not None else None
         if outputs:
             for name in outputs.absolute_names():
                 if name not in self.model._var_abs2prom['output']:
-                    raise KeyError("{}: Output variable, '{}', recorded in the case is not "
-                                   "found in the model".format(self.msginfo, name))
+                    raise KeyError(f"{self.msginfo}: Output variable, '{name}', recorded in the "
+                                   "case is not found in the model")
                 self[name] = outputs[name]
 
     def check_config(self, logger=None, checks=_default_checks, out_file='openmdao_checks.out'):
@@ -2235,10 +2229,10 @@ class Problem(object):
 
         for c in checks:
             if c not in _all_checks:
-                print("WARNING: '%s' is not a recognized check.  Available checks are: %s" %
-                      (c, sorted(_all_checks)))
+                print(f"WARNING: '{c}' is not a recognized check.  Available checks are: "
+                      f"{ sorted(_all_checks)}")
                 continue
-            logger.info('checking %s' % c)
+            logger.info(f'checking {c}')
             _all_checks[c](self, logger)
 
     def set_complex_step_mode(self, active):
@@ -2472,8 +2466,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         matrix_free = system.matrix_free
 
         if sys_name not in derivative_data:
-            msg = "No derivative data found for %s '%s'." % (sys_type, sys_name)
-            issue_warning(msg, category=DerivativesWarning)
+            issue_warning(f"No derivative data found for {sys_type} '{sys_name}'.",
+                          category=DerivativesWarning)
             continue
 
         derivatives = derivative_data[sys_name]
@@ -2494,8 +2488,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             else:
                 header = f"{sys_type}: {sys_class_name} '{sys_name}'"
 
-            border = '-' * len(header)
-            print(f"{border}\n{header}\n{border}\n", file=out_buffer)
+            print(f"{add_border(header, '-')}\n", file=out_buffer)
 
             if compact_print:
                 # Error Header
@@ -2544,18 +2537,20 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                             )
 
                 out_buffer.write(header + '\n')
-                out_buffer.write('-' * len(header) + '\n' + '\n')
+                out_buffer.write('-' * len(header) + '\n\n')
 
-        for key, fd_norm, fd_opts, directional, above_abs, above_rel in _iter_derivs(derivatives, sys_name,
-                                                               show_only_incorrect, compact_print,
-                                                               global_options, totals, matrix_free,
-                                                               indep_key,
-                                                               abs_error_tol, rel_error_tol):
+        for key, fd_norm, fd_opts, directional, above_abs, above_rel in \
+                _iter_derivs(derivatives, sys_name, show_only_incorrect, compact_print,
+                             global_options, totals, matrix_free, indep_key,
+                             abs_error_tol, rel_error_tol):
             of, wrt = key
             derivative_info = derivatives[key]
 
             do_rev = not totals and matrix_free and not directional
             do_rev_dp = not totals and matrix_free and directional
+
+            if above_abs or above_rel:
+                num_bad_jacs += 1
 
             # Informative output for responses that were declared with an index.
             indices = derivative_info.get('indices')
@@ -2577,31 +2572,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                             magnitude.fd,
                             abs_err.forward,
                             rel_err.forward))
-                        if above_abs:
-                            out_buffer.write(' >ABS_TOL')
-                        if above_rel:
-                            out_buffer.write(' >REL_TOL')
-                        out_buffer.write('\n')
                     else:
-                        error_string = ''
-                        if above_abs:
-                            error_string += ' >ABS_TOL'
-                        if above_rel:
-                            error_string += ' >REL_TOL'
-
-                        # See if this component has the greater
-                        # error in the derivative computation
-                        # compared to the other components so far
-                        is_worst_subjac = False
-                        for error in rel_err[:2]:
-                            if error is not None and not np.isnan(error) and error > worst_subjac_rel_err:
-                                worst_subjac_rel_err = error
-                                worst_subjac = (sys_type, sys_class_name, sys_name)
-                                is_worst_subjac = True
-
-                        if above_abs or above_rel:
-                            num_bad_jacs += 1
-
                         if directional:
                             wrt_padded = pad_name(f"(d)'{wrt}'", max_width_wrt)
                         else:
@@ -2639,10 +2610,23 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                     abs_err.forward,
                                     rel_err.forward,
                                 )
-                        out_buffer.write(deriv_info_line + error_string + '\n')
 
-                        if is_worst_subjac:
-                            worst_subjac_line = deriv_info_line
+                        out_buffer.write(deriv_info_line)
+
+                        # See if this component has the greater error in the derivative computation
+                        # compared to the other components so far
+                        for err in rel_err[:2]:
+                            if err is not None and not np.isnan(err) and err > worst_subjac_rel_err:
+                                worst_subjac_rel_err = err
+                                worst_subjac = (sys_type, sys_class_name, sys_name)
+                                worst_subjac_line = deriv_info_line
+
+                    if above_abs:
+                        out_buffer.write(' >ABS_TOL')
+                    if above_rel:
+                        out_buffer.write(' >REL_TOL')
+                    out_buffer.write('\n')
+
                 else:  # not compact print
 
                     forward = derivative_info['J_fwd']
@@ -2662,14 +2646,12 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         out_buffer.write('     Forward')
                     else:
                         out_buffer.write('    Analytic')
-                    out_buffer.write(' Magnitude: {:.6e}\n'.format(magnitude.forward))
+                    out_buffer.write(f' Magnitude: {magnitude.forward:.6e}\n')
 
                     if do_rev:
-                        txt = '     Reverse Magnitude: {:.6e}'
-                        out_buffer.write(txt.format(magnitude.reverse) + '\n')
+                        out_buffer.write(f'     Reverse Magnitude: {magnitude.reverse:.6e}\n')
 
-                    out_buffer.write('          Fd Magnitude: {:.6e} ({})\n'.format(
-                        magnitude.fd, fd_desc))
+                    out_buffer.write(f'          Fd Magnitude: {magnitude.fd:.6e} ({fd_desc})\n')
 
                     # Absolute Errors
                     if do_rev:
@@ -2682,10 +2664,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
                     for error, desc in zip(abs_err, error_descs):
                         error_str = _format_error(error, abs_error_tol)
-                        if error_str.endswith('*'):
-                            num_bad_jacs += 1
                         if out_stream:
-                            out_buffer.write('    Absolute Error {}: {}\n'.format(desc, error_str))
+                            out_buffer.write(f'    Absolute Error {desc}: {error_str}\n')
 
                     out_buffer.write('\n')
 
@@ -2714,13 +2694,11 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
                     for error, desc in zip(rel_err, error_descs):
                         error_str = _format_error(error, rel_error_tol)
-                        if error_str.endswith('*'):
-                            num_bad_jacs += 1
 
-                        out_buffer.write('    Relative Error {}: {}\n'.format(desc, error_str))
+                        out_buffer.write(f'    Relative Error {desc}: {error_str}\n')
 
                     if MPI and MPI.COMM_WORLD.size > 1:
-                        out_buffer.write('    MPI Rank {}\n'.format(MPI.COMM_WORLD.rank))
+                        out_buffer.write(f'    MPI Rank {MPI.COMM_WORLD.rank}\n')
                     out_buffer.write('\n')
 
                     # Raw Derivatives
@@ -2765,14 +2743,12 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
     if not suppress_output and compact_print and not totals:
         if worst_subjac:
-            worst_subjac_header = \
-                "Sub Jacobian with Largest Relative Error: {1} '{2}'".format(*worst_subjac)
-            out_stream.write('\n' + '#' * len(worst_subjac_header) + '\n')
-            out_stream.write("{}\n".format(worst_subjac_header))
-            out_stream.write('#' * len(worst_subjac_header) + '\n')
-            out_stream.write(header + '\n')
-            out_stream.write('-' * len(header) + '\n')
-            out_stream.write(worst_subjac_line + '\n')
+            _, class_name, name = worst_subjac
+            worst_header = f"Sub Jacobian with Largest Relative Error: {class_name} '{name}'"
+            print(f"\n{add_border(worst_header, '#')}\n", file=out_stream)
+            print(header, file=out_stream)
+            print('-' * len(header), file=out_stream)
+            print(worst_subjac_line, file=out_stream)
 
 
 def _format_if_not_matrix_free(matrix_free, val):
