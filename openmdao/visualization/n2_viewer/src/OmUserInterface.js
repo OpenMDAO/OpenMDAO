@@ -40,7 +40,7 @@ class OmUserInterface extends UserInterface {
 
     /** Determine the style of the inactive handle (overriding superclass) */
     _inactiveResizerHandlerStyle() {
-        return self.diag.showSolvers?
+        return this.diag.showSolvers?
             'inactive-resizer-handle' : 'inactive-resizer-handle-without-solvers'
     }
 

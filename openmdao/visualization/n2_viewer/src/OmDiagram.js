@@ -263,7 +263,7 @@ class OmDiagram extends Diagram {
     /** Add the opt-vars class to design variable elements to set the fill color */
     showDesignVars() {
         [Object.keys(modelData.design_vars), Object.keys(modelData.responses)].flat().forEach(
-            item => d3.select("#" + item.replaceAll(".", "_")).classed('opt-vars', true)
+            path => d3.select(`#${TreeNode.pathToId(path)}`).classed('opt-vars', true)
             );
         d3.select('.model_tree_grp #_auto_ivc').classed('opt-vars', true)
     }
@@ -271,7 +271,7 @@ class OmDiagram extends Diagram {
     /** Remove the opt-vars class from design variable elements to use the default fill color */
     hideDesignVars() {
         [Object.keys(modelData.design_vars), Object.keys(modelData.responses)].flat().forEach(
-            item => d3.select("#" + item.replaceAll(".", "_")).classed('opt-vars', false)
+            path => d3.select(`#${TreeNode.pathToId(path)}`).classed('opt-vars', false)
             );
         d3.select("#_auto_ivc").classed('opt-vars', false)
     }
