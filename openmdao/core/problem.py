@@ -2447,8 +2447,12 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
     # Keep track of the worst subjac in terms of relative error for fwd and rev
     if not suppress_output and show_only_incorrect:
-        out_stream.write('\n** Only writing information about components with '
-                         'incorrect Jacobians **\n\n')
+        if totals:
+            out_stream.write('\n** Only writing information about incorrect total derivatives **'
+                             '\n\n')
+        else:
+            out_stream.write('\n** Only writing information about components with '
+                             'incorrect Jacobians **\n\n')
 
     worst_subjac_rel_err = 0.0
     worst_subjac = None
@@ -2485,10 +2489,15 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             # worst subjac. That info is printed at the bottom of all the output
             out_buffer = StringIO()
 
-            header_str = '-' * (len(sys_name) + len(sys_type) + len(sys_class_name) + 5) + '\n'
-            out_buffer.write(header_str)
-            out_buffer.write(f"{sys_type}: {sys_class_name} '{sys_name}'\n")
-            out_buffer.write(header_str)
+            if totals:
+                header = f"Total Derivatives"
+            else:
+                header = f"{sys_type}: {sys_class_name} '{sys_name}'"
+
+            border = '-' * len(header)
+            print(border, file=out_buffer)
+            print(header, file=out_buffer)
+            print(border + '\n', file=out_buffer)
 
             if compact_print:
                 # Error Header
@@ -2569,8 +2578,12 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                             magnitude.forward,
                             magnitude.fd,
                             abs_err.forward,
-                            rel_err.forward,
-                        ) + '\n')
+                            rel_err.forward))
+                        if above_abs:
+                            out_buffer.write(' >ABS_TOL')
+                        if above_rel:
+                            out_buffer.write(' >REL_TOL')
+                        out_buffer.write('\n')
                     else:
                         error_string = ''
                         if above_abs:
@@ -2743,7 +2756,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             # End of if not suppress_output
         # End of for of, wrt in sorted_keys
 
-        if (not show_only_incorrect or num_bad_jacs) and not suppress_output:
+        if not suppress_output:
             out_stream.write(out_buffer.getvalue())
 
     # End of for system in system_list

@@ -3745,7 +3745,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.compute_totals()
 
         stream = StringIO()
-        prob.check_totals(out_stream=stream, show_only_incorrect=True,)
+        prob.check_totals(out_stream=stream, show_only_incorrect=True)
 
         self.assertEqual(stream.getvalue().count("'C2.y' wrt 'badcomp.y1'"), 1)
         self.assertEqual(stream.getvalue().count("'C2.y' wrt 'badcomp.y2'"), 1)
@@ -3778,10 +3778,9 @@ class TestProblemCheckTotals(unittest.TestCase):
         stream = StringIO()
         prob.check_totals(out_stream=stream, show_only_incorrect=True, compact_print=True)
 
-        self.assertEqual(stream.getvalue().count('>ABS_TOL'), 0)
-        self.assertEqual(stream.getvalue().count('>REL_TOL'), 0)
-        self.fail("foo")
-
+        self.assertEqual(stream.getvalue().count('>ABS_TOL'), 2)
+        self.assertEqual(stream.getvalue().count('>REL_TOL'), 2)
+        
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestProblemCheckTotalsMPI(unittest.TestCase):
