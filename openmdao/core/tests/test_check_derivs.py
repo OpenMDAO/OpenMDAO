@@ -1333,8 +1333,6 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count("MyCompBadPartials"), 2)
         self.assertEqual(stream.getvalue().count("'z'        wrt 'y1'"), 2)
         self.assertEqual(stream.getvalue().count("MyCompGoodPartials"), 0)
-        
-        print(stream.getvalue())
 
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=False, show_only_incorrect=True)
@@ -3754,7 +3752,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertEqual(stream.getvalue().count("'C1.y' wrt 'goodcomp.y2'"), 0)
         self.assertEqual(stream.getvalue().count("'C2.y' wrt 'goodcomp.y1'"), 0)
         self.assertEqual(stream.getvalue().count("'C2.y' wrt 'goodcomp.y2'"), 0)
-        
+
     def test_compact_print_exceed_tol_show_only_incorrect(self):
 
         prob = om.Problem()
