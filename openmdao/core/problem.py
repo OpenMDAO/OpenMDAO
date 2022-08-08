@@ -2441,7 +2441,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
     if compact_print:
         if print_reverse:
             deriv_line = "{0} wrt {1} | {2:.4e} | {3} | {4:.4e} | {5:.4e} | {6} | {7}" \
-                         " | {8:.4e} | {9} | {10}"
+                         " | {8} | {9} | {10}"
         else:
             deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}"
 
@@ -2495,9 +2495,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 header = f"{sys_type}: {sys_class_name} '{sys_name}'"
 
             border = '-' * len(header)
-            print(border, file=out_buffer)
-            print(header, file=out_buffer)
-            print(border + '\n', file=out_buffer)
+            print(f"{border}\n{header}\n{border}\n", file=out_buffer)
 
             if compact_print:
                 # Error Header
@@ -2601,8 +2599,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                 worst_subjac = (sys_type, sys_class_name, sys_name)
                                 is_worst_subjac = True
 
-                        if error_string:  # Any error string indicates that at least one of the
-                            #  derivative calcs is greater than the rel tolerance
+                        if above_abs or above_rel:
                             num_bad_jacs += 1
 
                         if directional:
@@ -2610,6 +2607,11 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         else:
                             wrt_padded = pad_name(wrt, max_width_wrt, quotes=True)
                         if print_reverse:
+                            if np.isnan(rel_err.forward):
+                                rel_fwd_str = pad_name('nan')
+                            else:
+                                rel_fwd_str = f"{rel_err.forward:.4e}"
+
                             deriv_info_line = \
                                 deriv_line.format(
                                     pad_name(of, max_width_of, quotes=True),
@@ -2622,7 +2624,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                     _format_if_not_matrix_free(matrix_free, abs_err.reverse),
                                     _format_if_not_matrix_free(matrix_free,
                                                                abs_err.forward_reverse),
-                                    rel_err.forward,
+                                    rel_fwd_str,
                                     _format_if_not_matrix_free(matrix_free, rel_err.reverse),
                                     _format_if_not_matrix_free(matrix_free,
                                                                rel_err.forward_reverse),
@@ -2637,8 +2639,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                     abs_err.forward,
                                     rel_err.forward,
                                 )
-                        if not show_only_incorrect or error_string:
-                            out_buffer.write(deriv_info_line + error_string + '\n')
+                        out_buffer.write(deriv_info_line + error_string + '\n')
 
                         if is_worst_subjac:
                             worst_subjac_line = deriv_info_line
@@ -2757,7 +2758,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         # End of for of, wrt in sorted_keys
 
         if not suppress_output:
-            out_stream.write(out_buffer.getvalue())
+            if totals or not show_only_incorrect or num_bad_jacs > 0:
+                out_stream.write(out_buffer.getvalue())
 
     # End of for system in system_list
 
@@ -2790,6 +2792,8 @@ def _format_if_not_matrix_free(matrix_free, val):
         String which is the actual value if matrix-free, otherwise 'n/a'
     """
     if matrix_free:
+        if np.isnan(val):
+            return pad_name('nan')
         return f'{val:.4e}'
     else:
         return pad_name('n/a')

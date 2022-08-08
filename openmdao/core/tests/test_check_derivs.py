@@ -1177,6 +1177,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
+
         self.assertEqual(stream.getvalue().count('n/a'), 25)
         self.assertEqual(stream.getvalue().count('rev'), 15)
         self.assertEqual(stream.getvalue().count('Component'), 2)
@@ -1328,14 +1329,12 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
 
         stream = StringIO()
-        # prob.check_partials(compact_print=True,show_only_incorrect=False)
         prob.check_partials(out_stream=stream, compact_print=True, show_only_incorrect=True)
         self.assertEqual(stream.getvalue().count("MyCompBadPartials"), 2)
         self.assertEqual(stream.getvalue().count("'z'        wrt 'y1'"), 2)
         self.assertEqual(stream.getvalue().count("MyCompGoodPartials"), 0)
 
         stream = StringIO()
-        prob.check_partials(compact_print=False, show_only_incorrect=False)
         prob.check_partials(out_stream=stream, compact_print=False, show_only_incorrect=True)
         self.assertEqual(stream.getvalue().count("MyCompGoodPartials"), 0)
         self.assertEqual(stream.getvalue().count("MyCompBadPartials"), 1)
@@ -3780,7 +3779,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         self.assertEqual(stream.getvalue().count('>ABS_TOL'), 2)
         self.assertEqual(stream.getvalue().count('>REL_TOL'), 2)
-        
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestProblemCheckTotalsMPI(unittest.TestCase):
