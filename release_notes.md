@@ -1,4 +1,47 @@
 ***********************************
+# Release Notes for OpenMDAO 3.20.0
+
+August 10, 2022
+
+OpenMDAO 3.20.0 adds an optimization summary to our reports and fixes several issues in the code and documentation.
+
+## New Deprecations
+
+- None
+
+## Backwards Incompatible API Changes
+
+- Various two-word OptionsDictionary entries, which cannot be provided as arguments because they are not valid python names, have been removed. A number of other existing deprecations have been removed. See [#2551](https://github.com/OpenMDAO/OpenMDAO/pull/2551)
+
+## Backwards Incompatible Non-API Changes
+
+- None
+
+## New Features
+
+- Added optimization summary report. [#2561](https://github.com/OpenMDAO/OpenMDAO/pull/2561)
+
+## Bug Fixes
+
+- Specified utf-8 encoding when reading certain files. [#2563](https://github.com/OpenMDAO/OpenMDAO/pull/2563)
+- Added code to close coloring plot to prevent matplotlib warnings. [#2569](https://github.com/OpenMDAO/OpenMDAO/pull/2569)
+- Fixed a bug in our petsc vector get_norm method. [#2572](https://github.com/OpenMDAO/OpenMDAO/pull/2572)
+- Fixed some issues with reports dirs and the index page displayed by 'openmdao view_reports' [#2578](https://github.com/OpenMDAO/OpenMDAO/pull/2578)
+- Fixed N2 diagram NL-solver toolbar button. [#2579](https://github.com/OpenMDAO/OpenMDAO/pull/2579)
+- Changed to wipeFilters() in Diagram and ModelData classes [#2584](https://github.com/OpenMDAO/OpenMDAO/pull/2584)
+- Fixed several minor N2 bugs [#2592](https://github.com/OpenMDAO/OpenMDAO/pull/2592)
+
+## Miscellaneous
+
+- Updated setup.py to reflect requirement of Python >= 3.8 plus some changes to the readme. [#2560](https://github.com/OpenMDAO/OpenMDAO/pull/2560)
+- Changed CI workflow to use mamba instead of conda due to conda issues. [#2565](https://github.com/OpenMDAO/OpenMDAO/pull/2565)
+- Fixed link to citing in readme.md [#2567](https://github.com/OpenMDAO/OpenMDAO/pull/2567)
+- Updated issue templates to use github forms and make submitting issues a bit easier. [#2576](https://github.com/OpenMDAO/OpenMDAO/pull/2576)
+- Update GitHub workflow [#2582](https://github.com/OpenMDAO/OpenMDAO/pull/2582)
+- Fixed pep issues from pycodestyle 2.9.0 [#2586](https://github.com/OpenMDAO/OpenMDAO/pull/2586)
+- Fixed docs for NonlinearBlockJac [#2587](https://github.com/OpenMDAO/OpenMDAO/pull/2587)
+
+***********************************
 # Release Notes for OpenMDAO 3.19.0
 
 June 29, 2022
