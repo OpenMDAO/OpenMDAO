@@ -185,7 +185,7 @@ class UserInterface {
 
             body.style('cursor', 'nwse-resize')
                 .on('mouseup', () => {
-                    diag.manuallyResized = true;
+                    self.diag.manuallyResized = true;
 
                     // Update the slider value and display
                     const defaultHeight = window.innerHeight * .95;
@@ -247,7 +247,7 @@ class UserInterface {
                 return;
             }
 
-            if (!diag.manuallyResized) {
+            if (!self.diag.manuallyResized) {
                 clearTimeout(self.resizeTimeout);
                 self.resizeTimeout =
                     setTimeout(function () {
