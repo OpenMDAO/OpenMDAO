@@ -2282,8 +2282,8 @@ class Problem(object):
         return reports_dirpath
 
 
-ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
-MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
+_ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
+_MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
 
 
 def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
@@ -2317,29 +2317,29 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
     else:
         rev_error = fwd_rev_error = None
 
-    derivative_info['abs error'] = ErrorTuple(fwd_error, rev_error, fwd_rev_error)
-    derivative_info['magnitude'] = MagnitudeTuple(fwd_norm, rev_norm, fd_norm)
+    derivative_info['abs error'] = _ErrorTuple(fwd_error, rev_error, fwd_rev_error)
+    derivative_info['magnitude'] = _MagnitudeTuple(fwd_norm, rev_norm, fd_norm)
 
     if fd_norm == 0.:
         if fwd_norm == 0.:
-            derivative_info['rel error'] = rel_err = ErrorTuple(nan, nan, nan)
+            derivative_info['rel error'] = rel_err = _ErrorTuple(nan, nan, nan)
 
         else:
             # If fd_norm is zero, let's use fwd_norm as the divisor for relative
             # check. That way we don't accidentally squelch a legitimate problem.
             if not totals and matrix_free:
-                rel_err = ErrorTuple(fwd_error / fwd_norm, rev_error / fwd_norm,
-                                     fwd_rev_error / fwd_norm)
+                rel_err = _ErrorTuple(fwd_error / fwd_norm, rev_error / fwd_norm,
+                                      fwd_rev_error / fwd_norm)
                 derivative_info['rel error'] = rel_err
             else:
-                derivative_info['rel error'] = ErrorTuple(fwd_error / fwd_norm, None, None)
+                derivative_info['rel error'] = _ErrorTuple(fwd_error / fwd_norm, None, None)
 
     else:
         if not totals and matrix_free:
-            derivative_info['rel error'] = ErrorTuple(fwd_error / fd_norm, rev_error / fd_norm,
+            derivative_info['rel error'] = _ErrorTuple(fwd_error / fd_norm, rev_error / fd_norm,
                                                       fwd_rev_error / fd_norm)
         else:
-            derivative_info['rel error'] = ErrorTuple(fwd_error / fd_norm, None, None)
+            derivative_info['rel error'] = _ErrorTuple(fwd_error / fd_norm, None, None)
 
     return fd_norm
 
@@ -2392,7 +2392,7 @@ def _iter_derivs(derivatives, sys_name, show_only_incorrect, compact_print, glob
         if show_only_incorrect and not (above_abs or above_rel):
             continue
 
-        yield  key, fd_norm, fd_opts, directional, above_abs, above_rel
+        yield key, fd_norm, fd_opts, directional, above_abs, above_rel
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
@@ -2589,7 +2589,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                     wrt_padded,
                                     magnitude.forward,
                                     _format_if_not_matrix_free(matrix_free and not directional,
-                                                                magnitude.reverse),
+                                                               magnitude.reverse),
                                     magnitude.fd,
                                     abs_err.forward,
                                     _format_if_not_matrix_free(matrix_free, abs_err.reverse),
