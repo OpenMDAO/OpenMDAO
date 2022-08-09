@@ -147,7 +147,7 @@ def activate_reports(reports, instance):
     instance : object
         The reports will be activated for this instance.
     """
-    cnames = {c.__name__ for c in inspect.getmro(instance.__class__)}
+    cnames = {c.__name__ for c in inspect.getmro(instance.__class__)}.difference(['object'])
     for name in reports:
         try:
             class_name = _reports_registry[name][2]

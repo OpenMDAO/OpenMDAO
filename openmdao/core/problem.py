@@ -40,7 +40,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import abs_key2rel_key
 from openmdao.utils.logger_utils import get_logger, TestLogger
-from openmdao.utils.hooks import _setup_hooks
+from openmdao.utils.hooks import _setup_hooks, _reset_all_hooks
 from openmdao.utils.indexer import indexer
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
@@ -81,6 +81,7 @@ _problem_names = []
 def _clear_problem_names():
     global _problem_names
     _problem_names = []
+    _reset_all_hooks()
 
 
 def _get_top_script():
@@ -253,8 +254,9 @@ class Problem(object):
             raise TypeError(self.msginfo +
                             ": The value provided for 'driver' is not a valid Driver.")
 
-        # can't use driver property here without causing a lint error, so just do it manually
         self._update_reports(driver)
+
+        # can't use driver property here without causing a lint error, so just do it manually
         self._driver = driver
 
         self.comm = comm
