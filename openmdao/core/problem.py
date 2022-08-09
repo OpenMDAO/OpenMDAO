@@ -7,6 +7,7 @@ import pprint
 import os
 import weakref
 import pathlib
+import textwrap
 
 from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
@@ -2166,14 +2167,11 @@ class Problem(object):
             print(row_string)
 
             if print_arrays:
-                left_column_width = max_width['name']
+                spaces = (max_width['name'] + col_spacing) * ' '
                 for col_name in have_array_values:
-                    print(f"{col_name:>{left_column_width + col_spacing}}:")
-                    cell = row[col_name]
-                    out_str = pprint.pformat(cell)
-                    indented_lines = [(left_column_width + col_spacing) * ' ' +
-                                      s for s in out_str.splitlines()]
-                    print('\n'.join(indented_lines) + '\n')
+                    print(f"{spaces}{col_name}:")
+                    print(textwrap.indent(pprint.pformat(row[col_name]), spaces))
+                    print()
 
         print()
 
