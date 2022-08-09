@@ -125,8 +125,7 @@ def opt_report(prob, outfile=None):
         return
 
     # only create report on rank 0
-    if MPI and MPI.COMM_WORLD.rank != 0:
-        return
+    create = MPI is None or MPI.COMM_WORLD.rank == 0
 
     if not outfile:
         outfile = _default_optimizer_report_filename
@@ -154,8 +153,9 @@ pip install tabulate
 </body>
 </html>
         '''
-        with open(outfilepath, 'w') as f:
-            f.write(s)
+        if create:
+            with open(outfilepath, 'w') as f:
+                f.write(s)
 
         return
 
@@ -223,14 +223,15 @@ pip install tabulate
 
     this_dir = os.path.dirname(os.path.abspath(__file__))
 
-    with open(os.path.join(this_dir, _optimizer_report_template), 'r', encoding='utf-8') as f:
-        template = f.read()
+    if create:
+        with open(os.path.join(this_dir, _optimizer_report_template), 'r', encoding='utf-8') as f:
+            template = f.read()
 
-    with open(outfilepath, 'w') as f:
-        s = template.format(title=prob._name, header=header_html, objs=objs_html,
-                            desvars=desvars_html, cons=cons_html, driver=driver_info_html,
-                            driver_class=type(driver).__name__)
-        f.write(s)
+        with open(outfilepath, 'w') as f:
+            s = template.format(title=prob._name, header=header_html, objs=objs_html,
+                                desvars=desvars_html, cons=cons_html, driver=driver_info_html,
+                                driver_class=type(driver).__name__)
+            f.write(s)
 
 
 def _make_header_table(prob):
