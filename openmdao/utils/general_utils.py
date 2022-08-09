@@ -494,21 +494,37 @@ def pad_name(name, pad_num=10, quotes=False):
     str
         Padded string.
     """
-    l_name = len(name)
-    quotes_len = 2 if quotes else 0
-    if l_name + quotes_len < pad_num:
-        pad = pad_num - (l_name + quotes_len)
-        if quotes:
-            pad_str = "'{name}'{sep:<{pad}}"
-        else:
-            pad_str = "{name}{sep:<{pad}}"
-        pad_name = pad_str.format(name=name, sep='', pad=pad)
-        return pad_name
+    name = f"'{name}'" if quotes else name
+    if pad_num > len(name):
+        return f"{name:<{pad_num}}"
     else:
-        if quotes:
-            return "'{0}'".format(name)
-        else:
-            return '{0}'.format(name)
+        return f'{name}'
+
+
+def add_border(msg, borderstr='=', vpad=0):
+    """
+    Add border lines before and after a message.
+
+    The message is assumed not to span multiple lines.
+
+    Parameters
+    ----------
+    msg : str
+        The message to be enclosed in a border.
+    borderstr : str
+        The repeating string to be used in the border.
+    vpad : int
+        The number of blank lines between the border and the message (before and after).
+
+    Returns
+    -------
+    str
+        A string containing the original message enclosed in a border.
+    """
+    border = len(msg) * borderstr
+    # handle borderstr of more than 1 char
+    border = border[:len(msg)]
+    return f"{border}\n{msg}\n{border}"
 
 
 def run_model(prob, ignore_exception=False):
