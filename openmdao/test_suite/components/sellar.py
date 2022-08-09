@@ -242,13 +242,13 @@ class SellarDerivatives(om.Group):
     """
 
     def initialize(self):
-        self.options.declare('nonlinear_solver', default=om.NonlinearBlockGS,
+        self.options.declare('nonlinear_solver', default=None,
                              desc='Nonlinear solver (class or instance) for Sellar MDA')
         self.options.declare('nl_atol', default=None,
                              desc='User-specified atol for nonlinear solver.')
         self.options.declare('nl_maxiter', default=None,
                              desc='Iteration limit for nonlinear solver.')
-        self.options.declare('linear_solver', default=om.ScipyKrylov,
+        self.options.declare('linear_solver', default=None,
                              desc='Linear solver (class or instance)')
         self.options.declare('ln_atol', default=None,
                              desc='User-specified atol for linear solver.')
@@ -272,14 +272,22 @@ class SellarDerivatives(om.Group):
         self.set_input_defaults('z', np.array([5.0, 2.0]))
 
         nl = self.options['nonlinear_solver']
-        self.nonlinear_solver = nl() if inspect.isclass(nl) else nl
+        if nl is None:
+            self.nonlinear_solver = om.NonlinearBlockGS()
+        else:
+            self.nonlinear_solver = nl() if inspect.isclass(nl) else nl
+
         if self.options['nl_atol']:
             self.nonlinear_solver.options['atol'] = self.options['nl_atol']
         if self.options['nl_maxiter']:
             self.nonlinear_solver.options['maxiter'] = self.options['nl_maxiter']
 
         ln = self.options['linear_solver']
-        self.linear_solver = ln() if inspect.isclass(ln) else ln
+        if ln is None:
+            self.linear_solver = om.ScipyKrylov()
+        else:
+            self.linear_solver = ln() if inspect.isclass(ln) else ln
+
         if self.options['ln_atol']:
             self.linear_solver.options['atol'] = self.options['ln_atol']
         if self.options['ln_maxiter']:
