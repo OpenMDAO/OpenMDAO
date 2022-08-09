@@ -2310,7 +2310,6 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
     float
         The norm of the FD jacobian.
     """
-
     nan = float('nan')
 
     def safe_norm(arr):
@@ -2447,7 +2446,6 @@ def _iter_derivs(derivatives, sys_name, show_only_incorrect, global_options, tot
     bool
         True if the differences for the current derivatives are above the relative error tolerance.
     """
-
     # Sorted keys ensures deterministic ordering
     sorted_keys = sorted(derivatives)
 
