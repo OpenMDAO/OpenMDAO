@@ -33,7 +33,7 @@ solvers, adds the ability to only show incorrect totals in `check_totals`, and f
 - Fixed N2 diagram NL-solver toolbar button. [#2579](https://github.com/OpenMDAO/OpenMDAO/pull/2579)
 - Changed to wipeFilters() in Diagram and ModelData classes [#2584](https://github.com/OpenMDAO/OpenMDAO/pull/2584)
 - Fixed several minor N2 bugs [#2592](https://github.com/OpenMDAO/OpenMDAO/pull/2592)
-- Fixed a hang in opt_report when using MPI. [#2598](https://github.com/OpenMDAO/OpenMDAO/pull/2598)
+- Fixed a hang in opt_report when using MPI. [#2596](https://github.com/OpenMDAO/OpenMDAO/pull/2596)
 
 ## Miscellaneous
 
