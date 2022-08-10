@@ -3,7 +3,8 @@
 
 August 10, 2022
 
-OpenMDAO 3.20.0 adds an optimization summary to our reports and fixes several issues in the code and documentation.
+OpenMDAO 3.20.0 adds an optimization summary to our reports, adds a new "restart from last successful" capability to
+solvers, adds the ability to only show incorrect totals in `check_totals`, and fixes several issues in the code and documentation.
 
 ## New Deprecations
 
@@ -11,7 +12,7 @@ OpenMDAO 3.20.0 adds an optimization summary to our reports and fixes several is
 
 ## Backwards Incompatible API Changes
 
-- Various two-word OptionsDictionary entries, which cannot be provided as arguments because they are not valid python names, have been removed. A number of other existing deprecations have been removed. See [#2551](https://github.com/OpenMDAO/OpenMDAO/pull/2551)
+- None
 
 ## Backwards Incompatible Non-API Changes
 
@@ -20,6 +21,8 @@ OpenMDAO 3.20.0 adds an optimization summary to our reports and fixes several is
 ## New Features
 
 - Added optimization summary report. [#2561](https://github.com/OpenMDAO/OpenMDAO/pull/2561)
+- Added 'restart_from_successful' option to solvers to allow restarting from the last known good state. See [POEM 068](https://github.com/OpenMDAO/POEMs/blob/master/POEM_068.md) for more information. [#2590](https://github.com/OpenMDAO/OpenMDAO/pull/2590)
+- Added 'show_only_incorrect' option to `Problem.check_totals`. [#2595](https://github.com/OpenMDAO/OpenMDAO/pull/2595)
 
 ## Bug Fixes
 
@@ -30,6 +33,7 @@ OpenMDAO 3.20.0 adds an optimization summary to our reports and fixes several is
 - Fixed N2 diagram NL-solver toolbar button. [#2579](https://github.com/OpenMDAO/OpenMDAO/pull/2579)
 - Changed to wipeFilters() in Diagram and ModelData classes [#2584](https://github.com/OpenMDAO/OpenMDAO/pull/2584)
 - Fixed several minor N2 bugs [#2592](https://github.com/OpenMDAO/OpenMDAO/pull/2592)
+- Fixed a hang in opt_report when using MPI. [#2598](https://github.com/OpenMDAO/OpenMDAO/pull/2598)
 
 ## Miscellaneous
 
@@ -40,6 +44,7 @@ OpenMDAO 3.20.0 adds an optimization summary to our reports and fixes several is
 - Update GitHub workflow [#2582](https://github.com/OpenMDAO/OpenMDAO/pull/2582)
 - Fixed pep issues from pycodestyle 2.9.0 [#2586](https://github.com/OpenMDAO/OpenMDAO/pull/2586)
 - Fixed docs for NonlinearBlockJac [#2587](https://github.com/OpenMDAO/OpenMDAO/pull/2587)
+- Cleaned up some documentation. [#2588](https://github.com/OpenMDAO/OpenMDAO/pull/2588)
 
 ***********************************
 # Release Notes for OpenMDAO 3.19.0
