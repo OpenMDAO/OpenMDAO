@@ -529,6 +529,9 @@ def _add_dir_to_tree(dirpath, lines, explevel, level, to_match):
     """
     dlist = os.listdir(dirpath)
 
+    if not dlist:  # don't include empty dirs in the index
+        return
+
     # split into files and dirs to make page look better
     directories = {f for f in dlist if os.path.isdir(os.path.join(dirpath, f))}
 

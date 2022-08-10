@@ -184,8 +184,6 @@ class System(object):
         When True, this system is undergoing complex step.
     under_finite_difference : bool
         When True, this system is undergoing finite differencing.
-    under_approx : bool
-        When True, this system is undergoing approximation.
     iter_count : int
         Counts the number of times this system has called _solve_nonlinear. This also
         corresponds to the number of times that the system's outputs are recorded if a recorder
@@ -466,7 +464,6 @@ class System(object):
         self._approx_subjac_keys = None
         self.matrix_free = False
 
-        self.under_approx = False
         self._owns_approx_jac = False
         self._owns_approx_jac_meta = {}
         self._owns_approx_wrt = None
@@ -520,6 +517,18 @@ class System(object):
         self._first_call_to_linearize = True   # will check in first call to _linearize
         self._tot_jac = None
         self._raise_connection_errors = True
+
+    @property
+    def under_approx(self):
+        """
+        Return True if under complex step or finite difference.
+
+        Returns
+        -------
+        bool
+            True if under CS or FD.
+        """
+        return self.under_complex_step or self.under_finite_difference
 
     @property
     def msginfo(self):
@@ -2416,13 +2425,11 @@ class System(object):
         if self.nonlinear_solver is not None and type_ != 'LN':
             self.nonlinear_solver._set_solver_print(level=level, type_=type_)
 
+        if self.pathname.count('.') + 1 >= depth:
+            return
+
         for subsys, _ in self._subsystems_allprocs.values():
-
-            current_depth = subsys.pathname.count('.')
-            if current_depth >= depth:
-                continue
-
-            subsys._set_solver_print(level=level, depth=depth - current_depth, type_=type_)
+            subsys._set_solver_print(level=level, depth=depth, type_=type_)
 
             if subsys._linear_solver is not None and type_ != 'NL':
                 subsys._linear_solver._set_solver_print(level=level, type_=type_)
@@ -4280,32 +4287,17 @@ class System(object):
                 sub._doutputs.set_complex_step_mode(active)
                 sub._dinputs.set_complex_step_mode(active)
                 sub._dresiduals.set_complex_step_mode(active)
+                if sub.nonlinear_solver:
+                    sub.nonlinear_solver._set_complex_step_mode(active)
 
                 if sub.linear_solver:
                     sub.linear_solver._set_complex_step_mode(active)
-
-                if sub.nonlinear_solver:
-                    sub.nonlinear_solver._set_complex_step_mode(active)
 
                 if sub._owns_approx_jac:
                     sub._jacobian.set_complex_step_mode(active)
 
                 if sub._assembled_jac:
                     sub._assembled_jac.set_complex_step_mode(active)
-
-    def _set_approx_mode(self, active):
-        """
-        Turn on or off approx mode flag.
-
-        Recurses to turn on or off approx mode flag in all subsystems.
-
-        Parameters
-        ----------
-        active : bool
-            Approx mode flag; set to True prior to commencing approximation.
-        """
-        for sub in self.system_iter(include_self=True, recurse=True):
-            sub.under_approx = active
 
     def cleanup(self):
         """

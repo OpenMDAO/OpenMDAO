@@ -22,6 +22,9 @@ class NonlinearRunOnce(NonlinearSolver):
 
     SOLVER = 'NL: RUNONCE'
 
+    def _solve_with_cache_check(self):
+        self.solve()  # don't use caching
+
     def solve(self):
         """
         Run the solver.
@@ -56,3 +59,4 @@ class NonlinearRunOnce(NonlinearSolver):
         # this solver does not iterate
         self.options.undeclare("maxiter")
         self.options.undeclare("err_on_non_converge")
+        self.options.undeclare("restart_from_successful")
