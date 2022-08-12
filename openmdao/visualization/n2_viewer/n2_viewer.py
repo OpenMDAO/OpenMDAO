@@ -301,7 +301,7 @@ def _get_tree_dict(system, is_parallel=False):
 
             try:
                 options[k] = val.SOLVER
-            except:
+            except AttributeError:
                 options[k] = val
         else:
             options[k] = _serialize_single_option(opt)
