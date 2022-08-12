@@ -1268,8 +1268,11 @@ class Problem(object):
         excludes = [excludes] if isinstance(excludes, str) else excludes
 
         comps = []
+        under_testflo = bool(os.environ.get('TESTFLO_RUNNING', ''))
+
         for comp in model.system_iter(typ=Component, include_self=True):
-            if comp._no_check_partials:
+            # if testflo is running, do all of the partials
+            if comp._no_check_partials and not under_testflo:
                 continue
 
             name = comp.pathname

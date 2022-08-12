@@ -77,7 +77,7 @@ class _PromotesInfo(object):
         yield self.flat
         yield self.src_shape
 
-    def __repr__(self):
+    def __repr__(self):  # pragma no cover
         return (f"_PromotesInfo(src_indices={self.src_indices}, flat={self.flat}, "
                 f"src_shape={self.src_shape}, promoted_from={self.promoted_from}, "
                 f"prom={self.prom})")
@@ -95,19 +95,6 @@ class _PromotesInfo(object):
         if self.src_indices is not None:
             self.src_indices.set_src_shape(shape)
         self.src_shape = shape
-
-    def convert_from(self, parent):
-        # return a new _PromotesInfo that converts our src_indices based on the parent
-        if parent.src_indices is None:
-            return self.copy()
-        elif self.src_indices is None:
-            return parent.copy()
-
-        src_inds = convert_src_inds(parent.src_indices, parent.src_shape,
-                                    self.src_indices, self.src_shape)
-
-        return _PromotesInfo(src_inds, self.flat or len(self.src_indices.indexed_src_shape) == 1,
-                             self.src_shape, self.promoted_from, self.prom)
 
     def compare(self, other):
         """
@@ -857,29 +844,6 @@ class Group(System):
                         raise RuntimeError(f"{self.msginfo}: Can't connect distributed output "
                                            f"'{abs_out}' to non-distributed input '{abs_in}' "
                                            "without specifying src_indices.")
-
-    def _get_group_input_meta(self, prom_in, meta_name):
-        """
-        Return the value for meta_name from the metadata associated with a set_input_defaults call.
-
-        Returns None if the metadata isn't found.
-
-        Parameters
-        ----------
-        prom_in : str
-            Promoted input name.
-        meta_name : str
-            Name of the metadata to be returned.
-
-        Returns
-        -------
-        object
-            Contents of the metadata dict corresponding to meta_name.
-        """
-        if prom_in in self._group_inputs:
-            meta = self._group_inputs[prom_in][0]
-            if meta_name in meta:
-                return meta[meta_name]
 
     def _resolve_src_indices(self):
         """

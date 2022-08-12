@@ -69,7 +69,7 @@ from openmdao.utils.spline_distributions import node_centered
 from openmdao.vectors.default_vector import DefaultVector
 try:
     from openmdao.vectors.petsc_vector import PETScVector
-except ImportError:
+except ImportError:  # pragma: no cover
     PETScVector = None
 
 # Drivers
@@ -125,17 +125,17 @@ import os
 wing_dbg()
 
 # set up tracing or memory profiling if env vars are set.
-if env_truthy('OPENMDAO_TRACE'):
+if env_truthy('OPENMDAO_TRACE'):  # pragma: no cover
     from openmdao.devtools.itrace import setup, start
     setup(os.environ['OPENMDAO_TRACE'])
     start()
-elif env_truthy('OPENMDAO_PROF_MEM'):
+elif env_truthy('OPENMDAO_PROF_MEM'):  # pragma: no cover
     from openmdao.devtools.iprof_mem import setup, start
     setup(os.environ['OPENMDAO_PROF_MEM'])
     start()
 
 
-if env_truthy('FLUSH_PRINT'):
+if env_truthy('FLUSH_PRINT'):  # pragma: no cover
     import builtins
     _oldprint = builtins.print
 

@@ -163,7 +163,10 @@ class BalanceComp(ImplicitComponent):
         for name, options in self._state_vars.items():
             lhs = inputs[options['lhs_name']]
             rhs = inputs[options['rhs_name']]
-            _scale_factor = np.ones((rhs.shape))
+
+            # set dtype to rhs.dtype to prevent
+            # "Casting complex values to real discards the imaginary part" warning.
+            _scale_factor = np.ones((rhs.shape), dtype=rhs.dtype)
 
             if options['normalize']:
                 # Indices where the rhs is near zero or not near zero

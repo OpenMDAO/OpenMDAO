@@ -3,6 +3,7 @@ import json
 import functools
 import builtins
 import os
+from contextlib import contextmanager
 
 import numpy as np
 
@@ -267,3 +268,23 @@ class MissingImports(object):
             Traceback object.
         """
         builtins.__import__ = self._cached_import
+
+
+@contextmanager
+def no_testflo_context():
+    """
+    Turn on memory tracing within a certain context.
+
+    Parameters
+    ----------
+    kwargs : dict
+        Named options to pass to setup.
+    """
+    save = os.environ.get('TESTFLO_RUNNING')
+    if save is not None:
+        del os.environ['TESTFLO_RUNNING']
+    try:
+        yield
+    finally:
+        if save is not None:
+            os.environ['TESTFLO_RUNNING'] = save

@@ -6,3 +6,4 @@ omit =
     */test_suite/*
     */docs/*
     */code_review/*
+    */_build/*
