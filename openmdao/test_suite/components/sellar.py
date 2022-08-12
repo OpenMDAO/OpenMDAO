@@ -272,9 +272,7 @@ class SellarDerivatives(om.Group):
         self.set_input_defaults('z', np.array([5.0, 2.0]))
 
         nl = self.options['nonlinear_solver']
-        if nl is None:
-            self.nonlinear_solver = om.NonlinearBlockGS()
-        else:
+        if nl:
             self.nonlinear_solver = nl() if inspect.isclass(nl) else nl
 
         if self.options['nl_atol']:
@@ -283,9 +281,7 @@ class SellarDerivatives(om.Group):
             self.nonlinear_solver.options['maxiter'] = self.options['nl_maxiter']
 
         ln = self.options['linear_solver']
-        if ln is None:
-            self.linear_solver = om.ScipyKrylov()
-        else:
+        if ln:
             self.linear_solver = ln() if inspect.isclass(ln) else ln
 
         if self.options['ln_atol']:
