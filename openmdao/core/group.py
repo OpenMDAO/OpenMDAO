@@ -2592,7 +2592,7 @@ class Group(System):
         name = self.pathname if self.pathname else 'root'
 
         with Recording(name + '._solve_nonlinear', self.iter_count, self):
-            self._nonlinear_solver.solve()
+            self._nonlinear_solver._solve_with_cache_check()
 
         # Iteration counter is incremented in the Recording context manager at exit.
 
