@@ -574,7 +574,7 @@ class TestPyoptSparse(unittest.TestCase):
         prob.set_solver_print(level=0)
 
         prob.driver = om.pyOptSparseDriver()
-        prob.driver.options['optimizer'] = 'SNOPT'
+        prob.driver.options['optimizer'] = OPTIMIZER
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -603,7 +603,7 @@ class TestPyoptSparse(unittest.TestCase):
         prob.set_solver_print(level=0)
 
         prob.driver = om.pyOptSparseDriver()
-        prob.driver.options['optimizer'] = 'SNOPT'
+        prob.driver.options['optimizer'] = OPTIMIZER
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
