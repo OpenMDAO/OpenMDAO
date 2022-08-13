@@ -94,7 +94,8 @@ class TestNewton(unittest.TestCase):
 
     def test_sellar_derivs_with_Lin_GS(self):
 
-        prob = om.Problem(model=SellarDerivatives(nonlinear_solver=om.NewtonSolver(solve_subsystems=False)))
+        prob = om.Problem(SellarDerivatives(nonlinear_solver=om.NewtonSolver(solve_subsystems=False),
+                                            linear_solver=om.ScipyKrylov))
 
         prob.setup()
         prob.set_solver_print(level=0)
