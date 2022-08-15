@@ -216,7 +216,8 @@ jobs:
               echo "SNOPT version ${{ matrix.SNOPT }} was requested but source is not available"
             fi
 
-            build_pyoptsparse $BRANCH $PAROPT $SNOPT
+            conda list
+            build_pyoptsparse --verbose $BRANCH $PAROPT $SNOPT
           fi
 
       - name: Install optional dependencies
