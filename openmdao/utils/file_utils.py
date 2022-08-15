@@ -5,6 +5,7 @@ Utilities for working with files.
 import sys
 import os
 import importlib
+import functools
 from fnmatch import fnmatch
 from os.path import join, basename, dirname, isfile, split, splitext, abspath
 
@@ -401,6 +402,7 @@ def support_coverage(fnc):
     function
         The wrapped function.
     """
+    @functools.wraps(fnc)
     def _wrap(*args, **kwargs):
         try:
             import coverage
