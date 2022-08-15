@@ -128,6 +128,7 @@ jobs:
           echo "Install OpenMDAO"
           echo "============================================================="
           python -m pip install .${{ matrix.OPTIONAL }}
+          python -m pip install git+https://github.com/naylor-b/testflo.git@new_coverage
 
       - name: Install jax
         if: matrix.JAX
@@ -263,6 +264,9 @@ jobs:
           echo "============================================================="
           echo "Run tests with coverage (from directory other than repo root)"
           echo "============================================================="
+          echo "############ .coveragerc contents #################"
+          cat .coveragerc
+          echo "###################################################"
           cp .coveragerc $HOME
           cd $HOME
           testflo -n 2 openmdao --timeout=120 --show_skipped --coverage --coverpkg openmdao --durations=20
@@ -458,7 +462,7 @@ jobs:
           echo "============================================================="
           copy .coveragerc $HOME
           cd $HOME
-          testflo -n 2 openmdao --timeout=120 --show_skipped --coverage  --coverpkg openmdao --durations=20
+          testflo -n 1 openmdao --timeout=120 --show_skipped --coverage  --coverpkg openmdao --durations=20
 
       - name: Submit coverage
         env:
