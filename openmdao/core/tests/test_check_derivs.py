@@ -23,7 +23,7 @@ from openmdao.test_suite.components.array_comp import ArrayComp
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC, Diamond
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
 from openmdao.utils.om_warnings import OMInvalidCheckDerivativesOptionsWarning
-from openmdao.utils.testing_utils import no_testflo_context
+from openmdao.utils.testing_utils import no_env_context
 
 from openmdao.utils.mpi import MPI
 
@@ -245,7 +245,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         # Make check_partials think TESTFLO isn't running so we'll get the expected
         # non-testflo behavior
-        with no_testflo_context():
+        with no_env_context('TESTFLO_RUNNING'):
             data = prob.check_partials(out_stream=None)
 
         # no derivative data for 'comp2'

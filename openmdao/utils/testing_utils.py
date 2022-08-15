@@ -271,15 +271,21 @@ class MissingImports(object):
 
 
 @contextmanager
-def no_testflo_context():
+def no_env_context(*args):
     """
-    Temporarily remove the TESTFLO_RUNNING environment variable.
+    Temporarily remove the named environment variables from os.environ.
+
+    Parameters
+    ----------
+    *args : list of str
+        Names of environment variables to temporarily remove.
     """
-    save = os.environ.get('TESTFLO_RUNNING')
-    if save is not None:
-        del os.environ['TESTFLO_RUNNING']
+    save = {n: os.environ.get(n) for n in args}
+    for n in save:
+        del os.environ[n]
     try:
         yield
     finally:
-        if save is not None:
-            os.environ['TESTFLO_RUNNING'] = save
+        for n, val in save.items():
+            if val is not None:
+                os.environ[n] = val
