@@ -124,6 +124,8 @@ jobs:
 
           python -m pip install --upgrade pip
 
+          # setuptools v65.0.0 breaks pyoptsparse install with:
+          # ModuleNotFoundError: No module named 'distutils.msvccompiler'
           python -m pip install 'setuptools<65.0.0'
 
           echo "============================================================="
@@ -218,8 +220,7 @@ jobs:
               echo "SNOPT version ${{ matrix.SNOPT }} was requested but source is not available"
             fi
 
-            conda list
-            build_pyoptsparse --verbose $BRANCH $PAROPT $SNOPT
+            build_pyoptsparse $BRANCH $PAROPT $SNOPT
           fi
 
       - name: Install optional dependencies
