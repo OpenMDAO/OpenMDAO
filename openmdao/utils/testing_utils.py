@@ -273,12 +273,7 @@ class MissingImports(object):
 @contextmanager
 def no_testflo_context():
     """
-    Turn on memory tracing within a certain context.
-
-    Parameters
-    ----------
-    kwargs : dict
-        Named options to pass to setup.
+    Temporarily remove the TESTFLO_RUNNING environment variable.
     """
     save = os.environ.get('TESTFLO_RUNNING')
     if save is not None:

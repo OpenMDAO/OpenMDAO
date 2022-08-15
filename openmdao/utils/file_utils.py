@@ -5,9 +5,8 @@ Utilities for working with files.
 import sys
 import os
 import importlib
-from inspect import getmembers, isclass, ismethod, isfunction
 from fnmatch import fnmatch
-from os.path import join, basename, dirname, isfile, split, splitext, abspath, expanduser
+from os.path import join, basename, dirname, isfile, split, splitext, abspath
 
 
 def get_module_path(fpath):
@@ -184,7 +183,17 @@ def _load_and_exec(script_name, user_args):
     sys.argv[:] = [script_name] + user_args
 
     with open(script_name, 'rb') as fp:
-        code = compile(fp.read(), script_name, 'exec')
+        content = fp.read()
+        if 'coverage' not in sys.modules:
+            content = b"""
+try:
+    import coverage
+except ImportError:
+    pass
+else:
+    coverage.process_startup()
+        \n""" + content
+        code = compile(content, script_name, 'exec')
 
     globals_dict = {
         '__file__': script_name,
@@ -376,3 +385,29 @@ def image2html(imagefile, title='', alt=''):
 </body>
 </html>
 """
+
+
+def support_coverage(fnc):
+    """
+    Decorate a function so that the function will report usage to coverage, if it's active.
+
+    Parameters
+    ----------
+    fnc : function
+        The funtion being decorated.
+
+    Returns
+    -------
+    function
+        The wrapped function.
+    """
+    def _wrap(*args, **kwargs):
+        try:
+            import coverage
+        except ImportError:
+            pass
+        else:
+            coverage.process_startup()
+        fnc(*args, **kwargs)
+
+    return _wrap

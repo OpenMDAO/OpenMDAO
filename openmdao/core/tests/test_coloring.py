@@ -618,6 +618,7 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         # improve coverage of coloring.py
         coloring = p_color.driver._coloring_info['coloring']
         coloring.display_txt()
+        coloring.display(show=False)
         with open(os.devnull, 'w') as f:
             array_viz(coloring.get_dense_sparsity(), prob=p_color, stream=f)
             array_viz(coloring.get_dense_sparsity(), stream=f)
