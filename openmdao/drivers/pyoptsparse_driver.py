@@ -14,12 +14,12 @@ from packaging.version import Version
 import numpy as np
 from scipy.sparse import coo_matrix
 
-try:
-    import pyoptsparse
-    Optimization = pyoptsparse.Optimization
-except Exception:
-    Optimization = None
-    pyoptsparse = None
+# try:
+import pyoptsparse
+Optimization = pyoptsparse.Optimization
+# except Exception:
+#     Optimization = None
+#     pyoptsparse = None
 
 from openmdao.core.constants import INT_DTYPE
 from openmdao.core.analysis_error import AnalysisError
