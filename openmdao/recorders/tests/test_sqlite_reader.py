@@ -238,7 +238,9 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     def test_reading_driver_cases(self):
         """ Tests that the reader returns params correctly. """
-        prob = SellarProblem(SellarDerivativesGrouped)
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce,
+                                                       linear_solver=om.ScipyKrylov,
+                                                       mda_nonlinear_solver=om.NonlinearBlockGS)
 
         driver = prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=False)
 
@@ -523,7 +525,9 @@ class TestSqliteCaseReader(unittest.TestCase):
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_get_child_cases(self):
-        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce)
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce,
+                                                       linear_solver=om.ScipyKrylov,
+                                                       mda_nonlinear_solver=om.NonlinearBlockGS)
 
         driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP', print_results=False)
         driver.recording_options['record_desvars'] = True
@@ -641,7 +645,9 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(count, 3)
 
     def test_get_child_cases_system(self):
-        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce)
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce,
+                                                       linear_solver=om.ScipyKrylov,
+                                                       mda_nonlinear_solver=om.NonlinearBlockGS)
         prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=False)
         prob.setup()
 
@@ -685,7 +691,9 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(i, len(expected_coords))
 
     def test_list_cases_recurse(self):
-        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce)
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce,
+                                                       linear_solver=om.ScipyKrylov,
+                                                       mda_nonlinear_solver=om.NonlinearBlockGS)
         prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
         prob.driver.add_recorder(self.recorder)
         prob.setup()
@@ -896,7 +904,9 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(str(cm.exception), expected_err)
 
     def test_get_cases_recurse(self):
-        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce)
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce,
+                                                       linear_solver=om.ScipyKrylov,
+                                                       mda_nonlinear_solver=om.NonlinearBlockGS)
         prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
         prob.driver.add_recorder(self.recorder)
         prob.setup()
@@ -2027,7 +2037,9 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(convert_units(10., from_units, to_units), 10000./3600.)
 
     def test_optimization_load_system_cases(self):
-        prob = SellarProblem(SellarDerivativesGrouped)
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce,
+                                                       linear_solver=om.ScipyKrylov,
+                                                       mda_nonlinear_solver=om.NonlinearBlockGS)
 
         prob.model.add_recorder(self.recorder)
 
@@ -2055,7 +2067,9 @@ class TestSqliteCaseReader(unittest.TestCase):
         iter_count_before = driver.iter_count
 
         # run the model again with a fresh model
-        prob = SellarProblem(SellarDerivativesGrouped)
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce,
+                                                       linear_solver=om.ScipyKrylov,
+                                                       mda_nonlinear_solver=om.NonlinearBlockGS)
 
         driver = prob.driver = om.ScipyOptimizeDriver()
         driver.options['optimizer'] = 'SLSQP'
@@ -2506,7 +2520,9 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertAlmostEqual((unscaled_y + adder) * scaler, scaled_y, places=12)
 
     def test_reading_all_case_types(self):
-        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce)
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce,
+                                                       linear_solver=om.ScipyKrylov,
+                                                       mda_nonlinear_solver=om.NonlinearBlockGS)
         prob.setup(mode='rev')
 
         driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)

@@ -1062,7 +1062,10 @@ class TestSqliteRecorder(unittest.TestCase):
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
     def test_record_system_with_hierarchy(self):
-        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce)
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce,
+                                                       linear_solver=om.ScipyKrylov,
+                                                       mda_linear_solver=om.ScipyKrylov,
+                                                       mda_nonlinear_solver=om.NonlinearBlockGS)
         prob.setup(mode='rev')
 
         model = prob.model
@@ -1627,7 +1630,10 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_record_driver_system_solver(self):
         # Test what happens when all three types are recorded: Driver, System, and Solver
 
-        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce)
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce,
+                                                       linear_solver=om.ScipyKrylov,
+                                                       mda_linear_solver=om.ScipyKrylov,
+                                                       mda_nonlinear_solver=om.NonlinearBlockGS)
         prob.setup(mode='rev')
 
         driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
@@ -1853,7 +1859,10 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_record_system_recursively(self):
         # Test adding recorders to all Systems using the recurse option to add_recorder
 
-        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce)
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce,
+                                                       linear_solver=om.ScipyKrylov,
+                                                       mda_linear_solver=om.ScipyKrylov,
+                                                       mda_nonlinear_solver=om.NonlinearBlockGS)
         prob.setup(mode='rev')
 
         # Need to do recursive adding of recorders AFTER setup
@@ -1889,7 +1898,10 @@ class TestSqliteRecorder(unittest.TestCase):
         ])
 
     def test_record_system_with_prefix(self):
-        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce)
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce,
+                                                       linear_solver=om.ScipyKrylov,
+                                                       mda_linear_solver=om.ScipyKrylov,
+                                                       mda_nonlinear_solver=om.NonlinearBlockGS)
         prob.setup(mode='rev')
 
         prob.model.mda.nonlinear_solver.options['use_apply_nonlinear'] = True
@@ -1934,7 +1946,10 @@ class TestSqliteRecorder(unittest.TestCase):
         ])
 
     def test_driver_recording_with_system_vars(self):
-        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce)
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce,
+                                                       linear_solver=om.ScipyKrylov,
+                                                       mda_linear_solver=om.ScipyKrylov,
+                                                       mda_nonlinear_solver=om.NonlinearBlockGS)
 
         driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
         driver.recording_options['record_desvars'] = True
@@ -2930,7 +2945,10 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         newton = om.NewtonSolver(solve_subsystems=True, max_sub_solves=4)
         newton.linesearch = om.BoundsEnforceLS()
 
-        model = SellarDerivativesGrouped(mda_nonlinear_solver=newton)
+        model = SellarDerivativesGrouped(nonlinear_solver=om.NonlinearBlockGS,
+                                         linear_solver=om.ScipyKrylov,
+                                         mda_linear_solver=om.ScipyKrylov,
+                                         mda_nonlinear_solver=newton)
 
         prob = om.Problem(model)
         prob.add_recorder(om.SqliteRecorder("cases.sql"))
@@ -2970,7 +2988,10 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
     def test_feature_system_options(self):
 
-        prob = om.Problem(model=SellarDerivativesGrouped())
+        prob = om.Problem(model=SellarDerivativesGrouped(nonlinear_solver=om.NonlinearBlockGS,
+                                                         linear_solver=om.ScipyKrylov,
+                                                         mda_linear_solver=om.ScipyKrylov,
+                                                         mda_nonlinear_solver=om.NonlinearBlockGS))
         prob.add_recorder(om.SqliteRecorder("cases.sql"))
 
         # set option and run model
@@ -3287,7 +3308,8 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
     def test_feature_record_with_prefix(self):
 
-        prob = om.Problem(model=SellarDerivatives())
+        prob = om.Problem(model=SellarDerivatives(nonlinear_solver=om.NonlinearRunOnce,
+                                                  linear_solver=om.ScipyKrylov))
         prob.setup()
 
         recorder = om.SqliteRecorder("cases.sql", record_viewer_data=False)

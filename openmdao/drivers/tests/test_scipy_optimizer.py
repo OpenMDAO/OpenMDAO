@@ -956,7 +956,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_sellar_mdf(self):
 
         prob = om.Problem()
-        model = prob.model = SellarDerivativesGrouped()
+        model = prob.model = SellarDerivativesGrouped(nonlinear_solver=om.NonlinearBlockGS,
+                                                      linear_solver=om.ScipyKrylov)
 
         prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
@@ -1098,7 +1099,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_sellar_mdf_COBYLA(self):
 
         prob = om.Problem()
-        model = prob.model = SellarDerivativesGrouped()
+        model = prob.model = SellarDerivativesGrouped(nonlinear_solver=om.NonlinearBlockGS,
+                                                      linear_solver=om.ScipyKrylov)
 
         prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA', tol=1e-9, disp=False)
 

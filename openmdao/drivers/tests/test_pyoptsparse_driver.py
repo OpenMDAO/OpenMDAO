@@ -1210,7 +1210,8 @@ class TestPyoptSparse(unittest.TestCase):
     def test_sellar_mdf(self):
 
         prob = om.Problem()
-        model = prob.model = SellarDerivativesGrouped()
+        model = prob.model = SellarDerivativesGrouped(nonlinear_solver=om.NonlinearBlockGS,
+                                                      linear_solver=om.ScipyKrylov)
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -2806,7 +2807,8 @@ class TestPyoptSparseFeature(unittest.TestCase):
     def test_slsqp_maxit(self):
 
         prob = om.Problem()
-        model = prob.model = SellarDerivativesGrouped()
+        model = prob.model = SellarDerivativesGrouped(nonlinear_solver=om.NonlinearBlockGS,
+                                                      linear_solver=om.ScipyKrylov)
 
         prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = "SLSQP"
@@ -2836,7 +2838,8 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
     def test_snopt_atol(self):
 
         prob = om.Problem()
-        model = prob.model = SellarDerivativesGrouped()
+        model = prob.model = SellarDerivativesGrouped(nonlinear_solver=om.NonlinearBlockGS,
+                                                      linear_solver=om.ScipyKrylov)
 
         prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = "SNOPT"
@@ -2859,7 +2862,8 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
     def test_snopt_maxit(self):
 
         prob = om.Problem()
-        model = prob.model = SellarDerivativesGrouped()
+        model = prob.model = SellarDerivativesGrouped(nonlinear_solver=om.NonlinearBlockGS,
+                                                      linear_solver=om.ScipyKrylov)
 
         prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = "SNOPT"
