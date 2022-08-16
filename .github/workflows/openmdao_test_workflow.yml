@@ -124,10 +124,6 @@ jobs:
 
           python -m pip install --upgrade pip
 
-          # setuptools v65.0.0 breaks pyoptsparse install with:
-          # ModuleNotFoundError: No module named 'distutils.msvccompiler'
-          python -m pip install 'setuptools<65.0.0'
-
           echo "============================================================="
           echo "Install OpenMDAO"
           echo "============================================================="
