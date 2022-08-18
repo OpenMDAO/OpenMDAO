@@ -262,7 +262,8 @@ class TestNotebookCaseReader(unittest.TestCase):
         self.recorder = om.SqliteRecorder(self.filename, record_viewer_data=False)
 
         # create & run problem, generate case
-        prob = SellarProblem()
+        prob = SellarProblem(nonlinear_solver=om.NonlinearBlockGS,
+                             linear_solver=om.ScipyKrylov)
         prob.setup()
 
         prob.add_recorder(self.recorder)

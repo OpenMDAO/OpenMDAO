@@ -4,11 +4,12 @@ import unittest
 import numpy as np
 
 from openmdao.api import Group, IndepVarComp, Problem
+from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
 from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
-     SellarStateConnection, SellarDerivatives
+     SellarStateConnection
 
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
@@ -407,6 +408,7 @@ class LinearSolverTests(object):
 
             prob = Problem()
             prob.model = SellarDerivativesGrouped()
+            prob.model.nonlinear_solver = NonlinearBlockGS()
             prob.model.linear_solver = self.linear_solver_class()
             prob.set_solver_print(level=0)
 

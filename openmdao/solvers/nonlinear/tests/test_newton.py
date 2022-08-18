@@ -39,7 +39,8 @@ class TestNewton(unittest.TestCase):
     def test_sellar_grouped(self):
         # Tests basic Newton solution on Sellar in a subgroup
 
-        prob = om.Problem(model=SellarDerivativesGrouped(nonlinear_solver=om.NewtonSolver(solve_subsystems=False)))
+        prob = om.Problem(model=SellarDerivativesGrouped(nonlinear_solver=om.NewtonSolver(solve_subsystems=False),
+                                                         linear_solver=om.ScipyKrylov))
 
         prob.setup()
         prob.set_solver_print(level=0)
@@ -54,7 +55,8 @@ class TestNewton(unittest.TestCase):
     def test_sellar(self):
         # Just tests Newton on Sellar with FD derivs.
 
-        prob = om.Problem(model=SellarNoDerivatives(nonlinear_solver=om.NewtonSolver(solve_subsystems=False)))
+        prob = om.Problem(model=SellarNoDerivatives(nonlinear_solver=om.NewtonSolver(solve_subsystems=False),
+                                                    linear_solver=om.ScipyKrylov))
 
         prob.setup()
         prob.run_model()
@@ -94,7 +96,8 @@ class TestNewton(unittest.TestCase):
 
     def test_sellar_derivs_with_Lin_GS(self):
 
-        prob = om.Problem(model=SellarDerivatives(nonlinear_solver=om.NewtonSolver(solve_subsystems=False)))
+        prob = om.Problem(SellarDerivatives(nonlinear_solver=om.NewtonSolver(solve_subsystems=False),
+                                            linear_solver=om.ScipyKrylov))
 
         prob.setup()
         prob.set_solver_print(level=0)

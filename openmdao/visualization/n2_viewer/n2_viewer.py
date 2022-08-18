@@ -292,13 +292,17 @@ def _get_tree_dict(system, is_parallel=False):
     options = {}
     slv = {'linear_solver', 'nonlinear_solver'}
     for k, opt in system.options._dict.items():
-        # need to handle solvers separate because they are classes or instances
         if k in slv:
+            # need to handle solver option separately because it can be a class, instance or None
             try:
-                options[k] = opt['val'].SOLVER
+                val = opt['val']
             except KeyError:
-                options[k] = opt['value'].SOLVER
+                val = opt['value']
 
+            try:
+                options[k] = val.SOLVER
+            except AttributeError:
+                options[k] = val
         else:
             options[k] = _serialize_single_option(opt)
 
