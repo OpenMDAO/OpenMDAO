@@ -99,7 +99,13 @@ def format_singular_error(system, matrix):
             # In this case, some row is a linear combination of the other rows.
 
             # SVD gives us some information that may help locate the source of the problem.
-            u, _, _ = np.linalg.svd(matrix)
+            try:
+                u, _, _ = np.linalg.svd(matrix)
+
+            except Exception as err:
+                msg = f"Jacobian in '{system.pathname}' is not full rank, but OpenMDAO was " + \
+                    "not able to determine which rows or columns."
+                return(msg)
 
             # Nonzero elements in the left singular vector show the rows that contribute strongly to
             # the singular subspace. Note that sometimes extra rows/cols are included in the set,
@@ -145,7 +151,7 @@ def format_nan_error(system, matrix):
     str
         New error string.
     """
-    # Because of how we built the matrix, a NaN in a comp cause the whole row to be NaN, so we
+    # Because of how we built the matrix, a NaN in a comp causes the whole row to be NaN, so we
     # need to associate each index with a variable.
     varsizes = np.sum(system._owned_sizes, axis=0)
 
@@ -279,10 +285,7 @@ class DirectSolver(LinearSolver):
                 try:
                     self._lu = scipy.sparse.linalg.splu(matrix)
                 except RuntimeError as err:
-                    if 'exactly singular' in str(err):
-                        raise RuntimeError(format_singular_error(system, matrix))
-                    else:
-                        raise err
+                    raise RuntimeError(format_singular_error(system, matrix))
 
             elif isinstance(matrix, np.ndarray):  # dense
                 # During LU decomposition, detect singularities and warn user.
@@ -371,10 +374,7 @@ class DirectSolver(LinearSolver):
                 try:
                     inv_jac = scipy.sparse.linalg.inv(matrix)
                 except RuntimeError as err:
-                    if 'exactly singular' in str(err):
-                        raise RuntimeError(format_singular_error(system, matrix))
-                    else:
-                        raise err
+                    raise RuntimeError(format_singular_error(system, matrix))
 
                 # to prevent broadcasting errors later, make sure inv_jac is 2D
                 # scipy.sparse.linalg.inv returns a shape (1,) array if matrix is shape (1,1)

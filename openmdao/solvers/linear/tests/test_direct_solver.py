@@ -832,6 +832,59 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
         self.assertEqual(expected, str(cm.exception))
 
+    def test_error_msg_bad_svd(self):
+
+        class BadComp(om.ImplicitComponent):
+
+            def setup(self):
+
+                self.add_input('a', 3.0)
+
+                self.add_output('x', 1.0)
+                self.add_output('y', 1.0)
+                self.add_output('z', 1.0)
+
+                self.declare_partials('x', 'a', val=1.0)
+                self.declare_partials('x', 'a', val=1.0)
+                self.declare_partials('x', 'a', val=1.0)
+
+                self.declare_partials('x', 'x', val=-2.0)
+                self.declare_partials('x', 'y', val=-1.0e331)
+                self.declare_partials('x', 'z', val=-1.0e331)
+                self.declare_partials('y', 'x', val=-1.0)
+                self.declare_partials('y', 'y', val=-2.0)
+                self.declare_partials('y', 'z', val=-1.0e331)
+                self.declare_partials('z', 'x', val=-1.0e331)
+                self.declare_partials('z', 'y', val=-1.0)
+                self.declare_partials('z', 'z', val=-2.0)
+
+            def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs=None, discrete_outputs=None):
+                a = inputs['a']
+                x, y, z = outputs.values()
+
+                residuals['x'] = a - 2.0 * x - y - z
+                residuals['y'] = a - x - 2.0 * y - z
+                residuals['z'] = a - x - y - 2.0 * z
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', BadComp(), promotes=['*'])
+
+        model.linear_solver = om.DirectSolver()
+
+        prob.setup()
+
+        prob.run_model()
+
+        with self.assertRaises(RuntimeError) as cm:
+            jac = prob.compute_totals(of=['x', 'y', 'z'], wrt=['a'])
+
+        expected = "Jacobian in '' is not full rank, but OpenMDAO was not " + \
+                    "able to determine which rows or columns."
+
+        self.assertEqual(expected, str(cm.exception))
+
     def test_matvec_error_raised(self):
         prob = om.Problem()
         model = prob.model
