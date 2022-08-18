@@ -128,7 +128,7 @@ jobs:
           echo "Install OpenMDAO"
           echo "============================================================="
           python -m pip install .${{ matrix.OPTIONAL }}
-          python -m pip install git+https://github.com/naylor-b/testflo.git@new_coverage
+          # python -m pip install git+https://github.com/naylor-b/testflo.git@new_coverage
 
       - name: Install jax
         if: matrix.JAX
