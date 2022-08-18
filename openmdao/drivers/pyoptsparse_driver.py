@@ -352,13 +352,16 @@ class pyOptSparseDriver(Driver):
         if len(lcons) > 0:
             _lin_jacs = self._compute_totals(of=lcons, wrt=indep_list,
                                              return_format=self._total_jac_format)
+            _con_vals = self.get_constraint_values(lintype='linear')
             # convert all of our linear constraint jacs to COO format. Otherwise pyoptsparse will
             # do it for us and we'll end up with a fully dense COO matrix and very slow evaluation
             # of linear constraints!
-            to_remove = []
-            for jacdct in _lin_jacs.values():
+            _y_intercepts = {}
+            for name, jacdct in _lin_jacs.items():
+                _y_intercepts[name] = _con_vals[name]
                 for n, subjac in jacdct.items():
                     if isinstance(subjac, np.ndarray):
+                        _y_intercepts[name] -= subjac.dot(input_vals[n])
                         # we can safely use coo_matrix to automatically convert the ndarray
                         # since our linear constraint jacs are constant, so zeros won't become
                         # nonzero during the optimization.
@@ -383,7 +386,9 @@ class pyOptSparseDriver(Driver):
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
-                opt_prob.addConGroup(name, size, lower=lower, upper=upper,
+                opt_prob.addConGroup(name, size,
+                                     lower=lower - _y_intercepts[name],
+                                     upper=upper - _y_intercepts[name],
                                      linear=True, wrt=wrt, jac=jac)
             else:
                 if name in self._res_subjacs:
@@ -415,7 +420,9 @@ class pyOptSparseDriver(Driver):
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
-                opt_prob.addConGroup(name, size, upper=upper, lower=lower,
+                opt_prob.addConGroup(name, size,
+                                     upper=upper - _y_intercepts[name],
+                                     lower=lower - _y_intercepts[name],
                                      linear=True, wrt=wrt, jac=jac)
             else:
                 if name in self._res_subjacs:

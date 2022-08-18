@@ -559,6 +559,64 @@ class TestPyoptSparse(unittest.TestCase):
         # Minimum should be at (7.166667, -7.833334)
         assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
+    def test_simple_paraboloid_linear_with_y_intercept_eq(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
+
+        parab = om.ExecComp('f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0')
+
+        model.add_subsystem('comp', parab, promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x + y - 25.0'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', equals=0.0, linear=True)
+
+        prob.setup()
+
+        prob.run_driver()
+
+        assert_near_equal(prob['x'], 19.5, 1e-6)
+        assert_near_equal(prob['y'], 5.5, 1e-6)
+
+    def test_simple_paraboloid_linear_with_y_intercept_ineq(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
+
+        parab = om.ExecComp('f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0')
+
+        model.add_subsystem('comp', parab, promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x + y - 25.0'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', lower=0.0, linear=True)
+
+        prob.setup()
+
+        prob.run_driver()
+
+        assert_near_equal(prob['x'], 19.5, 1e-6)
+        assert_near_equal(prob['y'], 5.5, 1e-6)
+
     def test_simple_array_comp2D(self):
 
         prob = om.Problem()

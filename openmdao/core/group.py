@@ -1831,6 +1831,7 @@ class Group(System):
         self._promotes_src_indices = None
 
         abs_in2out = self._conn_abs_in2out = {}
+        self._conn_discrete_in2out = {}
         global_abs_in2out = self._conn_global_abs_in2out
         pathname = self.pathname
         allprocs_discrete_in = self._var_allprocs_discrete['input']
