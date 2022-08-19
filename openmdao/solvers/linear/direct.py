@@ -105,7 +105,7 @@ def format_singular_error(system, matrix):
             except Exception as err:
                 msg = f"Jacobian in '{system.pathname}' is not full rank, but OpenMDAO was " + \
                     "not able to determine which rows or columns."
-                return(msg)
+                return msg
 
             # Nonzero elements in the left singular vector show the rows that contribute strongly to
             # the singular subspace. Note that sometimes extra rows/cols are included in the set,
