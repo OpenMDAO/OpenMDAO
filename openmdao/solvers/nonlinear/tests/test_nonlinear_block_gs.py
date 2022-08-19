@@ -390,7 +390,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
     def test_NLBGS_Aitken_cs(self):
 
-        prob = om.Problem(model=SellarDerivatives())
+        prob = om.Problem(model=SellarDerivatives(nonlinear_solver=om.NonlinearBlockGS))
 
         model = prob.model
         model.approx_totals(method='cs', step=1e-10)
@@ -411,7 +411,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
     def test_NLBGS_cs(self):
 
-        prob = om.Problem(model=SellarDerivatives())
+        prob = om.Problem(model=SellarDerivatives(nonlinear_solver=om.NonlinearBlockGS))
 
         model = prob.model
         model.approx_totals(method='cs')

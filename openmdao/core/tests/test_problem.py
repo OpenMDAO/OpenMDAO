@@ -523,6 +523,7 @@ class TestProblem(unittest.TestCase):
         prob = om.Problem()
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = om.NonlinearBlockGS()
+        prob.model.linear_solver = om.ScipyKrylov()
 
         prob.setup(mode=mode)
         prob.run_model()
