@@ -2,6 +2,7 @@
 [report]
 omit =
     */tests/*
+    */test/*
     */devtools/*
     */test_suite/*
     */docs/*
