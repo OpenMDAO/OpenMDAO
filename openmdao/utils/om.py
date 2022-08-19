@@ -52,8 +52,7 @@ from openmdao.utils.coloring import _total_coloring_setup_parser, _total_colorin
     _partial_coloring_setup_parser, _partial_coloring_cmd, \
     _view_coloring_setup_parser, _view_coloring_exec
 from openmdao.utils.scaffold import _scaffold_setup_parser, _scaffold_exec
-from openmdao.utils.file_utils import _load_and_exec, _to_filename, _iter_entry_points, \
-    support_coverage
+from openmdao.utils.file_utils import _load_and_exec, _to_filename, _iter_entry_points
 from openmdao.utils.entry_points import _list_installed_setup_parser, _list_installed_cmd, \
     split_ep, _compute_entry_points_setup_parser, _compute_entry_points_exec, \
         _find_plugins_setup_parser, _find_plugins_exec
@@ -505,7 +504,6 @@ _command_map = {
 }
 
 
-@support_coverage
 def openmdao_cmd():
     """
     Run an 'openmdao' sub-command or list help info for 'openmdao' command or sub-commands.
