@@ -113,6 +113,11 @@ n2_gui_test_scripts = {
             "arrowCount": 4
         },
         {
+            "desc": "Hover on an N2 cell with cycle arrows and count",
+            "test": "hoverArrow",
+            
+        },
+        {
             "desc": "Left-click on partition tree element to zoom",
             "test": "click",
             "selector": "g#tree rect#circuit_R2",

@@ -198,11 +198,10 @@ class OmMatrix extends Matrix {
     drawOffDiagonalArrows(cell) {
         super.drawOffDiagonalArrows(cell);
 
-        /* Cycle arrows are only drawn in the bottom triangle of the diagram */
+        /* Cycle arrows are only drawn for cells in the bottom triangle of the diagram */
         if (cell.row > cell.col) {
             const src = this.diagNodes[cell.row],
                 tgt = this.diagNodes[cell.col];
-
             // Get an array of all the parents and children of the target with cycle arrows
             const relativesWithCycleArrows = tgt.getNodesWithCycleArrows();
 
