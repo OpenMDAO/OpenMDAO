@@ -502,7 +502,7 @@ def _get_viewer_data(data_source, case_id=None):
             if nz.size > 1:
                 nz -= 1  # convert back to correct edge index
                 edges_list = [edge_ids[i] for i in nz]
-                edges_list = sorted(edges_list, key=itemgetter(0,1))
+                edges_list = sorted(edges_list, key=itemgetter(0, 1))
 
                 for vsrc, vtgtlist in G.get_edge_data(src, tgt)['conns'].items():
                     for vtgt in vtgtlist:
@@ -514,7 +514,7 @@ def _get_viewer_data(data_source, case_id=None):
             for vtgt in vtgtlist:
                 connections_list.append({'src': vsrc, 'tgt': vtgt})
 
-    connections_list = sorted(connections_list, key=itemgetter('src','tgt'))
+    connections_list = sorted(connections_list, key=itemgetter('src', 'tgt'))
 
     data_dict['sys_pathnames_list'] = list(sys_idx)
     data_dict['connections_list'] = connections_list
