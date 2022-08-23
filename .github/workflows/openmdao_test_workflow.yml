@@ -414,6 +414,11 @@ jobs:
         run: |
           mamba install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
 
+          echo "============================================================="
+          echo "Install jupyter dependencies with mamba"
+          echo "============================================================="
+          mamba install jupyter jupyter-book 'lxml>=4.9.1'
+
           python -m pip install --upgrade pip
 
           echo "============================================================="
