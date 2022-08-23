@@ -127,3 +127,12 @@ function wipeObj(obj) {
 function visible(elem) {
     return !!( elem.offsetWidth || elem.offsetHeight || elem.getClientRects().length );
 }
+
+/**
+ * An adaptation of the common "basename()" function.
+ * @param {String} filepath The path to get the basename from.
+ * @returns {String} The basename of the current URL, minus the .html/.htm extension.
+ */
+function basename(filepath = window.location.pathname) {
+    return String(filepath).replace(/^.*[\/\\](.+)\.html?$/i, "$1");
+}

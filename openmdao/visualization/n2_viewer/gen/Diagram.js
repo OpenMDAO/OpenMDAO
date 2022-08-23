@@ -142,11 +142,10 @@ class Diagram {
         const svgUrl = URL.createObjectURL(svgBlob);
         const downloadLink = document.createElement("a");
         downloadLink.href = svgUrl;
-        
+
         // To suggest a filename to save as, get the basename of the current HTML file,
-        // remove the .html/.htm extension, and add .svg.
-        const svgFileName = String(window.location.pathname)
-            .replace(/^.*\/(.+)\.html?$/i, "$1") + ".svg";
+        // remove the .html/.htm extension, and add ".svg".
+        const svgFileName = basename() + ".svg";
         downloadLink.download = svgFileName;
         
         document.body.appendChild(downloadLink);
