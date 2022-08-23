@@ -147,7 +147,7 @@ def activate_reports(reports, instance):
     instance : object
         The reports will be activated for this instance.
     """
-    cnames = {c.__name__ for c in inspect.getmro(instance.__class__)}
+    cnames = {c.__name__ for c in inspect.getmro(instance.__class__)}.difference(['object'])
     for name in reports:
         try:
             class_name = _reports_registry[name][2]
@@ -528,6 +528,9 @@ def _add_dir_to_tree(dirpath, lines, explevel, level, to_match):
         Directory names to show.
     """
     dlist = os.listdir(dirpath)
+
+    if not dlist:  # don't include empty dirs in the index
+        return
 
     # split into files and dirs to make page look better
     directories = {f for f in dlist if os.path.isdir(os.path.join(dirpath, f))}

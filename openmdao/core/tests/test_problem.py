@@ -523,6 +523,7 @@ class TestProblem(unittest.TestCase):
         prob = om.Problem()
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = om.NonlinearBlockGS()
+        prob.model.linear_solver = om.ScipyKrylov()
 
         prob.setup(mode=mode)
         prob.run_model()
@@ -2313,7 +2314,7 @@ class NestedProblemTestCase(unittest.TestCase):
 
             def solve(self):
                 # create a simple subproblem and run it to test for global solver_info bug
-                p = om.Problem(name=self.prob_name)
+                p = om.Problem(name=self.prob_name, reports=False)
                 self._problem = p
                 p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
                 p.model.add_subsystem('comp', om.ExecComp('y=2*x'))
@@ -2327,7 +2328,7 @@ class NestedProblemTestCase(unittest.TestCase):
 
         # Initially use the default names
         openmdao.core.problem._clear_problem_names()  # need to reset these to simulate separate runs
-        p = om.Problem()
+        p = om.Problem(reports=False)
         p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
         G = p.model.add_subsystem('G', om.Group())
         G.add_subsystem('comp', om.ExecComp('y=2*x'))
@@ -2343,7 +2344,7 @@ class NestedProblemTestCase(unittest.TestCase):
 
         # If the second Problem uses the default name of the first
         openmdao.core.problem._clear_problem_names()  # need to reset these to simulate separate runs
-        p = om.Problem()
+        p = om.Problem(reports=False)
         p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
         G = p.model.add_subsystem('G', om.Group())
         G.add_subsystem('comp', om.ExecComp('y=2*x'))
@@ -2357,7 +2358,7 @@ class NestedProblemTestCase(unittest.TestCase):
 
         # If the first Problem uses the default name of 'problem2'
         openmdao.core.problem._clear_problem_names()  # need to reset these to simulate separate runs
-        p = om.Problem(name=defname + '2')
+        p = om.Problem(name=defname + '2', reports=False)
         p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
         G = p.model.add_subsystem('G', om.Group())
         G.add_subsystem('comp', om.ExecComp('y=2*x'))
@@ -2372,7 +2373,7 @@ class NestedProblemTestCase(unittest.TestCase):
 
 class SystemInTwoProblemsTestCase(unittest.TestCase):
     def test_2problems(self):
-        prob = om.Problem()
+        prob = om.Problem(reports=False)
         G1 = prob.model.add_subsystem("G1", om.Group())
         G2 = G1.add_subsystem('G2', om.Group(), promotes_inputs=['x'])
         G2.add_subsystem('C1', om.ExecComp('y = 2 * x'), promotes_inputs=['x'])
@@ -2382,7 +2383,7 @@ class SystemInTwoProblemsTestCase(unittest.TestCase):
         prob.run_model()
 
         # 2nd problem
-        prob = om.Problem()
+        prob = om.Problem(reports=False)
         prob.model = G2
 
         prob.setup()

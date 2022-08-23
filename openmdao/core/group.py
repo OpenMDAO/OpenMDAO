@@ -1867,6 +1867,7 @@ class Group(System):
         self._promotes_src_indices = None
 
         abs_in2out = self._conn_abs_in2out = {}
+        self._conn_discrete_in2out = {}
         global_abs_in2out = self._conn_global_abs_in2out
         pathname = self.pathname
         allprocs_discrete_in = self._var_allprocs_discrete['input']
@@ -2592,7 +2593,7 @@ class Group(System):
         name = self.pathname if self.pathname else 'root'
 
         with Recording(name + '._solve_nonlinear', self.iter_count, self):
-            self._nonlinear_solver.solve()
+            self._nonlinear_solver._solve_with_cache_check()
 
         # Iteration counter is incremented in the Recording context manager at exit.
 

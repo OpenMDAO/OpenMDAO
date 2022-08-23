@@ -77,7 +77,7 @@ class ImplicitComponent(Component):
         """
         if self._nonlinear_solver is not None:
             with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
-                self._nonlinear_solver.solve()
+                self._nonlinear_solver._solve_with_cache_check()
         else:
             with self._unscaled_context(outputs=[self._outputs]):
                 with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
