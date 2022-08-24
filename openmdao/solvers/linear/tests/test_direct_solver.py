@@ -92,6 +92,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         prob = om.Problem()
         model = prob.model = SellarDerivatives()
 
+        model.nonlinear_solver = om.NonlinearBlockGS()
         model.linear_solver = om.DirectSolver()
 
         prob.setup()

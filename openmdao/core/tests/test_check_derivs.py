@@ -2834,6 +2834,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob = om.Problem()
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = om.NonlinearBlockGS()
+        prob.model.linear_solver = om.ScipyKrylov()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=-100, upper=100)
