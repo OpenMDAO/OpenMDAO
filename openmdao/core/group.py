@@ -2972,6 +2972,7 @@ class Group(System):
         abs2idx = self._var_allprocs_abs2idx
         sizes = self._var_sizes['output']
         approx_of_idx = self._owns_approx_of_idx
+        responses = self.get_responses(recurse=True)
 
         if self._owns_approx_of:
             szname = 'global_size' if total else 'size'
@@ -2980,8 +2981,8 @@ class Group(System):
             for of in self._owns_approx_of:
 
                 # Support for constraint aliases.
-                if of in self._responses and self._responses[of]['alias'] is not None:
-                    path = self._responses[of]['source']
+                if of in responses and responses[of]['alias'] is not None:
+                    path = responses[of]['source']
                 else:
                     path = of
 
@@ -3121,6 +3122,7 @@ class Group(System):
 
         abs2meta = self._var_allprocs_abs2meta
         info = self._coloring_info
+        responses = self.get_responses(recurse=True)
 
         if info['coloring'] is not None and (self._owns_approx_of is None or
                                              self._owns_approx_wrt is None):
@@ -3138,10 +3140,10 @@ class Group(System):
         approx_keys = self._get_approx_subjac_keys()
         for key in approx_keys:
             left, right = key
-            if left in self._responses and self._responses[left]['alias'] is not None:
-                left = self._responses[left]['source']
-            if right in self._responses and self._responses[right]['alias'] is not None:
-                right = self._responses[right]['source']
+            if left in responses and responses[left]['alias'] is not None:
+                left = responses[left]['source']
+            if right in responses and responses[right]['alias'] is not None:
+                right = responses[right]['source']
 
             if key in self._subjacs_info:
                 meta = self._subjacs_info[key]
