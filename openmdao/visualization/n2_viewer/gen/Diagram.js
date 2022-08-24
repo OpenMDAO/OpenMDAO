@@ -53,7 +53,6 @@ class Diagram {
 
     _newModelData() {
         this.model = new ModelData(this.modelData);
-        console.log(this.model)
     }
 
     /** Create a Layout object. Can be overridden to create different types of Layouts */

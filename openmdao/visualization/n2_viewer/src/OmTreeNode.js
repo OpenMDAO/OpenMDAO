@@ -125,8 +125,9 @@ class OmTreeNode extends FilterCapableNode {
 
         if (this.hasChildren()) {
             for (const child of this.children) {
-                if (child instanceof OmTreeNode)
+                if (child instanceof OmTreeNode) {
                     child._getNodesInChildrenWithCycleArrows(arr);
+                }
             }
         }
     }
