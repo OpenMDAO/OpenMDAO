@@ -139,8 +139,9 @@ class OmMatrix extends Matrix {
      * @param {Number} endIndex The index of the last diagonal node.
      */
     _drawArrowsInputView(cell, startIndex, endIndex) {
-        const boxStart = this._boxInfo[startIndex],
-            boxEnd = this._boxInfo[endIndex];
+        const boxInfo = this._boxInfo()
+        const boxStart = boxInfo[startIndex],
+            boxEnd = boxInfo[endIndex];
 
         // Draw multiple horizontal lines, but no more than one vertical line
         // for box-to-box connections
@@ -175,17 +176,32 @@ class OmMatrix extends Matrix {
     }
 
     /**
+     * Find the index of the first node in this.diagNodes that "has" the supplied node.
+     * For some reason Array.findIndex() did not work correctly for this.
+     * @param {OmTreeNode} node Reference to the node to search for.
+     * @returns {Number} The index of the node if found, otherwise -1.
+     */
+    _findDiagNodeIndex(node) {
+        for (const idx in this.diagNodes) {
+            if (this.diagNodes[idx].hasNode(node)) {
+                return idx;
+            }
+        }
+
+        return -1;
+    }
+
+    /**
      * Look for and draw cycle arrows of the specified cell.
      * @param {OmMatrixCell} cell The off-diagonal cell to draw arrows for.
      */
     drawOffDiagonalArrows(cell) {
         super.drawOffDiagonalArrows(cell);
 
-        /* Cycle arrows are only drawn in the bottom triangle of the diagram */
+        /* Cycle arrows are only drawn for cells in the bottom triangle of the diagram */
         if (cell.row > cell.col) {
             const src = this.diagNodes[cell.row],
                 tgt = this.diagNodes[cell.col];
-
             // Get an array of all the parents and children of the target with cycle arrows
             const relativesWithCycleArrows = tgt.getNodesWithCycleArrows();
 
@@ -193,13 +209,11 @@ class OmMatrix extends Matrix {
                 for (const ai of relative.cycleArrows) {
                     if (src.hasNode(ai.src)) {
                         for (const arrow of ai.arrows) {
-                            const firstBeginIndex =
-                                this.diagNodes.findIndex(diagNode => diagNode.hasNode(arrow.begin));
+                            const firstBeginIndex = this._findDiagNodeIndex(arrow.begin);
                             if (firstBeginIndex == -1)
                                 throw ("OmMatrix.drawOffDiagonalArrows() error: first begin index not found");
 
-                            const firstEndIndex =
-                                this.diagNodes.findIndex(diagNode => diagNode.hasNode(arrow.end));
+                            const firstEndIndex = this._findDiagNodeIndex(arrow.end);
                             if (firstEndIndex == -1)
                                 throw ("OmMatrix.drawOffDiagonalArrows() error: first end index not found");
 

@@ -295,7 +295,7 @@ class Matrix {
 
         // Find which variable box each of the variables belong in,
         // while finding the bounds of that box. Top and bottom
-        // rows recorded for each node in this._boxInfo[].
+        // rows recorded for each node.
         for (let ri = 1; ri < this.diagNodes.length; ++ri) {
             const curNode = this.diagNodes[ri];
             const startINode = this.diagNodes[currentBox.startI];

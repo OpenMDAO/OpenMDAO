@@ -53,7 +53,6 @@ class Diagram {
 
     _newModelData() {
         this.model = new ModelData(this.modelData);
-        console.log(this.model)
     }
 
     /** Create a Layout object. Can be overridden to create different types of Layouts */
@@ -143,8 +142,12 @@ class Diagram {
         const svgUrl = URL.createObjectURL(svgBlob);
         const downloadLink = document.createElement("a");
         downloadLink.href = svgUrl;
-        const svgFileName = prompt("Filename to save SVG as", 'partition_tree_n2.svg');
+
+        // To suggest a filename to save as, get the basename of the current HTML file,
+        // remove the .html/.htm extension, and add ".svg".
+        const svgFileName = basename() + ".svg";
         downloadLink.download = svgFileName;
+        
         document.body.appendChild(downloadLink);
         downloadLink.click();
         document.body.removeChild(downloadLink);

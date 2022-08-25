@@ -2,6 +2,7 @@
 import inspect
 import os
 import pathlib
+from operator import itemgetter
 
 import networkx as nx
 import numpy as np
@@ -451,13 +452,12 @@ def _get_viewer_data(data_source, case_id=None):
 
     connections_list = []
 
-    sys_idx = {}  # map of pathnames to index of pathname in list (systems in cycles only)
-
     G = root_group.compute_sys_graph(comps_only=True)
 
     scc = nx.strongly_connected_components(G)
 
     strongdict = {}
+    sys_idx_names = []
 
     for i, strong_comp in enumerate(scc):
         for c in strong_comp:
@@ -466,9 +466,13 @@ def _get_viewer_data(data_source, case_id=None):
         if len(strong_comp) > 1:
             # these IDs are only used when back edges are present
             for name in strong_comp:
-                sys_idx[name] = len(sys_idx)
+                sys_idx_names.append(name)
+
+    sys_idx = {}  # map of pathnames to index of pathname in list (systems in cycles only)
 
     comp_orders = {name: i for i, name in enumerate(root_group._ordered_comp_name_iter())}
+    for name in sorted(sys_idx_names):
+        sys_idx[name] = len(sys_idx)
 
     # 1 is added to the indices of all edges in the matrix so that we can use 0 entries to
     # indicate that there is no connection.
@@ -502,6 +506,8 @@ def _get_viewer_data(data_source, case_id=None):
             if nz.size > 1:
                 nz -= 1  # convert back to correct edge index
                 edges_list = [edge_ids[i] for i in nz]
+                edges_list = sorted(edges_list, key=itemgetter(0, 1))
+
                 for vsrc, vtgtlist in G.get_edge_data(src, tgt)['conns'].items():
                     for vtgt in vtgtlist:
                         connections_list.append({'src': vsrc, 'tgt': vtgt,
@@ -512,14 +518,10 @@ def _get_viewer_data(data_source, case_id=None):
             for vtgt in vtgtlist:
                 connections_list.append({'src': vsrc, 'tgt': vtgt})
 
-    # connections_list2 = []
-    # conns2 = root_group._problem_meta['model_ref']()._conn_global_abs_in2out
-    # for c in conns2:
-    #    connections_list2.append({'src': conns2[c], 'tgt': c})
+    connections_list = sorted(connections_list, key=itemgetter('src', 'tgt'))
 
     data_dict['sys_pathnames_list'] = list(sys_idx)
     data_dict['connections_list'] = connections_list
-    # data_dict['connections_list'] = connections_list2
     data_dict['abs2prom'] = root_group._var_abs2prom
 
     data_dict['driver'] = {

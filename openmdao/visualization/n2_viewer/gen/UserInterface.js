@@ -750,7 +750,7 @@ class UserInterface {
      * @param {Object} [extraData={}] Additional items to save.
      */
     saveState(extraData = {}) {
-        const stateFileName = prompt("Filename to save view state as", 'saved.n2view');
+        const stateFileName = basename() + '.n2view';
 
         // Zoomed node
         const zoomedElement = this.diag.zoomedElement.id;

@@ -25,8 +25,8 @@ class NodeConnection {
         else {
             // Collect all parents of the source node.
             srcObjParents.push(this.srcObj);
-            for (let obj = this.srcObj.parent; obj != null; obj = obj.parent) {
-                srcObjParents.push(obj);
+            for (let parentObj = this.srcObj.parent; parentObj != null; parentObj = parentObj.parent) {
+                srcObjParents.push(parentObj);
             }
         }
 
