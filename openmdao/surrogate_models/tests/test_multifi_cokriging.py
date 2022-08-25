@@ -7,7 +7,7 @@ from openmdao.utils.assert_utils import assert_near_equal
 
 
 class CoKrigingSurrogateTest(unittest.TestCase):
-
+z
     def test_1d_1fi_cokriging(self):
         # CoKrigingSurrogate with one fidelity could be used as a KrigingSurrogate
         # Same test as for KrigingSurrogate...  well with predicted test value adjustment
@@ -175,6 +175,7 @@ class CoKrigingSurrogateTest(unittest.TestCase):
 
     def test_normalization(self):
         # This dataset is ill conditioned if not normalized.
+        np.random.seed(1)
 
         size = 100
         x = np.random.random((size, 1))
