@@ -175,6 +175,7 @@ class CoKrigingSurrogateTest(unittest.TestCase):
 
     def test_normalization(self):
         # This dataset is ill conditioned if not normalized.
+        np.random.seed(1)
 
         size = 100
         x = np.random.random((size, 1))
