@@ -3736,9 +3736,6 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.pyOptSparseDriver(optimizer='SLSQP', print_results=False)
-        prob.driver.opt_settings['ACC'] = 1e-9
-
         sub.add_design_var('x', lower=-50.0, upper=50.0)
         sub.add_design_var('y', lower=-50.0, upper=50.0)
         sub.add_objective('f_xy')
@@ -3748,7 +3745,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         prob.run_model()
 
-        totals = prob.check_totals()
+        totals = prob.check_totals(out_stream=None)
         assert_check_totals(totals)
 
     def test_exceed_tol_show_only_incorrect(self):
