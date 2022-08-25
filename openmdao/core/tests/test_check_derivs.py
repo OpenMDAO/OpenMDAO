@@ -20,7 +20,8 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1w
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.array_comp import ArrayComp
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC, Diamond
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials, \
+     assert_check_totals
 from openmdao.utils.om_warnings import OMInvalidCheckDerivativesOptionsWarning
 
 from openmdao.utils.mpi import MPI
@@ -3719,6 +3720,33 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_near_equal(totals['a2', 'p1.widths']['abs error'][0], 0.0, 1e-6)
         assert_near_equal(totals['a3', 'p1.widths']['abs error'][0], 0.0, 1e-6)
         assert_near_equal(totals['a4', 'p1.widths']['abs error'][0], 0.0, 1e-6)
+
+    def test_alias_constraints_nested(self):
+        # Tests a bug where we need to lookup the constraint alias on a response that is from
+        # a child system.
+        prob = om.Problem()
+        model = prob.model
+
+        sub = model.add_subsystem('sub', om.Group())
+
+        sub.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        sub.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        sub.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        sub.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        sub.add_design_var('x', lower=-50.0, upper=50.0)
+        sub.add_design_var('y', lower=-50.0, upper=50.0)
+        sub.add_objective('f_xy')
+        sub.add_constraint('c', upper=-15.0, alias="Stuff")
+
+        prob.setup()
+
+        prob.run_model()
+
+        totals = prob.check_totals(out_stream=None)
+        assert_check_totals(totals)
 
     def test_exceed_tol_show_only_incorrect(self):
 
