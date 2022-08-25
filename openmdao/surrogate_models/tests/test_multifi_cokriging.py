@@ -7,7 +7,7 @@ from openmdao.utils.assert_utils import assert_near_equal
 
 
 class CoKrigingSurrogateTest(unittest.TestCase):
-z
+
     def test_1d_1fi_cokriging(self):
         # CoKrigingSurrogate with one fidelity could be used as a KrigingSurrogate
         # Same test as for KrigingSurrogate...  well with predicted test value adjustment
