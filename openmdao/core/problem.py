@@ -2020,7 +2020,6 @@ class Problem(object):
             ['ref', 'ref0', 'indices', 'adder', 'scaler', 'units',
             'parallel_deriv_color', 'cache_linear_solution'].
         """
-
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             raise RuntimeError(
                 "list_problem_vars can only be called after final_setup is called, either "
