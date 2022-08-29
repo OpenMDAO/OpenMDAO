@@ -1686,7 +1686,7 @@ class TestFunctionRegistration(unittest.TestCase):
             assert_near_equal(p['comp.area_square'], np.ones(size) * 9., 1e-11)
 
             data = p.check_partials(out_stream=None)
-            if env_truthy('GITHUB_ACTION') or env_truthy('TRAVIS'):
+            if env_truthy('CI'):
                 self.assertEqual(list(data), ['comp'])
             else:
                 self.assertEqual(list(data), [])

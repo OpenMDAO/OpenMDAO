@@ -1268,7 +1268,7 @@ class Problem(object):
         excludes = [excludes] if isinstance(excludes, str) else excludes
 
         comps = []
-        under_CI = env_truthy('GITHUB_ACTION') or env_truthy('TRAVIS')
+        under_CI = env_truthy('CI')
 
         for comp in model.system_iter(typ=Component, include_self=True):
             # if we're under CI, do all of the partials, ignoring _no_check_partials
