@@ -1,6 +1,5 @@
 """ Testing for Problem.check_partials and check_totals."""
 
-import os
 from io import StringIO
 
 

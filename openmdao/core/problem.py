@@ -1271,7 +1271,7 @@ class Problem(object):
         under_CI = env_truthy('GITHUB_ACTION') or env_truthy('TRAVIS')
 
         for comp in model.system_iter(typ=Component, include_self=True):
-            # if testflo is running, do all of the partials
+            # if we're under CI, do all of the partials, ignoring _no_check_partials
             if comp._no_check_partials and not under_CI:
                 continue
 
