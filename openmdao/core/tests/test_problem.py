@@ -1975,11 +1975,11 @@ class TestProblem(unittest.TestCase):
         prob.model.add_constraint('const.g', lower=0, upper=10.)
         prob.setup()
 
-        with self.assertRaises(RuntimeError) as err:
+        msg = "Problem .*: Problem.list_problem_vars\(\) cannot be called before " \
+                         "`Problem\.run_model\(\)`, `Problem\.run_driver\(\)`, or " \
+                         "`Problem\.final_setup\(\)`\."
+        with self.assertRaisesRegex(RuntimeError, msg):
             prob.list_problem_vars()
-        expected_error_msg = "list_problem_vars can only be called after final_setup is called, " \
-                             "either explicitly, or by running run_driver"
-        self.assertEqual(str(err.exception), expected_error_msg)
 
     def test_list_problem_w_multi_constraints(self):
         p = om.Problem()
