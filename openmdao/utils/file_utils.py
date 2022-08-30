@@ -256,6 +256,13 @@ def _run_test_func(mod, funcpath):
 if sys.version_info >= (3, 8):
     from importlib.metadata import entry_points
 
+    if sys.version_info >= (3, 10):
+        def _eps_get(eps, group):
+            return eps.select(group=group)
+    else:
+        def _eps_get(eps, group):
+            return eps[group]
+
     def _iter_entry_points(group):
         eps = entry_points()
         # there seems to be a bug currently where entry points can show up more than
@@ -263,7 +270,7 @@ if sys.version_info >= (3, 8):
         # TODO: revisit later to see if we can remove the check
         seen = set()
         if group in eps:
-            for ep in eps[group]:
+            for ep in _eps_get(eps, group):
                 if ep.name not in seen:
                     seen.add(ep.name)
                     yield ep
