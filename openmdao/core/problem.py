@@ -2020,6 +2020,11 @@ class Problem(object):
             ['ref', 'ref0', 'indices', 'adder', 'scaler', 'units',
             'parallel_deriv_color', 'cache_linear_solution'].
         """
+        if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
+            raise RuntimeError(f"{self.msginfo}: Problem.list_problem_vars() cannot be called "
+                               "before `Problem.run_model()`, `Problem.run_driver()`, or "
+                               "`Problem.final_setup()`.")
+
         default_col_names = ['name', 'val', 'size']
 
         # Design vars

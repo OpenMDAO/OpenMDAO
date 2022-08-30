@@ -1961,6 +1961,26 @@ class TestProblem(unittest.TestCase):
         self.assertRegex(output[12], r'^\s+upper:')
         self.assertRegex(output[13], r'^\s+array+\(+\[[0-9., e+-]+\]+\)')
 
+    def test_list_problem_vars_before_final_setup(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('parab', Paraboloid(), promotes_inputs=['x', 'y'])
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
+        prob.model.set_input_defaults('x', 3.0)
+        prob.model.set_input_defaults('y', -4.0)
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'COBYLA'
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+        prob.model.add_objective('parab.f_xy')
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+        prob.setup()
+
+        msg = "Problem .*: Problem.list_problem_vars\(\) cannot be called before " \
+                         "`Problem\.run_model\(\)`, `Problem\.run_driver\(\)`, or " \
+                         "`Problem\.final_setup\(\)`\."
+        with self.assertRaisesRegex(RuntimeError, msg):
+            prob.list_problem_vars()
+
     def test_list_problem_w_multi_constraints(self):
         p = om.Problem()
 
