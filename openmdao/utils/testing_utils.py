@@ -3,6 +3,7 @@ import json
 import functools
 import builtins
 import os
+from contextlib import contextmanager
 
 import numpy as np
 
@@ -163,26 +164,48 @@ class set_env_vars(object):
         """
         def wrap(*args, **kwargs):
             saved = {}
-            news = set()
             try:
                 for k, v in self.envs.items():
-                    if k in os.environ:
-                        saved[k] = os.environ[k]
-                    else:
-                        news.add(k)
-
+                    saved[k] = os.environ.get(k)
                     os.environ[k] = v  # will raise exception if v is not a string
 
                 return fnc(*args, **kwargs)
             finally:
                 # put environment back as it was
-                for name in news:
-                    if name in os.environ:
-                        del os.environ[name]
                 for k, v in saved.items():
-                    os.environ[k] = v
+                    if v is None:
+                        del os.environ[k]
+                    else:
+                        os.environ[k] = v
 
         return wrap
+
+
+@contextmanager
+def set_env_vars_context(**kwargs):
+    """
+    Decorate a function to temporarily set some environment variables.
+
+    Parameters
+    ----------
+    **kwargs : dict
+        Keyword args corresponding to environment variables to set.
+    """
+    saved = {}
+    try:
+        for k, v in kwargs.items():
+            saved[k] = os.environ.get(k)
+            os.environ[k] = v  # will raise exception if v is not a string
+
+        yield
+
+    finally:
+        # put environment back as it was
+        for k, v in saved.items():
+            if v is None:
+                del os.environ[k]
+            else:
+                os.environ[k] = v
 
 
 class _ModelViewerDataTreeEncoder(json.JSONEncoder):

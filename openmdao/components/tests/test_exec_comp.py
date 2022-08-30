@@ -20,6 +20,7 @@ except ImportError:
 import openmdao.api as om
 from openmdao.components.exec_comp import _expr_dict, _temporary_expr_dict
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_warning
+from openmdao.utils.general_utils import env_truthy
 from openmdao.utils.om_warnings import OMDeprecationWarning, SetupWarning
 
 _ufunc_test_data = {
@@ -1685,7 +1686,10 @@ class TestFunctionRegistration(unittest.TestCase):
             assert_near_equal(p['comp.area_square'], np.ones(size) * 9., 1e-11)
 
             data = p.check_partials(out_stream=None)
-            self.assertEqual(list(data), [])
+            if env_truthy('CI'):
+                self.assertEqual(list(data), ['comp'])
+            else:
+                self.assertEqual(list(data), [])
 
     def test_register_simple_arr_manual_partials_cs(self):
         with _temporary_expr_dict():

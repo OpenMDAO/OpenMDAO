@@ -1268,8 +1268,11 @@ class Problem(object):
         excludes = [excludes] if isinstance(excludes, str) else excludes
 
         comps = []
+        under_CI = env_truthy('CI')
+
         for comp in model.system_iter(typ=Component, include_self=True):
-            if comp._no_check_partials:
+            # if we're under CI, do all of the partials, ignoring _no_check_partials
+            if comp._no_check_partials and not under_CI:
                 continue
 
             name = comp.pathname

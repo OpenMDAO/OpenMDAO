@@ -5,9 +5,9 @@ Utilities for working with files.
 import sys
 import os
 import importlib
-from inspect import getmembers, isclass, ismethod, isfunction
+import functools
 from fnmatch import fnmatch
-from os.path import join, basename, dirname, isfile, split, splitext, abspath, expanduser
+from os.path import join, basename, dirname, isfile, split, splitext, abspath
 
 
 def get_module_path(fpath):

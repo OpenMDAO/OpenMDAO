@@ -23,6 +23,7 @@ from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC, Diamond
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials, \
      assert_check_totals
 from openmdao.utils.om_warnings import OMInvalidCheckDerivativesOptionsWarning
+from openmdao.utils.testing_utils import set_env_vars_context
 
 from openmdao.utils.mpi import MPI
 
@@ -241,7 +242,10 @@ class TestProblemCheckPartials(unittest.TestCase):
         # disable partials on comp2
         #
         comp2._no_check_partials = True
-        data = prob.check_partials(out_stream=None)
+
+        # Make check_partials think we're not on CI so we'll get the expected  non-CI behavior
+        with set_env_vars_context(CI='0'):
+            data = prob.check_partials(out_stream=None)
 
         # no derivative data for 'comp2'
         self.assertFalse('comp2' in data)

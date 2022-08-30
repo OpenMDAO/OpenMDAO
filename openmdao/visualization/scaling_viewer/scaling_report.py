@@ -8,9 +8,7 @@ import pathlib
 import numpy as np
 
 from openmdao.core.constants import _SetupStatus, INF_BOUND
-import openmdao.utils.coloring as coloring_mod
 import openmdao.utils.hooks as hooks
-from openmdao.utils.units import convert_units
 from openmdao.utils.mpi import MPI
 from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import ignore_errors, default_noraise

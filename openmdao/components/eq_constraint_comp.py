@@ -121,7 +121,10 @@ class EQConstraintComp(ExplicitComponent):
         for name, options in self._output_vars.items():
             lhs = inputs[options['lhs_name']]
             rhs = inputs[options['rhs_name']]
-            _scale_factor = np.ones((rhs.shape))
+
+            # set dtype to rhs.dtype to prevent
+            # "Casting complex values to real discards the imaginary part" warning.
+            _scale_factor = np.ones((rhs.shape), dtype=rhs.dtype)
 
             # Compute scaling factors
             # scale factor that normalizes by the rhs, except near 0

@@ -291,6 +291,9 @@ jobs:
           echo "============================================================="
           echo "Run tests with coverage (from directory other than repo root)"
           echo "============================================================="
+          echo "############ .coveragerc contents #################"
+          cat .coveragerc
+          echo "###################################################"
           cp .coveragerc $HOME
           cd $HOME
           testflo -n 2 openmdao --timeout=120 --show_skipped --coverage --coverpkg openmdao --durations=20
