@@ -256,17 +256,26 @@ def _run_test_func(mod, funcpath):
 if sys.version_info >= (3, 8):
     from importlib.metadata import entry_points
 
+    if sys.version_info >= (3, 10):
+        def _eps_get(group):
+            eps = entry_points().select(group=group)
+            for name in eps.names:
+                yield eps[name]
+    else:
+        def _eps_get(group):
+            eps = entry_points()
+            if group in eps:
+                yield from eps[group]
+
     def _iter_entry_points(group):
-        eps = entry_points()
         # there seems to be a bug currently where entry points can show up more than
         # once in the iterator, so keep track of the ones we've already seen.
         # TODO: revisit later to see if we can remove the check
         seen = set()
-        if group in eps:
-            for ep in eps[group]:
-                if ep.name not in seen:
-                    seen.add(ep.name)
-                    yield ep
+        for ep in _eps_get(group):
+            if ep.name not in seen:
+                seen.add(ep.name)
+                yield ep
 else:
     try:
         import pkg_resources

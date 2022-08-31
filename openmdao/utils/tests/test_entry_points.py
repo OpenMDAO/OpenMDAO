@@ -1,13 +1,10 @@
 import unittest
-import os
 import importlib
-import inspect
 import types
-from os.path import dirname, abspath, splitext
 
 from openmdao.utils.entry_points import list_installed, _filtered_ep_iter, _allowed_types, \
     compute_entry_points, _epgroup_bases, split_ep
-from openmdao.utils.file_utils import files_iter
+from openmdao.utils.assert_utils import assert_no_warning
 
 from openmdao.api import Group, SurrogateModel
 from openmdao.core.component import Component
@@ -90,6 +87,14 @@ class TestEntryPoints(unittest.TestCase):
         if badep:
             self.fail("For entry point group 'openmdao_report', the following EPs either couldn't "
                       f"be found or are not functions: {sorted(badep)}.")
+
+
+class TestEntryPointsWarning(unittest.TestCase):
+    ISOLATED = True
+
+    def test_ep_warn(self):
+        with assert_no_warning(Warning):
+            list_installed()
 
 
 if __name__ == "__main__":
