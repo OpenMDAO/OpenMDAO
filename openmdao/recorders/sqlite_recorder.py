@@ -72,7 +72,7 @@ META_KEY_SEP = '!'
 
 def array_to_blob(array):
     """
-    Make numpy array in to BLOB type.
+    Make numpy array into a BLOB.
 
     Convert a numpy array to something that can be written
     to a BLOB field in sqlite.

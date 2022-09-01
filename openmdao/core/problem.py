@@ -44,6 +44,7 @@ from openmdao.utils.logger_utils import get_logger, TestLogger
 from openmdao.utils.hooks import _setup_hooks, _reset_all_hooks
 from openmdao.utils.indexer import indexer
 from openmdao.utils.record_util import create_local_meta
+from openmdao.utils.array_utils import scatter_dist_to_local
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
     clear_reports, get_reports_dir, _load_report_plugins
 from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable, \
@@ -2193,20 +2194,35 @@ class Problem(object):
             A Case from a CaseRecorder file.
         """
         inputs = case.inputs if case.inputs is not None else None
+        abs2idx = self.model._var_allprocs_abs2idx
         if inputs:
+            meta = self.model._var_allprocs_abs2meta['input']
+            abs2prom = self.model._var_allprocs_abs2prom['input']
             for name in inputs.absolute_names():
-                if name not in self.model._var_abs2prom['input']:
+                if name not in abs2prom:
                     raise KeyError(f"{self.msginfo}: Input variable, '{name}', recorded in the "
                                    "case is not found in the model")
-                self[name] = inputs[name]
+                varmeta = meta[name]
+                if varmeta['distributed'] and self.model.comm.size > 1:
+                    sizes = self.model._var_sizes['input'][:, abs2idx[name]]
+                    self[name] = scatter_dist_to_local(inputs[name], self.model.comm, sizes)
+                else:
+                    self[name] = inputs[name]
 
         outputs = case.outputs if case.outputs is not None else None
         if outputs:
+            meta = self.model._var_allprocs_abs2meta['output']
+            abs2prom = self.model._var_allprocs_abs2prom['output']
             for name in outputs.absolute_names():
-                if name not in self.model._var_abs2prom['output']:
+                if name not in abs2prom:
                     raise KeyError(f"{self.msginfo}: Output variable, '{name}', recorded in the "
                                    "case is not found in the model")
-                self[name] = outputs[name]
+                varmeta = meta[name]
+                if varmeta['distributed'] and self.model.comm.size > 1:
+                    sizes = self.model._var_sizes['input'][:, abs2idx[name]]
+                    self[name] = scatter_dist_to_local(outputs[name], self.model.comm, sizes)
+                else:
+                    self[name] = outputs[name]
 
     def check_config(self, logger=None, checks=_default_checks, out_file='openmdao_checks.out'):
         """

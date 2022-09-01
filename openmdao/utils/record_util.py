@@ -7,6 +7,8 @@ import re
 import json
 import numpy as np
 
+from openmdao.utils.mpi import MPI
+
 
 def create_local_meta(name):
     """
