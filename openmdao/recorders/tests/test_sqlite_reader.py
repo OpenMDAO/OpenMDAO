@@ -35,6 +35,7 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt, determine_adder_scaler, printoptions
 from openmdao.utils.general_utils import remove_whitespace
 from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.units import convert_units
 from openmdao.utils.om_warnings import OMDeprecationWarning
 
@@ -42,6 +43,11 @@ from openmdao.utils.om_warnings import OMDeprecationWarning
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 def count_keys(d):
@@ -4864,6 +4870,60 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
         _assert_model_matches_case(seventh_slsqp_iteration_case, prob.model)
 
+
+class Adder(om.ExplicitComponent):
+    def setup(self):
+        self.add_input('x', shape_by_conn=True, distributed=True)
+        self.add_input('y')
+        self.add_output('x_sum', shape=1)
+        self.add_output('out_dist', copy_shape='x', distributed=True)
+
+    def compute(self, inputs, outputs):
+        outputs['x_sum'] = np.sum(inputs['x']) + inputs['y']**2.0
+        outputs['out_dist'] = inputs['x'] + 1.
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@use_tempdirs
+class SqliteCaseReaderMPI(unittest.TestCase):
+    N_PROCS = 2
+    def test_distrib_var_load(self):
+        prob = om.Problem()
+        ivc = prob.model.add_subsystem('ivc',om.IndepVarComp(), promotes=['*'])
+        ivc.add_output('x', val = np.ones(100 if prob.comm.rank == 0 else 10), distributed=True)
+        ivc.add_output('y', val = 1.0)
+
+        prob.model.add_subsystem('adder', Adder(), promotes=['*'])
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9)
+        prob.model.add_design_var('y', lower=-1, upper=1)
+        prob.model.add_objective('x_sum')
+
+        recorder_file = 'distributed.sql'
+        prob.driver.add_recorder(om.SqliteRecorder(recorder_file))
+        prob.driver.recording_options['includes'] = ['*']
+        prob.driver.recording_options['record_objectives'] = True
+        prob.driver.recording_options['record_constraints'] = True
+        prob.driver.recording_options['record_desvars'] = True
+
+        prob.setup()
+        prob.run_driver()
+
+        reader = om.CaseReader(recorder_file)
+        # print(reader.list_cases())
+        prob.load_case(reader.get_case(-1))
+
+        with multi_proc_exception_check(prob.comm):
+            val = prob.get_val('adder.x', get_remote=False)
+            if prob.comm.rank == 0:
+                assert_near_equal(val, np.ones(100, dtype=float))
+            else:
+                assert_near_equal(val, np.ones(10, dtype=float))
+
+            val = prob.get_val('adder.out_dist', get_remote=False)
+            if prob.comm.rank == 0:
+                assert_near_equal(val, np.ones(100, dtype=float) + 1.)
+            else:
+                assert_near_equal(val, np.ones(10, dtype=float) + 1.)
 
 if __name__ == "__main__":
     unittest.main()

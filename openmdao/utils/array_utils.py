@@ -93,6 +93,32 @@ def evenly_distrib_idxs(num_divisions, arr_size):
     return sizes, offsets
 
 
+def scatter_dist_to_local(dist_val, comm, sizes):
+    """
+    Scatter a full distributed value to local values in each MPI process.
+
+    Parameters
+    ----------
+    dist_val : ndarray
+        The full distributed value.
+    comm : MPI communicator
+        The MPI communicator.
+    sizes : ndarray
+        The array of sizes for each process.
+
+    Returns
+    -------
+    ndarray
+        The local value on this process.
+    """
+    from openmdao.utils.mpi import MPI
+    offsets = np.zeros(sizes.shape, dtype=INT_DTYPE)
+    offsets[1:] = np.cumsum(sizes)[:-1]
+    local = np.zeros(sizes[comm.rank])
+    comm.Scatterv([dist_val, sizes, offsets, MPI.DOUBLE], local, root=0)
+    return local
+
+
 def get_evenly_distributed_size(comm, full_size):
     """
     Return the size of the current rank's part of an array of the given size.
