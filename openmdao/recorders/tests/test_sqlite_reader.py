@@ -4888,10 +4888,9 @@ class Adder(om.ExplicitComponent):
 class SqliteCaseReaderMPI(unittest.TestCase):
     N_PROCS = 2
     def test_distrib_var_load(self):
-        size = 100 if MPI.COMM_WORLD.rank ==0 else 10
         prob = om.Problem()
         ivc = prob.model.add_subsystem('ivc',om.IndepVarComp(), promotes=['*'])
-        ivc.add_output('x', val = np.ones(size), distributed=True)
+        ivc.add_output('x', val = np.ones(100 if prob.comm.rank == 0 else 10), distributed=True)
         ivc.add_output('y', val = 1.0)
 
         prob.model.add_subsystem('adder', Adder(), promotes=['*'])
