@@ -2219,7 +2219,7 @@ class Problem(object):
                                    "case is not found in the model")
                 varmeta = meta[name]
                 if varmeta['distributed'] and self.model.comm.size > 1:
-                    sizes = self.model._var_sizes['input'][:, abs2idx[name]]
+                    sizes = self.model._var_sizes['output'][:, abs2idx[name]]
                     self[name] = scatter_dist_to_local(outputs[name], self.model.comm, sizes)
                 else:
                     self[name] = outputs[name]
