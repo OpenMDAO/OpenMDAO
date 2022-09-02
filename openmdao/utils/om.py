@@ -457,7 +457,8 @@ def _cite_cmd(options, user_args):
     ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
-def _get_deps(dep_dict:dict, package_name:str)->None:
+
+def _get_deps(dep_dict: dict, package_name: str) -> None:
     """
     Recursively determine all installed depenency versions and add newly found ones to dep_dict
 
@@ -481,6 +482,7 @@ def _get_deps(dep_dict:dict, package_name:str)->None:
         except ilmd.PackageNotFoundError:
             # Some packages list optional dependencies which are not installed, ignore them
             pass
+
 
 # this dict should contain names mapped to tuples of the form:
 #   (setup_parser_func, executor, description)
@@ -529,6 +531,7 @@ _command_map = {
                      'View existing reports.'),
 }
 
+
 def openmdao_cmd():
     """
     Run an 'openmdao' sub-command or list help info for 'openmdao' command or sub-commands.
@@ -553,7 +556,7 @@ def openmdao_cmd():
     ver_group = parser.add_mutually_exclusive_group()
     ver_group.add_argument('--version', action='version', version=version)
     ver_group.add_argument('--dependency_versions', action='store_true', default=False,
-                        help="show versions of OpenMDAO and all dependencies, then exit")
+                           help="show versions of OpenMDAO and all dependencies, then exit")
 
     # setting 'dest' here will populate the Namespace with the active subparser name
     subs = parser.add_subparsers(title='Tools', metavar='', dest="subparser_name")
@@ -618,6 +621,7 @@ def openmdao_cmd():
                 print(f'{dep_basename}: {dep_versions[dep_basename]}')
         else:
             print("\nNothing to do.")
+
 
 if __name__ == '__main__':
     openmdao_cmd()
