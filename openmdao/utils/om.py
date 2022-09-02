@@ -460,7 +460,7 @@ def _cite_cmd(options, user_args):
 
 def _get_deps(dep_dict: dict, package_name: str) -> None:
     """
-    Recursively determine all installed depenency versions and add newly found ones to dep_dict
+    Recursively determine all installed depenency versions and add newly found ones to dep_dict.
 
     Parameters
     ----------
