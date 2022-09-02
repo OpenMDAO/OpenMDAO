@@ -5,6 +5,8 @@ A console script wrapper for multiple openmdao functions.
 import sys
 import os
 import argparse
+import importlib.metadata as ilmd
+import re
 from openmdao import __version__ as version
 
 try:
@@ -455,6 +457,30 @@ def _cite_cmd(options, user_args):
     ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
+def _get_deps(dep_dict:dict, package_name:str)->None:
+    """
+    Recursively determine all installed depenency versions and add newly found ones to dep_dict
+
+    Parameters
+    ----------
+    dep_dict : dict
+        Dictionary with package names as keys and installed versions as values
+    package_name : str
+        The name of the package to query
+    """
+    if package_name not in dep_dict:
+        try:
+            dep_dict[package_name] = ilmd.version(package_name)
+            dependencies = ilmd.requires(package_name)
+            if dependencies is not None:
+                for dep_fullname in dependencies:
+                    # requires() returns the full specs, we just want the package name:
+                    dep_basename = re.sub(r'^([\w-]+)\W*.*$', r'\1', dep_fullname)
+                    _get_deps(dep_dict, dep_basename)
+
+        except ilmd.PackageNotFoundError:
+            # Some packages list optional dependencies which are not installed, ignore them
+            pass
 
 # this dict should contain names mapped to tuples of the form:
 #   (setup_parser_func, executor, description)
@@ -503,7 +529,6 @@ _command_map = {
                      'View existing reports.'),
 }
 
-
 def openmdao_cmd():
     """
     Run an 'openmdao' sub-command or list help info for 'openmdao' command or sub-commands.
@@ -525,7 +550,10 @@ def openmdao_cmd():
                                      'For example: '
                                      '"openmdao n2 -o foo.html myscript.py -- -x --myarg=bar"')
 
-    parser.add_argument('--version', action='version', version=version)
+    ver_group = parser.add_mutually_exclusive_group()
+    ver_group.add_argument('--version', action='version', version=version)
+    ver_group.add_argument('--dependency_versions', action='store_true', default=False,
+                        help="show versions of OpenMDAO and all dependencies, then exit")
 
     # setting 'dest' here will populate the Namespace with the active subparser name
     subs = parser.add_subparsers(title='Tools', metavar='', dest="subparser_name")
@@ -560,7 +588,7 @@ def openmdao_cmd():
 
     # handle case where someone just runs `openmdao <script> [dashed-args]`
     args = [a for a in sys.argv[1:] if not a.startswith('-')]
-    cmdargs = [a for a in sys.argv[1:] if a not in ('-h', '--version')]
+    cmdargs = [a for a in sys.argv[1:] if a not in ('-h', '--version', '--dependency_versions')]
     if not set(args).intersection(subs.choices) and len(args) == 1 and os.path.isfile(cmdargs[0]):
         _load_and_exec(args[0], user_args)
     else:
@@ -582,9 +610,14 @@ def openmdao_cmd():
 
         if hasattr(options, 'executor'):
             options.executor(options, user_args)
+        elif options.dependency_versions is True:
+            dep_versions = {}
+            _get_deps(dep_versions, 'openmdao')
+
+            for dep_basename in sorted(dep_versions.keys()):
+                print(f'{dep_basename}: {dep_versions[dep_basename]}')
         else:
             print("\nNothing to do.")
-
 
 if __name__ == '__main__':
     openmdao_cmd()
