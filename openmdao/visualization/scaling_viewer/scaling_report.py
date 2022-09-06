@@ -132,7 +132,7 @@ def _compute_jac_view_info(totals, data, dv_vals, response_vals, coloring):
             # use max of abs value here instead of norm to keep coloring consistent between
             # top level jac and subjacs
             var_matrix[i, j] = np.max(matrix[ofstart:ofend, wrtstart:wrtend])
-            if var_matrix[i, j] > 0. or (coloring and
+            if var_matrix[i, j] > 0. or (coloring is not None and
                                          np.any(mask[ofstart:ofend, wrtstart:wrtend])):
                 nonempty_submats.add((of, wrt))
 
@@ -141,7 +141,7 @@ def _compute_jac_view_info(totals, data, dv_vals, response_vals, coloring):
     for i in range(matrix.shape[0]):
         for j in range(matrix.shape[1]):
             val = matrix[i, j]
-            if coloring and not mask[i, j]:
+            if coloring is not None and not mask[i, j]:
                 val = None
             else:
                 if val == 0.:
