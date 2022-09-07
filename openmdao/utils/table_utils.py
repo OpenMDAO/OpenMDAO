@@ -1,4 +1,82 @@
 
+from numbers import Number, Integral
+
+
+class TableBuilder(object):
+    def __init__(self, rows=None, column_info=None, precision=4):
+        self._rows = []
+        self._column_infos = []
+        self._widths = []
+        self._precision = precision
+
+        if rows is not None:
+            for row in rows:
+                self.add_row(row)
+
+        if column_info is not None:
+            for colinf in column_info:
+                self.add_column_info(**colinf)
+
+    def _check(self):
+        if len(self._rows) != len(self._column_infos):
+            raise RuntimeError("Number of row entries must match number of column infos in "
+                               "TableBuilder.")
+
+    def _compute_widths(self):
+        if not self._rows:
+            return
+
+        if not self._column_infos:
+            for row in self._rows:
+                self.add_column_info(title='')
+
+        self._check()
+
+        for row in self._rows:
+            for i in range(len(self._column_infos)):
+                wid = len(row[i])
+                if wid > self._widths[i]:
+                    self._widths[i] = wid
+
+        for i, cinfo in enumerate(self._column_infos):
+            wid = len(cinfo['title'])
+            if wid > self._widths[i]:
+                self._widths[i] = wid
+
+    def add_row(self, row):
+        cells = []
+        for cell in row:
+            if isinstance(cell, Number):
+                if isinstance(cell, Integral):
+                    cells.append(str(cell))
+                else:
+                    cells.append(f'{cell:.{self._precision}}')
+            elif isinstance(cell, str):
+                cells.append(cell)
+            else:
+                cells.append(str(cell))
+
+        if self._rows and len(cells) != len(self._rows[-1]):
+            raise RuntimeError("Can't add rows of unequal length to TableBuilder.")
+
+        self._rows.append(cells)
+
+    def add_column_info(self, **options):
+        self._column_info.append(options)
+        self._widths.append(0)
+
+
+class TabulatorJSBuilder(TableBuilder):
+    def __init__(self, rows=None, column_infos=None, **options):
+        super().__init__(rows, column_infos)
+        self._options = options
+
+    def __str__(self):
+        """
+        Return a string representation of the Table.
+        """
+        pass
+
 
 table = []
 idx = 1  # unique ID for use by Tabulator
