@@ -5,22 +5,36 @@ from numbers import Number, Integral
 
 
 class TableBuilder(object):
-    def __init__(self, rows=None, column_infos=None, precision=4):
-        self._rows = []
-        self._column_infos = {}
+    def __init__(self, rows=None, column_meta=None, precision=4):
+        if rows is None:
+            self._raw_rows = []
+        else:
+            self._raw_rows = rows
+        self._column_meta = {}
         self._widths = None
-        self._precision = precision
+        self._rows = None
 
-        if column_infos is not None:
-            for i, colinf in enumerate(column_infos):
+        # these are the default format strings for the first formatting stage,
+        # before the column width is set
+        self._default_formats = {
+            'real': "{" + f":.{precision}" + "}",
+            'integral': "{}",
+            'other': "{}",
+        }
+
+        if column_meta is not None:
+            for i, colinf in enumerate(column_meta):
                 self.add_column_info(i, **colinf)
 
-        if rows is not None:
-            for row in rows:
-                self.add_row(row)
+    def _get_srows(self):
+        if self._rows is None:
+            self._rows = []
+            for row in self._raw_rows:
+                self._add_srow(row)
+        return self._rows
 
     def _check(self):
-        if len(self._rows) != len(self._column_infos):
+        if len(self._rows) != len(self._column_meta):
             raise RuntimeError("Number of row entries must match number of column infos in "
                                "TableBuilder.")
 
@@ -28,41 +42,52 @@ class TableBuilder(object):
         if self._widths is not None:
             return  # widths already computed
 
-        self._check()
-        
-        self._widths = [0] * len(self._column_infos)
+        rows = self._get_srows()
 
-        for row in self._rows:
-            for i in range(len(self._column_infos)):
+        self._check()
+
+        self._widths = [0] * len(self._column_meta)
+
+        for row in rows:
+            for i in range(len(self._column_meta)):
                 wid = len(row[i])
                 if wid > self._widths[i]:
                     self._widths[i] = wid
 
-        for i, cinfo in sorted(self._column_infos.items(), key=lambda x: x[0]):
-            wid = len(cinfo['title'])
+        for i, cinfo in sorted(self._column_meta.items(), key=lambda x: x[0]):
+            wid = len(cinfo['header'])
             if wid > self._widths[i]:
                 self._widths[i] = wid
 
     def add_row(self, row):
-        cells = []
-        for i, cell in enumerate(row):
-            align = 'left'
-            if isinstance(cell, Number):
-                align = 'right'
-                if isinstance(cell, Integral):
-                    cells.append(str(cell))
-                else:
-                    cells.append(f'{cell:.{self._precision}}')
-            elif isinstance(cell, str):
-                cells.append(cell)
-            else:
-                cells.append(str(cell))
+        # raw_list could have originally been an iterator, and if so add_row wouldn't normally
+        # be called, but if it is, we copy the iterator's contents so we can add to them.
+        if not isinstance(self._raw_rows, list):  # not likely, but handle it anyway
+            self._raw_rows = list(self._raw_rows)
+        self._raw_rows.append(row)
 
-            if i not in self._column_infos:
-                self._column_infos[i] = {'title': ''}
-                
-            if 'align' not in self._column_infos[i]:
-                self._column_infos[i]['align'] = align
+    def _add_srow(self, row):
+        if not self._rows:  # if this is the first row
+            for i, cell in enumerate(row):
+                align = 'left'
+                if isinstance(cell, Number):
+                    align = 'right'
+                    if isinstance(cell, Integral):
+                        format = 'integral'
+                    else:
+                        format = 'real'
+                else:
+                    format = 'other'
+
+                if i in self._column_meta:
+                    if 'format' not in self._column_meta[i]:
+                        self._column_meta[i]['format'] = self._default_formats[format]
+                    if 'align' not in self._column_meta[i]:
+                        self._column_meta[i]['align'] = align
+                else:
+                    self._column_meta[i] = {'header': '', 'format': format, 'align': align}
+
+        cells = [self._column_meta[i]['format'].format(cell) for i, cell in enumerate(row)]
 
         if self._rows and len(cells) != len(self._rows[-1]):
             raise RuntimeError("Can't add rows of unequal length to TableBuilder.")
@@ -70,37 +95,37 @@ class TableBuilder(object):
         self._rows.append(cells)
 
     def add_column_info(self, col_idx, **options):
-        if col_idx not in self._column_infos:
-            self._column_infos[col_idx] = {'title': ''}
-        self._column_infos[col_idx].update(options)
+        if col_idx not in self._column_meta:
+            self._column_meta[col_idx] = {'header': ''}
+        self._column_meta[col_idx].update(options)
 
     def dump(self, stream=sys.stdout):
-        header_cells = [None] * len(self._column_infos)
+        header_cells = [None] * len(self._column_meta)
         self._compute_widths()
         a2sym = {'center': '^', 'right': '>', 'left': '<'}
-        sorted_cols = sorted(self._column_infos.items(), key=lambda x: x[0])
+        sorted_cols = sorted(self._column_meta.items(), key=lambda x: x[0])
         for i, c in sorted_cols:
             sym = a2sym[c.get('align', 'left')]
-            header_cells[i] = f"{c['title']:{sym}{self._widths[i]}}"
+            header_cells[i] = f"{c['header']:{sym}{self._widths[i]}}"
 
         header_line = ' | '.join(header_cells)
-        
+
         print('-' * len(header_line), file=stream)
         print(header_line, file=stream)
         print('-' * len(header_line), file=stream)
-        
-        row_cells = [None] * len(self._column_infos)
-        for row in rows:
+
+        row_cells = [None] * len(self._column_meta)
+        for row in self._get_srows():
             for i, c in sorted_cols:
                 sym = a2sym[c.get('align', 'left')]
                 row_cells[i] = f"{row[i]:{sym}{self._widths[i]}}"
-                
+
             print(' | '.join(row_cells), file=stream)
 
 
 class TabulatorJSBuilder(TableBuilder):
-    def __init__(self, rows=None, column_infos=None, precision=4, **options):
-        super().__init__(rows, column_infos, precision)
+    def __init__(self, rows=None, column_meta=None, precision=4, **options):
+        super().__init__(rows, column_meta, precision)
         self._options = options
 
     def __str__(self):
@@ -218,16 +243,17 @@ if __name__ == '__main__':
     import numpy as np
     rows = np.arange(100, dtype=float).reshape((10,10))
     cols = [
-        {'title': 'foo'},
-        {'title': 'bar'},
-        {'title': 'fxxxoo'},
-        {'title': 'xxx'},
-        {'title': 'zzz'},
-        {'title': 'abcd'},
-        {'title': 'efgh'},
-        {'title': 'sdfgsd'},
-        {'title': 'uioiu'},
-        {'title': 'vccbfc'},
+        {'header': 'foowergw'},
+        {'header': 'bagwerwgwer'},
+        {'header': 'fxxxoo'},
+        {'header': 'xxx'},
+        {'header': 'zzz'},
+        {'header': 'abctyjrtyjtjd'},
+        {'header': 'efgh'},
+        {'header': 'sdfgsd'},
+        {'header': 'uioiu'},
+        {'header': 'vccbfc'},
     ]
-    tab = TabulatorJSBuilder(rows, column_infos=cols)
+    tab = TabulatorJSBuilder(rows, column_meta=cols, precision=4)
+    tab.add_column_info(5, align='center', format="{:40.3e}")
     tab.dump()
