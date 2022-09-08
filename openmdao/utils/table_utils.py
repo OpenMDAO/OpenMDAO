@@ -1,18 +1,29 @@
 
 import sys
+from io import StringIO
 
 from numbers import Number, Integral
 
 
+_a2sym = {'center': '^', 'right': '>', 'left': '<'}
+
+
 class TableBuilder(object):
-    def __init__(self, rows=None, column_meta=None, precision=4):
-        if rows is None:
-            self._raw_rows = []
-        else:
-            self._raw_rows = rows
+    allowed_col_meta = {'header', 'align', 'width', 'format'}
+
+    def __init__(self, rows, headers=None, column_meta=None, precision=4):
+        self._raw_rows = rows
         self._column_meta = {}
         self._widths = None
         self._rows = None
+
+        # these attributes change in subclasses
+        self.column_sep = ' | '
+        self.top_border = ''
+        self.header_bottom_border = '-'
+        self.bottom_border = ''
+        self.left_border = ''
+        self.right_border = ''
 
         # these are the default format strings for the first formatting stage,
         # before the column width is set
@@ -22,21 +33,37 @@ class TableBuilder(object):
             'other': "{}",
         }
 
+        # for convenience, allow a user to specify header strings without putting them
+        # inside a metadata dict
+        if headers is not None:
+            hlen = len(list(headers))
+            for i, h in enumerate(headers):
+                self.update_column_meta(i, header=h)
+
         if column_meta is not None:
-            for i, colinf in enumerate(column_meta):
-                self.add_column_info(i, **colinf)
+            clen = len(list(column_meta))
+            for i, meta in enumerate(column_meta):
+                self.update_column_meta(i, **meta)
+
+        if headers is not None and column_meta is not None and hlen != clen:
+            raise RuntimeError("Number of headers and number of column metadata dicts must match "
+                               f"if both are provided, but {hlen} != {clen}.")
 
     def _get_srows(self):
+        """
+        Get table rows with cells converted to strings.
+
+        Returns
+        -------
+        list
+            The list of table rows where each cell is a string.
+        """
         if self._rows is None:
             self._rows = []
             for row in self._raw_rows:
                 self._add_srow(row)
-        return self._rows
 
-    def _check(self):
-        if len(self._rows) != len(self._column_meta):
-            raise RuntimeError("Number of row entries must match number of column infos in "
-                               "TableBuilder.")
+        return self._rows
 
     def _compute_widths(self):
         if self._widths is not None:
@@ -44,13 +71,15 @@ class TableBuilder(object):
 
         rows = self._get_srows()
 
-        self._check()
+        if len(self._rows) != len(self._column_meta):
+            raise RuntimeError("Number of row entries must match number of column infos in "
+                               "TableBuilder.")
 
         self._widths = [0] * len(self._column_meta)
 
         for row in rows:
-            for i in range(len(self._column_meta)):
-                wid = len(row[i])
+            for i, cell in enumerate(row):
+                wid = len(cell)
                 if wid > self._widths[i]:
                     self._widths[i] = wid
 
@@ -59,33 +88,29 @@ class TableBuilder(object):
             if wid > self._widths[i]:
                 self._widths[i] = wid
 
-    def add_row(self, row):
-        # raw_list could have originally been an iterator, and if so add_row wouldn't normally
-        # be called, but if it is, we copy the iterator's contents so we can add to them.
-        if not isinstance(self._raw_rows, list):  # not likely, but handle it anyway
-            self._raw_rows = list(self._raw_rows)
-        self._raw_rows.append(row)
+    def _update_col_meta_from_row(self, row):
+        for i, cell in enumerate(row):
+            align = 'left'
+            if isinstance(cell, Number):
+                align = 'right'
+                if isinstance(cell, Integral):
+                    format = 'integral'
+                else:
+                    format = 'real'
+            else:
+                format = 'other'
+
+            if i in self._column_meta:
+                if 'format' not in self._column_meta[i]:
+                    self._column_meta[i]['format'] = self._default_formats[format]
+                if 'align' not in self._column_meta[i]:
+                    self._column_meta[i]['align'] = align
+            else:
+                self._column_meta[i] = {'header': '', 'format': format, 'align': align}
 
     def _add_srow(self, row):
         if not self._rows:  # if this is the first row
-            for i, cell in enumerate(row):
-                align = 'left'
-                if isinstance(cell, Number):
-                    align = 'right'
-                    if isinstance(cell, Integral):
-                        format = 'integral'
-                    else:
-                        format = 'real'
-                else:
-                    format = 'other'
-
-                if i in self._column_meta:
-                    if 'format' not in self._column_meta[i]:
-                        self._column_meta[i]['format'] = self._default_formats[format]
-                    if 'align' not in self._column_meta[i]:
-                        self._column_meta[i]['align'] = align
-                else:
-                    self._column_meta[i] = {'header': '', 'format': format, 'align': align}
+            self._update_col_meta_from_row(row)
 
         cells = [self._column_meta[i]['format'].format(cell) for i, cell in enumerate(row)]
 
@@ -94,45 +119,115 @@ class TableBuilder(object):
 
         self._rows.append(cells)
 
-    def add_column_info(self, col_idx, **options):
+    def update_column_meta(self, col_idx, **options):
         if col_idx not in self._column_meta:
             self._column_meta[col_idx] = {'header': ''}
-        self._column_meta[col_idx].update(options)
+        meta = self._column_meta[col_idx]
+        for name, val in options.items():
+            if name not in self.allowed_col_meta:
+                raise KeyError(f"'{name}' is not a valid column metadata key.")
+            meta[name] = val
 
-    def dump(self, stream=sys.stdout):
+    def _get_fixed_width_cell(self, col_meta, cell, width):
+        align = col_meta.get('align', 'left')
+        try:
+            sym = _a2sym[align]
+        except KeyError:
+            raise KeyError("Expected one of ['left', 'right', 'center'] for 'align' metadata, but "
+                           f"got '{align}'.")
+        return f"{cell:{sym}{width}}"
+
+    def _get_stringified_headers(self, sorted_cols):
         header_cells = [None] * len(self._column_meta)
-        self._compute_widths()
-        a2sym = {'center': '^', 'right': '>', 'left': '<'}
-        sorted_cols = sorted(self._column_meta.items(), key=lambda x: x[0])
         for i, c in sorted_cols:
-            sym = a2sym[c.get('align', 'left')]
-            header_cells[i] = f"{c['header']:{sym}{self._widths[i]}}"
+            header_cells[i] = self._get_fixed_width_cell(c, c['header'], self._widths[i])
 
-        header_line = ' | '.join(header_cells)
+        return header_cells
 
-        print('-' * len(header_line), file=stream)
-        print(header_line, file=stream)
-        print('-' * len(header_line), file=stream)
-
+    def _stringified_row_iter(self, sorted_cols):
         row_cells = [None] * len(self._column_meta)
         for row in self._get_srows():
             for i, c in sorted_cols:
-                sym = a2sym[c.get('align', 'left')]
-                row_cells[i] = f"{row[i]:{sym}{self._widths[i]}}"
+                row_cells[i] = self._get_fixed_width_cell(c, row[i], self._widths[i])
+            yield row_cells
 
-            print(' | '.join(row_cells), file=stream)
+    def add_side_borders(self, line):
+        if self.left_border or self.right_border:
+            parts = [p for p in (self.left_border, line, self.right_border) if p]
+            line = ''.join(parts)
+        return line
 
+    def get_top_border(self, header_cells):
+        width = sum(len(h) for h in header_cells) + len(self.column_sep) * (len(header_cells) - 1)
+        return self.add_side_borders((self.top_border * width)[:width])
 
-class TabulatorJSBuilder(TableBuilder):
-    def __init__(self, rows=None, column_meta=None, precision=4, **options):
-        super().__init__(rows, column_meta, precision)
-        self._options = options
+    def get_header_bottom_border(self, header_cells):
+        parts = [(self.header_bottom_border * len(h))[:len(h)] for h in header_cells]
+        return self.add_side_borders(self.column_sep.join(parts))
+
+    def dump(self, stream=sys.stdout):
+        self._compute_widths()
+        sorted_cols = sorted(self._column_meta.items(), key=lambda x: x[0])
+
+        header_cells = self._get_stringified_headers(sorted_cols)
+        if self.top_border:
+            print(self.get_top_border(header_cells), file=stream)
+
+        print(self.add_side_borders(self.column_sep.join(header_cells)), file=stream)
+
+        if self.header_bottom_border:
+            print(self.get_header_bottom_border(header_cells), file=stream)
+
+        for row_cells in self._stringified_row_iter(sorted_cols):
+            print(self.add_side_borders(self.column_sep.join(row_cells)), file=stream)
 
     def __str__(self):
         """
         Return a string representation of the Table.
         """
-        pass
+        io = StringIO()
+        self.dump(stream=io)
+        return io.getvalue()
+
+
+class TextTableBuilder(TableBuilder):
+    def __init__(self, rows=None, headers=None, column_meta=None, precision=4):
+        super().__init__(rows, headers, column_meta, precision)
+        self.column_sep = ' | '
+        self.top_border = '-'
+        self.header_bottom_border = '-'
+        self.bottom_border = '-'
+        self.left_border = '| '
+        self.right_border = ' |'
+
+
+class GithubTableBuilder(TableBuilder):
+    def get_header_bottom_border(self, header_cells):
+        parts = []
+        for cell, meta in zip(header_cells, self._column_meta.values()):
+            align = meta['align']
+            left = right = center = ''
+            size = len(cell)
+            if align == 'left':
+                left = ':'
+                size -= 1
+            elif align == 'right':
+                right = ':'
+                size -= 1
+            else:  # center
+                left = right = ':'
+                size -= 2
+            parts.append(left + (self.header_bottom_border * size) + right)
+
+        return self.add_side_borders(self.column_sep.join(parts))
+
+
+class TabulatorJSBuilder(TableBuilder):
+    allowed_col_meta = TableBuilder.allowed_col_meta.union({'sort', 'filter'})
+
+    def __init__(self, rows=None, headers=None, column_meta=None, precision=4):
+        super().__init__(rows, headers, column_meta, precision)
+
 
 
 # table = []
@@ -241,19 +336,26 @@ class TabulatorJSBuilder(TableBuilder):
 
 if __name__ == '__main__':
     import numpy as np
-    rows = np.arange(100, dtype=float).reshape((10,10))
-    cols = [
-        {'header': 'foowergw'},
-        {'header': 'bagwerwgwer'},
-        {'header': 'fxxxoo'},
-        {'header': 'xxx'},
-        {'header': 'zzz'},
-        {'header': 'abctyjrtyjtjd'},
-        {'header': 'efgh'},
-        {'header': 'sdfgsd'},
-        {'header': 'uioiu'},
-        {'header': 'vccbfc'},
+    import sys
+
+    rows = np.arange(49, dtype=float).reshape((7,7))
+    hdrs = [
+        'foowergw',
+        'bagwerwgwer',
+        'fxxxoo',
+        'xxx',
+        'zzz',
+        'abctyjrtyjtjd',
+        'efgh',
     ]
-    tab = TabulatorJSBuilder(rows, column_meta=cols, precision=4)
-    tab.add_column_info(5, align='center', format="{:40.3e}")
-    tab.dump()
+    if 'github' in sys.argv:
+        klass = GithubTableBuilder
+    elif 'text' in sys.argv:
+        klass = TextTableBuilder
+    elif 'tabulator' in sys.argv:
+        klass = TabulatorJSBuilder
+    else:
+        klass = TableBuilder
+    tab = klass(rows, headers=hdrs, precision=4)
+    tab.update_column_meta(5, align='center')
+    print(tab)
