@@ -1990,6 +1990,8 @@ class System(object):
 
             Parameters
             ----------
+            io : str
+                One of 'input' or 'output'.
             matches : dict {'input': ..., 'output': ...}
                 Dict of promoted names and associated info.
             match_type : intEnum
