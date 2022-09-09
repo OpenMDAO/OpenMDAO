@@ -1,0 +1,88 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script type="text/javascript">
+    <tabulator_src>
+</script>
+<script type="text/javascript">
+    <d3_src>
+</script>
+<style>
+    <tabulator_style>
+</style>
+</head>
+<body onload="startup()">
+
+    <h2 id="table-title"></h2>
+    <div id="tabulator-table"></div>
+
+<script type="text/javascript">
+
+var my_table_data = <table_data>;
+
+document.title = my_table_data.title;
+document.getElementById("table-title").innerHTML = my_table_data.title
+
+var d3_format = d3.format(".6~g");
+
+
+function val_cell_formatter(cell, formatterParams, onRendered) {
+    // cell value is actually [value, size]
+    let val = cell.getValue();
+    if (val[0] === "") {
+        return "";
+    }
+    return d3_format(val[0]);
+}
+
+
+function val_sorter(a, b, aRow, bRow, column, dir, sorterParams) {
+    if (a === "") {
+        a = [-1e99, 0];
+    }
+    if (b === "") {
+        b = [-1e99, 0];
+    }
+    return a[0] - b[0];
+}
+
+
+function numrow(title, field) {
+    return {
+        title:title,
+        field:field,
+        hozAlign:"right",
+        visible:true,
+        headerFilter:false,
+        formatter:val_cell_formatter,
+        sorter:val_sorter,
+    }
+}
+
+
+function setup_tabulator(table_data) {
+    rows = table_data.rows
+    cols = table_data.cols
+    meta = table_data.meta
+    title = table_data.title
+
+    return new Tabulator(meta.id, {
+        // set height of table (in CSS or here), this enables the Virtual DOM and
+        // improves render speed dramatically (can be any valid css height value)
+        height: meta.height,
+        data: rows, // assign data to table
+        layout: meta.layout, // "fitDataFill", "fitColumns"
+        columns: cols,
+    });
+}
+
+
+function startup() {
+    var the_table = setup_tabulator(my_table_data);
+}
+
+</script>
+</body>
+</html>

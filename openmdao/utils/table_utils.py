@@ -1,5 +1,7 @@
 
 import sys
+import os
+import json
 from io import StringIO
 
 from numbers import Number, Integral
@@ -9,7 +11,7 @@ _a2sym = {'center': '^', 'right': '>', 'left': '<'}
 
 
 class TableBuilder(object):
-    allowed_col_meta = {'header', 'align', 'width', 'format'}
+    allowed_col_meta = {'header', 'align', 'header_align', 'width', 'format'}
 
     def __init__(self, rows, headers=None, column_meta=None, precision=4):
         self._raw_rows = rows
@@ -65,9 +67,9 @@ class TableBuilder(object):
 
         return self._rows
 
-    def _compute_widths(self):
+    def _get_widths(self):
         if self._widths is not None:
-            return  # widths already computed
+            return  self._widths  # widths already computed
 
         rows = self._get_srows()
 
@@ -88,6 +90,13 @@ class TableBuilder(object):
             if wid > self._widths[i]:
                 self._widths[i] = wid
 
+        return self._widths
+
+    def _default_column_meta(self, **options):
+        dct = { 'header': '',  'header_align': 'center'}
+        dct.update(options)
+        return dct
+
     def _update_col_meta_from_row(self, row):
         for i, cell in enumerate(row):
             align = 'left'
@@ -106,7 +115,7 @@ class TableBuilder(object):
                 if 'align' not in self._column_meta[i]:
                     self._column_meta[i]['align'] = align
             else:
-                self._column_meta[i] = {'header': '', 'format': format, 'align': align}
+                self._column_meta[i] = self._default_column_meta(format=format, align=align)
 
     def _add_srow(self, row):
         if not self._rows:  # if this is the first row
@@ -121,34 +130,37 @@ class TableBuilder(object):
 
     def update_column_meta(self, col_idx, **options):
         if col_idx not in self._column_meta:
-            self._column_meta[col_idx] = {'header': ''}
+            self._column_meta[col_idx] = self._default_column_meta()
         meta = self._column_meta[col_idx]
         for name, val in options.items():
             if name not in self.allowed_col_meta:
                 raise KeyError(f"'{name}' is not a valid column metadata key.")
             meta[name] = val
 
-    def _get_fixed_width_cell(self, col_meta, cell, width):
-        align = col_meta.get('align', 'left')
+    def _get_fixed_width_cell(self, col_meta, cell, width, align_name):
+        align = col_meta.get(align_name, 'left')
         try:
             sym = _a2sym[align]
         except KeyError:
-            raise KeyError("Expected one of ['left', 'right', 'center'] for 'align' metadata, but "
-                           f"got '{align}'.")
+            raise KeyError(f"Expected one of ['left', 'right', 'center'] for '{align_name}' "
+                           f"metadata, but got '{align}'.")
         return f"{cell:{sym}{width}}"
 
     def _get_stringified_headers(self, sorted_cols):
         header_cells = [None] * len(self._column_meta)
-        for i, c in sorted_cols:
-            header_cells[i] = self._get_fixed_width_cell(c, c['header'], self._widths[i])
+        widths = self._get_widths()
+        for i, meta in sorted_cols:
+            header_cells[i] = self._get_fixed_width_cell(meta, meta['header'], widths[i],
+                                                         'header_align')
 
         return header_cells
 
     def _stringified_row_iter(self, sorted_cols):
+        widths = self._get_widths()
         row_cells = [None] * len(self._column_meta)
         for row in self._get_srows():
-            for i, c in sorted_cols:
-                row_cells[i] = self._get_fixed_width_cell(c, row[i], self._widths[i])
+            for i, meta in sorted_cols:
+                row_cells[i] = self._get_fixed_width_cell(meta, row[i], widths[i], 'align')
             yield row_cells
 
     def add_side_borders(self, line):
@@ -165,8 +177,7 @@ class TableBuilder(object):
         parts = [(self.header_bottom_border * len(h))[:len(h)] for h in header_cells]
         return self.add_side_borders(self.column_sep.join(parts))
 
-    def dump(self, stream=sys.stdout):
-        self._compute_widths()
+    def write(self, stream=sys.stdout):
         sorted_cols = sorted(self._column_meta.items(), key=lambda x: x[0])
 
         header_cells = self._get_stringified_headers(sorted_cols)
@@ -186,7 +197,7 @@ class TableBuilder(object):
         Return a string representation of the Table.
         """
         io = StringIO()
-        self.dump(stream=io)
+        self.write(stream=io)
         return io.getvalue()
 
 
@@ -223,122 +234,150 @@ class GithubTableBuilder(TableBuilder):
 
 
 class TabulatorJSBuilder(TableBuilder):
-    allowed_col_meta = TableBuilder.allowed_col_meta.union({'sort', 'filter'})
+    allowed_col_meta = TableBuilder.allowed_col_meta.union({
+        'filter',
+        'header_align',
+        'sorter',
+        'formatter'
+    })
 
-    def __init__(self, rows=None, headers=None, column_meta=None, precision=4):
+    allowed_table_meta = {
+        'id',  # html id
+        'layout',  # fitData, fitDataStretch, fitDataTable, fitColumns
+        'height',  # number in pixels
+    }
+
+    def __init__(self, rows=None, headers=None, column_meta=None, precision=4,
+                 layout='fitColumns', height=300, html_id='tabulator-table', title=''):
         super().__init__(rows, headers, column_meta, precision)
+        self._table_meta = {
+            'layout': layout,
+            'height': str(height),
+            'id': html_id if html_id.startswith('#') else '#' + html_id,
+        }
+        self._title = title
+
+    def _stringified_row_iter(self, sorted_cols):
+        row_cells = [None] * len(self._column_meta)
+        for row in self._get_srows():
+            for i, meta in sorted_cols:
+                row_cells[i] = row[i]
+            yield row_cells
+
+    def _update_col_meta_from_row(self, row):
+        for i, cell in enumerate(row):
+            align = 'left'
+            filter = False
+            sorter = 'string'
+            formatter = 'plaintext'
+            if isinstance(cell, Number):
+                align = 'right'
+                sorter = 'number'
+                if isinstance(cell, bool):
+                    align = 'center'
+                    format = 'other'
+                    filter = 'tickCross'
+                    formatter = 'tickCross'
+                    sorter = 'boolean'
+                elif isinstance(cell, Integral):
+                    format = 'integral'
+                else:
+                    format = 'real'
+            else:
+                format = 'other'
+                filter = 'input'
+
+            if i in self._column_meta:
+                meta = self._column_meta[i]
+                if 'format' not in meta:
+                    meta['format'] = self._default_formats[format]
+                if 'align' not in meta:
+                    meta['align'] = align
+                if 'filter' not in meta:
+                    meta['filter'] = filter
+                if 'sorter' not in meta:
+                    meta['sorter'] = sorter
+                if 'formatter' not in meta:
+                    meta['formatter'] = formatter
+
+            else:
+                self._column_meta[i] = self._default_column_meta(format=format, align=align)
+
+    def get_table_data(self):
+        rows = []
+        idx = 1  # unique ID for use by Tabulator
+
+        sorted_cols = sorted(self._column_meta.items(), key=lambda x: x[0])
+        for row_cells in self._stringified_row_iter(sorted_cols):
+            dct = {'id': idx}
+            for i, cell in enumerate(row_cells):
+                dct[f'col{i}'] = cell
+            rows.append(dct)
+            idx += 1
+
+        cols = []
+        for i, meta in sorted_cols:
+            cols.append({
+                'title': meta['header'],
+                'field': f'col{i}',
+                'hozAlign': meta['align'],
+                'headerHozAlign': meta['header_align'],
+                'headerFilter': meta['filter'], # input, textarea, number, range, tickCross
+                'sorter': meta['sorter'],  # string, number, alphanum, boolean, exists
+                'formatter': meta['formatter'], # plaintext, textarea, html, money, image, link,
+                                                # tickCross, traffic, star, progress, color,
+                                                # buttonTick, buttonCross,
+            })
+
+        return {
+            'title': self._title,
+            'rows': rows,
+            'cols': cols,
+            'meta': self._table_meta,
+        }
+
+    def write_html(self, outfile, viewer_template='generic_table.html'):
+        import openmdao.visualization
+        code_dir = os.path.dirname(openmdao.visualization.__file__)
+        libs_dir = os.path.join(code_dir, 'common', 'libs')
+        style_dir = os.path.join(code_dir, 'common', 'style')
+
+        with open(os.path.join(code_dir, viewer_template), "r", encoding='utf-8') as f:
+            template = f.read()
+
+        with open(os.path.join(libs_dir, 'tabulator.min.js'), "r", encoding='utf-8') as f:
+            tabulator_src = f.read()
+        s = template.replace("<tabulator_src>", tabulator_src)
+        del tabulator_src
+
+        with open(os.path.join(style_dir, 'tabulator.min.css'), "r", encoding='utf-8') as f:
+            tabulator_style = f.read()
+        s = s.replace("<tabulator_style>", tabulator_style)
+
+        with open(os.path.join(libs_dir, 'd3.v6.min.js'), "r", encoding='utf-8') as f:
+            d3_src = f.read()
+        s = s.replace("<d3_src>", d3_src)
+        del d3_src
+
+        jsontxt = json.dumps(self.get_table_data())
+        s = s.replace("<table_data>", jsontxt)
+        del jsontxt
+
+        with open(outfile, 'w', encoding='utf-8') as f:
+            f.write(s)
 
 
-
-# table = []
-# idx = 1  # unique ID for use by Tabulator
-# for tgt, src in connections.items():
-#     usrc = units[src]
-#     utgt = units[tgt]
-#     if usrc != utgt:
-#         # prepend these with '!' so they'll be colored red
-#         if usrc:
-#             usrc = '!' + units[src]
-#         if utgt:
-#             utgt = '!' + units[tgt]
-
-#     row = {'id': idx, 'src': src, 'sprom': sprom[src], 'sunits': usrc,
-#             'val': _val2str(vals[tgt]), 'tunits': utgt,
-#             'tprom': tprom[tgt], 'tgt': tgt}
-#     table.append(row)
-#     idx += 1
-
-# if title is None:
-#     title = ''
-
-# data = {
-#     'title': title,
-#     'table': table,
-# }
-
-### JS template ###
-
-# var table =
-#     new Tabulator("#connection-table", {
-#         // set height of table (in CSS or here), this enables the Virtual DOM and
-#         // improves render speed dramatically (can be any valid css height value)
-#         height: 650,
-#         data:tabledata, //assign data to table
-#         layout:"fitColumns", //"fitDataFill",
-#         footerElement:"<p class='middle'>" +
-#                             "<span class='toggle'><input type='checkbox' onclick='src_abs_toggle(this)'>Absolute Outputs</input></span>" +
-#                             "<span class='toggle'><input type='checkbox' checked='true' onclick='src_prom_toggle(this)'>Promoted Outputs</input></span>" +
-#                             "<span class='toggle'><input type='checkbox' checked='true' onclick='sunits_toggle(this)'>Output Units</input></span>" +
-#                             valstr +
-#                             "<span class='toggle'><input type='checkbox' checked='true' onclick='tunits_toggle(this)'>Input Units</input></span>" +
-#                             "<span class='toggle'><input type='checkbox' onclick='tgt_abs_toggle(this)'>Absolute Inputs</input></span>" +
-#                             "<span class='toggle'><input type='checkbox' checked='true' onclick='tgt_prom_toggle(this)'>Promoted Inputs</input></span></p>",
-#         columns:[ //Define Table Columns
-#                 {title: "Output (absolute)", field:"src", hozAlign:"left", headerFilter:true,
-#                     visible:false, minWidth:300,
-#                 tooltip:function(cell){
-#                     return cell.getData().sprom;
-#                 }},
-#                 {title: "Output (promoted)", field:"sprom", hozAlign:"left", headerFilter:true, minWidth:300,
-#                     formatter:function(cell, formmaterParams, onRendered) {
-#                     var promname = cell.getData().sprom;
-#                     if (promname == cell.getData().src) {
-#                         return promname;
-#                     }
-#                     else {
-#                         return "<span class='promoted'>" + promname + "</span>";
-#                     }
-#                 },
-#                 tooltip:function(cell){
-#                     return cell.getData().src;
-#                 }},
-#                 {title: "Units", field:"sunits", hozAlign:"center", headerFilter:true,
-#                     formatter:function(cell, formatterParams){
-#                     var value = cell.getValue();
-#                     if(value.startsWith("!")){
-#                         return "<span class='unitnomatch'>" + value.substring(1) + "</span>";
-#                     }else{
-#                         return value;
-#                     }
-#                     }},
-#                 {title: "Value", visible:data.show_values, field:"val", hozAlign:"center", headerFilter:true},
-#                 {title: "Units", field:"tunits", hozAlign:"center", headerFilter:true,
-#                     formatter:function(cell, formatterParams){
-#                         var value = cell.getValue();
-#                         if(value.startsWith("!")){
-#                             return "<span class='unitnomatch'>" + value.substring(1) + "</span>";
-#                         }else{
-#                             return value;
-#                         }
-#                     }
-#                 },
-#                 {title: "Input (absolute)", field:"tgt", hozAlign:"left", headerFilter:true,
-#                     visible:false, minWidth:300,
-#                     tooltip:function(cell){
-#                     return cell.getData().tprom;
-#                     }},
-#                 {title: "Input (promoted)", field:"tprom", hozAlign:"left", headerFilter:true,
-#                     minWidth:300,
-#                     formatter:function(cell, formmaterParams, onRendered) {
-#                     var promname = cell.getData().tprom;
-#                     if (promname == cell.getData().tgt) {
-#                         return promname;
-#                     }
-#                     else {
-#                         return "<span class='promoted'>" + promname + "</span>";
-#                     }
-#                     },
-#                     tooltip:function(cell){
-#                     return cell.getData().tgt;
-#                 }},
-#         ],
-# });
 
 if __name__ == '__main__':
     import numpy as np
     import sys
 
-    rows = np.arange(49, dtype=float).reshape((7,7))
+    nrows = 7
+    rows = []
+    for i in range(nrows):
+        rows.append(['asdf', True, i, 'sdfa sdfsf', np.random.random(),
+                     i*np.random.randint(99999), np.random.random()*5e8])
+
     hdrs = [
         'foowergw',
         'bagwerwgwer',
@@ -357,5 +396,15 @@ if __name__ == '__main__':
     else:
         klass = TableBuilder
     tab = klass(rows, headers=hdrs, precision=4)
-    tab.update_column_meta(5, align='center')
-    print(tab)
+
+    if 'tabulator' in sys.argv:
+        tab.update_column_meta(5, align='center', filter='number')
+
+        import pprint
+        pprint.pprint(tab.get_table_data())
+
+        print("\n\n\n")
+        tab.write_html('table_junk.html')
+    else:
+        tab.update_column_meta(5, align='center')
+        print(tab)
