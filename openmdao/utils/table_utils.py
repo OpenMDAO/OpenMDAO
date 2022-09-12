@@ -8,6 +8,12 @@ from numbers import Number, Integral
 
 
 _a2sym = {'center': '^', 'right': '>', 'left': '<'}
+_default_align = {
+    'integral': 'right',
+    'real': 'right',
+    'bool': 'center',
+    'other': 'left',
+}
 
 
 class TableBuilder(object):
@@ -32,6 +38,7 @@ class TableBuilder(object):
         self._default_formats = {
             'real': "{" + f":.{precision}" + "}",
             'integral': "{}",
+            'bool': "{}",
             'other': "{}",
         }
 
@@ -99,15 +106,17 @@ class TableBuilder(object):
 
     def _update_col_meta_from_row(self, row):
         for i, cell in enumerate(row):
-            align = 'left'
             if isinstance(cell, Number):
-                align = 'right'
-                if isinstance(cell, Integral):
+                if isinstance(cell, bool):
+                    format = 'bool'
+                elif isinstance(cell, Integral):
                     format = 'integral'
                 else:
                     format = 'real'
             else:
                 format = 'other'
+
+            align = _default_align[format]
 
             if i in self._column_meta:
                 if 'format' not in self._column_meta[i]:
@@ -115,7 +124,8 @@ class TableBuilder(object):
                 if 'align' not in self._column_meta[i]:
                     self._column_meta[i]['align'] = align
             else:
-                self._column_meta[i] = self._default_column_meta(format=format, align=align)
+                self._column_meta[i] = \
+                    self._default_column_meta(format=self._default_formats[format], align=align)
 
     def _add_srow(self, row):
         if not self._rows:  # if this is the first row
@@ -129,6 +139,9 @@ class TableBuilder(object):
         self._rows.append(cells)
 
     def update_column_meta(self, col_idx, **options):
+        if col_idx < 0 or col_idx >= len(self._raw_rows):
+            raise IndexError(f"Index '{col_idx}' is not a valid table column index for a table with"
+                             f" {len(self._raw_rows)} columns.")
         if col_idx not in self._column_meta:
             self._column_meta[col_idx] = self._default_column_meta()
         meta = self._column_meta[col_idx]
@@ -152,7 +165,6 @@ class TableBuilder(object):
         for i, meta in sorted_cols:
             header_cells[i] = self._get_fixed_width_cell(meta, meta['header'], widths[i],
                                                          'header_align')
-
         return header_cells
 
     def _stringified_row_iter(self, sorted_cols):
@@ -248,7 +260,7 @@ class TabulatorJSBuilder(TableBuilder):
     }
 
     def __init__(self, rows=None, headers=None, column_meta=None, precision=4,
-                 layout='fitColumns', height=300, html_id='tabulator-table', title=''):
+                 layout='fitDataTable', height=300, html_id='tabul-table', title=''):
         super().__init__(rows, headers, column_meta, precision)
         self._table_meta = {
             'layout': layout,
@@ -258,11 +270,24 @@ class TabulatorJSBuilder(TableBuilder):
         self._title = title
 
     def _stringified_row_iter(self, sorted_cols):
-        row_cells = [None] * len(self._column_meta)
         for row in self._get_srows():
-            for i, meta in sorted_cols:
-                row_cells[i] = row[i]
-            yield row_cells
+            yield row
+
+    def _add_srow(self, row):
+        if not self._rows:  # if this is the first row
+            self._update_col_meta_from_row(row)
+
+        cells = []
+        for i, cell in enumerate(row):
+            if isinstance(cell, bool):  # treat booleans in a special way for Tabulator
+                cells.append(cell)
+            else:
+                cells.append(self._column_meta[i]['format'].format(cell))
+
+        if self._rows and len(cells) != len(self._rows[-1]):
+            raise RuntimeError("Can't add rows of unequal length to TableBuilder.")
+
+        self._rows.append(cells)
 
     def _update_col_meta_from_row(self, row):
         for i, cell in enumerate(row):
@@ -275,10 +300,10 @@ class TabulatorJSBuilder(TableBuilder):
                 sorter = 'number'
                 if isinstance(cell, bool):
                     align = 'center'
-                    format = 'other'
-                    filter = 'tickCross'
+                    format = 'bool'
                     formatter = 'tickCross'
-                    sorter = 'boolean'
+                    filter = 'tickCross'
+                    sorter = 'string'
                 elif isinstance(cell, Integral):
                     format = 'integral'
                 else:
@@ -295,13 +320,17 @@ class TabulatorJSBuilder(TableBuilder):
                     meta['align'] = align
                 if 'filter' not in meta:
                     meta['filter'] = filter
+                    if filter == 'tickCross':
+                        meta['headerFilterParams'] = {'tristate': True}
                 if 'sorter' not in meta:
                     meta['sorter'] = sorter
                 if 'formatter' not in meta:
                     meta['formatter'] = formatter
-
+                    if formatter == 'tickCross':
+                        meta['formatterParams'] = {'crossElement': False}
             else:
-                self._column_meta[i] = self._default_column_meta(format=format, align=align)
+                self._column_meta[i] = \
+                    self._default_column_meta(format=self._default_formats[format], align=align)
 
     def get_table_data(self):
         rows = []
@@ -327,6 +356,10 @@ class TabulatorJSBuilder(TableBuilder):
                 'formatter': meta['formatter'], # plaintext, textarea, html, money, image, link,
                                                 # tickCross, traffic, star, progress, color,
                                                 # buttonTick, buttonCross,
+                'formatterParams': meta.get('formatterParams', None),
+                'editor': meta.get('editor', None),
+                'editorParams': meta.get('editorParams', None),
+                'headerFilterParams': meta.get('headerFilterParams', None),
             })
 
         return {
@@ -354,17 +387,33 @@ class TabulatorJSBuilder(TableBuilder):
             tabulator_style = f.read()
         s = s.replace("<tabulator_style>", tabulator_style)
 
-        with open(os.path.join(libs_dir, 'd3.v6.min.js'), "r", encoding='utf-8') as f:
-            d3_src = f.read()
-        s = s.replace("<d3_src>", d3_src)
-        del d3_src
-
         jsontxt = json.dumps(self.get_table_data())
         s = s.replace("<table_data>", jsontxt)
         del jsontxt
 
         with open(outfile, 'w', encoding='utf-8') as f:
             f.write(s)
+
+        return s
+
+
+_table_types = {
+    'text': TextTableBuilder,
+    'github': GithubTableBuilder,
+    'tabulate': TabulatorJSBuilder,
+}
+
+
+def to_table(rows, type='text', headers=None, column_meta=None, precision=6, **options):
+    try:
+        table_class = _table_types[type]
+    except Exception:
+        raise KeyError(f"'{type}' is not a valid type choice for to_table.  Valid choices are: "
+                       f"{sorted(_table_types)}.")
+
+    table = table_class(rows, headers=headers, column_meta=column_meta, precision=precision,
+                        **options)
+
 
 
 
@@ -375,7 +424,7 @@ if __name__ == '__main__':
     nrows = 7
     rows = []
     for i in range(nrows):
-        rows.append(['asdf', True, i, 'sdfa sdfsf', np.random.random(),
+        rows.append(['asdf',bool(np.random.randint(2)), i, 'sdfa sdfsf', np.random.random(),
                      i*np.random.randint(99999), np.random.random()*5e8])
 
     hdrs = [
@@ -387,24 +436,21 @@ if __name__ == '__main__':
         'abctyjrtyjtjd',
         'efgh',
     ]
+    kwargs = {}
     if 'github' in sys.argv:
         klass = GithubTableBuilder
     elif 'text' in sys.argv:
         klass = TextTableBuilder
     elif 'tabulator' in sys.argv:
         klass = TabulatorJSBuilder
+        kwargs = {'title': 'My Awesome Table'}
     else:
         klass = TableBuilder
-    tab = klass(rows, headers=hdrs, precision=4)
+    tab = klass(rows, headers=hdrs, precision=4, **kwargs)
 
+    tab.update_column_meta(5, align='center')
     if 'tabulator' in sys.argv:
-        tab.update_column_meta(5, align='center', filter='number')
-
-        import pprint
-        pprint.pprint(tab.get_table_data())
-
-        print("\n\n\n")
+        tab.update_column_meta(6, format='{:.6f}')
         tab.write_html('table_junk.html')
     else:
-        tab.update_column_meta(5, align='center')
         print(tab)
