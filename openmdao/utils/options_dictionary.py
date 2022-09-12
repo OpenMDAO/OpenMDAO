@@ -4,6 +4,7 @@ import re
 
 from openmdao.utils.om_warnings import warn_deprecation
 from openmdao.utils.notebook_utils import notebook_mode
+from openmdao.utils.table_utils import to_table
 
 from openmdao.core.constants import _UNDEFINED
 
@@ -151,10 +152,15 @@ class OptionsDictionary(object):
         hdrs = ['Option', 'Default', 'Acceptable Values', 'Acceptable Types', 'Description']
         rows = []
 
+        deprecations = False
+        for meta in self._dict.values():
+            if meta['deprecation'] is not None:
+                deprecations = True
+                hdrs.append('Deprecation')
+                break
+
         for key in sorted(self._dict.keys()):
             option = self._dict[key]
-            deprecations = False
-
             default = option['val'] if option['val'] is not _UNDEFINED else '**Required**'
             default_str = str(default)
 
@@ -180,15 +186,15 @@ class OptionsDictionary(object):
 
             deprecation = option['deprecation']
             if deprecation is not None:
-                if not deprecations:
-                    hdrs.append('Deprecation')
-                    deprecations = True
+                deprecation = deprecation[0]
+
+            if deprecations:
                 rows.append([key, default, acceptable_values, acceptable_types, desc,
-                             deprecation[0]])
+                             deprecation])
             else:
                 rows.append([key, default, acceptable_values, acceptable_types, desc])
 
-        return tabulate(rows, headers=hdrs, tablefmt=fmt, missingval=missingval)
+        return to_table(rows, headers=hdrs, tablefmt=fmt, missingval=missingval)
 
     def __str__(self, width=100):
         """

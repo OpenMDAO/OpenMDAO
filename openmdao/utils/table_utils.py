@@ -11,7 +11,7 @@ from numbers import Number, Integral
 
 _a2sym = {'center': '^', 'right': '>', 'left': '<'}
 _default_align = {
-    'integral': 'right',
+    'int': 'right',
     'real': 'right',
     'bool': 'center',
     'other': 'left',
@@ -21,11 +21,12 @@ _default_align = {
 class TableBuilder(object):
     allowed_col_meta = {'header', 'align', 'header_align', 'width', 'format'}
 
-    def __init__(self, rows, headers=None, column_meta=None, precision=4):
+    def __init__(self, rows, headers=None, column_meta=None, precision=4, missingval=None):
         self._raw_rows = rows
         self._column_meta = {}
         self._widths = None
         self._rows = None
+        self.missingval = missingval
 
         # these attributes change in subclasses
         self.column_sep = ' | '
@@ -39,7 +40,7 @@ class TableBuilder(object):
         # before the column width is set
         self._default_formats = {
             'real': "{" + f":.{precision}" + "}",
-            'integral': "{}",
+            'int': "{}",
             'bool': "{}",
             'other': "{}",
         }
@@ -70,8 +71,11 @@ class TableBuilder(object):
             The list of table rows where each cell is a string.
         """
         if self._rows is None:
+            self._update_col_meta_from_rows()
             self._rows = []
             for row in self._raw_rows:
+                if self.missingval is not None:
+                    row = [self.missingval if v is None else v for v in row]
                 self._add_srow(row)
 
         return self._rows
@@ -106,17 +110,28 @@ class TableBuilder(object):
         dct.update(options)
         return dct
 
-    def _update_col_meta_from_row(self, row):
-        for i, cell in enumerate(row):
-            if isinstance(cell, Number):
-                if isinstance(cell, bool):
-                    format = 'bool'
-                elif isinstance(cell, Integral):
-                    format = 'integral'
+    def _update_col_meta_from_rows(self):
+        types = None
+        for row in self._raw_rows:
+            if types is None:
+                types = [set() for r in row]
+
+            for i, cell in enumerate(row):
+                if isinstance(cell, Number):
+                    if isinstance(cell, bool):
+                       types[i].add('bool')
+                    elif isinstance(cell, Integral):
+                       types[i].add('int')
+                    else:
+                       types[i].add('real')
                 else:
-                    format = 'real'
+                   types[i].add('other')
+
+        for i, tset in enumerate(types):
+            if len(tset) > 1:
+                format = 'other'  # mixed type column, so just use "{}" format
             else:
-                format = 'other'
+                format = tset.pop()
 
             align = _default_align[format]
 
@@ -130,9 +145,6 @@ class TableBuilder(object):
                     self._default_column_meta(format=self._default_formats[format], align=align)
 
     def _add_srow(self, row):
-        if not self._rows:  # if this is the first row
-            self._update_col_meta_from_row(row)
-
         cells = [self._column_meta[i]['format'].format(cell) for i, cell in enumerate(row)]
 
         if self._rows and len(cells) != len(self._rows[-1]):
@@ -141,7 +153,7 @@ class TableBuilder(object):
         self._rows.append(cells)
 
     def update_column_meta(self, col_idx, **options):
-        if col_idx < 0 or col_idx >= len(self._raw_rows):
+        if col_idx < 0 or col_idx >= len(self._raw_rows[0]):
             raise IndexError(f"Index '{col_idx}' is not a valid table column index for a table with"
                              f" {len(self._raw_rows)} columns.  The leftmost column has column "
                              "index of 0.")
@@ -224,8 +236,8 @@ class TableBuilder(object):
 
 
 class TextTableBuilder(TableBuilder):
-    def __init__(self, rows=None, headers=None, column_meta=None, precision=4):
-        super().__init__(rows, headers, column_meta, precision)
+    def __init__(self, rows=None, headers=None, column_meta=None, precision=4, missingval=None):
+        super().__init__(rows, headers, column_meta, precision, missingval)
         self.column_sep = ' | '
         self.top_border = '-'
         self.header_bottom_border = '-'
@@ -235,8 +247,8 @@ class TextTableBuilder(TableBuilder):
 
 
 class RSTTableBuilder(TableBuilder):
-    def __init__(self, rows=None, headers=None, column_meta=None, precision=4):
-        super().__init__(rows, headers, column_meta, precision)
+    def __init__(self, rows=None, headers=None, column_meta=None, precision=4, missingval=None):
+        super().__init__(rows, headers, column_meta, precision, missingval)
         self.column_sep = '  '
         self.top_border = '='
         self.header_bottom_border = '='
@@ -250,6 +262,15 @@ class RSTTableBuilder(TableBuilder):
 
 
 class GithubTableBuilder(TableBuilder):
+    def __init__(self, rows=None, headers=None, column_meta=None, precision=4, missingval=None):
+        super().__init__(rows, headers, column_meta, precision, missingval)
+        self.column_sep = ' | '
+        self.top_border = ''
+        self.header_bottom_border = '-'
+        self.bottom_border = ''
+        self.left_border = '|'
+        self.right_border = '|'
+
     def get_header_bottom_border(self, header_cells):
         parts = []
         for cell, meta in zip(header_cells, self._column_meta.values()):
@@ -299,9 +320,6 @@ class TabulatorJSBuilder(TableBuilder):
             yield row
 
     def _add_srow(self, row):
-        if not self._rows:  # if this is the first row
-            self._update_col_meta_from_row(row)
-
         cells = []
         for i, cell in enumerate(row):
             if isinstance(cell, bool):  # treat booleans in a special way for Tabulator
@@ -314,44 +332,68 @@ class TabulatorJSBuilder(TableBuilder):
 
         self._rows.append(cells)
 
-    def _update_col_meta_from_row(self, row):
-        for i, cell in enumerate(row):
-            align = 'left'
-            filter = False
-            sorter = 'string'
-            formatter = 'plaintext'
-            if isinstance(cell, Number):
-                align = 'right'
-                sorter = 'number'
-                if isinstance(cell, bool):
-                    align = 'center'
-                    format = 'bool'
-                    formatter = 'tickCross'
-                    filter = 'tickCross'
-                    sorter = 'string'
-                elif isinstance(cell, Integral):
-                    format = 'integral'
+    def _update_col_meta_from_rows(self):
+        typemeta = {
+            'bool': {
+                'align': 'center',
+                'formatter': 'tickCross',
+                'filter': 'tickCross',
+                'sorter': 'string',
+            },
+            'int': {
+                'align': 'right',
+                'formatter': 'plaintext',
+                'filter': False,
+                'sorter': 'number',
+            },
+            'real': {
+                'align': 'right',
+                'formatter': 'plaintext',
+                'filter': False,
+                'sorter': 'number',
+            },
+            'other': {
+                'align': 'left',
+                'formatter': 'plaintext',
+                'filter': 'input',
+                'sorter': 'string',
+            }
+        }
+
+        types = [set() for r in self._raw_rows[0]]
+        for row in self._raw_rows:
+            for i, cell in enumerate(row):
+                if isinstance(cell, Number):
+                    if isinstance(cell, bool):
+                        types[i].add('bool')
+                    elif isinstance(cell, Integral):
+                        types[i].add('int')
+                    else:
+                        types[i].add('real')
                 else:
-                    format = 'real'
+                    types[i].add('other')
+
+        for i, tset in enumerate(types):
+            if len(tset) > 1:
+                format = 'other'  # mixed type column, so just use "{}" format
             else:
-                format = 'other'
-                filter = 'input'
+                format = tset.pop()
 
             if i in self._column_meta:
                 meta = self._column_meta[i]
                 if 'format' not in meta:
                     meta['format'] = self._default_formats[format]
                 if 'align' not in meta:
-                    meta['align'] = align
+                    meta['align'] = typemeta[format]['align']
                 if 'filter' not in meta:
-                    meta['filter'] = filter
+                    meta['filter'] = typemeta[format]['filter']
                     if filter == 'tickCross':
                         meta['headerFilterParams'] = {'tristate': True}
                 if 'sorter' not in meta:
-                    meta['sorter'] = sorter
+                    meta['sorter'] = typemeta[format]['sorter']
                 if 'formatter' not in meta:
-                    meta['formatter'] = formatter
-                    if formatter == 'tickCross':
+                    meta['formatter'] = typemeta[format]['formatter']
+                    if meta['formatter'] == 'tickCross':
                         meta['formatterParams'] = {'crossElement': False}
             else:
                 self._column_meta[i] = \
@@ -429,19 +471,21 @@ class TabulatorJSBuilder(TableBuilder):
 _table_types = {
     'text': TextTableBuilder,
     'github': GithubTableBuilder,
+    'rst': RSTTableBuilder,
     'tabulate': TabulatorJSBuilder,
 }
 
 
-def to_table(rows, type='text', headers=None, column_meta=None, precision=6, **options):
+def to_table(rows, tablefmt='text', headers=None, column_meta=None, precision=6, missingval=None,
+             **options):
     try:
-        table_class = _table_types[type]
+        table_class = _table_types[tablefmt]
     except Exception:
-        raise KeyError(f"'{type}' is not a valid type choice for to_table.  Valid choices are: "
+        raise KeyError(f"'{tablefmt}' is not a valid type choice for to_table.  Valid choices are: "
                        f"{sorted(_table_types)}.")
 
-    table = table_class(rows, headers=headers, column_meta=column_meta, precision=precision,
-                        **options)
+    return str(table_class(rows, headers=headers, column_meta=column_meta, precision=precision,
+                           missingval=missingval, **options))
 
 
 
