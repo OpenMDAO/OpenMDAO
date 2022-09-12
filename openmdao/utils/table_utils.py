@@ -3,8 +3,10 @@ import sys
 import os
 import json
 from io import StringIO
-
 from numbers import Number, Integral
+
+# TODO: add support for multiline cells
+# from textwrap import wrap
 
 
 _a2sym = {'center': '^', 'right': '>', 'left': '<'}
@@ -80,9 +82,9 @@ class TableBuilder(object):
 
         rows = self._get_srows()
 
-        if len(self._rows) != len(self._column_meta):
-            raise RuntimeError("Number of row entries must match number of column infos in "
-                               "TableBuilder.")
+        if len(self._rows[0]) != len(self._column_meta):
+            raise RuntimeError(f"Number of row entries ({len(self._rows[0])}) must match number of "
+                               f"columns ({len(self._column_meta)}) in TableBuilder.")
 
         self._widths = [0] * len(self._column_meta)
 
@@ -141,7 +143,8 @@ class TableBuilder(object):
     def update_column_meta(self, col_idx, **options):
         if col_idx < 0 or col_idx >= len(self._raw_rows):
             raise IndexError(f"Index '{col_idx}' is not a valid table column index for a table with"
-                             f" {len(self._raw_rows)} columns.")
+                             f" {len(self._raw_rows)} columns.  The leftmost column has column "
+                             "index of 0.")
         if col_idx not in self._column_meta:
             self._column_meta[col_idx] = self._default_column_meta()
         meta = self._column_meta[col_idx]
@@ -189,6 +192,10 @@ class TableBuilder(object):
         parts = [(self.header_bottom_border * len(h))[:len(h)] for h in header_cells]
         return self.add_side_borders(self.column_sep.join(parts))
 
+    def get_bottom_border(self, header_cells):
+        parts = [(self.bottom_border * len(h))[:len(h)] for h in header_cells]
+        return self.add_side_borders(self.column_sep.join(parts))
+
     def write(self, stream=sys.stdout):
         sorted_cols = sorted(self._column_meta.items(), key=lambda x: x[0])
 
@@ -203,6 +210,9 @@ class TableBuilder(object):
 
         for row_cells in self._stringified_row_iter(sorted_cols):
             print(self.add_side_borders(self.column_sep.join(row_cells)), file=stream)
+
+        if self.bottom_border:
+            print(self.get_bottom_border(header_cells), file=stream)
 
     def __str__(self):
         """
@@ -222,6 +232,21 @@ class TextTableBuilder(TableBuilder):
         self.bottom_border = '-'
         self.left_border = '| '
         self.right_border = ' |'
+
+
+class RSTTableBuilder(TableBuilder):
+    def __init__(self, rows=None, headers=None, column_meta=None, precision=4):
+        super().__init__(rows, headers, column_meta, precision)
+        self.column_sep = '  '
+        self.top_border = '='
+        self.header_bottom_border = '='
+        self.bottom_border = '='
+        self.left_border = ''
+        self.right_border = ''
+
+    def get_top_border(self, header_cells):
+        parts = [(self.top_border * len(h))[:len(h)] for h in header_cells]
+        return self.add_side_borders(self.column_sep.join(parts))
 
 
 class GithubTableBuilder(TableBuilder):
