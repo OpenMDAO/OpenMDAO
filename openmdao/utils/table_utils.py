@@ -260,11 +260,11 @@ class TabulatorJSBuilder(TableBuilder):
     }
 
     def __init__(self, rows=None, headers=None, column_meta=None, precision=4,
-                 layout='fitDataTable', height=300, html_id='tabul-table', title=''):
+                 layout='fitDataTable', height=None, html_id='tabul-table', title=''):
         super().__init__(rows, headers, column_meta, precision)
         self._table_meta = {
             'layout': layout,
-            'height': str(height),
+            'height':height,
             'id': html_id if html_id.startswith('#') else '#' + html_id,
         }
         self._title = title
@@ -362,6 +362,10 @@ class TabulatorJSBuilder(TableBuilder):
                 'headerFilterParams': meta.get('headerFilterParams', None),
             })
 
+        # for big tables, make sure to use virtual DOM for speed
+        if len(self._raw_rows) > 75 and self._table_meta['height'] is None:
+            self._table_meta['height'] = 600
+
         return {
             'title': self._title,
             'rows': rows,
@@ -421,7 +425,7 @@ if __name__ == '__main__':
     import numpy as np
     import sys
 
-    nrows = 7
+    nrows = 110
     rows = []
     for i in range(nrows):
         rows.append(['asdf',bool(np.random.randint(2)), i, 'sdfa sdfsf', np.random.random(),
