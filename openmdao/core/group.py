@@ -3371,12 +3371,13 @@ class Group(System):
                     if val.size > 1:
                         raise ValueError(f"Shape of input '{tgt}', (), doesn't match shape "
                                          f"{val.shape}.")
-                elif val.shape != value.shape and val.size > 1 and value.size > 1:
+                elif np.squeeze(val).shape != np.squeeze(value).shape:
                     raise ValueError(f"Shape of input '{tgt}', {value.shape}, doesn't match shape "
                                      f"{val.shape}.")
+
                 if val is not value:
                     if val.shape:
-                        val[:] = value
+                        val = np.reshape(value, newshape=val.shape)
                     else:
                         val = value
 
