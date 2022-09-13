@@ -212,8 +212,11 @@ class OptionsDictionary(object):
         """
         rst = self.to_table(fmt='rst').split('\n')
         cols = [len(header) for header in rst[0].split()]
-        desc_col = sum(cols[:-1]) + 2 * (len(cols) - 1)
-        desc_len = width - desc_col
+        if len(cols) == 5:
+            end_cols = sum(cols[:-1]) + 2 * (len(cols) - 1)
+        else:  # last column is Deprecation
+            end_cols = sum(cols[:-2]) + 2 * (len(cols) - 1)
+        desc_len = width - end_cols
 
         # if it won't fit in allowed width, just return the rST
         if desc_len < 10:
@@ -226,7 +229,7 @@ class OptionsDictionary(object):
                 if not row.startswith('==='):
                     row = row[width:].rstrip()
                     while len(row) > 0:
-                        text.append(' ' * desc_col + row[:desc_len])
+                        text.append(' ' * end_cols + row[:desc_len])
                         row = row[desc_len:]
             else:
                 text.append(row)

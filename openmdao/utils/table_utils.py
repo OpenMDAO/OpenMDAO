@@ -106,7 +106,7 @@ class TableBuilder(object):
         return self._widths
 
     def _default_column_meta(self, **options):
-        dct = { 'header': '',  'header_align': 'center'}
+        dct = { 'header': ''}
         dct.update(options)
         return dct
 
@@ -140,6 +140,8 @@ class TableBuilder(object):
                     self._column_meta[i]['format'] = self._default_formats[format]
                 if 'align' not in self._column_meta[i]:
                     self._column_meta[i]['align'] = align
+                if 'header_align' not in self._column_meta[i]:
+                    self._column_meta[i]['header_align'] = self._column_meta[i]['align']
             else:
                 self._column_meta[i] = \
                     self._default_column_meta(format=self._default_formats[format], align=align)
@@ -268,8 +270,8 @@ class GithubTableBuilder(TableBuilder):
         self.top_border = ''
         self.header_bottom_border = '-'
         self.bottom_border = ''
-        self.left_border = '|'
-        self.right_border = '|'
+        self.left_border = '| '
+        self.right_border = ' |'
 
     def get_header_bottom_border(self, header_cells):
         parts = []
@@ -385,6 +387,8 @@ class TabulatorJSBuilder(TableBuilder):
                     meta['format'] = self._default_formats[format]
                 if 'align' not in meta:
                     meta['align'] = typemeta[format]['align']
+                if 'header_align' not in meta:
+                    meta['header_align'] = meta['align']
                 if 'filter' not in meta:
                     meta['filter'] = typemeta[format]['filter']
                     if filter == 'tickCross':
@@ -397,7 +401,8 @@ class TabulatorJSBuilder(TableBuilder):
                         meta['formatterParams'] = {'crossElement': False}
             else:
                 self._column_meta[i] = \
-                    self._default_column_meta(format=self._default_formats[format], align=align)
+                    self._default_column_meta(format=self._default_formats[format],
+                                              align=typemeta[format]['align'])
 
     def get_table_data(self):
         rows = []
@@ -417,7 +422,7 @@ class TabulatorJSBuilder(TableBuilder):
                 'title': meta['header'],
                 'field': f'col{i}',
                 'hozAlign': meta['align'],
-                'headerHozAlign': meta['header_align'],
+                'headerHozAlign': meta.get('header_align', meta['align']),
                 'headerFilter': meta['filter'], # input, textarea, number, range, tickCross
                 'sorter': meta['sorter'],  # string, number, alphanum, boolean, exists
                 'formatter': meta['formatter'], # plaintext, textarea, html, money, image, link,

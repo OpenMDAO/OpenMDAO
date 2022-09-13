@@ -84,26 +84,16 @@ class TestOptionsDict(unittest.TestCase):
                           desc='This description is long and verbose, so it '
                                'takes up multiple lines in the options table.')
 
-        expected = "| Option    | Default      | Acceptable Values   | Acceptable Types      " \
-                   "| Description                                                            " \
-                   "                   |\n" \
-                   "|-----------|--------------|---------------------|-----------------------|--" \
-                   "----------------------------------------------------------------------------" \
-                   "-------------|\n" \
-                   "| comp      | MyComp       | N/A                 | ['ExplicitComponent'] |   " \
-                   "                                                                             " \
-                   "           |\n" \
-                   "| flag      | False        | [True, False]       | ['bool']              |   " \
-                   "                                                                             " \
-                   "           |\n" \
-                   "| long_desc | **Required** | N/A                 | ['str']               | Th" \
-                   "is description is long and verbose, so it takes up multiple lines in the opti" \
-                   "ons table. |\n" \
-                   "| test      | **Required** | ['a', 'b']          | N/A                   | Te" \
-                   "st integer value                                                             " \
-                   "           |"
-
-        self.assertEqual(self.dict.to_table(fmt='github'), expected)
+        expected = \
+"""
+| Option    | Default      | Acceptable Values | Acceptable Types      | Description                                                                               |
+| :-------- | :----------- | :---------------- | :-------------------- | :---------------------------------------------------------------------------------------- |
+| comp      | MyComp       | N/A               | ['ExplicitComponent'] |                                                                                           |
+| flag      | False        | [True, False]     | ['bool']              |                                                                                           |
+| long_desc | **Required** | N/A               | ['str']               | This description is long and verbose, so it takes up multiple lines in the options table. |
+| test      | **Required** | ['a', 'b']        | N/A                   | Test integer value                                                                        |
+"""
+        self.assertEqual(self.dict.to_table(fmt='github').strip(), expected.strip())
 
     @unittest.skipIf(tabulate is None, reason="package 'tabulate' is not installed")
     def test_deprecation_col(self):
@@ -120,15 +110,17 @@ class TestOptionsDict(unittest.TestCase):
                                'takes up multiple lines in the options table.',
                           deprecation='This option is deprecated')
 
-        expected = "|Option|Default|AcceptableValues|AcceptableTypes|Description|Deprecation|\n|" \
-        "-----------|--------------|---------------------|-----------------------|-----------------" \
-        "--------------------------------------------------------------------------|---------------" \
-        "------------|\n|comp|MyComp|N/A|['ExplicitComponent']||N/A|\n|flag|False|[True,False]|" \
-        "['bool']||N/A|\n|long_desc|**Required**|N/A|['str']|Thisdescriptionislongandverbose,soit" \
-        "takesupmultiplelinesintheoptionstable.|Thisoptionisdeprecated|\n|test|**Required**|" \
-        "['a','b']|N/A|Testintegervalue|N/A|"
+        expected = \
+"""
+| Option    | Default      | Acceptable Values | Acceptable Types      | Description                                                                               | Deprecation               |
+| :-------- | :----------- | :---------------- | :-------------------- | :---------------------------------------------------------------------------------------- | :------------------------ |
+| comp      | MyComp       | N/A               | ['ExplicitComponent'] |                                                                                           | N/A                       |
+| flag      | False        | [True, False]     | ['bool']              |                                                                                           | N/A                       |
+| long_desc | **Required** | N/A               | ['str']               | This description is long and verbose, so it takes up multiple lines in the options table. | This option is deprecated |
+| test      | **Required** | ['a', 'b']        | N/A                   | Test integer value                                                                        | N/A                       |
+"""
 
-        self.assertEqual(self.dict.to_table(fmt='github').replace(" ", ""), expected)
+        self.assertEqual(self.dict.to_table(fmt='github').strip(), expected.strip())
 
         my_comp = MyComp()
 
@@ -139,14 +131,17 @@ class TestOptionsDict(unittest.TestCase):
                           desc='This description is long and verbose, so it '
                                'takes up multiple lines in the options table.')
 
-        expected = "|Option|Default|AcceptableValues|AcceptableTypes|Description|\n|-----------|----" \
-        "----------|---------------------|-----------------------|-----------------------------------" \
-        "--------------------------------------------------------|\n|comp|MyComp|N/A|" \
-        "['ExplicitComponent']||\n|flag|False|[True,False]|['bool']||\n|long_desc|**Required**|N/A|" \
-        "['str']|Thisdescriptionislongandverbose,soittakesupmultiplelinesintheoptionstable.|\n|test|" \
-        "**Required**|['a','b']|N/A|Testintegervalue|"
+        expected = \
+"""
+| Option    | Default      | Acceptable Values | Acceptable Types      | Description                                                                               |
+| :-------- | :----------- | :---------------- | :-------------------- | :---------------------------------------------------------------------------------------- |
+| comp      | MyComp       | N/A               | ['ExplicitComponent'] |                                                                                           |
+| flag      | False        | [True, False]     | ['bool']              |                                                                                           |
+| long_desc | **Required** | N/A               | ['str']               | This description is long and verbose, so it takes up multiple lines in the options table. |
+| test      | **Required** | ['a', 'b']        | N/A                   | Test integer value                                                                        |
+"""
 
-        self.assertEqual(self.dict.to_table(fmt='github').replace(" ", ""), expected)
+        self.assertEqual(self.dict.to_table(fmt='github').strip(), expected.strip())
 
     def test_type_checking(self):
         self.dict.declare('test', types=int, desc='Test integer value')
@@ -402,7 +397,7 @@ class TestOptionsDict(unittest.TestCase):
 
         expected_msg = "Can't find aliased option 'foo3' for deprecated option 'test3'."
         self.assertEqual(context.exception.args[0], expected_msg)
-        
+
     def test_bad_option_name(self):
         opt = OptionsDictionary()
         msg = "'foo:bar' is not a valid python name and will become an invalid option name in a future release. You can prevent this warning (and future exceptions) by declaring this option using a valid python name."
