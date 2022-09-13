@@ -39,36 +39,32 @@ class TestOptionsDict(unittest.TestCase):
 
         self.assertEqual(repr(self.dict), repr(self.dict._dict))
 
-        self.assertEqual(self.dict.__str__(width=89), '\n'.join([
-            "=========  ============  ===================  =====================  ====================",
-            "Option     Default       Acceptable Values    Acceptable Types       Description",
-            "=========  ============  ===================  =====================  ====================",
-            "comp       MyComp        N/A                  ['ExplicitComponent']",
-            "flag       False         [True, False]        ['bool']",
-            "long_desc  **Required**  N/A                  ['str']                This description is ",
-            "                                                                     long and verbose, so",
-            "                                                                      it takes up multipl",
-            "                                                                     e lines in the optio",
-            "                                                                     ns table.",
-            "test       **Required**  ['a', 'b']           N/A                    Test integer value",
-            "=========  ============  ===================  =====================  ====================",
-        ]))
+        self.assertEqual(self.dict.__str__(width=89).strip(), """
+=========  ============  =================  =====================  ======================
+Option     Default       Acceptable Values  Acceptable Types       Description           
+=========  ============  =================  =====================  ======================
+comp       MyComp        N/A                ['ExplicitComponent']  
+flag       False         [True, False]      ['bool']               
+long_desc  **Required**  N/A                ['str']                This description is   
+                                                                   long and verbose, so  
+                                                                   it takes up multiple  
+                                                                   lines in the options  
+                                                                   table.                
+test       **Required**  ['a', 'b']         N/A                    Test integer value    
+=========  ============  =================  =====================  ======================
+""".strip())
 
         # if the table can't be represented in specified width, then we get the full width version
-        self.assertEqual(self.dict.__str__(width=40), '\n'.join([
-            "=========  ============  ===================  =====================  ====================="
-            "====================================================================",
-            "Option     Default       Acceptable Values    Acceptable Types       Description",
-            "=========  ============  ===================  =====================  ====================="
-            "====================================================================",
-            "comp       MyComp        N/A                  ['ExplicitComponent']",
-            "flag       False         [True, False]        ['bool']",
-            "long_desc  **Required**  N/A                  ['str']                This description is l"
-            "ong and verbose, so it takes up multiple lines in the options table.",
-            "test       **Required**  ['a', 'b']           N/A                    Test integer value",
-            "=========  ============  ===================  =====================  ====================="
-            "====================================================================",
-        ]))
+        self.assertEqual(self.dict.__str__(width=40).strip(), """
+=========  ============  =================  =====================  =========================================================================================
+Option     Default       Acceptable Values  Acceptable Types       Description                                                                              
+=========  ============  =================  =====================  =========================================================================================
+comp       MyComp        N/A                ['ExplicitComponent']                                                                                           
+flag       False         [True, False]      ['bool']                                                                                                        
+long_desc  **Required**  N/A                ['str']                This description is long and verbose, so it takes up multiple lines in the options table.
+test       **Required**  ['a', 'b']         N/A                    Test integer value                                                                       
+=========  ============  =================  =====================  =========================================================================================
+""".strip())
 
     @unittest.skipIf(tabulate is None, reason="package 'tabulate' is not installed")
     def test_to_table(self):

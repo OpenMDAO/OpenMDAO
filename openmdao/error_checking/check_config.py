@@ -397,7 +397,7 @@ def _check_system_configs(problem, logger):
 
 def _check_solvers(problem, logger):
     """
-    Search over all solvers and raise an error for unsupported configurations.
+    Search over all solvers and warn about unsupported configurations.
 
     Report any implicit component that does not implement solve_nonlinear and
     solve_linear or have an iterative nonlinear and linear solver upstream of it.

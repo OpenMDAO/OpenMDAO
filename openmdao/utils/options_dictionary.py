@@ -1,6 +1,7 @@
 """Define the OptionsDictionary class."""
 
 import re
+import textwrap
 
 from openmdao.utils.om_warnings import warn_deprecation
 from openmdao.utils.notebook_utils import notebook_mode
@@ -117,13 +118,12 @@ class OptionsDictionary(object):
 
         Returns
         -------
-        list of str
+        str
             A rendition of the options as an rST table.
         """
-        lines = self.to_table(fmt='rst').split('\n')
-        return lines
+        return self.to_table(fmt='rst')
 
-    def to_table(self, fmt='github', missingval='N/A'):
+    def to_table(self, fmt='github', missingval='N/A', max_width=None):
         """
         Get a table representation of this OptionsDictionary as a table in the requested format.
 
@@ -135,6 +135,8 @@ class OptionsDictionary(object):
             Default value of 'github' produces a table in GitHub-flavored markdown.
         missingval : str
             The value to be displayed in place of None.
+        max_width : int or None
+            If not None, try to limit the total width of the table to this value.
 
         Returns
         -------
@@ -194,7 +196,13 @@ class OptionsDictionary(object):
             else:
                 rows.append([key, default, acceptable_values, acceptable_types, desc])
 
-        return to_table(rows, headers=hdrs, tablefmt=fmt, missingval=missingval)
+        tab = to_table(rows, headers=hdrs, tablefmt=fmt, missingval=missingval,
+                       max_width=max_width)
+        if max_width is not None:
+            # make sure the first four columns are not resized to try to meet the width requirement
+            for i in range(4):
+                tab.update_column_meta(i, max_width=99)
+        return str(tab)
 
     def __str__(self, width=100):
         """
@@ -203,38 +211,14 @@ class OptionsDictionary(object):
         Parameters
         ----------
         width : int
-            The maximum width of the text.
+            The maximum allowed width of the text.
 
         Returns
         -------
         str
             A text representation of the options table.
         """
-        rst = self.to_table(fmt='rst').split('\n')
-        cols = [len(header) for header in rst[0].split()]
-        if len(cols) == 5:
-            end_cols = sum(cols[:-1]) + 2 * (len(cols) - 1)
-        else:  # last column is Deprecation
-            end_cols = sum(cols[:-2]) + 2 * (len(cols) - 1)
-        desc_len = width - end_cols
-
-        # if it won't fit in allowed width, just return the rST
-        if desc_len < 10:
-            return '\n'.join(rst)
-
-        text = []
-        for row in rst:
-            if len(row) > width:
-                text.append(row[:width])
-                if not row.startswith('==='):
-                    row = row[width:].rstrip()
-                    while len(row) > 0:
-                        text.append(' ' * end_cols + row[:desc_len])
-                        row = row[desc_len:]
-            else:
-                text.append(row)
-
-        return '\n'.join(text)
+        return str(self.to_table(fmt='rst', max_width=width))
 
     def _raise(self, msg, exc_type=RuntimeError):
         """

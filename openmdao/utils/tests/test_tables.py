@@ -1,6 +1,8 @@
 import unittest
 import numpy as np
 
+from openmdao.utils.table_utils import to_table
+
 test_seed = 42
 
 # limit our random strings to upper, lower case letters, numbers, :, _, and space
@@ -49,7 +51,7 @@ _cell_creators = {
 
 def _create_random_table_data(coltypes, nrows, seed=test_seed):
     colgens = []
-    for t, kwargs in coltypes.items():
+    for t, kwargs in coltypes:
         colgens.append(_cell_creators[t](nrows, **kwargs))
 
     headers = [s for s in _str_gen(len(coltypes))]
@@ -60,17 +62,30 @@ def _create_random_table_data(coltypes, nrows, seed=test_seed):
     return headers, rows
 
 
-class TestTables(unittest.TestCase):
+# class TestTables(unittest.TestCase):
 
-    def test_text(self):
-        coltypes = {
-            'str': {'maxsize': 40},
-            'real': {'low': -1e10, 'high': 1e10},
-            'real': {},
-            'bool': {},
-            'str': {'maxsize': 10},
-            'int': {'low': -99, 'high': 2500},
-            'str': {'maxsize': 60},
-        }
+def random_table(tablefmt='text', **options):
+    coltypes = [
+        ('str', {'maxsize': 40}),
+        ('real', {'low': -1e10, 'high': 1e10}),
+        ('str', {'maxsize': 50}),
+        ('bool', {}),
+        ('str', {'maxsize': 10}),
+        ('int', {'low': -99, 'high': 2500}),
+    ]
 
-        headers, data = _create_random_table_data(coltypes, 10)
+    headers, data = _create_random_table_data(coltypes, 10)
+
+    return to_table(data, tablefmt=tablefmt, headers=headers, **options)
+
+
+if __name__ == '__main__':
+    import sys
+    from openmdao.utils.table_utils import TabulatorJSBuilder
+
+    tab = random_table(tablefmt=sys.argv[1])
+    tab.max_width = 100
+    if isinstance(tab, TabulatorJSBuilder):
+        tab.write_html('table_junk.html')
+    else:
+        print(tab)
