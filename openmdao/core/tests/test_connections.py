@@ -547,6 +547,59 @@ class TestMultiConns(unittest.TestCase):
         self.assertEqual(err_msg, msg)
 
 
+class TestAutoIVCAllowableShapeMismatch(unittest.TestCase):
+
+    def test_allowable_shape_mismatch(self):
+
+        p = om.Problem()
+
+        c1 = p.model.add_subsystem('c1', om.ExecComp())
+        c2 = p.model.add_subsystem('c2', om.ExecComp())
+
+        c1.add_expr('a = 5.0 * x1', a=dict(shape=(1,)), x1=dict(shape=(1,)))
+        c2.add_expr('b = 5.0 * x2', b=dict(shape=(1,)), x2=dict(shape=(1, 1)))
+
+        p.model.promotes('c1', inputs=[('x1', 'x')])
+        p.model.promotes('c2', inputs=[('x2', 'x')])
+
+        p.setup()
+
+        p.set_val('x', 4.0)
+
+        p.run_model()
+
+        a = p.get_val('c1.a')
+        b = p.get_val('c2.b')
+
+        assert_near_equal(a, 20.0)
+        assert_near_equal(b, 20.0)
+
+    def test_allowable_shape_mismatch_1x3x1(self):
+
+        p = om.Problem()
+
+        c1 = p.model.add_subsystem('c1', om.ExecComp())
+        c2 = p.model.add_subsystem('c2', om.ExecComp())
+
+        c1.add_expr('a = 5.0 * x1', a=dict(shape=(3,)), x1=dict(shape=(3,)))
+        c2.add_expr('b = 5.0 * x2', b=dict(shape=(3,)), x2=dict(shape=(1, 3, 1)))
+
+        p.model.promotes('c1', inputs=[('x1', 'x')])
+        p.model.promotes('c2', inputs=[('x2', 'x')])
+
+        p.setup()
+
+        p.set_val('x', np.array([1., 2., 3.]))
+
+        p.run_model()
+
+        a = p.get_val('c1.a')
+        b = p.get_val('c2.b')
+
+        assert_near_equal(a, np.array([5., 10., 15.]))
+        assert_near_equal(b, np.array([5., 10., 15.]))
+
+
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestConnectionsDistrib(unittest.TestCase):
     N_PROCS = 2
