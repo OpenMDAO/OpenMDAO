@@ -1,10 +1,9 @@
 """Define the OptionsDictionary class."""
 
 import re
-import textwrap
 
 from openmdao.utils.om_warnings import warn_deprecation
-from openmdao.utils.notebook_utils import notebook_mode
+from openmdao.utils.notebook_utils import notebook
 from openmdao.utils.table_utils import to_table
 
 from openmdao.core.constants import _UNDEFINED
@@ -104,7 +103,7 @@ class OptionsDictionary(object):
         return self._dict.__repr__()
 
     def _repr_pretty_(self, p, cycle):
-        if not cycle and notebook_mode():
+        if not cycle and notebook:
             try:
                 from openmdao.visualization.options_widget import OptionsWidget
                 return OptionsWidget(self)
@@ -198,10 +197,20 @@ class OptionsDictionary(object):
 
         tab = to_table(rows, headers=hdrs, tablefmt=fmt, missingval=missingval,
                        max_width=max_width)
+
+        if notebook and fmt == 'tabulator':
+            if deprecations:
+                tab.update_column_meta(-1, width=300)
+                tab.update_column_meta(-2, width=300)
+            else:
+                tab.update_column_meta(-1, width=600)
+
         if max_width is not None:
-            # make sure the first four columns are not resized to try to meet the width requirement
-            for i in range(4):
-                tab.update_column_meta(i, max_width=99)
+            if fmt != 'tabulator':
+                # make sure the first four columns are not resized to try to meet the max width
+                # requirement
+                for i in range(4):
+                    tab.update_column_meta(i, fixed_width=True)
 
         tab.display()
 

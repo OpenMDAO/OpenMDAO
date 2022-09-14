@@ -3,13 +3,11 @@ import sys
 import os
 import json
 import textwrap
+from html import escape
 from io import StringIO
 from numbers import Number, Integral
 from openmdao.utils.notebook_utils import notebook, display, HTML, IFrame, colab
-
-# TODO: add support for multiline cells
-# from textwrap import wrap
-
+from openmdao.utils.file_utils import text2html
 
 _a2sym = {'center': '^', 'right': '>', 'left': '<'}
 _default_align = {
@@ -105,8 +103,8 @@ class TableBuilder(object):
 
         sorted_meta = sorted(self._column_meta.items(), key=lambda x: x[0])
 
-        for i, cinfo in sorted_meta:
-            wid = len(cinfo['header'])
+        for i, meta in sorted_meta:
+            wid = len(meta['header'])
             if wid > self._widths[i]:
                 self._widths[i] = wid
 
@@ -118,7 +116,7 @@ class TableBuilder(object):
         if self.max_width is not None and self.max_width < total_width:
 
             winfo = [[i, w] for (i, meta), w in zip(sorted_meta, self._widths)
-                     if meta['col_type'] == 'other' and meta['max_width'] is None]
+                     if meta['col_type'] == 'other' and not meta.get('fixed_width')]
             min_width = 10
 
             fixed_width = total_width - sum([w for _, w in winfo])
@@ -188,6 +186,8 @@ class TableBuilder(object):
         self._rows.append(cells)
 
     def update_column_meta(self, col_idx, **options):
+        if col_idx < 0:
+            col_idx = len(self._raw_rows[0]) + col_idx
         if col_idx < 0 or col_idx >= len(self._raw_rows[0]):
             raise IndexError(f"Index '{col_idx}' is not a valid table column index for a table with"
                              f" {len(self._raw_rows)} columns.  The leftmost column has column "
@@ -413,6 +413,102 @@ _tabulator_typemeta = {
 }
 
 
+class HTMLTableBuilder(TableBuilder):
+    def __init__(self, rows, html_id=None, **kwargs):
+        super().__init__(rows, **kwargs)
+        self._html_id = html_id
+
+    def _stringified_row_iter(self):
+        for row in self._get_srows():
+            yield row
+
+    def header_style(self, meta):
+        return ''
+
+    def write(self, stream=sys.stdout):
+        sorted_cols = sorted(self._column_meta.items(), key=lambda x: x[0])
+        ident = f' id="{self._html_id}"' if self._html_id else ''
+        print(f"<table{ident}>", file=stream)
+
+        print("   <tr>", file=stream, end='')
+        for _, meta in sorted_cols:
+            print(f"<th>{escape(meta['header'])}{self.header_style(meta)}</th>",
+                  file=stream, end='')
+        print("</tr>", file=stream)
+
+        for row_cells in self._stringified_row_iter():
+            print("   <tr>", file=stream, end='')
+            for cell in row_cells:
+                print(f"<td>{escape(cell)}</td>", file=stream, end='')
+            print("   </tr>", file=stream)
+
+        print("</table>", file=stream)
+
+    def write_html(self, outfile=None):
+        if outfile is None:
+            outfile = 'table.html'
+
+        title = ''
+        style = """
+            tr:nth-child(even) {
+                background-color: #D6EEEE;
+            }
+        """
+        table = \
+"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <style>
+        .center {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            width: 90%;
+        }
+        h2 {text-align: center;}
+        tr:nth-child(even) {
+            background-color: lightgray;
+        }
+        tr:hover {background-color: #D6EEEE;}
+        table, th, td {
+            border: 1px solid black;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 5px;
+        }
+        th {
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+<h2>""" + title + """</h2>
+""" + str(self) + """
+</body>
+</html>
+"""
+        with open(outfile, 'w', encoding='utf-8') as f:
+            f.write(table)
+
+    def display(self, outfile=None):
+        if outfile is None:
+            outfile = 'table.html'
+
+        self.write_html(outfile)
+
+        if notebook:
+            if not colab:
+                display(IFrame(src=outfile, width="100%", height=700))
+            else:
+                display(HTML(outfile))
+        else:
+            # open it up in the browser
+            from openmdao.utils.webview import webview
+            webview(outfile)
+
+
 class TabulatorJSBuilder(TableBuilder):
     allowed_col_meta = TableBuilder.allowed_col_meta.union({
         'filter',
@@ -427,7 +523,7 @@ class TabulatorJSBuilder(TableBuilder):
     #     'height',  # number in pixels
     # }
 
-    def __init__(self, rows, layout='fitDataTable', height=None, html_id='tabul-table', title='',
+    def __init__(self, rows, layout='fitColumns', height=None, html_id='tabul-table', title='',
                  display_in_notebook=True, show_browser=True, outfile='tabulator_table.html',
                  **kwargs):
         super().__init__(rows, **kwargs)
@@ -448,7 +544,8 @@ class TabulatorJSBuilder(TableBuilder):
     def _add_srow(self, row):
         cells = []
         for i, cell in enumerate(row):
-            if isinstance(cell, bool):  # treat booleans in a special way for Tabulator
+            # If we convert booleans to strings for Tabulator the tri-state sorting won't work
+            if isinstance(cell, bool):
                 cells.append(cell)
             else:
                 cells.append(self._column_meta[i]['format'].format(cell))
@@ -505,6 +602,8 @@ class TabulatorJSBuilder(TableBuilder):
             cmeta = {
                 'field': f'c{i}',
                 'title': meta['header'],
+                'maxWidth': meta['max_width'],
+                'width': meta.get('width'),
                 'hozAlign': meta['align'],
                 'headerHozAlign': meta['header_align'],
                 'headerFilter': meta['filter'],  # input, textarea, number, range, tickCross
@@ -589,6 +688,7 @@ _table_types = {
     'github': GithubTableBuilder,
     'rst': RSTTableBuilder,
     'tabulator': TabulatorJSBuilder,
+    'html': HTMLTableBuilder,
 }
 
 
@@ -611,7 +711,7 @@ if __name__ == '__main__':
         ('real', {'low': -1e10, 'high': 1e10}),
         ('bool', {}),
         ('int', {'low': -99, 'high': 2500}),
-        ('str', {'maxsize': 10}),
+        ('str', {'maxsize': 50}),
         ('str', {'maxsize': 50}),
     ]
 
@@ -621,7 +721,7 @@ if __name__ == '__main__':
         tablefmt = 'text'
 
     from openmdao.utils.tests.test_tables import random_table
-    tab = random_table(tablefmt=tablefmt, coltypes=coltypes, nrows=30)
+    tab = random_table(tablefmt=tablefmt, coltypes=coltypes, nrows=30, html_id='foobar')
 
     tab.max_width = 100
     tab.display()
