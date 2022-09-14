@@ -34,11 +34,11 @@ class TableBuilder(object):
 
         # these attributes change in subclasses
         self.column_sep = ' | '
-        self.top_border = ''
+        self.top_border = '-'
         self.header_bottom_border = '-'
-        self.bottom_border = ''
-        self.left_border = ''
-        self.right_border = ''
+        self.bottom_border = '-'
+        self.left_border = '| '
+        self.right_border = ' |'
 
         # these are the default format strings for the first formatting stage,
         # before the column width is set
@@ -338,17 +338,6 @@ class TableBuilder(object):
         print(self)
 
 
-class TextTableBuilder(TableBuilder):
-    def __init__(self, rows, **kwargs):
-        super().__init__(rows, **kwargs)
-        self.column_sep = ' | '
-        self.top_border = '-'
-        self.header_bottom_border = '-'
-        self.bottom_border = '-'
-        self.left_border = '| '
-        self.right_border = ' |'
-
-
 class RSTTableBuilder(TableBuilder):
     def __init__(self, rows, **kwargs):
         super().__init__(rows, **kwargs)
@@ -603,7 +592,7 @@ class TabulatorJSBuilder(TableBuilder):
 
 
 _table_types = {
-    'text': TextTableBuilder,
+    'text': TableBuilder,
     'github': GithubTableBuilder,
     'rst': RSTTableBuilder,
     'tabulator': TabulatorJSBuilder,
@@ -633,14 +622,10 @@ if __name__ == '__main__':
         ('str', {'maxsize': 50}),
     ]
 
-    kwargs = {}
     try:
         tablefmt = sys.argv[1]
     except Exception:
         tablefmt = 'text'
-
-    if tablefmt == 'tabulator':
-        kwargs = {'title': 'My Awesome Table'}
 
     from openmdao.utils.tests.test_tables import random_table
     tab = random_table(tablefmt=tablefmt, coltypes=coltypes, nrows=30)
