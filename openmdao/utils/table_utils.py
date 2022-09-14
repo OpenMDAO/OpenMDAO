@@ -165,20 +165,17 @@ class TableBuilder(object):
 
             align = _default_align[col_type]
 
-            if i not in self._column_meta:
-                self._column_meta[i] = {}
-
-            keep = self._column_meta[i]
-
             meta = {
                 'header': '',
                 'format': self._default_formats[col_type],
                 'align': align,
-                'header_align': keep.get('align', align),
+                'header_align': align,
                 'max_width': None,
                 'col_type': col_type
             }
-            meta.update(keep)
+
+            if i in self._column_meta:
+                meta.update(self._column_meta[i])
 
             self._column_meta[i] = meta
 
@@ -481,17 +478,14 @@ class TabulatorJSBuilder(TableBuilder):
             else:
                 col_type = tset.pop()
 
-            if i not in self._column_meta:
-                self._column_meta[i] = {}
-
-            keep = self._column_meta[i]
-
             meta = _tabulator_typemeta[col_type].copy()
             meta['format'] = self._default_formats[col_type]
             meta['header_align'] = meta['align']
             meta['max_width'] = None
             meta['col_type'] = col_type
-            meta.update(keep)
+
+            if i in self._column_meta:
+                meta.update(self._column_meta[i])
 
             self._column_meta[i] = meta
 
@@ -509,10 +503,10 @@ class TabulatorJSBuilder(TableBuilder):
         cols = []
         for i, meta in  sorted(self._column_meta.items(), key=lambda x: x[0]):
             cmeta = {
-                'title': meta['header'],
                 'field': f'c{i}',
+                'title': meta['header'],
                 'hozAlign': meta['align'],
-                'headerHozAlign': meta.get('header_align', meta['align']),
+                'headerHozAlign': meta['header_align'],
                 'headerFilter': meta['filter'],  # input, textarea, number, range, tickCross
                 'sorter': meta['sorter'],  # string, number, alphanum, boolean, exists
                 'formatter': meta['formatter'],  # plaintext, textarea, html, money, image, link,
@@ -524,8 +518,7 @@ class TabulatorJSBuilder(TableBuilder):
                 'headerFilterParams': meta.get('headerFilterParams', None),
             }
 
-            # get rid of all None metadata entries in cols since they just make the html file bigger
-            cols.append({key: val for key, val in cmeta.items() if val is not None})
+            cols.append(cmeta)
 
         # for big tables, use virtual DOM for speed (setting height activates it)
         if len(self._raw_rows) > 75 and self._table_meta['height'] is None:
