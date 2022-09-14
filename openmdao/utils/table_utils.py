@@ -170,20 +170,21 @@ class TableBuilder(object):
 
             align = _default_align[col_type]
 
-            if i in self._column_meta:
-                if 'format' not in self._column_meta[i]:
-                    self._column_meta[i]['format'] = self._default_formats[col_type]
-                if 'align' not in self._column_meta[i]:
-                    self._column_meta[i]['align'] = align
-                if 'header_align' not in self._column_meta[i]:
-                    self._column_meta[i]['header_align'] = self._column_meta[i]['align']
-                if 'max_width' not in self._column_meta[i]:
-                    self._column_meta[i]['max_width'] = None
-                self._column_meta[i]['col_type'] = col_type
-            else:
-                self._column_meta[i] = \
-                    self._default_column_meta(format=self._default_formats[col_type], align=align,
-                                              max_width=None, col_type=col_type)
+            if i not in self._column_meta:
+                self._column_meta[i] = self._default_column_meta()
+
+            keep = self._column_meta[i]
+
+            meta = {
+                'format': self._default_formats[col_type],
+                'align': align,
+                'header_align': keep.get('align', align),
+                'max_width': None,
+                'col_type': col_type
+            }
+            meta.update(keep)
+
+            self._column_meta[i] = meta
 
     def _add_srow(self, row):
         cells = [self._column_meta[i]['format'].format(cell) for i, cell in enumerate(row)]
@@ -223,9 +224,11 @@ class TableBuilder(object):
                     return True
         return needs_wrap
 
-    def _stringified_header_iter(self, sorted_cols):
+    def _stringified_header_iter(self):
         header_cells = [None] * len(self._column_meta)
         widths = self._get_widths()
+
+        sorted_cols = sorted(self._column_meta.items(), key=lambda x: x[0])
 
         for i, meta in sorted_cols:
             header_cells[i] = self._get_fixed_width_cell(meta, meta['header'], widths[i],
@@ -256,11 +259,12 @@ class TableBuilder(object):
         else:
             yield header_cells
 
-    def _stringified_row_iter(self, sorted_cols):
+    def _stringified_row_iter(self):
         widths = self._get_widths()
         row_cells = [None] * len(self._column_meta)
 
         needs_wrap = self.needs_wrap()
+        sorted_cols = sorted(self._column_meta.items(), key=lambda x: x[0])
 
         for row in self._get_srows():
             for i, meta in sorted_cols:
@@ -311,9 +315,7 @@ class TableBuilder(object):
         return self.add_side_borders(self.column_sep.join(parts))
 
     def write(self, stream=sys.stdout):
-        sorted_cols = sorted(self._column_meta.items(), key=lambda x: x[0])
-
-        for i, header_cells in enumerate(self._stringified_header_iter(sorted_cols)):
+        for i, header_cells in enumerate(self._stringified_header_iter()):
             if i == 0 and self.top_border:
                 print(self.get_top_border(header_cells), file=stream)
 
@@ -322,7 +324,7 @@ class TableBuilder(object):
         if self.header_bottom_border:
             print(self.get_header_bottom_border(header_cells), file=stream)
 
-        for row_cells in self._stringified_row_iter(sorted_cols):
+        for row_cells in self._stringified_row_iter():
             print(self.add_side_borders(self.column_sep.join(row_cells)), file=stream)
 
         if self.bottom_border:
@@ -427,7 +429,7 @@ class TabulatorJSBuilder(TableBuilder):
         self._show_browser = show_browser
         self._outfile = outfile
 
-    def _stringified_row_iter(self, sorted_cols):
+    def _stringified_row_iter(self):
         for row in self._get_srows():
             yield row
 
@@ -521,8 +523,7 @@ class TabulatorJSBuilder(TableBuilder):
         rows = []
         idx = 1  # unique ID for use by Tabulator
 
-        sorted_cols = sorted(self._column_meta.items(), key=lambda x: x[0])
-        for row_cells in self._stringified_row_iter(sorted_cols):
+        for row_cells in self._stringified_row_iter():
             dct = {'id': idx}
             for i, cell in enumerate(row_cells):
                 dct[f'c{i}'] = cell
@@ -530,7 +531,7 @@ class TabulatorJSBuilder(TableBuilder):
             idx += 1
 
         cols = []
-        for i, meta in sorted_cols:
+        for i, meta in  sorted(self._column_meta.items(), key=lambda x: x[0]):
             cmeta = {
                 'title': meta['header'],
                 'field': f'c{i}',
