@@ -336,6 +336,9 @@ class TableBuilder(object):
         self.write(stream=io)
         return io.getvalue()
 
+    def display(self):
+        print(self)
+
 
 class TextTableBuilder(TableBuilder):
     def __init__(self, rows, **kwargs):
@@ -392,6 +395,9 @@ class GithubTableBuilder(TableBuilder):
 
         return self.add_side_borders(self.column_sep.join(parts))
 
+    def needs_wrap(self):
+        return False  # github tables seem to have no support for text wrapping in columns
+
 
 class TabulatorJSBuilder(TableBuilder):
     allowed_col_meta = TableBuilder.allowed_col_meta.union({
@@ -408,6 +414,7 @@ class TabulatorJSBuilder(TableBuilder):
     }
 
     def __init__(self, rows, layout='fitDataTable', height=None, html_id='tabul-table', title='',
+                 display_in_notebook=True, show_browser=True, outfile='tabulator_table.html',
                  **kwargs):
         super().__init__(rows, **kwargs)
         self._table_meta = {
@@ -416,6 +423,9 @@ class TabulatorJSBuilder(TableBuilder):
             'id': html_id if html_id.startswith('#') else '#' + html_id,
         }
         self._title = title
+        self._display_in_notebook = display_in_notebook
+        self._show_browser = show_browser
+        self._outfile = outfile
 
     def _stringified_row_iter(self, sorted_cols):
         for row in self._get_srows():
@@ -456,7 +466,7 @@ class TabulatorJSBuilder(TableBuilder):
             },
             'other': {
                 'align': 'left',
-                'formatter': 'plaintext',
+                'formatter': 'textarea',
                 'filter': 'input',
                 'sorter': 'string',
             }
@@ -491,7 +501,7 @@ class TabulatorJSBuilder(TableBuilder):
                     meta['header_align'] = meta['align']
                 if 'filter' not in meta:
                     meta['filter'] = typemeta[col_type]['filter']
-                    if filter == 'tickCross':
+                    if meta['filter'] == 'tickCross':
                         meta['headerFilterParams'] = {'tristate': True}
                 if 'sorter' not in meta:
                     meta['sorter'] = typemeta[col_type]['sorter']
@@ -502,7 +512,7 @@ class TabulatorJSBuilder(TableBuilder):
                 meta['max_width'] = None  # don't use max_width with Tabulator
                 meta['col_type'] = col_type
             else:
-                self._column_meta[i] = \
+                self._column_meta[i] = meta = \
                     self._default_column_meta(format=self._default_formats[col_type],
                                               align=typemeta[col_type]['align'], max_width=None,
                                               col_type=col_type)
@@ -515,15 +525,15 @@ class TabulatorJSBuilder(TableBuilder):
         for row_cells in self._stringified_row_iter(sorted_cols):
             dct = {'id': idx}
             for i, cell in enumerate(row_cells):
-                dct[f'col{i}'] = cell
+                dct[f'c{i}'] = cell
             rows.append(dct)
             idx += 1
 
         cols = []
         for i, meta in sorted_cols:
-            cols.append({
+            cmeta = {
                 'title': meta['header'],
-                'field': f'col{i}',
+                'field': f'c{i}',
                 'hozAlign': meta['align'],
                 'headerHozAlign': meta.get('header_align', meta['align']),
                 'headerFilter': meta['filter'],  # input, textarea, number, range, tickCross
@@ -535,9 +545,12 @@ class TabulatorJSBuilder(TableBuilder):
                 'editor': meta.get('editor', None),
                 'editorParams': meta.get('editorParams', None),
                 'headerFilterParams': meta.get('headerFilterParams', None),
-            })
+            }
 
-        # for big tables, make sure to use virtual DOM for speed
+            # get rid of all None metadata entries in cols since they just make the html file bigger
+            cols.append({key: val for key, val in cmeta.items() if val is not None})
+
+        # for big tables, use virtual DOM for speed (setting height activates it)
         if len(self._raw_rows) > 75 and self._table_meta['height'] is None:
             self._table_meta['height'] = 600
 
@@ -548,8 +561,14 @@ class TabulatorJSBuilder(TableBuilder):
             'meta': self._table_meta,
         }
 
-    def write_html(self, outfile):
+    def write_html(self, outfile=None):
         import openmdao.visualization
+
+        if outfile is None:
+            outfile = self._outfile
+
+        outfile = os.path.relpath(outfile)
+
         code_dir = os.path.dirname(openmdao.visualization.__file__)
         libs_dir = os.path.join(code_dir, 'common', 'libs')
         style_dir = os.path.join(code_dir, 'common', 'style')
@@ -573,14 +592,26 @@ class TabulatorJSBuilder(TableBuilder):
         with open(outfile, 'w', encoding='utf-8') as f:
             f.write(s)
 
-        return s
-
     def __str__(self):
         """
         Return a string representation of the Table.
         """
-        return ("__str__ is not supported for TabulatorJSBuilder. Use "
-                "<table_instance>.write_html(outfile) and then open outfile in a browser.")
+        return ''
+
+    def display(self, outfile=None):
+        if outfile is None:
+            outfile = self._outfile
+
+        self.write_html(outfile)
+        if notebook:
+            if not colab:
+                display(IFrame(src=self._outfile, width="100%", height=700))
+            else:
+                display(HTML(self._outfile))
+        else:
+            # open it up in the browser
+            from openmdao.utils.webview import webview
+            webview(outfile)
 
 
 _table_types = {
@@ -598,19 +629,6 @@ def to_table(rows, tablefmt='text', **options):
         raise KeyError(f"'{tablefmt}' is not a valid type choice for to_table.  Valid choices are: "
                        f"{sorted(_table_types)}.")
 
-    # if notebook:
-    #     if display_in_notebook:
-    #         # display in Jupyter Notebook
-    #         outfile = os.path.relpath(outfile)
-    #         if not colab:
-    #             display(IFrame(src=outfile, width="100%", height=700))
-    #         else:
-    #             display(HTML(outfile))
-    # elif show_browser:
-    #     # open it up in the browser
-    #     from openmdao.utils.webview import webview
-    #     webview(outfile)
-
     return table_class(rows, **options)
 
 
@@ -618,36 +636,26 @@ if __name__ == '__main__':
     import numpy as np
     import sys
 
-    nrows = 110
-    rows = []
-    for i in range(nrows):
-        rows.append(['asdf', bool(np.random.randint(2)), i, 'sdfa sdfsf', np.random.random(),
-                     i * np.random.randint(99999), np.random.random() * 5e8])
-
-    hdrs = [
-        'foowergw',
-        'bagwerwgwer',
-        'fxxxoo',
-        'xxx',
-        'zzz',
-        'abctyjrtyjtjd',
-        'efgh',
+    coltypes = [
+        ('str', {'maxsize': 20}),
+        ('real', {'low': -1e10, 'high': 1e10}),
+        ('bool', {}),
+        ('int', {'low': -99, 'high': 2500}),
+        ('str', {'maxsize': 10}),
+        ('str', {'maxsize': 50}),
     ]
-    kwargs = {}
-    if 'github' in sys.argv:
-        klass = GithubTableBuilder
-    elif 'text' in sys.argv:
-        klass = TextTableBuilder
-    elif 'tabulator' in sys.argv:
-        klass = TabulatorJSBuilder
-        kwargs = {'title': 'My Awesome Table'}
-    else:
-        klass = TableBuilder
-    tab = klass(rows, headers=hdrs, precision=4, **kwargs)
 
-    tab.update_column_meta(5, align='center')
-    if 'tabulator' in sys.argv:
-        tab.update_column_meta(6, format='{:.6f}')
-        tab.write_html('table_junk.html')
-    else:
-        print(tab)
+    kwargs = {}
+    try:
+        tablefmt = sys.argv[1]
+    except Exception:
+        tablefmt = 'text'
+
+    if tablefmt == 'tabulator':
+        kwargs = {'title': 'My Awesome Table'}
+
+    from openmdao.utils.tests.test_tables import random_table
+    tab = random_table(tablefmt=tablefmt, coltypes=coltypes, nrows=30)
+
+    tab.max_width = 100
+    tab.display()

@@ -14,8 +14,7 @@
     }
 </style>
 </head>
-<body onload="startup()">
-
+<body>
     <div id="tabul-container">
         <div class="center">
             <h2 id="tabul-title"></h2>
@@ -25,14 +24,14 @@
 
 <script type="text/javascript">
 
-var my_table_data = <table_data>;
+let my_table_data = <table_data>;
 
 document.title = my_table_data.title;
 document.getElementById("tabul-title").innerHTML = my_table_data.title;
 
 
 function setup_tabulator(table_data) {
-    return new Tabulator(table_data.meta.id, {
+    let tab = new Tabulator(table_data.meta.id, {
         // set height of table (in CSS or here), this enables the Virtual DOM and
         // improves render speed dramatically (can be any valid css height value)
         height: table_data.meta.height,
@@ -40,12 +39,13 @@ function setup_tabulator(table_data) {
         layout: table_data.meta.layout, // "fitDataFill", "fitColumns"
         columns: table_data.cols,
     });
+
+    // full redraw is necessary, else word wrapping in columns is hosed until user manually
+    // resizes a column.
+    tab.redraw(true);
 }
 
-
-function startup() {
-    var the_table = setup_tabulator(my_table_data);
-}
+let the_table = setup_tabulator(my_table_data);
 
 </script>
 </body>

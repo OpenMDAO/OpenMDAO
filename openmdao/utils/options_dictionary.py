@@ -202,6 +202,9 @@ class OptionsDictionary(object):
             # make sure the first four columns are not resized to try to meet the width requirement
             for i in range(4):
                 tab.update_column_meta(i, max_width=99)
+
+        tab.display()
+
         return str(tab)
 
     def __str__(self, width=100):
@@ -218,7 +221,7 @@ class OptionsDictionary(object):
         str
             A text representation of the options table.
         """
-        return str(self.to_table(fmt='rst', max_width=width))
+        return self.to_table(fmt='rst', max_width=width)
 
     def _raise(self, msg, exc_type=RuntimeError):
         """

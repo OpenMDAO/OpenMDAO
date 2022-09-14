@@ -10,7 +10,7 @@ _char_map = [chr(i) for i in range(48, 59)]  # numbers + ':'
 _char_map.extend([chr(i) for i in range(65, 91)])  # CAPS
 _char_map.extend([chr(i) for i in range(97, 123)])  # lower case
 _char_map.append(chr(95))  # '_'
-_char_map.append(chr(32))  # ' '
+_char_map.extend([chr(32)] * 20)  # ' ' (20 of them to make spaces more common)
 
 
 #  generators for random table cells
@@ -64,17 +64,18 @@ def _create_random_table_data(coltypes, nrows, seed=test_seed):
 
 # class TestTables(unittest.TestCase):
 
-def random_table(tablefmt='text', **options):
-    coltypes = [
-        ('str', {'maxsize': 40}),
-        ('real', {'low': -1e10, 'high': 1e10}),
-        ('str', {'maxsize': 50}),
-        ('bool', {}),
-        ('str', {'maxsize': 10}),
-        ('int', {'low': -99, 'high': 2500}),
-    ]
+def random_table(tablefmt='text', nrows=10, coltypes=None, **options):
+    if coltypes is None:
+        coltypes = [
+            ('str', {'maxsize': 40}),
+            ('real', {'low': -1e10, 'high': 1e10}),
+            ('str', {'maxsize': 50}),
+            ('bool', {}),
+            ('str', {'maxsize': 10}),
+            ('int', {'low': -99, 'high': 2500}),
+        ]
 
-    headers, data = _create_random_table_data(coltypes, 10)
+    headers, data = _create_random_table_data(coltypes, nrows)
 
     return to_table(data, tablefmt=tablefmt, headers=headers, **options)
 
