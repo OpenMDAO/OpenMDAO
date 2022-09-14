@@ -140,11 +140,6 @@ class TableBuilder(object):
 
         return self._widths
 
-    def _default_column_meta(self, **options):
-        dct = {'header': ''}
-        dct.update(options)
-        return dct
-
     def _update_col_meta_from_rows(self):
         types = None
         for row in self._raw_rows:
@@ -171,11 +166,12 @@ class TableBuilder(object):
             align = _default_align[col_type]
 
             if i not in self._column_meta:
-                self._column_meta[i] = self._default_column_meta()
+                self._column_meta[i] = {}
 
             keep = self._column_meta[i]
 
             meta = {
+                'header': '',
                 'format': self._default_formats[col_type],
                 'align': align,
                 'header_align': keep.get('align', align),
@@ -200,7 +196,7 @@ class TableBuilder(object):
                              f" {len(self._raw_rows)} columns.  The leftmost column has column "
                              "index of 0.")
         if col_idx not in self._column_meta:
-            self._column_meta[col_idx] = self._default_column_meta()
+            self._column_meta[col_idx] = {}
         meta = self._column_meta[col_idx]
         for name, val in options.items():
             if name not in self.allowed_col_meta:
@@ -401,6 +397,36 @@ class GithubTableBuilder(TableBuilder):
         return False  # github tables seem to have no support for text wrapping in columns
 
 
+_tabulator_typemeta = {
+    'bool': {
+        'align': 'center',
+        'formatter': 'tickCross',
+        'formatterParams': {'crossElement': False},
+        'filter': 'tickCross',
+        'headerFilterParams': {'tristate': True},
+        'sorter': 'string',
+    },
+    'int': {
+        'align': 'right',
+        'formatter': 'plaintext',
+        'filter': False,
+        'sorter': 'number',
+    },
+    'real': {
+        'align': 'right',
+        'formatter': 'plaintext',
+        'filter': False,
+        'sorter': 'number',
+    },
+    'other': {
+        'align': 'left',
+        'formatter': 'textarea',
+        'filter': 'input',
+        'sorter': 'string',
+    }
+}
+
+
 class TabulatorJSBuilder(TableBuilder):
     allowed_col_meta = TableBuilder.allowed_col_meta.union({
         'filter',
@@ -409,11 +435,11 @@ class TabulatorJSBuilder(TableBuilder):
         'formatter'
     })
 
-    allowed_table_meta = {
-        'id',  # html id
-        'layout',  # fitData, fitDataStretch, fitDataTable, fitColumns
-        'height',  # number in pixels
-    }
+    # allowed_table_meta = {
+    #     'id',  # html id
+    #     'layout',  # fitData, fitDataStretch, fitDataTable, fitColumns
+    #     'height',  # number in pixels
+    # }
 
     def __init__(self, rows, layout='fitDataTable', height=None, html_id='tabul-table', title='',
                  display_in_notebook=True, show_browser=True, outfile='tabulator_table.html',
@@ -447,33 +473,6 @@ class TabulatorJSBuilder(TableBuilder):
         self._rows.append(cells)
 
     def _update_col_meta_from_rows(self):
-        typemeta = {
-            'bool': {
-                'align': 'center',
-                'formatter': 'tickCross',
-                'filter': 'tickCross',
-                'sorter': 'string',
-            },
-            'int': {
-                'align': 'right',
-                'formatter': 'plaintext',
-                'filter': False,
-                'sorter': 'number',
-            },
-            'real': {
-                'align': 'right',
-                'formatter': 'plaintext',
-                'filter': False,
-                'sorter': 'number',
-            },
-            'other': {
-                'align': 'left',
-                'formatter': 'textarea',
-                'filter': 'input',
-                'sorter': 'string',
-            }
-        }
-
         types = [set() for r in self._raw_rows[0]]
         for row in self._raw_rows:
             for i, cell in enumerate(row):
@@ -493,31 +492,19 @@ class TabulatorJSBuilder(TableBuilder):
             else:
                 col_type = tset.pop()
 
-            if i in self._column_meta:
-                meta = self._column_meta[i]
-                if 'format' not in meta:
-                    meta['format'] = self._default_formats[col_type]
-                if 'align' not in meta:
-                    meta['align'] = typemeta[col_type]['align']
-                if 'header_align' not in meta:
-                    meta['header_align'] = meta['align']
-                if 'filter' not in meta:
-                    meta['filter'] = typemeta[col_type]['filter']
-                    if meta['filter'] == 'tickCross':
-                        meta['headerFilterParams'] = {'tristate': True}
-                if 'sorter' not in meta:
-                    meta['sorter'] = typemeta[col_type]['sorter']
-                if 'formatter' not in meta:
-                    meta['formatter'] = typemeta[col_type]['formatter']
-                    if meta['formatter'] == 'tickCross':
-                        meta['formatterParams'] = {'crossElement': False}
-                meta['max_width'] = None  # don't use max_width with Tabulator
-                meta['col_type'] = col_type
-            else:
-                self._column_meta[i] = meta = \
-                    self._default_column_meta(format=self._default_formats[col_type],
-                                              align=typemeta[col_type]['align'], max_width=None,
-                                              col_type=col_type)
+            if i not in self._column_meta:
+                self._column_meta[i] = {}
+
+            keep = self._column_meta[i]
+
+            meta = _tabulator_typemeta[col_type].copy()
+            meta['format'] = self._default_formats[col_type]
+            meta['header_align'] = meta['align']
+            meta['max_width'] = None
+            meta['col_type'] = col_type
+            meta.update(keep)
+
+            self._column_meta[i] = meta
 
     def get_table_data(self):
         rows = []
