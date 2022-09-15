@@ -63,6 +63,9 @@ class TableBuilder(object):
             raise RuntimeError("Number of headers and number of column metadata dicts must match "
                                f"if both are provided, but {hlen} != {clen}.")
 
+    def sorted_meta(self):
+        return [m for _, m in sorted(self._column_meta.items(), key=lambda x: x[0])]
+
     def _get_srows(self):
         """
         Get table rows with cells converted to strings.
@@ -82,40 +85,18 @@ class TableBuilder(object):
 
         return self._rows
 
-    def _get_widths(self):
-        if self._widths is not None:
-            return self._widths  # widths already computed
-
-        rows = self._get_srows()
+    def _set_max_col_widths(self):
+        widths = self._set_data_widths()
         ncols = len(self._column_meta)
 
-        if len(self._rows[0]) != ncols:
-            raise RuntimeError(f"Number of row entries ({len(self._rows[0])}) must match number of "
-                               f"columns ({ncols}) in TableBuilder.")
-
-        self._widths = [0] * ncols
-
-        for row in rows:
-            for i, cell in enumerate(row):
-                wid = len(cell)
-                if wid > self._widths[i]:
-                    self._widths[i] = wid
-
-        sorted_meta = sorted(self._column_meta.items(), key=lambda x: x[0])
-
-        for i, meta in sorted_meta:
-            wid = len(meta['header'])
-            if wid > self._widths[i]:
-                self._widths[i] = wid
-
-        total_width = sum(self._widths) + len(self.column_sep) * (ncols - 1) + \
+        total_width = sum(widths) + len(self.column_sep) * (ncols - 1) + \
             len(self.left_border) + len(self.right_border)
 
         # check for case where total table width is specified and we have to set max_width on
         # column(s) as a result
         if self.max_width is not None and self.max_width < total_width:
 
-            winfo = [[i, w] for (i, meta), w in zip(sorted_meta, self._widths)
+            winfo = [[i, w] for (i, meta), w in zip(enumerate(self.sorted_meta()), widths)
                      if meta['col_type'] == 'other' and not meta.get('fixed_width')]
             min_width = 10
 
@@ -136,14 +117,37 @@ class TableBuilder(object):
                     meta = self._column_meta[i]
                     meta['max_width'] = w
 
+        return widths
+
+    def _set_data_widths(self):
+        if self._widths is not None:
+            return self._widths  # widths already computed
+
+        rows = self._get_srows()
+        ncols = len(self._column_meta)
+
+        if len(self._rows[0]) != ncols:
+            raise RuntimeError(f"Number of row entries ({len(self._rows[0])}) must match number of "
+                               f"columns ({ncols}) in TableBuilder.")
+
+        self._widths = [0] * ncols
+
+        for row in rows:
+            for i, cell in enumerate(row):
+                wid = len(cell)
+                if wid > self._widths[i]:
+                    self._widths[i] = wid
+
+        for i, meta in enumerate(self.sorted_meta()):
+            wid = len(meta['header'])
+            if wid > self._widths[i]:
+                self._widths[i] = wid
+
         return self._widths
 
-    def _update_col_meta_from_rows(self):
-        types = None
+    def _get_cell_types(self):
+        types = [set() for r in self._raw_rows[0]] if self._raw_rows else []
         for row in self._raw_rows:
-            if types is None:
-                types = [set() for r in row]
-
             for i, cell in enumerate(row):
                 if isinstance(cell, Number):
                     if isinstance(cell, bool):
@@ -154,6 +158,10 @@ class TableBuilder(object):
                         types[i].add('real')
                 else:
                     types[i].add('other')
+        return types
+
+    def _update_col_meta_from_rows(self):
+        types = self._get_cell_types()
 
         for i, tset in enumerate(types):
             if len(tset) > 1:
@@ -219,18 +227,17 @@ class TableBuilder(object):
 
     def _stringified_header_iter(self):
         header_cells = [None] * len(self._column_meta)
-        widths = self._get_widths()
+        widths = self._set_max_col_widths()
 
-        sorted_cols = sorted(self._column_meta.items(), key=lambda x: x[0])
+        sorted_cols = self.sorted_meta()
 
-        for i, meta in sorted_cols:
+        for i, meta in enumerate(sorted_cols):
             header_cells[i] = self._get_fixed_width_cell(meta, meta['header'], widths[i],
                                                          'header_align')
 
         if self.needs_wrap():
             cell_lists = []
-            for i, meta in sorted_cols:
-                cell = header_cells[i]
+            for meta, cell in zip(sorted_cols, header_cells):
                 maxwid = meta['max_width']
                 if maxwid is not None and maxwid < len(cell):
                     lines = textwrap.wrap(cell, maxwid)
@@ -253,20 +260,19 @@ class TableBuilder(object):
             yield header_cells
 
     def _stringified_row_iter(self):
-        widths = self._get_widths()
+        widths = self._set_max_col_widths()
         row_cells = [None] * len(self._column_meta)
 
         needs_wrap = self.needs_wrap()
-        sorted_cols = sorted(self._column_meta.items(), key=lambda x: x[0])
+        sorted_cols = self.sorted_meta()
 
         for row in self._get_srows():
-            for i, meta in sorted_cols:
+            for i, meta in enumerate(sorted_cols):
                 row_cells[i] = self._get_fixed_width_cell(meta, row[i], widths[i], 'align')
 
             if needs_wrap:
                 cell_lists = []
-                for i, meta in sorted_cols:
-                    cell = row_cells[i]
+                for meta, cell in zip(sorted_cols, row_cells):
                     maxwid = meta['max_width']
                     if maxwid is not None and maxwid < len(cell):
                         lines = textwrap.wrap(cell, maxwid)
@@ -426,12 +432,11 @@ class HTMLTableBuilder(TableBuilder):
         return ''
 
     def write(self, stream=sys.stdout):
-        sorted_cols = sorted(self._column_meta.items(), key=lambda x: x[0])
         ident = f' id="{self._html_id}"' if self._html_id else ''
         print(f"<table{ident}>", file=stream)
 
         print("   <tr>", file=stream, end='')
-        for _, meta in sorted_cols:
+        for meta in self.sorted_meta():
             print(f"<th>{escape(meta['header'])}{self.header_style(meta)}</th>",
                   file=stream, end='')
         print("</tr>", file=stream)
@@ -562,18 +567,7 @@ class TabulatorJSBuilder(TableBuilder):
         self._rows.append(cells)
 
     def _update_col_meta_from_rows(self):
-        types = [set() for r in self._raw_rows[0]]
-        for row in self._raw_rows:
-            for i, cell in enumerate(row):
-                if isinstance(cell, Number):
-                    if isinstance(cell, bool):
-                        types[i].add('bool')
-                    elif isinstance(cell, Integral):
-                        types[i].add('int')
-                    else:
-                        types[i].add('real')
-                else:
-                    types[i].add('other')
+        types = self._get_cell_types()
 
         for i, tset in enumerate(types):
             if len(tset) > 1:
