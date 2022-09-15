@@ -205,13 +205,6 @@ class OptionsDictionary(object):
             else:
                 tab.update_column_meta(-1, width=600)
 
-        if max_width is not None:
-            if fmt != 'tabulator':
-                # make sure the first four columns are not resized to try to meet the max width
-                # requirement
-                for i in range(4):
-                    tab.update_column_meta(i, fixed_width=True)
-
         tab.display()
 
         return str(tab)

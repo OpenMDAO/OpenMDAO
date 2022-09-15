@@ -5,6 +5,7 @@ import json
 import textwrap
 from html import escape
 from io import StringIO
+from math import floor
 from numbers import Number, Integral
 from openmdao.utils.notebook_utils import notebook, display, HTML, IFrame, colab
 from openmdao.utils.file_utils import text2html
@@ -19,13 +20,14 @@ _default_align = {
 
 
 class TableBuilder(object):
-    allowed_col_meta = {'header', 'align', 'header_align', 'width', 'format', 'max_width'}
+    allowed_col_meta = {'header', 'align', 'header_align', 'width', 'format',
+                        'max_width', 'min_width'}
 
     def __init__(self, rows, headers=None, column_meta=None, precision=4, missingval=None,
                  max_width=None):
         self._raw_rows = rows
         self._column_meta = {}
-        self._widths = None
+        self._widths = None  # width of the data in each cell before a uniform column width is set
         self._rows = None
         self.missingval = missingval
         self.max_width = max_width
@@ -85,41 +87,43 @@ class TableBuilder(object):
 
         return self._rows
 
-    def _set_max_col_widths(self):
-        widths = self._set_data_widths()
-        ncols = len(self._column_meta)
-
-        total_width = sum(widths) + len(self.column_sep) * (ncols - 1) + \
+    def _get_total_width(self):
+        return sum(self._widths) + len(self.column_sep) * (len(self._column_meta) - 1) + \
             len(self.left_border) + len(self.right_border)
+
+    def _cell_width(self, cell):
+        return len(cell)
+
+    def _set_max_widths(self):
+        total_width = self._get_total_width()
 
         # check for case where total table width is specified and we have to set max_width on
         # column(s) as a result
         if self.max_width is not None and self.max_width < total_width:
 
-            winfo = [[i, w] for (i, meta), w in zip(enumerate(self.sorted_meta()), widths)
-                     if meta['col_type'] == 'other' and not meta.get('fixed_width')]
-            min_width = 10
+            winfo = [[i, w, meta.get('min_width', 10)]
+                      for (i, meta), w in zip(enumerate(self.sorted_meta()), self._widths)
+                      if meta['col_type'] == 'other']
 
-            fixed_width = total_width - sum([w for _, w in winfo])
+            fixed_width = total_width - sum([w for _, w, _ in winfo])
             allowed_width = self.max_width - fixed_width
 
             # subtract 1 from the widest column until we meed the total max_width requirement,
             # or get as close as we can without violating a minimum allowed width.
-            while sum([w for _, w in winfo]) > allowed_width:
-                sortedw = sorted(winfo, key=lambda x: x[-1], reverse=True)
-                if sortedw[0][-1] > min_width:
-                    sortedw[0][-1] -= 1
+            while sum([w for _, w, _ in winfo]) > allowed_width:
+                # sort over min_width - width
+                sortedw = sorted(winfo, key=lambda x: x[1] - x[2], reverse=True)
+                if sortedw[0][1] > 0:
+                    sortedw[0][1] -= 1
                 else:
                     break
 
-            if sum([w for _, w in winfo]) <= allowed_width:
-                for i, w in winfo:
+            if sum([w for _, w, _ in winfo]) <= allowed_width:
+                for i, w, _ in winfo:
                     meta = self._column_meta[i]
                     meta['max_width'] = w
 
-        return widths
-
-    def _set_data_widths(self):
+    def _set_widths(self):
         if self._widths is not None:
             return self._widths  # widths already computed
 
@@ -134,14 +138,28 @@ class TableBuilder(object):
 
         for row in rows:
             for i, cell in enumerate(row):
-                wid = len(cell)
+                wid = self._cell_width(cell)
                 if wid > self._widths[i]:
                     self._widths[i] = wid
 
+        # set widths and min widths
         for i, meta in enumerate(self.sorted_meta()):
-            wid = len(meta['header'])
+            header = meta['header']
+            wid = len(header)
+
+            # check if header is splittable and if so, allow for min_width using a split header
+            # if min_width will be > min data width.
+            longest = max(len(word) for word in header.strip().split())
+            if meta.get('min_width') is None:
+                if meta['col_type'] == 'other':  # strings
+                    meta['min_width'] = max(10, longest)
+                else:
+                    meta['min_width'] = max(self._widths[i], longest)
+
             if wid > self._widths[i]:
                 self._widths[i] = wid
+
+        self._set_max_widths()
 
         return self._widths
 
@@ -227,7 +245,7 @@ class TableBuilder(object):
 
     def _stringified_header_iter(self):
         header_cells = [None] * len(self._column_meta)
-        widths = self._set_max_col_widths()
+        widths = self._set_widths()
 
         sorted_cols = self.sorted_meta()
 
@@ -260,7 +278,7 @@ class TableBuilder(object):
             yield header_cells
 
     def _stringified_row_iter(self):
-        widths = self._set_max_col_widths()
+        widths = self._set_widths()
         row_cells = [None] * len(self._column_meta)
 
         needs_wrap = self.needs_wrap()
@@ -389,36 +407,6 @@ class GithubTableBuilder(TableBuilder):
         return False  # github tables seem to have no support for text wrapping in columns
 
 
-_tabulator_typemeta = {
-    'bool': {
-        'align': 'center',
-        'formatter': 'tickCross',
-        'formatterParams': {'crossElement': False},
-        'filter': 'tickCross',
-        'headerFilterParams': {'tristate': True},
-        'sorter': 'string',
-    },
-    'int': {
-        'align': 'right',
-        'formatter': 'plaintext',
-        'filter': False,
-        'sorter': 'number',
-    },
-    'real': {
-        'align': 'right',
-        'formatter': 'plaintext',
-        'filter': False,
-        'sorter': 'number',
-    },
-    'other': {
-        'align': 'left',
-        'formatter': 'textarea',
-        'filter': 'input',
-        'sorter': 'string',
-    }
-}
-
-
 class HTMLTableBuilder(TableBuilder):
     def __init__(self, rows, html_id=None, **kwargs):
         super().__init__(rows, **kwargs)
@@ -454,11 +442,6 @@ class HTMLTableBuilder(TableBuilder):
             outfile = 'table.html'
 
         title = ''
-        style = """
-            tr:nth-child(even) {
-                background-color: #D6EEEE;
-            }
-        """
         table = \
 """
 <!DOCTYPE html>
@@ -514,6 +497,40 @@ class HTMLTableBuilder(TableBuilder):
             webview(outfile)
 
 
+_tabulator_typemeta = {
+    'bool': {
+        'align': 'center',
+        'formatter': 'tickCross',
+        'formatterParams': {'crossElement': False},
+        'titleFormatter': 'textarea',
+        'filter': 'tickCross',
+        'headerFilterParams': {'tristate': True},
+        'sorter': 'string',
+    },
+    'int': {
+        'align': 'right',
+        'formatter': 'plaintext',
+        'titleFormatter': 'textarea',
+        'filter': False,
+        'sorter': 'number',
+    },
+    'real': {
+        'align': 'right',
+        'formatter': 'plaintext',
+        'titleFormatter': 'textarea',
+        'filter': False,
+        'sorter': 'number',
+    },
+    'other': {
+        'align': 'left',
+        'formatter': 'textarea',
+        'titleFormatter': 'textarea',
+        'filter': 'input',
+        'sorter': 'string',
+    }
+}
+
+
 class TabulatorJSBuilder(TableBuilder):
     allowed_col_meta = TableBuilder.allowed_col_meta.union({
         'filter',
@@ -521,12 +538,6 @@ class TabulatorJSBuilder(TableBuilder):
         'sorter',
         'formatter'
     })
-
-    # allowed_table_meta = {
-    #     'id',  # html id
-    #     'layout',  # fitData, fitDataStretch, fitDataTable, fitColumns
-    #     'height',  # number in pixels
-    # }
 
     def __init__(self, rows, layout=None, height=None, html_id='tabul-table', title='',
                  display_in_notebook=True, show_browser=True, outfile='tabulator_table.html',
@@ -548,7 +559,17 @@ class TabulatorJSBuilder(TableBuilder):
         self._show_browser = show_browser
         self._outfile = outfile
 
+    def _cell_width(self, cell):
+        # special handling for bool cells
+        if isinstance(cell, bool):
+            return 5
+        return len(cell)
+
+    def _get_total_width(self):
+        return sum(self._widths)
+
     def _stringified_row_iter(self):
+        self._set_widths()
         for row in self._get_srows():
             yield row
 
@@ -586,6 +607,39 @@ class TabulatorJSBuilder(TableBuilder):
 
             self._column_meta[i] = meta
 
+    def _set_max_widths(self):
+        total_width = self._get_total_width()
+
+        if self.max_width is not None and self.max_width < total_width:
+            # this assumes that min_widths have already been computed
+            super()._set_max_widths()
+
+            # we now have max_widths in terms of characters, but tabulator needs them in terms
+            # of pixels or precentages.  We'll use percentages so we don't have to know anything
+            # about fonts, etc.
+            revised_total = 0
+            widths = []
+            for i, meta in self._column_meta.items():
+                if 'width' in meta:
+                    width = meta['width']
+                    if isinstance(width, str) and width.endswith('%'):
+                        raise RuntimeError("Percentage widths are not supported. Use width in characters instead.")
+                    widths.append(width)
+                elif meta['max_width'] is not None:
+                    widths.append(meta['max_width'])
+                else:
+                    revised_total += self._widths[i]
+                    widths.append(None)
+                    continue
+
+                revised_total += widths[-1]
+
+            for w, meta in zip(widths, self._column_meta.values()):
+                if w is None:
+                    continue
+                pct = int(floor(100 * w / revised_total))
+                meta['width'] = f"{pct}%"
+
     def get_table_data(self):
         rows = []
         idx = 1  # unique ID for use by Tabulator
@@ -602,7 +656,6 @@ class TabulatorJSBuilder(TableBuilder):
             cmeta = {
                 'field': f'c{i}',
                 'title': meta['header'],
-                'maxWidth': meta['max_width'],
                 'hozAlign': meta['align'],
                 'headerHozAlign': meta['header_align'],
                 'headerFilter': meta['filter'],  # input, textarea, number, range, tickCross
@@ -611,6 +664,8 @@ class TabulatorJSBuilder(TableBuilder):
                                                  # tickCross, traffic, star, progress, color,
                                                  # buttonTick, buttonCross,
                 'formatterParams': meta.get('formatterParams', None),
+                'titleFormatter': meta.get('titleFormatter', None),
+                'titleFormatterParams': meta.get('titleFormatterParams', None),
                 'editor': meta.get('editor', None),
                 'editorParams': meta.get('editorParams', None),
                 'headerFilterParams': meta.get('headerFilterParams', None),
@@ -720,13 +775,12 @@ if __name__ == '__main__':
     ]
 
     try:
-        tablefmt = sys.argv[1]
+        formats = [sys.argv[1]]
     except Exception:
-        tablefmt = 'text'
+        formats = ['rst', 'github', 'text', 'html', 'tabulator']
 
     from openmdao.utils.tests.test_tables import random_table
-    tab = random_table(tablefmt=tablefmt, coltypes=coltypes, nrows=30)
-
-    tab.max_width = 90
-
-    tab.display()
+    for fmt in formats:
+        tab = random_table(tablefmt=fmt, coltypes=coltypes, nrows=30)
+        tab.max_width = 95
+        tab.display()
