@@ -523,10 +523,16 @@ class TabulatorJSBuilder(TableBuilder):
     #     'height',  # number in pixels
     # }
 
-    def __init__(self, rows, layout='fitColumns', height=None, html_id='tabul-table', title='',
+    def __init__(self, rows, layout=None, height=None, html_id='tabul-table', title='',
                  display_in_notebook=True, show_browser=True, outfile='tabulator_table.html',
                  **kwargs):
         super().__init__(rows, **kwargs)
+        if layout is None:
+            if notebook:
+                layout = 'fitColumns'
+            else:
+                layout = 'fitDataTable'
+
         self._table_meta = {
             'layout': layout,
             'height': height,
@@ -603,7 +609,6 @@ class TabulatorJSBuilder(TableBuilder):
                 'field': f'c{i}',
                 'title': meta['header'],
                 'maxWidth': meta['max_width'],
-                'width': meta.get('width'),
                 'hozAlign': meta['align'],
                 'headerHozAlign': meta['header_align'],
                 'headerFilter': meta['filter'],  # input, textarea, number, range, tickCross
@@ -616,6 +621,11 @@ class TabulatorJSBuilder(TableBuilder):
                 'editorParams': meta.get('editorParams', None),
                 'headerFilterParams': meta.get('headerFilterParams', None),
             }
+
+            # can't do a get('width') above because setting width to None messes up the table layout
+            width = meta.get('width')
+            if width is not None:
+                cmeta['width'] = width
 
             cols.append(cmeta)
 
@@ -721,7 +731,8 @@ if __name__ == '__main__':
         tablefmt = 'text'
 
     from openmdao.utils.tests.test_tables import random_table
-    tab = random_table(tablefmt=tablefmt, coltypes=coltypes, nrows=30, html_id='foobar')
+    tab = random_table(tablefmt=tablefmt, coltypes=coltypes, nrows=30)
 
-    tab.max_width = 100
+    tab.max_width = 90
+
     tab.display()
