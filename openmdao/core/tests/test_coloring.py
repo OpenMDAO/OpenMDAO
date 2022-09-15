@@ -163,9 +163,13 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
     if 'method' in options:
         p.model.approx_totals(method=options['method'])
         del options['method']
+        
+    min_improve_pct = options.get('min_improve_pct', 5.)
+    if 'min_improve_pct' in options:
+        del options['min_improve_pct']
 
     if 'dynamic_total_coloring' in options:
-        p.driver.declare_coloring(tol=1e-15)
+        p.driver.declare_coloring(tol=1e-15, min_improve_pct=min_improve_pct)
         del options['dynamic_total_coloring']
 
     p.driver.options.update(options)
@@ -690,6 +694,24 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         # coloring saves 16 solves per driver iter  (5 vs 21)
         self.assertEqual(p.model._solve_count, 21)
         self.assertEqual(p_color.model._solve_count, 5)
+        
+    def test_min_improve_pct(self):
+        # first, run w/o coloring
+        p = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False)
+        p_color = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True, min_improve_pct=99.)
+
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
+
+        p.model._solve_count = 0
+        p_color.model._solve_count = 0
+
+        J = p.driver._compute_totals()
+        J_color = p_color.driver._compute_totals()
+
+        # coloring should have been aborted since it couldn't improve more than 99% so solve counts should match
+        self.assertEqual(p.model._solve_count, 21)
+        self.assertEqual(p_color.model._solve_count, 21)
 
     def test_dynamic_total_coloring_auto_con_alias(self):
         # This test makes sure that coloring works with aliased constraints.
