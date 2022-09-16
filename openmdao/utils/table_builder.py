@@ -251,13 +251,13 @@ class TableBuilder(object):
                 else:
                     break
 
-            print("ALLOWED:", allowed_width)
-
             if sum([w for _, w, _ in winfo]) <= allowed_width:
                 for i, w, _ in winfo:
                     meta = self._column_meta[i]
                     print(i, "MAX_WIDTH", w)
                     meta['max_width'] = w
+
+            return winfo
 
     def __str__(self):
         """
@@ -603,7 +603,7 @@ class TabulatorJSBuilder(TableBuilder):
         # HTML sizing (in pixels)
         resize_handle_w = 0 # 5
         padding = 0 # 4
-        title_right_padding = 0 # 25
+        title_right_padding = 25
 
         self.table_border = 1
         self._cell_padding = 2 * (resize_handle_w + padding)
@@ -614,9 +614,9 @@ class TabulatorJSBuilder(TableBuilder):
         # get max of data widths vs. header_width + padding
         cell_widths = [self._to_table_units(w) for w in self._data_widths]
         header_widths = [self._to_table_units(w) for w in self._header_widths]
-        # return [max(wc + self._cell_padding, wh + self._header_padding)
-        return [max(wc, wh)
+        return [max(wc + self._cell_padding, wh + self._header_padding)
                 for wc, wh in zip(cell_widths, header_widths)]
+        # return [max(wc, wh)
 
     def get_max_total_col_width(self, winfo):
         return self._to_table_units(self.max_width)
@@ -670,11 +670,14 @@ class TabulatorJSBuilder(TableBuilder):
     def _set_max_widths(self):
         if self.max_width is not None:
             # this assumes that min_widths (in terms of characters) have already been computed
-            super()._set_max_widths()
-            for meta in self._column_meta.values():
-                max_width = meta['max_width']
-                if max_width is not None:
-                    meta['width'] = f"{max_width}"
+            winfo = super()._set_max_widths()
+            if winfo is not None:
+                widths = [w for _, w, _ in winfo]
+                total = sum(widths)
+                pcts = [int(floor(w * 100 / total)) for w in widths]
+                lst = [(meta, pct) for meta, pct in zip(self.sorted_meta(), pcts) if meta['max_width'] is not None]
+                for meta, pct in sorted(lst, key=lambda x:x[1])[1:]:
+                    meta['width'] = f"{pct}%"
 
     #         # we now have max_widths in terms of characters, but tabulator needs them in terms
     #         # of pixels.
@@ -741,8 +744,8 @@ class TabulatorJSBuilder(TableBuilder):
                 print(i, "WIDTH", width)
             # if meta['max_width'] is not None:
             #     cmeta['maxWidth'] = meta['max_width']
-            # if meta['min_width'] is not None:
-            #     cmeta['min_width'] = meta['min_width']
+            if meta['min_width'] is not None:
+                cmeta['min_width'] = meta['min_width']
             print("MIN", meta['min_width'], "MAX", meta['max_width'])
 
             cols.append(cmeta)
@@ -851,5 +854,5 @@ if __name__ == '__main__':
     from openmdao.utils.tests.test_tables import random_table
     for fmt in formats:
         tab = random_table(tablefmt=fmt, coltypes=coltypes, nrows=55)
-        tab.max_width = 110
+        tab.max_width = 140
         tab.display()
