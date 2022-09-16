@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from openmdao.utils.table_utils import to_table
+from openmdao.utils.table_builder import to_table
 
 test_seed = 42
 
@@ -82,7 +82,7 @@ def random_table(tablefmt='text', nrows=10, coltypes=None, **options):
 
 if __name__ == '__main__':
     import sys
-    from openmdao.utils.table_utils import TabulatorJSBuilder
+    from openmdao.utils.table_builder import TabulatorJSBuilder
 
     tab = random_table(tablefmt=sys.argv[1])
     tab.max_width = 100

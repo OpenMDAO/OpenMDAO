@@ -4,7 +4,7 @@ import re
 
 from openmdao.utils.om_warnings import warn_deprecation
 from openmdao.utils.notebook_utils import notebook
-from openmdao.utils.table_utils import to_table
+from openmdao.utils.table_builder import to_table
 
 from openmdao.core.constants import _UNDEFINED
 
@@ -198,12 +198,18 @@ class OptionsDictionary(object):
         tab = to_table(rows, headers=hdrs, tablefmt=fmt, missingval=missingval,
                        max_width=max_width)
 
-        if notebook and fmt == 'tabulator':
-            if deprecations:
-                tab.update_column_meta(-1, width=300)
-                tab.update_column_meta(-2, width=300)
-            else:
-                tab.update_column_meta(-1, width=600)
+        # if notebook and fmt == 'tabulator':
+        #     if deprecations:
+        #         tab.update_column_meta(-1, width=300)
+        #         tab.update_column_meta(-2, width=300)
+        #     else:
+        #         tab.update_column_meta(-1, width=600)
+
+        if max_width is not None:
+            # make sure the first four columns are not resized to try to meet the max width
+            # requirement
+            for i in range(4):
+                tab.update_column_meta(i, fixed_width=True)
 
         tab.display()
 
