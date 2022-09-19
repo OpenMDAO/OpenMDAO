@@ -122,7 +122,7 @@ class OptionsDictionary(object):
         """
         return self.to_table(fmt='rst')
 
-    def to_table(self, fmt='github', missingval='N/A', max_width=None):
+    def to_table(self, fmt='github', missingval='N/A', max_width=None, display=True):
         """
         Get a table representation of this OptionsDictionary as a table in the requested format.
 
@@ -136,6 +136,9 @@ class OptionsDictionary(object):
             The value to be displayed in place of None.
         max_width : int or None
             If not None, try to limit the total width of the table to this value.
+        display : bool
+            If True, display the table, typically by writing it to stdout or opening a
+            browser.
 
         Returns
         -------
@@ -195,23 +198,20 @@ class OptionsDictionary(object):
             else:
                 rows.append([key, default, acceptable_values, acceptable_types, desc])
 
-        tab = to_table(rows, headers=hdrs, tablefmt=fmt, missingval=missingval,
-                       max_width=max_width)
+        kwargs = {
+            'tablefmt': fmt,
+            'headers': hdrs,
+            'missingval': missingval,
+            'max_width': max_width,
+        }
+        if fmt == 'tabulator':
+            kwargs['filter'] = False
+            kwargs['sort'] = False
 
-        # if notebook and fmt == 'tabulator':
-        #     if deprecations:
-        #         tab.update_column_meta(-1, width=300)
-        #         tab.update_column_meta(-2, width=300)
-        #     else:
-        #         tab.update_column_meta(-1, width=600)
+        tab = to_table(rows, **kwargs)
 
-        if max_width is not None:
-            # make sure the first four columns are not resized to try to meet the max width
-            # requirement
-            for i in range(4):
-                tab.update_column_meta(i, fixed_width=True)
-
-        tab.display()
+        if display:
+            tab.display()
 
         return str(tab)
 
@@ -229,7 +229,7 @@ class OptionsDictionary(object):
         str
             A text representation of the options table.
         """
-        return self.to_table(fmt='rst', max_width=width)
+        return self.to_table(fmt='rst', max_width=width, display=False)
 
     def _raise(self, msg, exc_type=RuntimeError):
         """
