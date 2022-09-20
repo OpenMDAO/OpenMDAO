@@ -22,14 +22,10 @@ except ImportError:
     mpl = None
 
 
-try:
-    from tabulate import tabulate
-except ImportError:
-    tabulate = None
-
 from openmdao.core.constants import INF_BOUND
 from openmdao.utils.mpi import MPI
 from openmdao.utils.om_warnings import issue_warning, DriverWarning
+from openmdao.utils.table_builder import to_table
 
 
 # Report file constants
@@ -131,33 +127,6 @@ def opt_report(prob, outfile=None):
         outfile = _default_optimizer_report_filename
 
     outfilepath = pathlib.Path(prob.get_reports_dir(force=True)).joinpath(outfile)
-
-    if not tabulate:
-        s = '''
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Optimization Report - Unable to Generate</title>
-</head>
-<body>
-
-<p>The optimization report requires the tabulate package but it is not currently installed.</p>
-
-<p>To install the tablulate module:</p>
-
-<code>
-pip install tabulate
-</code>
-
-</body>
-</html>
-        '''
-        if create:
-            with open(outfilepath, 'w') as f:
-                f.write(s)
-
-        return
 
     driver_scaling = True
 
@@ -267,7 +236,7 @@ def _make_header_table(prob):
     rows.append(['Wall clock run time:', runtime_formatted])
     rows.append(['Exit status:', prob.driver.opt_result['exit_status']])
 
-    return tabulate(rows, tablefmt='html')
+    return to_table(rows, tablefmt='html')
 
 
 def _make_opt_value_table(driver):
@@ -288,7 +257,7 @@ def _make_opt_value_table(driver):
     for key, meta in driver.options.items():
         meta = driver.options._dict[key]
         opt_settings.append((key, meta['val'], meta['desc']))
-    opt_settings_table = tabulate(opt_settings, headers=['Setting', 'Val', 'Description'],
+    opt_settings_table = to_table(opt_settings, headers=['Setting', 'Val', 'Description'],
                                   tablefmt='html')
 
     html = ''
@@ -345,8 +314,8 @@ def _make_obj_table(objs_meta, objs_vals,
                 row[col_name] = meta[col_name]
         rows.append(row)
 
-    return tabulate(rows, headers='keys', tablefmt='html', floatfmt='.4e', stralign='left',
-                    numalign='left')
+    return to_table(rows, headers='keys', tablefmt='html')  #, floatfmt='.4e', stralign='left',
+                    # numalign='left')
 
 
 def _make_dvcons_table(meta_dict, vals_dict, kind,
@@ -464,7 +433,7 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
                         '<span class="plot-unavailable">Visuals require matplotlib</span>'
             elif col_name == 'size':
                 row[col_name] = int(meta[col_name])  # sometimes size in the meta data is a numpy
-                # array so tabulate does different formatting for that
+                # array so to_table does different formatting for that
             elif col_name in ['ref', 'ref0']:
                 if meta[col_name] is not None:
                     derived_val = np.mean(meta[col_name])
@@ -477,8 +446,9 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
 
         rows.append(row)
 
-    return tabulate(rows, headers='keys', tablefmt='unsafehtml', floatfmt='.4e', stralign='center',
-                    numalign='left')
+    return to_table(rows, headers='keys', tablefmt='html')
+                    # tablefmt='unsafehtml',
+                    # floatfmt='.4e', stralign='center', numalign='left')
 
 
 def _sparkline(kind, meta, val, width=300):

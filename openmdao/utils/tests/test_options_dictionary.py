@@ -7,11 +7,6 @@ from openmdao.utils.om_warnings import OMDeprecationWarning
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 
-try:
-    import tabulate
-except ImportError:
-    tabulate = None
-
 
 def check_even(name, value):
     if value % 2 != 0:
@@ -23,7 +18,6 @@ class TestOptionsDict(unittest.TestCase):
     def setUp(self):
         self.dict = OptionsDictionary()
 
-    @unittest.skipIf(tabulate is None, reason="package 'tabulate' is not installed")
     def test_reprs(self):
         class MyComp(ExplicitComponent):
             pass
@@ -66,7 +60,6 @@ test       **Required**  ['a', 'b']         N/A                    Test integer 
 =========  ============  =================  =====================  =========================================================================================
 """.strip())
 
-    @unittest.skipIf(tabulate is None, reason="package 'tabulate' is not installed")
     def test_to_table(self):
         class MyComp(ExplicitComponent):
             pass
@@ -91,7 +84,6 @@ test       **Required**  ['a', 'b']         N/A                    Test integer 
 """
         self.assertEqual(self.dict.to_table(fmt='github').strip(), expected.strip())
 
-    @unittest.skipIf(tabulate is None, reason="package 'tabulate' is not installed")
     def test_deprecation_col(self):
         class MyComp(ExplicitComponent):
             pass

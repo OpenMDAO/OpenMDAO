@@ -12,11 +12,6 @@ except ImportError:
 
 from openmdao.utils.om_warnings import issue_warning
 
-try:
-    from tabulate import tabulate
-except ImportError:
-    tabulate = None
-
 colab = 'google.colab' in sys.modules
 
 
@@ -148,7 +143,7 @@ def cite(reference):
 
 def notebook_mode():
     """
-    Check if the environment is interactive and if tabulate is installed.
+    Check if the environment is interactive.
 
     Returns
     -------

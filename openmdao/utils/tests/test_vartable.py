@@ -6,7 +6,7 @@ from io import StringIO
 
 import openmdao.api as om
 
-from openmdao.utils.notebook_utils import notebook_mode, tabulate
+from openmdao.utils.notebook_utils import notebook_mode
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.testing_utils import use_tempdirs
 
@@ -15,19 +15,19 @@ from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.sellar import SellarProblem
 
 """
-The following System methods should generate HTML using tabulate
+The following System methods should generate HTML using to_table
 when called with the default output stream in a jupyter notebook.
 
 - list_outputs()
 - list_inputs()
 
-The following Case methods should generate HTML using tabulate
+The following Case methods should generate HTML using to_table
 when called with the default output stream in a jupyter notebook.
 
 - list_outputs()
 - list_inputs()
 
-The following CaseReader methods should generate HTML using tabulate
+The following CaseReader methods should generate HTML using to_table
 when called with the default output stream in a jupyter notebook.
 
 - list_sources()
@@ -39,7 +39,6 @@ when called with the default output stream in a jupyter notebook.
 - list_cases(coord, recurse=True, flat=True)
 """
 
-@unittest.skipUnless(tabulate, "Tabulate is required")
 @use_tempdirs
 class TestNotebookListIO(unittest.TestCase):
 
@@ -124,8 +123,8 @@ class TestNotebookListIO(unittest.TestCase):
 
         # generated HTML should be a table and have all expected inputs with metadata
         captured_HTML = self.html_stream.getvalue()
-        self.assertTrue(captured_HTML.startswith('<table>'))
-        self.assertTrue(captured_HTML.endswith('</table>'))
+        self.assertTrue(captured_HTML.startswith('<table'))
+        self.assertTrue(captured_HTML.rstrip().endswith('</table>'))
         self.assertEqual(captured_HTML.count('<tr><td'), len(self.expected_inputs))
         for column in ['varname', 'val', 'units', 'shape', 'prom_name']:
             self.assertTrue(column in captured_HTML)
@@ -159,8 +158,8 @@ class TestNotebookListIO(unittest.TestCase):
 
         # generated HTML should be a table and have all expected inputs with metadata
         captured_HTML = self.html_stream.getvalue()
-        self.assertTrue(captured_HTML.startswith('<table>'))
-        self.assertTrue(captured_HTML.endswith('</table>'))
+        self.assertTrue(captured_HTML.startswith('<table'))
+        self.assertTrue(captured_HTML.rstrip().endswith('</table>'))
         self.assertEqual(captured_HTML.count('<tr><td'), len(self.expected_outputs))
         for column in ['varname', 'val', 'units', 'shape', 'prom_name']:
             self.assertTrue(column in captured_HTML)
@@ -195,8 +194,8 @@ class TestNotebookListIO(unittest.TestCase):
 
         # generated HTML should be a table and have all expected inputs with metadata
         captured_HTML = self.html_stream.getvalue()
-        self.assertTrue(captured_HTML.startswith('<table>'))
-        self.assertTrue(captured_HTML.endswith('</table>'))
+        self.assertTrue(captured_HTML.startswith('<table'))
+        self.assertTrue(captured_HTML.rstrip().endswith('</table>'))
         self.assertEqual(captured_HTML.count('<tr><td'), len(self.expected_inputs))
         for column in ['varname', 'val', 'units', 'shape', 'prom_name']:
             self.assertTrue(column in captured_HTML)
@@ -232,8 +231,8 @@ class TestNotebookListIO(unittest.TestCase):
 
         # generated HTML should be a table and have all expected inputs with metadata
         captured_HTML = self.html_stream.getvalue()
-        self.assertTrue(captured_HTML.startswith('<table>'))
-        self.assertTrue(captured_HTML.endswith('</table>'))
+        self.assertTrue(captured_HTML.startswith('<table'))
+        self.assertTrue(captured_HTML.rstrip().endswith('</table>'))
         self.assertEqual(captured_HTML.count('<tr><td'), len(self.expected_outputs))
         for column in ['varname', 'val', 'units', 'shape', 'prom_name']:
             self.assertTrue(column in captured_HTML)
@@ -241,9 +240,10 @@ class TestNotebookListIO(unittest.TestCase):
             self.assertTrue(name in captured_HTML)
 
 
-@unittest.skipUnless(tabulate, "Tabulate is required")
 @use_tempdirs
 class TestNotebookCaseReader(unittest.TestCase):
+    def write_html(self, x):
+        self.html_stream.write(x)
 
     def setUp(self):
         # override notebook flag for system, variable table and sqlite_reader
@@ -254,8 +254,8 @@ class TestNotebookCaseReader(unittest.TestCase):
 
         # capture HTML output from variable_table
         self.html_stream = StringIO()
-        variable_table.HTML = lambda x: self.html_stream.write(x)
-        sqlite_reader.HTML = lambda x: self.html_stream.write(x)
+        variable_table.HTML = self.write_html # lambda x: self.html_stream.write(x)
+        sqlite_reader.HTML = self.write_html  # lambda x: self.html_stream.write(x)
 
         # create recorder
         self.filename = "cases.sql"
@@ -337,8 +337,8 @@ class TestNotebookCaseReader(unittest.TestCase):
 
         # generated HTML should be a table and have all expected sources and cases
         captured_HTML = self.html_stream.getvalue()
-        self.assertTrue(captured_HTML.startswith('<table>'))
-        self.assertTrue(captured_HTML.endswith('</table>'))
+        self.assertTrue(captured_HTML.startswith('<table'))
+        self.assertTrue(captured_HTML.rstrip().endswith('</table>'))
         self.assertEqual(captured_HTML.count('<tr><td'), len(self.expected_sources))
         for source in self.expected_sources:
             self.assertTrue(source in captured_HTML)
@@ -369,8 +369,8 @@ class TestNotebookCaseReader(unittest.TestCase):
 
             # generated HTML should be a table and have all expected source vars
             captured_HTML = self.html_stream.getvalue()
-            self.assertTrue(captured_HTML.startswith('<table>'))
-            self.assertTrue(captured_HTML.endswith('</table>'))
+            self.assertTrue(captured_HTML.startswith('<table'))
+            self.assertTrue(captured_HTML.rstrip().endswith('</table>'))
             for header in ['inputs', 'outputs', 'residuals']:
                 self.assertTrue(header in captured_HTML)
             for var_name in source_vars['inputs'] + source_vars['outputs'] + source_vars['residuals']:
@@ -402,8 +402,8 @@ class TestNotebookCaseReader(unittest.TestCase):
 
         # generated HTML should be a table and have all expected sources and cases
         captured_HTML = self.html_stream.getvalue()
-        self.assertTrue(captured_HTML.startswith('<table>'))
-        self.assertTrue(captured_HTML.endswith('</table>'))
+        self.assertTrue(captured_HTML.startswith('<table'))
+        self.assertTrue(captured_HTML.rstrip().endswith('</table>'))
         self.assertEqual(captured_HTML.count('<tr><td'), len(self.expected_cases))
         for source in self.expected_headers:
             self.assertTrue(source in captured_HTML)
@@ -433,8 +433,8 @@ class TestNotebookCaseReader(unittest.TestCase):
 
         # generated HTML should be a table and have all expected sources and cases
         captured_HTML = self.html_stream.getvalue()
-        self.assertTrue(captured_HTML.startswith('<table>'))
-        self.assertTrue(captured_HTML.endswith('</table>'))
+        self.assertTrue(captured_HTML.startswith('<table'))
+        self.assertTrue(captured_HTML.rstrip().endswith('</table>'))
         self.assertEqual(captured_HTML.count('<tr><td'), 1)
         self.assertTrue('problem' in captured_HTML)  # table header
         self.assertTrue('final' in captured_HTML)    # row value
@@ -470,8 +470,8 @@ class TestNotebookCaseReader(unittest.TestCase):
 
         # generated HTML should be a table and have all expected sources and cases
         captured_HTML = self.html_stream.getvalue()
-        self.assertTrue(captured_HTML.startswith('<table>'))
-        self.assertTrue(captured_HTML.endswith('</table>'))
+        self.assertTrue(captured_HTML.startswith('<table'))
+        self.assertTrue(captured_HTML.rstrip().endswith('</table>'))
         self.assertEqual(captured_HTML.count('<tr><td'), len(expected_cases))
         for source in expected_headers:
             self.assertTrue(source in captured_HTML)
@@ -479,7 +479,6 @@ class TestNotebookCaseReader(unittest.TestCase):
             self.assertTrue(case in captured_HTML)
 
 
-@unittest.skipUnless(tabulate, "Tabulate is required")
 @use_tempdirs
 class TestNotebookDriverCases(unittest.TestCase):
 
@@ -551,8 +550,8 @@ class TestNotebookDriverCases(unittest.TestCase):
 
         # generated HTML should be a table and have all expected sources and cases
         captured_HTML = self.html_stream.getvalue()
-        self.assertTrue(captured_HTML.startswith('<table>'))
-        self.assertTrue(captured_HTML.endswith('</table>'))
+        self.assertTrue(captured_HTML.startswith('<table'))
+        self.assertTrue(captured_HTML.rstrip().endswith('</table>'))
         self.assertEqual(captured_HTML.count('<tr><td'), len(self.expected_cases))
         for source in self.expected_sources:
             self.assertEqual(captured_HTML.count(source), 1)  # header occurs only once

@@ -16,7 +16,8 @@ from openmdao.utils.om_warnings import issue_warning, CaseRecorderWarning
 
 from openmdao.recorders.sqlite_recorder import format_version, META_KEY_SEP
 
-from openmdao.utils.notebook_utils import notebook, tabulate, display, HTML
+from openmdao.utils.notebook_utils import notebook, display, HTML
+from openmdao.utils.table_builder import to_table
 
 import pickle
 import zlib
@@ -391,10 +392,9 @@ class SqliteCaseReader(BaseCaseReader):
             sources.extend(self._problem_cases.list_sources())
 
         if out_stream:
-            if notebook and tabulate and out_stream is _DEFAULT_OUT_STREAM:
-                display(HTML(tabulate([[s] for s in sources],
-                                      disable_numparse=True, colalign=["center"],
-                                      headers=["Sources"], tablefmt='html')))
+            if notebook and out_stream is _DEFAULT_OUT_STREAM:
+                display(HTML(str(to_table([[s] for s in sources],
+                                 headers=["Sources"], tablefmt='html'))))
             else:
                 if out_stream is _DEFAULT_OUT_STREAM:
                     out_stream = sys.stdout

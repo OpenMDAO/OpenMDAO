@@ -3,6 +3,7 @@ import sys
 import os
 import json
 import textwrap
+from itertools import zip_longest
 from html import escape
 from io import StringIO
 from math import floor
@@ -21,12 +22,66 @@ _default_align = {
 }
 
 
+def num_rows(rows):
+    i = 0
+    for _ in rows:
+        i += 1
+    return i
+
+
+def num_cols(rows):
+    ncols = None
+    for row in rows:
+        i = 0
+        for _ in row:
+            i += 1
+        if ncols is None:
+            ncols = i
+        elif ncols != i:
+            raise RuntimeError(f"All table rows must have equal length, but {i} != {ncols}.")
+    return 0 if ncols is None else ncols
+
+
 class TableBuilder(object):
     allowed_col_meta = {'header', 'align', 'header_align', 'width', 'format',
                         'max_width', 'min_width', 'fixed_width'}
 
-    def __init__(self, rows, headers=None, column_meta=None, precision=4, missingval=None,
+    def __init__(self, rows, headers=None, column_meta=None, precision=4, missingval='',
                  max_width=None):
+        if headers == 'keys':
+            # handle case where rows is an iter of dicts
+            headers = []
+            if isinstance(rows, dict):
+                headers = list(rows.keys())
+                # each value is a column, so re-arrange to be row major, and allow columns of
+                # unequal length (to be compatible with tabulate).
+
+                # First, get max column length
+                maxcol = 0
+                for col in rows.values():
+                    clen = len(list(col))
+                    if clen > maxcol:
+                        maxcol = clen
+
+                new_rows = []
+                for col in rows.values():
+                    if not new_rows:
+                        new_rows = [[] for i in range(maxcol)]
+
+                    for row, cell in zip_longest(new_rows, col, fillvalue=''):
+                        row.append(cell)
+            else:
+                for row in rows:
+                    headers = list(row.keys())
+                    break
+                new_rows = []
+                for row in rows:
+                    new_rows.append(list(row.values()))
+
+            rows = new_rows
+
+        self._nrows = num_rows(rows)
+        self._ncols = num_cols(rows)
         self._raw_rows = rows # original rows passed in
         self._rows = None  # rows after initial formatting (total width not set)
         self._column_meta = {}
@@ -47,14 +102,23 @@ class TableBuilder(object):
         # for convenience, allow a user to specify header strings without putting them
         # inside a metadata dict
         if headers is not None:
-            hlen = len(list(headers))
+            i = -1
             for i, h in enumerate(headers):
                 self.update_column_meta(i, header=h)
+            hlen = i + 1
+            if hlen != self._ncols:
+                raise RuntimeError("Number of headers and number of data columns must match, but "
+                                   f"{hlen} != {self._ncols}.")
+
 
         if column_meta is not None:
-            clen = len(list(column_meta))
+            i = -1
             for i, meta in enumerate(column_meta):
                 self.update_column_meta(i, **meta)
+            clen = i + 1
+            if clen != self._ncols:
+                raise RuntimeError("Number of column metadata dicts and number of data columns "
+                                   f"must match, but {clen} != {self._ncols}.")
 
         if headers is not None and column_meta is not None and hlen != clen:
             raise RuntimeError("Number of headers and number of column metadata dicts must match "
@@ -89,8 +153,11 @@ class TableBuilder(object):
         return content_width
 
     def _get_cell_types(self):
-        types = [set() for r in self._raw_rows[0]] if self._raw_rows else []
+        types = []
         for row in self._raw_rows:
+            if not types:
+                types = [set() for r in row] if row else []
+
             for i, cell in enumerate(row):
                 if isinstance(cell, Number):
                     if isinstance(cell, bool):
@@ -109,13 +176,17 @@ class TableBuilder(object):
                 yield tset.pop()
 
     def update_column_meta(self, col_idx, **options):
-        if col_idx < 0:  # allow negative indices
-            col_idx = len(self._raw_rows[0]) + col_idx
+        ncols = 0
+        for r in self._raw_rows:
+            ncols = len(r)
+            break
 
-        if col_idx < 0 or col_idx >= len(self._raw_rows[0]):
+        if col_idx < 0:  # allow negative indices
+            col_idx = ncols + col_idx
+
+        if col_idx < 0 or col_idx >= ncols:
             raise IndexError(f"Index '{col_idx}' is not a valid table column index for a table with"
-                             f" {len(self._raw_rows)} columns.  The leftmost column has column "
-                             "index of 0.")
+                             f" {ncols} columns.  The leftmost column has column index of 0.")
 
         if col_idx not in self._column_meta:
             self._column_meta[col_idx] = {}
@@ -419,8 +490,12 @@ class TextTableBuilder(TableBuilder):
         if self.bottom_border:
             print(self.get_bottom_border(header_cells), file=stream)
 
-    def display(self):
-        print(self)
+    def display(self, outfile=None):
+        if outfile is None:
+            print(self)
+        else:
+            with open(outfile, 'w') as f:
+                print(self, file=f)
 
 
 class RSTTableBuilder(TextTableBuilder):
@@ -519,7 +594,7 @@ class HTMLTableBuilder(TableBuilder):
             for cell, meta in zip(row_cells, self.sorted_meta()):
                 typename = meta['col_type']
                 print(f'<td class="{typename}_col">{escape(cell)}</td>', file=stream, end='')
-            print("   </tr>", file=stream)
+            print("</tr>", file=stream)
 
         print("</table>", file=stream)
 

@@ -129,9 +129,10 @@ class OptionsDictionary(object):
         Parameters
         ----------
         fmt : str
-            The formatting of the requested table.  Options are the same as those available
-            to the tabulate package.  See tabulate.tabulate_formats for a complete list.
+            The formatting of the requested table.  Options are
+            ['github', 'rst', 'html', 'text', 'tabulator'].
             Default value of 'github' produces a table in GitHub-flavored markdown.
+            'html' and 'tabulator' produce output viewable in a browser.
         missingval : str
             The value to be displayed in place of None.
         max_width : int or None
@@ -145,14 +146,6 @@ class OptionsDictionary(object):
         str
             A string representation of the table in the requested format.
         """
-        try:
-            from tabulate import tabulate
-        except ImportError as e:
-            msg = "'to_table' requires the tabulate package but it is not currently installed." \
-                  " Use `pip install tabulate` or install openmdao with" \
-                  " `pip install openmdao[notebooks]`."
-            raise ImportError(msg)
-
         hdrs = ['Option', 'Default', 'Acceptable Values', 'Acceptable Types', 'Description']
         rows = []
 

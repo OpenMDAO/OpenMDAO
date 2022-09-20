@@ -22,14 +22,12 @@ optional_dependencies = {
         'testflo',
         'ipyparallel',
         'numpydoc>=1.1',
-        'tabulate',
         'jupyter-book<0.13',
         'jupyter-sphinx',
         'sphinx-sitemap'
     ],
     'notebooks': [
         'notebook',
-        'tabulate',
         'ipython',
         'ipywidgets>=7.6.5',
         'ipympl'

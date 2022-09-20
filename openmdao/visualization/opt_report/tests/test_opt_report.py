@@ -22,13 +22,8 @@ from openmdao.utils.tests.test_hooks import hooks_active
 from openmdao.visualization.opt_report.opt_report import opt_report, \
     _default_optimizer_report_filename
 
-try:
-    from tabulate import tabulate
-except ImportError:
-    tabulate = None
 
 @use_tempdirs
-@unittest.skipIf(tabulate is None, reason="package 'tabulate' is not installed")
 class TestOptimizationReport(unittest.TestCase):
 
     def setup_problem_and_run_driver(self, driver,
@@ -116,18 +111,18 @@ class TestOptimizationReport(unittest.TestCase):
         report_file_path = str(pathlib.Path(prob.get_reports_dir()).joinpath(_default_optimizer_report_filename))
 
         check_rows = {
-            # 'runtime': '<tr><td>Wall clock run time:',
-            'iter_count':  '<tr><td>Number of driver iterations:',
-            'obj_calls':   '<tr><td>Number of objective calls:',
-            'deriv_calls': '<tr><td>Number of derivative calls:',
-            'exit_status': '<tr><td>Exit status:'
+            # 'runtime': 'Wall clock run time:',
+            'iter_count':  'Number of driver iterations:',
+            'obj_calls':   'Number of objective calls:',
+            'deriv_calls': 'Number of derivative calls:',
+            'exit_status': 'Exit status:'
         }
 
         def second_cell(line):
             """
             get value from second cell of table row
             """
-            value = line.split('</td><td>')[1].split('</td>')[0].strip()
+            value = line.split('>', 4)[-1].split('<', 1)[0].strip()
             if value == '':
                 # The report will show an empty cell when the value is 'None'
                 value = None
@@ -142,9 +137,10 @@ class TestOptimizationReport(unittest.TestCase):
 
         with open(report_file_path, 'r') as f:
             for line in f.readlines():
-                if line.startswith('<tr><td>'):
+                line = line.lstrip()
+                if line.startswith('<tr><td'):
                     for key, row in check_rows.items():
-                        if line.startswith(row):
+                        if line.startswith('<tr><td') and row in line:
                             reported[key] = second_cell(line)
                 elif line.startswith('</table>'):
                     # skip the rest of the file
