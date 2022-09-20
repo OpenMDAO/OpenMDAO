@@ -20,7 +20,7 @@ def _str_gen(nvals, maxsize=25, seed=test_seed):
     ctop = len(_char_map)
     for i in range(nvals):
         sz = randgen.integers(low=1, high=maxsize + 1)
-        yield ''.join([_char_map[c] for c in randgen.integers(ctop, size=sz)])
+        yield ''.join([_char_map[c] for c in randgen.integers(ctop, size=sz)]).lstrip()
 
 
 def _bool_gen(nvals, seed=test_seed):
@@ -84,9 +84,12 @@ if __name__ == '__main__':
     import sys
     from openmdao.utils.table_builder import TabulatorJSBuilder
 
-    tab = random_table(tablefmt=sys.argv[1])
-    tab.max_width = 100
-    if isinstance(tab, TabulatorJSBuilder):
-        tab.write_html('table_junk.html')
-    else:
-        print(tab)
+    try:
+        formats = [sys.argv[1]]
+    except Exception:
+        formats = ['rst', 'github', 'text', 'html', 'tabulator']
+
+    for fmt in formats:
+        tab = random_table(tablefmt=fmt)
+        tab.max_width = 120
+        tab.display()

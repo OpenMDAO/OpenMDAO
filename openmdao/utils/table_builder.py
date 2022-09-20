@@ -101,7 +101,12 @@ class TableBuilder(object):
                         types[i].add('real')
                 else:
                     types[i].add('other')
-        return types
+
+        for tset in types:
+            if len(tset) > 1:
+                yield 'other'  # mixed type column, so just use "{}" format
+            else:
+                yield tset.pop()
 
     def update_column_meta(self, col_idx, **options):
         if col_idx < 0:  # allow negative indices
@@ -163,14 +168,7 @@ class TableBuilder(object):
         """
         Fill in missing column metadata based on the data types of column contents.
         """
-        types = self._get_cell_types()
-
-        for i, tset in enumerate(types):
-            if len(tset) > 1:
-                col_type = 'other'  # mixed type column, so just use "{}" format
-            else:
-                col_type = tset.pop()
-
+        for i, col_type in enumerate(self._get_cell_types()):
             align = _default_align[col_type]
 
             meta = {
@@ -191,7 +189,7 @@ class TableBuilder(object):
         """
         Return True if the width of the table or any column exceeds the its specified max_width.
         """
-        needs_wrap = self.max_width is not None
+        needs_wrap = self.max_width is not None and self.max_width < self._get_total_width()
         if not needs_wrap:
             for meta in self._column_meta.values():
                 if meta['max_width'] is not None:
@@ -217,12 +215,9 @@ class TableBuilder(object):
         return self.max_width - fixed_width
 
     def _set_max_column_widths(self):
-        total_width = self._get_total_width()
-
         # check for case where total table width is specified and we have to set max_width on
         # column(s) as a result
-        if self.max_width is not None and self.max_width < total_width:
-
+        if self.max_width is not None and self.max_width < self._get_total_width():
             winfo = [[i, w, meta['min_width']]
                       for (i, meta), w in zip(enumerate(self.sorted_meta()),
                                               self._get_column_widths())
@@ -475,11 +470,12 @@ class HTMLTableBuilder(TableBuilder):
 
     def __init__(self, rows, html_id=None, title='', style=None, **kwargs):
         super().__init__(rows, **kwargs)
-        if style is None:
-            style = {
-                'margin': 'auto',
-            }
-        self._style = style
+        tstyle = {
+            'margin': 'auto',
+        }
+        if style is not None:
+            tstyle.update(style)
+        self._style = tstyle
         self._html_id = html_id
         self._title = title
 
@@ -490,6 +486,14 @@ class HTMLTableBuilder(TableBuilder):
     def _header_style(self, meta):
         if 'header_style' in meta and meta['header_style']:
             parts = ' '.join([f"{name}: {val};" for name, val in meta['header_style'].items()])
+            if parts:
+                return f' style="{parts}"'
+        return ''
+
+    def _get_type_style(self, typename):
+        style = self._type_styles[typename]
+        if style:
+            parts = ' '.join([f"{name}: {val};" for name, val in style.items()])
             if parts:
                 return f' style="{parts}"'
         return ''
@@ -512,8 +516,9 @@ class HTMLTableBuilder(TableBuilder):
 
         for row_cells in self._stringified_row_iter():
             print("   <tr>", file=stream, end='')
-            for cell in row_cells:
-                print(f"<td>{escape(cell)}</td>", file=stream, end='')
+            for cell, meta in zip(row_cells, self.sorted_meta()):
+                typename = meta['col_type']
+                print(f'<td class="{typename}_col">{escape(cell)}</td>', file=stream, end='')
             print("   </tr>", file=stream)
 
         print("</table>", file=stream)
@@ -521,12 +526,6 @@ class HTMLTableBuilder(TableBuilder):
     def write_html(self, outfile=None):
         if outfile is None:
             outfile = 'table.html'
-
-                    # .center {{
-                    #     margin-left: auto;
-                    #     margin-right: auto;
-                    #     width: 90%;
-                    # }}
 
         table = f"""
             <!DOCTYPE html>
@@ -552,6 +551,18 @@ class HTMLTableBuilder(TableBuilder):
                     th {{
                         text-align: center;
                         background-color: #e6e6e6;
+                    }}
+                    .real_col {{
+                        text-align: right;
+                    }}
+                    .int_col {{
+                        text-align: right;
+                    }}
+                    .bool_col {{
+                        text-align: center;
+                    }}
+                    .other_col {{
+                        text-align: left;
                     }}
                 </style>
             </head>
@@ -672,14 +683,7 @@ class TabulatorJSBuilder(TableBuilder):
             yield row
 
     def _update_col_meta_from_rows(self):
-        types = self._get_cell_types()
-
-        for i, tset in enumerate(types):
-            if len(tset) > 1:
-                col_type = 'other'  # mixed type column, so just use "{}" format
-            else:
-                col_type = tset.pop()
-
+        for i, col_type in enumerate(self._get_cell_types()):
             meta = _tabulator_typemeta[col_type].copy()
             meta['format'] = self._default_formats[col_type]
             meta['header_align'] = meta['align']
@@ -709,7 +713,6 @@ class TabulatorJSBuilder(TableBuilder):
             rows.append(dct)
             idx += 1
 
-        max_set = False
         cols = []
         for i, meta in enumerate(self.sorted_meta()):
             cmeta = {
@@ -734,7 +737,6 @@ class TabulatorJSBuilder(TableBuilder):
             }
 
             if meta['max_width'] is not None:
-                max_set = True
                 cmeta['initialMaxWidth'] = meta['max_width'] * self.font_size
 
             cols.append(cmeta)
@@ -747,7 +749,7 @@ class TabulatorJSBuilder(TableBuilder):
         self._table_meta['columns'] = cols
 
         if self._table_meta['layout'] is None:
-            if max_set:
+            if self.needs_wrap():
                 self._table_meta['layout'] = 'fitColumns'
             else:
                 self._table_meta['layout'] = 'fitDataTable'
@@ -851,5 +853,5 @@ if __name__ == '__main__':
         tab = random_table(tablefmt=fmt, coltypes=coltypes, nrows=55)
         if fmt == 'html':
             tab.update_column_meta(3, header_style={'text-align': 'right'})
-        tab.max_width = 110
+        tab.max_width = 200
         tab.display()
