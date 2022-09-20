@@ -327,7 +327,7 @@ class CaseViewer(object):
         self._fig, self._ax = plt.subplots(1, 1, figsize=(9, 9 / 1.6), tight_layout=True)
         norm = mpl.colors.Normalize(vmin=0, vmax=1)
         self._scalar_mappable = cm.ScalarMappable(norm=norm, cmap=self._cmap)
-        self._colorbar = self._fig.colorbar(self._scalar_mappable, label='Case Index')
+        self._colorbar = self._fig.colorbar(self._scalar_mappable, label='Case Index', ax=self._ax)
         self._scatters = []
         self._lines = []
 

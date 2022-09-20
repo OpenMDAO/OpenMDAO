@@ -1292,13 +1292,14 @@ class Driver(object):
 
             if coloring is not None:
                 # if the improvement wasn't large enough, don't use coloring
-                pct = coloring._solves_info()[1]
+                pct = coloring._solves_info()[-1]
                 info = self._coloring_info
                 if info['min_improve_pct'] > pct:
                     info['coloring'] = info['static'] = None
                     msg = f"Coloring was deactivated.  Improvement of {pct:.1f}% was less " \
                           f"than min allowed ({info['min_improve_pct']:.1f}%)."
                     issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
+                    self._coloring_info['coloring'] = coloring = None
 
             return coloring
 
