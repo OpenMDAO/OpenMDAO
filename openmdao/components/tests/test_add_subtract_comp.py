@@ -217,6 +217,49 @@ class TestAddSubtractScalingFactors(unittest.TestCase):
         assert_check_partials(partials)
 
 
+class TestAddSubtractMIMO(unittest.TestCase):
+
+    def setUp(self):
+        self.nn = 5
+
+        self.p = om.Problem()
+
+        adder=self.p.model.add_subsystem(name='add_subtract_comp',
+                                   subsys=om.AddSubtractComp(),
+                                   promotes=['*'])
+
+        adder.add_equation('x', ['a', 'b', 'c'], vec_size=self.nn, length=3,
+                           scaling_factors=[2., 1., -1])
+        adder.add_equation('y', ['a', 'b', 'c'], vec_size=self.nn, length=3,
+                           scaling_factors=[-3., 7., 2])
+        adder.add_equation('z', ['a', 'b', 'c'], vec_size=self.nn, length=3,
+                           scaling_factors=[3.3, -1.5, 5])
+
+        self.p.setup()
+
+        self.p['a'] = np.random.rand(self.nn, 3)
+        self.p['b'] = np.random.rand(self.nn, 3)
+        self.p['c'] = np.random.rand(self.nn, 3)
+
+        self.p.run_model()
+
+    def test_results(self):
+        a = self.p['a']
+        b = self.p['b']
+        c = self.p['c']
+        x = self.p.get_val('x')
+        y = self.p.get_val('y')
+        z = self.p.get_val('z')
+
+        assert_near_equal(x, 2*a + b - c,1e-16)
+        assert_near_equal(y, -3*a + 7*b + 2*c,1e-16)
+        assert_near_equal(z, 3.3*a - 1.5*b + 5*c,1e-16)
+
+    def test_partials(self):
+        partials = self.p.check_partials(method='fd', out_stream=None)
+        assert_check_partials(partials)
+
+
 class TestAddSubtractUnits(unittest.TestCase):
 
     def setUp(self):

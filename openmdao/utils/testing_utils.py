@@ -190,6 +190,10 @@ def set_env_vars_context(**kwargs):
     ----------
     **kwargs : dict
         Keyword args corresponding to environment variables to set.
+
+    Yields
+    ------
+    None
     """
     saved = {}
     try:
