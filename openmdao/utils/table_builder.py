@@ -13,7 +13,12 @@ from openmdao.utils.file_utils import text2html
 from openmdao.utils.om_warnings import issue_warning
 
 
-_a2sym = {'center': '^', 'right': '>', 'left': '<'}
+_align2symbol = {
+    'center': '^',
+    'right': '>',
+    'left': '<'
+}
+
 _default_align = {
     'int': 'right',
     'real': 'right',
@@ -22,14 +27,7 @@ _default_align = {
 }
 
 
-def num_rows(rows):
-    i = 0
-    for _ in rows:
-        i += 1
-    return i
-
-
-def num_cols(rows):
+def _num_cols(rows):
     ncols = None
     for row in rows:
         i = 0
@@ -43,57 +41,72 @@ def num_cols(rows):
 
 
 class TableBuilder(object):
+    """
+    Base class for all table builders.
+
+    Parameters
+    ----------
+    rows : iter of iters
+        Data used to fill table cells.
+    headers : iter of str or None
+        If not None, header strings for all columns.  Size must match
+        number of columns in each row of data in rows.
+    column_meta : iter of dict or None
+        If not None, contains a dict for each table column and the dict contains values
+        of metadata for that column.
+    precision : int or str
+        Precision applied to all columns of real numbers.  May be overridden by column
+        metadata for a specific column. Defaults to 4.
+    missingval : str
+        A value that will replace any cell data having a value of None.  Defaults to ''.
+    max_width : int or None
+        If not None, specifies the maximum width, in characters, allowed for the table.
+        If the table cannot meet the max width requirement by resizing columns, the max_width
+        is ignored.
+
+    Attributes
+    ----------
+    _ncols : int
+        Number of columns.
+    _raw_rows : iter of iters
+        Table row data from the caller, possibly converted to list of lists if caller passed in
+        dict or iter of dicts.
+    _rows : list of lists
+        Table row data after initial formatting.
+    _column_meta : dict
+        Metadata for each column, keyed by column index, starting at 0.
+    _data_widths : list of int
+        Width of widest data cell in each column.
+    _header_widths : list of int
+        Width of each column header.
+    _missing_val : str
+        String to replace any data values of None.
+    _max_width : int or None
+        If not None, specifies the maximum allowable width, in characters, of the table.
+    _default_formats : dict
+        Dict mapping each column type to its default format string.
+    """
     allowed_col_meta = {'header', 'align', 'header_align', 'width', 'format',
                         'max_width', 'min_width', 'fixed_width'}
 
     def __init__(self, rows, headers=None, column_meta=None, precision=4, missingval='',
                  max_width=None):
         if headers == 'keys':
-            # handle case where rows is an iter of dicts
-            headers = []
-            if isinstance(rows, dict):
-                headers = list(rows.keys())
-                # each value is a column, so re-arrange to be row major, and allow columns of
-                # unequal length (to be compatible with tabulate).
+            headers, rows = self._dict2rows(rows)
 
-                # First, get max column length
-                maxcol = 0
-                for col in rows.values():
-                    clen = len(list(col))
-                    if clen > maxcol:
-                        maxcol = clen
-
-                new_rows = []
-                for col in rows.values():
-                    if not new_rows:
-                        new_rows = [[] for i in range(maxcol)]
-
-                    for row, cell in zip_longest(new_rows, col, fillvalue=''):
-                        row.append(cell)
-            else:
-                for row in rows:
-                    headers = list(row.keys())
-                    break
-                new_rows = []
-                for row in rows:
-                    new_rows.append(list(row.values()))
-
-            rows = new_rows
-
-        self._nrows = num_rows(rows)
-        self._ncols = num_cols(rows)
+        self._ncols = _num_cols(rows)
         self._raw_rows = rows # original rows passed in
         self._rows = None  # rows after initial formatting (total width not set)
         self._column_meta = {}
         self._data_widths = None  # width of data in each cell before a uniform column width is set
         self._header_widths = None  # width of headers before a uniform column width is set
-        self.missingval = missingval
-        self.max_width = max_width
+        self._missing_val = missingval
+        self._max_width = max_width
 
         # these are the default format strings for the first formatting stage,
         # before the column width is set
         self._default_formats = {
-            'real': "{" + f":.{precision}" + "}",
+            'real': f"{{:.{precision}}}",
             'int': "{}",
             'bool': "{}",
             'other': "{}",
@@ -124,7 +137,66 @@ class TableBuilder(object):
             raise RuntimeError("Number of headers and number of column metadata dicts must match "
                                f"if both are provided, but {hlen} != {clen}.")
 
+    def _dict2rows(self, rows):
+        """
+        Convert dict or iter of dicts into expected row and header data format.
+
+        Parameters
+        ----------
+        rows : dict or iter of dicts
+            Table cell and header data.
+
+        Returns
+        -------
+        list of lists
+            Table data cells.
+        list of str
+            Table headers.
+        """
+        headers = []
+        new_rows = []
+
+        if isinstance(rows, dict):
+            # each value is a column, so re-arrange to be row major, and allow columns of
+            # unequal length (to be compatible with tabulate).
+            headers = list(rows.keys())
+
+            # First, get max column length
+            maxcol = 0
+            for col in rows.values():
+                clen = len(list(col))
+                if clen > maxcol:
+                    maxcol = clen
+
+            for col in rows.values():
+                if not new_rows:
+                    new_rows = [[] for i in range(maxcol)]
+
+                for row, cell in zip_longest(new_rows, col, fillvalue=''):
+                    row.append(cell)
+        else:
+            # handle case where rows is an iter of dicts
+            try:
+                for row in rows:
+                    headers = list(row.keys())
+                    break
+            except AttributeError:
+                raise AttributeError("Since headers == 'keys', table builder was expecting an iter "
+                                     f"of dicts, but got an iter of {type(row).__name__}.")
+            for row in rows:
+                new_rows.append(list(row.values()))
+
+        return new_rows, headers
+
     def sorted_meta(self):
+        """
+        Return the column metadata sorted in ascending column order.
+
+        Returns
+        -------
+        list
+            The sorted column metadata.
+        """
         return [m for _, m in sorted(self._column_meta.items(), key=lambda x: x[0])]
 
     def _get_formatted_rows(self):
@@ -134,25 +206,45 @@ class TableBuilder(object):
         Returns
         -------
         list
-            The list of table rows where each cell is a string.
+            The list of table rows where each cell has been formatted.
         """
         if self._rows is None:
             self._update_col_meta_from_rows()
+            sorted_cols = self.sorted_meta()
             self._rows = []
             for row in self._raw_rows:
-                if self.missingval is not None:
-                    row = [self.missingval if v is None else v for v in row]
-                self._add_srow(row)
+                if self._missing_val is not None:
+                    row = [self._missing_val if v is None else v for v in row]
+                if self._rows and len(row) != len(self._rows[-1]):
+                    raise RuntimeError("Can't add rows of unequal length to TableBuilder.")
+
+                self._rows.append([self._format_cell(meta, cell)
+                                   for meta, cell in zip(sorted_cols, row)])
 
         return self._rows
 
     def _cell_width(self, cell):
+        """
+        Return the width of the cell.
+
+        Returns
+        -------
+        int
+            The width of the cell.
+        """
         return len(cell)
 
-    def _header_cell_width(self, content_width):
-        return content_width
-
     def _get_cell_types(self):
+        """
+        Yield the type of cells each column contains.
+
+        If columns have mixed types, yield 'other'.
+
+        Yields
+        ------
+        str
+            The type of the current column.
+        """
         types = []
         for row in self._raw_rows:
             if not types:
@@ -176,17 +268,22 @@ class TableBuilder(object):
                 yield tset.pop()
 
     def update_column_meta(self, col_idx, **options):
-        ncols = 0
-        for r in self._raw_rows:
-            ncols = len(r)
-            break
+        r"""
+        Update metadata for the column at the specified index (starting at index 0).
 
+        Parameters
+        ----------
+        col_idx : int
+            The index of the column.
+        **options : dict
+            The metadata dict will be updated with these options.
+        """
         if col_idx < 0:  # allow negative indices
-            col_idx = ncols + col_idx
+            col_idx = self._ncols + col_idx
 
-        if col_idx < 0 or col_idx >= ncols:
+        if col_idx < 0 or col_idx >= self._ncols:
             raise IndexError(f"Index '{col_idx}' is not a valid table column index for a table with"
-                             f" {ncols} columns.  The leftmost column has column index of 0.")
+                             f" {self._ncols} columns.  The leftmost column has column index of 0.")
 
         if col_idx not in self._column_meta:
             self._column_meta[col_idx] = {}
@@ -199,18 +296,20 @@ class TableBuilder(object):
             meta[name] = val
 
     def _set_widths(self):
+        """
+        Set data and header widths to their final values.
+        """
         if self._data_widths is not None:
             return  # widths already computed
 
         rows = self._get_formatted_rows()
-        ncols = len(self._column_meta)
 
-        if len(self._rows[0]) != ncols:
+        if len(self._rows[0]) != self._ncols:
             raise RuntimeError(f"Number of row entries ({len(self._rows[0])}) must match number of "
-                               f"columns ({ncols}) in TableBuilder.")
+                               f"columns ({self._ncols}) in TableBuilder.")
 
-        self._data_widths = [0] * ncols
-        self._header_widths = [0] * ncols
+        self._data_widths = [0] * self._ncols
+        self._header_widths = [0] * self._ncols
 
         for row in rows:
             for i, cell in enumerate(row):
@@ -226,14 +325,17 @@ class TableBuilder(object):
         self._set_max_column_widths()
 
     def _format_cell(self, meta, cell):
+        """
+        Apply the initial formatting (before final width setting) to a cell.
+
+        Parameters
+        ----------
+        meta : dict
+            Column metadata dict.
+        cell : object
+            Data contained in a table cell.
+        """
         return meta['format'].format(cell)
-
-    def _add_srow(self, row):
-        if self._rows and len(row) != len(self._rows[-1]):
-            raise RuntimeError("Can't add rows of unequal length to TableBuilder.")
-
-        self._rows.append([self._format_cell(self._column_meta[i], cell)
-                           for i, cell in enumerate(row)])
 
     def _update_col_meta_from_rows(self):
         """
@@ -260,7 +362,7 @@ class TableBuilder(object):
         """
         Return True if the width of the table or any column exceeds the its specified max_width.
         """
-        needs_wrap = self.max_width is not None and self.max_width < self._get_total_width()
+        needs_wrap = self._max_width is not None and self._max_width < self._get_total_width()
         if not needs_wrap:
             for meta in self._column_meta.values():
                 if meta['max_width'] is not None:
@@ -268,33 +370,38 @@ class TableBuilder(object):
         return needs_wrap
 
     def _set_min_widths(self):
-        for meta, wcell, wheader in zip(self.sorted_meta(), self._data_widths, self._header_widths):
+        """
+        Set minimum width for columns.
+        """
+        for meta, wcell in zip(self.sorted_meta(), self._data_widths):
             header = meta['header']
 
             # check if header is splittable into words, and if so, allow for min_width using a
             # split header if min_width will be > min data width.
             longest_part = max(len(word) for word in header.strip().split())
-            wheader = self._header_cell_width(longest_part)
 
             if meta['col_type'] == 'other':  # strings
-                meta['min_width'] = max(10, wheader)
+                meta['min_width'] = max(10, longest_part)
             else:
-                meta['min_width'] = max(wcell, wheader)
+                meta['min_width'] = max(wcell, longest_part)
 
-    def get_max_total_col_width(self, winfo):
+    def get_shrinkable_col_width(self, winfo):
         fixed_width = self._get_total_width() - sum([w for _, w, _ in winfo])
-        return self.max_width - fixed_width
+        return self._max_width - fixed_width
 
     def _set_max_column_widths(self):
+        """
+        Set the maximum allowable column widths based on the table max_width.
+        """
         # check for case where total table width is specified and we have to set max_width on
         # column(s) as a result
-        if self.max_width is not None and self.max_width < self._get_total_width():
+        if self._max_width is not None and self._max_width < self._get_total_width():
             winfo = [[i, w, meta['min_width']]
                       for (i, meta), w in zip(enumerate(self.sorted_meta()),
                                               self._get_column_widths())
                       if not meta.get('fixed_width')]
 
-            allowed_width = self.get_max_total_col_width(winfo)
+            allowed_width = self.get_shrinkable_col_width(winfo)
 
             # subtract 1 from the widest column until we meet the total max_width requirement,
             # or get as close as we can without violating a minimum allowed width.
@@ -311,9 +418,15 @@ class TableBuilder(object):
                 for i, w, _ in winfo:
                     self._column_meta[i]['max_width'] = w
 
-            return winfo
-
     def _get_column_widths(self):
+        """
+        Return the width of each column.
+
+        Returns
+        -------
+        list
+            The column widths.
+        """
         return [max(wd, wh) for wd, wh in zip(self._data_widths, self._header_widths)]
 
     def __str__(self):
@@ -326,7 +439,43 @@ class TableBuilder(object):
 
 
 class TextTableBuilder(TableBuilder):
+    r"""
+    Base class for all text-based table builders.
 
+    Parameters
+    ----------
+    rows : iter of iters
+        Data used to fill table cells.
+    column_sep : str
+        Column separator string.
+    top_border : str
+        Top border character(s).
+    bottom_border : str
+        Bottom border character(s).
+    header_bottom_border : str
+        Header bottom border character(s).
+    left_border : str
+        Left border character(s).
+    right_border : str
+        Right border character(s).
+    **kwargs : dict
+        Keyword args for the base class.
+
+    Attributes
+    ----------
+    _column_sep : str
+        Column separator string.
+    _top_border : str
+        Top border character(s).
+    _bottom_border : str
+        Bottom border character(s).
+    _header_bottom_border : str
+        Header bottom border character(s).
+    _left_border : str
+        Left border character(s).
+    _right_border : str
+        Right border character(s).
+    """
     def __init__(self, rows, column_sep=' | ', top_border='-', header_bottom_border='-',
                  bottom_border='-', left_border='| ', right_border=' |', **kwargs):
         super().__init__(rows, **kwargs)
@@ -339,6 +488,9 @@ class TextTableBuilder(TableBuilder):
         self.right_border = right_border
 
     def _get_total_width(self):
+        """
+        Return the total table width in characters.
+        """
         return sum(self._get_column_widths()) + len(self.column_sep) * (len(self._column_meta) - 1)\
             + len(self.left_border) + len(self.right_border)
 
@@ -365,7 +517,7 @@ class TextTableBuilder(TableBuilder):
         """
         align = col_meta.get(align_name, 'left')
         try:
-            sym = _a2sym[align]
+            sym = _align2symbol[align]
         except KeyError:
             raise KeyError(f"Expected one of ['left', 'right', 'center'] for '{align_name}' "
                            f"metadata, but got '{align}'.")
@@ -373,7 +525,19 @@ class TextTableBuilder(TableBuilder):
 
     def get_lengthened_columns(self, sorted_cols, header_cells):
         """
-        Yield as many rows of cells as needed to allow for multi-line cells due to work wrapping.
+        Yield as many rows of cells as needed to allow for multi-line cells due to word wrapping.
+
+        Parameters
+        ----------
+        sorted_cols : list of dict
+            List of sorted column metadata.
+        header_cells : list of str
+            List of header strings.
+
+        Yields
+        ------
+        list
+            Each row after expanding due to word wrapping.
         """
         cell_lists = []
         for meta, cell in zip(sorted_cols, header_cells):
@@ -398,7 +562,12 @@ class TextTableBuilder(TableBuilder):
 
     def _stringified_header_iter(self):
         """
-        Yields one or more rows of header cells.
+        Yield one or more rows of header cells.
+
+        Yields
+        ------
+        list
+            Each header row after expanding due to word wrapping.
         """
         header_cells = [None] * len(self._column_meta)
         self._set_widths()
@@ -735,9 +904,6 @@ class TabulatorJSBuilder(TableBuilder):
         self._header_padding = self._cell_padding + title_right_padding
         self.font_size = 14
 
-    def get_max_total_col_width(self, winfo):
-        return self.max_width
-
     def _cell_width(self, cell):
         # special handling for bool cells
         if isinstance(cell, bool):
@@ -765,17 +931,10 @@ class TabulatorJSBuilder(TableBuilder):
             meta['max_width'] = None
             meta['col_type'] = col_type
 
-            if notebook:
-                meta['headerSort'] = False
-
             if i in self._column_meta:
                 meta.update(self._column_meta[i])
 
             self._column_meta[i] = meta
-
-    def _header_cell_width(self, content_width):
-        # content_width assumed in pixels
-        return content_width + self._header_padding
 
     def get_table_data(self):
         rows = []
@@ -817,7 +976,7 @@ class TabulatorJSBuilder(TableBuilder):
             cols.append(cmeta)
 
         # for big tables, use virtual DOM for speed (setting height activates it)
-        if len(self._raw_rows) > 20 and self._table_meta['height'] is None:
+        if idx - 1 > 30 and self._table_meta['height'] is None:
             self._table_meta['height'] = 600
 
         self._table_meta['data'] = rows
