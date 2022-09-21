@@ -57,7 +57,7 @@ class TableBuilder(object):
     precision : int or str
         Precision applied to all columns of real numbers.  May be overridden by column
         metadata for a specific column. Defaults to 4.
-    missingval : str
+    missing_val : str
         A value that will replace any cell data having a value of None.  Defaults to ''.
     max_width : int or None
         If not None, specifies the maximum width, in characters, allowed for the table.
@@ -66,6 +66,10 @@ class TableBuilder(object):
 
     Attributes
     ----------
+    missing_val : str
+        String to replace any data values of None.
+    max_width : int or None
+        If not None, specifies the maximum allowable width, in characters, of the table.
     _ncols : int
         Number of columns.
     _raw_rows : iter of iters
@@ -79,17 +83,13 @@ class TableBuilder(object):
         Width of widest data cell in each column.
     _header_widths : list of int
         Width of each column header.
-    _missing_val : str
-        String to replace any data values of None.
-    _max_width : int or None
-        If not None, specifies the maximum allowable width, in characters, of the table.
     _default_formats : dict
         Dict mapping each column type to its default format string.
     """
     allowed_col_meta = {'header', 'align', 'header_align', 'width', 'format',
                         'max_width', 'min_width', 'fixed_width'}
 
-    def __init__(self, rows, headers=None, column_meta=None, precision=4, missingval='',
+    def __init__(self, rows, headers=None, column_meta=None, precision=4, missing_val='',
                  max_width=None):
         if headers == 'keys':
             headers, rows = self._dict2rows(rows)
@@ -100,8 +100,8 @@ class TableBuilder(object):
         self._column_meta = {}
         self._data_widths = None  # width of data in each cell before a uniform column width is set
         self._header_widths = None  # width of headers before a uniform column width is set
-        self._missing_val = missingval
-        self._max_width = max_width
+        self.missing_val = missing_val
+        self.max_width = max_width
 
         # these are the default format strings for the first formatting stage,
         # before the column width is set
@@ -213,8 +213,8 @@ class TableBuilder(object):
             sorted_cols = self.sorted_meta()
             self._rows = []
             for row in self._raw_rows:
-                if self._missing_val is not None:
-                    row = [self._missing_val if v is None else v for v in row]
+                if self.missing_val is not None:
+                    row = [self.missing_val if v is None else v for v in row]
                 if self._rows and len(row) != len(self._rows[-1]):
                     raise RuntimeError("Can't add rows of unequal length to TableBuilder.")
 
@@ -362,7 +362,7 @@ class TableBuilder(object):
         """
         Return True if the width of the table or any column exceeds the its specified max_width.
         """
-        needs_wrap = self._max_width is not None and self._max_width < self._get_total_width()
+        needs_wrap = self.max_width is not None and self.max_width < self._get_total_width()
         if not needs_wrap:
             for meta in self._column_meta.values():
                 if meta['max_width'] is not None:
@@ -387,7 +387,7 @@ class TableBuilder(object):
 
     def get_shrinkable_col_width(self, winfo):
         fixed_width = self._get_total_width() - sum([w for _, w, _ in winfo])
-        return self._max_width - fixed_width
+        return self.max_width - fixed_width
 
     def _set_max_column_widths(self):
         """
@@ -395,7 +395,7 @@ class TableBuilder(object):
         """
         # check for case where total table width is specified and we have to set max_width on
         # column(s) as a result
-        if self._max_width is not None and self._max_width < self._get_total_width():
+        if self.max_width is not None and self.max_width < self._get_total_width():
             winfo = [[i, w, meta['min_width']]
                       for (i, meta), w in zip(enumerate(self.sorted_meta()),
                                               self._get_column_widths())
@@ -588,6 +588,8 @@ class TextTableBuilder(TableBuilder):
     def _stringified_row_iter(self):
         """
         Yields rows of data cells, allowing for multi-line rows due to word wrapping.
+
+        The cells are all strings with the same width as their column.
         """
         self._set_widths()
         widths = self._get_column_widths()
@@ -628,36 +630,36 @@ class TextTableBuilder(TableBuilder):
     def add_side_borders(self, line):
         if self.left_border or self.right_border:
             parts = [p for p in (self.left_border, line, self.right_border) if p]
-            line = ''.join(parts)
+            return ''.join(parts)
         return line
 
     def get_top_border(self, header_cells):
         width = sum(len(h) for h in header_cells) + len(self.column_sep) * (len(header_cells) - 1)
-        return self.add_side_borders((self.top_border * width)[:width])
+        return (self.top_border * width)[:width]
 
     def get_header_bottom_border(self, header_cells):
         parts = [(self.header_bottom_border * len(h))[:len(h)] for h in header_cells]
-        return self.add_side_borders(self.column_sep.join(parts))
+        return self.column_sep.join(parts)
 
     def get_bottom_border(self, header_cells):
         parts = [(self.bottom_border * len(h))[:len(h)] for h in header_cells]
-        return self.add_side_borders(self.column_sep.join(parts))
+        return self.column_sep.join(parts)
 
     def write(self, stream=sys.stdout):
         for i, header_cells in enumerate(self._stringified_header_iter()):
             if i == 0 and self.top_border:
-                print(self.get_top_border(header_cells), file=stream)
+                print(self.add_side_borders(self.get_top_border(header_cells)), file=stream)
 
             print(self.add_side_borders(self.column_sep.join(header_cells)), file=stream)
 
         if self.header_bottom_border:
-            print(self.get_header_bottom_border(header_cells), file=stream)
+            print(self.add_side_borders(self.get_header_bottom_border(header_cells)), file=stream)
 
         for row_cells in self._stringified_row_iter():
             print(self.add_side_borders(self.column_sep.join(row_cells)), file=stream)
 
         if self.bottom_border:
-            print(self.get_bottom_border(header_cells), file=stream)
+            print(self.add_side_borders(self.get_bottom_border(header_cells)), file=stream)
 
     def display(self, outfile=None):
         if outfile is None:
@@ -1087,5 +1089,5 @@ if __name__ == '__main__':
         tab = random_table(tablefmt=fmt, coltypes=coltypes, nrows=55)
         if fmt == 'html':
             tab.update_column_meta(3, header_style={'text-align': 'right'})
-        tab.max_width = 200
+        tab.max_width = 100
         tab.display()

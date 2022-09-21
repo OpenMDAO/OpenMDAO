@@ -194,7 +194,7 @@ class OptionsDictionary(object):
         kwargs = {
             'tablefmt': fmt,
             'headers': hdrs,
-            'missingval': missingval,
+            'missing_val': missingval,
             'max_width': max_width,
         }
         if fmt == 'tabulator':
