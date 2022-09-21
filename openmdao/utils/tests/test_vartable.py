@@ -242,9 +242,6 @@ class TestNotebookListIO(unittest.TestCase):
 
 @use_tempdirs
 class TestNotebookCaseReader(unittest.TestCase):
-    def write_html(self, x):
-        self.html_stream.write(x)
-
     def setUp(self):
         # override notebook flag for system, variable table and sqlite_reader
         from openmdao.core import system
@@ -254,8 +251,8 @@ class TestNotebookCaseReader(unittest.TestCase):
 
         # capture HTML output from variable_table
         self.html_stream = StringIO()
-        variable_table.HTML = self.write_html # lambda x: self.html_stream.write(x)
-        sqlite_reader.HTML = self.write_html  # lambda x: self.html_stream.write(x)
+        variable_table.HTML = lambda x: self.html_stream.write(x)
+        sqlite_reader.HTML = lambda x: self.html_stream.write(x)
 
         # create recorder
         self.filename = "cases.sql"

@@ -1,3 +1,6 @@
+"""
+Table building classes.
+"""
 
 import sys
 import os
@@ -84,16 +87,20 @@ class TableBuilder(object):
     _default_formats : dict
         Dict mapping each column type to its default format string.
     """
+
     allowed_col_meta = {'header', 'align', 'header_align', 'width', 'format',
                         'max_width', 'min_width', 'fixed_width'}
 
     def __init__(self, rows, headers=None, column_meta=None, precision=4, missing_val='',
                  max_width=None):
+        """
+        Initialize all attributes.
+        """
         if headers == 'keys':
             rows, headers = self._dict2rows(rows)
 
         self._ncols = _num_cols(rows)
-        self._raw_rows = rows # original rows passed in
+        self._raw_rows = rows  # original rows passed in
         self._rows = None  # rows after initial formatting (total width not set)
         self._column_meta = {}
         self._data_widths = None  # width of data in each cell before a uniform column width is set
@@ -120,7 +127,6 @@ class TableBuilder(object):
             if hlen != self._ncols:
                 raise RuntimeError("Number of headers and number of data columns must match, but "
                                    f"{hlen} != {self._ncols}.")
-
 
         if column_meta is not None:
             i = -1
@@ -371,6 +377,11 @@ class TableBuilder(object):
     def needs_wrap(self):
         """
         Return True if the width of the table or any column exceeds the its specified max_width.
+
+        Returns
+        -------
+        bool
+            Indicates whether or not this table requires word wrapping to fit the maximum width.
         """
         needs_wrap = self.max_width is not None and self.max_width < self._get_total_width()
         if not needs_wrap:
@@ -403,9 +414,9 @@ class TableBuilder(object):
         # column(s) as a result
         if self.max_width is not None and self.max_width < self._get_total_width():
             winfo = [[i, w, meta['min_width']]
-                      for (i, meta), w in zip(enumerate(self.sorted_meta()),
-                                              self._get_column_widths())
-                      if not meta.get('fixed_width')]
+                     for (i, meta), w in zip(enumerate(self.sorted_meta()),
+                                             self._get_column_widths())
+                     if not meta.get('fixed_width')]
 
             fixed_width = self._get_total_width() - sum([w for _, w, _ in winfo])
             allowed_width = self.max_width - fixed_width
@@ -470,21 +481,25 @@ class TextTableBuilder(TableBuilder):
 
     Attributes
     ----------
-    _column_sep : str
+    column_sep : str
         Column separator string.
-    _top_border : str
+    top_border : str
         Top border character(s).
-    _bottom_border : str
+    bottom_border : str
         Bottom border character(s).
-    _header_bottom_border : str
+    header_bottom_border : str
         Header bottom border character(s).
-    _left_border : str
+    left_border : str
         Left border character(s).
-    _right_border : str
+    right_border : str
         Right border character(s).
     """
-    def __init__(self, rows, column_sep=' | ', top_border='-', header_bottom_border='-',
-                 bottom_border='-', left_border='| ', right_border=' |', **kwargs):
+
+    def __init__(self, rows, column_sep=' | ', top_border='-', bottom_border='-',
+                 header_bottom_border='-', left_border='| ', right_border=' |', **kwargs):
+        """
+        Initialize all attributes.
+        """
         super().__init__(rows, **kwargs)
 
         self.column_sep = column_sep
@@ -594,9 +609,14 @@ class TextTableBuilder(TableBuilder):
 
     def _stringified_row_iter(self):
         """
-        Yields rows of data cells, allowing for multi-line rows due to word wrapping.
+        Yield rows of data cells, allowing for multi-line rows due to word wrapping.
 
         The cells are all strings with the same width as their column.
+
+        Yields
+        ------
+        list
+            List of cells for the current row.
         """
         self._set_widths()
         widths = self._get_column_widths()
@@ -635,24 +655,84 @@ class TextTableBuilder(TableBuilder):
                 yield row_cells
 
     def add_side_borders(self, line):
+        """
+        Add side borders to the given line.
+
+        Parameters
+        ----------
+        line : str
+            The border will be added to this line.
+
+        Returns
+        -------
+        str
+            The line with side borders added.
+        """
         if self.left_border or self.right_border:
             parts = [p for p in (self.left_border, line, self.right_border) if p]
             return ''.join(parts)
         return line
 
     def get_top_border(self, header_cells):
+        """
+        Return the top border string for this table.
+
+        Parameters
+        ----------
+        header_cells : list of str
+            The list of header cells.
+
+        Returns
+        -------
+        str
+            The top border string.
+        """
         width = sum(len(h) for h in header_cells) + len(self.column_sep) * (len(header_cells) - 1)
         return (self.top_border * width)[:width]
 
     def get_header_bottom_border(self, header_cells):
+        """
+        Return the header bottom border string for this table.
+
+        Parameters
+        ----------
+        header_cells : list of str
+            The list of header cells.
+
+        Returns
+        -------
+        str
+            The header bottom border string.
+        """
         parts = [(self.header_bottom_border * len(h))[:len(h)] for h in header_cells]
         return self.column_sep.join(parts)
 
     def get_bottom_border(self, header_cells):
+        """
+        Return the bottome border string for this table.
+
+        Parameters
+        ----------
+        header_cells : list of str
+            The list of header cells.
+
+        Returns
+        -------
+        str
+            The bottome border string.
+        """
         parts = [(self.bottom_border * len(h))[:len(h)] for h in header_cells]
         return self.column_sep.join(parts)
 
     def write(self, stream=sys.stdout):
+        """
+        Write this table to the given stream.
+
+        Parameters
+        ----------
+        stream : file-like
+            The output stream.
+        """
         for i, header_cells in enumerate(self._stringified_header_iter()):
             if i == 0 and self.top_border:
                 print(self.add_side_borders(self.get_top_border(header_cells)), file=stream)
@@ -669,6 +749,14 @@ class TextTableBuilder(TableBuilder):
             print(self.add_side_borders(self.get_bottom_border(header_cells)), file=stream)
 
     def display(self, outfile=None):
+        """
+        Display this table.
+
+        Parameters
+        ----------
+        outfile : str or None
+            If None, print this table to stdout, else write it to the named file.
+        """
         if outfile is None:
             print(self)
         else:
@@ -687,7 +775,11 @@ class RSTTableBuilder(TextTableBuilder):
     **kwargs : dict
         Keyword args for the base class.
     """
+
     def __init__(self, rows, **kwargs):
+        """
+        Initialize all attributes.
+        """
         super().__init__(rows, column_sep='  ', top_border='=', header_bottom_border='=',
                          bottom_border='=', left_border='', right_border='', **kwargs)
 
@@ -710,11 +802,38 @@ class RSTTableBuilder(TextTableBuilder):
 
 
 class GithubTableBuilder(TextTableBuilder):
+    r"""
+    Class that generates a table in Github markdown format.
+
+    Parameters
+    ----------
+    rows : iter of iters
+        Data used to fill table cells.
+    **kwargs : dict
+        Keyword args for the base class.
+    """
+
     def __init__(self, rows, **kwargs):
+        """
+        Initialize all attributes.
+        """
         super().__init__(rows, column_sep=' | ', top_border='', header_bottom_border='-',
                          bottom_border='', left_border='| ', right_border=' |', **kwargs)
 
     def get_header_bottom_border(self, header_cells):
+        """
+        Return the header bottom border string.
+
+        Parameters
+        ----------
+        header_cells : list of str
+            List of header cells.
+
+        Returns
+        -------
+        str
+            The header bottom border string.
+        """
         parts = []
         for i, cell in enumerate(header_cells):
             meta = self._column_meta[i]
@@ -735,16 +854,78 @@ class GithubTableBuilder(TextTableBuilder):
         return self.column_sep.join(parts)
 
     def needs_wrap(self):
+        """
+        Return False.
+
+        This table does not allow word wrapping.
+
+        Returns
+        -------
+        False
+            No wrapping will be used.
+        """
         return False  # github tables seem to have no support for text wrapping in columns
 
 
+def _to_inline_style(dct):
+    """
+    For the given dict, return an inline HTML style string.
+
+    Parameters
+    ----------
+    dct : dict
+        The dict containing style parameters and their values.
+
+    Returns
+    -------
+    str
+        The inline style string.
+    """
+    parts = ' '.join([f"{name}: {val};" for name, val in dct.items()])
+    if parts:
+        return f' style="{parts}"'
+    return ''
+
+
+_default_html_table = 'table.html'
+
+
 class HTMLTableBuilder(TableBuilder):
+    r"""
+    Class that generates a table in plain HTML format.
+
+    Parameters
+    ----------
+    rows : iter of iters
+        Data used to fill table cells.
+    html_id : str or None
+        If not None, the HTML id for the <table> block.
+    title : str or None
+        If not None, the title appearing above the table on the web page.
+    style : dict or None
+        If not None, a dict mapping table style parameters to their values.
+    **kwargs : dict
+        Keyword args for the base class.
+
+    Attributes
+    ----------
+    _style : dict or None
+        Mapping of style parameters to the values for the table.
+    _html_id : str or None
+        If not None, this is the html id of the table block.
+    _title : str or None
+        If not None, this is the title that will appear on the web page above the table.
+    """
+
     allowed_col_meta = TableBuilder.allowed_col_meta.union({
         'header_style',
         'style',
     })
 
     def __init__(self, rows, html_id=None, title='', style=None, **kwargs):
+        """
+        Initialize all attributes.
+        """
         super().__init__(rows, **kwargs)
         tstyle = {
             'margin': 'auto',
@@ -756,37 +937,36 @@ class HTMLTableBuilder(TableBuilder):
         self._title = title
 
     def _stringified_row_iter(self):
+        """
+        Yield rows of string data cells whose width matches their column width.
+
+        Yields
+        ------
+        list
+            List of cells for the current row.
+        """
         for row in self._get_formatted_rows():
             yield row
 
-    def _header_style(self, meta):
-        if 'header_style' in meta and meta['header_style']:
-            parts = ' '.join([f"{name}: {val};" for name, val in meta['header_style'].items()])
-            if parts:
-                return f' style="{parts}"'
-        return ''
-
-    def _get_type_style(self, typename):
-        style = self._type_styles[typename]
-        if style:
-            parts = ' '.join([f"{name}: {val};" for name, val in style.items()])
-            if parts:
-                return f' style="{parts}"'
-        return ''
-
-    def _get_style(self):
-        parts = ' '.join([f"{name}: {val};" for name, val in self._style.items()])
-        return f' style="{parts}"' if parts else ''
-
-    def _get_id(self):
-        return f' id="{self._html_id}"' if self._html_id else ''
-
     def write(self, stream=sys.stdout):
-        print(f'<table{self._get_id()}{self._get_style()}>', file=stream)
+        """
+        Write this table to the given stream.
+
+        Parameters
+        ----------
+        stream : file-like
+            The output stream.
+        """
+        html_id = f' id="{self._html_id}"' if self._html_id else ''
+        print(f'<table{html_id}{_to_inline_style(self._style)}>', file=stream)
 
         print("   <tr>", file=stream, end='')
         for meta in self.sorted_meta():
-            print(f"<th{self._header_style(meta)}>{escape(meta['header'])}</th>",
+            if 'header_style' in meta and meta['header_style']:
+                header_style = _to_inline_style(meta['header_style'])
+            else:
+                header_style = ''
+            print(f"<th{header_style}>{escape(meta['header'])}</th>",
                   file=stream, end='')
         print("</tr>", file=stream)
 
@@ -800,8 +980,19 @@ class HTMLTableBuilder(TableBuilder):
         print("</table>", file=stream)
 
     def write_html(self, outfile=None):
+        """
+        Write this table to the given output file.
+
+        If outfile is not given, write this table to 'table.html' in the current
+        directory.
+
+        Parameters
+        ----------
+        outfile : str or None
+            If not None, the output file where the HTML will be written.
+        """
         if outfile is None:
-            outfile = 'table.html'
+            outfile = _default_html_table
 
         table = f"""
             <!DOCTYPE html>
@@ -852,8 +1043,19 @@ class HTMLTableBuilder(TableBuilder):
             f.write(table)
 
     def display(self, outfile=None):
+        """
+        Display this table, either in a notebook or a browser.
+
+        This table will also be written to outfile.  If outfile is not supplied, the table
+        will be written to 'table.html' in the current directory.
+
+        Parameters
+        ----------
+        outfile : str or None
+            If None, write this table to 'table.html'.
+        """
         if outfile is None:
-            outfile = 'table.html'
+            outfile = _default_html_table
 
         self.write_html(outfile)
 
@@ -901,8 +1103,49 @@ _tabulator_typemeta = {
     }
 }
 
+_default_tabulator_file = 'tabulator_table.html'
+
 
 class TabulatorJSBuilder(TableBuilder):
+    r"""
+    Class that generates an interactive table using Tabulator.js.
+
+    Parameters
+    ----------
+    rows : iter of iters
+        Data used to fill table cells.
+    layout : str or None
+        If supplied, Tabulator.js will use this table layout method.  Allowed values are
+        ['fitColumns', 'fitDataTable'].
+    height : int or None
+        If not None, set the table to this height in pixels.
+    html_id : str or None
+        If not None, the HTML id for the <table> block.
+    title : str or None
+        If not None, the title appearing above the table on the web page.
+    filter : bool
+        If True, include filter fields in the column headers where it makes sense.
+    sort : bool
+        If True, add sorting to column headers.
+    **kwargs : dict
+        Keyword args for the base class.
+
+    Attributes
+    ----------
+    _html_id : str or None
+        If not None, this is the html id of the table block.
+    _title : str or None
+        If not None, this is the title that will appear on the web page above the table.
+    _filter : bool
+        If True, include filter fields in the column headers where it makes sense.
+    _sort : bool
+        If True, add sorting to column headers.
+    _table_meta : dict
+        Metadata for the table.
+    font_size : int
+        The font size used by the table.
+    """
+
     allowed_col_meta = TableBuilder.allowed_col_meta.union({
         'filter',
         'header_align',
@@ -911,10 +1154,13 @@ class TabulatorJSBuilder(TableBuilder):
     })
 
     def __init__(self, rows, layout=None, height=None, html_id='tabul-table', title='',
-                 display_in_notebook=True, show_browser=True, outfile='tabulator_table.html',
                  filter=True, sort=True, **kwargs):
+        """
+        Initialize all attributes.
+        """
         super().__init__(rows, **kwargs)
         self._html_id = html_id if html_id.startswith('#') else '#' + html_id
+        self._title = title
         self._filter = filter
         self._sort = sort
 
@@ -922,40 +1168,80 @@ class TabulatorJSBuilder(TableBuilder):
             'layout': layout,
             'height': height,
         }
-        self._title = title
-        self._display_in_notebook = display_in_notebook
-        self._show_browser = show_browser
-        self._outfile = outfile
 
-        # HTML sizing (in pixels)
-        resize_handle_w = 0 # 5
-        padding = 0 # 4
-        title_right_padding = 0 # 25
-
-        self._cell_padding = 2 * (resize_handle_w + padding)
-        self._header_padding = self._cell_padding + title_right_padding
         self.font_size = 14
 
     def _cell_width(self, cell):
+        """
+        Return given cell's width in characters.
+
+        This table's bool cells are left as bools instead of converted to strings in order to
+        make the Tabulator.js table sorting work properly for bool columns, so this method
+        will return a width for bool cells.
+
+        Parameters
+        ----------
+        cell : str or bool
+            The contents of the current table cell.
+
+        Returns
+        -------
+        int
+            The width of the cell.
+        """
         # special handling for bool cells
         if isinstance(cell, bool):
             return 5
         return len(cell)
 
     def _format_cell(self, meta, cell):
+        """
+        Return the string formatted form of the cell, but leave bool cells unmodified.
+
+        Parameters
+        ----------
+        meta : dict
+            The metadata for the current column.
+        cell : str or bool
+            The current table cell.
+
+        Returns
+        -------
+        str or bool
+            The formatted cell if it's a str, else the unmodified cell.
+        """
         if isinstance(cell, bool):
             return cell
         return meta['format'].format(cell)
 
     def _get_total_width(self):
+        """
+        Return the total table width in characters.
+
+        Returns
+        -------
+        int
+            The total table width.
+        """
         return sum(self._get_column_widths())
 
     def _stringified_row_iter(self):
+        """
+        Yield rows of string data cells.
+
+        Yields
+        ------
+        list
+            List of cells for the current row.
+        """
         self._set_widths()
         for row in self._get_formatted_rows():
             yield row
 
     def _update_col_meta_from_rows(self):
+        """
+        Fill in missing column metadata based on the data types of column contents.
+        """
         for i, col_type in enumerate(self._get_cell_types()):
             meta = _tabulator_typemeta[col_type].copy()
             meta['format'] = self._default_formats[col_type]
@@ -968,7 +1254,15 @@ class TabulatorJSBuilder(TableBuilder):
 
             self._column_meta[i] = meta
 
-    def get_table_data(self):
+    def _get_table_data(self):
+        """
+        Return table data in a format that can be converted to json for Tabulator.js to use.
+
+        Returns
+        -------
+        dict
+            A dict to be converted to json and provided to Tabulator.js.
+        """
         rows = []
         idx = 1  # unique ID for use by Tabulator
 
@@ -1027,12 +1321,30 @@ class TabulatorJSBuilder(TableBuilder):
         }
 
     def write_html(self, outfile=None):
-        import openmdao.visualization
+        """
+        Write this table to the given output file.
 
+        If outfile is not given, write this table to 'tabulator_table.html' in the current
+        directory.
+
+        Parameters
+        ----------
+        outfile : str or None
+            If not None, the output file where the HTML will be written.
+        """
         if outfile is None:
-            outfile = self._outfile
+            outfile = _default_tabulator_file
 
         outfile = os.path.relpath(outfile)
+
+        with open(outfile, 'w', encoding='utf-8') as f:
+            f.write(str(self))
+
+    def __str__(self):
+        """
+        Return a string representation of the Table.
+        """
+        import openmdao.visualization
 
         code_dir = os.path.dirname(openmdao.visualization.__file__)
         libs_dir = os.path.join(code_dir, 'common', 'libs')
@@ -1050,29 +1362,33 @@ class TabulatorJSBuilder(TableBuilder):
             tabulator_style = f.read()
         s = s.replace("<tabulator_style>", tabulator_style)
 
-        jsontxt = json.dumps(self.get_table_data())
+        jsontxt = json.dumps(self._get_table_data())
         s = s.replace("<table_data>", jsontxt)
         del jsontxt
 
-        with open(outfile, 'w', encoding='utf-8') as f:
-            f.write(s)
-
-    def __str__(self):
-        """
-        Return a string representation of the Table.
-        """
-        return ''
+        return s
 
     def display(self, outfile=None):
+        """
+        Display this table, either in a notebook or a browser.
+
+        This table will also be written to outfile.  If outfile is not supplied, the table
+        will be written to '{_default_tabulator_file}' in the current directory.
+
+        Parameters
+        ----------
+        outfile : str or None
+            If None, write this table to '{_default_tabulator_file}'.
+        """
         if outfile is None:
-            outfile = self._outfile
+            outfile = _default_tabulator_file
 
         self.write_html(outfile)
         if notebook:
             if not colab:
-                display(IFrame(src=self._outfile, width="100%", height=700))
+                display(IFrame(src=outfile, width="100%", height=700))
             else:
-                display(HTML(self._outfile))
+                display(HTML(outfile))
         else:
             # open it up in the browser
             from openmdao.utils.webview import webview
@@ -1080,6 +1396,23 @@ class TabulatorJSBuilder(TableBuilder):
 
 
 def to_table(rows, tablefmt='text', **options):
+    r"""
+    Return the specified table builder class.
+
+    Parameters
+    ----------
+    rows : iter of iters
+        This specifies the cells in each table row.
+    tablefmt : str
+        This determines which table builder object will be returned.
+    **options : dict
+        Named arguments specific to a given table builder class.
+
+    Returns
+    -------
+    TableBuilder
+        A table builder object.
+    """
     _table_types = {
         'text': TextTableBuilder,
         'github': GithubTableBuilder,

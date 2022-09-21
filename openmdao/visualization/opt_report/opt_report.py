@@ -314,8 +314,7 @@ def _make_obj_table(objs_meta, objs_vals,
                 row[col_name] = meta[col_name]
         rows.append(row)
 
-    return to_table(rows, headers='keys', tablefmt='html')  #, floatfmt='.4e', stralign='left',
-                    # numalign='left')
+    return to_table(rows, headers='keys', tablefmt='html')
 
 
 def _make_dvcons_table(meta_dict, vals_dict, kind,
@@ -446,9 +445,9 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
 
         rows.append(row)
 
-    return to_table(rows, headers='keys', tablefmt='html')
-                    # tablefmt='unsafehtml',
-                    # floatfmt='.4e', stralign='center', numalign='left')
+    table = to_table(rows, headers='keys', tablefmt='html')
+    table.precision = '.4e'
+    return table
 
 
 def _sparkline(kind, meta, val, width=300):
