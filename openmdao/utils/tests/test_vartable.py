@@ -6,7 +6,7 @@ from io import StringIO
 
 import openmdao.api as om
 
-from openmdao.utils.notebook_utils import notebook_mode
+from openmdao.utils.notebook_utils import notebook
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.testing_utils import use_tempdirs
 
@@ -39,6 +39,7 @@ when called with the default output stream in a jupyter notebook.
 - list_cases(coord, recurse=True, flat=True)
 """
 
+@unittest.skipUnless(notebook, "Only runs if IPython is installed.")
 @use_tempdirs
 class TestNotebookListIO(unittest.TestCase):
 
@@ -240,6 +241,7 @@ class TestNotebookListIO(unittest.TestCase):
             self.assertTrue(name in captured_HTML)
 
 
+@unittest.skipUnless(notebook, "Only runs if IPython is installed.")
 @use_tempdirs
 class TestNotebookCaseReader(unittest.TestCase):
     def setUp(self):
@@ -476,6 +478,7 @@ class TestNotebookCaseReader(unittest.TestCase):
             self.assertTrue(case in captured_HTML)
 
 
+@unittest.skipUnless(notebook, "Only runs if IPython is installed.")
 @use_tempdirs
 class TestNotebookDriverCases(unittest.TestCase):
 
