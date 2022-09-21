@@ -64,9 +64,9 @@ if __name__ == '__main__':
     p.setup(mode='fwd', force_alloc_complex=True)
     p.run_model()
 
-    start = time.time()
+    start = time.perf_counter()
     J = p.compute_totals(of=['comp.y'], wrt=['indep.x'])
 
     print("norm J - mat:", np.linalg.norm(J['comp.y','indep.x'] - comp.mat))
-    print("Elapsed time:", time.time() - start)
+    print("Elapsed time:", time.perf_counter() - start)
 

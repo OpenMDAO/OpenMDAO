@@ -97,7 +97,7 @@ class RecordingManager(object):
             return
 
         if metadata is not None:
-            metadata['timestamp'] = time.time()
+            metadata['timestamp'] = time.perf_counter()
 
         for recorder in self._recorders:
             recorder.record_iteration(recording_requester, data, metadata)
@@ -119,7 +119,7 @@ class RecordingManager(object):
             return
 
         if metadata is not None:
-            metadata['timestamp'] = time.time()
+            metadata['timestamp'] = time.perf_counter()
 
         for recorder in self._recorders:
             recorder.record_derivatives(recording_requester, data, metadata)

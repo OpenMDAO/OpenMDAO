@@ -1192,7 +1192,7 @@ class System(object):
 
         save_first_call = self._first_call_to_linearize
         self._first_call_to_linearize = False
-        sparsity_start_time = time.time()
+        sparsity_start_time = time.perf_counter()
 
         # for groups, this does some setup of approximations
         self._setup_approx_coloring()
@@ -1243,7 +1243,7 @@ class System(object):
             for scheme in self._approx_schemes.values():
                 scheme._reset()
 
-        sparsity_time = time.time() - sparsity_start_time
+        sparsity_time = time.perf_counter() - sparsity_start_time
 
         ordered_wrt_info = list(self._jac_wrt_iter(info['wrt_matches']))
         ordered_of_info = list(self._jac_of_iter())
