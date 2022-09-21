@@ -927,28 +927,25 @@ class HTMLTableBuilder(TableBuilder):
         Initialize all attributes.
         """
         super().__init__(rows, **kwargs)
+        self._data_style = {
+            'border': '1px solid #999',
+            'border-collapse': 'collapse',
+            'padding': '5px',
+        }
+        self._header_style = {
+            'border': '1px solid #999',
+            'border-collapse': 'collapse',
+            'padding': '5px',
+            'background-color': '#E9E9E9',
+        }
         tstyle = {
             'margin': 'auto',
+            'border': '1px solid #999',
+            'border-collapse': 'collapse',
         }
-                    # tr:nth-child(odd) {
-                    #     background-color: #EFEFEF;
-                    # }
-                    # tr:hover {
-                    #     background-color: #D6EEEE;
-                    # }
-                    # table, th, td {
-                    #     border: 1px solid #999;
-                    #     border-collapse: collapse;
-                    # }
-                    # th, td {
-                    #     padding: 5px;
-                    # }
-                    # th {
-                    #     text-align: center;
-                    #     background-color: #e6e6e6;
-                    # }
         if style is not None:
             tstyle.update(style)
+
         self._style = tstyle
         self._html_id = html_id
         self._title = title
@@ -967,10 +964,12 @@ class HTMLTableBuilder(TableBuilder):
 
     def _assemble(self):
         rlines = []
-        for row_cells in self._stringified_row_iter():
-            parts = ["   <tr>"]
+        for irow, row_cells in enumerate(self._stringified_row_iter()):
+            row_style = {'background-color': '#F3F3F3' if irow % 2 else 'ghostwhite'}
+            parts = [f"   <tr{_to_inline_style(row_style)}>"]
             for cell, meta in zip(row_cells, self.sorted_meta()):
-                style = {'text-align':  meta['align']}
+                style = self._data_style.copy()
+                style['text-align'] = meta['align']
                 parts.append(f'<td{_to_inline_style(style)}>{escape(cell)}</td>')
             parts.append("</tr>")
             rlines.append(''.join(parts))
@@ -984,10 +983,11 @@ class HTMLTableBuilder(TableBuilder):
         # parts of the column metadata.
         hparts = ["   <tr>"]
         for meta in self.sorted_meta():
+            style = self._header_style.copy()
+            style['text-align'] = meta['header_align']
             if 'header_style' in meta and meta['header_style']:
-                header_style = _to_inline_style(meta['header_style'])
-            else:
-                header_style = _to_inline_style({'text-align': meta['header_align']})
+                style.update(meta['header_style'])
+            header_style = _to_inline_style(style)
             hparts.append(f"<th{header_style}>{escape(meta['header'])}</th>")
         hparts.append("</tr>")
         lines.append(''.join(hparts))
