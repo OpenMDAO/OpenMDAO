@@ -106,7 +106,6 @@ def write_var_table(pathname, var_list, var_type, var_dict,
             rows.append([name] + [var_dict[name][field] for field in column_names])
 
         hdrs = ['varname'] + column_names
-        # algn = ["center"] * len(hdrs)  # colalign "left" is currently broken
         display(HTML(str(to_table(rows, headers=hdrs, tablefmt='html'))))
         return
 
@@ -206,9 +205,9 @@ def write_source_table(source_dicts, out_stream):
 
     # use table_builder if we are in a notebook and are using the default out_stream
     if notebook and out_stream is _DEFAULT_OUT_STREAM:
-        use_table_builder = True
+        fmt = "html"
     else:
-        use_table_builder = False
+        fmt = "text"
 
     if out_stream is _DEFAULT_OUT_STREAM:
         out_stream = sys.stdout
@@ -223,14 +222,11 @@ def write_source_table(source_dicts, out_stream):
         source_dicts = [source_dicts]
 
     for source_dict in source_dicts:
-        if use_table_builder:
-            display(HTML(str(to_table(source_dict, headers='keys', tablefmt='html'))))
+        table = to_table(source_dict, headers='keys', tablefmt=fmt)
+        if fmt == 'html':
+            display(HTML(str(table)))
         else:
-            for key, value in source_dict.items():
-                if value:
-                    out_stream.write(f'{key}\n')
-                    for val in value:
-                        out_stream.write(f'    {val}\n')
+            table.write(out_stream)
 
 
 def _write_variable(out_stream, row, column_names, var_dict, print_arrays):

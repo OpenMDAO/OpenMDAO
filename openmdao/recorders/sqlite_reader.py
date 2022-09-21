@@ -392,16 +392,15 @@ class SqliteCaseReader(BaseCaseReader):
             sources.extend(self._problem_cases.list_sources())
 
         if out_stream:
+            rows = [[s] for s in sources]
             if notebook and out_stream is _DEFAULT_OUT_STREAM:
-                display(HTML(str(to_table([[s] for s in sources],
-                                 headers=["Sources"], tablefmt='html'))))
+                display(HTML(str(to_table(rows, headers=['Sources'], tablefmt='html'))))
             else:
                 if out_stream is _DEFAULT_OUT_STREAM:
                     out_stream = sys.stdout
                 elif not isinstance(out_stream, TextIOBase):
                     raise TypeError("Invalid output stream specified for 'out_stream'.")
-                for source in sources:
-                    out_stream.write('{}\n'.format(source))
+                to_table(rows, headers=['Sources'], tablefmt='text').write(out_stream)
 
         return sources
 

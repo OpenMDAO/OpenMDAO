@@ -948,6 +948,39 @@ class HTMLTableBuilder(TableBuilder):
         for row in self._get_formatted_rows():
             yield row
 
+    def _assemble(self):
+        rlines = []
+        for row_cells in self._stringified_row_iter():
+            parts = ["   <tr>"]
+            for cell, meta in zip(row_cells, self.sorted_meta()):
+                style = {'text-align':  meta['align']}
+                parts.append(f'<td{_to_inline_style(style)}>{escape(cell)}</td>')
+            parts.append("</tr>")
+            rlines.append(''.join(parts))
+
+        lines = []
+        html_id = f' id="{self._html_id}"' if self._html_id else ''
+        lines.append(f'<table{html_id}{_to_inline_style(self._style)}>')
+
+        # we do the header out-of-order with the rows here because we need to
+        # query the rows first to determine column data type to fill in missing
+        # parts of the column metadata.
+        hparts = ["   <tr>"]
+        for meta in self.sorted_meta():
+            if 'header_style' in meta and meta['header_style']:
+                header_style = _to_inline_style(meta['header_style'])
+            else:
+                header_style = _to_inline_style({'text-align': meta['header_align']})
+            hparts.append(f"<th{header_style}>{escape(meta['header'])}</th>")
+        hparts.append("</tr>")
+        lines.append(''.join(hparts))
+
+        lines.extend(rlines)  # now add the rows back in
+
+        lines.append("</table>")
+
+        return '\n'.join(lines)
+
     def write(self, stream=sys.stdout):
         """
         Write this table to the given stream.
@@ -957,44 +990,13 @@ class HTMLTableBuilder(TableBuilder):
         stream : file-like
             The output stream.
         """
-        html_id = f' id="{self._html_id}"' if self._html_id else ''
-        print(f'<table{html_id}{_to_inline_style(self._style)}>', file=stream)
+        stream.write(str(self))
 
-        print("   <tr>", file=stream, end='')
-        for meta in self.sorted_meta():
-            if 'header_style' in meta and meta['header_style']:
-                header_style = _to_inline_style(meta['header_style'])
-            else:
-                header_style = ''
-            print(f"<th{header_style}>{escape(meta['header'])}</th>",
-                  file=stream, end='')
-        print("</tr>", file=stream)
-
-        for row_cells in self._stringified_row_iter():
-            print("   <tr>", file=stream, end='')
-            for cell, meta in zip(row_cells, self.sorted_meta()):
-                typename = meta['col_type']
-                print(f'<td class="{typename}_col">{escape(cell)}</td>', file=stream, end='')
-            print("</tr>", file=stream)
-
-        print("</table>", file=stream)
-
-    def write_html(self, outfile=None):
+    def __str__(self):
         """
-        Write this table to the given output file.
-
-        If outfile is not given, write this table to 'table.html' in the current
-        directory.
-
-        Parameters
-        ----------
-        outfile : str or None
-            If not None, the output file where the HTML will be written.
+        Return a string representation of the Table.
         """
-        if outfile is None:
-            outfile = _default_html_table
-
-        table = f"""
+        return f"""
             <!DOCTYPE html>
             <html lang="en">
             <head>
@@ -1019,30 +1021,34 @@ class HTMLTableBuilder(TableBuilder):
                         text-align: center;
                         background-color: #e6e6e6;
                     }}
-                    .real_col {{
-                        text-align: right;
-                    }}
-                    .int_col {{
-                        text-align: right;
-                    }}
-                    .bool_col {{
-                        text-align: center;
-                    }}
-                    .other_col {{
-                        text-align: left;
-                    }}
                 </style>
             </head>
             <body>
                 <h2>{self._title}</h2>
-                {str(self)}
+                {self._assemble()}
             </body>
             </html>
         """
-        with open(outfile, 'w', encoding='utf-8') as f:
-            f.write(table)
 
-    def display(self, outfile=None):
+    def write_html(self, outfile=_default_html_table):
+        """
+        Write this table to the given output file.
+
+        If outfile is not given, write this table to 'table.html' in the current
+        directory.
+
+        Parameters
+        ----------
+        outfile : str
+            The output file where the HTML will be written.
+        """
+        if outfile is None:
+            outfile = _default_html_table
+
+        with open(outfile, 'w', encoding='utf-8') as f:
+            f.write(str(self))
+
+    def display(self, outfile=_default_html_table):
         """
         Display this table, either in a notebook or a browser.
 
@@ -1051,12 +1057,9 @@ class HTMLTableBuilder(TableBuilder):
 
         Parameters
         ----------
-        outfile : str or None
-            If None, write this table to 'table.html'.
+        outfile : str
+            Table will be written to this file.
         """
-        if outfile is None:
-            outfile = _default_html_table
-
         self.write_html(outfile)
 
         if notebook:

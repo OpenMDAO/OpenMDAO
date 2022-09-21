@@ -10,17 +10,23 @@ _char_map = [chr(i) for i in range(48, 59)]  # numbers + ':'
 _char_map.extend([chr(i) for i in range(65, 91)])  # CAPS
 _char_map.extend([chr(i) for i in range(97, 123)])  # lower case
 _char_map.append(chr(95))  # '_'
-_char_map.extend([chr(32)] * 20)  # ' ' (20 of them to make spaces more common)
 
 
 #  generators for random table cells
 
 def _str_gen(nvals, maxsize=25, seed=test_seed):
     randgen = np.random.default_rng(seed)
+    mxword = min(maxsize, 15)
+    mnword = 5
     ctop = len(_char_map)
     for i in range(nvals):
-        sz = randgen.integers(low=1, high=maxsize + 1)
-        yield ''.join([_char_map[c] for c in randgen.integers(ctop, size=sz)]).lstrip()
+        tot = 0
+        words = []
+        while tot <= maxsize:
+            sz = randgen.integers(low=mnword, high=mxword + 1)
+            words.append(''.join([_char_map[c] for c in randgen.integers(ctop, size=sz)]))
+            tot += len(words[-1])
+        yield ' '.join(words)
 
 
 def _bool_gen(nvals, seed=test_seed):
@@ -52,9 +58,10 @@ _cell_creators = {
 def _create_random_table_data(coltypes, nrows, seed=test_seed):
     colgens = []
     for t, kwargs in coltypes:
-        colgens.append(_cell_creators[t](nrows, **kwargs))
+        colgens.append(_cell_creators[t](nrows, seed=seed, **kwargs))
+        seed += 1
 
-    headers = [s for s in _str_gen(len(coltypes))]
+    headers = [s for s in _str_gen(len(coltypes), seed+1)]
     rows = []
     for i in range(nrows):
         rows.append([next(cg) for cg in colgens])
@@ -64,7 +71,7 @@ def _create_random_table_data(coltypes, nrows, seed=test_seed):
 
 # class TestTables(unittest.TestCase):
 
-def random_table(tablefmt='text', nrows=10, coltypes=None, **options):
+def random_table(tablefmt='text', nrows=10, coltypes=None, seed=test_seed, **options):
     if coltypes is None:
         coltypes = [
             ('str', {'maxsize': 40}),
@@ -75,14 +82,25 @@ def random_table(tablefmt='text', nrows=10, coltypes=None, **options):
             ('int', {'low': -99, 'high': 2500}),
         ]
 
-    headers, data = _create_random_table_data(coltypes, nrows)
+    headers, data = _create_random_table_data(coltypes, nrows, seed=seed)
 
     return to_table(data, tablefmt=tablefmt, headers=headers, **options)
 
 
+class TableTestCase(unittest.TestCase):
+    def test_basic(self):
+        self.fail("no test")
+
+    def test_missing_vals(self):
+        self.fail("no test")
+
+    def test_word_wrap(self):
+        self.fail("no test")
+
+
+
 if __name__ == '__main__':
     import sys
-    from openmdao.utils.table_builder import TabulatorJSBuilder
 
     try:
         formats = [sys.argv[1]]

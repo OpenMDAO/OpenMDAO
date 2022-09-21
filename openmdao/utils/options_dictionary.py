@@ -120,7 +120,7 @@ class OptionsDictionary(object):
         str
             A rendition of the options as an rST table.
         """
-        return self.to_table(fmt='rst')
+        return self.to_table(fmt='rst', display=False)
 
     def to_table(self, fmt='github', missingval='N/A', max_width=None, display=True):
         """
