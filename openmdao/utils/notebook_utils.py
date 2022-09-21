@@ -119,7 +119,8 @@ def show_options_table(reference, recording_options=False):
         else:
             opt = obj.recording_options
 
-        opt.to_table(fmt='html')
+        html = str(opt.to_table(fmt='html', display=False))
+        return display(HTML(html))
     else:
         issue_warning("IPython is not installed. Run `pip install openmdao[notebooks]` or "
                       "`pip install openmdao[docs]` to upgrade.")

@@ -33,10 +33,8 @@ def _num_cols(rows):
         i = 0
         for _ in row:
             i += 1
-        if ncols is None:
+        if ncols is None or ncols < i:
             ncols = i
-        elif ncols != i:
-            raise RuntimeError(f"All table rows must have equal length, but {i} != {ncols}.")
     return 0 if ncols is None else ncols
 
 
@@ -92,7 +90,7 @@ class TableBuilder(object):
     def __init__(self, rows, headers=None, column_meta=None, precision=4, missing_val='',
                  max_width=None):
         if headers == 'keys':
-            headers, rows = self._dict2rows(rows)
+            rows, headers = self._dict2rows(rows)
 
         self._ncols = _num_cols(rows)
         self._raw_rows = rows # original rows passed in
@@ -212,14 +210,26 @@ class TableBuilder(object):
             self._update_col_meta_from_rows()
             sorted_cols = self.sorted_meta()
             self._rows = []
+            unequal = False
+            maxcols = 0
             for row in self._raw_rows:
                 if self.missing_val is not None:
                     row = [self.missing_val if v is None else v for v in row]
+
                 if self._rows and len(row) != len(self._rows[-1]):
-                    raise RuntimeError("Can't add rows of unequal length to TableBuilder.")
+                    unequal = True
+
+                if len(row) > maxcols:
+                    maxcols = len(row)
 
                 self._rows.append([self._format_cell(meta, cell)
                                    for meta, cell in zip(sorted_cols, row)])
+
+            if unequal:
+                # make all rows have same number of cells
+                for row in self._rows:
+                    if len(row) < maxcols:
+                        row.extend([self.missing_val] * (maxcols - len(row)))
 
         return self._rows
 
@@ -385,10 +395,6 @@ class TableBuilder(object):
             else:
                 meta['min_width'] = max(wcell, longest_part)
 
-    def get_shrinkable_col_width(self, winfo):
-        fixed_width = self._get_total_width() - sum([w for _, w, _ in winfo])
-        return self.max_width - fixed_width
-
     def _set_max_column_widths(self):
         """
         Set the maximum allowable column widths based on the table max_width.
@@ -401,7 +407,8 @@ class TableBuilder(object):
                                               self._get_column_widths())
                       if not meta.get('fixed_width')]
 
-            allowed_width = self.get_shrinkable_col_width(winfo)
+            fixed_width = self._get_total_width() - sum([w for _, w, _ in winfo])
+            allowed_width = self.max_width - fixed_width
 
             # subtract 1 from the widest column until we meet the total max_width requirement,
             # or get as close as we can without violating a minimum allowed width.
@@ -670,13 +677,36 @@ class TextTableBuilder(TableBuilder):
 
 
 class RSTTableBuilder(TextTableBuilder):
+    r"""
+    Class that generates an RST table.
+
+    Parameters
+    ----------
+    rows : iter of iters
+        Data used to fill table cells.
+    **kwargs : dict
+        Keyword args for the base class.
+    """
     def __init__(self, rows, **kwargs):
         super().__init__(rows, column_sep='  ', top_border='=', header_bottom_border='=',
                          bottom_border='=', left_border='', right_border='', **kwargs)
 
     def get_top_border(self, header_cells):
+        """
+        Return the top border string.
+
+        Parameters
+        ----------
+        header_cells : list of str
+            List of header cells.
+
+        Returns
+        -------
+        str
+            The top border string.
+        """
         parts = [(self.top_border * len(h))[:len(h)] for h in header_cells]
-        return self.add_side_borders(self.column_sep.join(parts))
+        return self.column_sep.join(parts)
 
 
 class GithubTableBuilder(TextTableBuilder):
@@ -702,7 +732,7 @@ class GithubTableBuilder(TextTableBuilder):
                 size -= 2
             parts.append(left + (self.header_bottom_border * size) + right)
 
-        return self.add_side_borders(self.column_sep.join(parts))
+        return self.column_sep.join(parts)
 
     def needs_wrap(self):
         return False  # github tables seem to have no support for text wrapping in columns
