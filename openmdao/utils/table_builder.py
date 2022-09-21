@@ -930,6 +930,23 @@ class HTMLTableBuilder(TableBuilder):
         tstyle = {
             'margin': 'auto',
         }
+                    # tr:nth-child(odd) {
+                    #     background-color: #EFEFEF;
+                    # }
+                    # tr:hover {
+                    #     background-color: #D6EEEE;
+                    # }
+                    # table, th, td {
+                    #     border: 1px solid #999;
+                    #     border-collapse: collapse;
+                    # }
+                    # th, td {
+                    #     padding: 5px;
+                    # }
+                    # th {
+                    #     text-align: center;
+                    #     background-color: #e6e6e6;
+                    # }
         if style is not None:
             tstyle.update(style)
         self._style = tstyle
@@ -1003,23 +1020,6 @@ class HTMLTableBuilder(TableBuilder):
                 <style>
                     h2 {{
                         text-align: center;
-                    }}
-                    tr:nth-child(odd) {{
-                        background-color: #EFEFEF;
-                    }}
-                    tr:hover {{
-                        background-color: #D6EEEE;
-                    }}
-                    table, th, td {{
-                        border: 1px solid #999;
-                        border-collapse: collapse;
-                    }}
-                    th, td {{
-                        padding: 5px;
-                    }}
-                    th {{
-                        text-align: center;
-                        background-color: #e6e6e6;
                     }}
                 </style>
             </head>
