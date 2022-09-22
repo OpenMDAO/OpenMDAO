@@ -274,12 +274,14 @@ class TableBuilder(object):
                         types[i].add('int')
                     else:
                         types[i].add('real')
+                elif cell is None:
+                    pass  # don't add to types if cell is None
                 else:
                     types[i].add('other')
 
         for tset in types:
-            if len(tset) > 1:
-                yield 'other'  # mixed type column, so just use "{}" format
+            if len(tset) > 1 or len(tset) == 0:
+                yield 'other'  # mixed type column (or all Nones), so just use "{}" format
             else:
                 yield tset.pop()
 
@@ -351,6 +353,8 @@ class TableBuilder(object):
         cell : object
             Data contained in a table cell.
         """
+        if cell is None:
+            return ''
         return meta['format'].format(cell)
 
     def _update_col_meta_from_rows(self):
@@ -447,13 +451,20 @@ class TableBuilder(object):
         """
         return [max(wd, wh) for wd, wh in zip(self._data_widths, self._header_widths)]
 
-    def __str__(self):
+    def write(self, outfile=None):
         """
-        Return a string representation of the Table.
+        Write this table to the given output file.
+
+        Parameters
+        ----------
+        outfile : str or None
+            The output file.  If None, assume table should be sent to stdout.
         """
-        io = StringIO()
-        self.write(stream=io)
-        return io.getvalue()
+        if outfile is None:
+            sys.stdout.write(str(self))
+        else:
+            with open(outfile, 'w') as f:
+                f.write(str(self))
 
 
 class TextTableBuilder(TableBuilder):
@@ -724,29 +735,32 @@ class TextTableBuilder(TableBuilder):
         parts = [(self.bottom_border * len(h))[:len(h)] for h in header_cells]
         return self.column_sep.join(parts)
 
-    def write(self, stream=sys.stdout):
+    def __str__(self):
         """
-        Write this table to the given stream.
+        Return this table to a string.
 
-        Parameters
-        ----------
-        stream : file-like
-            The output stream.
+        Returns
+        -------
+        str
+            This table as a string.
         """
+        lines = []
         for i, header_cells in enumerate(self._stringified_header_iter()):
             if i == 0 and self.top_border:
-                print(self.add_side_borders(self.get_top_border(header_cells)), file=stream)
+                lines.append(self.add_side_borders(self.get_top_border(header_cells)))
 
-            print(self.add_side_borders(self.column_sep.join(header_cells)), file=stream)
+            lines.append(self.add_side_borders(self.column_sep.join(header_cells)))
 
         if self.header_bottom_border:
-            print(self.add_side_borders(self.get_header_bottom_border(header_cells)), file=stream)
+            lines.append(self.add_side_borders(self.get_header_bottom_border(header_cells)))
 
         for row_cells in self._stringified_row_iter():
-            print(self.add_side_borders(self.column_sep.join(row_cells)), file=stream)
+            lines.append(self.add_side_borders(self.column_sep.join(row_cells)))
 
         if self.bottom_border:
-            print(self.add_side_borders(self.get_bottom_border(header_cells)), file=stream)
+            lines.append(self.add_side_borders(self.get_bottom_border(header_cells)))
+
+        return '\n'.join(lines)
 
     def display(self, outfile=None):
         """
@@ -758,10 +772,10 @@ class TextTableBuilder(TableBuilder):
             If None, print this table to stdout, else write it to the named file.
         """
         if outfile is None:
-            print(self)
+            sys.stdout.write(str(self))
         else:
             with open(outfile, 'w') as f:
-                print(self, file=f)
+                f.write(str(self))
 
 
 class RSTTableBuilder(TextTableBuilder):
@@ -1002,17 +1016,6 @@ class HTMLTableBuilder(TableBuilder):
 
         return '\n'.join(lines)
 
-    def write(self, stream=sys.stdout):
-        """
-        Write this table to the given stream.
-
-        Parameters
-        ----------
-        stream : file-like
-            The output stream.
-        """
-        stream.write(str(self))
-
     def __str__(self):
         """
         Return a string representation of the Table.
@@ -1034,7 +1037,7 @@ class HTMLTableBuilder(TableBuilder):
             </html>
         """
 
-    def write_html(self, outfile=_default_html_table):
+    def write(self, outfile=_default_html_table):
         """
         Write this table to the given output file.
 
@@ -1046,9 +1049,6 @@ class HTMLTableBuilder(TableBuilder):
         outfile : str
             The output file where the HTML will be written.
         """
-        if outfile is None:
-            outfile = _default_html_table
-
         with open(outfile, 'w', encoding='utf-8') as f:
             f.write(str(self))
 
@@ -1064,7 +1064,7 @@ class HTMLTableBuilder(TableBuilder):
         outfile : str
             Table will be written to this file.
         """
-        self.write_html(outfile)
+        self.write(outfile)
 
         if notebook:
             if not colab:
@@ -1219,7 +1219,7 @@ class TabulatorJSBuilder(TableBuilder):
         """
         if isinstance(cell, bool):
             return cell
-        return meta['format'].format(cell)
+        return super()._format_cell(meta, cell)
 
     def _get_total_width(self):
         """
@@ -1327,7 +1327,7 @@ class TabulatorJSBuilder(TableBuilder):
             'meta': self._table_meta,
         }
 
-    def write_html(self, outfile=None):
+    def write(self, outfile=_default_tabulator_file):
         """
         Write this table to the given output file.
 
@@ -1339,9 +1339,6 @@ class TabulatorJSBuilder(TableBuilder):
         outfile : str or None
             If not None, the output file where the HTML will be written.
         """
-        if outfile is None:
-            outfile = _default_tabulator_file
-
         outfile = os.path.relpath(outfile)
 
         with open(outfile, 'w', encoding='utf-8') as f:
@@ -1350,6 +1347,11 @@ class TabulatorJSBuilder(TableBuilder):
     def __str__(self):
         """
         Return a string representation of the Table.
+
+        Returns
+        -------
+        str
+            This table as a string.
         """
         import openmdao.visualization
 
@@ -1390,7 +1392,7 @@ class TabulatorJSBuilder(TableBuilder):
         if outfile is None:
             outfile = _default_tabulator_file
 
-        self.write_html(outfile)
+        self.write(outfile)
         if notebook:
             if not colab:
                 display(IFrame(src=outfile, width="100%", height=700))

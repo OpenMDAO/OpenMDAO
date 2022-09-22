@@ -23,7 +23,7 @@ _Report = namedtuple(
     'Report', 'func description class_name inst_id method pre_or_post report_filename'
 )
 _reports_registry = {}
-_default_reports = ['scaling', 'total_coloring', 'n2', 'optimizer']
+_default_reports = ['scaling', 'total_coloring', 'n2', 'optimizer', 'inputs']
 _active_reports = set()  # these reports will actually run (assuming their hook funcs are triggered)
 _cmdline_reports = set()  # cmdline reports registered here so default reports aren't modified
 _reports_dir = os.environ.get('OPENMDAO_REPORTS_DIR', './reports')  # top dir for the reports
