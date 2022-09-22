@@ -1402,7 +1402,7 @@ class TabulatorJSBuilder(TableBuilder):
             webview(outfile)
 
 
-def to_table(rows, tablefmt='text', **options):
+def generate_table(rows, tablefmt='text', **options):
     r"""
     Return the specified table builder class.
 
@@ -1431,8 +1431,8 @@ def to_table(rows, tablefmt='text', **options):
     try:
         table_class = _table_types[tablefmt]
     except Exception:
-        raise KeyError(f"'{tablefmt}' is not a valid type choice for to_table.  Valid choices are: "
-                       f"{sorted(_table_types)}.")
+        raise KeyError(f"'{tablefmt}' is not a valid type choice for generate_table.  Valid "
+                       f"choices are: {sorted(_table_types)}.")
 
     return table_class(rows, **options)
 
@@ -1441,12 +1441,12 @@ if __name__ == '__main__':
     import sys
 
     coltypes = [
-        ('str', {'maxsize': 20}),
+        ('str', {'nwords': 5, 'maxsize': 5}),
         ('real', {'low': -1e10, 'high': 1e10}),
         ('bool', {}),
         ('int', {'low': -99, 'high': 2500}),
-        # ('str', {'maxsize': 10}),
-        ('str', {'maxsize': 30}),
+        # ('str', {'nwords': 15, 'maxsize': 5}),
+        ('str', {'nwords': 30, 'maxsize': 8}),
     ]
 
     try:

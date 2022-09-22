@@ -10,7 +10,7 @@ import numpy as np
 
 from openmdao.core.constants import _DEFAULT_OUT_STREAM
 from openmdao.utils.notebook_utils import notebook, display, HTML
-from openmdao.utils.table_builder import to_table
+from openmdao.utils.table_builder import generate_table
 
 column_widths = {
     'val': 20,
@@ -106,7 +106,7 @@ def write_var_table(pathname, var_list, var_type, var_dict,
             rows.append([name] + [var_dict[name][field] for field in column_names])
 
         hdrs = ['varname'] + column_names
-        display(HTML(str(to_table(rows, headers=hdrs, tablefmt='html'))))
+        display(HTML(str(generate_table(rows, headers=hdrs, tablefmt='html'))))
         return
 
     # Find with width of the first column in the table
@@ -222,7 +222,7 @@ def write_source_table(source_dicts, out_stream):
         source_dicts = [source_dicts]
 
     for source_dict in source_dicts:
-        table = to_table(source_dict, headers='keys', tablefmt=fmt)
+        table = generate_table(source_dict, headers='keys', tablefmt=fmt)
         if fmt == 'html':
             display(HTML(str(table)))
         else:

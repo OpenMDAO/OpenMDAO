@@ -15,19 +15,19 @@ from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.sellar import SellarProblem
 
 """
-The following System methods should generate HTML using to_table
+The following System methods should generate HTML using generate_table
 when called with the default output stream in a jupyter notebook.
 
 - list_outputs()
 - list_inputs()
 
-The following Case methods should generate HTML using to_table
+The following Case methods should generate HTML using generate_table
 when called with the default output stream in a jupyter notebook.
 
 - list_outputs()
 - list_inputs()
 
-The following CaseReader methods should generate HTML using to_table
+The following CaseReader methods should generate HTML using generate_table
 when called with the default output stream in a jupyter notebook.
 
 - list_sources()

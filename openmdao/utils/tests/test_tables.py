@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from openmdao.utils.table_builder import to_table
+from openmdao.utils.table_builder import generate_table
 
 test_seed = 42
 
@@ -80,7 +80,7 @@ def random_table(tablefmt='text', nrows=10, coltypes=None, seed=test_seed, **opt
 
     headers, data = _create_random_table_data(coltypes, nrows, seed=seed)
 
-    return to_table(data, tablefmt=tablefmt, headers=headers, **options)
+    return generate_table(data, tablefmt=tablefmt, headers=headers, **options)
 
 
 class TableTestCase(unittest.TestCase):

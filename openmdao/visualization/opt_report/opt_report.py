@@ -25,7 +25,7 @@ except ImportError:
 from openmdao.core.constants import INF_BOUND
 from openmdao.utils.mpi import MPI
 from openmdao.utils.om_warnings import issue_warning, DriverWarning
-from openmdao.utils.table_builder import to_table
+from openmdao.utils.table_builder import generate_table
 
 
 # Report file constants
@@ -236,7 +236,7 @@ def _make_header_table(prob):
     rows.append(['Wall clock run time:', runtime_formatted])
     rows.append(['Exit status:', prob.driver.opt_result['exit_status']])
 
-    return to_table(rows, tablefmt='html')
+    return generate_table(rows, tablefmt='html')
 
 
 def _make_opt_value_table(driver):
@@ -257,7 +257,7 @@ def _make_opt_value_table(driver):
     for key, meta in driver.options.items():
         meta = driver.options._dict[key]
         opt_settings.append((key, meta['val'], meta['desc']))
-    opt_settings_table = to_table(opt_settings, headers=['Setting', 'Val', 'Description'],
+    opt_settings_table = generate_table(opt_settings, headers=['Setting', 'Val', 'Description'],
                                   tablefmt='html')
 
     html = ''
@@ -314,7 +314,7 @@ def _make_obj_table(objs_meta, objs_vals,
                 row[col_name] = meta[col_name]
         rows.append(row)
 
-    return to_table(rows, headers='keys', tablefmt='html')
+    return generate_table(rows, headers='keys', tablefmt='html')
 
 
 def _make_dvcons_table(meta_dict, vals_dict, kind,
@@ -432,7 +432,7 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
                         '<span class="plot-unavailable">Visuals require matplotlib</span>'
             elif col_name == 'size':
                 row[col_name] = int(meta[col_name])  # sometimes size in the meta data is a numpy
-                # array so to_table does different formatting for that
+                # array so generate_table does different formatting for that
             elif col_name in ['ref', 'ref0']:
                 if meta[col_name] is not None:
                     derived_val = np.mean(meta[col_name])
@@ -445,7 +445,7 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
 
         rows.append(row)
 
-    table = to_table(rows, headers='keys', tablefmt='html')
+    table = generate_table(rows, headers='keys', tablefmt='html')
     table.precision = '.4e'
     return table
 

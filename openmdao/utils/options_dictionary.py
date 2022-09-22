@@ -4,7 +4,7 @@ import re
 
 from openmdao.utils.om_warnings import warn_deprecation
 from openmdao.utils.notebook_utils import notebook
-from openmdao.utils.table_builder import to_table
+from openmdao.utils.table_builder import generate_table
 
 from openmdao.core.constants import _UNDEFINED
 
@@ -201,7 +201,7 @@ class OptionsDictionary(object):
             kwargs['filter'] = False
             kwargs['sort'] = False
 
-        tab = to_table(rows, **kwargs)
+        tab = generate_table(rows, **kwargs)
 
         if display:
             tab.display()

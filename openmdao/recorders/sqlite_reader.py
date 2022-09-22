@@ -17,7 +17,7 @@ from openmdao.utils.om_warnings import issue_warning, CaseRecorderWarning
 from openmdao.recorders.sqlite_recorder import format_version, META_KEY_SEP
 
 from openmdao.utils.notebook_utils import notebook, display, HTML
-from openmdao.utils.table_builder import to_table
+from openmdao.utils.table_builder import generate_table
 
 import pickle
 import zlib
@@ -394,13 +394,13 @@ class SqliteCaseReader(BaseCaseReader):
         if out_stream:
             rows = [[s] for s in sources]
             if notebook and out_stream is _DEFAULT_OUT_STREAM:
-                display(HTML(str(to_table(rows, headers=['Sources'], tablefmt='html'))))
+                display(HTML(str(generate_table(rows, headers=['Sources'], tablefmt='html'))))
             else:
                 if out_stream is _DEFAULT_OUT_STREAM:
                     out_stream = sys.stdout
                 elif not isinstance(out_stream, TextIOBase):
                     raise TypeError("Invalid output stream specified for 'out_stream'.")
-                to_table(rows, headers=['Sources'], tablefmt='text').write(out_stream)
+                generate_table(rows, headers=['Sources'], tablefmt='text').write(out_stream)
 
         return sources
 
