@@ -17,9 +17,10 @@ from scipy.sparse import coo_matrix
 try:
     import pyoptsparse
     Optimization = pyoptsparse.Optimization
-except Exception:
-    Optimization = None
+except ImportError:
     pyoptsparse = None
+except Exception as err:
+    pyoptsparse = err
 
 from openmdao.core.constants import INT_DTYPE
 from openmdao.core.analysis_error import AnalysisError
@@ -27,24 +28,53 @@ from openmdao.core.driver import Driver, RecordingDebugging
 import openmdao.utils.coloring as c_mod
 from openmdao.utils.class_util import WeakMethodWrapper
 from openmdao.utils.mpi import FakeComm
-from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 from openmdao.utils.general_utils import _src_or_alias_name
 from openmdao.utils.mpi import MPI
 
+# what version of pyoptspare are we working with
+if pyoptsparse and hasattr(pyoptsparse, '__version__'):
+    pyoptsparse_version = Version(pyoptsparse.__version__)
+else:
+    pyoptsparse_version = None
+
+# All optimizers in pyoptsparse
+optlist = {'ALPSO', 'CONMIN', 'IPOPT', 'NLPQLP', 'NSGA2', 'ParOpt', 'PSQP', 'SLSQP', 'SNOPT'}
+
+if pyoptsparse_version is None or pyoptsparse_version < Version('2.6.0'):
+    optlist.add('NOMAD')
+
+if pyoptsparse_version is None or pyoptsparse_version < Version('2.1.2'):
+    optlist.update({'FSQP', 'NLPY_AUGLAG'})
 
 # names of optimizers that use gradients
-grad_drivers = {'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
-                'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'ParOpt'}
+grad_drivers = optlist.intersection({'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP', 'PSQP',
+                                     'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'ParOpt'})
 
 # names of optimizers that allow multiple objectives
 multi_obj_drivers = {'NSGA2'}
 
-# All optimizers in pyoptsparse
-optlist = ['ALPSO', 'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
-           'NSGA2', 'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'NOMAD', 'ParOpt']
-
 # All optimizers that require an initial run
-run_required = ['NSGA2', 'ALPSO']
+run_required = {'NSGA2', 'ALPSO'}
+
+# The pyoptsparse API provides for an optional 'fail' flag in the return value of
+# objective and gradient functions, but this flag is only used by a subset of the
+# available optimizers. If the flag is not respected by the optimizer, we have to
+# return NaN values to indicate a bad evaluation.
+respects_fail_flag = {
+    # Currently supported optimizers (v2.9.0)
+    'ALPSO': False,
+    'CONMIN': False,
+    'IPOPT': False,
+    'NLPQLP': False,
+    'NSGA2': False,
+    'PSQP': False,
+    'ParOpt': True,
+    'SLSQP': False,
+    'SNOPT': True,           # as of v2.0.0, requires SNOPT 7.7
+    'FSQP': False,           # no longer supported as of v2.1.2
+    'NLPY_AUGLAG': False,    # no longer supported as of v2.1.2
+    'NOMAD': False           # no longer supported as of v2.6.0
+}
 
 DEFAULT_OPT_SETTINGS = {}
 DEFAULT_OPT_SETTINGS['IPOPT'] = {
@@ -137,6 +167,8 @@ class pyOptSparseDriver(Driver):
         Dictionary for setting optimizer-specific options.
     pyopt_solution : Solution
         Pyopt_sparse solution object.
+    _fill_NANs : bool
+        Used internally to control when to return NANs for a bad evaluation.
     _check_jac : bool
         Used internally to control when to perform singular checks on computed total derivs.
     _exc_info : 3 item tuple
@@ -160,8 +192,13 @@ class pyOptSparseDriver(Driver):
         """
         Initialize pyopt.
         """
-        if Optimization is None:
+        if pyoptsparse is None:
+            # pyoptsparse is not installed
             raise RuntimeError('pyOptSparseDriver is not available, pyOptsparse is not installed.')
+
+        if isinstance(pyoptsparse, Exception):
+            # there is some other issue with the pyoptsparse installation
+            raise pyoptsparse
 
         super().__init__(**kwargs)
 
@@ -193,6 +230,10 @@ class pyOptSparseDriver(Driver):
         # We save the pyopt_solution so that it can be queried later on.
         self.pyopt_solution = None
 
+        # we have to return NANs in order for some optimizers that don't respect
+        # the fail flag (e.g. IPOPT) to recognize a bad point and respond accordingly
+        self._fill_NANs = False
+
         self._indep_list = []
         self._quantities = []
         self.fail = False
@@ -221,15 +262,15 @@ class pyOptSparseDriver(Driver):
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},
                              desc='Finite difference implementation to use')
         self.options.declare('user_terminate_signal', default=DEFAULT_SIGNAL, allow_none=True,
-                             desc='OS signal that triggers a clean user-termination. Only SNOPT '
-                             'supports this option.')
+                             desc='OS signal that triggers a clean user-termination. '
+                                  'Only SNOPT supports this option.')
         self.options.declare('singular_jac_behavior', default='warn',
                              values=['error', 'warn', 'ignore'],
                              desc='Defines behavior of a zero row/col check after first call to'
-                             'compute_totals:'
-                             'error - raise an error.'
-                             'warn - raise a warning.'
-                             "ignore - don't perform check.")
+                                  'compute_totals:'
+                                  'error - raise an error.'
+                                  'warn - raise a warning.'
+                                  "ignore - don't perform check.")
         self.options.declare('singular_jac_tol', default=1e-16,
                              desc='Tolerance for zero row/column check.')
 
@@ -298,8 +339,10 @@ class pyOptSparseDriver(Driver):
         self._total_jac = None
         self.iter_count = 0
         fwd = problem._mode == 'fwd'
-        optimizer = self.options['optimizer']
         self._quantities = []
+
+        optimizer = self.options['optimizer']
+        self._fill_NANs = not respects_fail_flag[self.options['optimizer']]
 
         self._check_for_missing_objective()
         self._check_jac = self.options['singular_jac_behavior'] in ['error', 'warn']
@@ -331,12 +374,16 @@ class pyOptSparseDriver(Driver):
 
         for name, meta in dv_meta.items():
             size = meta['global_size'] if meta['distributed'] else meta['size']
-            opt_prob.addVarGroup(name, size, type='c',
-                                 value=input_vals[name],
-                                 lower=meta['lower'], upper=meta['upper'])
+            if pyoptsparse_version is None or pyoptsparse_version < Version('2.6.1'):
+                opt_prob.addVarGroup(name, size, type='c',
+                                     value=input_vals[name],
+                                     lower=meta['lower'], upper=meta['upper'])
+            else:
+                opt_prob.addVarGroup(name, size, varType='c',
+                                     value=input_vals[name],
+                                     lower=meta['lower'], upper=meta['upper'])
 
-        if not hasattr(pyoptsparse, '__version__') or \
-           Version(pyoptsparse.__version__) < Version('2.5.1'):
+        if pyoptsparse_version is None or pyoptsparse_version < Version('2.5.1'):
             opt_prob.finalizeDesignVariables()
         else:
             opt_prob.finalize()
@@ -612,6 +659,10 @@ class pyOptSparseDriver(Driver):
                 func_dict = self.get_objective_values()
                 func_dict.update(self.get_constraint_values(lintype='nonlinear'))
 
+                if fail > 0 and self._fill_NANs:
+                    for name in func_dict:
+                        func_dict[name].fill(np.NAN)
+
                 # Record after getting obj and constraint to assure they have
                 # been gathered in MPI.
                 rec.abs = 0.0
@@ -717,6 +768,8 @@ class pyOptSparseDriver(Driver):
                     for ikey, ival in dv_dict.items():
                         isize = len(ival)
                         sens_dict[okey][ikey] = np.zeros((osize, isize))
+                        if self._fill_NANs:
+                            sens_dict[okey][ikey].fill(np.NAN)
 
         except Exception:
             self._exc_info = sys.exc_info()
