@@ -251,7 +251,7 @@ def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
     print_arrays : bool
         When False, in the columnar display, just display norm of any ndarrays with size > 1.
         The norm is surrounded by vertical bars to indicate that it is a norm.
-        When True, also display full values of the ndarray below the row. Format  is affected
+        When True, also display full values of the ndarray below the row. Format is affected
         by the values set with numpy.set_printoptions
         Default is False.
 

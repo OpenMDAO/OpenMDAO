@@ -902,6 +902,8 @@ class HTMLTableBuilder(TableBuilder):
         If not None, the HTML id for the <table> block.
     title : str or None
         If not None, the title appearing above the table on the web page.
+    center : bool
+        If True, center the table on the page.
     style : dict or None
         If not None, a dict mapping table style parameters to their values.
     **kwargs : dict
@@ -922,7 +924,7 @@ class HTMLTableBuilder(TableBuilder):
         'style',
     })
 
-    def __init__(self, rows, html_id=None, title='', style=None, **kwargs):
+    def __init__(self, rows, html_id=None, title='', center=False, style=None, **kwargs):
         """
         Initialize all attributes.
         """
@@ -939,10 +941,12 @@ class HTMLTableBuilder(TableBuilder):
             'background-color': '#E9E9E9',
         }
         tstyle = {
-            'margin': 'auto',
             'border': '1px solid #999',
             'border-collapse': 'collapse',
         }
+        if center:
+            tstyle['margin'] = 'auto'
+
         if style is not None:
             tstyle.update(style)
 
@@ -1442,7 +1446,7 @@ if __name__ == '__main__':
         ('bool', {}),
         ('int', {'low': -99, 'high': 2500}),
         ('str', {'maxsize': 80}),
-        ('str', {'maxsize': 150}),
+        ('str', {'maxsize': 30}),
     ]
 
     try:
