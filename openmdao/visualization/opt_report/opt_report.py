@@ -445,9 +445,7 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
 
         rows.append(row)
 
-    table = generate_table(rows, headers='keys', tablefmt='html')
-    table.precision = '.4e'
-    return table
+    return generate_table(rows, headers='keys', tablefmt='html', safe=False, precision='.4e')
 
 
 def _sparkline(kind, meta, val, width=300):

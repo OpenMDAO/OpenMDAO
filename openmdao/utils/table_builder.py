@@ -920,6 +920,8 @@ class HTMLTableBuilder(TableBuilder):
         If True, center the table on the page.
     style : dict or None
         If not None, a dict mapping table style parameters to their values.
+    safe : bool
+        If True (the default), html escape text in the cells.
     **kwargs : dict
         Keyword args for the base class.
 
@@ -931,6 +933,8 @@ class HTMLTableBuilder(TableBuilder):
         If not None, this is the html id of the table block.
     _title : str or None
         If not None, this is the title that will appear on the web page above the table.
+    _safe : bool
+        If True (the default), html escape text in the cells.
     """
 
     allowed_col_meta = TableBuilder.allowed_col_meta.union({
@@ -938,7 +942,7 @@ class HTMLTableBuilder(TableBuilder):
         'style',
     })
 
-    def __init__(self, rows, html_id=None, title='', center=False, style=None, **kwargs):
+    def __init__(self, rows, html_id=None, title='', center=False, style=None, safe=True, **kwargs):
         """
         Initialize all attributes.
         """
@@ -967,6 +971,7 @@ class HTMLTableBuilder(TableBuilder):
         self._style = tstyle
         self._html_id = html_id
         self._title = title
+        self._safe = safe
 
     def _stringified_row_iter(self):
         """
@@ -982,13 +987,18 @@ class HTMLTableBuilder(TableBuilder):
 
     def _assemble(self):
         rlines = []
+        if self._safe:
+            _escape = escape
+        else:
+            _escape = lambda s: s
+
         for irow, row_cells in enumerate(self._stringified_row_iter()):
             row_style = {'background-color': '#F3F3F3' if irow % 2 else 'ghostwhite'}
             parts = [f"   <tr{_to_inline_style(row_style)}>"]
             for cell, meta in zip(row_cells, self.sorted_meta()):
                 style = self._data_style.copy()
                 style['text-align'] = meta['align']
-                parts.append(f'<td{_to_inline_style(style)}>{escape(cell)}</td>')
+                parts.append(f'<td{_to_inline_style(style)}>{_escape(cell)}</td>')
             parts.append("</tr>")
             rlines.append(''.join(parts))
 
@@ -1006,7 +1016,7 @@ class HTMLTableBuilder(TableBuilder):
             if 'header_style' in meta and meta['header_style']:
                 style.update(meta['header_style'])
             header_style = _to_inline_style(style)
-            hparts.append(f"<th{header_style}>{escape(meta['header'])}</th>")
+            hparts.append(f"<th{header_style}>{_escape(meta['header'])}</th>")
         hparts.append("</tr>")
         lines.append(''.join(hparts))
 

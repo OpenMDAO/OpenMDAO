@@ -34,8 +34,8 @@ def _get_val_cells(val):
     if isinstance(val, np.ndarray):
         minval = np.min(val)
         maxval = np.max(val)
-        if val.size > 10:
-            val = f"|{np.linalg.norm(val)}|"
+        if val.size > 5:
+            val = f"| {np.linalg.norm(val)} |"
         else:
             val = np.array2string(val)
         return val, minval, maxval
