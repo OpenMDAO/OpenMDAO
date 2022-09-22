@@ -1445,7 +1445,7 @@ if __name__ == '__main__':
         ('real', {'low': -1e10, 'high': 1e10}),
         ('bool', {}),
         ('int', {'low': -99, 'high': 2500}),
-        ('str', {'maxsize': 80}),
+        # ('str', {'maxsize': 10}),
         ('str', {'maxsize': 30}),
     ]
 
@@ -1456,8 +1456,10 @@ if __name__ == '__main__':
 
     from openmdao.utils.tests.test_tables import random_table
     for fmt in formats:
-        tab = random_table(tablefmt=fmt, coltypes=coltypes, nrows=55)
         if fmt == 'html':
-            tab.update_column_meta(3, header_style={'text-align': 'right'})
+            tab = random_table(tablefmt=fmt, coltypes=coltypes, nrows=55, center=True)
+            # tab.update_column_meta(-1, header_style={'text-align': 'right'})
+        else:
+            tab = random_table(tablefmt=fmt, coltypes=coltypes, nrows=55)
         tab.max_width = 100
         tab.display()

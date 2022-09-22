@@ -14,18 +14,14 @@ _char_map.append(chr(95))  # '_'
 
 #  generators for random table cells
 
-def _str_gen(nvals, maxsize=25, seed=test_seed):
+def _str_gen(nvals, nwords=20, maxsize=8, seed=test_seed):
     randgen = np.random.default_rng(seed)
-    mxword = min(maxsize, 15)
-    mnword = 5
     ctop = len(_char_map)
     for i in range(nvals):
-        tot = 0
         words = []
-        while tot <= maxsize:
-            sz = randgen.integers(low=mnword, high=mxword + 1)
+        for _ in range(nwords):
+            sz = randgen.integers(low=min(4, maxsize), high=maxsize + 1)
             words.append(''.join([_char_map[c] for c in randgen.integers(ctop, size=sz)]))
-            tot += len(words[-1])
         yield ' '.join(words)
 
 
@@ -61,7 +57,7 @@ def _create_random_table_data(coltypes, nrows, seed=test_seed):
         colgens.append(_cell_creators[t](nrows, seed=seed, **kwargs))
         seed += 1
 
-    headers = [s for s in _str_gen(len(coltypes), seed+1)]
+    headers = [s for s in _str_gen(len(coltypes), nwords=2, maxsize=5, seed=seed+1)]
     rows = []
     for i in range(nrows):
         rows.append([next(cg) for cg in colgens])
