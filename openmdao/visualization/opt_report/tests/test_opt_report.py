@@ -138,10 +138,12 @@ class TestOptimizationReport(unittest.TestCase):
         with open(report_file_path, 'r') as f:
             for line in f.readlines():
                 line = line.lstrip()
-                if line.startswith('<tr><td'):
-                    for key, row in check_rows.items():
-                        if line.startswith('<tr><td') and row in line:
-                            reported[key] = second_cell(line)
+                if line.startswith('<tr'):
+                    parts = line.split('>', 1)
+                    if parts[1].startswith('<td'):
+                        for key, row in check_rows.items():
+                            if row in line:
+                                reported[key] = second_cell(line)
                 elif line.startswith('</table>'):
                     # skip the rest of the file
                     break

@@ -301,16 +301,16 @@ class TableBuilder(object):
 
         if col_idx < 0 or col_idx >= self._ncols:
             raise IndexError(f"Index '{col_idx}' is not a valid table column index for a table with"
-                             f" {self._ncols} columns.  The leftmost column has column index of 0.")
+                             f" {self._ncols} columns.")
 
         if col_idx not in self._column_meta:
             self._column_meta[col_idx] = {}
 
         meta = self._column_meta[col_idx]
         for name, val in options.items():
-            if name not in self.allowed_col_meta:
-                raise KeyError(f"'{name}' is not a valid column metadata key. Allowed keys are "
-                               f"{sorted(self.allowed_col_meta)}.")
+            # if name not in self.allowed_col_meta:
+            #     raise KeyError(f"'{name}' is not a valid column metadata key. Allowed keys are "
+            #                    f"{sorted(self.allowed_col_meta)}.")
             meta[name] = val
 
     def _set_widths(self):
@@ -322,7 +322,7 @@ class TableBuilder(object):
 
         rows = self._get_formatted_rows()
 
-        if len(self._rows[0]) != self._ncols:
+        if self._rows and len(self._rows[0]) != self._ncols:
             raise RuntimeError(f"Number of row entries ({len(self._rows[0])}) must match number of "
                                f"columns ({self._ncols}) in TableBuilder.")
 
@@ -927,14 +927,18 @@ class HTMLTableBuilder(TableBuilder):
 
     Attributes
     ----------
-    _style : dict or None
-        Mapping of style parameters to the values for the table.
     _html_id : str or None
         If not None, this is the html id of the table block.
     _title : str or None
         If not None, this is the title that will appear on the web page above the table.
     _safe : bool
         If True (the default), html escape text in the cells.
+    _data_style : dict
+        Contains style metadata for <td> blocks.
+    _header_style : dict
+        Contains style metadata for <th> blocks.
+    _style : dict or None
+        Contains style metadata for the table.
     """
 
     allowed_col_meta = TableBuilder.allowed_col_meta.union({
@@ -990,7 +994,8 @@ class HTMLTableBuilder(TableBuilder):
         if self._safe:
             _escape = escape
         else:
-            _escape = lambda s: s
+            def _escape(s):
+                return s
 
         for irow, row_cells in enumerate(self._stringified_row_iter()):
             row_style = {'background-color': '#F3F3F3' if irow % 2 else 'ghostwhite'}
@@ -1131,9 +1136,6 @@ class TabulatorJSBuilder(TableBuilder):
     ----------
     rows : iter of iters
         Data used to fill table cells.
-    layout : str or None
-        If supplied, Tabulator.js will use this table layout method.  Allowed values are
-        ['fitColumns', 'fitDataTable'].
     height : int or None
         If not None, set the table to this height in pixels.
     html_id : str or None
@@ -1144,6 +1146,8 @@ class TabulatorJSBuilder(TableBuilder):
         If True, include filter fields in the column headers where it makes sense.
     sort : bool
         If True, add sorting to column headers.
+    table_meta : dict or None
+        If not None, a dict of Tabulator.js metadata names mapped to their values.
     **kwargs : dict
         Keyword args for the base class.
 
@@ -1170,8 +1174,8 @@ class TabulatorJSBuilder(TableBuilder):
         'formatter'
     })
 
-    def __init__(self, rows, layout=None, height=None, html_id='tabul-table', title='',
-                 filter=True, sort=True, **kwargs):
+    def __init__(self, rows, height=None, html_id='tabul-table', title='',
+                 filter=True, sort=True, table_meta=None, **kwargs):
         """
         Initialize all attributes.
         """
@@ -1182,9 +1186,11 @@ class TabulatorJSBuilder(TableBuilder):
         self._sort = sort
 
         self._table_meta = {
-            'layout': layout,
             'height': height,
         }
+
+        if table_meta is not None:
+            self._table_meta.update(table_meta)
 
         self.font_size = 14
 

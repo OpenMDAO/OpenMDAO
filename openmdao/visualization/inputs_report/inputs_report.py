@@ -1,8 +1,7 @@
-import os
+"""
+A Viewer for OpenMDAO inputs.
+"""
 import pathlib
-import json
-from itertools import chain
-from collections import defaultdict
 
 import numpy as np
 
@@ -44,7 +43,7 @@ def _get_val_cells(val):
 
 
 def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
-                  tablefmt='tabulate'):
+                  tablefmt='tabulator'):
     """
     Generate a self-contained html file containing a detailed inputs report.
 
@@ -67,25 +66,25 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
         Format for generated table. Should be one of ['text', 'github', 'rst', 'html', 'tabulator'].
         Defaults to 'tabulator' which generates a sortable, filterable web-based table.
     """
-    if MPI and MPI.COMM_WORLD.rank != 0:
-        return
-
     # since people will be used to passing the Problem as the first arg to
     # the N2 diagram funct, allow them to pass a Problem here as well.
     if isinstance(prob, Problem):
         model = prob.model
     else:
-       raise RuntimeError("Input report requires a Problem instance, but got a "
-                          f"'{type(prob).__name__}'.")
+        raise RuntimeError("Input report requires a Problem instance, but got a "
+                           f"'{type(prob).__name__}'.")
 
     connections = model._conn_global_abs_in2out
+
+    if not connections:  # only possible if top level system is a component
+        return
 
     if model._outputs is None:
         raise RuntimeError("Can't generate inputs report. Input values are unknown because "
                            "final_setup has not been called.")
 
     # get absolute src names of design vars
-    desvars =  model.get_design_vars(recurse=True, use_prom_ivc=False)
+    desvars = model.get_design_vars(recurse=True, use_prom_ivc=False)
 
     rows = []
     with printoptions(precision=precision, suppress=True, threshold=10000):
@@ -112,16 +111,42 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
 
     headers = ['Absolute Name', 'Promoted Name', 'Source Name', 'Source is IVC', 'Source is DV',
                'Units', 'Shape', 'Tags', 'Val', 'Min Val', 'Max Val']
+    column_meta = [{'header': h} for h in headers]
 
-    table = generate_table(rows, tablefmt=tablefmt, headers=headers)
+    kwargs = {}
+
+    if tablefmt == 'tabulator':
+        column_meta[0]['responsive'] = 10  # abs name column will be hidden first if width to small
+        column_meta[0]['minWidth'] = 100
+        column_meta[1]['responsive'] = 0  # don't hide prom name
+        column_meta[2]['responsive'] = 0  # don't hide src name
+        column_meta[3]['responsive'] = 0  # don't hide src is IVC
+        column_meta[4]['responsive'] = 0  # don't hide src is DV
+        column_meta[5]['responsive'] = 4  # units
+        column_meta[6]['responsive'] = 5  # shape
+        column_meta[7]['responsive'] = 9  # tags
+        column_meta[8]['responsive'] = 6  # val
+        column_meta[9]['responsive'] = 8  # minval
+        column_meta[10]['responsive'] = 7  # maxval
+        kwargs['table_meta'] = {
+            'layout': 'fitDataTable',
+            'responsiveLayout': 'hide',
+        }
+
+    if not rows:
+        column_meta = []
+
+    table = generate_table(rows, tablefmt=tablefmt, column_meta=column_meta, **kwargs)
+
+    if MPI and MPI.COMM_WORLD.rank != 0:
+        return
+
     if display:
-        if tablefmt in ('html', 'tabulate') and outfile is None:
+        if tablefmt in ('html', 'tabulator') and outfile is None:
             outfile = 'inputs.html'
         table.display(outfile)
     elif outfile is not None:
         table.write(outfile)
-
-    return table
 
 
 # inputs report definition

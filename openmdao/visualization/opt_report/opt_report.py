@@ -258,7 +258,7 @@ def _make_opt_value_table(driver):
         meta = driver.options._dict[key]
         opt_settings.append((key, meta['val'], meta['desc']))
     opt_settings_table = generate_table(opt_settings, headers=['Setting', 'Val', 'Description'],
-                                  tablefmt='html')
+                                        tablefmt='html')
 
     html = ''
     if opt_settings_table is not None:

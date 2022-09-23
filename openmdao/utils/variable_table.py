@@ -204,10 +204,7 @@ def write_source_table(source_dicts, out_stream):
         return
 
     # use table_builder if we are in a notebook and are using the default out_stream
-    if notebook and out_stream is _DEFAULT_OUT_STREAM:
-        fmt = "html"
-    else:
-        fmt = "text"
+    use_html = notebook and out_stream is _DEFAULT_OUT_STREAM
 
     if out_stream is _DEFAULT_OUT_STREAM:
         out_stream = sys.stdout
@@ -222,11 +219,14 @@ def write_source_table(source_dicts, out_stream):
         source_dicts = [source_dicts]
 
     for source_dict in source_dicts:
-        table = generate_table(source_dict, headers='keys', tablefmt=fmt)
-        if fmt == 'html':
-            display(HTML(str(table)))
+        if use_html:
+            display(HTML(str(generate_table(source_dict, headers='keys', tablefmt='html'))))
         else:
-            table.write(out_stream)
+            for key, value in source_dict.items():
+                if value:
+                    out_stream.write(f'{key}\n')
+                    for val in value:
+                        out_stream.write(f'    {val}\n')
 
 
 def _write_variable(out_stream, row, column_names, var_dict, print_arrays):

@@ -400,8 +400,8 @@ class SqliteCaseReader(BaseCaseReader):
                     out_stream = sys.stdout
                 elif not isinstance(out_stream, TextIOBase):
                     raise TypeError("Invalid output stream specified for 'out_stream'.")
-                generate_table(rows, headers=['Sources'], tablefmt='text').write(out_stream)
-
+                for source in sources:
+                    out_stream.write('{}\n'.format(source))
         return sources
 
     def list_source_vars(self, source, out_stream=_DEFAULT_OUT_STREAM):
@@ -656,14 +656,11 @@ class SqliteCaseReader(BaseCaseReader):
                             (source, type(source).__name__))
 
         if not source:
-            return self._list_cases_recurse_flat(out_stream=out_stream)
+            cases = self._list_cases_recurse_flat(out_stream=None)
 
         elif source == 'problem':
             if self._format_version >= 2:
                 cases = self._problem_cases.list_cases()
-                if out_stream:
-                    write_source_table({'problem': cases}, out_stream)
-                return cases
             else:
                 raise RuntimeError('No problem cases recorded (data format = %d).' %
                                    self._format_version)
@@ -683,16 +680,15 @@ class SqliteCaseReader(BaseCaseReader):
                 if not recurse:
                     # return list of cases from the source alone
                     cases = case_table.list_cases(source)
-                    if out_stream:
-                        write_source_table({source: cases}, out_stream)
-                    return cases
+                    # if out_stream:
+                    #     write_source_table({source: cases}, out_stream)
+                    # return cases
                 elif flat:
                     # return list of cases from the source plus child cases
                     cases = []
                     source_cases = case_table.get_cases(source)
                     for case in source_cases:
-                        cases += self._list_cases_recurse_flat(case.name, out_stream=out_stream)
-                    return cases
+                        cases += self._list_cases_recurse_flat(case.name, out_stream=None)
                 else:
                     # return nested dict of cases from the source and child cases
                     cases = OrderedDict()
@@ -704,11 +700,22 @@ class SqliteCaseReader(BaseCaseReader):
                 # source is a coordinate
                 if recurse:
                     if flat:
-                        return self._list_cases_recurse_flat(source, out_stream=out_stream)
+                        return self._list_cases_recurse_flat(source, out_stream=None)
                     else:
                         return self._list_cases_recurse_nested(source)
             else:
                 raise RuntimeError('Source not found: %s' % source)
+
+        if out_stream:
+            if not source:
+                for source, subcases in self.source_cases_table.items():
+                    if subcases:
+                        write_source_table({source: subcases}, out_stream)
+                del self.source_cases_table
+            else:
+                write_source_table({source: cases}, out_stream)
+
+        return cases
 
     def _list_cases_recurse_flat(self, coord=None, out_stream=_DEFAULT_OUT_STREAM):
         """
