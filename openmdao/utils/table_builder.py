@@ -773,9 +773,11 @@ class TextTableBuilder(TableBuilder):
         """
         if outfile is None:
             sys.stdout.write(str(self))
+            sys.stdout.write('\n')
         else:
             with open(outfile, 'w') as f:
                 f.write(str(self))
+                f.write('\n')
 
 
 class RSTTableBuilder(TextTableBuilder):
