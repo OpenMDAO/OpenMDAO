@@ -32,7 +32,8 @@ optional_dependencies = {
         'tabulate',
         'ipython',
         'ipywidgets>=7.6.5',
-        'ipympl'
+        'ipympl',
+	'myst_nb'
     ],
     'visualization': [
         'bokeh>=1.3.4',

@@ -550,17 +550,17 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
 
         p.run_model()
 
-        elapsed_rev = time.time()
+        elapsed_rev = time.perf_counter()
         Jrev = p.compute_totals(of, wrt, return_format='dict')
-        elapsed_rev = time.time() - elapsed_rev
+        elapsed_rev = time.perf_counter() - elapsed_rev
 
         # run in fwd mode and compare times for deriv calculation
         p.setup(mode='fwd')
         p.run_model()
 
-        elapsed_fwd = time.time()
+        elapsed_fwd = time.perf_counter()
         Jfwd = p.compute_totals(of, wrt, return_format='dict')
-        elapsed_fwd = time.time() - elapsed_fwd
+        elapsed_fwd = time.perf_counter() - elapsed_fwd
 
         assert_near_equal(Jfwd['ParallelGroup1.Con1.y']['Comp1.x'][0], np.ones(size)*2., 1e-6)
         assert_near_equal(Jfwd['ParallelGroup1.Con2.y']['Comp1.x'][0], np.ones(size)*-3., 1e-6)

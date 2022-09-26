@@ -1662,7 +1662,7 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
         use_driver = False
 
     with _compute_total_coloring_context(prob.model):
-        start_time = time.time()
+        start_time = time.perf_counter()
         fullJ = None
         for i in range(num_full_jacs):
             if use_driver:
@@ -1677,7 +1677,7 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
                 fullJ += np.abs(Jabs)
 
         Jabs = None
-        elapsed = time.time() - start_time
+        elapsed = time.perf_counter() - start_time
 
     fullJ *= (1.0 / np.max(fullJ))
 
@@ -1769,7 +1769,7 @@ def _compute_coloring(J, mode):
     Coloring
         See Coloring class docstring.
     """
-    start_time = time.time()
+    start_time = time.perf_counter()
     try:
         start_mem = mem_usage()
     except RuntimeError:
@@ -1792,7 +1792,7 @@ def _compute_coloring(J, mode):
         fallback = None
 
         # record the total time and memory usage for bidir, fwd, and rev
-        coloring._meta['coloring_time'] = time.time() - start_time
+        coloring._meta['coloring_time'] = time.perf_counter() - start_time
         if start_mem is not None:
             coloring._meta['coloring_memory'] = mem_usage() - start_mem
 
@@ -1831,7 +1831,7 @@ def _compute_coloring(J, mode):
     else:  # fwd
         coloring._fwd = (col_groups, col2rows)
 
-    coloring._meta['coloring_time'] = time.time() - start_time
+    coloring._meta['coloring_time'] = time.perf_counter() - start_time
     if start_mem is not None:
         coloring._meta['coloring_memory'] = mem_usage() - start_mem
 
