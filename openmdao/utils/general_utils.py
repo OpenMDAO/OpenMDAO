@@ -927,7 +927,7 @@ def match_prom_or_abs(name, prom_name, includes=None, excludes=None):
     return False
 
 
-_falsey = {'0', 'false', 'no', 'off', ''}
+_falsey = {'0', 'false', 'no', 'off', 'none', ''}
 
 
 def is_truthy(s):
