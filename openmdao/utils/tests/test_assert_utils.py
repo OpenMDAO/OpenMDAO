@@ -105,10 +105,10 @@ class TestAssertUtils(unittest.TestCase):
         prob.setup()
         prob.final_setup()
 
-        with self.assertRaises(AssertionError) as cm:
+        with self.assertRaises(AssertionError):
             assert_no_approx_partials(prob.model, include_self=True, recurse=True, method='any')
 
-        with self.assertRaises(AssertionError) as cm:
+        with self.assertRaises(AssertionError) :
             assert_no_approx_partials(prob.model, include_self=True, recurse=True, method='cs')
 
         assert_no_approx_partials(prob.model, include_self=True, recurse=True, method='fd')
@@ -121,10 +121,10 @@ class TestAssertUtils(unittest.TestCase):
         prob.setup()
         prob.final_setup()
 
-        with self.assertRaises(AssertionError) as cm:
+        with self.assertRaises(AssertionError):
             assert_no_approx_partials(prob.model, include_self=True, recurse=True, method='any')
 
-        with self.assertRaises(AssertionError) as cm:
+        with self.assertRaises(AssertionError):
             assert_no_approx_partials(prob.model, include_self=True, recurse=True, method='fd')
 
         assert_no_approx_partials(prob.model, include_self=True, recurse=True, method='cs')
@@ -138,7 +138,7 @@ class TestAssertUtils(unittest.TestCase):
 
         assert_no_approx_partials(prob.model, include_self=True, recurse=True)
 
-    def test_assert_no_approx_partials_exception_exclude_pathname(self):
+    def test_assert_no_approx_partials_exception_exclude_single_pathname(self):
 
         prob = om.Problem()
         C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x+1.', x=2.0))
@@ -147,7 +147,7 @@ class TestAssertUtils(unittest.TestCase):
         prob.setup()
         prob.final_setup()
 
-        with self.assertRaises(AssertionError) as cm:
+        with self.assertRaises(AssertionError) :
             assert_no_approx_partials(prob.model, include_self=True, recurse=True)
 
         assert_no_approx_partials(prob.model, include_self=True, recurse=True, excludes='C1')

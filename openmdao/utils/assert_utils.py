@@ -303,8 +303,8 @@ def assert_no_approx_partials(system, include_self=True, recurse=True, method='a
     recurse : bool
         If True, iterate over the whole tree under this system.
     method : str
-        Specifically look for Systems with this method of approx partials. Values can be
-        'cs', 'fd', or 'any'. The default is 'any'.
+        Specifically look for Components with this method of approx partials. Values can be
+        'cs', 'fd', or 'any'. 'any' means either 'cs' or 'fd'. The default is 'any'.
     excludes : str, iter of str, or None
         Glob patterns for pathnames to exclude from the check. Default is None, which
         excludes nothing.
