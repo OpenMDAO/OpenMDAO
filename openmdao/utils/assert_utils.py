@@ -1,14 +1,15 @@
 """
 Functions for making assertions about OpenMDAO Systems.
 """
-import numpy as np
-from math import isnan
 
+from math import isnan
+from fnmatch import fnmatch
 import warnings
 import unittest
-
 from contextlib import contextmanager
 from functools import wraps
+
+import numpy as np
 
 from openmdao.core.component import Component
 from openmdao.core.group import Group
@@ -289,7 +290,7 @@ def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6):
              for key, val, err in fails]))
 
 
-def assert_no_approx_partials(system, include_self=True, recurse=True):
+def assert_no_approx_partials(system, include_self=True, recurse=True, method='any', excludes=None):
     """
     Raise assertion error if any component within system is using approximated partials.
 
@@ -301,25 +302,38 @@ def assert_no_approx_partials(system, include_self=True, recurse=True):
         If True, include this system in the iteration.
     recurse : bool
         If True, iterate over the whole tree under this system.
+    method : str
+        Specifically look for Systems with this method of approx partials. Values can be
+        'cs', 'fd', or 'any'. The default is 'any'
+    excludes : str, iter of str, or None
+        Glob patterns for pathnames to exclude from the check. Default is None, which
+        excludes nothing.
+
 
     Raises
     ------
     AssertionError
         If a subsystem of group is found to be using approximated partials.
     """
+    if isinstance(excludes, str):
+        excludes = [excludes, ]
+
     has_approx_partials = False
     msg = 'The following components use approximated partials:\n'
     for s in system.system_iter(include_self=include_self, recurse=recurse):
         if isinstance(s, Component):
+            if excludes is not None and any(fnmatch(s.pathname, exclude) for exclude in excludes):
+                continue
             if s._approx_schemes:
-                has_approx_partials = True
-                approx_partials = [(k, v['method']) for k, v in s._declared_partials.items()
-                                   if 'method' in v and v['method']]
-                msg += '    ' + s.pathname + '\n'
-                for key, method in approx_partials:
-                    msg += '        of={0:12s}    wrt={1:12s}    method={2:2s}\n'.format(key[0],
-                                                                                         key[1],
-                                                                                         method)
+                if method == 'any' or method in s._approx_schemes:
+                    has_approx_partials = True
+                    approx_partials = [(k, v['method']) for k, v in s._declared_partials.items()
+                                       if 'method' in v and v['method']]
+                    msg += '    ' + s.pathname + '\n'
+                    for key, method in approx_partials:
+                        msg += '        of={0:12s}    wrt={1:12s}    method={2:2s}\n'.format(key[0],
+                                                                                             key[1],
+                                                                                             method)
     if has_approx_partials:
         raise AssertionError(msg)
 
