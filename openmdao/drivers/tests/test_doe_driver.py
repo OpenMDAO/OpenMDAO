@@ -123,6 +123,20 @@ class TestDOEDriver(unittest.TestCase):
             {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         ]
 
+        self.expected_fullfact_derivs3 = [
+            {('f_xy', 'x'): np.array(-6.), ('f_xy', 'y'): np.array(8.)},
+            {('f_xy', 'x'): np.array(-5.), ('f_xy', 'y'): np.array(8.5)},
+            {('f_xy', 'x'): np.array(-4.), ('f_xy', 'y'): np.array(9.)},
+
+            {('f_xy', 'x'): np.array(-5.5), ('f_xy', 'y'): np.array(9.)},
+            {('f_xy', 'x'): np.array(-4.5), ('f_xy', 'y'): np.array(9.5)},
+            {('f_xy', 'x'): np.array(-3.5), ('f_xy', 'y'): np.array(10.)},
+
+            {('f_xy', 'x'): np.array(-5.), ('f_xy', 'y'): np.array(10.)},
+            {('f_xy', 'x'): np.array(-4.), ('f_xy', 'y'): np.array(10.5)},
+            {('f_xy', 'x'): np.array(-3.), ('f_xy', 'y'): np.array(11.)},
+        ]
+
     def test_no_generator(self):
         prob = om.Problem()
         model = prob.model
@@ -1405,6 +1419,70 @@ class TestDOEDriver(unittest.TestCase):
             outputs = cr.get_case(case).outputs
             assert_near_equal(outputs['b'], np.array([1., 2, 3]))
 
+    def test_derivative_recording(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+        model.set_input_defaults('x', 0.0)
+        model.set_input_defaults('y', 0.0)
+        model.add_design_var('x', lower=0.0, upper=1.0)
+        model.add_design_var('y', lower=0.0, upper=1.0)
+        model.add_objective('f_xy')
+
+        prob.driver = om.DOEDriver(generator=om.FullFactorialGenerator(levels=3))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+        prob.driver.recording_options['record_derivatives'] = True
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        expected_vals = self.expected_fullfact3
+        expected_derivs = self.expected_fullfact_derivs3
+
+        cr = om.CaseReader("cases.sql")
+        cases = cr.list_cases('driver', out_stream=None)
+
+        self.assertEqual(len(cases), 9)
+
+        for case, expected_val, expected_deriv in zip(cases, expected_vals, expected_derivs):
+            outputs = cr.get_case(case).outputs
+            for name in ('x', 'y', 'f_xy'):
+                self.assertEqual(outputs[name], expected_val[name])
+            
+            derivs = cr.get_case(case).derivatives
+            for dv in ('x', 'y'):
+                self.assertEqual(derivs['f_xy', dv], expected_deriv['f_xy', dv])
+                # print(f"derivs: 'f_xy', {dv} = {derivs['f_xy', dv]}")
+
+    def test_derivative_no_recording(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+        model.set_input_defaults('x', 0.0)
+        model.set_input_defaults('y', 0.0)
+        model.add_design_var('x', lower=0.0, upper=1.0)
+        model.add_design_var('y', lower=0.0, upper=1.0)
+        model.add_objective('f_xy')
+
+        prob.driver = om.DOEDriver(generator=om.FullFactorialGenerator(levels=3))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+        prob.driver.recording_options['record_derivatives'] = False
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+        cases = cr.list_cases('driver', out_stream=None)
+
+        self.assertEqual(len(cases), 9)
+
+        for case in cases:            
+            derivs = cr.get_case(case).derivatives
+            self.assertIsNone(derivs)
 
 @use_tempdirs
 class TestDOEDriverListVars(unittest.TestCase):
