@@ -23,3 +23,6 @@ These tutorials cover more advanced topics. This guide assumes that you have rea
 
 ## Details about Complex Step
 - [Using Complex Step to Compute Derivatives](complex_step.ipynb)
+
+## Using AnalysisError
+- [Using AnalysisError to avoid a region in the solution space](analysis_errors/analysis_error.ipynb)

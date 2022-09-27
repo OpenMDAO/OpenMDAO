@@ -37,8 +37,10 @@ def disable_snopt_cells(fname):
 
 if __name__ == '__main__':
 
-    notebooks = ['features/building_blocks/drivers/pyoptsparse_driver.ipynb']
+    notebooks = [
+        'features/building_blocks/drivers/pyoptsparse_driver.ipynb',
+        'advanced_user_guide/analysis_errors/analysis_error.ipynb'
+    ]
 
     for notebook in notebooks:
         disable_snopt_cells(notebook)
-

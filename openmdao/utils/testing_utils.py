@@ -5,6 +5,11 @@ import builtins
 import os
 from contextlib import contextmanager
 
+try:
+    from parameterized import parameterized
+except ImportError:
+    parameterized = None
+
 import numpy as np
 
 
@@ -115,21 +120,49 @@ def require_pyoptsparse(optimizer=None):
             obj.__unittest_skip_why__ = msg
             return obj
 
-        try:
-            OPT(optimizer)
-        except Exception:
-            msg = "pyoptsparse is not providing %s" % optimizer
+        if optimizer:
+            try:
+                OPT(optimizer)
+            except Exception:
+                msg = "pyoptsparse is not providing %s" % optimizer
 
-            if not isinstance(obj, type):
-                @functools.wraps(obj)
-                def skip_wrapper(*args, **kwargs):
-                    raise unittest.SkipTest(msg)
-                obj = skip_wrapper
-            obj.__unittest_skip__ = True
-            obj.__unittest_skip_why__ = msg
+                if not isinstance(obj, type):
+                    @functools.wraps(obj)
+                    def skip_wrapper(*args, **kwargs):
+                        raise unittest.SkipTest(msg)
+                    obj = skip_wrapper
+                obj.__unittest_skip__ = True
+                obj.__unittest_skip_why__ = msg
 
         return obj
     return decorator
+
+
+if parameterized:
+    def parameterized_name(testcase_func, num, param):
+        """
+        Generate a name for a parameterized test from the parameters.
+
+        Parameters
+        ----------
+        testcase_func : str
+            the root test function name
+        num : int
+            parameter number
+        param : any
+            parameter value
+
+        Returns
+        -------
+        TestCase or TestCase.method
+            The decorated TestCase class or method.
+        """
+        return "%s_%s" % (
+            testcase_func.__name__,
+            parameterized.to_safe_name("_".join(str(x) for x in param.args)),
+        )
+else:
+    parameterized_name = None
 
 
 class set_env_vars(object):
