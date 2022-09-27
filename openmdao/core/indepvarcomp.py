@@ -277,7 +277,7 @@ class _AutoIndepVarComp(IndepVarComp):
             'res_units': None,
             'desc': '',
             'distributed': False,
-            'tags': set(['openmdao:allow_desvar']),
+            'tags': set(['openmdao:allow_desvar', 'indep_var']),
             'ref': 1.0,
             'ref0': 0.0,
             'res_ref': 1.0,

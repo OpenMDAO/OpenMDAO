@@ -13,6 +13,7 @@
         text-align: center;
     }
 
+
 </style>
 </head>
 <body>
@@ -30,7 +31,6 @@ let my_table_data = <table_data>;
 document.title = my_table_data.title;
 document.getElementById("tabul-title").innerHTML = my_table_data.title;
 
-
 function setup_tabulator(table_data) {
     let tab = new Tabulator(table_data.id, table_data.meta);
     // full redraw is necessary, else word wrapping in columns is hosed until user manually
@@ -39,6 +39,7 @@ function setup_tabulator(table_data) {
 }
 
 let the_table = setup_tabulator(my_table_data);
+
 
 </script>
 </body>

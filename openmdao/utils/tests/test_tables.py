@@ -3,7 +3,6 @@ import numpy as np
 
 from openmdao.utils.table_builder import generate_table
 
-test_seed = 42
 
 # limit our random strings to upper, lower case letters, numbers, :, _, and space
 _char_map = [chr(i) for i in range(48, 59)]  # numbers + ':'
@@ -14,7 +13,7 @@ _char_map.append(chr(95))  # '_'
 
 #  generators for random table cells
 
-def _str_gen(nvals, nwords=20, maxsize=8, seed=test_seed):
+def _str_gen(nvals, nwords=20, maxsize=8, seed=None):
     randgen = np.random.default_rng(seed)
     ctop = len(_char_map)
     for i in range(nvals):
@@ -25,20 +24,20 @@ def _str_gen(nvals, nwords=20, maxsize=8, seed=test_seed):
         yield ' '.join(words)
 
 
-def _bool_gen(nvals, seed=test_seed):
+def _bool_gen(nvals, seed=None):
     randgen = np.random.default_rng(seed)
     for i in range(nvals):
         yield randgen.random() > .5
 
 
-def _real_gen(nvals, low=-10000., high=10000., seed=test_seed):
+def _real_gen(nvals, low=-10000., high=10000., seed=None):
     randgen = np.random.default_rng(seed)
     mult = high - low
     for i in range(nvals):
         yield randgen.random() * mult + low
 
 
-def _int_gen(nvals, low=-10000, high=10000, seed=test_seed):
+def _int_gen(nvals, low=-10000, high=10000, seed=None):
     randgen = np.random.default_rng(seed)
     for i in range(nvals):
         yield randgen.integers(low=low, high=high)
@@ -51,13 +50,14 @@ _cell_creators = {
     'str': _str_gen,
 }
 
-def _create_random_table_data(coltypes, nrows, seed=test_seed):
+def _create_random_table_data(coltypes, nrows, seed=None):
     colgens = []
     for t, kwargs in coltypes:
         colgens.append(_cell_creators[t](nrows, seed=seed, **kwargs))
-        seed += 1
+        if seed is not None:
+            seed += 1
 
-    headers = [s for s in _str_gen(len(coltypes), nwords=2, maxsize=5, seed=seed+1)]
+    headers = [s for s in _str_gen(len(coltypes), nwords=2, maxsize=5, seed=seed)]
     rows = []
     for i in range(nrows):
         rows.append([next(cg) for cg in colgens])
@@ -67,7 +67,7 @@ def _create_random_table_data(coltypes, nrows, seed=test_seed):
 
 # class TestTables(unittest.TestCase):
 
-def random_table(tablefmt='text', nrows=10, coltypes=None, seed=test_seed, **options):
+def random_table(tablefmt='text', nrows=10, coltypes=None, seed=None, **options):
     if coltypes is None:
         coltypes = [
             ('str', {'maxsize': 40}),

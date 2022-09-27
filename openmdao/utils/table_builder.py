@@ -29,6 +29,8 @@ _default_align = {
     'other': 'left',
 }
 
+_big_table_height = 600
+
 
 def _num_cols(rows):
     ncols = None
@@ -313,9 +315,14 @@ class TableBuilder(object):
             #                    f"{sorted(self.allowed_col_meta)}.")
             meta[name] = val
 
-    def _set_widths(self):
+    def _set_widths(self, force_set_max=False):
         """
         Set data and header widths to their final values.
+
+        Parameters
+        ----------
+        force_set_max : bool
+            If True, compute the max column widths even if the table max_width limit is violated.
         """
         if self._data_widths is not None:
             return  # widths already computed
@@ -340,7 +347,7 @@ class TableBuilder(object):
             self._header_widths[i] = len(meta['header'])
 
         self._set_min_widths()
-        self._set_max_column_widths()
+        self._set_max_column_widths(force_set_max)
 
     def _format_cell(self, meta, cell):
         """
@@ -410,9 +417,14 @@ class TableBuilder(object):
             else:
                 meta['min_width'] = max(wcell, longest_part)
 
-    def _set_max_column_widths(self):
+    def _set_max_column_widths(self, force_set_max=False):
         """
         Set the maximum allowable column widths based on the table max_width.
+
+        Parameters
+        ----------
+        force_set_max : bool
+            If True, compute the max column widths even if the table max_width limit is violated.
         """
         # check for case where total table width is specified and we have to set max_width on
         # column(s) as a result
@@ -436,7 +448,7 @@ class TableBuilder(object):
                 else:
                     break
 
-            if sum([w for _, w, _ in winfo]) <= allowed_width:
+            if force_set_max or sum([w for _, w, _ in winfo]) <= allowed_width:
                 for i, w, _ in winfo:
                     self._column_meta[i]['max_width'] = w
 
@@ -1259,7 +1271,7 @@ class TabulatorJSBuilder(TableBuilder):
         list
             List of cells for the current row.
         """
-        self._set_widths()
+        self._set_widths(force_set_max=True)
         for row in self._get_formatted_rows():
             yield row
 
@@ -1298,6 +1310,15 @@ class TabulatorJSBuilder(TableBuilder):
             rows.append(dct)
             idx += 1
 
+        if 'layout' not in self._table_meta:
+            if self.needs_wrap():
+                self._table_meta['layout'] = 'fitColumns'
+            else:
+                self._table_meta['layout'] = 'fitDataTable'
+
+        if self._table_meta['layout'] == 'fitColumns':
+            self._setup_fit_columns_layout()
+
         cols = []
         for i, meta in enumerate(self.sorted_meta()):
             cmeta = {
@@ -1311,39 +1332,40 @@ class TabulatorJSBuilder(TableBuilder):
                 'formatter': meta['formatter'],  # plaintext, textarea, html, money, image, link,
                                                  # tickCross, traffic, star, progress, color,
                                                  # buttonTick, buttonCross,
-                'formatterParams': meta.get('formatterParams', None),
-                'titleFormatter': meta.get('titleFormatter', None),
-                'titleFormatterParams': meta.get('titleFormatterParams', None),
-                'editor': meta.get('editor', None),
-                'editorParams': meta.get('editorParams', None),
-                'headerFilterParams': meta.get('headerFilterParams', None),
+                'formatterParams': meta.get('formatterParams'),
+                'titleFormatter': meta.get('titleFormatter'),
+                'titleFormatterParams': meta.get('titleFormatterParams'),
+                'editor': meta.get('editor'),
+                'editorParams': meta.get('editorParams'),
+                'headerFilterParams': meta.get('headerFilterParams'),
                 'widthGrow': meta.get('widthGrow'),
                 'widthShrink': meta.get('widthShrink'),
             }
 
-            if meta['max_width'] is not None:
-                cmeta['initialMaxWidth'] = meta['max_width'] * self.font_size
-
+            width = meta.get('width')
+            if width is not None:
+                cmeta['width'] = width
             cols.append(cmeta)
 
         # for big tables, use virtual DOM for speed (setting height activates it)
         if idx - 1 > 30 and self._table_meta['height'] is None:
-            self._table_meta['height'] = 600
+            self._table_meta['height'] = _big_table_height
 
         self._table_meta['data'] = rows
         self._table_meta['columns'] = cols
-
-        if self._table_meta['layout'] is None:
-            if self.needs_wrap():
-                self._table_meta['layout'] = 'fitColumns'
-            else:
-                self._table_meta['layout'] = 'fitDataTable'
 
         return {
             'id': self._html_id,
             'title': self._title,
             'meta': self._table_meta,
         }
+
+    def _setup_fit_columns_layout(self):
+        for meta in self.sorted_meta():
+            if meta['col_type'] == 'other':
+                pass
+            else:
+                meta['width'] = '10%'
 
     def write(self, outfile=_default_tabulator_file):
         """
@@ -1413,7 +1435,7 @@ class TabulatorJSBuilder(TableBuilder):
         self.write(outfile)
         if notebook:
             if not colab:
-                display(IFrame(src=outfile, width="100%", height=700))
+                display(IFrame(src=outfile, width="100%", height=_big_table_height))
             else:
                 display(HTML(outfile))
         else:
@@ -1477,9 +1499,9 @@ if __name__ == '__main__':
     from openmdao.utils.tests.test_tables import random_table
     for fmt in formats:
         if fmt == 'html':
-            tab = random_table(tablefmt=fmt, coltypes=coltypes, nrows=55, center=True)
+            tab = random_table(tablefmt=fmt, coltypes=coltypes, nrows=15, center=True)
             # tab.update_column_meta(-1, header_style={'text-align': 'right'})
         else:
-            tab = random_table(tablefmt=fmt, coltypes=coltypes, nrows=55)
+            tab = random_table(tablefmt=fmt, coltypes=coltypes, nrows=15)
         tab.max_width = 100
         tab.display()
