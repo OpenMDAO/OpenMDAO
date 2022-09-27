@@ -3,7 +3,12 @@
 
 September 28, 2022
 
-OpenMDAO 3.21.0 implements several bug fixes and a few new capabilities.
+OpenMDAO 3.21.0 implements several bug fixes and a few new capabilities. DOEDriver can now compute and record 
+derivatives, which can be useful for testing. AnalysisError will now correctly feed back to IPOPT when using
+pyoptsparse. This feature previously worked only with SNOPT. The behavior with other optimizers varies as not all
+are capable of dealing with failed analyses. Finally, `assert_no_approx_partials`, from `openmdao.utils.assert_utils`,
+can now be used to separately test models and their children for the presence of partials approximated with 
+complex-step, finite-difference, or both.
 
 ## New Deprecations
 
@@ -22,6 +27,7 @@ OpenMDAO 3.21.0 implements several bug fixes and a few new capabilities.
 - Added --dependency_vesions option to command line interface to show versions of OpenMDAO dependencies. [#2628](https://github.com/OpenMDAO/OpenMDAO/pull/2628)
 - Handle AnalysisError within pyoptsparse_driver using optimizers other than SNOPT. [#2646](https://github.com/OpenMDAO/OpenMDAO/pull/2646)
 - **POEM_073**: Allow DOEDriver to record derivatives to allow user to check derivatives across model. [#2648](https://github.com/OpenMDAO/OpenMDAO/pull/2648)
+- Added optional arguments `method` and `excludes` to `assert_no_approx_partials` [#2652](https://github.com/OpenMDAO/OpenMDAO/pull/2652)
 
 ## Bug Fixes
 
