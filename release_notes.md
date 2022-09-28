@@ -1,4 +1,63 @@
 ***********************************
+# Release Notes for OpenMDAO 3.21.0
+
+September 28, 2022
+
+OpenMDAO 3.21.0 implements several bug fixes and a few new capabilities. DOEDriver can now compute and record 
+derivatives, which can be useful for testing. AnalysisError will now correctly feed back to IPOPT when using
+pyoptsparse. This feature previously worked only with SNOPT. The behavior with other optimizers varies as not all
+are capable of dealing with failed analyses. Finally, `assert_no_approx_partials`, from `openmdao.utils.assert_utils`,
+can now be used to separately test models and their children for the presence of partials approximated with 
+complex-step, finite-difference, or both.
+
+## New Deprecations
+
+- None
+
+## Backwards Incompatible API Changes
+
+- None
+
+## Backwards Incompatible Non-API Changes
+
+- None
+
+## New Features
+
+- Added --dependency_vesions option to command line interface to show versions of OpenMDAO dependencies. [#2628](https://github.com/OpenMDAO/OpenMDAO/pull/2628)
+- Handle AnalysisError within pyoptsparse_driver using optimizers other than SNOPT. [#2646](https://github.com/OpenMDAO/OpenMDAO/pull/2646)
+- **POEM_073**: Allow DOEDriver to record derivatives to allow user to check derivatives across model. [#2648](https://github.com/OpenMDAO/OpenMDAO/pull/2648)
+- Added optional arguments `method` and `excludes` to `assert_no_approx_partials` [#2652](https://github.com/OpenMDAO/OpenMDAO/pull/2652)
+
+## Bug Fixes
+
+- Accounted for y-intercept on bounds in linear constraints given to pyoptsparse. [#2605](https://github.com/OpenMDAO/OpenMDAO/pull/2605)
+- Fixed bug where models with discrete connections were reconfigured between setup calls. [#2610](https://github.com/OpenMDAO/OpenMDAO/pull/2610)
+- Added a better error message when DirectSolver fails and broadened conditions to check for rank deficiency. [#2614](https://github.com/OpenMDAO/OpenMDAO/pull/2614)
+- Sorted information for N2 generation to ensure consistency in created diagrams and fixed an error when drawing cycle arrows. [#2616](https://github.com/OpenMDAO/OpenMDAO/pull/2616)
+- Fixed file save dialongs for the N2 diagram. [#2619](https://github.com/OpenMDAO/OpenMDAO/pull/2619)
+- Fixed a bug in check_totals when an aliased constraint is defined in a child system. [#2621](https://github.com/OpenMDAO/OpenMDAO/pull/2621)
+- Fixed the error message to be more helpful when a user calls `Problem.list_problem_vars()` before `final_setup`. [#2624](https://github.com/OpenMDAO/OpenMDAO/pull/2624)
+- Removed deprecation warnings under python 3.10 when entry points are used. [#2625](https://github.com/OpenMDAO/OpenMDAO/pull/2625)
+- Fixed failure in load_case when variable is distributed. [#2627](https://github.com/OpenMDAO/OpenMDAO/pull/2627)
+- Updated check for when coloring doesn't meet min improvement percentage to prevent errant messages. [#2630](https://github.com/OpenMDAO/OpenMDAO/pull/2630)
+- Fixed to allow a shape mismatch in AutoIVC if all promoted inputs have different shapes but unambiguous storage orders. [#2632](https://github.com/OpenMDAO/OpenMDAO/pull/2632)
+- Fixed a bug in `AddSubtractComp` when reusing an input defined in a previous equation. [#2636](https://github.com/OpenMDAO/OpenMDAO/pull/2636)
+- pip install myst_nb in the docs when run on Colab. [#2638](https://github.com/OpenMDAO/OpenMDAO/pull/2638)
+- Fix for CaseViewer issue caused by matplotlib change. [#2640](https://github.com/OpenMDAO/OpenMDAO/pull/2640)
+- Fix to allow "OPENMDAO_REPORTS=none" to diable reports, per the docs. [#2649](https://github.com/OpenMDAO/OpenMDAO/pull/2649)
+
+## Miscellaneous
+
+- Added `long_description_content_type` to setup.py for rendering on pypi. [#2604](https://github.com/OpenMDAO/OpenMDAO/pull/2604)
+- Updated `Sellar` model used for testing and documentation.. [#2613](https://github.com/OpenMDAO/OpenMDAO/pull/2613)
+- Added coverage improvements. [#2615](https://github.com/OpenMDAO/OpenMDAO/pull/2615)
+- Due to issues with conda switch github workflow to use mamba and pre-install some jupyter dependencies. [#2618](https://github.com/OpenMDAO/OpenMDAO/pull/2618)
+- Added MacOS build to CI. [#2623](https://github.com/OpenMDAO/OpenMDAO/pull/2623)
+- Replaced all calls to time.time() with time.perf_counter(). [#2643](https://github.com/OpenMDAO/OpenMDAO/pull/2643)
+- Fixed some out-of-date documentation dealing with fixed-size interpolants. [#2644](https://github.com/OpenMDAO/OpenMDAO/pull/2644)
+
+***********************************
 # Release Notes for OpenMDAO 3.20.0
 
 August 10, 2022
