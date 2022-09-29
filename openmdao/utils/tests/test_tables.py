@@ -297,7 +297,7 @@ Col0  Col1  Col2
         column_meta = [{'header_align': 'center'}, {}, {'align': 'center'}]
         expected = """
 | ---------------------------------- |
-| Strings     | Floats | Something   |
+|   Strings   | Floats | Something   |
 |             |        | else        |
 | ----------- | ------ | ----------- |
 | foobar blah |    1.0 |     N/A     |

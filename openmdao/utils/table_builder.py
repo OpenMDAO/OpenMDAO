@@ -598,7 +598,7 @@ class TextTableBuilder(TableBuilder):
                 if sym == '^':  # center
                     lines = [l.strip() for l in lines]
                 # ensure all cells have same width in this column
-                cell_lists.append([f"{line:<{maxwid}}" for line in lines])
+                cell_lists.append([f"{line:{sym}{maxwid}}" for line in lines])
             else:
                 cell_lists.append([cell])
 
