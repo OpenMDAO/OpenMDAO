@@ -90,7 +90,7 @@ def _trace_call(frame, arg, stack, context):
     """
     global time0
     if time0 is None:
-        time0 = time.time()
+        time0 = time.perf_counter()
 
     (qual_cache, method_counts, class_counts, id2count,
      verbose, memory, leaks, stream, show_ptrs) = context
@@ -163,7 +163,7 @@ def _trace_return(frame, arg, stack, context):
         if current_mem != last_mem:
             delta = current_mem - last_mem
             _printer("%s<-- %s (time: %8.5f) (total: %6.3f MB) (diff: %+.0f KB)" %
-                     (indent, '.'.join((sname, funcname)), time.time() - time0, current_mem,
+                     (indent, '.'.join((sname, funcname)), time.perf_counter() - time0, current_mem,
                      delta * 1024.))
 
             # add this delta to all callers so when they calculate their own delta, this
@@ -172,7 +172,7 @@ def _trace_return(frame, arg, stack, context):
                 memory[i] += delta
         else:
             _printer("%s<-- %s (time: %8.5f) (total: %6.3f MB)" %
-                     (indent, '.'.join((sname, funcname)), time.time() - time0, current_mem))
+                     (indent, '.'.join((sname, funcname)), time.perf_counter() - time0, current_mem))
     else:
         _printer("%s<-- %s" % (indent, '.'.join((sname, funcname))))
 

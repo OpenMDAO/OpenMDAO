@@ -16,7 +16,7 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_warning, asser
 from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
 from openmdao.utils.testing_utils import use_tempdirs, require_pyoptsparse
 from openmdao.utils.mpi import MPI
-from openmdao.utils.om_warnings import OMDeprecationWarning
+
 
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
@@ -1407,51 +1407,6 @@ class TestPyoptSparse(unittest.TestCase):
         # Piggyback test: make sure we can run the driver again as a subdriver without a keyerror.
         prob.driver.run()
 
-    def test_analysis_error_objfunc(self):
-
-        # Component raises an analysis error during some runs, and pyopt
-        # attempts to recover.
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
-
-        model.add_subsystem('comp', ParaboloidAE(), promotes=['*'])
-
-        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
-
-        prob.driver = pyOptSparseDriver()
-        prob.driver.options['optimizer'] = OPTIMIZER
-
-        if OPTIMIZER == 'SLSQP':
-            prob.driver.opt_settings['ACC'] = 1e-9
-
-        prob.driver.options['print_results'] = False
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-
-        model.add_objective('f_xy')
-        model.add_constraint('c', upper=-15.0)
-
-        prob.setup()
-        failed = prob.run_driver()
-
-        self.assertFalse(failed, "Optimization failed, info = " +
-                                 str(prob.driver.pyopt_solution.optInform))
-
-        # Minimum should be at (7.166667, -7.833334)
-        assert_near_equal(prob['x'], 7.16667, 1e-6)
-        assert_near_equal(prob['y'], -7.833334, 1e-6)
-
-        # Normally it takes 9 iterations, but takes 13 here because of the
-        # analysis failures. (note SLSQP takes 5 instead of 4)
-        if OPTIMIZER == 'SLSQP':
-            self.assertEqual(prob.driver.iter_count, 7)
-        else:
-            self.assertEqual(prob.driver.iter_count, 15)
-
     def test_raised_error_objfunc(self):
 
         # Component fails hard this time during execution, so we expect
@@ -1489,59 +1444,6 @@ class TestPyoptSparse(unittest.TestCase):
             prob.run_driver()
 
         # pyopt's failure message differs by platform and is not informative anyway
-
-    def test_analysis_error_sensfunc(self):
-
-        # Component raises an analysis error during some linearize calls, and
-        # pyopt attempts to recover.
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
-
-        comp = model.add_subsystem('comp', ParaboloidAE(), promotes=['*'])
-
-        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
-
-        prob.driver = pyOptSparseDriver()
-        prob.driver.options['optimizer'] = OPTIMIZER
-
-        if OPTIMIZER == 'SLSQP':
-            prob.driver.opt_settings['ACC'] = 1e-9
-
-        prob.driver.options['print_results'] = False
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-
-        model.add_objective('f_xy')
-        model.add_constraint('c', upper=-15.0)
-
-        comp.grad_fail_at = 2
-        comp.eval_fail_at = 100
-
-        prob.setup()
-
-        failed = prob.run_driver()
-
-        self.assertFalse(failed, "Optimization failed, info = " +
-                                 str(prob.driver.pyopt_solution.optInform))
-
-        # SLSQP does a bad job recovering from gradient failures
-        if OPTIMIZER == 'SLSQP':
-            tol = 1e-2
-        else:
-            tol = 1e-6
-
-        # Minimum should be at (7.166667, -7.833334)
-        assert_near_equal(prob['x'], 7.16667, tol)
-        assert_near_equal(prob['y'], -7.833334, tol)
-
-        # Normally it takes 9 iterations, but takes 13 here because of the
-        # gradfunc failures. (note SLSQP just doesn't do well)
-        if OPTIMIZER == 'SNOPT':
-            self.assertEqual(prob.driver.iter_count, 15)
 
     def test_raised_error_sensfunc(self):
 
@@ -1778,8 +1680,8 @@ class TestPyoptSparse(unittest.TestCase):
     def test_show_exception_bad_opt(self):
 
         # First, check if we have the optimizer for this test. If they do, then just skip it.
-        _, loc_opt = set_pyoptsparse_opt('NOMAD')
-        if loc_opt == 'NOMAD':
+        _, loc_opt = set_pyoptsparse_opt('NLPQLP')
+        if loc_opt == 'NLPQLP':
             raise unittest.SkipTest("Skipping because user has this optimizer.")
 
         prob = om.Problem()
@@ -1799,15 +1701,15 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.driver = pyOptSparseDriver()
 
-        # We generally don't hae a working NOMAD install.
-        prob.driver.options['optimizer'] = 'NOMAD'
+        # We generally don't have a working NLPQLP install.
+        prob.driver.options['optimizer'] = 'NLPQLP'
         prob.setup()
 
         # Test that we get exception.
         with self.assertRaises(ImportError) as raises_cm:
             prob.run_driver()
 
-        self.assertTrue("NOMAD is not available" in str(raises_cm.exception))
+        self.assertTrue("NLPQLP is not available" in str(raises_cm.exception))
 
     # Travis testing core dumps on many of the machines. Probabaly a build problem with the NSGA source.
     # Limiting this to the single travis 1.14 machine for now.

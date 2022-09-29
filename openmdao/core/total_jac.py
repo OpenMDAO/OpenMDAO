@@ -1367,7 +1367,7 @@ class _TotalJacInfo(object):
                                 print(f"In mode: {mode}.\n('{self.ivc_print_names.get(key, key)}'"
                                       f", [{inds}])", flush=True)
 
-                        t0 = time.time()
+                        t0 = time.perf_counter()
 
                     # restore old linear solution if cache_linear_solution was set by the user for
                     # any input variables involved in this linear solution.
@@ -1380,7 +1380,7 @@ class _TotalJacInfo(object):
                             model._solve_linear(mode, rel_systems)
 
                     if debug_print:
-                        print(f'Elapsed Time: {time.time() - t0} secs\n', flush=True)
+                        print(f'Elapsed Time: {time.perf_counter() - t0} secs\n', flush=True)
 
                     jac_setter(inds, mode, imeta)
 
@@ -1433,7 +1433,7 @@ class _TotalJacInfo(object):
         # Solve for derivs with the approximation_scheme.
         # This cuts out the middleman by grabbing the Jacobian directly after linearization.
 
-        t0 = time.time()
+        t0 = time.perf_counter()
 
         model._tot_jac = self
         try:
@@ -1470,7 +1470,7 @@ class _TotalJacInfo(object):
 
         totals = self.J_dict
         if debug_print:
-            print(f'Elapsed time to approx totals: {time.time() - t0} secs\n', flush=True)
+            print(f'Elapsed time to approx totals: {time.perf_counter() - t0} secs\n', flush=True)
 
         # Driver scaling.
         if self.has_scaling:

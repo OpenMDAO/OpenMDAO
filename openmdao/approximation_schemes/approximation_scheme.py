@@ -442,7 +442,7 @@ class ApproximationScheme(object):
         for group_i, tup in enumerate(approx_groups):
             wrt, data, jcol_idxs, vec, vec_idxs, directional, direction = tup
             if self._progress_out:
-                start_time = time.time()
+                start_time = time.perf_counter()
 
             if direction is not None:
                 app_data = self.apply_directional(data, direction)
@@ -474,7 +474,7 @@ class ApproximationScheme(object):
                         tosend = (group_i, next(jidx_iter), result)  # use local jac row var index
 
                     if self._progress_out:
-                        end_time = time.time()
+                        end_time = time.perf_counter()
                         prom_name = _convert_auto_ivc_to_conn_name(
                             system._conn_global_abs_in2out, wrt)
                         self._progress_out.write(f"{fd_count+1}/{len(result)}: Checking "

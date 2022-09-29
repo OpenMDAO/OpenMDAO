@@ -6,6 +6,7 @@ import openmdao.api as om
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.test_suite.components.sellar import SellarNoDerivatives
 from openmdao.test_suite.components.sellar_feature import SellarNoDerivativesCS
 from openmdao.test_suite.components.partial_check_feature import BrokenDerivComp
 from openmdao.utils.assert_utils import assert_check_partials, assert_no_approx_partials, assert_no_dict_jacobians
@@ -96,6 +97,38 @@ class TestAssertUtils(unittest.TestCase):
         else:
             self.fail('Exception expected.')
 
+    def test_assert_no_approx_partials_cs_method(self):
+
+        prob = om.Problem()
+        prob.model = SellarNoDerivativesCS()
+
+        prob.setup()
+        prob.final_setup()
+
+        with self.assertRaises(AssertionError):
+            assert_no_approx_partials(prob.model, include_self=True, recurse=True, method='any')
+
+        with self.assertRaises(AssertionError) :
+            assert_no_approx_partials(prob.model, include_self=True, recurse=True, method='cs')
+
+        assert_no_approx_partials(prob.model, include_self=True, recurse=True, method='fd')
+
+    def test_assert_no_approx_partials_fd_method(self):
+
+        prob = om.Problem()
+        prob.model = SellarNoDerivatives()  # uses FD
+
+        prob.setup()
+        prob.final_setup()
+
+        with self.assertRaises(AssertionError):
+            assert_no_approx_partials(prob.model, include_self=True, recurse=True, method='any')
+
+        with self.assertRaises(AssertionError):
+            assert_no_approx_partials(prob.model, include_self=True, recurse=True, method='fd')
+
+        assert_no_approx_partials(prob.model, include_self=True, recurse=True, method='cs')
+
     def test_assert_no_approx_partials_exception_not_expected(self):
 
         prob = om.Problem()
@@ -104,6 +137,31 @@ class TestAssertUtils(unittest.TestCase):
         prob.setup()
 
         assert_no_approx_partials(prob.model, include_self=True, recurse=True)
+
+    def test_assert_no_approx_partials_exception_exclude_single_pathname(self):
+
+        prob = om.Problem()
+        C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x+1.', x=2.0))
+        C1.declare_partials('y', 'x', method='fd')
+
+        prob.setup()
+        prob.final_setup()
+
+        with self.assertRaises(AssertionError) :
+            assert_no_approx_partials(prob.model, include_self=True, recurse=True)
+
+        assert_no_approx_partials(prob.model, include_self=True, recurse=True, excludes='C1')
+
+    def test_assert_no_approx_partials_exception_exclude_pathnames(self):
+
+        prob = om.Problem()
+        prob.model = SellarNoDerivativesCS()
+
+        prob.setup()
+        prob.final_setup()
+
+        assert_no_approx_partials(prob.model, include_self=True, recurse=True,
+                                  excludes=['cycle.d1', 'cycle.d2'])
 
     def test_assert_no_dict_jacobians_exception_expected(self):
 

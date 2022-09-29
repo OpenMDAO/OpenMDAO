@@ -28,6 +28,8 @@ parts:
     - file: advanced_user_guide/analytic_derivatives/partial_derivs_explicit
     - file: advanced_user_guide/recording/advanced_case_recording
     - file: advanced_user_guide/example/euler_integration_example
+    - file: advanced_user_guide/complex_step
+    - file: advanced_user_guide/analysis_errors/analysis_error
 - caption: Reference Guide
   chapters:
   - file: theory_manual/theory_manual

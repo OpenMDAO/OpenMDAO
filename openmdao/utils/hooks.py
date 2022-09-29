@@ -7,6 +7,8 @@ import inspect
 import warnings
 import sys
 
+from openmdao.utils.om_warnings import issue_warning
+
 
 # global dict of hooks
 # {class_name: { inst_id: {fname: [pre_hooks, post_hooks]}}}
@@ -262,8 +264,8 @@ def _remove_hook(to_remove, hooks, class_name, fname, hook_loc, inst_id):
                     hooks.remove(hook)
                     break
             else:
-                raise RuntimeError(f"Couldn't find the given '{hook_loc}' function in the "
-                                   f"{hook_loc} hooks for {class_name}.{fname}.")
+                issue_warning(f"Couldn't find the given '{hook_loc}' function in the "
+                              f"{hook_loc} hooks for {class_name}.{fname}.")
 
 
 def _unregister_hook(fname, class_name, inst_id=None, pre=True, post=True):
