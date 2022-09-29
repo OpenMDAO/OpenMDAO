@@ -6,7 +6,7 @@ import sys
 import os
 import json
 import textwrap
-from itertools import zip_longest
+from itertools import zip_longest, chain
 from html import escape
 from io import StringIO
 from math import floor
@@ -101,8 +101,10 @@ class TableBuilder(object):
         if headers == 'keys':
             rows, headers = self._dict2rows(rows)
 
-        self._ncols = _num_cols(rows)
-        self._raw_rows = rows  # original rows passed in
+        self._raw_rows = []
+        for row in rows:
+            self._raw_rows.append(list(row))
+        self._ncols = _num_cols(self._raw_rows)
         self._rows = None  # rows after initial formatting (total width not set)
         self._column_meta = {}
         self._data_widths = None  # width of data in each cell before a uniform column width is set
@@ -266,7 +268,7 @@ class TableBuilder(object):
         types = []
         for row in self._raw_rows:
             if not types:
-                types = [set() for r in row] if row else []
+                types = [set() for r in row] if row is not None else []
 
             for i, cell in enumerate(row):
                 if isinstance(cell, Number):
@@ -344,7 +346,7 @@ class TableBuilder(object):
 
         # set widths and min widths
         for i, meta in enumerate(self.sorted_meta()):
-            self._header_widths[i] = len(meta['header'])
+            self._header_widths[i] = 0 if meta['header'] is None else len(meta['header'])
 
         self._set_min_widths()
         self._set_max_column_widths(force_set_max)
@@ -372,7 +374,7 @@ class TableBuilder(object):
             align = _default_align[col_type]
 
             meta = {
-                'header': '',
+                'header': None,
                 'format': self._default_formats[col_type],
                 'align': align,
                 'header_align': align,
@@ -410,7 +412,10 @@ class TableBuilder(object):
 
             # check if header is splittable into words, and if so, allow for min_width using a
             # split header if min_width will be > min data width.
-            longest_part = max(len(word) for word in header.strip().split())
+            if header is not None and header.strip():
+                longest_part = max(len(word) for word in header.strip().split())
+            else:
+                longest_part = 0
 
             if meta['col_type'] == 'other':  # strings
                 meta['min_width'] = max(10, longest_part)
@@ -439,7 +444,7 @@ class TableBuilder(object):
 
             # subtract 1 from the widest column until we meet the total max_width requirement,
             # or get as close as we can without violating a minimum allowed width.
-            while sum([w for i, w, _ in winfo]) > allowed_width:
+            while sum([w for _, w, _ in winfo]) > allowed_width:
                 for info in sorted(winfo, key=lambda x: x[1], reverse=True):
                     _, width, min_width = info
                     if width - 1 >= min_width:
@@ -614,7 +619,7 @@ class TextTableBuilder(TableBuilder):
         list
             Each header row after expanding due to word wrapping.
         """
-        header_cells = [None] * len(self._column_meta)
+        header_cells = [None] * self._ncols
         self._set_widths()
 
         widths = self._get_column_widths()
@@ -622,8 +627,10 @@ class TextTableBuilder(TableBuilder):
         sorted_cols = self.sorted_meta()
 
         for i, meta in enumerate(sorted_cols):
-            header_cells[i] = self._get_fixed_width_cell(meta, meta['header'], widths[i],
-                                                         'header_align')
+            header = meta['header']
+            if header is not None:
+                header_cells[i] = self._get_fixed_width_cell(meta, header, widths[i],
+                                                             'header_align')
 
         if self.needs_wrap():
             yield from self.get_lengthened_columns(sorted_cols, header_cells)
@@ -658,8 +665,11 @@ class TextTableBuilder(TableBuilder):
                     maxwid = meta['max_width']
                     if maxwid is not None and maxwid < len(cell):
                         lines = textwrap.wrap(cell, maxwid)
+                        sym = _align2symbol[meta['align']]
+                        if sym == '^':  # center
+                            lines = [l.strip() for l in lines]
                         # ensure all cells have same width in this column
-                        cell_lists.append([f"{line:<{maxwid}}" for line in lines])
+                        cell_lists.append([f"{line:{sym}{maxwid}}" for line in lines])
                     else:
                         cell_lists.append([cell])
 
@@ -756,23 +766,26 @@ class TextTableBuilder(TableBuilder):
         str
             This table as a string.
         """
-        lines = []
-        for i, header_cells in enumerate(self._stringified_header_iter()):
-            if i == 0 and self.top_border:
-                lines.append(self.add_side_borders(self.get_top_border(header_cells)))
-
-            lines.append(self.add_side_borders(self.column_sep.join(header_cells)))
-
-        if self.header_bottom_border:
-            lines.append(self.add_side_borders(self.get_header_bottom_border(header_cells)))
-
+        header_lines = []
+        data_lines = []
+        row_cells = None
         for row_cells in self._stringified_row_iter():
-            lines.append(self.add_side_borders(self.column_sep.join(row_cells)))
+            data_lines.append(self.add_side_borders(self.column_sep.join(row_cells)))
 
         if self.bottom_border:
-            lines.append(self.add_side_borders(self.get_bottom_border(header_cells)))
+            data_lines.append(self.add_side_borders(self.get_bottom_border(row_cells)))
 
-        return '\n'.join(lines)
+        if row_cells is not None and self.top_border:
+            header_lines.append(self.add_side_borders(self.get_top_border(row_cells)))
+
+        if sum(self._header_widths) > 0:
+            for i, header_cells in enumerate(self._stringified_header_iter()):
+                header_lines.append(self.add_side_borders(self.column_sep.join(header_cells)))
+
+            if self.header_bottom_border:
+                header_lines.append(self.add_side_borders(self.get_header_bottom_border(header_cells)))
+
+        return '\n'.join(chain(header_lines, data_lines))
 
     def display(self, outfile=None):
         """
@@ -1005,11 +1018,13 @@ class HTMLTableBuilder(TableBuilder):
 
     def _assemble(self):
         rlines = []
-        if self._safe:
-            _escape = escape
-        else:
-            def _escape(s):
-                return s
+
+        def _escape(s):
+            if s is None:
+                return ''
+            elif self._safe:
+                return escape(s)
+            return s
 
         for irow, row_cells in enumerate(self._stringified_row_iter()):
             row_style = {'background-color': '#F3F3F3' if irow % 2 else 'ghostwhite'}
@@ -1028,16 +1043,25 @@ class HTMLTableBuilder(TableBuilder):
         # we do the header out-of-order with the rows here because we need to
         # query the rows first to determine column data type to fill in missing
         # parts of the column metadata.
-        hparts = ["   <tr>"]
+
+        # First, make sure we actually have a header
+        has_header = False
         for meta in self.sorted_meta():
-            style = self._header_style.copy()
-            style['text-align'] = meta['header_align']
-            if 'header_style' in meta and meta['header_style']:
-                style.update(meta['header_style'])
-            header_style = _to_inline_style(style)
-            hparts.append(f"<th{header_style}>{_escape(meta['header'])}</th>")
-        hparts.append("</tr>")
-        lines.append(''.join(hparts))
+            if meta['header'] is not None:
+                has_header = True
+                break
+
+        if has_header:
+            hparts = ["    <tr>"]
+            for meta in self.sorted_meta():
+                style = self._header_style.copy()
+                style['text-align'] = meta['header_align']
+                if 'header_style' in meta and meta['header_style']:
+                    style.update(meta['header_style'])
+                header_style = _to_inline_style(style)
+                hparts.append(f"<th{header_style}>{_escape(meta['header'])}</th>")
+            hparts.append("</tr>")
+            lines.append(''.join(hparts))
 
         lines.extend(rlines)  # now add the rows back in
 
@@ -1049,7 +1073,7 @@ class HTMLTableBuilder(TableBuilder):
         """
         Return a string representation of the Table.
         """
-        return f"""
+        return textwrap.dedent("""
             <!DOCTYPE html>
             <html lang="en">
             <head>
@@ -1060,11 +1084,11 @@ class HTMLTableBuilder(TableBuilder):
                 </style>
             </head>
             <body>
-                <h2>{self._title}</h2>
-                {self._assemble()}
+                <h2>{}</h2>
+                {}
             </body>
             </html>
-        """
+        """).format(self._title, textwrap.indent(self._assemble(), '    '))
 
     def write(self, outfile=_default_html_table):
         """
@@ -1150,8 +1174,6 @@ class TabulatorJSBuilder(TableBuilder):
     ----------
     rows : iter of iters
         Data used to fill table cells.
-    height : int or None
-        If not None, set the table to this height in pixels.
     html_id : str or None
         If not None, the HTML id for the <table> block.
     title : str or None
@@ -1188,7 +1210,7 @@ class TabulatorJSBuilder(TableBuilder):
         'formatter'
     })
 
-    def __init__(self, rows, height=None, html_id='tabul-table', title='',
+    def __init__(self, rows, html_id='tabul-table', title='',
                  filter=True, sort=True, table_meta=None, **kwargs):
         """
         Initialize all attributes.
@@ -1200,7 +1222,7 @@ class TabulatorJSBuilder(TableBuilder):
         self._sort = sort
 
         self._table_meta = {
-            'height': height,
+            'autoResize': True,
         }
 
         if table_meta is not None:
@@ -1285,6 +1307,7 @@ class TabulatorJSBuilder(TableBuilder):
             meta['header_align'] = meta['align']
             meta['max_width'] = None
             meta['col_type'] = col_type
+            meta['header'] = None
 
             if i in self._column_meta:
                 meta.update(self._column_meta[i])
@@ -1321,9 +1344,12 @@ class TabulatorJSBuilder(TableBuilder):
 
         cols = []
         for i, meta in enumerate(self.sorted_meta()):
+            print("header:", type(meta['header']))
             cmeta = {
                 'field': f'c{i}',
-                'title': meta['header'],
+                # can't eliminate headers from tabulator.js tables, so just set to ' ' if None.
+                # Setting to '' results in the header containing '&nbsp' which doesn't look great.
+                'title': ' ' if meta['header'] is None else meta['header'],
                 'hozAlign': meta['align'],
                 'headerHozAlign': meta['header_align'],
                 'headerFilter': meta['filter'] if self._filter else False,
@@ -1348,7 +1374,7 @@ class TabulatorJSBuilder(TableBuilder):
             cols.append(cmeta)
 
         # for big tables, use virtual DOM for speed (setting height activates it)
-        if idx - 1 > 30 and self._table_meta['height'] is None:
+        if idx - 1 > 60 and self._table_meta['height'] is None:
             self._table_meta['height'] = _big_table_height
 
         self._table_meta['data'] = rows
@@ -1361,11 +1387,21 @@ class TabulatorJSBuilder(TableBuilder):
         }
 
     def _setup_fit_columns_layout(self):
-        for meta in self.sorted_meta():
-            if meta['col_type'] == 'other':
-                pass
-            else:
-                meta['width'] = '10%'
+        smeta = self.sorted_meta()
+        maxws = [m['max_width'] for m in smeta]
+        mx = sum(maxws)
+        pcts = [int(w / mx * 100) for w in maxws]
+        rempcts = 100 - sum(pcts)
+        while rempcts > 0:
+            for i in range(len(pcts)):
+                if rempcts > 0:
+                    pcts[i] += 1
+                    rempcts -= 1
+                else:
+                    break
+
+        for pct, meta in zip(pcts, smeta):
+            meta['width'] = f"{pct}%"
 
     def write(self, outfile=_default_tabulator_file):
         """
@@ -1444,6 +1480,22 @@ class TabulatorJSBuilder(TableBuilder):
             webview(outfile)
 
 
+def _fmt2class(tablefmt):
+    _table_types = {
+        'text': TextTableBuilder,
+        'github': GithubTableBuilder,
+        'rst': RSTTableBuilder,
+        'tabulator': TabulatorJSBuilder,
+        'html': HTMLTableBuilder,
+    }
+
+    try:
+        return _table_types[tablefmt]
+    except Exception:
+        raise KeyError(f"'{tablefmt}' is not a valid type choice for generate_table. Valid "
+                       f"choices are: {sorted(_table_types)}.")
+
+
 def generate_table(rows, tablefmt='text', **options):
     r"""
     Return the specified table builder class.
@@ -1462,21 +1514,7 @@ def generate_table(rows, tablefmt='text', **options):
     TableBuilder
         A table builder object.
     """
-    _table_types = {
-        'text': TextTableBuilder,
-        'github': GithubTableBuilder,
-        'rst': RSTTableBuilder,
-        'tabulator': TabulatorJSBuilder,
-        'html': HTMLTableBuilder,
-    }
-
-    try:
-        table_class = _table_types[tablefmt]
-    except Exception:
-        raise KeyError(f"'{tablefmt}' is not a valid type choice for generate_table.  Valid "
-                       f"choices are: {sorted(_table_types)}.")
-
-    return table_class(rows, **options)
+    return _fmt2class(tablefmt)(rows, **options)
 
 
 if __name__ == '__main__':

@@ -160,7 +160,7 @@ def activate_reports(reports, instance):
             activate_report(name, instance)
 
 
-def list_reports(default=False, outfile=None):
+def list_reports(default=False, outfile=None, max_width=80):
     """
     Write table of information about reports currently registered in the reporting system.
 
@@ -170,6 +170,8 @@ def list_reports(default=False, outfile=None):
         If True, list only the default reports.
     outfile : str or None
         Where to send report info.  None will result in output to stdout.
+    max_width : int
+        Maximum width of the table. Defaults to 80.
     """
     global _reports_registry
 
@@ -199,7 +201,7 @@ def list_reports(default=False, outfile=None):
                     val = str(val)
             rows[-1].append(val)
 
-    generate_table(rows, tablefmt='text', headers=headers, max_width=80).display(outfile)
+    generate_table(rows, tablefmt='text', headers=headers, max_width=max_width).display(outfile)
 
 
 def _list_reports_setup_parser(parser):
