@@ -230,7 +230,7 @@ def _list_reports_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    list_reports(options.outfile)
+    list_reports(outfile=options.outfile, default=options.dflt)
 
 
 def view_reports(probnames=None, level=2):
