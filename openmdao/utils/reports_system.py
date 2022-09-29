@@ -188,7 +188,7 @@ def list_reports(default=False, outfile=None, max_width=80):
 
     rows = []
     # Now for the values
-    for name, report in reg.items():
+    for name, report in sorted(reg.items()):
         rows.append([])
         for column_name in headers:
             if column_name == 'name':
