@@ -137,6 +137,16 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
         column_meta = []
 
     table = generate_table(rows, tablefmt=tablefmt, column_meta=column_meta, **kwargs)
+    if tablefmt == 'tabulator':
+        table._table_meta['initialHeaderFilter'] = [
+            # set the filter defaults for Source is IVC and Source is DV so that the user will
+            # see only those inputs that they are responsible for setting.
+
+            # set initial filter for 'Source is IVC' to True
+            {'field': 'c3', 'value': True},
+            # set initial filter for 'Source is DV' to False
+            {'field': 'c4', 'value': False},
+        ]
 
     if MPI and MPI.COMM_WORLD.rank != 0:
         return

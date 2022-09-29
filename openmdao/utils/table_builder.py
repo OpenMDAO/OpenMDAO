@@ -594,6 +594,9 @@ class TextTableBuilder(TableBuilder):
             maxwid = meta['max_width']
             if maxwid is not None and maxwid < len(cell):
                 lines = textwrap.wrap(cell, maxwid)
+                sym = _align2symbol[meta['header_align']]
+                if sym == '^':  # center
+                    lines = [l.strip() for l in lines]
                 # ensure all cells have same width in this column
                 cell_lists.append([f"{line:<{maxwid}}" for line in lines])
             else:
@@ -1374,7 +1377,8 @@ class TabulatorJSBuilder(TableBuilder):
             cols.append(cmeta)
 
         # for big tables, use virtual DOM for speed (setting height activates it)
-        if idx - 1 > 60 and self._table_meta['height'] is None:
+        if idx - 1 > 60 and ('height' not in self._table_meta or
+                             self._table_meta['height'] is None):
             self._table_meta['height'] = _big_table_height
 
         self._table_meta['data'] = rows
