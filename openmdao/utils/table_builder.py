@@ -596,7 +596,7 @@ class TextTableBuilder(TableBuilder):
                 lines = textwrap.wrap(cell, maxwid)
                 sym = _align2symbol[meta['header_align']]
                 if sym == '^':  # center
-                    lines = [l.strip() for l in lines]
+                    lines = [line.strip() for line in lines]
                 # ensure all cells have same width in this column
                 cell_lists.append([f"{line:{sym}{maxwid}}" for line in lines])
             else:
@@ -670,7 +670,7 @@ class TextTableBuilder(TableBuilder):
                         lines = textwrap.wrap(cell, maxwid)
                         sym = _align2symbol[meta['align']]
                         if sym == '^':  # center
-                            lines = [l.strip() for l in lines]
+                            lines = [line.strip() for line in lines]
                         # ensure all cells have same width in this column
                         cell_lists.append([f"{line:{sym}{maxwid}}" for line in lines])
                     else:
@@ -786,7 +786,8 @@ class TextTableBuilder(TableBuilder):
                 header_lines.append(self.add_side_borders(self.column_sep.join(header_cells)))
 
             if self.header_bottom_border:
-                header_lines.append(self.add_side_borders(self.get_header_bottom_border(header_cells)))
+                bottom = self.add_side_borders(self.get_header_bottom_border(header_cells))
+                header_lines.append(bottom)
 
         return '\n'.join(chain(header_lines, data_lines))
 
