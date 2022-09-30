@@ -25,7 +25,7 @@ except ImportError:
 from openmdao.core.constants import INF_BOUND
 from openmdao.utils.mpi import MPI
 from openmdao.utils.om_warnings import issue_warning, DriverWarning
-from openmdao.utils.table_builder import generate_table
+from openmdao.visualization.tables.table_builder import generate_table
 
 
 # Report file constants

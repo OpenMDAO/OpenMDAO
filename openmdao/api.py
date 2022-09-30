@@ -98,7 +98,7 @@ from openmdao.visualization.timing_viewer.timing_viewer import view_timing, view
     view_MPI_timing
 from openmdao.visualization.options_widget import OptionsWidget
 from openmdao.visualization.case_viewer.case_viewer import CaseViewer
-from openmdao.utils.table_builder import generate_table
+from openmdao.visualization.tables.table_builder import generate_table
 
 # Notebook Utils
 from openmdao.utils.notebook_utils import notebook_mode, display_source, show_options_table, cite

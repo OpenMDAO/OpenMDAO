@@ -30,6 +30,7 @@ _default_align = {
 }
 
 _big_table_height = 600
+_row_height_px = 45  # use to size the IFrame in a notebook
 
 
 def _num_cols(rows):
@@ -296,7 +297,7 @@ class TableBuilder(object):
         Parameters
         ----------
         col_idx : int
-            The index of the column.
+            The index of the column, starting at 0.
         **options : dict
             The metadata dict will be updated with these options.
         """
@@ -865,6 +866,9 @@ class GithubTableBuilder(TextTableBuilder):
         super().__init__(rows, column_sep=' | ', top_border='', header_bottom_border='-',
                          bottom_border='', left_border='| ', right_border=' |', **kwargs)
 
+    def _repr_markdown_(self):
+        return str(self)
+
     def get_header_bottom_border(self, header_cells):
         """
         Return the header bottom border string.
@@ -1008,6 +1012,9 @@ class HTMLTableBuilder(TableBuilder):
         self._title = title
         self._safe = safe
 
+    def _repr_html_(self):
+        return str(self)
+
     def _stringified_row_iter(self):
         """
         Yield rows of string data cells whose width matches their column width.
@@ -1092,7 +1099,7 @@ class HTMLTableBuilder(TableBuilder):
                 {}
             </body>
             </html>
-        """).format(self._title, textwrap.indent(self._assemble(), '    '))
+            """).format(self._title, textwrap.indent(self._assemble(), '    '))
 
     def write(self, outfile=_default_html_table):
         """
@@ -1125,7 +1132,8 @@ class HTMLTableBuilder(TableBuilder):
 
         if notebook:
             if not colab:
-                display(IFrame(src=outfile, width="100%", height=700))
+                height = min(_big_table_height, len(self._rows) * _row_height_px)
+                display(IFrame(src=outfile, width="100%", height=height))
             else:
                 display(HTML(outfile))
         else:
@@ -1186,6 +1194,8 @@ class TabulatorJSBuilder(TableBuilder):
         If True, include filter fields in the column headers where it makes sense.
     sort : bool
         If True, add sorting to column headers.
+    center : bool
+        If True, center the table on the page.
     table_meta : dict or None
         If not None, a dict of Tabulator.js metadata names mapped to their values.
     **kwargs : dict
@@ -1201,6 +1211,8 @@ class TabulatorJSBuilder(TableBuilder):
         If True, include filter fields in the column headers where it makes sense.
     _sort : bool
         If True, add sorting to column headers.
+    _center : bool
+        If True, center the table on the page.
     _table_meta : dict
         Metadata for the table.
     font_size : int
@@ -1214,8 +1226,8 @@ class TabulatorJSBuilder(TableBuilder):
         'formatter'
     })
 
-    def __init__(self, rows, html_id='tabul-table', title='',
-                 filter=True, sort=True, table_meta=None, **kwargs):
+    def __init__(self, rows, html_id='tabul-table', title='', filter=True, sort=True, center=False,
+                 table_meta=None, **kwargs):
         """
         Initialize all attributes.
         """
@@ -1224,6 +1236,7 @@ class TabulatorJSBuilder(TableBuilder):
         self._title = title
         self._filter = filter
         self._sort = sort
+        self._center = center
 
         self._table_meta = {
             'autoResize': True,
@@ -1239,7 +1252,7 @@ class TabulatorJSBuilder(TableBuilder):
         Return given cell's width in characters.
 
         This table's bool cells are left as bools instead of converted to strings in order to
-        make the Tabulator.js table sorting work properly for bool columns, so this method
+        make the Tabulator.js table filtering work properly for bool columns, so this method
         will return a width for bool cells.
 
         Parameters
@@ -1348,7 +1361,6 @@ class TabulatorJSBuilder(TableBuilder):
 
         cols = []
         for i, meta in enumerate(self.sorted_meta()):
-            print("header:", type(meta['header']))
             cmeta = {
                 'field': f'c{i}',
                 # can't eliminate headers from tabulator.js tables, so just set to ' ' if None.
@@ -1440,23 +1452,30 @@ class TabulatorJSBuilder(TableBuilder):
         libs_dir = os.path.join(code_dir, 'common', 'libs')
         style_dir = os.path.join(code_dir, 'common', 'style')
 
-        with open(os.path.join(code_dir, 'generic_table.html'), "r", encoding='utf-8') as f:
+        format_dct = {}
+        if self._center:
+            format_dct['table_div_style'] = 'class="center"'
+        else:
+            format_dct['table_div_style'] = ''
+
+        with open(os.path.join(code_dir, 'tables', 'generic_table.template'), "r",
+                  encoding='utf-8') as f:
             template = f.read()
 
         with open(os.path.join(libs_dir, 'tabulator.min.js'), "r", encoding='utf-8') as f:
             tabulator_src = f.read()
-        s = template.replace("<tabulator_src>", tabulator_src)
-        del tabulator_src
+
+        format_dct['tabulator_src'] = tabulator_src
 
         with open(os.path.join(style_dir, 'tabulator.min.css'), "r", encoding='utf-8') as f:
             tabulator_style = f.read()
-        s = s.replace("<tabulator_style>", tabulator_style)
+
+        format_dct['tabulator_style'] = tabulator_style
 
         jsontxt = json.dumps(self._get_table_data())
-        s = s.replace("<table_data>", jsontxt)
-        del jsontxt
+        format_dct['table_data'] = jsontxt
 
-        return s
+        return template.format(**format_dct)
 
     def display(self, outfile=None):
         """
@@ -1476,7 +1495,8 @@ class TabulatorJSBuilder(TableBuilder):
         self.write(outfile)
         if notebook:
             if not colab:
-                display(IFrame(src=outfile, width="100%", height=_big_table_height))
+                height = min(_big_table_height, len(self._rows) * _row_height_px)
+                display(IFrame(src=outfile, width="100%", height=height))
             else:
                 display(HTML(outfile))
         else:
@@ -1520,31 +1540,3 @@ def generate_table(rows, tablefmt='text', **options):
         A table builder object.
     """
     return _fmt2class(tablefmt)(rows, **options)
-
-
-if __name__ == '__main__':
-    import sys
-
-    coltypes = [
-        ('str', {'nwords': 5, 'maxsize': 5}),
-        ('real', {'low': -1e10, 'high': 1e10}),
-        ('bool', {}),
-        ('int', {'low': -99, 'high': 2500}),
-        # ('str', {'nwords': 15, 'maxsize': 5}),
-        ('str', {'nwords': 30, 'maxsize': 8}),
-    ]
-
-    try:
-        formats = [sys.argv[1]]
-    except Exception:
-        formats = ['rst', 'github', 'text', 'html', 'tabulator']
-
-    from openmdao.utils.tests.test_tables import random_table
-    for fmt in formats:
-        if fmt == 'html':
-            tab = random_table(tablefmt=fmt, coltypes=coltypes, nrows=15, center=True)
-            # tab.update_column_meta(-1, header_style={'text-align': 'right'})
-        else:
-            tab = random_table(tablefmt=fmt, coltypes=coltypes, nrows=15)
-        tab.max_width = 100
-        tab.display()

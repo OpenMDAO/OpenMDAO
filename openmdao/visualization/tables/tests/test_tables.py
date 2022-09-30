@@ -4,7 +4,7 @@ import math
 from html.parser import HTMLParser
 from html.entities import name2codepoint
 
-from openmdao.utils.table_builder import generate_table, _fmt2class
+from openmdao.visualization.tables.table_builder import generate_table
 from openmdao.utils.testing_utils import use_tempdirs
 
 

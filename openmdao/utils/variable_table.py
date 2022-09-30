@@ -10,7 +10,7 @@ import numpy as np
 
 from openmdao.core.constants import _DEFAULT_OUT_STREAM
 from openmdao.utils.notebook_utils import notebook, display, HTML
-from openmdao.utils.table_builder import generate_table
+from openmdao.visualization.tables.table_builder import generate_table
 
 column_widths = {
     'val': 20,

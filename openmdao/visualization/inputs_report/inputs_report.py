@@ -18,7 +18,7 @@ from openmdao.utils.general_utils import printoptions
 from openmdao.utils.notebook_utils import notebook, colab
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.reports_system import register_report
-from openmdao.utils.table_builder import generate_table
+from openmdao.visualization.tables.table_builder import generate_table
 
 
 def _unit_str(meta):

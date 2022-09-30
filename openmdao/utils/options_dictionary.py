@@ -4,7 +4,7 @@ import re
 
 from openmdao.utils.om_warnings import warn_deprecation
 from openmdao.utils.notebook_utils import notebook
-from openmdao.utils.table_builder import generate_table
+from openmdao.visualization.tables.table_builder import generate_table
 
 from openmdao.core.constants import _UNDEFINED
 

@@ -4,24 +4,24 @@
 <head>
 <meta charset="utf-8">
 <script type="text/javascript">
-    <tabulator_src>
+    {tabulator_src}
 </script>
 <style>
-    <tabulator_style>
+    {tabulator_style}
 
-    .tabulator .tabulator-header .tabulator-col .tabulator-col-content .tabulator-col-title {
+    .tabulator .tabulator-header .tabulator-col .tabulator-col-content .tabulator-col-title {{
         white-space: normal;
-    }
+    }}
 
-    .center {
+    .center {{
         text-align: center;
-    }
+    }}
 
 </style>
 </head>
 <body>
     <div id="tabul-container">
-        <div class="center">
+        <div {table_div_style}>
             <h2 id="tabul-title"></h2>
             <div id="tabul-table"></div>
         </div>
@@ -29,17 +29,17 @@
 
 <script type="text/javascript">
 
-let my_table_data = <table_data>;
+let my_table_data = {table_data};
 
 document.title = my_table_data.title;
 document.getElementById("tabul-title").innerHTML = my_table_data.title;
 
-function setup_tabulator(table_data) {
+function setup_tabulator(table_data) {{
     let tab = new Tabulator(table_data.id, table_data.meta);
     // full redraw is necessary, else word wrapping in columns is hosed until user manually
     // resizes a column.
     tab.redraw(true);
-}
+}}
 
 let the_table = setup_tabulator(my_table_data);
 

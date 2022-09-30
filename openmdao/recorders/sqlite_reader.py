@@ -17,7 +17,7 @@ from openmdao.utils.om_warnings import issue_warning, CaseRecorderWarning
 from openmdao.recorders.sqlite_recorder import format_version, META_KEY_SEP
 
 from openmdao.utils.notebook_utils import notebook, display, HTML
-from openmdao.utils.table_builder import generate_table
+from openmdao.visualization.tables.table_builder import generate_table
 
 import pickle
 import zlib

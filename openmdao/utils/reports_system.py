@@ -17,7 +17,7 @@ from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.file_utils import _iter_entry_points
 from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import env_truthy, is_truthy
-from openmdao.utils.table_builder import generate_table
+from openmdao.visualization.tables.table_builder import generate_table
 
 # Keeping track of the registered reports
 _Report = namedtuple(
