@@ -217,11 +217,11 @@ Col0  Col1  Col2
 
     def test_align(self):
         headers = ['Strings', 'Floats', 'Something else']
-        column_meta = [{'header_align': 'center'}, {}, {'align': 'center'}]
+        column_meta = [{'header_align': 'center'}, {}, {'align': 'center', 'header_align': 'center'}]
         expected = """
 | ---------------------------------- |
-|   Strings   | Floats | Something   |
-|             |        | else        |
+|   Strings   | Floats |  Something  |
+|             |        |    else     |
 | ----------- | ------ | ----------- |
 | foobar blah |    1.0 |     N/A     |
 | asdfas      |  3.142 |     N/A     |
