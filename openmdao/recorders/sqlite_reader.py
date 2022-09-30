@@ -392,9 +392,9 @@ class SqliteCaseReader(BaseCaseReader):
             sources.extend(self._problem_cases.list_sources())
 
         if out_stream:
-            rows = [[s] for s in sources]
             if notebook and out_stream is _DEFAULT_OUT_STREAM:
-                display(HTML(str(generate_table(rows, headers=['Sources'], tablefmt='html'))))
+                display(HTML(str(generate_table([[s] for s in sources], headers=['Sources'],
+                                                tablefmt='html'))))
             else:
                 if out_stream is _DEFAULT_OUT_STREAM:
                     out_stream = sys.stdout
@@ -402,6 +402,7 @@ class SqliteCaseReader(BaseCaseReader):
                     raise TypeError("Invalid output stream specified for 'out_stream'.")
                 for source in sources:
                     out_stream.write('{}\n'.format(source))
+
         return sources
 
     def list_source_vars(self, source, out_stream=_DEFAULT_OUT_STREAM):
@@ -680,9 +681,6 @@ class SqliteCaseReader(BaseCaseReader):
                 if not recurse:
                     # return list of cases from the source alone
                     cases = case_table.list_cases(source)
-                    # if out_stream:
-                    #     write_source_table({source: cases}, out_stream)
-                    # return cases
                 elif flat:
                     # return list of cases from the source plus child cases
                     cases = []

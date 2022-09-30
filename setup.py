@@ -123,6 +123,7 @@ setup(
         'openmdao.visualization.n2_viewer',
         'openmdao.visualization.meta_model_viewer',
         'openmdao.visualization.opt_report',
+        'openmdao.visualization.tables',
     ],
     package_data={
         'openmdao.devtools': ['*.wpr', ],
@@ -144,6 +145,9 @@ setup(
         ],
         'openmdao.visualization.connection_viewer': [
             '*.html',
+        ],
+        'openmdao.visualization.tables': [
+            '*.template',
         ],
         'openmdao.visualization.timing_viewer': [
             '*.html',
