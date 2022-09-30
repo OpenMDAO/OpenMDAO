@@ -8,83 +8,6 @@ from openmdao.visualization.tables.table_builder import generate_table
 from openmdao.utils.testing_utils import use_tempdirs
 
 
-# limit our random strings to upper, lower case letters, numbers, :, _, and space
-_char_map = [chr(i) for i in range(48, 59)]  # numbers + ':'
-_char_map.extend([chr(i) for i in range(65, 91)])  # CAPS
-_char_map.extend([chr(i) for i in range(97, 123)])  # lower case
-_char_map.append(chr(95))  # '_'
-
-
-#  generators for random table cells
-
-def _str_gen(nvals, nwords=20, maxsize=8, seed=None):
-    randgen = np.random.default_rng(seed)
-    ctop = len(_char_map)
-    for i in range(nvals):
-        words = []
-        for _ in range(nwords):
-            sz = randgen.integers(low=min(4, maxsize), high=maxsize + 1)
-            words.append(''.join([_char_map[c] for c in randgen.integers(ctop, size=sz)]))
-        yield ' '.join(words)
-
-
-def _bool_gen(nvals, seed=None):
-    randgen = np.random.default_rng(seed)
-    for i in range(nvals):
-        yield randgen.random() > .5
-
-
-def _real_gen(nvals, low=-10000., high=10000., seed=None):
-    randgen = np.random.default_rng(seed)
-    mult = high - low
-    for i in range(nvals):
-        yield randgen.random() * mult + low
-
-
-def _int_gen(nvals, low=-10000, high=10000, seed=None):
-    randgen = np.random.default_rng(seed)
-    for i in range(nvals):
-        yield randgen.integers(low=low, high=high)
-
-
-_cell_creators = {
-    'real': _real_gen,
-    'int': _int_gen,
-    'bool': _bool_gen,
-    'str': _str_gen,
-}
-
-def _create_random_table_data(coltypes, nrows, seed=None):
-    colgens = []
-    for t, kwargs in coltypes:
-        colgens.append(_cell_creators[t](nrows, seed=seed, **kwargs))
-        if seed is not None:
-            seed += 1
-
-    headers = [s for s in _str_gen(len(coltypes), nwords=2, maxsize=5, seed=seed)]
-    rows = []
-    for i in range(nrows):
-        rows.append([next(cg) for cg in colgens])
-
-    return headers, rows
-
-
-def random_table(tablefmt='text', nrows=10, coltypes=None, seed=None, **options):
-    if coltypes is None:
-        coltypes = [
-            ('str', {'maxsize': 40}),
-            ('real', {'low': -1e10, 'high': 1e10}),
-            ('str', {'maxsize': 50}),
-            ('bool', {}),
-            ('str', {'maxsize': 10}),
-            ('int', {'low': -99, 'high': 2500}),
-        ]
-
-    headers, data = _create_random_table_data(coltypes, nrows, seed=seed)
-
-    return generate_table(data, tablefmt=tablefmt, headers=headers, **options)
-
-
 class HTMLTableParser(HTMLParser):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -310,16 +233,9 @@ Col0  Col1  Col2
         self.check_text('text', self.table_row_iter('str', 'float', None), headers, expected,
                         column_meta=column_meta, missing_val='N/A', max_width=38)
 
-if __name__ == '__main__':
-    import sys
-
-    try:
-        formats = [sys.argv[1]]
-    except Exception:
-        formats = ['rst', 'github', 'text', 'html', 'tabulator']
-
-    rows = np.arange(9).reshape((3,3))
-    for fmt in formats:
-        tab = generate_table(rows, tablefmt=fmt)
-        tab.max_width = 120
-        tab.display()
+    def test_basic_tabulator(self):
+        # for now, just check that it doesn't crash
+        headers = ['Strings', 'Floats', 'Something else']
+        table = generate_table(self.table_row_iter('str', 'float', None),
+                               tablefmt='tabulator', headers=headers)
+        tstr = str(table)
