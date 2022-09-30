@@ -754,9 +754,8 @@ class ExecComp(ExplicitComponent):
                 self.compute(pwrap, uwrap)
 
                 for u in out_names:
-                    key = (u, inp)
-                    if key in self._declared_partials:
-                        partials[key] = imag(uwrap[u] * inv_stepsize).flat
+                    if (u, inp) in self._declared_partials:
+                        partials[(u, inp)] = imag(uwrap[u] * inv_stepsize).flat
 
                 # restore old input value
                 pwrap[inp] -= step
