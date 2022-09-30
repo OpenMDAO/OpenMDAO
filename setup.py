@@ -118,6 +118,7 @@ setup(
         'openmdao.visualization',
         'openmdao.visualization.case_viewer',
         'openmdao.visualization.connection_viewer',
+        'openmdao.visualization.inputs_report',
         'openmdao.visualization.timing_viewer',
         'openmdao.visualization.scaling_viewer',
         'openmdao.visualization.n2_viewer',
