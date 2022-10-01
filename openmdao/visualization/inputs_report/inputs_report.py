@@ -114,7 +114,7 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
     # kwargs = {}
 
     # if tablefmt == 'tabulator':
-    #     column_meta[0]['responsive'] = 10  # abs name column will be hidden first if width to small
+    #     column_meta[0]['responsive'] = 10  # hide abs name column first if width too small
     #     column_meta[0]['minWidth'] = 100
     #     column_meta[1]['responsive'] = 0  # don't hide prom name
     #     column_meta[2]['responsive'] = 0  # don't hide src name
