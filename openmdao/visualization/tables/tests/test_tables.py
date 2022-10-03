@@ -186,6 +186,22 @@ Col0  Col1  Col2
         self.check_html(np.arange(9).reshape((3,3)), headers, [['0', '1', '2'], ['3', '4', '5'], ['6', '7', '8']], headers)
         self.check_html([[0,1,2],[3,4,5],[6,7,8]], headers, [['0', '1', '2'], ['3', '4', '5'], ['6', '7', '8']], headers)
 
+        # check with dict and headers='keys'
+        tdict = {
+            'Col0': [0,3,6],
+            'Col1': [1,4,7],
+            'Col2': [2,5,8],
+        }
+        self.check_html(tdict, 'keys', [['0', '1', '2'], ['3', '4', '5'], ['6', '7', '8']], headers)
+
+        # check list of dicts
+        dlist = [
+            {'Col0': 0, 'Col1': 1, 'Col2': 2},
+            {'Col0': 3, 'Col1': 4, 'Col2': 5},
+            {'Col0': 6, 'Col1': 7, 'Col2': 8},
+            ]
+        self.check_html(dlist, 'keys', [['0', '1', '2'], ['3', '4', '5'], ['6', '7', '8']], headers)
+
     def test_missing_vals(self):
         headers = ['Strings', 'Floats', 'Something else']
         expected = """
