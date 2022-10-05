@@ -55,6 +55,7 @@ cmd_tests = [
     ('openmdao scaffold -b ExplicitComponent -c Foo', {}),
     ('openmdao scaffold -b ImplicitComponent -c Foo', {}),
     ('openmdao scaffold -p blahpkg --cmd=hello', {}),
+    ('openmdao scaling --no_browser {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao summary {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao timing -v no_browser {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao total_coloring {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
