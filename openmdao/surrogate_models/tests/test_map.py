@@ -14,9 +14,9 @@ class CompressorMap(MetaModelUnStructuredComp):
         self.add_input('Rline', val=2.0)
         self.add_input('alpha', val=0.0)
 
-        self.add_output('PR', val=1.0, surrogate=NearestNeighbor(interpolant_type='linear'))
-        self.add_output('eff', val=1.0, surrogate=NearestNeighbor(interpolant_type='linear'))
-        self.add_output('Wc', val=1.0, surrogate=NearestNeighbor(interpolant_type='linear'))
+        self.add_output('PR', val=1.0, surrogate=NearestNeighbor(interpolant_type='weighted'))
+        self.add_output('eff', val=1.0, surrogate=NearestNeighbor(interpolant_type='weighted'))
+        self.add_output('Wc', val=1.0, surrogate=NearestNeighbor(interpolant_type='weighted'))
 
 
 class TestMap(unittest.TestCase):

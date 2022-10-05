@@ -397,9 +397,9 @@ jobs:
         include:
           # baseline versions
           - NAME: Windows Baseline
-            PY: 3.9
-            NUMPY: 1.22
-            SCIPY: 1.6
+            PY: 3
+            NUMPY: 1
+            SCIPY: 1
 
     name: ${{ matrix.NAME }}
 
