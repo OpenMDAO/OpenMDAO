@@ -3,7 +3,7 @@
 import numpy as np
 
 from math import ceil
-from scipy.spatial import cKDTree
+from scipy.spatial import KDTree
 
 
 class NNBase(object):
@@ -78,7 +78,7 @@ class NNBase(object):
 
         # Make training data into a Tree
         leavesz = ceil(self._ntpts / float(num_leaves))
-        self._KData = cKDTree(self._tp, leafsize=leavesz)
+        self._KData = KDTree(self._tp, leafsize=leavesz)
 
         # Cache for gradients
         self._pt_cache = None
