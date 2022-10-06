@@ -8,12 +8,8 @@ import json
 import textwrap
 from itertools import zip_longest, chain
 from html import escape
-from io import StringIO
-from math import floor
 from numbers import Number, Integral
 from openmdao.utils.notebook_utils import notebook, display, HTML, IFrame, colab
-from openmdao.utils.file_utils import text2html
-from openmdao.utils.om_warnings import issue_warning
 
 
 _align2symbol = {
@@ -52,9 +48,11 @@ class TableBuilder(object):
     ----------
     rows : iter of iters
         Data used to fill table cells.
-    headers : iter of str or None
+    headers : iter of str, 'keys', or None
         If not None, header strings for all columns.  Size must match
-        number of columns in each row of data in rows.
+        number of columns in each row of data in rows.  A value of 'keys' means that rows is
+        either a dict or a list of dicts and the keys of that/those dict(s) should be used
+        as headers.
     column_meta : iter of dict or None
         If not None, contains a dict for each table column and the dict contains values
         of metadata for that column.
