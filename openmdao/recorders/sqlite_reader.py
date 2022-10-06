@@ -698,7 +698,7 @@ class SqliteCaseReader(BaseCaseReader):
                 # source is a coordinate
                 if recurse:
                     if flat:
-                        return self._list_cases_recurse_flat(source, out_stream=None)
+                        cases = self._list_cases_recurse_flat(source, out_stream=None)
                     else:
                         return self._list_cases_recurse_nested(source)
             else:

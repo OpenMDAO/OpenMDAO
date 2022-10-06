@@ -60,9 +60,9 @@ def write_var_table(pathname, var_list, var_type, var_dict,
         return
 
     if notebook and not hierarchical and out_stream is _DEFAULT_OUT_STREAM:
-        use_table_builder = True
+        use_html = True
     else:
-        use_table_builder = False
+        use_html = False
 
     if out_stream is _DEFAULT_OUT_STREAM:
         out_stream = sys.stdout
@@ -100,7 +100,7 @@ def write_var_table(pathname, var_list, var_type, var_dict,
         column_names = [out_type for out_type in out_types if out_type in outputs]
         break
 
-    if use_table_builder and var_list:
+    if use_html and var_list:
         rows = []
         for name in var_list:
             rows.append([name] + [var_dict[name][field] for field in column_names])

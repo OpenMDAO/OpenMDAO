@@ -111,30 +111,10 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
                'Units', 'Shape', 'Tags', 'Val', 'Min Val', 'Max Val']
     column_meta = [{'header': h} for h in headers]
 
-    # kwargs = {}
-
-    # if tablefmt == 'tabulator':
-    #     column_meta[0]['responsive'] = 10  # hide abs name column first if width too small
-    #     column_meta[0]['minWidth'] = 100
-    #     column_meta[1]['responsive'] = 0  # don't hide prom name
-    #     column_meta[2]['responsive'] = 0  # don't hide src name
-    #     column_meta[3]['responsive'] = 0  # don't hide src is IVC
-    #     column_meta[4]['responsive'] = 0  # don't hide src is DV
-    #     column_meta[5]['responsive'] = 4  # units
-    #     column_meta[6]['responsive'] = 5  # shape
-    #     column_meta[7]['responsive'] = 9  # tags
-    #     column_meta[8]['responsive'] = 6  # val
-    #     column_meta[9]['responsive'] = 8  # minval
-    #     column_meta[10]['responsive'] = 7  # maxval
-    #     kwargs['table_meta'] = {
-    #         'layout': 'fitDataTable',
-    #         'responsiveLayout': 'hide',
-    #     }
-
     if not rows:
         column_meta = []
 
-    table = generate_table(rows, tablefmt=tablefmt, column_meta=column_meta)  # , **kwargs)
+    table = generate_table(rows, tablefmt=tablefmt, column_meta=column_meta)
     if tablefmt == 'tabulator':
         table._table_meta['initialHeaderFilter'] = [
             # set the filter defaults for Source is IVC and Source is DV so that the user will
