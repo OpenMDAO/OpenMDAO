@@ -1046,6 +1046,19 @@ class Problem(object):
         model = self.model
         comm = self.comm
 
+        if sys.version_info.minor < 8:
+            sv = sys.version_info
+            msg = f'Python version {sv.major}.{sv.minor} detected. Only version 3.8 and ' \
+                   'higher are tested and supported for OpenMDAO.'
+            try:
+                from IPython import get_ipython
+                if 'IPKernelApp' not in get_ipython().config:  # pragma: no cover
+                    warn_deprecation(msg)
+            except ImportError:
+                warn_deprecation(msg)
+            except AttributeError:
+                warn_deprecation(msg)
+
         # A distributed vector type is required for MPI
         if comm.size > 1:
             if distributed_vector_class is PETScVector and PETScVector is None:
