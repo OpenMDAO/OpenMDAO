@@ -98,7 +98,7 @@ class TableBuilder(object):
         Initialize all attributes.
         """
         if headers == 'keys':
-            rows, headers = self._dict2rows(rows)
+            rows, headers = self._to_rows(rows)
 
         self._raw_rows = []
         for row in rows:
@@ -123,28 +123,42 @@ class TableBuilder(object):
         # for convenience, allow a user to specify header strings without putting them
         # inside a metadata dict
         if headers is not None:
-            i = -1
-            for i, h in enumerate(headers):
-                self.update_column_meta(i, header=h)
-            hlen = i + 1
+            headers = list(headers)
+            hlen = len(headers)
             if hlen != self._ncols:
                 raise RuntimeError("Number of headers and number of data columns must match, but "
                                    f"{hlen} != {self._ncols}.")
 
+            for i, h in enumerate(headers):
+                self.update_column_meta(i, header=h)
+
         if column_meta is not None:
-            i = -1
-            for i, meta in enumerate(column_meta):
-                self.update_column_meta(i, **meta)
-            clen = i + 1
+            column_meta = list(column_meta)
+            clen = len(column_meta)
             if clen != self._ncols:
                 raise RuntimeError("Number of column metadata dicts and number of data columns "
                                    f"must match, but {clen} != {self._ncols}.")
+
+            for i, meta in enumerate(column_meta):
+                self.update_column_meta(i, **meta)
 
         if headers is not None and column_meta is not None and hlen != clen:
             raise RuntimeError("Number of headers and number of column metadata dicts must match "
                                f"if both are provided, but {hlen} != {clen}.")
 
-    def _dict2rows(self, rows):
+    def display(self, outfile=None):
+        """
+        Display this table.
+
+        Parameters
+        ----------
+        outfile : str or None
+            If None, print this table to stdout, else write it to the named file.
+        """
+        raise NotImplementedError("The display method is not defined for class "
+                                  f"'{type(self).__name__}'.")
+
+    def _to_rows(self, rows):
         """
         Convert dict or iter of dicts into expected row and header data format.
 
@@ -363,7 +377,10 @@ class TableBuilder(object):
         """
         if cell is None:
             return ''
-        return meta['format'].format(cell)
+        try:
+            return meta['format'].format(cell)
+        except Exception:
+            return '{}'.format(cell)
 
     def _update_col_meta_from_rows(self):
         """
@@ -744,7 +761,7 @@ class TextTableBuilder(TableBuilder):
 
     def get_bottom_border(self, header_cells):
         """
-        Return the bottome border string for this table.
+        Return the bottom border string for this table.
 
         Parameters
         ----------
@@ -754,7 +771,7 @@ class TextTableBuilder(TableBuilder):
         Returns
         -------
         str
-            The bottome border string.
+            The bottom border string.
         """
         parts = [(self.bottom_border * len(h))[:len(h)] for h in header_cells]
         return self.column_sep.join(parts)

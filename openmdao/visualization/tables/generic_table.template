@@ -22,7 +22,7 @@
 <body>
     <div id="tabul-container">
         <div {table_div_style}>
-            <h2 id="tabul-title"></h2>
+            <h2 class="center" id="tabul-title"></h2>
             <div id="tabul-table"></div>
         </div>
     </div>

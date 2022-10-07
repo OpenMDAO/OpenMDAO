@@ -2,6 +2,7 @@
 A Viewer for OpenMDAO inputs.
 """
 import pathlib
+import functools
 
 import numpy as np
 
@@ -11,12 +12,8 @@ except ImportError:
     IFrame = display = None
 
 from openmdao.core.problem import Problem
-from openmdao.utils.units import convert_units
 from openmdao.utils.mpi import MPI
-from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import printoptions
-from openmdao.utils.notebook_utils import notebook, colab
-from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.reports_system import register_report
 from openmdao.visualization.tables.table_builder import generate_table
 
@@ -39,7 +36,11 @@ def _get_val_cells(val):
             val = np.array2string(val)
         return val, minval, maxval
 
-    return val, None, None
+    return val, val, val
+
+
+def _arr_fmt(formatter, string):
+    return formatter.format(string)
 
 
 def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
@@ -84,8 +85,15 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
     # get absolute src names of design vars
     desvars = model.get_design_vars(recurse=True, use_prom_ivc=False)
 
+    headers = ['Absolute Name', 'Promoted Name', 'Source Name', 'Source is IVC', 'Source is DV',
+               'Units', 'Shape', 'Tags', 'Val', 'Min Val', 'Max Val']
+    column_meta = [{'header': h} for h in headers]
+    column_meta[9]['format'] = '{:.6g}'
+    column_meta[10]['format'] = '{:.6g}'
+
     rows = []
-    with printoptions(precision=precision, suppress=True, threshold=10000):
+    with printoptions(formatter={'float': functools.partial(_arr_fmt, '{:.6g}')},
+                      suppress=True, threshold=10000):
         for target, meta in model._var_allprocs_abs2meta['input'].items():
             prom = model._var_allprocs_abs2prom['input'][target]
             src = connections[target]
@@ -107,18 +115,18 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
         rows.append([target, prom, src, src_is_ivc, src in desvars, '', None, sorted(meta['tags']),
                      val, None, None])
 
-    headers = ['Absolute Name', 'Promoted Name', 'Source Name', 'Source is IVC', 'Source is DV',
-               'Units', 'Shape', 'Tags', 'Val', 'Min Val', 'Max Val']
-    column_meta = [{'header': h} for h in headers]
-
     if not rows:
         column_meta = []
 
-    table = generate_table(rows, tablefmt=tablefmt, column_meta=column_meta)
+    kwargs = {'rows': rows, 'tablefmt': tablefmt, 'column_meta': column_meta}
+    if title is not None and tablefmt in ('html', 'tabulator'):
+        kwargs['title'] = title
+
+    table = generate_table(**kwargs)
     if tablefmt == 'tabulator':
         table._table_meta['initialHeaderFilter'] = [
             # set the filter defaults for Source is IVC and Source is DV so that the user will
-            # see only those inputs that they are responsible for setting.
+            # initially see only those inputs that they are responsible for setting.
 
             # set initial filter for 'Source is IVC' to True
             {'field': 'c3', 'value': True},
