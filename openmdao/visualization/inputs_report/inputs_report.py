@@ -91,7 +91,7 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
             src = connections[target]
             val = model.get_val(target, get_remote=True, from_src=not src.startswith('_auto_ivc.'))
             smeta = model._var_allprocs_abs2meta['output'][src]
-            src_is_ivc = 'indep_var' in smeta['tags']
+            src_is_ivc = 'openmdao:indep_var' in smeta['tags']
             vcell, mincell, maxcell = _get_val_cells(val)
 
             rows.append([target, prom, src, src_is_ivc, src in desvars, _unit_str(meta),
@@ -102,7 +102,7 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
         src = connections[target]
         val = model.get_val(target, get_remote=True, from_src=not src.startswith('_auto_ivc.'))
         smeta = model._var_discrete['output'][src]
-        src_is_ivc = 'indep_var' in smeta['tags']
+        src_is_ivc = 'openmdao:indep_var' in smeta['tags']
 
         rows.append([target, prom, src, src_is_ivc, src in desvars, '', None, sorted(meta['tags']),
                      val, None, None])
