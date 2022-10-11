@@ -31,7 +31,7 @@ def _get_val_cells(val):
         minval = np.min(val)
         maxval = np.max(val)
         if val.size > 5:
-            val = f"| {np.linalg.norm(val)} |"
+            val = f"| {np.linalg.norm(val):.4g} |"
         else:
             val = np.array2string(val)
         return val, minval, maxval
@@ -85,11 +85,15 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
     # get absolute src names of design vars
     desvars = model.get_design_vars(recurse=True, use_prom_ivc=False)
 
-    headers = ['Absolute Name', 'Promoted Name', 'Source Name', 'Source is IVC', 'Source is DV',
-               'Units', 'Shape', 'Tags', 'Val', 'Min Val', 'Max Val']
+    headers = ['Absolute Name', 'Input Name', 'Source Name', 'Source is IVC', 'Source is DV',
+               'Units', 'Shape', 'Tags', 'Val', 'Min Val', 'Max Val', 'Absolute Source', ]
     column_meta = [{'header': h} for h in headers]
     column_meta[9]['format'] = '{:.6g}'
     column_meta[10]['format'] = '{:.6g}'
+    column_meta[1]['tooltip'] = 'c0'
+    column_meta[2]['tooltip'] = 'c11'
+    column_meta[0]['visible'] = False  # abs input is only used for a tooltip, so hide it
+    column_meta[11]['visible'] = False  # abs src is only used for a tooltip, so hide it
 
     rows = []
     with printoptions(formatter={'float': functools.partial(_arr_fmt, '{:.6g}')},
@@ -97,13 +101,14 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
         for target, meta in model._var_allprocs_abs2meta['input'].items():
             prom = model._var_allprocs_abs2prom['input'][target]
             src = connections[target]
+            sprom = model._var_allprocs_abs2prom['output'][src]
             val = model.get_val(target, get_remote=True, from_src=not src.startswith('_auto_ivc.'))
             smeta = model._var_allprocs_abs2meta['output'][src]
             src_is_ivc = 'openmdao:indep_var' in smeta['tags']
             vcell, mincell, maxcell = _get_val_cells(val)
 
-            rows.append([target, prom, src, src_is_ivc, src in desvars, _unit_str(meta),
-                         meta['shape'], sorted(meta['tags']), vcell, mincell, maxcell])
+            rows.append([target, prom, sprom, src_is_ivc, src in desvars, _unit_str(meta),
+                         meta['shape'], sorted(meta['tags']), vcell, mincell, maxcell, src])
 
     for target, meta in model._var_discrete['input'].items():
         prom = model._var_allprocs_abs2prom['input'][target]
@@ -121,6 +126,7 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
     kwargs = {'rows': rows, 'tablefmt': tablefmt, 'column_meta': column_meta}
     if title is not None and tablefmt in ('html', 'tabulator'):
         kwargs['title'] = title
+        kwargs['center'] = True
 
     table = generate_table(**kwargs)
     if tablefmt == 'tabulator':

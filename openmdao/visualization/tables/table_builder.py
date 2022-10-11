@@ -1397,6 +1397,8 @@ class TabulatorJSBuilder(TableBuilder):
                 'headerFilterParams': meta.get('headerFilterParams'),
                 'widthGrow': meta.get('widthGrow'),
                 'widthShrink': meta.get('widthShrink'),
+                'tooltip': meta.get('tooltip'),
+                'visible': meta.get('visible', True),
             }
 
             width = meta.get('width')
