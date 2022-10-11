@@ -1049,7 +1049,7 @@ class Problem(object):
         if sys.version_info.minor < 8:
             sv = sys.version_info
             msg = f'Python version {sv.major}.{sv.minor} detected. Only version 3.8 and ' \
-                   'higher are tested and supported for OpenMDAO.'
+                  'higher are tested and supported for OpenMDAO.'
             try:
                 from IPython import get_ipython
                 if 'IPKernelApp' not in get_ipython().config:  # pragma: no cover
