@@ -380,7 +380,7 @@ class Component(System):
         """
         ofs, allwrt = self._get_partials_varlists()
         wrt_patterns = info['wrt_patterns']
-        if '*' in wrt_patterns or wrt_patterns is None:
+        if wrt_patterns is None or '*' in wrt_patterns:
             info['wrt_matches_rel'] = None
             info['wrt_matches'] = None
             return
@@ -1394,7 +1394,7 @@ class Component(System):
                 rows = None
                 cols = None
 
-        pattern_matches = self._find_partial_matches(of, wrt)
+        pattern_matches = self._find_partial_matches(of, '*' if wrt is None else wrt)
         abs2meta_in = self._var_abs2meta['input']
         abs2meta_out = self._var_abs2meta['output']
 

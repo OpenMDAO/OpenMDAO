@@ -3,6 +3,7 @@ import re
 import time
 from itertools import product
 from contextlib import contextmanager
+from collections import defaultdict
 
 import numpy as np
 from numpy import ndarray, imag, complex as npcomplex
@@ -328,7 +329,7 @@ class ExecComp(ExplicitComponent):
         outs = set()
         allvars = set()
 
-        self._exprs_info = exprs_info = [(self._parse_for_out_vars(expr.split('=', 1)[0]),
+        self._exprs_info = exprs_info = [(self._parse_for_out_vars(expr.partition('=')[0]),
                                           self._parse_for_names(expr, **kwargs)) for expr in exprs]
 
         self._requires_fd = {}
@@ -651,15 +652,15 @@ class ExecComp(ExplicitComponent):
         Check that all partials are declared.
         """
         if not self._manual_decl_partials:
-            if self.options['do_coloring']:
+            if self.options['do_coloring'] and not self.options['has_diag_partials']:
                 rank = self.comm.rank
                 sizes = self._var_sizes
                 if sum(sizes['input'][rank]) > 1 and sum(sizes['output'][rank]) > 1:
                     if not self._coloring_declared:
-                        kwargs = self.options['declare_coloring_kwargs']
-                        if 'method' not in kwargs or kwargs['method'] is None:
-                            kwargs['method'] = 'cs'
-                        super().declare_coloring(**kwargs)
+                        super().declare_coloring(wrt=None, method='cs')
+                        self._coloring_info['dynamic'] = True
+                        self._manual_decl_partials = False  # this gets reset in declare_partials
+                        self._declared_partials = defaultdict(dict)
                 else:
                     self.options['do_coloring'] = False
                     self._coloring_info['dynamic'] = False
@@ -690,6 +691,7 @@ class ExecComp(ExplicitComponent):
                             decl_partials(of=out, wrt=inp)
 
         super()._setup_partials()
+
         if self._manual_decl_partials:
             undeclared = []
             for i, (outs, tup) in enumerate(self._exprs_info):
@@ -836,8 +838,7 @@ class ExecComp(ExplicitComponent):
         show_sparsity : bool
             If True, display sparsity with coloring info after generating coloring.
         """
-        super().declare_coloring(wrt, method, form, step, per_instance,
-                                 num_full_jacs,
+        super().declare_coloring(wrt, method, form, step, per_instance, num_full_jacs,
                                  tol, orders, perturb_size, min_improve_pct,
                                  show_summary, show_sparsity)
         self._coloring_declared = True
@@ -942,8 +943,6 @@ class ExecComp(ExplicitComponent):
         oarr = self._outarray
         indict = self._indict
         outdict = self._outdict
-
-        raise RuntimeError("FOO")
 
         inarr[:] = self._inputs._data
         scratch = np.empty(oarr.size)
@@ -1070,7 +1069,7 @@ class _IODict(object):
                 return self._constants[name]
 
     def __setitem__(self, name, value):
-        self._outputs[name] = value
+        self._outputs[name][:] = value
 
     def __contains__(self, name):
         return name in self._outputs or name in self._inputs or name in self._constants
