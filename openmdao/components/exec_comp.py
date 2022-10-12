@@ -26,7 +26,7 @@ _allowed_meta = {'value', 'val', 'shape', 'units', 'res_units', 'desc',
 
 # Names that are not allowed for input or output variables (keywords for options)
 _disallowed_names = {'has_diag_partials', 'units', 'shape', 'shape_by_conn', 'run_root_only',
-                     'constant'}
+                     'constant', 'do_coloring', 'declare_coloring_kwargs'}
 
 
 def check_option(option, value):
@@ -110,6 +110,8 @@ class ExecComp(ExplicitComponent):
     _constants : dict of dicts
         Constants defined in the expressions. The key is the name of the constant and the value
         is a dict of metadata.
+    _coloring_declared : bool
+        If True, coloring has been declared.
     """
 
     def __init__(self, exprs=[], **kwargs):
@@ -257,6 +259,10 @@ class ExecComp(ExplicitComponent):
         self.options.declare('shape_by_conn', types=bool, default=False,
                              desc='If True, shape all inputs and outputs based on their '
                                   'connection. Default is False.')
+
+        self.options.declare('do_coloring', types=bool, default=True,
+                             desc='If True (the default), compute the partial jacobian '
+                             'coloring for this component.')
 
     @classmethod
     def register(cls, name, callable_obj, complex_safe):
@@ -626,11 +632,38 @@ class ExecComp(ExplicitComponent):
         self._manual_decl_partials = True
         return super().declare_partials(*args, **kwargs)
 
+    def _get_coloring(self):
+        """
+        Get the Coloring for this system.
+
+        If necessary, load the Coloring from a file or dynamically generate it.
+
+        Returns
+        -------
+        Coloring or None
+            Coloring object, possible loaded from a file or dynamically generated, or None
+        """
+        if self.options['do_coloring']:
+            return super()._get_coloring()
+
     def _setup_partials(self):
         """
         Check that all partials are declared.
         """
         if not self._manual_decl_partials:
+            if self.options['do_coloring']:
+                rank = self.comm.rank
+                sizes = self._var_sizes
+                if sum(sizes['input'][rank]) > 1 and sum(sizes['output'][rank]) > 1:
+                    if not self._coloring_declared:
+                        kwargs = self.options['declare_coloring_kwargs']
+                        if 'method' not in kwargs or kwargs['method'] is None:
+                            kwargs['method'] = 'cs'
+                        super().declare_coloring(**kwargs)
+                else:
+                    self.options['do_coloring'] = False
+                    self._coloring_info['dynamic'] = False
+
             meta = self._var_rel2meta
             decl_partials = super().declare_partials
             for outs, tup in self._exprs_info:
