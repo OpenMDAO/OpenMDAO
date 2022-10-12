@@ -964,6 +964,10 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
                 # inputs is read_only, should not be allowed
                 resids['y'] = 0.
 
+            def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs=None,
+                discrete_outputs=None):
+                pass
+            
         group = om.Group()
 
         group.add_subsystem('px', om.IndepVarComp('x', 77.0))
