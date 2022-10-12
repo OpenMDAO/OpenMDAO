@@ -21,6 +21,7 @@ import scipy.sparse as sparse
 from openmdao.core.constants import _SetupStatus
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver, record_iteration, SaveOptResult
+from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group, System
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
@@ -1276,6 +1277,15 @@ class Problem(object):
             if comp._no_check_partials and not under_CI:
                 continue
 
+            # skip any Component with no outputs
+            if len(comp._var_allprocs_abs2meta['output']) == 0:
+                continue
+
+            # skip any ExplicitComponent with no inputs (e.g. IndepVarComp)
+            if (len(comp._var_allprocs_abs2meta['input']) == 0 and
+                    isinstance(comp, ExplicitComponent)):
+                continue
+
             name = comp.pathname
 
             # Process includes
@@ -2512,7 +2522,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
     compact_print : bool
         If results should be printed verbosely or in a table.
     system_list : iterable
-        The systems (in the proper order) that were checked.0
+        The systems (in the proper order) that were checked.
     global_options : dict
         Dictionary containing the options for the approximation.
     totals : bool
