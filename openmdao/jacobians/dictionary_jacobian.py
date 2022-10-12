@@ -264,7 +264,7 @@ class _CheckingJacobian(DictionaryJacobian):
         # If we are doing a directional derivative, then the sparsity will be violated.
         # Skip sparsity check if that is the case.
         options = system._get_check_partial_options()
-        loc_wrt = wrt.split('.')[-1]
+        loc_wrt = wrt.rpartition('.')[2]
         directional = (options is not None and loc_wrt in options and
                        options[loc_wrt]['directional'])
 

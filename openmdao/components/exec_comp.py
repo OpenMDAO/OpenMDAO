@@ -1,11 +1,14 @@
 """Define the ExecComp class, a component that evaluates an expression."""
 import re
+import time
 from itertools import product
 from contextlib import contextmanager
 
 import numpy as np
 from numpy import ndarray, imag, complex as npcomplex
 
+from openmdao.core.system import _DEFAULT_COLORING_META
+from openmdao.utils.coloring import _ColSparsityJac, _compute_coloring
 from openmdao.core.constants import INT_DTYPE
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.units import valid_units
@@ -210,6 +213,10 @@ class ExecComp(ExplicitComponent):
 
         super().__init__(**options)
 
+        # change default coloring values
+        self._coloring_info['method'] = 'cs'
+        self._coloring_info['num_full_jacs'] = 2
+
         # if complex step is used for derivatives, this is the stepsize
         self.complex_stepsize = 1.e-40
 
@@ -225,6 +232,7 @@ class ExecComp(ExplicitComponent):
         self._no_check_partials = True
 
         self._constants = {}
+        self._coloring_declared = False
 
     def initialize(self):
         """
@@ -608,7 +616,7 @@ class ExecComp(ExplicitComponent):
         dict
             Metadata dict for the specified partial(s).
         """
-        if 'method' not in kwargs or kwargs['method'] == 'exact':
+        if 'method' not in kwargs or kwargs['method'] not in ('cs', 'fd'):
             raise RuntimeError(f"{self.msginfo}: declare_partials must be called with method='cs' "
                                "or method='fd'.")
         if self.options['has_diag_partials']:
@@ -625,7 +633,7 @@ class ExecComp(ExplicitComponent):
         if not self._manual_decl_partials:
             meta = self._var_rel2meta
             decl_partials = super().declare_partials
-            for i, (outs, tup) in enumerate(self._exprs_info):
+            for outs, tup in self._exprs_info:
                 vs, funcs = tup
                 ins = sorted(set(vs).difference(outs))
                 for out in sorted(outs):
@@ -667,6 +675,35 @@ class ExecComp(ExplicitComponent):
                 issue_warning(f"The following partial derivatives have not been "
                               f"declared so they are assumed to be zero: [{undeclared}].",
                               prefix=self.msginfo, category=DerivativesWarning)
+
+    def _setup_vectors(self, root_vectors):
+        """
+        Compute all vectors for all vec names and assign excluded variables lists.
+
+        Parameters
+        ----------
+        root_vectors : dict of dict of Vector
+            Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        """
+        super()._setup_vectors(root_vectors)
+        if not self._manual_decl_partials:
+            # set up some data structures to speed up compute_partials
+            pathlen = len(self.pathname) + 1 if self.pathname else 0
+            self._inarray = iarr = np.zeros(len(self._inputs), dtype=complex)
+            self._indict = idict = {}
+            abs2meta = self._var_abs2meta['input']
+            for name, slc in self._inputs.get_slice_dict().items():
+                view = iarr[slc]
+                view.shape = abs2meta[name]['shape']
+                idict[name[pathlen:]] = view
+
+            self._outarray = oarr = np.zeros(len(self._outputs), dtype=complex)
+            self._outdict = odict = {}
+            abs2meta = self._var_abs2meta['output']
+            for name, slc in self._outputs.get_slice_dict().items():
+                view = oarr[slc]
+                view.shape = abs2meta[name]['shape']
+                odict[name[pathlen:]] = view
 
     def compute(self, inputs, outputs):
         """
@@ -717,124 +754,241 @@ class ExecComp(ExplicitComponent):
 
         super()._linearize(jac, sub_do_ln)
 
+    def declare_coloring(self,
+                         wrt=_DEFAULT_COLORING_META['wrt_patterns'],
+                         method=_DEFAULT_COLORING_META['method'],
+                         form=None,
+                         step=None,
+                         per_instance=_DEFAULT_COLORING_META['per_instance'],
+                         num_full_jacs=_DEFAULT_COLORING_META['num_full_jacs'],
+                         tol=_DEFAULT_COLORING_META['tol'],
+                         orders=_DEFAULT_COLORING_META['orders'],
+                         perturb_size=_DEFAULT_COLORING_META['perturb_size'],
+                         min_improve_pct=_DEFAULT_COLORING_META['min_improve_pct'],
+                         show_summary=_DEFAULT_COLORING_META['show_summary'],
+                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity']):
+        """
+        Set options for deriv coloring of a set of wrt vars matching the given pattern(s).
+
+        Parameters
+        ----------
+        wrt : str or list of str
+            The name or names of the variables that derivatives are taken with respect to.
+            This can contain input names, output names, or glob patterns.
+        method : str
+            Method used to compute derivative: "fd" for finite difference, "cs" for complex step.
+        form : str
+            Finite difference form, can be "forward", "central", or "backward". Leave
+            undeclared to keep unchanged from previous or default value.
+        step : float
+            Step size for finite difference. Leave undeclared to keep unchanged from previous
+            or default value.
+        per_instance : bool
+            If True, a separate coloring will be generated for each instance of a given class.
+            Otherwise, only one coloring for a given class will be generated and all instances
+            of that class will use it.
+        num_full_jacs : int
+            Number of times to repeat partial jacobian computation when computing sparsity.
+        tol : float
+            Tolerance used to determine if an array entry is nonzero during sparsity determination.
+        orders : int
+            Number of orders above and below the tolerance to check during the tolerance sweep.
+        perturb_size : float
+            Size of input/output perturbation during generation of sparsity.
+        min_improve_pct : float
+            If coloring does not improve (decrease) the number of solves more than the given
+            percentage, coloring will not be used.
+        show_summary : bool
+            If True, display summary information after generating coloring.
+        show_sparsity : bool
+            If True, display sparsity with coloring info after generating coloring.
+        """
+        super().declare_coloring(wrt, method, form, step, per_instance,
+                                 num_full_jacs,
+                                 tol, orders, perturb_size, min_improve_pct,
+                                 show_summary, show_sparsity)
+        self._coloring_declared = True
+
+    def _compute_coloring(self, recurse=False, **overrides):
+        """
+        Compute a coloring of the partial jacobian.
+
+        This assumes that the current System is in a proper state for computing derivatives.
+
+        Parameters
+        ----------
+        recurse : bool
+            Ignored.
+        **overrides : dict
+            Any args that will override either default coloring settings or coloring settings
+            resulting from an earlier call to declare_coloring.
+
+        Returns
+        -------
+        list of Coloring
+            The computed colorings.
+        """
+        if self._manual_decl_partials:
+            return super()._compute_coloring(recurse=recurse, **overrides)
+
+        info = self._coloring_info
+        info.update(**overrides)
+        if isinstance(info['wrt_patterns'], str):
+            info['wrt_patterns'] = [info['wrt_patterns']]
+
+        if not self._coloring_declared and info['method'] is None:
+            info['method'] = 'cs'
+
+        if info['method'] != 'cs':
+            raise RuntimeError(f"{self.msginfo}: 'method' for coloring must be 'cs' if partials "
+                               "and/or coloring are not declared manually using declare_partials "
+                               "or declare_coloring.")
+
+        if info['coloring'] is None and info['static'] is None:
+            info['dynamic'] = True
+
+        # match everything
+        info['wrt_matches_rel'] = None
+        info['wrt_matches'] = None
+
+        sparsity_start_time = time.perf_counter()
+
+        step = self.complex_stepsize * 1j
+        inv_stepsize = 1.0 / self.complex_stepsize
+        inarr = self._inarray
+        oarr = self._outarray
+        indict = self._indict
+        outdict = self._outdict
+
+        if self.options['has_diag_partials']:
+            # construct a sparsity matrix
+            raise NotImplementedError("no has_diag_partials support yet")
+        else:
+            # compute perturbations
+            starting_inputs = self._inputs.asarray()
+            in_offsets = starting_inputs.copy()
+            in_offsets[in_offsets == 0.0] = 1.0
+            in_offsets *= info['perturb_size']
+
+            # use special sparse jacobian to collect sparsity info
+            jac = _ColSparsityJac(self, info)
+
+            for i in range(info['num_full_jacs']):
+                inarr[:] = starting_inputs + in_offsets * np.random.random(in_offsets.size)
+
+                for i in range(inarr.size):
+                    inarr[i] += step
+                    self.compute(indict, outdict)
+                    jac.set_col(self, i, imag(oarr * inv_stepsize).flat)
+                    inarr[i] -= step
+
+            sparsity, sp_info = jac.get_sparsity(self)
+            sparsity_time = time.perf_counter() - sparsity_start_time
+
+            coloring = _compute_coloring(sparsity, 'fwd')
+
+            if not self._finalize_coloring(coloring, info, sp_info, sparsity_time):
+                return [None]
+
+        return [coloring]
+
+    def _compute_colored_partials(self, inputs, partials):
+        """
+        Use complex step method with coloring to update the given Jacobian.
+
+        Parameters
+        ----------
+        inputs : Vector or dict
+            Vector containing parameters (p).
+        partials : `Jacobian`
+            Contains sub-jacobians.
+        """
+        step = self.complex_stepsize * 1j
+        inv_stepsize = 1.0 / self.complex_stepsize
+        inarr = self._inarray
+        oarr = self._outarray
+        indict = self._indict
+        outdict = self._outdict
+
+        raise RuntimeError("FOO")
+
+        inarr[:] = self._inputs._data
+        scratch = np.empty(oarr.size)
+
+        for icols, nzrowlists in self._coloring_info['coloring'].color_nonzero_iter('fwd'):
+            # set a complex input value
+            inarr[icols] += step
+
+            # solve with complex input value
+            self.compute(indict, outdict)
+
+            for icol, rows in zip(icols, nzrowlists):
+                scratch[:] = 0.
+                scratch[rows] = imag(oarr[rows] * inv_stepsize)
+                partials.set_col(self, icol, scratch)
+
+            # restore old input value
+            inarr[icols] -= step
+
     def compute_partials(self, inputs, partials):
         """
         Use complex step method to update the given Jacobian.
 
         Parameters
         ----------
-        inputs : `VecWrapper`
-            `VecWrapper` containing parameters (p).
+        inputs : Vector or dict
+            Vector containing parameters (p).
         partials : `Jacobian`
             Contains sub-jacobians.
         """
         if self._manual_decl_partials:
             return
 
+        if self._coloring_info['coloring'] is not None:
+            self._compute_colored_partials(inputs, partials)
+            return
+
         step = self.complex_stepsize * 1j
         out_names = self._var_rel_names['output']
         inv_stepsize = 1.0 / self.complex_stepsize
         has_diag_partials = self.options['has_diag_partials']
+        inarr = self._inarray
+        indict = self._indict
+        outdict = self._outdict
 
-        for inp in inputs:
+        inarr[:] = self._inputs._data
 
-            pwrap = _TmpDict(inputs)
-            pval = inputs[inp]
-            psize = pval.size
-            pwrap[inp] = np.asarray(pval, npcomplex)
+        for inp, ival in indict.items():
+            psize = ival.size
 
             if has_diag_partials or psize == 1:
                 # set a complex inpup value
-                pwrap[inp] += step
-
-                uwrap = _TmpDict(self._outputs, return_complex=True)
+                ival += step
 
                 # solve with complex input value
-                self._residuals.set_val(0.0)
-                self.compute(pwrap, uwrap)
+                self.compute(indict, outdict)
 
                 for u in out_names:
                     if (u, inp) in self._declared_partials:
-                        partials[(u, inp)] = imag(uwrap[u] * inv_stepsize).flat
+                        partials[u, inp] = imag(outdict[u] * inv_stepsize).flat
 
                 # restore old input value
-                pwrap[inp] -= step
+                ival -= step
             else:
-                for i, idx in enumerate(array_idx_iter(pwrap[inp].shape)):
+                for i, idx in enumerate(array_idx_iter(ival.shape)):
                     # set a complex input value
-                    pwrap[inp][idx] += step
-
-                    uwrap = _TmpDict(self._outputs, return_complex=True)
+                    ival[idx] += step
 
                     # solve with complex input value
-                    self._residuals.set_val(0.0)
-                    self.compute(pwrap, uwrap)
+                    self.compute(indict, outdict)
 
                     for u in out_names:
                         if (u, inp) in self._declared_partials:
                             # set the column in the Jacobian entry
-                            partials[(u, inp)][:, i] = imag(uwrap[u] * inv_stepsize).flat
+                            partials[u, inp][:, i] = imag(outdict[u] * inv_stepsize).flat
 
                     # restore old input value
-                    pwrap[inp][idx] -= step
-
-
-class _TmpDict(object):
-    """
-    Dict wrapper that allows modification without changing the wrapped dict.
-
-    It will allow getting of values
-    from its inner dict unless those values get modified via
-    __setitem__.  After values have been modified they are managed
-    thereafter by the wrapper.  This protects the inner dict from
-    modification.
-
-    Attributes
-    ----------
-    _inner : dict-like
-        The dictionary to be wrapped.
-    _changed : dict-like
-        The key names for the values that were changed.
-    _complex : bool
-        If True, return a complex version of values from __getitem__.
-    """
-
-    def __init__(self, inner, return_complex=False):
-        """
-        Construct the dictionary object.
-
-        Parameters
-        ----------
-        inner : dict-like
-            The dictionary to be wrapped.
-        return_complex : bool, optional
-            If True, return a complex version of values from __getitem__
-        """
-        self._inner = inner
-        self._changed = {}
-        self._complex = return_complex
-
-    def __getitem__(self, name):
-        if name in self._changed:
-            return self._changed[name]
-        elif self._complex:
-            val = self._inner[name]
-            if isinstance(val, ndarray):
-                self._changed[name] = np.asarray(val, dtype=npcomplex)
-            else:
-                self._changed[name] = npcomplex(val)
-            return self._changed[name]
-        else:
-            return self._inner[name]
-
-    def __setitem__(self, name, value):
-        self._changed[name] = value
-
-    def __contains__(self, name):
-        return name in self._inner or name in self._changed
-
-    def __getattr__(self, name):
-        return getattr(self._inner, name)
+                    ival[idx] -= step
 
 
 class _IODict(object):

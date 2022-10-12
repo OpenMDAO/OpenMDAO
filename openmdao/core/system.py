@@ -1077,6 +1077,63 @@ class System(object):
 
         self._coloring_info = options
 
+    def _coloring_pct_too_low(self, coloring, info):
+        # if the improvement wasn't large enough, don't use coloring
+        pct = coloring._solves_info()[-1]
+        if info['min_improve_pct'] > pct:
+            info['coloring'] = info['static'] = None
+            msg = f"Coloring was deactivated.  Improvement of {pct:.1f}% was less than min " \
+                  f"allowed ({info['min_improve_pct']:.1f}%)."
+            issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
+            if not info['per_instance']:
+                coloring_mod._CLASS_COLORINGS[self.get_coloring_fname()] = None
+            return True
+        return False
+
+    def _finalize_coloring(self, coloring, info, sp_info, sparsity_time):
+        # if the improvement wasn't large enough, don't use coloring
+        if self._coloring_pct_too_low(coloring, info):
+            return False
+
+        sp_info['sparsity_time'] = sparsity_time
+        sp_info['pathname'] = self.pathname
+        sp_info['class'] = type(self).__name__
+        sp_info['type'] = 'semi-total' if self._subsystems_allprocs else 'partial'
+
+        ordered_wrt_info = list(self._jac_wrt_iter(info['wrt_matches']))
+        ordered_of_info = list(self._jac_of_iter())
+
+        if self.pathname:
+            ordered_of_info = self._jac_var_info_abs2prom(ordered_of_info)
+            ordered_wrt_info = self._jac_var_info_abs2prom(ordered_wrt_info)
+
+        coloring._row_vars = [t[0] for t in ordered_of_info]
+        coloring._col_vars = [t[0] for t in ordered_wrt_info]
+        coloring._row_var_sizes = [t[2] - t[1] for t in ordered_of_info]
+        coloring._col_var_sizes = [t[2] - t[1] for t in ordered_wrt_info]
+
+        coloring._meta.update(info)  # save metadata we used to create the coloring
+        del coloring._meta['coloring']
+        coloring._meta.update(sp_info)
+
+        info['coloring'] = coloring
+
+        if info['show_sparsity'] or info['show_summary']:
+            print("\nColoring for '%s' (class %s)" % (self.pathname, type(self).__name__))
+
+        if info['show_sparsity']:
+            coloring.display_txt()
+        if info['show_summary']:
+            coloring.summary()
+
+        self._save_coloring(coloring)
+
+        if not info['per_instance']:
+            # save the class coloring for other instances of this class to use
+            coloring_mod._CLASS_COLORINGS[self.get_coloring_fname()] = coloring
+
+        return True
+
     def _compute_coloring(self, recurse=False, **overrides):
         """
         Compute a coloring of the partial jacobian.
@@ -1143,7 +1200,7 @@ class System(object):
                                   prefix=self.msginfo, category=DerivativesWarning)
                     try:
                         self.declare_partials('*', '*', method=info['method'])
-                    except AttributeError:  # this system must be a group
+                    except AttributeError:  # assume system is a group
                         from openmdao.core.component import Component
                         from openmdao.core.indepvarcomp import IndepVarComp
                         from openmdao.components.exec_comp import ExecComp
@@ -1177,19 +1234,6 @@ class System(object):
                     approx_scheme._reset()
             return [coloring]
 
-        # compute perturbations
-        starting_inputs = self._inputs.asarray(copy=True)
-        in_offsets = starting_inputs.copy()
-        in_offsets[in_offsets == 0.0] = 1.0
-        in_offsets *= info['perturb_size']
-
-        starting_outputs = self._outputs.asarray(copy=True)
-        out_offsets = starting_outputs.copy()
-        out_offsets[out_offsets == 0.0] = 1.0
-        out_offsets *= info['perturb_size']
-
-        starting_resids = self._residuals.asarray(copy=True)
-
         save_first_call = self._first_call_to_linearize
         self._first_call_to_linearize = False
         sparsity_start_time = time.perf_counter()
@@ -1211,6 +1255,19 @@ class System(object):
 
         from openmdao.core.group import Group
         is_total = isinstance(self, Group)
+
+        # compute perturbations
+        starting_inputs = self._inputs.asarray(copy=True)
+        in_offsets = starting_inputs.copy()
+        in_offsets[in_offsets == 0.0] = 1.0
+        in_offsets *= info['perturb_size']
+
+        starting_outputs = self._outputs.asarray(copy=True)
+        out_offsets = starting_outputs.copy()
+        out_offsets[out_offsets == 0.0] = 1.0
+        out_offsets *= info['perturb_size']
+
+        starting_resids = self._residuals.asarray(copy=True)
 
         for i in range(info['num_full_jacs']):
             # randomize inputs (and outputs if implicit)
@@ -1243,71 +1300,21 @@ class System(object):
             for scheme in self._approx_schemes.values():
                 scheme._reset()
 
-        sparsity_time = time.perf_counter() - sparsity_start_time
-
-        ordered_wrt_info = list(self._jac_wrt_iter(info['wrt_matches']))
-        ordered_of_info = list(self._jac_of_iter())
-
-        sp_info['sparsity_time'] = sparsity_time
-        sp_info['pathname'] = self.pathname
-        sp_info['class'] = type(self).__name__
-        sp_info['type'] = 'semi-total' if self._subsystems_allprocs else 'partial'
-
-        if self.pathname:
-            ordered_of_info = self._jac_var_info_abs2prom(ordered_of_info)
-            ordered_wrt_info = self._jac_var_info_abs2prom(ordered_wrt_info)
-
         if use_jax:
             direction = self._mode
         else:
             direction = 'fwd'
+
+        sparsity_time = time.perf_counter() - sparsity_start_time
+
         coloring = _compute_coloring(sparsity, direction)
 
-        # if the improvement wasn't large enough, don't use coloring
-        pct = coloring._solves_info()[-1]
-        if info['min_improve_pct'] > pct:
-            info['coloring'] = info['static'] = None
-            msg = f"Coloring was deactivated.  Improvement of {pct:.1f}% was less than min " \
-                  f"allowed ({info['min_improve_pct']:.1f}%)."
-            issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
-            if not info['per_instance']:
-                coloring_mod._CLASS_COLORINGS[coloring_fname] = None
-
+        if not self._finalize_coloring(coloring, info, sp_info, sparsity_time):
             # make sure we have no leftover garbage from sparsity/coloring computations
             self._inputs.set_val(starting_inputs)
             self._outputs.set_val(starting_outputs)
             self._residuals.set_val(starting_resids)
             return [None]
-
-        coloring._row_vars = [t[0] for t in ordered_of_info]
-        coloring._col_vars = [t[0] for t in ordered_wrt_info]
-        coloring._row_var_sizes = [t[2] - t[1] for t in ordered_of_info]
-        coloring._col_var_sizes = [t[2] - t[1] for t in ordered_wrt_info]
-
-        coloring._meta.update(info)  # save metadata we used to create the coloring
-        del coloring._meta['coloring']
-        coloring._meta.update(sp_info)
-
-        info['coloring'] = coloring
-
-        if not use_jax:
-            approx = self._get_approx_scheme(coloring._meta['method'])
-            # force regen of approx groups during next compute_approximations
-            approx._reset()
-
-        if info['show_sparsity'] or info['show_summary']:
-            print("\nColoring for '%s' (class %s)" % (self.pathname, type(self).__name__))
-
-        if info['show_sparsity']:
-            coloring.display_txt()
-        if info['show_summary']:
-            coloring.summary()
-
-        self._save_coloring(coloring)
-
-        if not info['per_instance']:
-            # save the class coloring for other instances of this class to use
-            coloring_mod._CLASS_COLORINGS[coloring_fname] = coloring
 
         # restore original inputs/outputs
         self._inputs.set_val(starting_inputs)
@@ -1315,6 +1322,11 @@ class System(object):
         self._residuals.set_val(starting_resids)
 
         self._first_call_to_linearize = save_first_call
+
+        if not use_jax:
+            approx = self._get_approx_scheme(coloring._meta['method'])
+            # force regen of approx groups during next compute_approximations
+            approx._reset()
 
         return [coloring]
 
