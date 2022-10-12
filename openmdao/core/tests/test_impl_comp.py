@@ -892,6 +892,10 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
                 # inputs is read_only, should not be allowed
                 inputs['x'] = 0.
 
+            def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs=None,
+                                discrete_outputs=None):
+                pass
+
         group = om.Group()
 
         group.add_subsystem('px', om.IndepVarComp('x', 77.0))
@@ -923,6 +927,10 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
             def guess_nonlinear(self, inputs, outputs, resids):
                 raise om.AnalysisError("It's just a scratch.")
+
+            def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs=None,
+                discrete_outputs=None):
+                pass
 
         group = om.Group()
 
