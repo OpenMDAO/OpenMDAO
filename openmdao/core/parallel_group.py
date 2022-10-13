@@ -28,5 +28,4 @@ class ParallelGroup(Group):
         """
         super()._configure()
         if self.comm.size > 1:
-            all_results = self.comm.allgather(self._has_guess)
-            self._has_guess = any(all_results)
+            self._has_guess = any(self.comm.allgather(self._has_guess))
