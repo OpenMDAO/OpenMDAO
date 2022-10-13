@@ -337,7 +337,7 @@ class ImplicitComponent(Component):
         discrete_outputs : dict or None
             If not None, dict containing discrete output values.
         """
-        raise NotImplementedError('ImplicitComponent.apply_nonlinear() must overridden '
+        raise NotImplementedError('ImplicitComponent.apply_nonlinear() must be overridden '
                                   'by the child class.')
 
     def solve_nonlinear(self, inputs, outputs):
