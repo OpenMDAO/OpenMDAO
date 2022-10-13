@@ -50,9 +50,10 @@ standards, which can be checked by running the tests in the `openmdao.code_revie
 Our coding standards generally align with the [PEP8](https://peps.python.org/pep-0008/) and
 [numpydoc](https://numpydoc.readthedocs.io/en/latest/format.html) standards.
 
-It is recommended that you install OpenMDAO with `pip install -e .[all]` in your development environment
-and run the full test suite using the `testflo openmdao` command to validate your changes before submitting
-a pull request.
+It is recommended that you run the full test suite on your branch in your local development environment
+before submitting a pull request.  To do this, use the `pip install -e .[all]` command at the top
+level of the OpenMDAO repository to install with support for testing and optional features.
+Then run the full test suite using the `testflo openmdao` command to validate your changes.
 
 ## License
 
