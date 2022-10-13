@@ -27,7 +27,7 @@ example code demonstrating how to replicate the error.
 
 ## Proposing New Features
 
-OpenMDAO has a formal process for proposing, discussing and approving changes that effect the behavior
+OpenMDAO has a formal process for proposing, discussing and approving changes that affect the behavior
 of the code or add new features. Such a proposal is dubbed a "POEM" and the process is explained in detail
 [here](https://github.com/OpenMDAO/POEMs/blob/master/POEM_000.md). In short, you are asked to submit a
 pull request to the [POEMs](https://github.com/OpenMDAO/POEMs) repository with a document (and optional
