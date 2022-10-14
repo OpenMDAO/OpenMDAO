@@ -30,6 +30,9 @@ _disallowed_names = {'has_diag_partials', 'units', 'shape', 'shape_by_conn', 'ru
                      'constant', 'do_coloring', 'declare_coloring_kwargs'}
 
 
+_randgen = np.random.default_rng()
+
+
 def check_option(option, value):
     """
     Check option for validity.
@@ -236,6 +239,9 @@ class ExecComp(ExplicitComponent):
 
         self._constants = {}
         self._coloring_declared = False
+        self._inarray = self._indict = None
+        self._outarray = self._outdict = None
+        self._icopy = self._ocopy = False
 
     def initialize(self):
         """
@@ -655,7 +661,7 @@ class ExecComp(ExplicitComponent):
             if self.options['do_coloring'] and not self.options['has_diag_partials']:
                 rank = self.comm.rank
                 sizes = self._var_sizes
-                if sum(sizes['input'][rank]) > 1 and sum(sizes['output'][rank]) > 1:
+                if sum(sizes['input'][rank]) > 1 and sum(sizes['output'][rank]) > 1 and not self._has_distrib_vars:
                     if not self._coloring_declared:
                         super().declare_coloring(wrt=None, method='cs')
                         self._coloring_info['dynamic'] = True
@@ -713,7 +719,7 @@ class ExecComp(ExplicitComponent):
 
     def _setup_vectors(self, root_vectors):
         """
-        Compute all vectors for all vec names and assign excluded variables lists.
+        Compute all vectors for all vec names.
 
         Parameters
         ----------
@@ -722,23 +728,17 @@ class ExecComp(ExplicitComponent):
         """
         super()._setup_vectors(root_vectors)
         if not self._manual_decl_partials:
-            # set up some data structures to speed up compute_partials
-            pathlen = len(self.pathname) + 1 if self.pathname else 0
-            self._inarray = iarr = np.zeros(len(self._inputs), dtype=complex)
-            self._indict = idict = {}
-            abs2meta = self._var_abs2meta['input']
-            for name, slc in self._inputs.get_slice_dict().items():
-                view = iarr[slc]
-                view.shape = abs2meta[name]['shape']
-                idict[name[pathlen:]] = view
+            # set up some data structures to speed up compute
+            self._inputs.set_complex_step_mode(True)
+            self._outputs.set_complex_step_mode(True)
 
-            self._outarray = oarr = np.zeros(len(self._outputs), dtype=complex)
-            self._outdict = odict = {}
-            abs2meta = self._var_abs2meta['output']
-            for name, slc in self._outputs.get_slice_dict().items():
-                view = oarr[slc]
-                view.shape = abs2meta[name]['shape']
-                odict[name[pathlen:]] = view
+            self._inarray, self._indict, self._icopy = \
+                self._inputs._get_local_views(dtype=complex, copy=True)
+            self._outarray, self._outdict, self._ocopy = \
+                self._outputs._get_local_views(dtype=complex, copy=True)
+
+            self._inputs.set_complex_step_mode(False)
+            self._outputs.set_complex_step_mode(False)
 
     def compute(self, inputs, outputs):
         """
@@ -863,6 +863,7 @@ class ExecComp(ExplicitComponent):
             The computed colorings.
         """
         if self._manual_decl_partials:
+            # use framework approx coloring
             return super()._compute_coloring(recurse=recurse, **overrides)
 
         info = self._coloring_info
@@ -895,26 +896,37 @@ class ExecComp(ExplicitComponent):
         outdict = self._outdict
 
         if self.options['has_diag_partials']:
-            # construct a sparsity matrix
+            # we should never get here
             raise NotImplementedError("no has_diag_partials support yet")
         else:
             # compute perturbations
-            starting_inputs = self._inputs.asarray()
+            starting_inputs = self._inputs.asarray(copy=not self._icopy)
             in_offsets = starting_inputs.copy()
             in_offsets[in_offsets == 0.0] = 1.0
             in_offsets *= info['perturb_size']
+
+            if not self._ocopy:
+                starting_outputs = self._outputs.asarray(copy=True)
+                starting_resids = self._residuals.asarray(copy=True)
 
             # use special sparse jacobian to collect sparsity info
             jac = _ColSparsityJac(self, info)
 
             for i in range(info['num_full_jacs']):
-                inarr[:] = starting_inputs + in_offsets * np.random.random(in_offsets.size)
+                inarr[:] = starting_inputs + in_offsets * _randgen.random(in_offsets.size)
 
                 for i in range(inarr.size):
                     inarr[i] += step
                     self.compute(indict, outdict)
                     jac.set_col(self, i, imag(oarr * inv_stepsize).flat)
                     inarr[i] -= step
+
+            # restore original inputs/outputs
+            if not self._icopy:
+                self._inputs.set_val(starting_inputs)
+            if not self._ocopy:
+                self._outputs.set_val(starting_outputs)
+                self._residuals.set_val(starting_resids)
 
             sparsity, sp_info = jac.get_sparsity(self)
             sparsity_time = time.perf_counter() - sparsity_start_time
@@ -944,7 +956,8 @@ class ExecComp(ExplicitComponent):
         indict = self._indict
         outdict = self._outdict
 
-        inarr[:] = self._inputs._data
+        if self._icopy:
+            inarr[:] = self._inputs._data
         scratch = np.empty(oarr.size)
 
         for icols, nzrowlists in self._coloring_info['coloring'].color_nonzero_iter('fwd'):
@@ -975,6 +988,11 @@ class ExecComp(ExplicitComponent):
         """
         if self._manual_decl_partials:
             return
+
+        if self.under_complex_step:
+            raise RuntimeError(f"{self.msginfo}: Can't compute complex step partials when higher "
+                               "level system is using complex step unless you manually call "
+                               "declare_partials and/or declare_coloring on this ExecComp.")
 
         if self._coloring_info['coloring'] is not None:
             self._compute_colored_partials(inputs, partials)
@@ -1069,10 +1087,18 @@ class _IODict(object):
                 return self._constants[name]
 
     def __setitem__(self, name, value):
-        self._outputs[name][:] = value
+        try:
+            self._outputs[name][:] = value
+        except ValueError:
+            # see if value fits if size 1 dimensions are removed
+            sqz = np.squeeze(value)
+            if np.squeeze(self._outputs[name]).shape == sqz.shape:
+                self._outputs[name][:] = sqz
+            else:
+                raise
 
     def __contains__(self, name):
-        return name in self._outputs or name in self._inputs or name in self._constants
+        return name in self._inputs or name in self._outputs or name in self._constants
 
 
 def _import_functs(mod, dct, names=None):

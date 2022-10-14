@@ -1774,8 +1774,7 @@ class TestFunctionRegistration(unittest.TestCase):
 
             # have to use regex to handle differences in numpy print formats for shape
             msg = "'comp' <class ExecComp>: Error occurred evaluating 'y = double\(x\) \* 3\.':\n" \
-                  "'comp' <class ExecComp>: Failed to set value of 'y': could not broadcast " \
-                  "input array from shape \(10.*\) into shape \(8.*\)."
+                  "could not broadcast input array from shape \(10.*\) into shape \(8.*\)"
             with self.assertRaisesRegex(Exception, msg) as cm:
                 p.run_model()
 
@@ -1876,7 +1875,7 @@ class TestFunctionRegistrationColoring(unittest.TestCase):
         except OSError:
             pass
 
-    def test_coloring(self):
+    def test_manual_coloring(self):
         with _temporary_expr_dict():
 
             prob = om.Problem(coloring_dir=self.tempdir)
@@ -1894,6 +1893,32 @@ class TestFunctionRegistrationColoring(unittest.TestCase):
                                                             y=np.ones(sparsity.shape[0])))
             comp.declare_coloring('x', method='cs')
 
+            prob.setup(mode='fwd')
+            prob.set_solver_print(level=0)
+            prob.run_model()
+
+            J = prob.compute_totals('comp.y', 'comp.x')
+
+            assert_near_equal(J['comp.y', 'comp.x'], sparsity)
+
+            self.assertTrue(np.all(comp._coloring_info['coloring'].get_dense_sparsity() == _MASK))
+
+    def test_auto_coloring(self):
+        with _temporary_expr_dict():
+
+            prob = om.Problem(coloring_dir=self.tempdir)
+            model = prob.model
+
+            sparsity = setup_sparsity(_MASK)
+
+            def mydot(x):
+                return sparsity.dot(x)
+
+            om.ExecComp.register('mydot', mydot, complex_safe=True)
+
+            comp = model.add_subsystem('comp', om.ExecComp('y=mydot(x)',
+                                                            x=np.ones(sparsity.shape[1]),
+                                                            y=np.ones(sparsity.shape[0])))
             prob.setup(mode='fwd')
             prob.set_solver_print(level=0)
             prob.run_model()

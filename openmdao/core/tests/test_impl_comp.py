@@ -568,7 +568,8 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         indep.add_output('c', 3.0)
         model.add_subsystem('p', indep)
         model.add_subsystem('comp', ImpWithInitial())
-        model.add_subsystem('fn', om.ExecComp(['y = .03*a*x*x - .04*a*a*b*x - c']))
+        fn = model.add_subsystem('fn', om.ExecComp(['y = .03*a*x*x - .04*a*a*b*x - c']))
+        fn.declare_partials(of='*', wrt='*', method='cs')
 
         model.connect('p.a', 'comp.a')
         model.connect('p.a', 'fn.a')

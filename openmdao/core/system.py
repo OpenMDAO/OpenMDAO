@@ -1309,17 +1309,13 @@ class System(object):
 
         coloring = _compute_coloring(sparsity, direction)
 
-        if not self._finalize_coloring(coloring, info, sp_info, sparsity_time):
-            # make sure we have no leftover garbage from sparsity/coloring computations
-            self._inputs.set_val(starting_inputs)
-            self._outputs.set_val(starting_outputs)
-            self._residuals.set_val(starting_resids)
-            return [None]
-
         # restore original inputs/outputs
         self._inputs.set_val(starting_inputs)
         self._outputs.set_val(starting_outputs)
         self._residuals.set_val(starting_resids)
+
+        if not self._finalize_coloring(coloring, info, sp_info, sparsity_time):
+            return [None]
 
         self._first_call_to_linearize = save_first_call
 

@@ -349,7 +349,6 @@ class TestPETScKrylov(unittest.TestCase):
         self.assertTrue(icount2 < icount1)
 
     def test_error_under_cs(self):
-        """Verify that PETScKrylov abides by the 'maxiter' option."""
         prob = om.Problem()
         model = prob.model
 
@@ -359,12 +358,16 @@ class TestPETScKrylov(unittest.TestCase):
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+        obj = model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
                                                    z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+        con1 = model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        con2 = model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        obj.declare_partials(of='*', wrt='*', method='cs')
+        con1.declare_partials(of='*', wrt='*', method='cs')
+        con2.declare_partials(of='*', wrt='*', method='cs')
 
         model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.linear_solver = om.PETScKrylov()
