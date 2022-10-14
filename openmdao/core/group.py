@@ -24,7 +24,7 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len
 from openmdao.utils.general_utils import common_subpath, \
-    conditional_error, convert_src_inds, \
+    conditional_error, convert_src_inds, ContainsAll, \
     shape2tuple, get_connection_owner, conditional_error
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
@@ -2732,7 +2732,7 @@ class Group(System):
             self._linear_solver._set_matvec_scope(scope_out, scope_in)
             self._linear_solver.solve(mode, rel_systems)
 
-    def _linearize(self, jac, sub_do_ln=True):
+    def _linearize(self, jac, sub_do_ln=True, rel_systems=ContainsAll()):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
@@ -2742,6 +2742,9 @@ class Group(System):
             If None, use local jacobian, else use assembled jacobian jac.
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
+        rel_systems : set or ContainsAll
+            Set of relevant system pathnames passed in to the model during computation of total
+            derivatives.
         """
         if self._jacobian is None:
             self._jacobian = DictionaryJacobian(self)
@@ -2768,9 +2771,10 @@ class Group(System):
 
             # Only linearize subsystems if we aren't approximating the derivs at this level.
             for subsys in self._subsystems_myproc:
-                do_ln = sub_do_ln and (subsys._linear_solver is not None and
-                                       subsys._linear_solver._linearize_children())
-                subsys._linearize(jac, sub_do_ln=do_ln)
+                if subsys.pathname in rel_systems:
+                    do_ln = sub_do_ln and (subsys._linear_solver is not None and
+                                           subsys._linear_solver._linearize_children())
+                    subsys._linearize(jac, sub_do_ln=do_ln)
 
             # Update jacobian
             if self._assembled_jac is not None:

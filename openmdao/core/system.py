@@ -5231,8 +5231,7 @@ class System(object):
                 elif desvar == response:
                     input_deps = set()
                     output_deps = set([response])
-                    parts = desvar.rsplit('.', 1)
-                    sys_deps = set(all_ancestors('' if len(parts) == 1 else parts[0]))
+                    sys_deps = set(all_ancestors(desvar.rpartition('.')[0]))
 
                 if common or desvar == response:
                     desvar = conns[desvar] if desvar in conns else desvar
