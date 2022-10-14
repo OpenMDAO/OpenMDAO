@@ -2774,7 +2774,10 @@ class Group(System):
                 if subsys.pathname in rel_systems:
                     do_ln = sub_do_ln and (subsys._linear_solver is not None and
                                            subsys._linear_solver._linearize_children())
-                    subsys._linearize(jac, sub_do_ln=do_ln)
+                    if len(subsys._subsystems_allprocs) > 0:
+                        subsys._linearize(jac, sub_do_ln=do_ln, rel_systems=rel_systems)
+                    else:
+                        subsys._linearize(jac, sub_do_ln=do_ln)
 
             # Update jacobian
             if self._assembled_jac is not None:
@@ -2782,7 +2785,7 @@ class Group(System):
 
             if sub_do_ln:
                 for subsys in self._subsystems_myproc:
-                    if subsys._linear_solver is not None:
+                    if subsys._linear_solver is not None and subsys.pathname in rel_systems:
                         subsys._linear_solver._linearize()
 
     def _check_first_linearize(self):
