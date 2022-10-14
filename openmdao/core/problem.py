@@ -1051,7 +1051,8 @@ class Problem(object):
             msg = f'OpenMDAO support for Python version {sv.major}.{sv.minor} will end soon.'
             try:
                 from IPython import get_ipython
-                if 'IPKernelApp' not in get_ipython().config:  # pragma: no cover
+                ip = get_ipython()
+                if ip is None or ip.config is None or 'IPKernelApp' not in ip.config:
                     warn_deprecation(msg)
             except ImportError:
                 warn_deprecation(msg)
