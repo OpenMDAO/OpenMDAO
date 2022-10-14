@@ -1,10 +1,6 @@
 """ Unit tests for the notebook_utils."""
 
 import unittest
-try:
-    from tabulate import tabulate
-except ImportError:
-    tabulate = None
 
 try:
     import IPython
@@ -29,7 +25,7 @@ class StateOptionsDictionary(om.OptionsDictionary):
         self.declare(name='name', types=str,
                      desc='name of ODE state variable')
 
-@unittest.skipUnless(tabulate and IPython, "Tabulate and IPython are required")
+@unittest.skipUnless(IPython, "IPython is required")
 class TestNotebookUtils(unittest.TestCase):
 
     def test_show_obj_options(self):

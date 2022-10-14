@@ -25,11 +25,6 @@ class TestMissingImports(unittest.TestCase):
         with MissingImports('IPython'):
             import openmdao.api as om
 
-
-        with MissingImports('tabulate'):
-            import openmdao.api as om
-
-
         with MissingImports('matplotlib'):
             import openmdao.api as om
 

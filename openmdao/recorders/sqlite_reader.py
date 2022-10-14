@@ -16,7 +16,8 @@ from openmdao.utils.om_warnings import issue_warning, CaseRecorderWarning
 
 from openmdao.recorders.sqlite_recorder import format_version, META_KEY_SEP
 
-from openmdao.utils.notebook_utils import notebook, tabulate, display, HTML
+from openmdao.utils.notebook_utils import notebook, display, HTML
+from openmdao.visualization.tables.table_builder import generate_table
 
 import pickle
 import zlib
@@ -391,10 +392,9 @@ class SqliteCaseReader(BaseCaseReader):
             sources.extend(self._problem_cases.list_sources())
 
         if out_stream:
-            if notebook and tabulate and out_stream is _DEFAULT_OUT_STREAM:
-                display(HTML(tabulate([[s] for s in sources],
-                                      disable_numparse=True, colalign=["center"],
-                                      headers=["Sources"], tablefmt='html')))
+            if notebook and out_stream is _DEFAULT_OUT_STREAM:
+                display(HTML(str(generate_table([[s] for s in sources], headers=['Sources'],
+                                                tablefmt='html'))))
             else:
                 if out_stream is _DEFAULT_OUT_STREAM:
                     out_stream = sys.stdout
@@ -657,14 +657,11 @@ class SqliteCaseReader(BaseCaseReader):
                             (source, type(source).__name__))
 
         if not source:
-            return self._list_cases_recurse_flat(out_stream=out_stream)
+            cases = self._list_cases_recurse_flat(out_stream=None)
 
         elif source == 'problem':
             if self._format_version >= 2:
                 cases = self._problem_cases.list_cases()
-                if out_stream:
-                    write_source_table({'problem': cases}, out_stream)
-                return cases
             else:
                 raise RuntimeError('No problem cases recorded (data format = %d).' %
                                    self._format_version)
@@ -684,16 +681,12 @@ class SqliteCaseReader(BaseCaseReader):
                 if not recurse:
                     # return list of cases from the source alone
                     cases = case_table.list_cases(source)
-                    if out_stream:
-                        write_source_table({source: cases}, out_stream)
-                    return cases
                 elif flat:
                     # return list of cases from the source plus child cases
                     cases = []
                     source_cases = case_table.get_cases(source)
                     for case in source_cases:
-                        cases += self._list_cases_recurse_flat(case.name, out_stream=out_stream)
-                    return cases
+                        cases += self._list_cases_recurse_flat(case.name, out_stream=None)
                 else:
                     # return nested dict of cases from the source and child cases
                     cases = OrderedDict()
@@ -705,11 +698,22 @@ class SqliteCaseReader(BaseCaseReader):
                 # source is a coordinate
                 if recurse:
                     if flat:
-                        return self._list_cases_recurse_flat(source, out_stream=out_stream)
+                        cases = self._list_cases_recurse_flat(source, out_stream=None)
                     else:
                         return self._list_cases_recurse_nested(source)
             else:
                 raise RuntimeError('Source not found: %s' % source)
+
+        if out_stream:
+            if not source:
+                for source, subcases in self.source_cases_table.items():
+                    if subcases:
+                        write_source_table({source: subcases}, out_stream)
+                del self.source_cases_table
+            else:
+                write_source_table({source: cases}, out_stream)
+
+        return cases
 
     def _list_cases_recurse_flat(self, coord=None, out_stream=_DEFAULT_OUT_STREAM):
         """

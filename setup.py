@@ -22,14 +22,12 @@ optional_dependencies = {
         'testflo',
         'ipyparallel',
         'numpydoc>=1.1',
-        'tabulate',
         'jupyter-book<0.13',
         'jupyter-sphinx',
         'sphinx-sitemap'
     ],
     'notebooks': [
         'notebook',
-        'tabulate',
         'ipython',
         'ipywidgets>=7.6.5',
         'ipympl',
@@ -120,11 +118,13 @@ setup(
         'openmdao.visualization',
         'openmdao.visualization.case_viewer',
         'openmdao.visualization.connection_viewer',
+        'openmdao.visualization.inputs_report',
         'openmdao.visualization.timing_viewer',
         'openmdao.visualization.scaling_viewer',
         'openmdao.visualization.n2_viewer',
         'openmdao.visualization.meta_model_viewer',
         'openmdao.visualization.opt_report',
+        'openmdao.visualization.tables',
     ],
     package_data={
         'openmdao.devtools': ['*.wpr', ],
@@ -146,6 +146,9 @@ setup(
         ],
         'openmdao.visualization.connection_viewer': [
             '*.html',
+        ],
+        'openmdao.visualization.tables': [
+            '*.template',
         ],
         'openmdao.visualization.timing_viewer': [
             '*.html',
@@ -261,9 +264,10 @@ setup(
             'n2=openmdao.visualization.n2_viewer.n2_viewer:_n2_report_register',
             'scaling=openmdao.visualization.scaling_viewer.scaling_report:_scaling_report_register',
             'optimizer=openmdao.visualization.opt_report.opt_report:_optimizer_report_register',
+            'connections=openmdao.visualization.connection_viewer.viewconns:_connections_report_register',
+            'inputs=openmdao.visualization.inputs_report.inputs_report:_inputs_report_register',
             'total_coloring=openmdao.utils.coloring:_total_coloring_report_register',
             'summary=openmdao.devtools.debug:_summary_report_register',
-            'connections=openmdao.visualization.connection_viewer.viewconns:_connections_report_register',
             'checks=openmdao.error_checking.check_config:_check_report_register',
         ],
         'openmdao_surrogate_model': [
