@@ -1046,6 +1046,19 @@ class Problem(object):
         model = self.model
         comm = self.comm
 
+        if sys.version_info.minor < 8:
+            sv = sys.version_info
+            msg = f'OpenMDAO support for Python version {sv.major}.{sv.minor} will end soon.'
+            try:
+                from IPython import get_ipython
+                ip = get_ipython()
+                if ip is None or ip.config is None or 'IPKernelApp' not in ip.config:
+                    warn_deprecation(msg)
+            except ImportError:
+                warn_deprecation(msg)
+            except AttributeError:
+                warn_deprecation(msg)
+
         # A distributed vector type is required for MPI
         if comm.size > 1:
             if distributed_vector_class is PETScVector and PETScVector is None:

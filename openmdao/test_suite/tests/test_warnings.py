@@ -144,7 +144,9 @@ class TestWarnings(unittest.TestCase):
         warnings.filterwarnings('error', category=om.OpenMDAOWarning)
 
         with self.assertRaises(om.UnitsWarning) as e:
-            p.setup()
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", r'.*OpenMDAO support for Python version .* will end soon.*')
+                p.setup()
 
         expected = "<model> <class Group>: Output 'a_comp.y' with units of 'm' is connected to " \
                    "input 'exec_comp.y' which has no units."
