@@ -19,3 +19,13 @@ class ParallelGroup(Group):
         """
         super().__init__(**kwargs)
         self._mpi_proc_allocator.parallel = True
+
+    def _configure(self):
+        """
+        Configure our model recursively to assign any children settings.
+
+        Highest system's settings take precedence.
+        """
+        super()._configure()
+        if self.comm.size > 1:
+            self._has_guess = any(self.comm.allgather(self._has_guess))
