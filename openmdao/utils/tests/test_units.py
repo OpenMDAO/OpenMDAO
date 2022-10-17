@@ -338,6 +338,7 @@ class TestModuleFunctions(unittest.TestCase):
 
         with warnings.catch_warnings():
             warnings.simplefilter("error")
+            warnings.filterwarnings("ignore", r'.*OpenMDAO support for Python version .* will end soon.*')
             p.setup()
 
         p.run_model()
@@ -354,6 +355,7 @@ class TestModuleFunctions(unittest.TestCase):
 
         with warnings.catch_warnings():
             warnings.simplefilter("error")
+            warnings.filterwarnings("ignore", r'.*OpenMDAO support for Python version .* will end soon.*')
             p.setup()
 
         p.run_model()
@@ -371,6 +373,7 @@ class TestModuleFunctions(unittest.TestCase):
 
         with warnings.catch_warnings():
             warnings.simplefilter("error")
+            warnings.filterwarnings("ignore", r'.*OpenMDAO support for Python version .* will end soon.*')
             p.setup()
 
         p.run_model()

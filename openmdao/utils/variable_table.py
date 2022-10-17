@@ -9,7 +9,8 @@ from io import TextIOBase
 import numpy as np
 
 from openmdao.core.constants import _DEFAULT_OUT_STREAM
-from openmdao.utils.notebook_utils import notebook, tabulate, display, HTML
+from openmdao.utils.notebook_utils import notebook, display, HTML
+from openmdao.visualization.tables.table_builder import generate_table
 
 column_widths = {
     'val': 20,
@@ -58,10 +59,10 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     if out_stream is None:
         return
 
-    if notebook and tabulate and not hierarchical and out_stream is _DEFAULT_OUT_STREAM:
-        use_tabulate = True
+    if notebook and not hierarchical and out_stream is _DEFAULT_OUT_STREAM:
+        use_html = True
     else:
-        use_tabulate = False
+        use_html = False
 
     if out_stream is _DEFAULT_OUT_STREAM:
         out_stream = sys.stdout
@@ -99,14 +100,13 @@ def write_var_table(pathname, var_list, var_type, var_dict,
         column_names = [out_type for out_type in out_types if out_type in outputs]
         break
 
-    if use_tabulate and var_list:
+    if use_html and var_list:
         rows = []
         for name in var_list:
             rows.append([name] + [var_dict[name][field] for field in column_names])
 
         hdrs = ['varname'] + column_names
-        algn = ["center"] * len(hdrs)  # colalign "left" is currently broken
-        display(HTML(tabulate(rows, headers=hdrs, colalign=algn, tablefmt='html')))
+        display(HTML(str(generate_table(rows, headers=hdrs, tablefmt='html'))))
         return
 
     # Find with width of the first column in the table
@@ -203,11 +203,8 @@ def write_source_table(source_dicts, out_stream):
     if out_stream is None:
         return
 
-    # use tabulate if we are in a notebook, have tabulate and are using the default out_stream
-    if notebook and tabulate and out_stream is _DEFAULT_OUT_STREAM:
-        use_tabulate = True
-    else:
-        use_tabulate = False
+    # use table_builder if we are in a notebook and are using the default out_stream
+    use_html = notebook and out_stream is _DEFAULT_OUT_STREAM
 
     if out_stream is _DEFAULT_OUT_STREAM:
         out_stream = sys.stdout
@@ -222,11 +219,8 @@ def write_source_table(source_dicts, out_stream):
         source_dicts = [source_dicts]
 
     for source_dict in source_dicts:
-        if use_tabulate:
-            display(HTML(tabulate(source_dict,
-                                  disable_numparse=True,
-                                  colalign=["center"] * len(source_dict),
-                                  headers="keys", tablefmt='html')))
+        if use_html:
+            display(HTML(str(generate_table(source_dict, headers='keys', tablefmt='html'))))
         else:
             for key, value in source_dict.items():
                 if value:
@@ -257,7 +251,7 @@ def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
     print_arrays : bool
         When False, in the columnar display, just display norm of any ndarrays with size > 1.
         The norm is surrounded by vertical bars to indicate that it is a norm.
-        When True, also display full values of the ndarray below the row. Format  is affected
+        When True, also display full values of the ndarray below the row. Format is affected
         by the values set with numpy.set_printoptions
         Default is False.
 

@@ -169,7 +169,7 @@ class TestReportsSystem(unittest.TestCase):
         strout = StringIO()
         sys.stdout = strout
         try:
-            list_reports()
+            list_reports(max_width=100)  # make width 100 to prevent word wrap
         finally:
             sys.stdout = stdout
 

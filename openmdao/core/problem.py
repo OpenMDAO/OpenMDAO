@@ -21,6 +21,7 @@ import scipy.sparse as sparse
 from openmdao.core.constants import _SetupStatus
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver, record_iteration, SaveOptResult
+from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group, System
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
@@ -1046,6 +1047,19 @@ class Problem(object):
         model = self.model
         comm = self.comm
 
+        if sys.version_info.minor < 8:
+            sv = sys.version_info
+            msg = f'OpenMDAO support for Python version {sv.major}.{sv.minor} will end soon.'
+            try:
+                from IPython import get_ipython
+                ip = get_ipython()
+                if ip is None or ip.config is None or 'IPKernelApp' not in ip.config:
+                    warn_deprecation(msg)
+            except ImportError:
+                warn_deprecation(msg)
+            except AttributeError:
+                warn_deprecation(msg)
+
         # A distributed vector type is required for MPI
         if comm.size > 1:
             if distributed_vector_class is PETScVector and PETScVector is None:
@@ -1274,6 +1288,15 @@ class Problem(object):
         for comp in model.system_iter(typ=Component, include_self=True):
             # if we're under CI, do all of the partials, ignoring _no_check_partials
             if comp._no_check_partials and not under_CI:
+                continue
+
+            # skip any Component with no outputs
+            if len(comp._var_allprocs_abs2meta['output']) == 0:
+                continue
+
+            # skip any ExplicitComponent with no inputs (e.g. IndepVarComp)
+            if (len(comp._var_allprocs_abs2meta['input']) == 0 and
+                    isinstance(comp, ExplicitComponent)):
                 continue
 
             name = comp.pathname
@@ -2512,7 +2535,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
     compact_print : bool
         If results should be printed verbosely or in a table.
     system_list : iterable
-        The systems (in the proper order) that were checked.0
+        The systems (in the proper order) that were checked.
     global_options : dict
         Dictionary containing the options for the approximation.
     totals : bool

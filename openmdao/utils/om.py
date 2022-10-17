@@ -5,7 +5,11 @@ A console script wrapper for multiple openmdao functions.
 import sys
 import os
 import argparse
-import importlib.metadata as ilmd
+if sys.version_info.minor > 7:
+    import importlib.metadata as ilmd
+else:
+    ilmd = None
+
 import re
 from openmdao import __version__ as version
 
@@ -613,7 +617,7 @@ def openmdao_cmd():
 
         if hasattr(options, 'executor'):
             options.executor(options, user_args)
-        elif options.dependency_versions is True:
+        elif options.dependency_versions is True and ilmd is not None:
             dep_versions = {}
             _get_deps(dep_versions, 'openmdao')
 
