@@ -1551,12 +1551,20 @@ def generate_table(rows, tablefmt='text', **options):
         },
         'grid': {
             'top_border': Line('+-', '-+-', '-+', '-'),
-            'header_bottom_border': Line('+-', '-+-', '-+', '-'),
+            'header_bottom_border': Line('+=', '=+=', '=+', '='),
             'bottom_border': Line('+-', '-+-', '-+', '-'),
             'header_line': Line('| ', ' | ', ' |'),
             'data_row_line':Line('| ', ' | ', ' |'),
             'row_separator': Line('+-', '-+-', '-+', '-')
         },
+        'simple_grid': {
+            'top_border': Line("┌─", "─┬─", "─┐", "─"),
+            'header_bottom_border': Line("├─", "─┼─", "─┤", "─"),
+            'row_separator': Line("├─", "─┼─", "─┤", "─"),
+            'bottom_border': Line("└─", "─┴─", "─┘", "─"),
+            'header_line': Line("│ ", " │ ", " │"),
+            'data_row_line': Line("│ ", " │ ", " │"),
+        }
     }
 
     _table_types = {
