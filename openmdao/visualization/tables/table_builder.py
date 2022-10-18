@@ -522,13 +522,9 @@ class Line:
     right: str = ''
     hline: str = ''
 
-    def get_border_line(self, widths, line_info=None):
-        if line_info is None:
-            line = self.sep.join([(self.hline * w)[:w] for w in widths])
-            return ''.join((self.left, line, self.right))
-
-        total_width = sum(widths) + len(line_info.sep) * (len(widths) - 1)
-        return ''.join((self.left, (self.hline * total_width)[:total_width], self.right))
+    def get_border_line(self, widths):
+        line = self.sep.join([(self.hline * w)[:w] for w in widths])
+        return ''.join((self.left, line, self.right))
 
     def get_data_line(self, cells):
         return ''.join((self.left, self.sep.join(cells), self.right))
@@ -574,9 +570,9 @@ class TextTableBuilder(TableBuilder):
     """
 
     def __init__(self, rows,
-                 top_border=Line('| ', ' | ', ' |', '-'),
+                 top_border=Line('| ', '---', ' |', '-'),
                  header_bottom_border=Line('| ', ' | ', ' |', '-'),
-                 bottom_border=Line('| ', ' | ', ' |', '-'),
+                 bottom_border=Line('| ', '---', ' |', '-'),
                  header_line=Line('| ', ' | ', ' |'),
                  data_row_line=Line('| ', ' | ', ' |'),
                  row_separator=None,
@@ -756,7 +752,7 @@ class TextTableBuilder(TableBuilder):
             else:
                 yield row_cells
 
-    def get_top_border(self, widths, line_info=None):
+    def get_top_border(self, widths):
         """
         Return the top border string for this table.
 
@@ -770,7 +766,7 @@ class TextTableBuilder(TableBuilder):
         str
             The top border string.
         """
-        return self.top_border.get_border_line(widths, line_info=line_info)
+        return self.top_border.get_border_line(widths)
 
     def get_header_bottom_border(self, widths):
         """
@@ -788,7 +784,7 @@ class TextTableBuilder(TableBuilder):
         """
         return self.header_bottom_border.get_border_line(widths)
 
-    def get_bottom_border(self, widths, line_info=None):
+    def get_bottom_border(self, widths):
         """
         Return the bottom border string for this table.
 
@@ -802,7 +798,7 @@ class TextTableBuilder(TableBuilder):
         str
             The bottom border string.
         """
-        return self.bottom_border.get_border_line(widths, line_info=line_info)
+        return self.bottom_border.get_border_line(widths)
 
     def __str__(self):
         """
@@ -829,10 +825,10 @@ class TextTableBuilder(TableBuilder):
                 data_lines.append(self.row_separator.get_border_line(widths))
 
         if self.bottom_border:
-            data_lines.append(self.get_bottom_border(widths, line_info=self.data_row_line))
+            data_lines.append(self.get_bottom_border(widths))
 
         if row_cells is not None and self.top_border:
-            header_lines.append(self.get_top_border(widths, line_info=self.data_row_line))
+            header_lines.append(self.get_top_border(widths))
 
         if sum(self._header_widths) > 0:
             for header_cells in self._stringified_header_iter():
@@ -883,38 +879,6 @@ class RSTTableBuilder(TextTableBuilder):
                          bottom_border=Line('', '  ', '', '='),
                          header_line=Line('', '  ', ''),
                          data_row_line=Line('', '  ', ''), **kwargs)
-
-    def get_top_border(self, widths, line_info=None):
-        """
-        Return the top border string.
-
-        Parameters
-        ----------
-        widths : list of int
-           Column widths.
-
-        Returns
-        -------
-        str
-            The top border string.
-        """
-        return self.top_border.get_border_line(widths, line_info=None)
-
-    def get_bottom_border(self, widths, line_info=None):
-        """
-        Return the top border string.
-
-        Parameters
-        ----------
-        widths : list of int
-           Column widths.
-
-        Returns
-        -------
-        str
-            The top border string.
-        """
-        return self.bottom_border.get_border_line(widths, line_info=None)
 
 
 class GithubTableBuilder(TextTableBuilder):
