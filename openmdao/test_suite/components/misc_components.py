@@ -70,6 +70,9 @@ class Comp4LinearCacheTest(om.ImplicitComponent):
 
 
 class ExplicitCounterComp(om.ExplicitComponent):
+    """
+    This component keeps counters for a number of core framework methods.
+    """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._counts = defaultdict(int)

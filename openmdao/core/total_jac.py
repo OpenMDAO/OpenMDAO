@@ -1474,11 +1474,12 @@ class _TotalJacInfo(object):
 
             # Linearize Model
             if len(model._subsystems_allprocs) > 0:
-                kwargs = {'rel_systems': self.total_relevant_systems}
+                model._linearize(model._assembled_jac,
+                                 sub_do_ln=model._linear_solver._linearize_children(),
+                                 rel_systems=self.total_relevant_systems)
             else:
-                kwargs = {}
-            model._linearize(model._assembled_jac,
-                             sub_do_ln=model._linear_solver._linearize_children(), **kwargs)
+                model._linearize(model._assembled_jac,
+                                 sub_do_ln=model._linear_solver._linearize_children())
 
         finally:
             model._tot_jac = None
