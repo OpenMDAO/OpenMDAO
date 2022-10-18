@@ -1681,7 +1681,7 @@ class System(object):
 
         if aliases:
             # now remove alias entries from the response dict because we don't need them in the
-            # relevance calculation. This reponse dict is used only for relevance and is *not*
+            # relevance calculation. This response dict is used only for relevance and is *not*
             # used by the driver.
             responses.update(to_add)
             responses = {r: meta for r, meta in responses.items() if r not in aliases}
