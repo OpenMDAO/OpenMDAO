@@ -517,16 +517,68 @@ class TableBuilder(object):
 
 @dataclass(frozen=True)
 class Line:
+    """
+    Information about a line in the table.
+
+    Parameters
+    ----------
+    left : str
+        Left border string.
+    sep : str
+        Column separator.
+    right : str
+        Right border string.
+    hline : str
+        Horizontal line string.
+
+    Attributes
+    ----------
+    left : str
+        Left border string.
+    sep : str
+        Column separator.
+    right : str
+        Right border string.
+    hline : str
+        Horizontal line string.
+    """
+
     left: str = ''
     sep: str = ''
     right: str = ''
     hline: str = ''
 
     def get_border_line(self, widths):
+        """
+        Return a border line given the column widths.
+
+        Parameters
+        ----------
+        widths : list of int
+            Column widths.
+
+        Returns
+        -------
+        str
+            The border line.
+        """
         line = self.sep.join([(self.hline * w)[:w] for w in widths])
         return ''.join((self.left, line, self.right))
 
     def get_data_line(self, cells):
+        """
+        Return a table line containing the given cells.
+
+        Parameters
+        ----------
+        cells : list of str
+            Contents of table columns for the current row.
+
+        Returns
+        -------
+        str
+            The table line containing the cells, with separators and left and right borders.
+        """
         return ''.join((self.left, self.sep.join(cells), self.right))
 
 
@@ -538,35 +590,35 @@ class TextTableBuilder(TableBuilder):
     ----------
     rows : iter of iters
         Data used to fill table cells.
-    column_sep : str
-        Column separator string.
-    top_border : str
-        Top border character(s).
-    bottom_border : str
-        Bottom border character(s).
-    header_bottom_border : str
-        Header bottom border character(s).
-    left_border : str
-        Left border character(s).
-    right_border : str
-        Right border character(s).
+    top_border : Line
+        Top border info.
+    header_bottom_border : Line
+        Header bottom border info.
+    bottom_border : Line
+        Bottom border info.
+    header_line : Line
+        Header line info.
+    data_row_line : Line
+        Data row line info.
+    row_separator : Line or None
+        If not None, info for lines between data rows.
     **kwargs : dict
         Keyword args for the base class.
 
     Attributes
     ----------
-    column_sep : str
-        Column separator string.
-    top_border : str
-        Top border character(s).
-    bottom_border : str
-        Bottom border character(s).
-    header_bottom_border : str
-        Header bottom border character(s).
-    left_border : str
-        Left border character(s).
-    right_border : str
-        Right border character(s).
+    top_border : Line
+        Top border info.
+    header_bottom_border : Line
+        Header bottom border info.
+    bottom_border : Line
+        Bottom border info.
+    header_line : Line
+        Header line info.
+    data_row_line : Line
+        Data row line info.
+    row_separator : Line or None
+        If not None, info for lines between data rows.
     """
 
     def __init__(self, rows,
@@ -724,6 +776,8 @@ class TextTableBuilder(TableBuilder):
                 maxwid = meta['max_width']
                 if maxwid is not None and maxwid < len(cell):
                     lines = textwrap.wrap(cell, maxwid)
+                    if not lines:  # empty cell or whitespace
+                        lines = ['']
                     wid = maxwid
                 elif '\n' in cell:
                     lines = cell.split('\n')
@@ -1554,7 +1608,7 @@ def generate_table(rows, tablefmt='text', **options):
             'header_bottom_border': Line('+=', '=+=', '=+', '='),
             'bottom_border': Line('+-', '-+-', '-+', '-'),
             'header_line': Line('| ', ' | ', ' |'),
-            'data_row_line':Line('| ', ' | ', ' |'),
+            'data_row_line': Line('| ', ' | ', ' |'),
             'row_separator': Line('+-', '-+-', '-+', '-')
         },
         'simple_grid': {
