@@ -1342,11 +1342,11 @@ class _TotalJacInfo(object):
             with model._scaled_context_all():
                 if len(model._subsystems_allprocs) > 0:
                     model._linearize(model._assembled_jac,
-                                    sub_do_ln=ln_solver._linearize_children(),
-                                    rel_systems=self.total_relevant_systems)
+                                     sub_do_ln=ln_solver._linearize_children(),
+                                     rel_systems=self.total_relevant_systems)
                 else:
                     model._linearize(model._assembled_jac,
-                                    sub_do_ln=ln_solver._linearize_children())
+                                     sub_do_ln=ln_solver._linearize_children())
             if ln_solver._assembled_jac is not None and \
                     ln_solver._assembled_jac._under_complex_step:
                 model.linear_solver._assembled_jac._update(model)
