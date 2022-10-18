@@ -11,6 +11,7 @@ import openmdao.api as om
 from openmdao.core.problem import _default_prob_name
 from openmdao.core.driver import Driver
 from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.test_suite.components.misc_components import MultComp
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesConnected
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 import openmdao.utils.hooks as hooks
@@ -2234,6 +2235,113 @@ class TestProblem(unittest.TestCase):
         except RuntimeError:
             self.fail("'setup raised RuntimeError unexpectedly")
 
+
+class RelevanceTestCase(unittest.TestCase):
+    def _setup_relevance_problem(self):
+        p = om.Problem()
+
+        model = p.model
+        indeps = model.add_subsystem('indeps', om.IndepVarComp())
+        indeps.add_output('a')
+        indeps.add_output('b')
+        indeps.add_output('c')
+
+        model.add_subsystem('C1', MultComp(2.))
+        model.add_subsystem('C2', MultComp(3.))
+        model.add_subsystem('C3', MultComp(5.))
+        model.add_subsystem('C4', MultComp(7.))
+        model.add_subsystem('C5', MultComp(9.))
+        model.add_subsystem('C6', MultComp(11.))
+
+        model.connect('indeps.a', 'C1.x')
+        model.connect('indeps.b', ['C1.y', 'C2.x'])
+        model.connect('indeps.c', 'C2.y')
+
+        model.connect('C1.fxy', 'C3.x')
+        model.connect('C2.fxy', ['C3.y', 'C4.x'])
+        model.connect('C3.fxy', 'C5.x')
+        model.connect('C4.fxy', 'C6.x')
+
+        return p
+
+    def _setup_relevance_problem_w_cycle(self):
+        p = self._setup_relevance_problem()
+        p.model.connect('C5.fxy', 'C4.y')
+        p.model.connect('C6.fxy', 'C5.y')
+        return p
+
+    def _finish_setup_and_check(self, p, expected):
+        p.setup()
+
+        p['indeps.a'] = 2.
+        p['indeps.b'] = 3.
+        p['indeps.c'] = 4.
+        p['C4.y'] = 1.
+        p['C5.y'] = 1.
+        p['C6.y'] = 1.
+
+        p.run_model()
+
+        p.run_driver()
+
+        allcomps = [getattr(p.model, f"C{i}") for i in range(1, 7)]
+        ran_linearize = [c.name for c in allcomps if c._counts['_linearize'] > 0]
+        ran_compute_partials = [c.name for c in allcomps if c._counts['_compute_partials_wrapper'] > 0]
+        ran_solve_linear = [c.name for c in allcomps if c._counts['_solve_linear'] > 0]
+
+        self.assertEqual(ran_linearize, expected)
+        self.assertEqual(ran_compute_partials, expected)
+        self.assertEqual(ran_solve_linear, expected)
+
+    def test_relevance(self):
+        p = self._setup_relevance_problem()
+
+        p.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9, optimizer='SLSQP')
+        p.model.add_design_var('indeps.b', lower=-50., upper=50.)
+        p.model.add_objective('C6.fxy')
+        p.model.add_constraint('C4.fxy', upper=1000.)
+
+        self._finish_setup_and_check(p, ['C2', 'C4', 'C6'])
+
+    def test_relevance2(self):
+        p = self._setup_relevance_problem()
+
+        p.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9, optimizer='SLSQP')
+        p.model.add_design_var('indeps.a', lower=-50., upper=50.)
+        p.model.add_objective('C5.fxy')
+        p.model.add_constraint('C3.fxy', upper=1000.)
+
+        self._finish_setup_and_check(p, ['C1', 'C3', 'C5'])
+
+    def test_relevance3(self):
+        p = self._setup_relevance_problem()
+
+        p.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9, optimizer='SLSQP')
+        p.model.add_design_var('indeps.c', lower=-50., upper=50.)
+        p.model.add_objective('C5.fxy')
+        p.model.add_constraint('C6.fxy', upper=1000.)
+
+        self._finish_setup_and_check(p, ['C2', 'C3', 'C4', 'C5', 'C6'])
+
+    def test_relevance4(self):
+        p = self._setup_relevance_problem_w_cycle()
+
+        p.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9, optimizer='SLSQP')
+        p.model.add_design_var('indeps.a', lower=-50., upper=50.)
+        p.model.add_objective('C5.fxy')
+        p.model.add_constraint('C3.fxy', upper=1000.)
+
+        self._finish_setup_and_check(p, ['C1', 'C3', 'C4', 'C5', 'C6'])
+
+    def test_relevance5(self):
+        p = self._setup_relevance_problem_w_cycle()
+
+        p.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9, optimizer='SLSQP')
+        p.model.add_design_var('indeps.c', lower=-50., upper=50.)
+        p.model.add_objective('C5.fxy')
+        p.model.add_constraint('C6.fxy', upper=1e22)
+
+        self._finish_setup_and_check(p, ['C2', 'C3', 'C4', 'C5', 'C6'])
 
 class NestedProblemTestCase(unittest.TestCase):
 
