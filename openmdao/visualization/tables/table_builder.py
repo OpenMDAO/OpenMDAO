@@ -719,38 +719,38 @@ class TextTableBuilder(TableBuilder):
             for i, meta in enumerate(sorted_cols):
                 row_cells[i] = self._get_fixed_width_cell(meta, row[i], widths[i], 'align')
 
-            if True:  # needs_wrap:
-                cell_lists = []
-                for meta, cell, wid in zip(sorted_cols, row_cells, widths):
-                    maxwid = meta['max_width']
-                    if maxwid is not None and maxwid < len(cell):
-                        lines = textwrap.wrap(cell, maxwid)
-                        wid = maxwid
-                    elif '\n' in cell:
-                        lines = cell.split('\n')
+            cell_lists = []
+            for meta, cell, wid in zip(sorted_cols, row_cells, widths):
+                maxwid = meta['max_width']
+                if maxwid is not None and maxwid < len(cell):
+                    lines = textwrap.wrap(cell, maxwid)
+                    wid = maxwid
+                elif '\n' in cell:
+                    lines = cell.split('\n')
+                else:
+                    cell_lists.append([cell])
+                    continue
+
+                sym = _align2symbol[meta['align']]
+                if sym == '^':  # center
+                    lines = [line.strip() for line in lines]
+                # ensure all cells have same width in this column
+                cell_lists.append([f"{line:{sym}{wid}}" for line in lines])
+
+            # now find longest column
+            maxlen = max([len(lst) for lst in cell_lists])
+            cell_list_group = []
+            for r in range(maxlen):
+                cells = []
+                for clist in cell_lists:
+                    if len(clist) > r:
+                        cells.append(clist[r])
                     else:
-                        cell_lists.append([cell])
-                        continue
+                        w = len(clist[0]) if clist else 0
+                        cells.append(' ' * w)
+                cell_list_group.append(cells)
 
-                    sym = _align2symbol[meta['align']]
-                    if sym == '^':  # center
-                        lines = [line.strip() for line in lines]
-                    # ensure all cells have same width in this column
-                    cell_lists.append([f"{line:{sym}{wid}}" for line in lines])
-
-                # now find longest column
-                maxlen = max([len(lst) for lst in cell_lists])
-                for r in range(maxlen):
-                    cells = []
-                    for clist in cell_lists:
-                        if len(clist) > r:
-                            cells.append(clist[r])
-                        else:
-                            w = len(clist[0]) if clist else 0
-                            cells.append(' ' * w)
-                    yield cells
-            else:
-                yield row_cells
+            yield cell_list_group
 
     def get_top_border(self, widths):
         """
@@ -815,14 +815,15 @@ class TextTableBuilder(TableBuilder):
         row_cells = None
         row_list = list(self._stringified_row_iter())
         if row_list:
-            widths = [len(c) for c in row_list[0]]
+            widths = [len(c) for c in row_list[0][0]]
         else:
             widths = []
 
-        for row_cells in row_list:
-            data_lines.append(self.data_row_line.get_data_line(row_cells))
-            if self.row_separator:
+        for i, cell_list_group in enumerate(row_list):
+            if i > 0 and self.row_separator:
                 data_lines.append(self.row_separator.get_border_line(widths))
+            for row_cells in cell_list_group:
+                data_lines.append(self.data_row_line.get_data_line(row_cells))
 
         if self.bottom_border:
             data_lines.append(self.get_bottom_border(widths))
@@ -855,30 +856,6 @@ class TextTableBuilder(TableBuilder):
             with open(outfile, 'w') as f:
                 f.write(str(self))
                 f.write('\n')
-
-
-class RSTTableBuilder(TextTableBuilder):
-    r"""
-    Class that generates an RST table.
-
-    Parameters
-    ----------
-    rows : iter of iters
-        Data used to fill table cells.
-    **kwargs : dict
-        Keyword args for the base class.
-    """
-
-    def __init__(self, rows, **kwargs):
-        """
-        Initialize all attributes.
-        """
-        super().__init__(rows,
-                         top_border=Line('', '  ', '', '='),
-                         header_bottom_border=Line('', '  ', '', '='),
-                         bottom_border=Line('', '  ', '', '='),
-                         header_line=Line('', '  ', ''),
-                         data_row_line=Line('', '  ', ''), **kwargs)
 
 
 class GithubTableBuilder(TextTableBuilder):
@@ -1546,22 +1523,6 @@ class TabulatorJSBuilder(TableBuilder):
             webview(outfile)
 
 
-def _fmt2class(tablefmt):
-    _table_types = {
-        'text': TextTableBuilder,
-        'github': GithubTableBuilder,
-        'rst': RSTTableBuilder,
-        'tabulator': TabulatorJSBuilder,
-        'html': HTMLTableBuilder,
-    }
-
-    try:
-        return _table_types[tablefmt]
-    except Exception:
-        raise KeyError(f"'{tablefmt}' is not a valid type choice for generate_table. Valid "
-                       f"choices are: {sorted(_table_types)}.")
-
-
 def generate_table(rows, tablefmt='text', **options):
     r"""
     Return the specified table builder class.
@@ -1580,4 +1541,41 @@ def generate_table(rows, tablefmt='text', **options):
     TableBuilder
         A table builder object.
     """
-    return _fmt2class(tablefmt)(rows, **options)
+    _text_formats = {
+        'rst': {
+            'top_border': Line('', '  ', '', '='),
+            'header_bottom_border': Line('', '  ', '', '='),
+            'bottom_border': Line('', '  ', '', '='),
+            'header_line': Line('', '  ', ''),
+            'data_row_line': Line('', '  ', '')
+        },
+        'grid': {
+            'top_border': Line('+-', '-+-', '-+', '-'),
+            'header_bottom_border': Line('+-', '-+-', '-+', '-'),
+            'bottom_border': Line('+-', '-+-', '-+', '-'),
+            'header_line': Line('| ', ' | ', ' |'),
+            'data_row_line':Line('| ', ' | ', ' |'),
+            'row_separator': Line('+-', '-+-', '-+', '-')
+        },
+    }
+
+    _table_types = {
+        'text': TextTableBuilder,
+        'github': GithubTableBuilder,
+        'tabulator': TabulatorJSBuilder,
+        'html': HTMLTableBuilder,
+    }
+
+    if tablefmt in _text_formats:
+        kwargs = _text_formats[tablefmt].copy()
+        kwargs['rows'] = rows
+        kwargs.update(**options)
+        return TextTableBuilder(**kwargs)
+
+    try:
+        builder = _table_types[tablefmt]
+    except Exception:
+        raise KeyError(f"'{tablefmt}' is not a valid type choice for generate_table. Valid "
+                       f"choices are: {sorted(_table_types)}.")
+
+    return builder(rows, **options)
