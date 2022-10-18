@@ -97,8 +97,8 @@ class TableBuilder(object):
         """
         Initialize all attributes.
         """
-        if headers == 'keys':
-            rows, headers = self._to_rows(rows)
+        if headers in ('keys', 'firstrow'):
+            rows, headers = self._to_rows(rows, headers)
 
         self._raw_rows = []
         for row in rows:
@@ -158,7 +158,7 @@ class TableBuilder(object):
         raise NotImplementedError("The display method is not defined for class "
                                   f"'{type(self).__name__}'.")
 
-    def _to_rows(self, rows):
+    def _to_rows(self, rows, headers):
         """
         Convert dict or iter of dicts into expected row and header data format.
 
@@ -166,6 +166,8 @@ class TableBuilder(object):
         ----------
         rows : dict or iter of dicts
             Table cell and header data.
+        headers : str
+            Either 'keys' or 'firstrow'.
 
         Returns
         -------
@@ -174,8 +176,19 @@ class TableBuilder(object):
         list of str
             Table headers.
         """
-        headers = []
         new_rows = []
+
+        if headers == 'firstrow':
+
+            for i, row in enumerate(rows):
+                if i == 0:
+                    headers = list(row)
+                else:
+                    new_rows.append(list(row))
+
+            return new_rows, headers
+
+        headers = []
 
         if isinstance(rows, dict):
             # each value is a column, so re-arrange to be row major, and allow columns of
@@ -589,7 +602,7 @@ class TextTableBuilder(TableBuilder):
                            f"metadata, but got '{align}'.")
         return f"{cell:{sym}{width}}"
 
-    def get_lengthened_columns(self, sorted_cols, header_cells):
+    def get_lengthened_columns(self, sorted_cols, header_cells, widths):
         """
         Yield as many rows of cells as needed to allow for multi-line cells due to word wrapping.
 
@@ -599,6 +612,8 @@ class TextTableBuilder(TableBuilder):
             List of sorted column metadata.
         header_cells : list of str
             List of header strings.
+        widths : list of int
+            Column widths.
 
         Yields
         ------
@@ -606,17 +621,22 @@ class TextTableBuilder(TableBuilder):
             Each row after expanding due to word wrapping.
         """
         cell_lists = []
-        for meta, cell in zip(sorted_cols, header_cells):
+        for meta, cell, wid in zip(sorted_cols, header_cells, widths):
             maxwid = meta['max_width']
             if maxwid is not None and maxwid < len(cell):
                 lines = textwrap.wrap(cell, maxwid)
-                sym = _align2symbol[meta['header_align']]
-                if sym == '^':  # center
-                    lines = [line.strip() for line in lines]
-                # ensure all cells have same width in this column
-                cell_lists.append([f"{line:{sym}{maxwid}}" for line in lines])
+                wid = maxwid
+            elif '\n' in cell:
+                lines = cell.split('\n')
             else:
                 cell_lists.append([cell])
+                continue
+
+            sym = _align2symbol[meta['header_align']]
+            if sym == '^':  # center
+                lines = [line.strip() for line in lines]
+            # ensure all cells have same width in this column
+            cell_lists.append([f"{line:{sym}{wid}}" for line in lines])
 
         # now find longest column
         maxlen = max([len(lst) for lst in cell_lists])
@@ -652,7 +672,7 @@ class TextTableBuilder(TableBuilder):
                                                              'header_align')
 
         if self.needs_wrap():
-            yield from self.get_lengthened_columns(sorted_cols, header_cells)
+            yield from self.get_lengthened_columns(sorted_cols, header_cells, widths)
         else:
             yield header_cells
 
@@ -678,19 +698,25 @@ class TextTableBuilder(TableBuilder):
             for i, meta in enumerate(sorted_cols):
                 row_cells[i] = self._get_fixed_width_cell(meta, row[i], widths[i], 'align')
 
-            if needs_wrap:
+            if True:  # needs_wrap:
                 cell_lists = []
-                for meta, cell in zip(sorted_cols, row_cells):
+                for meta, cell, colwid in zip(sorted_cols, row_cells, self._data_widths):
                     maxwid = meta['max_width']
                     if maxwid is not None and maxwid < len(cell):
                         lines = textwrap.wrap(cell, maxwid)
-                        sym = _align2symbol[meta['align']]
-                        if sym == '^':  # center
-                            lines = [line.strip() for line in lines]
-                        # ensure all cells have same width in this column
-                        cell_lists.append([f"{line:{sym}{maxwid}}" for line in lines])
+                        wid = maxwid
+                    elif '\n' in cell:
+                        lines = cell.split('\n')
+                        wid = colwid
                     else:
                         cell_lists.append([cell])
+                        continue
+
+                    sym = _align2symbol[meta['align']]
+                    if sym == '^':  # center
+                        lines = [line.strip() for line in lines]
+                    # ensure all cells have same width in this column
+                    cell_lists.append([f"{line:{sym}{wid}}" for line in lines])
 
                 # now find longest column
                 maxlen = max([len(lst) for lst in cell_lists])
