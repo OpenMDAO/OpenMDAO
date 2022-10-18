@@ -6,6 +6,7 @@ import sys
 import os
 import json
 import textwrap
+from collections import namedtuple
 from itertools import zip_longest, chain
 from html import escape
 from numbers import Number, Integral
@@ -513,6 +514,11 @@ class TableBuilder(object):
                 f.write(str(self))
 
 
+# these are taken straight from Tabulate to make it easier to define lots of different formats
+Line = namedtuple("Line", ["begin", "hline", "sep", "end"])
+DataRow = namedtuple("DataRow", ["begin", "sep", "end"])
+
+
 class TextTableBuilder(TableBuilder):
     r"""
     Base class for all text-based table builders.
@@ -700,14 +706,13 @@ class TextTableBuilder(TableBuilder):
 
             if True:  # needs_wrap:
                 cell_lists = []
-                for meta, cell, colwid in zip(sorted_cols, row_cells, self._data_widths):
+                for meta, cell, wid in zip(sorted_cols, row_cells, widths):
                     maxwid = meta['max_width']
                     if maxwid is not None and maxwid < len(cell):
                         lines = textwrap.wrap(cell, maxwid)
                         wid = maxwid
                     elif '\n' in cell:
                         lines = cell.split('\n')
-                        wid = colwid
                     else:
                         cell_lists.append([cell])
                         continue
