@@ -677,10 +677,7 @@ class TextTableBuilder(TableBuilder):
                 header_cells[i] = self._get_fixed_width_cell(meta, header, widths[i],
                                                              'header_align')
 
-        if self.needs_wrap():
-            yield from self.get_lengthened_columns(sorted_cols, header_cells, widths)
-        else:
-            yield header_cells
+        yield from self.get_lengthened_columns(sorted_cols, header_cells, widths)
 
     def _stringified_row_iter(self):
         """
