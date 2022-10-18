@@ -114,7 +114,7 @@ class TableTestCase(unittest.TestCase):
 | 0 | 1 | 2 |
 | 3 | 4 | 5 |
 | 6 | 7 | 8 |
-| - | - | - |"""
+| --------- |"""
         self.check_text('text', np.arange(9).reshape((3,3)), None, expected)
         self.check_text('text', [[0,1,2],[3,4,5],[6,7,8]], None, expected)
         self.check_text('text', iter(np.arange(9).reshape((3,3))), None, expected)
@@ -146,7 +146,7 @@ class TableTestCase(unittest.TestCase):
 |    0 |    1 |    2 |
 |    3 |    4 |    5 |
 |    6 |    7 |    8 |
-| ---- | ---- | ---- |"""
+| ------------------ |"""
         self.check_text('text', np.arange(9).reshape((3,3)), headers, expected)
         self.check_text('text', [[0,1,2],[3,4,5],[6,7,8]], headers, expected)
 
@@ -210,7 +210,7 @@ Col0  Col1  Col2
 | foobar blah           |    1.0 | N/A            |
 | asdfas dffff          |  3.142 | N/A            |
 | hello world blah blah |   9.87 | N/A            |
-| --------------------- | ------ | -------------- |
+| ----------------------------------------------- |
 """
         self.check_text('text', self.table_row_iter('str', 'float', None), headers, expected, missing_val='N/A')
 
@@ -226,7 +226,7 @@ Col0  Col1  Col2
 | dffff       |        |             |
 | hello world |   9.87 | N/A         |
 | blah blah   |        |             |
-| ----------- | ------ | ----------- |
+| ---------------------------------- |
 """
         self.check_text('text', self.table_row_iter('str', 'float', None), headers, expected, missing_val='N/A', max_width=38)
 
@@ -243,7 +243,7 @@ Col0  Col1  Col2
 | dffff       |        |             |
 | hello world |   9.87 |     N/A     |
 | blah blah   |        |             |
-| ----------- | ------ | ----------- |
+| ---------------------------------- |
 """
         self.check_text('text', self.table_row_iter('str', 'float', None), headers, expected,
                         column_meta=column_meta, missing_val='N/A', max_width=38)
