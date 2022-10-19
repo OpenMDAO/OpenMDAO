@@ -1,15 +1,16 @@
 import unittest
 import warnings
 import io
-from contextlib import redirect_stdout, redirect_stderr
-
-from openmdao.utils.om_warnings import reset_warnings, OMDeprecationWarning
+from contextlib import redirect_stderr
 
 
 class TestOMWarnings(unittest.TestCase):
+
     def test_warnings_filters(self):
-        # OMDeprecationWarning should only generate one warning because it has the 'once'
-        #   filter
+        # OMDeprecationWarning should only generate one warning
+        # because it has the 'once' filter
+
+        from openmdao.utils.om_warnings import OMDeprecationWarning
 
         # first call should generate a warning
         f = io.StringIO()
@@ -26,3 +27,7 @@ class TestOMWarnings(unittest.TestCase):
             warnings.warn('msg', OMDeprecationWarning)
         err = f.getvalue()
         self.assertEqual(len(err), 0 )
+
+
+if __name__ == "__main__":
+    unittest.main()

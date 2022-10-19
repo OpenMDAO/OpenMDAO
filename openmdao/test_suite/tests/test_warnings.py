@@ -95,9 +95,9 @@ class TestWarnings(unittest.TestCase):
         p.model.connect('a_comp.z', 'exec_comp.z')
         p.driver.declare_coloring()
 
-        warnings.filterwarnings('ignore', category=om.UnitsWarning)
-
         with warnings.catch_warnings(record=True) as w:
+            warnings.filterwarnings('ignore', category=om.UnitsWarning)
+
             p.setup()
             unit_warnings = [wm for wm in w if wm.category is om.UnitsWarning]
             assert (len(unit_warnings) == 0)
@@ -141,11 +141,11 @@ class TestWarnings(unittest.TestCase):
         p.model.connect('a_comp.z', 'exec_comp.z')
         p.driver.declare_coloring()
 
-        warnings.filterwarnings('error', category=om.OpenMDAOWarning)
+        with warnings.catch_warnings():
+            warnings.filterwarnings('error', category=om.OpenMDAOWarning)
+            warnings.filterwarnings("ignore", r'.*OpenMDAO support for Python version .* will end soon.*')
 
-        with self.assertRaises(om.UnitsWarning) as e:
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", r'.*OpenMDAO support for Python version .* will end soon.*')
+            with self.assertRaises(om.UnitsWarning) as e:
                 p.setup()
 
         expected = "<model> <class Group>: Output 'a_comp.y' with units of 'm' is connected to " \
