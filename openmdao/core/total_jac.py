@@ -92,6 +92,8 @@ class _TotalJacInfo(object):
     in_idx_map : dict
         Mapping of jacobian row/col index to a tuple of the form
         (ndups, relevant_systems, cache_linear_solutions_flag)
+    total_relevant_systems : set
+        The set of names of all systems relevant to the computation of the total derivatives.
     """
 
     def __init__(self, problem, of, wrt, use_abs_names, return_format, approx=False,
