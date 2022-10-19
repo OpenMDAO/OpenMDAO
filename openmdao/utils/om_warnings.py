@@ -278,6 +278,7 @@ class reset_warning_registry(object):
     Context manager which archives & clears warning registry for duration of context.
 
     From https://bugs.python.org/file40031/reset_warning_registry.py
+    (https://bugs.python.org/issue21724, https://github.com/python/cpython/issues/65923)
 
     Parameters
     ----------
