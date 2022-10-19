@@ -123,7 +123,7 @@ class OptionsDictionary(object):
         return self.to_table(fmt='rst', display=False)
 
     def to_table(self, fmt='github', missingval='N/A', max_width=None, display=True):
-        """
+        r"""
         Get a table representation of this OptionsDictionary as a table in the requested format.
 
         Parameters
