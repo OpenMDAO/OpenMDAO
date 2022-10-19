@@ -344,9 +344,6 @@ class TableBuilder(object):
 
         meta = self._column_meta[col_idx]
         for name, val in options.items():
-            # if name not in self.allowed_col_meta:
-            #     raise KeyError(f"'{name}' is not a valid column metadata key. Allowed keys are "
-            #                    f"{sorted(self.allowed_col_meta)}.")
             meta[name] = val
 
     def _set_widths(self, force_set_max=False):
@@ -1648,6 +1645,12 @@ def generate_table(rows, tablefmt='text', **options):
             'data_row_line': Line("║ ", " ┊ ", " ║"),
         },
     }
+
+    for fmt in list(_text_formats):
+        if 'grid' in fmt:
+            dct = _text_formats[fmt].copy()
+            dct['row_separator'] = None
+            _text_formats[fmt.replace('grid', 'outline')] = dct
 
     _table_types = {
         'text': TextTableBuilder,
