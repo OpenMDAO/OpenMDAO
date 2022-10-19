@@ -101,6 +101,8 @@ class TableBuilder(object):
         """
         if headers in ('keys', 'firstrow'):
             rows, headers = self._to_rows(rows, headers)
+        elif isinstance(headers, str):
+            raise RuntimeError(f"If 'headers' is a string, it must be one of ['keys', 'firstrow'].")
 
         self._raw_rows = []
         for row in rows:
@@ -132,6 +134,8 @@ class TableBuilder(object):
                                    f"{hlen} != {self._ncols}.")
 
             for i, h in enumerate(headers):
+                if not isinstance(h, str):
+                    h = str(h)
                 self.update_column_meta(i, header=h)
 
         if column_meta is not None:
@@ -1598,27 +1602,51 @@ def generate_table(rows, tablefmt='text', **options):
     _text_formats = {
         'rst': {
             'top_border': Line('', '  ', '', '='),
+            'header_line': Line('', '  ', ''),
             'header_bottom_border': Line('', '  ', '', '='),
             'bottom_border': Line('', '  ', '', '='),
-            'header_line': Line('', '  ', ''),
             'data_row_line': Line('', '  ', '')
         },
         'grid': {
             'top_border': Line('+-', '-+-', '-+', '-'),
+            'header_line': Line('| ', ' | ', ' |'),
             'header_bottom_border': Line('+=', '=+=', '=+', '='),
             'bottom_border': Line('+-', '-+-', '-+', '-'),
-            'header_line': Line('| ', ' | ', ' |'),
             'data_row_line': Line('| ', ' | ', ' |'),
             'row_separator': Line('+-', '-+-', '-+', '-')
         },
         'simple_grid': {
             'top_border': Line("┌─", "─┬─", "─┐", "─"),
+            'header_line': Line("│ ", " │ ", " │"),
             'header_bottom_border': Line("├─", "─┼─", "─┤", "─"),
             'row_separator': Line("├─", "─┼─", "─┤", "─"),
             'bottom_border': Line("└─", "─┴─", "─┘", "─"),
-            'header_line': Line("│ ", " │ ", " │"),
             'data_row_line': Line("│ ", " │ ", " │"),
-        }
+        },
+        'heavy_grid': {
+            'top_border': Line("┏━", "━┳━", "━┓", "━"),
+            'header_line': Line("┃ ", " ┃ ", " ┃"),
+            'header_bottom_border': Line("┣━", "━╋━", "━┫", "━"),
+            'row_separator': Line("┣━", "━╋━", "━┫", "━"),
+            'bottom_border': Line("┗━", "━┻━", "━┛", "━"),
+            'data_row_line': Line("┃ ", " ┃ ", " ┃"),
+        },
+        'double_grid': {
+            'top_border': Line("╔═", "═╦═", "═╗", "═"),
+            'header_line': Line("║ ", " ║ ", " ║"),
+            'header_bottom_border': Line("╠═", "═╬═", "═╣", "═"),
+            'row_separator': Line("╠═", "═╬═", "═╣", "═"),
+            'bottom_border': Line("╚═", "═╩═", "═╝", "═"),
+            'data_row_line': Line("║ ", " ║ ", " ║"),
+        },
+        'box_grid': {
+            'top_border': Line("╔═", "═╤═", "═╗", "═"),
+            'header_line': Line("║ ", " ┊ ", " ║"),
+            'header_bottom_border': Line("╠═", "═╪═", "═╣", "═"),
+            'row_separator': Line("╟┈", "┈┿┈", "┈╢", "┈"),
+            'bottom_border': Line("╚═", "═╧═", "═╝", "═"),
+            'data_row_line': Line("║ ", " ┊ ", " ║"),
+        },
     }
 
     _table_types = {
