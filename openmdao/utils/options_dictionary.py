@@ -123,14 +123,14 @@ class OptionsDictionary(object):
         return self.to_table(fmt='rst', display=False)
 
     def to_table(self, fmt='github', missingval='N/A', max_width=None, display=True):
-        r"""
+        """
         Get a table representation of this OptionsDictionary as a table in the requested format.
 
         Parameters
         ----------
         fmt : str
             The formatting of the requested table.  Options are
-            ['github', 'rst', 'text', 'html', 'tabulator'] and several '*grid' and '*outline'
+            ['github', 'rst', 'text', 'html', 'tabulator'] and several 'grid' and 'outline'
             formats that mimic those found in the python 'tabulate' library.
             Default value of 'github' produces a table in GitHub-flavored markdown.
             'html' and 'tabulator' produce output viewable in a browser.
