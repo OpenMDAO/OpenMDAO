@@ -20,9 +20,9 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1w
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.array_comp import ArrayComp
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC, Diamond
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials, \
-     assert_check_totals
-from openmdao.utils.om_warnings import OMInvalidCheckDerivativesOptionsWarning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_no_warning, \
+     assert_check_partials, assert_check_totals
+from openmdao.utils.om_warnings import DerivativesWarning, OMInvalidCheckDerivativesOptionsWarning
 from openmdao.utils.testing_utils import set_env_vars_context
 
 from openmdao.utils.mpi import MPI
@@ -209,10 +209,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        # warning about 'comp2'
-        msg = "No derivative data found for Component 'comp2'."
-
-        with assert_warning(UserWarning, msg):
+        # no warnings about 'comp2' having no derivatives
+        with assert_no_warning(DerivativesWarning):
             data = prob.check_partials(out_stream=None)
 
         # and no derivative data for 'comp2'
@@ -223,6 +221,33 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         assert_near_equal(data['comp1'][('f_xy', 'x')]['J_fd'][0][0], 4., 1e-6)
         assert_near_equal(data['comp1'][('f_xy', 'x')]['J_fwd'][0][0], 4., 1e-15)
+
+    def test_component_has_no_inputs(self):
+        prob = om.Problem()
+        model = prob.model
+
+        comp1 = model.add_subsystem("comp1", om.ExplicitComponent())
+        comp1.add_output('x', val=5.)
+
+        model.add_subsystem("comp2", Paraboloid())
+
+        model.connect('comp1.x', 'comp2.x')
+
+        prob.setup()
+        prob.run_model()
+
+        # no warnings about 'comp1' having no derivatives
+        with assert_no_warning(DerivativesWarning):
+            data = prob.check_partials(out_stream=None)
+
+        # and no derivative data for 'comp1'
+        self.assertFalse('comp1' in data)
+
+        # but we still get good derivative data for 'comp1'
+        self.assertTrue('comp2' in data)
+
+        assert_near_equal(data['comp2'][('f_xy', 'x')]['J_fd'][0][0], 4., 1e-6)
+        assert_near_equal(data['comp2'][('f_xy', 'x')]['J_fwd'][0][0], 4., 1e-15)
 
     def test_component_no_check_partials(self):
         prob = om.Problem()

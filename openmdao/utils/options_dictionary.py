@@ -3,7 +3,8 @@
 import re
 
 from openmdao.utils.om_warnings import warn_deprecation
-from openmdao.utils.notebook_utils import notebook_mode
+from openmdao.utils.notebook_utils import notebook
+from openmdao.visualization.tables.table_builder import generate_table
 
 from openmdao.core.constants import _UNDEFINED
 
@@ -102,7 +103,7 @@ class OptionsDictionary(object):
         return self._dict.__repr__()
 
     def _repr_pretty_(self, p, cycle):
-        if not cycle and notebook_mode():
+        if not cycle and notebook:
             try:
                 from openmdao.visualization.options_widget import OptionsWidget
                 return OptionsWidget(self)
@@ -116,45 +117,47 @@ class OptionsDictionary(object):
 
         Returns
         -------
-        list of str
+        str
             A rendition of the options as an rST table.
         """
-        lines = self.to_table(fmt='rst').split('\n')
-        return lines
+        return self.to_table(fmt='rst', display=False)
 
-    def to_table(self, fmt='github', missingval='N/A'):
+    def to_table(self, fmt='github', missingval='N/A', max_width=None, display=True):
         """
         Get a table representation of this OptionsDictionary as a table in the requested format.
 
         Parameters
         ----------
         fmt : str
-            The formatting of the requested table.  Options are the same as those available
-            to the tabulate package.  See tabulate.tabulate_formats for a complete list.
+            The formatting of the requested table.  Options are
+            ['github', 'rst', 'html', 'text', 'tabulator'].
             Default value of 'github' produces a table in GitHub-flavored markdown.
+            'html' and 'tabulator' produce output viewable in a browser.
         missingval : str
             The value to be displayed in place of None.
+        max_width : int or None
+            If not None, try to limit the total width of the table to this value.
+        display : bool
+            If True, display the table, typically by writing it to stdout or opening a
+            browser.
 
         Returns
         -------
         str
             A string representation of the table in the requested format.
         """
-        try:
-            from tabulate import tabulate
-        except ImportError as e:
-            msg = "'to_table' requires the tabulate package but it is not currently installed." \
-                  " Use `pip install tabulate` or install openmdao with" \
-                  " `pip install openmdao[notebooks]`."
-            raise ImportError(msg)
-
         hdrs = ['Option', 'Default', 'Acceptable Values', 'Acceptable Types', 'Description']
         rows = []
 
+        deprecations = False
+        for meta in self._dict.values():
+            if meta['deprecation'] is not None:
+                deprecations = True
+                hdrs.append('Deprecation')
+                break
+
         for key in sorted(self._dict.keys()):
             option = self._dict[key]
-            deprecations = False
-
             default = option['val'] if option['val'] is not _UNDEFINED else '**Required**'
             default_str = str(default)
 
@@ -180,15 +183,30 @@ class OptionsDictionary(object):
 
             deprecation = option['deprecation']
             if deprecation is not None:
-                if not deprecations:
-                    hdrs.append('Deprecation')
-                    deprecations = True
+                deprecation = deprecation[0]
+
+            if deprecations:
                 rows.append([key, default, acceptable_values, acceptable_types, desc,
-                             deprecation[0]])
+                             deprecation])
             else:
                 rows.append([key, default, acceptable_values, acceptable_types, desc])
 
-        return tabulate(rows, headers=hdrs, tablefmt=fmt, missingval=missingval)
+        kwargs = {
+            'tablefmt': fmt,
+            'headers': hdrs,
+            'missing_val': missingval,
+            'max_width': max_width,
+        }
+        if fmt == 'tabulator':
+            kwargs['filter'] = False
+            kwargs['sort'] = False
+
+        tab = generate_table(rows, **kwargs)
+
+        if display:
+            tab.display()
+
+        return str(tab)
 
     def __str__(self, width=100):
         """
@@ -197,35 +215,14 @@ class OptionsDictionary(object):
         Parameters
         ----------
         width : int
-            The maximum width of the text.
+            The maximum allowed width of the text.
 
         Returns
         -------
         str
             A text representation of the options table.
         """
-        rst = self.to_table(fmt='rst').split('\n')
-        cols = [len(header) for header in rst[0].split()]
-        desc_col = sum(cols[:-1]) + 2 * (len(cols) - 1)
-        desc_len = width - desc_col
-
-        # if it won't fit in allowed width, just return the rST
-        if desc_len < 10:
-            return '\n'.join(rst)
-
-        text = []
-        for row in rst:
-            if len(row) > width:
-                text.append(row[:width])
-                if not row.startswith('==='):
-                    row = row[width:].rstrip()
-                    while len(row) > 0:
-                        text.append(' ' * desc_col + row[:desc_len])
-                        row = row[desc_len:]
-            else:
-                text.append(row)
-
-        return '\n'.join(text)
+        return self.to_table(fmt='rst', max_width=width, display=False)
 
     def _raise(self, msg, exc_type=RuntimeError):
         """

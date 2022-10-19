@@ -1,0 +1,64 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script type="text/javascript">
+    {tabulator_src}
+</script>
+<style>
+    {tabulator_style}
+
+    .tabulator .tabulator-header .tabulator-col .tabulator-col-content .tabulator-col-title {{
+        white-space: normal;
+    }}
+
+    .center {{
+        text-align: center;
+    }}
+
+</style>
+</head>
+<body>
+    <div id="tabul-container">
+        <div {table_div_style}>
+            <h2 class="center" id="tabul-title"></h2>
+            <div id="tabul-table"></div>
+        </div>
+    </div>
+
+<script type="text/javascript">
+
+let my_table_data = {table_data};
+
+document.title = my_table_data.title;
+document.getElementById("tabul-title").innerHTML = my_table_data.title;
+let columns = my_table_data.meta.columns;
+
+// this loop will replace any tooltip strings with a function that returns the cell data for that
+// field (the column name).  Without this, the same string would be returned for all cells in a
+// given column, which isn't very helpful.
+
+for (let i = 0; i < columns.length; i++) {{
+    if (columns[i].tooltip === undefined) {{
+        continue;
+    }}
+    let tt = columns[i].tooltip; // should be a string
+    columns[i].tooltip = function(cell) {{
+        return cell.getData()[tt];
+    }}
+}}
+
+function setup_tabulator(table_data) {{
+    let tab = new Tabulator(table_data.id, table_data.meta);
+    // full redraw is necessary, else word wrapping in columns is hosed until user manually
+    // resizes a column.
+    tab.redraw(true);
+}}
+
+let the_table = setup_tabulator(my_table_data);
+
+
+</script>
+</body>
+</html>

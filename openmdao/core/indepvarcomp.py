@@ -29,9 +29,9 @@ class IndepVarComp(ExplicitComponent):
         super().__init__(**kwargs)
 
         if 'tags' not in kwargs:
-            kwargs['tags'] = {'indep_var', 'openmdao:allow_desvar'}
+            kwargs['tags'] = {'openmdao:indep_var', 'openmdao:allow_desvar'}
         else:
-            kwargs['tags'] = make_set(kwargs['tags'], name='tags') | {'indep_var',
+            kwargs['tags'] = make_set(kwargs['tags'], name='tags') | {'openmdao:indep_var',
                                                                       'openmdao:allow_desvar'}
 
         # A single variable is declared during instantiation
@@ -145,9 +145,9 @@ class IndepVarComp(ExplicitComponent):
             Metadata for added variable.
         """
         if tags is None:
-            tags = {'indep_var', 'openmdao:allow_desvar'}
+            tags = {'openmdao:indep_var', 'openmdao:allow_desvar'}
         else:
-            tags = make_set(tags) | {'indep_var', 'openmdao:allow_desvar'}
+            tags = make_set(tags) | {'openmdao:indep_var', 'openmdao:allow_desvar'}
 
         kwargs = {'shape': shape, 'units': units, 'desc': desc,
                   'tags': tags, 'shape_by_conn': shape_by_conn,
@@ -176,9 +176,9 @@ class IndepVarComp(ExplicitComponent):
             Metadata for added variable.
         """
         if tags is None:
-            tags = {'indep_var'}
+            tags = {'openmdao:indep_var'}
         else:
-            tags = make_set(tags, name='tags') | {'indep_var'}
+            tags = make_set(tags, name='tags') | {'openmdao:indep_var'}
 
         kwargs = {'desc': desc, 'tags': tags}
         return super().add_discrete_output(name, val, **kwargs)
@@ -277,7 +277,7 @@ class _AutoIndepVarComp(IndepVarComp):
             'res_units': None,
             'desc': '',
             'distributed': False,
-            'tags': set(['openmdao:allow_desvar']),
+            'tags': set(['openmdao:allow_desvar', 'openmdao:indep_var']),
             'ref': 1.0,
             'ref0': 0.0,
             'res_ref': 1.0,

@@ -17,13 +17,14 @@ from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.file_utils import _iter_entry_points
 from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import env_truthy, is_truthy
+from openmdao.visualization.tables.table_builder import generate_table
 
 # Keeping track of the registered reports
 _Report = namedtuple(
     'Report', 'func description class_name inst_id method pre_or_post report_filename'
 )
 _reports_registry = {}
-_default_reports = ['scaling', 'total_coloring', 'n2', 'optimizer']
+_default_reports = ['scaling', 'total_coloring', 'n2', 'optimizer', 'inputs']
 _active_reports = set()  # these reports will actually run (assuming their hook funcs are triggered)
 _cmdline_reports = set()  # cmdline reports registered here so default reports aren't modified
 _reports_dir = os.environ.get('OPENMDAO_REPORTS_DIR', './reports')  # top dir for the reports
@@ -159,7 +160,7 @@ def activate_reports(reports, instance):
             activate_report(name, instance)
 
 
-def list_reports(default=False, out_stream=None):
+def list_reports(default=False, outfile=None, max_width=80):
     """
     Write table of information about reports currently registered in the reporting system.
 
@@ -167,8 +168,10 @@ def list_reports(default=False, out_stream=None):
     ----------
     default : bool
         If True, list only the default reports.
-    out_stream : file-like object
-        Where to send report info.
+    outfile : str or None
+        Where to send report info.  None will result in output to stdout.
+    max_width : int
+        Maximum width of the table. Defaults to 80.
     """
     global _reports_registry
 
@@ -176,24 +179,18 @@ def list_reports(default=False, out_stream=None):
     # if it *has* already been initialized, this call will do nothing.
     _load_report_plugins()
 
-    if not out_stream:
-        out_stream = sys.stdout
-
-    column_names = ['name', 'description', 'class name', 'method', 'pre or post']
-    column_widths = {}
-    # Determine the column widths of the data fields by finding the max width for all rows
-    # First for the headers
-    for column_name in column_names:
-        column_widths[column_name] = len(column_name)
+    headers = ['name', 'description', 'class name', 'method', 'pre or post']
 
     if default:
         reg = {r: _reports_registry[r] for r in _default_reports}
     else:
         reg = _reports_registry
 
+    rows = []
     # Now for the values
-    for name, report in reg.items():
-        for column_name in column_names:
+    for name, report in sorted(reg.items()):
+        rows.append([])
+        for column_name in headers:
             if column_name == 'name':
                 val = name
             else:
@@ -202,37 +199,9 @@ def list_reports(default=False, out_stream=None):
                     val = val.__name__
                 else:
                     val = str(val)
-            column_widths[column_name] = max(column_widths[column_name], len(val))
+            rows[-1].append(val)
 
-    column_header = ''
-    column_dashes = ''
-    column_spacing = 2
-    for i, column_name in enumerate(column_names):
-        column_header += '{:{width}}'.format(column_name, width=column_widths[column_name])
-        column_dashes += column_widths[column_name] * '-'
-        if i < len(column_names) - 1:
-            column_header += column_spacing * ' '
-            column_dashes += column_spacing * ' '
-
-    out_stream.write('\n')
-    out_stream.write(column_header + '\n')
-    out_stream.write(column_dashes + '\n')
-
-    for name, report in reg.items():
-        report_info = ''
-        for i, column_name in enumerate(column_names):
-            if column_name == 'name':
-                val = name
-            else:
-                val = str(getattr(report, column_name.replace(' ', '_')))
-            val_formatted = f"{val:<{column_widths[column_name]}}"
-            report_info += val_formatted
-            if i < len(column_names) - 1:
-                report_info += column_spacing * ' '
-
-        out_stream.write(report_info + '\n')
-
-    out_stream.write('\n')
+    generate_table(rows, tablefmt='text', headers=headers, max_width=max_width).display(outfile)
 
 
 def _list_reports_setup_parser(parser):
@@ -261,11 +230,7 @@ def _list_reports_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    if options.outfile is None:
-        list_reports(options.dflt)
-    else:
-        with open(options.outfile, 'w') as f:
-            list_reports(options.dflt, f)
+    list_reports(outfile=options.outfile, default=options.dflt)
 
 
 def view_reports(probnames=None, level=2):
