@@ -412,16 +412,17 @@ class Component(System):
             A nested dict of the form dct[of][wrt] = (rows, cols, shape)
         """
         # sparsity uses relative names, so we need to convert to absolute
-        pathname = self.pathname
+        prefix = self.pathname + '.' if self.pathname else None
         for of, sub in sparsity.items():
-            of_abs = '.'.join((pathname, of)) if pathname else of
+            if prefix:
+                of = prefix + of
             for wrt, tup in sub.items():
-                wrt_abs = '.'.join((pathname, wrt)) if pathname else wrt
-                abs_key = (of_abs, wrt_abs)
+                if prefix:
+                    wrt = prefix + wrt
+                abs_key = (of, wrt)
                 if abs_key in self._subjacs_info:
-                    meta = self._subjacs_info[abs_key]
                     # add sparsity info to existing partial info
-                    meta['sparsity'] = tup
+                    self._subjacs_info[abs_key]['sparsity'] = tup
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
                   units=None, desc='', tags=None, shape_by_conn=False, copy_shape=None,

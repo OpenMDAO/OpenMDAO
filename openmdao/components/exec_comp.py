@@ -874,6 +874,7 @@ class ExecComp(ExplicitComponent):
                                  tol, orders, perturb_size, min_improve_pct,
                                  show_summary, show_sparsity)
         self._coloring_declared = True
+        self._manual_decl_partials = True
 
     def _exec(self):
         for i, expr in enumerate(self._codes):
@@ -952,7 +953,7 @@ class ExecComp(ExplicitComponent):
                 for i in range(inarr.size):
                     inarr[i] += step
                     self._exec()
-                    jac.set_col(self, i, imag(oarr * inv_stepsize).flat)
+                    jac.set_col(self, i, imag(oarr * inv_stepsize))
                     inarr[i] -= step
 
             sparsity, sp_info = jac.get_sparsity(self)
@@ -963,16 +964,26 @@ class ExecComp(ExplicitComponent):
             if not self._finalize_coloring(coloring, info, sp_info, sparsity_time):
                 return [None]
 
+            # compute mapping of col index to wrt varname
+            self._col_idx2name = idxnames = [None] * len(self._inputs)
+            plen = len(self.pathname) + 1 if self.pathname else 0
+            for name, slc in self._inputs.get_slice_dict().items():
+                name = name[plen:]
+                for i in range(slc.start, slc.stop):
+                    idxnames[i] = name
+
+            # get slice dicts using relative name keys
+            self._out_slices = {n[plen:]: slc for n, slc in self._outputs.get_slice_dict().items()}
+            self._in_slices = {n[plen:]: slc for n, slc in self._inputs.get_slice_dict().items()}
+
         return [coloring]
 
-    def _compute_colored_partials(self, inputs, partials):
+    def _compute_colored_partials(self, partials):
         """
         Use complex step method with coloring to update the given Jacobian.
 
         Parameters
         ----------
-        inputs : Vector or dict
-            Vector containing parameters (p).
         partials : `Jacobian`
             Contains sub-jacobians.
         """
@@ -980,9 +991,13 @@ class ExecComp(ExplicitComponent):
         inv_stepsize = 1.0 / self.complex_stepsize
         inarr = self._inarray
         oarr = self._outarray
+        out_names = self._var_rel_names['output']
 
         inarr[:] = self._inputs.asarray(copy=False)
-        scratch = np.empty(oarr.size)
+        scratch = np.zeros(oarr.size)
+        idx2name = self._col_idx2name
+        out_slices = self._out_slices
+        in_slices = self._in_slices
 
         for icols, nzrowlists in self._coloring_info['coloring'].color_nonzero_iter('fwd'):
             # set a complex input value
@@ -991,10 +1006,19 @@ class ExecComp(ExplicitComponent):
             # solve with complex input value
             self._exec()
 
+            imag_oar = imag(oarr * inv_stepsize)
+
             for icol, rows in zip(icols, nzrowlists):
-                scratch[:] = 0.
-                scratch[rows] = imag(oarr[rows] * inv_stepsize)
-                partials.set_col(self, icol, scratch)
+                scratch[rows] = imag_oar[rows]
+                inp = idx2name[icol]
+                loc_i = icol - in_slices[inp].start
+                for u in out_names:
+                    key = (u, inp)
+                    if key in self._declared_partials:
+                        # set the column in the Jacobian entry
+                        part = scratch[out_slices[u]]
+                        partials[key][:, loc_i] = part
+                        part[:] = 0.
 
             # restore old input value
             inarr[icols] -= step
@@ -1019,7 +1043,7 @@ class ExecComp(ExplicitComponent):
                                "declare_partials and/or declare_coloring on this ExecComp.")
 
         if self._coloring_info['coloring'] is not None:
-            self._compute_colored_partials(inputs, partials)
+            self._compute_colored_partials(partials)
             return
 
         step = self.complex_stepsize * 1j
