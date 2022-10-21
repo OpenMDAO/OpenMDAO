@@ -116,6 +116,15 @@ class ExecComp(ExplicitComponent):
         is a dict of metadata.
     _coloring_declared : bool
         If True, coloring has been declared.
+    _inarray : ndarray or None
+        If using internal CS, this is a complex array containing input values.
+    _outarray : ndarray or None
+        If using internal CS, this is a complex array containing output values.
+    _indict : dict or None
+        If using internal CS, this maps input variable views in _inarray to input names.
+    _viewdict : dict or None
+        If using internal CS, this maps input, output, and constant names to their corresponding
+        views/values.
     """
 
     def __init__(self, exprs=[], **kwargs):
@@ -239,9 +248,10 @@ class ExecComp(ExplicitComponent):
 
         self._constants = {}
         self._coloring_declared = False
-        self._inarray = self._indict = None
-        self._outarray = self._outdict = None
-        self._icopy = self._ocopy = False
+        self._inarray = None
+        self._outarray = None
+        self._indict = None
+        self._viewdict = None
 
     def initialize(self):
         """
@@ -323,30 +333,44 @@ class ExecComp(ExplicitComponent):
         exprs = self._exprs
         kwargs = self._kwargs
 
-        units = self.options['units']
         shape = self.options['shape']
         shape_by_conn = self.options['shape_by_conn']
-
-        warned = False
 
         if shape is not None and shape_by_conn:
             raise RuntimeError(f"{self.msginfo}: Can't set both shape and shape_by_conn.")
 
+        self._exprs_info = exprs_info = []
         outs = set()
         allvars = set()
-
-        self._exprs_info = exprs_info = [(self._parse_for_out_vars(expr.partition('=')[0]),
-                                          self._parse_for_names(expr, **kwargs)) for expr in exprs]
-
         self._requires_fd = {}
 
-        # find all of the variables and which ones are outputs
-        for onames, names in exprs_info:
+        for expr in exprs:
+            lhs, _, rhs = expr.partition('=')
+            onames = self._parse_for_out_vars(lhs)
+            vnames, fnames = self._parse_for_names(rhs)
+
+            # remove constants
+            vnames = vnames.difference(
+                [n for n, val in kwargs.items()
+                 if isinstance(val, dict) and 'constant' in val and val['constant']]
+            )
+
+            allvars.update(vnames)
             outs.update(onames)
-            allvars.update(names[0])
-            if _not_complex_safe.intersection(names[1]):
+
+            if onames.intersection(allvars):
+                # we have a used-before-calculated output
+                violators = sorted([n for n in onames if n in allvars])
+                raise RuntimeError(f"{self.msginfo}: Outputs {violators} are used before "
+                                   "being calculated, so this ExecComp is not a valid explicit "
+                                   "component.")
+
+            exprs_info.append((onames, vnames, fnames))
+            if _not_complex_safe.intersection(fnames):
                 for o in onames:
-                    self._requires_fd[o] = names
+                    self._requires_fd[o] = (vnames, fnames)
+
+        allvars.update(outs)
 
         if self._requires_fd:
             inps = []
@@ -359,6 +383,8 @@ class ExecComp(ExplicitComponent):
 
         kwargs2 = {}
         init_vals = {}
+        units = self.options['units']
+        warned = False
 
         # make sure all kwargs are legit
         for arg, val in kwargs.items():
@@ -527,17 +553,17 @@ class ExecComp(ExplicitComponent):
 
     def _compile_exprs(self, exprs):
         compiled = []
-        outputs = []
+        outputs = set()
         for i, expr in enumerate(exprs):
 
             # Quick dupe check.
-            lhs_name = expr.split('=', 1)[0].strip()
+            lhs_name = expr.partition('=')[0].strip()
             if lhs_name in outputs:
                 # Can't add two equations with the same output.
                 raise RuntimeError(f"{self.msginfo}: The output '{lhs_name}' has already been "
                                    "defined by an expression.")
             else:
-                outputs.append(lhs_name)
+                outputs.add(lhs_name)
 
             try:
                 compiled.append(compile(expr, expr, 'exec'))
@@ -556,14 +582,11 @@ class ExecComp(ExplicitComponent):
                                 "function or constant." % (self.msginfo, v))
         return vnames
 
-    def _parse_for_names(self, s, **kwargs):
+    def _parse_for_names(self, s):
         names = [x.strip() for x in re.findall(VAR_RGX, s) if not x.startswith('.')]
         vnames = set()
         for n in names:
             if n.endswith('('):
-                continue
-            if n in kwargs and isinstance(kwargs[n], dict) and 'constant' in kwargs[n] \
-                    and kwargs[n]['constant']:
                 continue
             vnames.add(n)
         fnames = [n[:-1] for n in names if n[-1] == '(']
@@ -661,7 +684,8 @@ class ExecComp(ExplicitComponent):
             if self.options['do_coloring'] and not self.options['has_diag_partials']:
                 rank = self.comm.rank
                 sizes = self._var_sizes
-                if sum(sizes['input'][rank]) > 1 and sum(sizes['output'][rank]) > 1 and not self._has_distrib_vars:
+                if not self._has_distrib_vars and (sum(sizes['input'][rank]) > 1 and
+                                                   sum(sizes['output'][rank]) > 1):
                     if not self._coloring_declared:
                         super().declare_coloring(wrt=None, method='cs')
                         self._coloring_info['dynamic'] = True
@@ -673,8 +697,7 @@ class ExecComp(ExplicitComponent):
 
             meta = self._var_rel2meta
             decl_partials = super().declare_partials
-            for outs, tup in self._exprs_info:
-                vs, funcs = tup
+            for outs, vs, _ in self._exprs_info:
                 ins = sorted(set(vs).difference(outs))
                 for out in sorted(outs):
                     for inp in ins:
@@ -700,8 +723,7 @@ class ExecComp(ExplicitComponent):
 
         if self._manual_decl_partials:
             undeclared = []
-            for i, (outs, tup) in enumerate(self._exprs_info):
-                vs, funcs = tup
+            for outs, vs, _ in self._exprs_info:
                 ins = sorted(set(vs).difference(outs))
                 for out in sorted(outs):
                     out = '.'.join((self.pathname, out)) if self.pathname else out
@@ -728,17 +750,17 @@ class ExecComp(ExplicitComponent):
         """
         super()._setup_vectors(root_vectors)
         if not self._manual_decl_partials:
-            # set up some data structures to speed up compute
-            self._inputs.set_complex_step_mode(True)
-            self._outputs.set_complex_step_mode(True)
-
-            self._inarray, self._indict, self._icopy = \
+            # set up some complex data structures needed for a complex compute
+            self._inarray, self._indict, _ = \
                 self._inputs._get_local_views(dtype=complex, copy=True)
-            self._outarray, self._outdict, self._ocopy = \
+            self._outarray, outdict, _ = \
                 self._outputs._get_local_views(dtype=complex, copy=True)
 
-            self._inputs.set_complex_step_mode(False)
-            self._outputs.set_complex_step_mode(False)
+            # combine lookup dicts for faster exec calls
+            viewdict = self._indict.copy()
+            viewdict.update(outdict)
+            viewdict.update(self._constants)
+            self._viewdict = _ViewDict(viewdict)
 
     def compute(self, inputs, outputs):
         """
@@ -752,6 +774,16 @@ class ExecComp(ExplicitComponent):
         outputs : `Vector`
             `Vector` containing outputs.
         """
+        if not self._manual_decl_partials:
+            self._inarray[:] = self._inputs.asarray(copy=False)
+            self._exec()
+            outs = outputs.asarray(copy=False)
+            if outs.dtype == self._outarray.dtype:
+                outs[:] = self._outarray
+            else:
+                outs[:] = self._outarray.real
+            return
+
         for i, expr in enumerate(self._codes):
             try:
                 #  inputs, outputs, and _constants are vectors
@@ -843,6 +875,14 @@ class ExecComp(ExplicitComponent):
                                  show_summary, show_sparsity)
         self._coloring_declared = True
 
+    def _exec(self):
+        for i, expr in enumerate(self._codes):
+            try:
+                exec(expr, _expr_dict, self._viewdict)  # nosec:
+            except Exception as err:
+                raise RuntimeError(f"{self.msginfo}: Error occurred evaluating "
+                                   f"'{self._exprs[i]}':\n{err}")
+
     def _compute_coloring(self, recurse=False, **overrides):
         """
         Compute a coloring of the partial jacobian.
@@ -892,22 +932,16 @@ class ExecComp(ExplicitComponent):
         inv_stepsize = 1.0 / self.complex_stepsize
         inarr = self._inarray
         oarr = self._outarray
-        indict = self._indict
-        outdict = self._outdict
 
         if self.options['has_diag_partials']:
             # we should never get here
             raise NotImplementedError("no has_diag_partials support yet")
         else:
             # compute perturbations
-            starting_inputs = self._inputs.asarray(copy=not self._icopy)
+            starting_inputs = self._inputs.asarray(copy=False)
             in_offsets = starting_inputs.copy()
             in_offsets[in_offsets == 0.0] = 1.0
             in_offsets *= info['perturb_size']
-
-            if not self._ocopy:
-                starting_outputs = self._outputs.asarray(copy=True)
-                starting_resids = self._residuals.asarray(copy=True)
 
             # use special sparse jacobian to collect sparsity info
             jac = _ColSparsityJac(self, info)
@@ -917,16 +951,9 @@ class ExecComp(ExplicitComponent):
 
                 for i in range(inarr.size):
                     inarr[i] += step
-                    self.compute(indict, outdict)
+                    self._exec()
                     jac.set_col(self, i, imag(oarr * inv_stepsize).flat)
                     inarr[i] -= step
-
-            # restore original inputs/outputs
-            if not self._icopy:
-                self._inputs.set_val(starting_inputs)
-            if not self._ocopy:
-                self._outputs.set_val(starting_outputs)
-                self._residuals.set_val(starting_resids)
 
             sparsity, sp_info = jac.get_sparsity(self)
             sparsity_time = time.perf_counter() - sparsity_start_time
@@ -953,11 +980,8 @@ class ExecComp(ExplicitComponent):
         inv_stepsize = 1.0 / self.complex_stepsize
         inarr = self._inarray
         oarr = self._outarray
-        indict = self._indict
-        outdict = self._outdict
 
-        if self._icopy:
-            inarr[:] = self._inputs._data
+        inarr[:] = self._inputs.asarray(copy=False)
         scratch = np.empty(oarr.size)
 
         for icols, nzrowlists in self._coloring_info['coloring'].color_nonzero_iter('fwd'):
@@ -965,7 +989,7 @@ class ExecComp(ExplicitComponent):
             inarr[icols] += step
 
             # solve with complex input value
-            self.compute(indict, outdict)
+            self._exec()
 
             for icol, rows in zip(icols, nzrowlists):
                 scratch[:] = 0.
@@ -1004,9 +1028,9 @@ class ExecComp(ExplicitComponent):
         has_diag_partials = self.options['has_diag_partials']
         inarr = self._inarray
         indict = self._indict
-        outdict = self._outdict
+        vdict = self._viewdict
 
-        inarr[:] = self._inputs._data
+        inarr[:] = self._inputs.asarray(copy=False)
 
         for inp, ival in indict.items():
             psize = ival.size
@@ -1016,11 +1040,11 @@ class ExecComp(ExplicitComponent):
                 ival += step
 
                 # solve with complex input value
-                self.compute(indict, outdict)
+                self._exec()
 
                 for u in out_names:
                     if (u, inp) in self._declared_partials:
-                        partials[u, inp] = imag(outdict[u] * inv_stepsize).flat
+                        partials[u, inp] = imag(vdict[u] * inv_stepsize).flat
 
                 # restore old input value
                 ival -= step
@@ -1030,15 +1054,41 @@ class ExecComp(ExplicitComponent):
                     ival[idx] += step
 
                     # solve with complex input value
-                    self.compute(indict, outdict)
+                    self._exec()
 
                     for u in out_names:
                         if (u, inp) in self._declared_partials:
                             # set the column in the Jacobian entry
-                            partials[u, inp][:, i] = imag(outdict[u] * inv_stepsize).flat
+                            partials[u, inp][:, i] = imag(vdict[u] * inv_stepsize).flat
 
                     # restore old input value
                     ival[idx] -= step
+
+
+class _ViewDict(object):
+    def __init__(self, dct):
+        self.dct = dct
+
+    def __getitem__(self, name):
+        return self.dct[name]
+
+    def __setitem__(self, name, value):
+        try:
+            self.dct[name][:] = value
+        except ValueError:
+            # see if value fits if size 1 dimensions are removed
+            sqz = np.squeeze(value)
+            if np.squeeze(self.dct[name]).shape == sqz.shape:
+                self.dct[name][:] = sqz
+            else:
+                raise
+
+    # need __contains__ here else we get weird KeyErrors in certain situations when evaluating
+    # the compiled expressions.  Non-compiled expressions evaluate just fine, but after compilation,
+    # and only in rare circumstances (like running under om trace), KeyErrors for 0, 1, ...
+    # are mysteriously generated.
+    def __contains__(self, name):
+        return name in self.dct
 
 
 class _IODict(object):

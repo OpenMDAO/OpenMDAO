@@ -479,6 +479,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        units: None",
             "        shape: None",
             "        shape_by_conn: False",
+            "        do_coloring: False",
             ""
         ]
 
@@ -574,6 +575,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        units: None",
             "        shape: None",
             "        shape_by_conn: False",
+            "        do_coloring: False",
             ""
         ]
 

@@ -728,7 +728,7 @@ class Vector(object):
         """
         arr = self.asarray(copy=False)
         copied = False
-        if arr.dtype != dtype or copy:
+        if copy or arr.dtype != dtype:
             arr = np.empty(len(self), dtype=dtype)
             copied = True
 
@@ -736,12 +736,11 @@ class Vector(object):
         path = self._system().pathname
         pathlen = len(path) + 1 if path else 0
 
-        start = end = 0
+        start = 0
         for name, val in self._abs_item_iter(flat=False):
-            end += val.size
-            view = arr[start:end]
+            view = arr[start:start + val.size]
             view.shape = val.shape
             dct[name[pathlen:]] = view
-            start = end
+            start += val.size
 
         return arr, dct, copied
