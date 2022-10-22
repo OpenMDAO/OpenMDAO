@@ -1479,10 +1479,8 @@ class Group(System):
                 else:
                     guesses = get_close_matches(prom_in, list(allprocs_prom2abs_list_in.keys()) + \
                                                        list(allprocs_discrete_in.keys()))
-                    # msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
-                    #       f"'{prom_in}', but '{prom_in}' doesn't exist. Perhaps you ment to connect to one of the following inputs:{guesses}"
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
-                          f"'{prom_in}', but '{prom_in}' doesn't exist."
+                          f"'{prom_in}', but '{prom_in}' doesn't exist. Perhaps you ment to connect to one of the following inputs:{guesses}"
                     conditional_error(msg, exc=NameError, category=SetupWarning,
                                       err=self._raise_connection_errors)
                     continue
