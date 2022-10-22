@@ -7,6 +7,7 @@ from itertools import product, chain
 from numbers import Number
 import inspect
 from fnmatch import fnmatchcase
+from difflib import get_close_matches
 
 import numpy as np
 import networkx as nx
@@ -1459,8 +1460,10 @@ class Group(System):
                                       err=self._raise_connection_errors)
                     continue
                 else:
+                    guesses = get_close_matches(prom_out, list(allprocs_prom2abs_list_out.keys()) + \
+                                                         list(allprocs_discrete_out.keys()))
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
-                          f"'{prom_in}', but '{prom_out}' doesn't exist."
+                          f"'{prom_in}', but '{prom_out}' doesn't exist.Perhaps you ment to connect to one of the following outputs:{guesses}"
                     conditional_error(msg, exc=NameError, category=SetupWarning,
                                       err=self._raise_connection_errors)
                     continue
@@ -1474,6 +1477,10 @@ class Group(System):
                                       err=self._raise_connection_errors)
                     continue
                 else:
+                    guesses = get_close_matches(prom_in, list(allprocs_prom2abs_list_in.keys()) + \
+                                                       list(allprocs_discrete_in.keys()))
+                    # msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
+                    #       f"'{prom_in}', but '{prom_in}' doesn't exist. Perhaps you ment to connect to one of the following inputs:{guesses}"
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_in}' doesn't exist."
                     conditional_error(msg, exc=NameError, category=SetupWarning,
