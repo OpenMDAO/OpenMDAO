@@ -1,10 +1,10 @@
 """Test the Newton nonlinear solver. """
 import unittest
-import tempfile
 
 import openmdao.api as om
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.visualization.inputs_report.inputs_report import inputs_report
 
 
@@ -13,7 +13,7 @@ try:
 except ImportError:
     PETScVector = None
 
-
+@use_tempdirs
 class TestInputsReport(unittest.TestCase):
 
     def test_inputs_reports(self):
@@ -59,9 +59,8 @@ class TestInputsReport(unittest.TestCase):
 | g2.d2.z       | g2.z       | _auto_ivc.v1 |     True      |    False     |       | (2,)  | []   | [0 0]  |       0 |       0 | _auto_ivc.v1    |
 | g2.d2.y1      | g2.y1      | g2.y1        |     False     |    False     |       | (1,)  | []   | [0.64] |    0.64 |    0.64 | g2.d1.y1        |
 """
-        report_file = tempfile.NamedTemporaryFile()
-        inputs_report(prob, outfile=report_file.name, display=True, precision=6, title=None, tablefmt='github')
-        with open(report_file.name) as f:
+        inputs_report(prob, outfile='temp_inputs_report.md', display=True, precision=6, title=None, tablefmt='github')
+        with open('temp_inputs_report.md') as f:
             report_content = f.read()
         self.assertEqual(expected, report_content)
 
@@ -96,12 +95,11 @@ class TestInputsReport(unittest.TestCase):
 | c2.x          | x          | x           |     True      |    False     |       | (1,)  | []   | [2] |       2 |       2 | c1.x            |
 | c2.y          | y          | y           |     True      |    False     |       | (1,)  | []   | [5] |       5 |       5 | c1.y            |
 """
-        report_file = tempfile.NamedTemporaryFile()
         with assert_warning(om.OMDeprecationWarning, 'source output x is tagged with the deprecated'
                                                      ' `indep_var` tag. Please change this tag to'
                                                      ' `openmdao:indep_var` as `indep_var` will'
                                                      ' be deprecated in a future release.'):
-            inputs_report(prob, outfile=report_file.name, display=True, precision=6, title=None, tablefmt='github')
-        with open(report_file.name) as f:
+            inputs_report(prob, outfile='temp_inputs_report.md', display=True, precision=6, title=None, tablefmt='github')
+        with open('temp_inputs_report.md') as f:
             report_content = f.read()
         self.assertEqual(expected, report_content)
