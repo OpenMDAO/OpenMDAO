@@ -1,4 +1,4 @@
-"""Test the Newton nonlinear solver. """
+"""Test the inputs report. """
 import unittest
 
 import openmdao.api as om
