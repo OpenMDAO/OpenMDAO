@@ -37,8 +37,8 @@ class TestOptionsDict(unittest.TestCase):
 =========  ============  =================  =====================  ======================
 Option     Default       Acceptable Values  Acceptable Types       Description           
 =========  ============  =================  =====================  ======================
-comp       MyComp        N/A                ['ExplicitComponent']  
-flag       False         [True, False]      ['bool']               
+comp       MyComp        N/A                ['ExplicitComponent']                        
+flag       False         [True, False]      ['bool']                                     
 long_desc  **Required**  N/A                ['str']                This description is   
                                                                    long and verbose, so  
                                                                    it takes up multiple  

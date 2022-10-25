@@ -130,7 +130,8 @@ class OptionsDictionary(object):
         ----------
         fmt : str
             The formatting of the requested table.  Options are
-            ['github', 'rst', 'html', 'text', 'tabulator'].
+            ['github', 'rst', 'text', 'html', 'tabulator'] and several 'grid' and 'outline'
+            formats that mimic those found in the python 'tabulate' library.
             Default value of 'github' produces a table in GitHub-flavored markdown.
             'html' and 'tabulator' produce output viewable in a browser.
         missingval : str
