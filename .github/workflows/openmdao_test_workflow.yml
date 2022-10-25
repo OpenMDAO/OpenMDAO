@@ -281,8 +281,9 @@ jobs:
           echo "============================================================="
           echo "Scan environment for packages with known vulnerabilities"
           echo "(Temporarily ignoring PYSEC-2022-237, required by nbconvert)"
+          echo "(Temporarily ignoring OSV-2022-715, in Pillow, required by matplotlib)"
           echo "============================================================="
-          python -m pip_audit --ignore-vuln PYSEC-2022-237 --ignore-vuln GHSA-fpfv-jqm9-f5jm
+          python -m pip_audit --ignore-vuln OSV-2022-715 --ignore-vuln PYSEC-2022-237 --ignore-vuln GHSA-fpfv-jqm9-f5jm
 
       - name: Run tests
         if: matrix.TESTS
@@ -478,8 +479,9 @@ jobs:
           echo "============================================================="
           echo "Scan environment for packages with known vulnerabilities"
           echo "(Temporarily ignoring PYSEC-2022-237, required by nbconvert)"
+          echo "(Temporarily ignoring OSV-2022-715, in Pillow, required by matplotlib)"
           echo "============================================================="
-          python -m pip_audit --ignore-vuln PYSEC-2022-237
+          python -m pip_audit -ignore-vuln OSV-2022-715 --ignore-vuln PYSEC-2022-237
 
       - name: Run tests
         run: |
