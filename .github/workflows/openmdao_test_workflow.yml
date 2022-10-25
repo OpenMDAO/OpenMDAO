@@ -135,23 +135,22 @@ jobs:
         run: |
           git fetch --prune --unshallow --tags
 
-      - name: Setup mamba
+      - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
         with:
           python-version: ${{ matrix.PY }}
-          mamba-version: "*"
           channels: conda-forge,defaults
           channel-priority: true
 
       - name: Install OpenMDAO
         run: |
-          mamba install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
+          conda install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
 
           if [[ "${{ matrix.OPTIONAL }}" == "[all]" ]]; then
             echo "============================================================="
-            echo "Install jupyter dependencies with mamba"
+            echo "Install jupyter dependencies with conda"
             echo "============================================================="
-            mamba install jupyter jupyter-book 'lxml>=4.9.1'
+            conda install jupyter jupyter-book 'lxml>=4.9.1'
           fi
 
           python -m pip install --upgrade pip
@@ -187,7 +186,7 @@ jobs:
             MPI4PY="mpi4py"
           fi
 
-          mamba install $COMPILERS $MPI4PY petsc4py=${{ matrix.PETSc }} -q -y
+          conda install $COMPILERS $MPI4PY petsc4py=${{ matrix.PETSc }} -q -y
 
           export OMPI_MCA_rmaps_base_oversubscribe=1
           echo "-----------------------"
@@ -218,7 +217,7 @@ jobs:
               echo "SNOPT ${{ matrix.SNOPT }} was requested but is not available on conda-forge"
             fi
 
-            mamba install -c conda-forge pyoptsparse
+            conda install -c conda-forge pyoptsparse
           else
             pip install git+https://github.com/OpenMDAO/build_pyoptsparse
 
@@ -261,8 +260,8 @@ jobs:
 
       - name: Display environment info
         run: |
-          mamba info
-          mamba list
+          conda info
+          conda list
 
           echo "============================================================="
           echo "Check installed versions of Python, Numpy and Scipy"
@@ -426,22 +425,22 @@ jobs:
         run: |
           git fetch --prune --unshallow --tags
 
-      - name: Setup mamba
+      - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
         with:
           python-version: ${{ matrix.PY }}
-          mamba-version: "*"
+          conda-version: "*"
           channels: conda-forge,defaults
           channel-priority: true
 
       - name: Install OpenDMAO
         run: |
-          mamba install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
+          conda install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
 
           echo "============================================================="
-          echo "Install jupyter dependencies with mamba"
+          echo "Install jupyter dependencies with conda"
           echo "============================================================="
-          mamba install jupyter jupyter-book 'lxml>=4.9.1'
+          conda install jupyter jupyter-book 'lxml>=4.9.1'
 
           python -m pip install --upgrade pip
 
@@ -459,8 +458,8 @@ jobs:
 
       - name: Display environment info
         run: |
-          mamba info
-          mamba list
+          conda info
+          conda list
 
           echo "============================================================="
           echo "Check installed versions of Python, Numpy and Scipy"
