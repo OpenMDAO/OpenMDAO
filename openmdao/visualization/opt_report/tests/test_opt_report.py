@@ -22,6 +22,11 @@ from openmdao.utils.tests.test_hooks import hooks_active
 from openmdao.visualization.opt_report.opt_report import opt_report, \
     _default_optimizer_report_filename
 
+try:
+    import pyDOE2
+except ImportError:
+    pyDOE2 = None
+
 
 @use_tempdirs
 class TestOptimizationReport(unittest.TestCase):
@@ -236,6 +241,7 @@ class TestOptimizationReport(unittest.TestCase):
         outfilepath = str(pathlib.Path(prob.get_reports_dir()).joinpath(_default_optimizer_report_filename))
         self.assertFalse(os.path.exists(outfilepath))
 
+    @unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
     def test_opt_report_genetic_algorithm(self):
         self.setup_problem_and_run_driver(om.SimpleGADriver,
                                           vars_lower=-50, vars_upper=50.,
@@ -246,6 +252,7 @@ class TestOptimizationReport(unittest.TestCase):
         opt_report(self.prob)
         self.check_opt_report(expected=expect)
 
+    @unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
     def test_opt_report_differential_evolution(self):
         prob = om.Problem()
 
