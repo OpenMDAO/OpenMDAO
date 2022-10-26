@@ -92,6 +92,8 @@ class _TotalJacInfo(object):
     in_idx_map : dict
         Mapping of jacobian row/col index to a tuple of the form
         (ndups, relevant_systems, cache_linear_solutions_flag)
+    total_relevant_systems : set
+        The set of names of all systems relevant to the computation of the total derivatives.
     """
 
     def __init__(self, problem, of, wrt, use_abs_names, return_format, approx=False,
@@ -252,6 +254,8 @@ class _TotalJacInfo(object):
         self.dist_input_idx_map = {}
         self.has_input_dist = {}
         self.has_output_dist = {}
+
+        self.total_relevant_systems = set()
 
         if approx:
             _initialize_model_approx(model, driver, self.of, self.wrt)
@@ -729,8 +733,12 @@ class _TotalJacInfo(object):
                 idx_iter_dict[name] = (imeta, self.single_index_iter)
 
             if path in relevant and not non_rel_outs:
-                tup = (ndups, relevant[path]['@all'][1], cache_lin_sol)
+                relsystems = relevant[path]['@all'][1]
+                if self.total_relevant_systems is not _contains_all:
+                    self.total_relevant_systems.update(relsystems)
+                tup = (ndups, relsystems, cache_lin_sol)
             else:
+                self.total_relevant_systems = _contains_all
                 tup = (ndups, _contains_all, cache_lin_sol)
 
             idx_map.extend([tup] * (end - start))
@@ -1324,18 +1332,23 @@ class _TotalJacInfo(object):
 
         model = self.model
         # Prepare model for calculation by cleaning out the derivatives vectors.
-        model._vectors['input']['linear'].set_val(0.0)
         model._dinputs.set_val(0.0)
         model._doutputs.set_val(0.0)
         model._dresiduals.set_val(0.0)
 
         # Linearize Model
         model._tot_jac = self
+
         try:
             ln_solver = model._linear_solver
             with model._scaled_context_all():
-                model._linearize(model._assembled_jac,
-                                 sub_do_ln=ln_solver._linearize_children())
+                if len(model._subsystems_allprocs) > 0:
+                    model._linearize(model._assembled_jac,
+                                     sub_do_ln=ln_solver._linearize_children(),
+                                     rel_systems=self.total_relevant_systems)
+                else:
+                    model._linearize(model._assembled_jac,
+                                     sub_do_ln=ln_solver._linearize_children())
             if ln_solver._assembled_jac is not None and \
                     ln_solver._assembled_jac._under_complex_step:
                 model.linear_solver._assembled_jac._update(model)
@@ -1462,8 +1475,13 @@ class _TotalJacInfo(object):
                     model._update_wrt_matches(model._coloring_info)
 
             # Linearize Model
-            model._linearize(model._assembled_jac,
-                             sub_do_ln=model._linear_solver._linearize_children())
+            if len(model._subsystems_allprocs) > 0:
+                model._linearize(model._assembled_jac,
+                                 sub_do_ln=model._linear_solver._linearize_children(),
+                                 rel_systems=self.total_relevant_systems)
+            else:
+                model._linearize(model._assembled_jac,
+                                 sub_do_ln=model._linear_solver._linearize_children())
 
         finally:
             model._tot_jac = None
