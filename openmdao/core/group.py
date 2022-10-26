@@ -1463,7 +1463,7 @@ class Group(System):
                     guesses = get_close_matches(prom_out, list(allprocs_prom2abs_list_out.keys()) + \
                                                          list(allprocs_discrete_out.keys()))
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
-                          f"'{prom_in}', but '{prom_out}' doesn't exist.Perhaps you ment to connect to one of the following outputs:{guesses}"
+                          f"'{prom_in}', but '{prom_out}' doesn't exist. Perhaps you meant to connect to one of the following outputs: {guesses}"
                     conditional_error(msg, exc=NameError, category=SetupWarning,
                                       err=self._raise_connection_errors)
                     continue
@@ -1480,7 +1480,7 @@ class Group(System):
                     guesses = get_close_matches(prom_in, list(allprocs_prom2abs_list_in.keys()) + \
                                                        list(allprocs_discrete_in.keys()))
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
-                          f"'{prom_in}', but '{prom_in}' doesn't exist. Perhaps you ment to connect to one of the following inputs:{guesses}"
+                          f"'{prom_in}', but '{prom_in}' doesn't exist. Perhaps you meant to connect to one of the following inputs: {guesses}"
                     conditional_error(msg, exc=NameError, category=SetupWarning,
                                       err=self._raise_connection_errors)
                     continue
