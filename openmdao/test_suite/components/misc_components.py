@@ -5,9 +5,11 @@ Contains some general test components that are used in multiple places for testi
 featured as examples, and are not meant to be showcased as the proper way to write components
 in OpenMDAO.
 """
+from collections import defaultdict
 import numpy as np
 
 import openmdao.api as om
+from openmdao.core.constants import _UNDEFINED
 
 
 class Comp4LinearCacheTest(om.ImplicitComponent):
@@ -65,3 +67,73 @@ class Comp4LinearCacheTest(om.ImplicitComponent):
         y = outputs['y']
         partials['y', 'x'] = y ** 3 - 9.0 * y * x ** 2
         partials['y', 'y'] = 3.0 * x * y ** 2 - 3.0 * y * x ** 3
+
+
+class ExplicitCounterComp(om.ExplicitComponent):
+    """
+    This component keeps counters for a number of core framework methods.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._counts = defaultdict(int)
+
+    def _reset_counts(self, names=None):
+        if names is None:
+            names = self._counts.keys()
+
+        for name in names:
+            self._counts[name] = 0
+
+    def _configure(self):
+        self._counts['_configure'] += 1
+        super()._configure()
+
+    def _compute_wrapper(self):
+        self._counts['_compute_wrapper'] += 1
+        super()._compute_wrapper()
+
+    def _apply_nonlinear(self):
+        self._counts['_apply_nonlinear'] += 1
+        super()._apply_nonlinear()
+
+    def _compute_jacvec_product_wrapper(self, inputs, d_inputs, d_resids, mode,
+                                        discrete_inputs=None):
+        self._counts['_compute_jacvec_product_wrapper'] += 1
+        super()._compute_jacvec_product_wrapper(inputs, d_inputs, d_resids, mode,
+                                                discrete_inputs=discrete_inputs)
+
+    def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
+        self._counts['_apply_linear'] += 1
+        super()._apply_linear(jac, rel_systems, mode, scope_out=scope_out, scope_in=scope_in)
+
+    def _solve_linear(self, mode, rel_systems, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
+        self._counts['_solve_linear'] += 1
+        super()._solve_linear(mode, rel_systems, scope_out=scope_out, scope_in=scope_in)
+
+    def _compute_partials_wrapper(self):
+        self._counts['_compute_partials_wrapper'] += 1
+        super()._compute_partials_wrapper()
+
+    def _linearize(self, jac=None, sub_do_ln=False):
+        self._counts['_linearize'] += 1
+        super()._linearize(jac=jac, sub_do_ln=sub_do_ln)
+
+
+class MultComp(ExplicitCounterComp):
+    def __init__(self, mult, **kwargs):
+        super().__init__(**kwargs)
+        self._mult = mult
+
+    def setup(self):
+        self.add_input('x')
+        self.add_input('y')
+        self.add_output('fxy')
+
+        self.declare_partials(of='*', wrt='*')
+
+    def compute(self, inputs, outputs):
+        outputs['fxy'] = (inputs['x'] - .5 * inputs['y']) * self._mult
+
+    def compute_partials(self, inputs, partials):
+        partials['fxy', 'x'] = self._mult
+        partials['fxy', 'y'] = -self._mult * .5

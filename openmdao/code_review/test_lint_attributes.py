@@ -117,7 +117,16 @@ class LintAttributesTestCase(unittest.TestCase):
                         # There is a valid __init__ section in the class
                         if('__init__' in class_.__dict__ and '__init__' in dir(class_) and (inspect.ismethod(getattr(class_, '__init__')) or inspect.isfunction(getattr(class_, '__init__'))) ):
                             method = getattr(class_, '__init__')
-                            mysrc = inspect.getsource(method)
+                            # don't die if inspect can't get the source.  This can happen with
+                            # dataclasses
+                            try:
+                                mysrc = inspect.getsource(method)
+                            except Exception:
+                                if new_failures:
+                                    key = '{0}/{1}:{2}'.format(dir_name, file_name, class_name)
+                                    failures[key] = new_failures
+                                continue
+
                             valid_lines = ''.join(valid_line_with_self_re.findall(mysrc))
                             all_member_vars = set(member_var_re.findall(valid_lines))
 
