@@ -1,4 +1,4 @@
-""" Unit tests for the SimpleGADriver Driver."""
+""" Unit tests for SimpleGADriver."""
 
 import unittest
 import os
@@ -50,6 +50,29 @@ def _test_func_name(func, num, param):
         else:
             args.append(str(p))
     return func.__name__ + '_' + '_'.join(args)
+
+
+class TestErrors(unittest.TestCase):
+
+    @unittest.skipIf(pyDOE2, "only runs if 'pyDOE2' is not installed")
+    def test_no_pyDOE2(self):
+        with self.assertRaises(RuntimeError) as err:
+            GeneticAlgorithm(lambda: 0)
+
+        self.assertEqual(str(err.exception),
+                         "GeneticAlgorithm requires the 'pyDOE2' package, "
+                         "which can be installed with one of the following commands:\n"
+                         "    pip install openmdao[doe]\n"
+                         "    pip install pyDOE2")
+
+        with self.assertRaises(RuntimeError) as err:
+            om.SimpleGADriver()
+
+        self.assertEqual(str(err.exception),
+                         "SimpleGADriver requires the 'pyDOE2' package, "
+                         "which can be installed with one of the following commands:\n"
+                         "    pip install openmdao[doe]\n"
+                         "    pip install pyDOE2")
 
 
 @unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")

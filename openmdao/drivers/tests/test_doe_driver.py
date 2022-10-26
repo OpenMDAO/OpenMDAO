@@ -100,6 +100,26 @@ class TestErrors(unittest.TestCase):
                          "DOEDriver requires an instance of DOEGenerator, "
                          "but an instance of Problem was found.")
 
+    @unittest.skipIf(pyDOE2, "only runs if 'pyDOE2' is not installed")
+    def test_no_pyDOE2(self):
+        with self.assertRaises(RuntimeError) as err:
+            om.FullFactorialGenerator(levels=3)
+
+        self.assertEqual(str(err.exception),
+                         "FullFactorialGenerator requires the 'pyDOE2' package, "
+                         "which can be installed with one of the following commands:\n"
+                         "    pip install openmdao[doe]\n"
+                         "    pip install pyDOE2")
+
+        with self.assertRaises(RuntimeError) as err:
+            om.DOEDriver(generator=om.FullFactorialGenerator(levels=3))
+
+        self.assertEqual(str(err.exception),
+                         "FullFactorialGenerator requires the 'pyDOE2' package, "
+                         "which can be installed with one of the following commands:\n"
+                         "    pip install openmdao[doe]\n"
+                         "    pip install pyDOE2")
+
     @unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
     def test_lhc_criterion(self):
         with self.assertRaises(ValueError) as err:
