@@ -32,6 +32,11 @@ try:
 except ImportError:
     PETScVector = None
 
+try:
+    import pyDOE2
+except ImportError:
+    pyDOE2 = None
+
 extra_prints = False  # enable printing results
 
 
@@ -47,6 +52,7 @@ def _test_func_name(func, num, param):
     return func.__name__ + '_' + '_'.join(args)
 
 
+@unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
 class TestSimpleGA(unittest.TestCase):
 
     def setUp(self):
@@ -502,6 +508,7 @@ class TestSimpleGA(unittest.TestCase):
             self.assertLessEqual(1.0, prob["x"][i])
 
 
+@unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
 class TestDriverOptionsSimpleGA(unittest.TestCase):
 
     def setUp(self):
@@ -551,6 +558,7 @@ class Box(om.ExplicitComponent):
         outputs['volume'] = length*height*width
 
 
+@unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
 class TestMultiObjectiveSimpleGA(unittest.TestCase):
 
     def setUp(self):
@@ -682,6 +690,7 @@ class TestMultiObjectiveSimpleGA(unittest.TestCase):
         self.assertTrue(np.all(sorted_obj[:-1, 1] >= sorted_obj[1:, 1]))
 
 
+@unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
 class TestConstrainedSimpleGA(unittest.TestCase):
 
     def setUp(self):
@@ -973,6 +982,7 @@ class TestConstrainedSimpleGA(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
 class MPITestSimpleGA(unittest.TestCase):
 
     N_PROCS = 2
@@ -1236,6 +1246,7 @@ class Summer(om.ExplicitComponent):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
 @use_tempdirs
 class MPITestSimpleGA4Procs(unittest.TestCase):
 
@@ -1441,6 +1452,7 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
         assert_near_equal(np.sum(prob.get_val('f_xy', get_remote=True))/3, -23.1333, 0.15)
 
 
+@unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
 class TestFeatureSimpleGA(unittest.TestCase):
 
     def setUp(self):
@@ -1674,6 +1686,7 @@ class TestFeatureSimpleGA(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
 class MPIFeatureTests(unittest.TestCase):
     N_PROCS = 2
 

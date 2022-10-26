@@ -28,6 +28,11 @@ try:
 except ImportError:
     PETScVector = None
 
+try:
+    import pyDOE2
+except ImportError:
+    pyDOE2 = None
+
 extra_prints = False  # enable printing results
 
 
@@ -43,6 +48,7 @@ def _test_func_name(func, num, param):
     return func.__name__ + '_' + '_'.join(args)
 
 
+@unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
 class TestDifferentialEvolution(unittest.TestCase):
 
     def setUp(self):
@@ -343,6 +349,7 @@ class TestDifferentialEvolution(unittest.TestCase):
             self.assertLessEqual(1.0 - 1e-6, prob["x"][i])
 
 
+@unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
 class TestDriverOptionsDifferentialEvolution(unittest.TestCase):
 
     def setUp(self):
@@ -375,6 +382,7 @@ class TestDriverOptionsDifferentialEvolution(unittest.TestCase):
         self.assertEqual(prob.driver.options['Pc'], 0.0123)
 
 
+@unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
 class TestMultiObjectiveDifferentialEvolution(unittest.TestCase):
 
     def setUp(self):
@@ -487,6 +495,7 @@ class TestMultiObjectiveDifferentialEvolution(unittest.TestCase):
         self.assertGreater(h2, h1)  # top area does not depend on height
 
 
+@unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
 class TestConstrainedDifferentialEvolution(unittest.TestCase):
 
     def setUp(self):
@@ -771,6 +780,7 @@ class TestConstrainedDifferentialEvolution(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
 class MPITestDifferentialEvolution(unittest.TestCase):
     N_PROCS = 2
 
@@ -820,6 +830,7 @@ class MPITestDifferentialEvolution(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
 class MPITestDifferentialEvolutionNoSetSeed(unittest.TestCase):
     N_PROCS = 2
 
@@ -928,6 +939,7 @@ class Summer(om.ExplicitComponent):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
 @use_tempdirs
 class MPITestDifferentialEvolution4Procs(unittest.TestCase):
     N_PROCS = 4
