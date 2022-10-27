@@ -56,12 +56,13 @@ else:
         cite = CITATION
         distributed = True
 
-        def __init__(self, name, kind, system, root_vector=None, alloc_complex=False):
+        def __init__(self, name, kind, system, root_vector=None, alloc_complex=False,
+                     rel_lookup=False):
             """
             Initialize all attributes.
             """
             super().__init__(name, kind, system, root_vector=root_vector,
-                             alloc_complex=alloc_complex)
+                             alloc_complex=alloc_complex, rel_lookup=rel_lookup)
 
             self._dup_inds = None
             self._dup_scratch = None

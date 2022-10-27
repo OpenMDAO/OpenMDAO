@@ -131,7 +131,7 @@ class DefaultVector(Vector):
         else:
             self._data, self._scaling = self._extract_root_data()
 
-    def _initialize_views(self):
+    def _initialize_views(self, rel_lookup=False):
         """
         Internally assemble views onto the vectors.
 
@@ -151,6 +151,11 @@ class DefaultVector(Vector):
 
         self._views = views = {}
         self._views_flat = views_flat = {}
+        if rel_lookup:
+            self._views_rel = views_rel = {}
+            relstart = len(system.pathname) + 1 if system.pathname else 0
+        else:
+            self._views_rel = None
 
         start = end = 0
         for abs_name, meta in system._var_abs2meta[io].items():
@@ -161,6 +166,9 @@ class DefaultVector(Vector):
                 v = v.view()
                 v.shape = shape
             views[abs_name] = v
+
+            if rel_lookup:
+                views_rel[abs_name[relstart:]] = v
 
             if do_scaling:
                 factor_tuple = factors[abs_name][kind]

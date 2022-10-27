@@ -1782,7 +1782,7 @@ class System(object):
         """
         pass
 
-    def _setup_vectors(self, root_vectors):
+    def _setup_vectors(self, root_vectors, rel_lookup=False):
         """
         Compute all vectors for all vec names and assign excluded variables lists.
 
@@ -1790,6 +1790,8 @@ class System(object):
         ----------
         root_vectors : dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        rel_lookup : bool
+            If True, create a mapping of relative name to view.
         """
         self._vectors = vectors = {'input': {}, 'output': {}, 'residual': {}}
 
@@ -1817,7 +1819,8 @@ class System(object):
             for kind in ['input', 'output', 'residual']:
                 rootvec = root_vectors[kind][vec_name]
                 vectors[kind][vec_name] = vector_class(
-                    vec_name, kind, self, rootvec, alloc_complex=vec_alloc_complex)
+                    vec_name, kind, self, rootvec, alloc_complex=vec_alloc_complex,
+                    rel_lookup=rel_lookup)
 
         if self._use_derivatives:
             vectors['input']['linear']._scaling_nl_vec = vectors['input']['nonlinear']._scaling

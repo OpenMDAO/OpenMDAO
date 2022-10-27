@@ -99,7 +99,7 @@ class Vector(object):
     # Indicator whether a vector class is MPI-distributed
     distributed = False
 
-    def __init__(self, name, kind, system, root_vector=None, alloc_complex=False):
+    def __init__(self, name, kind, system, root_vector=None, alloc_complex=False, rel_lookup=False):
         """
         Initialize all attributes.
         """
@@ -145,8 +145,10 @@ class Vector(object):
         else:
             self._root_vector = root_vector
 
+        self._views_rel = None
+
         self._initialize_data(root_vector)
-        self._initialize_views()
+        self._initialize_views(rel_lookup)
 
         self.read_only = False
 
@@ -366,6 +368,14 @@ class Vector(object):
         float or ndarray
             variable value.
         """
+        if self._views_rel is not None:
+            try:
+                if self._under_complex_step:
+                    return self._views_rel[name]
+                return self._views_rel[name].real
+            except KeyError:
+                pass  # try normal lookup after rel lookup failed
+
         abs_name = self._name2abs_name(name)
         if abs_name is not None:
             return self._abs_get_val(abs_name, flat=False)
@@ -410,6 +420,12 @@ class Vector(object):
         value : float or list or tuple or ndarray
             variable value to set
         """
+        if self._views_rel is not None:
+            try:
+                self._views_rel[name][:] = value
+            except Exception:
+                pass  # fall through to normal set if fast one failed in any way
+
         self.set_var(name, value)
 
     def _initialize_data(self, root_vector):
@@ -426,7 +442,7 @@ class Vector(object):
         raise NotImplementedError('_initialize_data not defined for vector type '
                                   f'{type(self).__name__}')
 
-    def _initialize_views(self):
+    def _initialize_views(self, rel_lookup=False):
         """
         Internally assemble views onto the vectors.
 

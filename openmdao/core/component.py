@@ -307,6 +307,19 @@ class Component(System):
 
         self._owned_sizes = self._var_sizes['output']
 
+    def _setup_vectors(self, root_vectors, rel_lookup=False):
+        """
+        Compute all vectors for all vec names and assign excluded variables lists.
+
+        Parameters
+        ----------
+        root_vectors : dict of dict of Vector
+            Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        rel_lookup : bool
+            If True, create a mapping of relative name to view.
+        """
+        super()._setup_vectors(root_vectors, rel_lookup=True)
+
     def _setup_partials(self):
         """
         Process all partials and approximations that the user declared.
