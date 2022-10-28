@@ -431,6 +431,8 @@ class Vector(object):
                 self._views_rel[name][:] = value
             except Exception:
                 pass  # fall through to normal set if fast one failed in any way
+            else:
+                return
 
         self.set_var(name, value)
 

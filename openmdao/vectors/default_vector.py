@@ -154,6 +154,7 @@ class DefaultVector(Vector):
 
         self._views = views = {}
         self._views_flat = views_flat = {}
+        rel_lookup = rel_lookup and (islinear or self._kind != 'residual')
         if rel_lookup:
             self._views_rel = views_rel = {}
             relstart = len(system.pathname) + 1 if system.pathname else 0
