@@ -405,13 +405,15 @@ class Vector(object):
             variable value.
         """
         if flat:
-            val = self._views_flat[name]
-        else:
-            val = self._views[name]
+            if self._under_complex_step:
+                return self._views_flat[name]
+            else:
+                return self._views_flat[name].real
 
         if self._under_complex_step:
-            return val
-        return val.real
+            return self._views[name]
+        else:
+            return self._views[name].real
 
     def __setitem__(self, name, value):
         """
