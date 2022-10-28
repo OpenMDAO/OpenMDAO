@@ -44,6 +44,8 @@ class Vector(object):
         Pointer to the vector owned by the root system.
     alloc_complex : bool
         Whether to allocate any imaginary storage to perform complex step. Default is False.
+    rel_lookup : bool
+        If True, add a dict mapping relative variable name to view, for use in Components only.
 
     Attributes
     ----------
@@ -63,6 +65,8 @@ class Vector(object):
         Dictionary mapping absolute variable names to the ndarray views.
     _views_flat : dict
         Dictionary mapping absolute variable names to the flattened ndarray views.
+    _views_rel : dict or None
+        If owning system is a component, this will contain a mapping of relative names to views.
     _names : set([str, ...])
         Set of variables that are relevant in the current context.
     _root_vector : Vector
@@ -447,6 +451,11 @@ class Vector(object):
         Internally assemble views onto the vectors.
 
         Must be implemented by the subclass.
+
+        Parameters
+        ----------
+        rel_lookup : bool
+            If True, add a dict mapping relative variable name to view, for use in Components only.
         """
         raise NotImplementedError('_initialize_views not defined for vector type '
                                   f'{type(self).__name__}')

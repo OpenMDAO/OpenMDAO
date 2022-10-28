@@ -17,7 +17,7 @@ def rel_name2abs_name(system, rel_name):
     str
         Absolute variable name.
     """
-    return rel_name if system.pathname == '' else system.pathname + '.' + rel_name
+    return system.pathname + '.' + rel_name if system.pathname else rel_name
 
 
 def abs_name2rel_name(system, abs_name):
@@ -36,7 +36,7 @@ def abs_name2rel_name(system, abs_name):
     str
         Relative variable name.
     """
-    return abs_name if system.pathname == '' else abs_name[len(system.pathname) + 1:]
+    return abs_name[len(system.pathname) + 1:] if system.pathname else abs_name
 
 
 def rel_key2abs_key(system, rel_key):
@@ -55,7 +55,8 @@ def rel_key2abs_key(system, rel_key):
     (str, str)
         Absolute variable name pair.
     """
-    return (rel_name2abs_name(system, rel_key[0]), rel_name2abs_name(system, rel_key[1]))
+    of, wrt = rel_key
+    return (rel_name2abs_name(system, of), rel_name2abs_name(system, wrt))
 
 
 def abs_key2rel_key(system, abs_key):
@@ -74,7 +75,8 @@ def abs_key2rel_key(system, abs_key):
     (str, str)
         Relative variable name pair.
     """
-    return (abs_name2rel_name(system, abs_key[0]), abs_name2rel_name(system, abs_key[1]))
+    of, wrt = abs_key
+    return (abs_name2rel_name(system, of), abs_name2rel_name(system, wrt))
 
 
 def prom_name2abs_name(system, prom_name, iotype):
@@ -203,7 +205,7 @@ def prom_key2abs_key(system, prom_key):
     """
     Map the given promoted name pair to the absolute name pair.
 
-    The first name is an output, and the second name can be an output or an input.
+    The first name is a continuous output, and the second name can be an output or an input.
     If the second name is non-unique, a KeyError is thrown.
 
     Parameters
@@ -219,21 +221,15 @@ def prom_key2abs_key(system, prom_key):
         Absolute name pair of sub-Jacobian or None is prom_key is invalid.
     """
     of, wrt = prom_key
-    abs_name1in = prom_name2abs_name(system, wrt, 'input')
-    abs_name1out = prom_name2abs_name(system, wrt, 'output')
-    if abs_name1in is None and abs_name1out is None:
-        return None
-    elif abs_name1in is None:
-        abs_name1 = abs_name1out
-    elif abs_name1out is None:
-        abs_name1 = abs_name1in
-    else:
-        msg = 'The promoted name "{}" is invalid because it is non-unique.'
-        raise KeyError(msg.format(wrt))
+    abs_wrt = prom_name2abs_name(system, wrt, 'input')
+    if abs_wrt is None:
+        abs_wrt = prom_name2abs_name(system, wrt, 'output')
+        if abs_wrt is None:
+            return None
 
-    abs_name0 = prom_name2abs_name(system, of, 'output')
-    if abs_name0 is not None:
-        return (abs_name0, abs_name1)
+    abs_of = prom_name2abs_name(system, of, 'output')
+    if abs_of is not None:
+        return (abs_of, abs_wrt)
 
 
 def key2abs_key(system, key):
@@ -263,9 +259,8 @@ def key2abs_key(system, key):
         return abs_key
 
     abs_key = rel_key2abs_key(system, key)
-    if abs_key[0] in system._var_abs2meta['output'] and \
-            (abs_key[1] in system._var_abs2meta['input'] or
-             abs_key[1] in system._var_abs2meta['output']):
+    of, wrt = abs_key
+    if of in system._var_allprocs_abs2idx and wrt in system._var_allprocs_abs2idx:
         return abs_key
     else:
         return None

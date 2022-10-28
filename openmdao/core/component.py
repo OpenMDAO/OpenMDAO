@@ -1642,7 +1642,7 @@ class Component(System):
                                               f"{shape} from '{pinfo.prom_path()}' using "
                                               f"src_indices {inds}: {exc[1]}",
                                               exc=exc, category=SetupWarning,
-                                              err=self._raise_connection_errors)
+                                              err=self.raise_connection_errors())
 
             elif meta['add_input_src_indices']:
                 self._var_prom2inds[abs2prom[tgt]] = [meta['shape'], meta['src_indices'],

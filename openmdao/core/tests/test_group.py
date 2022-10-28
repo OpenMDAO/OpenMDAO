@@ -2456,7 +2456,6 @@ class TestConnect(unittest.TestCase):
             self.fail('Exception expected.')
 
         self.prob.model._raise_connection_errors = False
-        self.prob.model._set_subsys_connection_errors(False)
 
         with assert_warning(UserWarning, msg):
             self.prob.setup()

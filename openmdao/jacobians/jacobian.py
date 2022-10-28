@@ -60,16 +60,14 @@ class Jacobian(object):
         self._system = weakref.ref(system)
         self._subjacs_info = system._subjacs_info
         self._under_complex_step = False
-        self._abs_keys = defaultdict(bool)
+        self._abs_keys = {}
         self._randgen = None
         self._col_var_offset = None
         self._col_varnames = None
         self._col2name_ind = None
 
     def _get_abs_key(self, key):
-        abskey = self._abs_keys[key]
-        if not abskey:
-            self._abs_keys[key] = abskey = key2abs_key(self._system(), key)
+        self._abs_keys[key] = abskey = key2abs_key(self._system(), key)
         return abskey
 
     def _abs_key2shape(self, abs_key):
@@ -126,7 +124,10 @@ class Jacobian(object):
         ndarray or spmatrix or list[3]
             sub-Jacobian as an array, sparse mtx, or AIJ/IJ list or tuple.
         """
-        abs_key = self._get_abs_key(key)
+        if key in self._abs_keys:
+            abs_key = self._abs_keys[key]
+        else:
+            abs_key = self._get_abs_key(key)
         if abs_key in self._subjacs_info:
             return self._subjacs_info[abs_key]['val']
         else:
@@ -144,42 +145,43 @@ class Jacobian(object):
         subjac : int or float or ndarray or sparse matrix
             sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
         """
-        abs_key = self._get_abs_key(key)
-        if abs_key is not None:
-
-            # You can only set declared subjacobians.
-            if abs_key not in self._subjacs_info:
-                msg = '{}: Variable name pair ("{}", "{}") must first be declared.'
+        if key in self._abs_keys:
+            abs_key = self._abs_keys[key]
+        else:
+            abs_key = self._get_abs_key(key)
+            if abs_key is None:
+                msg = '{}: Variable name pair ("{}", "{}") not found.'
                 raise KeyError(msg.format(self.msginfo, key[0], key[1]))
 
-            subjacs_info = self._subjacs_info[abs_key]
-
-            if issparse(subjac):
-                subjacs_info['val'] = subjac
-            else:
-                rows = subjacs_info['rows']
-
-                if rows is None:
-                    # Dense subjac
-                    subjac = np.atleast_2d(subjac)
-                    if subjac.shape != (1, 1):
-                        shape = self._abs_key2shape(abs_key)
-                        subjac = subjac.reshape(shape)
-
-                    subjacs_info['val'][:] = subjac
-
-                else:
-                    try:
-                        subjacs_info['val'][:] = subjac
-                    except ValueError:
-                        subjac = np.atleast_1d(subjac)
-                        msg = '{}: Sub-jacobian for key {} has the wrong shape ({}), expected ({}).'
-                        raise ValueError(msg.format(self.msginfo, abs_key,
-                                                    subjac.shape, rows.shape))
-
-        else:
-            msg = '{}: Variable name pair ("{}", "{}") not found.'
+        # You can only set declared subjacobians.
+        if abs_key not in self._subjacs_info:
+            msg = '{}: Variable name pair ("{}", "{}") must first be declared.'
             raise KeyError(msg.format(self.msginfo, key[0], key[1]))
+
+        subjacs_info = self._subjacs_info[abs_key]
+
+        if issparse(subjac):
+            subjacs_info['val'] = subjac
+        else:
+            rows = subjacs_info['rows']
+
+            if rows is None:
+                # Dense subjac
+                subjac = np.atleast_2d(subjac)
+                if subjac.shape != (1, 1):
+                    shape = self._abs_key2shape(abs_key)
+                    subjac = subjac.reshape(shape)
+
+                subjacs_info['val'][:] = subjac
+
+            else:
+                try:
+                    subjacs_info['val'][:] = subjac
+                except ValueError:
+                    subjac = np.atleast_1d(subjac)
+                    msg = '{}: Sub-jacobian for key {} has the wrong shape ({}), expected ({}).'
+                    raise ValueError(msg.format(self.msginfo, abs_key,
+                                                subjac.shape, rows.shape))
 
     def __iter__(self):
         """

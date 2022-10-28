@@ -2408,6 +2408,19 @@ class System(object):
         """
         return self._problem_meta is None or self._problem_meta['static_mode']
 
+    def raise_connection_errors(self):
+        """
+        Return True if connection errors should be exceptions, else they'll be warnings.
+
+        Returns
+        -------
+        bool
+            True if connection errors should be raised as exceptions.
+        """
+        if self._problem_meta is None:
+            return self._raise_connection_errors
+        return self._raise_connection_errors and self._problem_meta['raise_connection_errors']
+
     def _set_solver_print(self, level=2, depth=1e99, type_='all'):
         """
         Apply the given print settings to the internal solvers, recursively.

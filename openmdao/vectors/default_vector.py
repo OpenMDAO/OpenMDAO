@@ -24,6 +24,8 @@ class DefaultVector(Vector):
         Pointer to the vector owned by the root system.
     alloc_complex : bool
         Whether to allocate any imaginary storage to perform complex step. Default is False.
+    rel_lookup : bool
+        If True, add a dict mapping relative variable name to view, for use in Components only.
     """
 
     TRANSFER = DefaultTransfer
@@ -135,9 +137,10 @@ class DefaultVector(Vector):
         """
         Internally assemble views onto the vectors.
 
-        Sets the following attributes:
-        _views
-        _views_flat
+        Parameters
+        ----------
+        rel_lookup : bool
+            If True, add a dict mapping relative variable name to view, for use in Components only.
         """
         system = self._system()
         io = self._typ

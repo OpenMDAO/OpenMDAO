@@ -128,8 +128,7 @@ class ExplicitComponent(Component):
         local_ins = self._var_abs2meta['input']
         toidx = self._var_allprocs_abs2idx
         sizes = self._var_sizes['input']
-        total = self.pathname == ''
-        szname = 'global_size' if total else 'size'
+        szname = 'size' if self.pathname else 'global_size'
         for wrt, meta in self._var_abs2meta['input'].items():
             if wrt_matches is None or wrt in wrt_matches:
                 end += meta[szname]
