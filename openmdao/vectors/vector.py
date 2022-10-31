@@ -705,44 +705,40 @@ class Vector(object):
         raise NotImplementedError(f'get_hash not defined for vector type {type(self).__name__}')
         return ''  # silence lint warning about missing return value.
 
-    def _get_local_views(self, dtype, copy=True):
+    def _get_local_views(self, arr=None):
         """
-        Return an array of specified dtype and a dict of views into that array using local names.
+        Return an array a dict of views into that array using local names.
 
-        If copy is False, attempt to use our existing internal data array.
+        If arr is not supplied, use our existing internal data array.
+        Note that if arr is not specified, the array used will depend upon the value of
+        _under_complex_step.
 
         Parameters
         ----------
-        dtype : np.dtype
-            Specifies the data type of the numpy array.
-        copy : bool
-            If False, attempt to use the internal data array of this Vector. Note that a copy may
-            still be necessary.
+        arr : ndarray or None
+            If not None, create views into this array.
 
         Returns
         -------
-        ndarray
-            Data array of the specified dtype.
         dict
             A dict of views into the data array keyed using local names.
-        bool
-            True if the returned array is a copy (may have different dtype).
         """
-        arr = self.asarray(copy=False)
-        copied = False
-        if copy or arr.dtype != dtype:
-            arr = np.empty(len(self), dtype=dtype)
-            copied = True
+        if arr is None:
+            arr = self.asarray(copy=False)
+        elif len(self) != arr.size:
+            raise RuntimeError(f"{self._system().msginfo}: can't create local view dict because "
+                               f"given array is size {arr.size} but expected size is {len(self)}.")
 
         dct = {}
         path = self._system().pathname
         pathlen = len(path) + 1 if path else 0
 
-        start = 0
+        start = end = 0
         for name, val in self._abs_item_iter(flat=False):
-            view = arr[start:start + val.size]
+            end += val.size
+            view = arr[start:end]
             view.shape = val.shape
             dct[name[pathlen:]] = view
-            start += val.size
+            start = end
 
-        return arr, dct, copied
+        return dct

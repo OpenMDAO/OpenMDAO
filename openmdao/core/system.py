@@ -1255,6 +1255,7 @@ class System(object):
 
         from openmdao.core.group import Group
         is_total = isinstance(self, Group)
+        is_explicit = self.is_explicit()
 
         # compute perturbations
         starting_inputs = self._inputs.asarray(copy=True)
@@ -1263,9 +1264,11 @@ class System(object):
         in_offsets *= info['perturb_size']
 
         starting_outputs = self._outputs.asarray(copy=True)
-        out_offsets = starting_outputs.copy()
-        out_offsets[out_offsets == 0.0] = 1.0
-        out_offsets *= info['perturb_size']
+
+        if not is_explicit:
+            out_offsets = starting_outputs.copy()
+            out_offsets[out_offsets == 0.0] = 1.0
+            out_offsets *= info['perturb_size']
 
         starting_resids = self._residuals.asarray(copy=True)
 
@@ -1274,8 +1277,9 @@ class System(object):
             if i > 0:
                 self._inputs.set_val(starting_inputs +
                                      in_offsets * np.random.random(in_offsets.size))
-                self._outputs.set_val(starting_outputs +
-                                      out_offsets * np.random.random(out_offsets.size))
+                if not is_explicit:
+                    self._outputs.set_val(starting_outputs +
+                                          out_offsets * np.random.random(out_offsets.size))
                 if is_total:
                     self._solve_nonlinear()
                 else:
@@ -5579,5 +5583,16 @@ class System(object):
         -------
         bool
             True if this System should have fast relative variable name lookup in vectors.
+        """
+        return False
+
+    def is_explicit(self):
+        """
+        Return True if this is an explicit component.
+
+        Returns
+        -------
+        bool
+            True if this is an explicit component.
         """
         return False

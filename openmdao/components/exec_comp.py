@@ -115,7 +115,7 @@ class ExecComp(ExplicitComponent):
         Constants defined in the expressions. The key is the name of the constant and the value
         is a dict of metadata.
     _coloring_declared : bool
-        If True, coloring has been declared.
+        If True, coloring has been declared manually.
     _inarray : ndarray or None
         If using internal CS, this is a complex array containing input values.
     _outarray : ndarray or None
@@ -680,8 +680,9 @@ class ExecComp(ExplicitComponent):
         """
         Check that all partials are declared.
         """
+        has_diag_partials = self.options['has_diag_partials']
         if not self._manual_decl_partials:
-            if self.options['do_coloring'] and not self.options['has_diag_partials']:
+            if self.options['do_coloring'] and not has_diag_partials:
                 rank = self.comm.rank
                 sizes = self._var_sizes
                 if not self._has_distrib_vars and (sum(sizes['input'][rank]) > 1 and
@@ -701,10 +702,10 @@ class ExecComp(ExplicitComponent):
                 ins = sorted(set(vs).difference(outs))
                 for out in sorted(outs):
                     for inp in ins:
-                        if self.options['has_diag_partials']:
+                        if has_diag_partials:
                             ival = meta[inp]['val']
-                            iarray = isinstance(ival, ndarray) and ival.size > 1
                             oval = meta[out]['val']
+                            iarray = isinstance(ival, ndarray) and ival.size > 1
                             if iarray and isinstance(oval, ndarray) and oval.size > 1:
                                 if oval.size != ival.size:
                                     raise RuntimeError(
@@ -749,12 +750,40 @@ class ExecComp(ExplicitComponent):
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         """
         super()._setup_vectors(root_vectors)
+
+        if not self._use_derivatives:
+            self._manual_decl_partials = True  # prevents attempts to use _viewdict in compute
+
+        self._iodict = _IODict(self._outputs, self._inputs, self._constants)
+
+        self._relcopy = False
+
         if not self._manual_decl_partials:
-            # set up some complex data structures needed for a complex compute
-            self._inarray, self._indict, _ = \
-                self._inputs._get_local_views(dtype=complex, copy=True)
-            self._outarray, outdict, _ = \
-                self._outputs._get_local_views(dtype=complex, copy=True)
+            if self._force_alloc_complex:
+                # we can use the internal Vector complex arrays
+
+                # set complex_step_mode so we'll get the full complex array
+                self._inputs.set_complex_step_mode(True)
+                self._outputs.set_complex_step_mode(True)
+
+                self._indict = self._inputs._get_local_views()
+                outdict = self._outputs._get_local_views()
+
+                self._inarray = self._inputs.asarray(copy=False)
+                self._outarray = self._outputs.asarray(copy=False)
+
+                self._inputs.set_complex_step_mode(False)
+                self._outputs.set_complex_step_mode(False)
+
+            else:
+                # we make our own complex 'copy' of the Vector arrays
+                self._inarray = np.zeros(len(self._inputs), dtype=complex)
+                self._outarray = np.zeros(len(self._outputs), dtype=complex)
+
+                self._indict = self._inputs._get_local_views(self._inarray)
+                outdict = self._outputs._get_local_views(self._outarray)
+
+                self._relcopy = True
 
             # combine lookup dicts for faster exec calls
             viewdict = self._indict.copy()
@@ -775,19 +804,26 @@ class ExecComp(ExplicitComponent):
             `Vector` containing outputs.
         """
         if not self._manual_decl_partials:
-            self._inarray[:] = self._inputs.asarray(copy=False)
-            self._exec()
-            outs = outputs.asarray(copy=False)
-            if outs.dtype == self._outarray.dtype:
-                outs[:] = self._outarray
+            if self._relcopy:
+                self._inarray[:] = self._inputs.asarray(copy=False)
+                self._exec()
+                outs = outputs.asarray(copy=False)
+                if outs.dtype == self._outarray.dtype:
+                    outs[:] = self._outarray
+                else:
+                    outs[:] = self._outarray.real
             else:
-                outs[:] = self._outarray.real
+                self._exec()
+
             return
+
+        if self._iodict._inputs is not inputs:
+            self._iodict = _IODict(outputs, inputs, self._constants)
 
         for i, expr in enumerate(self._codes):
             try:
                 #  inputs, outputs, and _constants are vectors
-                exec(expr, _expr_dict, _IODict(outputs, inputs, self._constants))  # nosec:
+                exec(expr, _expr_dict, self._iodict)  # nosec:
                 # limited to _expr_dict
             except Exception as err:
                 raise RuntimeError(f"{self.msginfo}: Error occurred evaluating '{self._exprs[i]}':"
@@ -936,45 +972,48 @@ class ExecComp(ExplicitComponent):
 
         if self.options['has_diag_partials']:
             # we should never get here
-            raise NotImplementedError("no has_diag_partials support yet")
-        else:
-            # compute perturbations
-            starting_inputs = self._inputs.asarray(copy=False)
-            in_offsets = starting_inputs.copy()
-            in_offsets[in_offsets == 0.0] = 1.0
-            in_offsets *= info['perturb_size']
+            raise NotImplementedError("has_diag_partials not supported with coloring yet")
 
-            # use special sparse jacobian to collect sparsity info
-            jac = _ColSparsityJac(self, info)
+        # compute perturbations
+        starting_inputs = self._inputs.asarray(copy=not self._relcopy)
+        in_offsets = starting_inputs.copy()
+        in_offsets[in_offsets == 0.0] = 1.0
+        in_offsets *= info['perturb_size']
 
-            for i in range(info['num_full_jacs']):
-                inarr[:] = starting_inputs + in_offsets * _randgen.random(in_offsets.size)
+        # use special sparse jacobian to collect sparsity info
+        jac = _ColSparsityJac(self, info)
 
-                for i in range(inarr.size):
-                    inarr[i] += step
-                    self._exec()
-                    jac.set_col(self, i, imag(oarr * inv_stepsize))
-                    inarr[i] -= step
+        for i in range(info['num_full_jacs']):
+            inarr[:] = starting_inputs + in_offsets * _randgen.random(in_offsets.size)
 
-            sparsity, sp_info = jac.get_sparsity(self)
-            sparsity_time = time.perf_counter() - sparsity_start_time
+            for i in range(inarr.size):
+                inarr[i] += step
+                self._exec()
+                jac.set_col(self, i, imag(oarr * inv_stepsize))
+                inarr[i] -= step
 
-            coloring = _compute_coloring(sparsity, 'fwd')
+        if not self._relcopy:
+            self._inputs.set_val(starting_inputs)
 
-            if not self._finalize_coloring(coloring, info, sp_info, sparsity_time):
-                return [None]
+        sparsity, sp_info = jac.get_sparsity(self)
+        sparsity_time = time.perf_counter() - sparsity_start_time
 
-            # compute mapping of col index to wrt varname
-            self._col_idx2name = idxnames = [None] * len(self._inputs)
-            plen = len(self.pathname) + 1 if self.pathname else 0
-            for name, slc in self._inputs.get_slice_dict().items():
-                name = name[plen:]
-                for i in range(slc.start, slc.stop):
-                    idxnames[i] = name
+        coloring = _compute_coloring(sparsity, 'fwd')
 
-            # get slice dicts using relative name keys
-            self._out_slices = {n[plen:]: slc for n, slc in self._outputs.get_slice_dict().items()}
-            self._in_slices = {n[plen:]: slc for n, slc in self._inputs.get_slice_dict().items()}
+        if not self._finalize_coloring(coloring, info, sp_info, sparsity_time):
+            return [None]
+
+        # compute mapping of col index to wrt varname
+        self._col_idx2name = idxnames = [None] * len(self._inputs)
+        plen = len(self.pathname) + 1 if self.pathname else 0
+        for name, slc in self._inputs.get_slice_dict().items():
+            name = name[plen:]
+            for i in range(slc.start, slc.stop):
+                idxnames[i] = name
+
+        # get slice dicts using relative name keys
+        self._out_slices = {n[plen:]: slc for n, slc in self._outputs.get_slice_dict().items()}
+        self._in_slices = {n[plen:]: slc for n, slc in self._inputs.get_slice_dict().items()}
 
         return [coloring]
 

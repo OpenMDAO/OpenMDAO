@@ -564,3 +564,14 @@ class ExplicitComponent(Component):
             If not None, dict containing discrete input values.
         """
         pass
+
+    def is_explicit(self):
+        """
+        Return True if this is an explicit component.
+
+        Returns
+        -------
+        bool
+            True if this is an explicit component.
+        """
+        return True
