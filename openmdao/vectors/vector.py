@@ -44,8 +44,6 @@ class Vector(object):
         Pointer to the vector owned by the root system.
     alloc_complex : bool
         Whether to allocate any imaginary storage to perform complex step. Default is False.
-    rel_lookup : bool
-        If True, add a dict mapping relative variable name to view, for use in Components only.
 
     Attributes
     ----------
@@ -65,8 +63,6 @@ class Vector(object):
         Dictionary mapping absolute variable names to the ndarray views.
     _views_flat : dict
         Dictionary mapping absolute variable names to the flattened ndarray views.
-    _views_rel : dict or None
-        If owning system is a component, this will contain a mapping of relative names to views.
     _names : set([str, ...])
         Set of variables that are relevant in the current context.
     _root_vector : Vector
@@ -103,7 +99,7 @@ class Vector(object):
     # Indicator whether a vector class is MPI-distributed
     distributed = False
 
-    def __init__(self, name, kind, system, root_vector=None, alloc_complex=False, rel_lookup=False):
+    def __init__(self, name, kind, system, root_vector=None, alloc_complex=False):
         """
         Initialize all attributes.
         """
@@ -149,10 +145,8 @@ class Vector(object):
         else:
             self._root_vector = root_vector
 
-        self._views_rel = None
-
         self._initialize_data(root_vector)
-        self._initialize_views(rel_lookup)
+        self._initialize_views()
 
         self.read_only = False
 
@@ -372,14 +366,6 @@ class Vector(object):
         float or ndarray
             variable value.
         """
-        if self._views_rel is not None:
-            try:
-                if self._under_complex_step:
-                    return self._views_rel[name]
-                return self._views_rel[name].real
-            except KeyError:
-                pass  # try normal lookup after rel lookup failed
-
         abs_name = self._name2abs_name(name)
         if abs_name is not None:
             return self._abs_get_val(abs_name, flat=False)
@@ -426,14 +412,6 @@ class Vector(object):
         value : float or list or tuple or ndarray
             variable value to set
         """
-        if self._views_rel is not None:
-            try:
-                self._views_rel[name][:] = value
-            except Exception:
-                pass  # fall through to normal set if fast one failed in any way
-            else:
-                return
-
         self.set_var(name, value)
 
     def _initialize_data(self, root_vector):
@@ -450,16 +428,11 @@ class Vector(object):
         raise NotImplementedError('_initialize_data not defined for vector type '
                                   f'{type(self).__name__}')
 
-    def _initialize_views(self, rel_lookup=False):
+    def _initialize_views(self):
         """
         Internally assemble views onto the vectors.
 
         Must be implemented by the subclass.
-
-        Parameters
-        ----------
-        rel_lookup : bool
-            If True, add a dict mapping relative variable name to view, for use in Components only.
         """
         raise NotImplementedError('_initialize_views not defined for vector type '
                                   f'{type(self).__name__}')

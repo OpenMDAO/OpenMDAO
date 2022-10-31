@@ -307,19 +307,6 @@ class Component(System):
 
         self._owned_sizes = self._var_sizes['output']
 
-    def _setup_vectors(self, root_vectors, rel_lookup=False):
-        """
-        Compute all vectors for all vec names and assign excluded variables lists.
-
-        Parameters
-        ----------
-        root_vectors : dict of dict of Vector
-            Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
-        rel_lookup : bool
-            If True, create a mapping of relative name to view.
-        """
-        super()._setup_vectors(root_vectors, rel_lookup=True)
-
     def _setup_partials(self):
         """
         Process all partials and approximations that the user declared.
@@ -1648,6 +1635,17 @@ class Component(System):
             elif meta['add_input_src_indices']:
                 self._var_prom2inds[abs2prom[tgt]] = [meta['shape'], meta['src_indices'],
                                                       meta['src_indices']._flat_src]
+
+    def _has_fast_rel_lookup(self):
+        """
+        Return True if this System should have fast relative variable name lookup in vectors.
+
+        Returns
+        -------
+        bool
+            True if this System should have fast relative variable name lookup in vectors.
+        """
+        return True
 
 
 class _DictValues(object):

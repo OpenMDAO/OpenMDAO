@@ -39,8 +39,6 @@ else:
             Pointer to the vector owned by the root system.
         alloc_complex : bool
             Whether to allocate any imaginary storage to perform complex step. Default is False.
-        rel_lookup : bool
-            If True, add a dict mapping relative variable name to view, for use in Components only.
 
         Attributes
         ----------
@@ -58,13 +56,12 @@ else:
         cite = CITATION
         distributed = True
 
-        def __init__(self, name, kind, system, root_vector=None, alloc_complex=False,
-                     rel_lookup=False):
+        def __init__(self, name, kind, system, root_vector=None, alloc_complex=False):
             """
             Initialize all attributes.
             """
             super().__init__(name, kind, system, root_vector=root_vector,
-                             alloc_complex=alloc_complex, rel_lookup=rel_lookup)
+                             alloc_complex=alloc_complex)
 
             self._dup_inds = None
             self._dup_scratch = None

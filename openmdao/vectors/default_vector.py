@@ -24,11 +24,69 @@ class DefaultVector(Vector):
         Pointer to the vector owned by the root system.
     alloc_complex : bool
         Whether to allocate any imaginary storage to perform complex step. Default is False.
-    rel_lookup : bool
-        If True, add a dict mapping relative variable name to view, for use in Components only.
+
+    Attributes
+    ----------
+    _views_rel : dict or None
+        If owning system is a component, this will contain a mapping of relative names to views.
     """
 
     TRANSFER = DefaultTransfer
+
+    def __init__(self, name, kind, system, root_vector=None, alloc_complex=False):
+        """
+        Initialize all attributes.
+        """
+        super().__init__(name, kind, system, root_vector=root_vector, alloc_complex=alloc_complex)
+        self._views_rel = None
+
+    def __getitem__(self, name):
+        """
+        Get the variable value.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the owning system's namespace.
+
+        Returns
+        -------
+        float or ndarray
+            variable value.
+        """
+        if self._views_rel is not None:
+            try:
+                if self._under_complex_step:
+                    return self._views_rel[name]
+                return self._views_rel[name].real
+            except KeyError:
+                pass  # try normal lookup after rel lookup failed
+
+        return super().__getitem__(name)
+
+    def __setitem__(self, name, value):
+        """
+        Set the variable value.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the owning system's namespace.
+        value : float or list or tuple or ndarray
+            variable value to set
+        """
+        if self._views_rel is not None:
+            try:
+                if self.read_only:
+                    raise ValueError(f"{self._system().msginfo}: Attempt to set value of "
+                                     f"'{name}' in {self._kind} vector when it is read only.")
+                self._views_rel[name][:] = value
+            except Exception:
+                pass  # fall through to normal set if fast one failed in any way
+            else:
+                return
+
+        self.set_var(name, value)
 
     def _get_data(self):
         """
@@ -131,19 +189,15 @@ class DefaultVector(Vector):
         else:
             self._data, self._scaling = self._extract_root_data()
 
-    def _initialize_views(self, rel_lookup=False):
+    def _initialize_views(self):
         """
         Internally assemble views onto the vectors.
-
-        Parameters
-        ----------
-        rel_lookup : bool
-            If True, add a dict mapping relative variable name to view, for use in Components only.
         """
         system = self._system()
         io = self._typ
         kind = self._kind
         islinear = self._name == 'linear'
+        rel_lookup = system._has_fast_rel_lookup()
 
         do_scaling = self._do_scaling
         if do_scaling:
