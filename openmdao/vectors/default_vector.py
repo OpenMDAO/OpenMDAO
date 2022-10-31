@@ -43,9 +43,7 @@ class DefaultVector(Vector):
         ndarray
             The data array or its real part.
         """
-        if self._under_complex_step:
-            return self._data
-        return self._data.real
+        return self._data if self._under_complex_step else self._data.real
 
     def _create_data(self):
         """
@@ -393,7 +391,7 @@ class DefaultVector(Vector):
         """
         Return an array representation of this vector.
 
-        If copy is True, return a copy.  Otherwise, try to avoid it.
+        If copy is True, return a copy.
 
         Parameters
         ----------

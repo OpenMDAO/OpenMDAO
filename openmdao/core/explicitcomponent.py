@@ -467,19 +467,21 @@ class ExplicitComponent(Component):
         Call compute_partials based on the value of the "run_root_only" option.
         """
         with self._call_user_function('compute_partials'):
-            args = [self._inputs, self._jacobian]
-            if self._discrete_inputs:
-                args += [self._discrete_inputs]
-
             if self._run_root_only():
                 if self.comm.rank == 0:
-                    self.compute_partials(*args)
+                    if self._discrete_inputs:
+                        self.compute_partials(self._inputs, self._jacobian, self._discrete_inputs)
+                    else:
+                        self.compute_partials(self._inputs, self._jacobian)
                     self.comm.bcast(list(self._jacobian.items()), root=0)
                 else:
                     for key, val in self.comm.bcast(None, root=0):
                         self._jacobian[key] = val
             else:
-                self.compute_partials(*args)
+                if self._discrete_inputs:
+                    self.compute_partials(self._inputs, self._jacobian, self._discrete_inputs)
+                else:
+                    self.compute_partials(self._inputs, self._jacobian)
 
     def _linearize(self, jac=None, sub_do_ln=False):
         """
