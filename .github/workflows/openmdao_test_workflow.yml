@@ -458,7 +458,7 @@ jobs:
           echo "============================================================="
           echo "Pre-install jupyter dependencies"
           echo "============================================================="
-          python -m pip install 'jupyter-core>=4.11.2' git+https://github.com/executablebooks/jupyter-book
+          conda install jupyter jupyter-book 'lxml>=4.9.1'
 
           echo "============================================================="
           echo "Install OpenMDAO"
