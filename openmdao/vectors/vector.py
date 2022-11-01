@@ -707,7 +707,7 @@ class Vector(object):
 
     def _get_local_views(self, arr=None):
         """
-        Return an array a dict of views into that array using local names.
+        Return a dict of views into an array using local names.
 
         If arr is not supplied, use our existing internal data array.
         Note that if arr is not specified, the array used will depend upon the value of
