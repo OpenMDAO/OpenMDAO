@@ -75,16 +75,12 @@ class DefaultVector(Vector):
         value : float or list or tuple or ndarray
             variable value to set
         """
-        if self._views_rel is not None:
+        if self._views_rel is not None and not self.read_only:
             try:
-                if self.read_only:
-                    raise ValueError(f"{self._system().msginfo}: Attempt to set value of "
-                                     f"'{name}' in {self._kind} vector when it is read only.")
                 self._views_rel[name][:] = value
+                return
             except Exception:
                 pass  # fall through to normal set if fast one failed in any way
-            else:
-                return
 
         self.set_var(name, value)
 
