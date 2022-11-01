@@ -39,6 +39,7 @@ class ImplicitComponent(Component):
         Also tag component if it provides a guess_nonlinear.
         """
         self._has_guess = overrides_method('guess_nonlinear', self, ImplicitComponent)
+        self._has_solve_nl = overrides_method('solve_nonlinear', self, ImplicitComponent)
 
         new_apply_linear = getattr(self, 'apply_linear', None)
 
@@ -52,13 +53,13 @@ class ImplicitComponent(Component):
         """
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
             with self._call_user_function('apply_nonlinear', protect_outputs=True):
-                args = [self._inputs, self._outputs, self._residuals]
-                if self._discrete_inputs or self._discrete_outputs:
-                    args += [self._discrete_inputs, self._discrete_outputs]
-
                 if self._run_root_only():
                     if self.comm.rank == 0:
-                        self.apply_nonlinear(*args)
+                        if self._discrete_inputs or self._discrete_outputs:
+                            self.apply_nonlinear(self._inputs, self._outputs, self._residuals,
+                                                 self._discrete_inputs, self._discrete_outputs)
+                        else:
+                            self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
                         self.comm.bcast([self._residuals.asarray(), self._discrete_outputs], root=0)
                     else:
                         new_res, new_disc_outs = self.comm.bcast(None, root=0)
@@ -67,7 +68,11 @@ class ImplicitComponent(Component):
                             for name, val in new_disc_outs.items():
                                 self._discrete_outputs[name] = val
                 else:
-                    self.apply_nonlinear(*args)
+                    if self._discrete_inputs or self._discrete_outputs:
+                        self.apply_nonlinear(self._inputs, self._outputs, self._residuals,
+                                             self._discrete_inputs, self._discrete_outputs)
+                    else:
+                        self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
 
         self.iter_count_apply += 1
 
@@ -79,15 +84,20 @@ class ImplicitComponent(Component):
             with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
                 self._nonlinear_solver._solve_with_cache_check()
         else:
+            if not self._has_solve_nl:
+                return
+
             with self._unscaled_context(outputs=[self._outputs]):
                 with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
                     with self._call_user_function('solve_nonlinear'):
-                        args = [self._inputs, self._outputs]
-                        if self._discrete_inputs or self._discrete_outputs:
-                            args += [self._discrete_inputs, self._discrete_outputs]
                         if self._run_root_only():
                             if self.comm.rank == 0:
-                                self.solve_nonlinear(*args)
+                                if self._discrete_inputs or self._discrete_outputs:
+                                    self.solve_nonlinear(self._inputs, self._outputs,
+                                                         self._discrete_inputs,
+                                                         self._discrete_outputs)
+                                else:
+                                    self.solve_nonlinear(self._inputs, self._outputs)
                                 self.comm.bcast([self._outputs.asarray(), self._discrete_outputs],
                                                 root=0)
                             else:
@@ -97,7 +107,11 @@ class ImplicitComponent(Component):
                                     for name, val in new_disc_outs.items():
                                         self._discrete_outputs[name] = val
                         else:
-                            self.solve_nonlinear(*args)
+                            if self._discrete_inputs or self._discrete_outputs:
+                                self.solve_nonlinear(self._inputs, self._outputs,
+                                                     self._discrete_inputs, self._discrete_outputs)
+                            else:
+                                self.solve_nonlinear(self._inputs, self._outputs)
 
         # Iteration counter is incremented in the Recording context manager at exit.
 
@@ -254,19 +268,23 @@ class ImplicitComponent(Component):
         Call linearize based on the value of the "run_root_only" option.
         """
         with self._call_user_function('linearize', protect_outputs=True):
-            args = [self._inputs, self._outputs, self._jacobian]
-            if self._discrete_inputs or self._discrete_outputs:
-                args += [self._discrete_inputs, self._discrete_outputs]
-
             if self._run_root_only():
                 if self.comm.rank == 0:
-                    self.linearize(*args)
+                    if self._discrete_inputs or self._discrete_outputs:
+                        self.linearize(self._inputs, self._outputs, self._jacobian,
+                                       self._discrete_inputs, self._discrete_outputs)
+                    else:
+                        self.linearize(self._inputs, self._outputs, self._jacobian)
                     self.comm.bcast(list(self._jacobian.items()), root=0)
                 else:
                     for key, val in self.comm.bcast(None, root=0):
                         self._jacobian[key] = val
             else:
-                self.linearize(*args)
+                if self._discrete_inputs or self._discrete_outputs:
+                    self.linearize(self._inputs, self._outputs, self._jacobian,
+                                   self._discrete_inputs, self._discrete_outputs)
+                else:
+                    self.linearize(self._inputs, self._outputs, self._jacobian)
 
     def _linearize(self, jac=None, sub_do_ln=True):
         """

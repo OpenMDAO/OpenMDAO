@@ -37,8 +37,8 @@ class DefaultVector(Vector):
         """
         Initialize all attributes.
         """
-        super().__init__(name, kind, system, root_vector=root_vector, alloc_complex=alloc_complex)
         self._views_rel = None
+        super().__init__(name, kind, system, root_vector=root_vector, alloc_complex=alloc_complex)
 
     def __getitem__(self, name):
         """
