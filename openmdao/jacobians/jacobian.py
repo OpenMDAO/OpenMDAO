@@ -40,7 +40,7 @@ class Jacobian(object):
         Dictionary of the sub-Jacobian metadata keyed by absolute names.
     _under_complex_step : bool
         When True, this Jacobian is under complex step, using a complex jacobian.
-    _abs_keys : defaultdict
+    _abs_keys : dict
         A cache dict for key to absolute key.
     _randgen : Generator or None
         If not None, use the generator to generate random numbers during computation of
@@ -67,7 +67,11 @@ class Jacobian(object):
         self._col2name_ind = None
 
     def _get_abs_key(self, key):
-        self._abs_keys[key] = abskey = key2abs_key(self._system(), key)
+        if key in self._abs_keys:
+            return self._abs_keys[key]
+        abskey = key2abs_key(self._system(), key)
+        if abskey is not None:
+            self._abs_keys[key] = abskey
         return abskey
 
     def _abs_key2shape(self, abs_key):
@@ -124,10 +128,7 @@ class Jacobian(object):
         ndarray or spmatrix or list[3]
             sub-Jacobian as an array, sparse mtx, or AIJ/IJ list or tuple.
         """
-        if key in self._abs_keys:
-            abs_key = self._abs_keys[key]
-        else:
-            abs_key = self._get_abs_key(key)
+        abs_key = self._get_abs_key(key)
         if abs_key in self._subjacs_info:
             return self._subjacs_info[abs_key]['val']
         else:
@@ -145,13 +146,10 @@ class Jacobian(object):
         subjac : int or float or ndarray or sparse matrix
             sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
         """
-        if key in self._abs_keys:
-            abs_key = self._abs_keys[key]
-        else:
-            abs_key = self._get_abs_key(key)
-            if abs_key is None:
-                msg = '{}: Variable name pair ("{}", "{}") not found.'
-                raise KeyError(msg.format(self.msginfo, key[0], key[1]))
+        abs_key = self._get_abs_key(key)
+        if abs_key is None:
+            msg = '{}: Variable name pair ("{}", "{}") not found.'
+            raise KeyError(msg.format(self.msginfo, key[0], key[1]))
 
         # You can only set declared subjacobians.
         if abs_key not in self._subjacs_info:

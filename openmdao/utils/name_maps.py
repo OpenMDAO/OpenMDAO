@@ -55,8 +55,10 @@ def rel_key2abs_key(system, rel_key):
     (str, str)
         Absolute variable name pair.
     """
-    of, wrt = rel_key
-    return (rel_name2abs_name(system, of), rel_name2abs_name(system, wrt))
+    if system.pathname:
+        of, wrt = rel_key
+        return (system.pathname + '.' + of, system.pathname + '.' + wrt)
+    return rel_key
 
 
 def abs_key2rel_key(system, abs_key):
@@ -75,8 +77,11 @@ def abs_key2rel_key(system, abs_key):
     (str, str)
         Relative variable name pair.
     """
-    of, wrt = abs_key
-    return (abs_name2rel_name(system, of), abs_name2rel_name(system, wrt))
+    if system.pathname:
+        of, wrt = abs_key
+        plen = len(system.pathname) + 1
+        return (of[plen:], wrt[plen:])
+    return abs_key
 
 
 def prom_name2abs_name(system, prom_name, iotype):
@@ -251,19 +256,17 @@ def key2abs_key(system, key):
     (str, str) or None
         Absolute name pair of sub-Jacobian if unique abs_key found or None otherwise.
     """
-    if key in system._subjacs_info:
-        return key
+    abs_key = rel_key2abs_key(system, key)
+    of, wrt = abs_key
+    if of in system._var_allprocs_abs2idx and wrt in system._var_allprocs_abs2idx:
+        return abs_key
 
     abs_key = prom_key2abs_key(system, key)
     if abs_key is not None:
         return abs_key
 
-    abs_key = rel_key2abs_key(system, key)
-    of, wrt = abs_key
-    if of in system._var_allprocs_abs2idx and wrt in system._var_allprocs_abs2idx:
-        return abs_key
-    else:
-        return None
+    if key in system._subjacs_info:
+        return key
 
 
 def abs_key_iter(system, rel_ofs, rel_wrts):
