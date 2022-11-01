@@ -6,7 +6,7 @@ from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.class_util import overrides_method
 
 
-_inst_functs = ['apply_linear']
+_inst_functs = ['apply_linear', 'solve_nonlinear']
 
 
 class ImplicitComponent(Component):
@@ -39,7 +39,10 @@ class ImplicitComponent(Component):
         Also tag component if it provides a guess_nonlinear.
         """
         self._has_guess = overrides_method('guess_nonlinear', self, ImplicitComponent)
-        self._has_solve_nl = overrides_method('solve_nonlinear', self, ImplicitComponent)
+
+        solve_nl = getattr(self, 'solve_nonlinear')
+        self._has_solve_nl = (overrides_method('solve_nonlinear', self, ImplicitComponent) or
+                              solve_nl != self._inst_functs['solve_nonlinear'])
 
         new_apply_linear = getattr(self, 'apply_linear', None)
 
@@ -83,10 +86,7 @@ class ImplicitComponent(Component):
         if self._nonlinear_solver is not None:
             with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
                 self._nonlinear_solver._solve_with_cache_check()
-        else:
-            if not self._has_solve_nl:
-                return
-
+        elif self._has_solve_nl:
             with self._unscaled_context(outputs=[self._outputs]):
                 with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
                     with self._call_user_function('solve_nonlinear'):
