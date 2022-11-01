@@ -3427,6 +3427,52 @@ class TestSqliteCaseReader(unittest.TestCase):
         for i, src in enumerate(sources):
             self.assertEqual(reader.list_cases(src, recurse=False, out_stream=None), [cases[i]])
 
+    def test_constraints_with_aliases(self):
+        p = om.Problem()
+
+        exec = om.ExecComp(['y = x**2',
+                            'z = a * x**2'],
+                        a={'shape': (1,)},
+                        y={'shape': (3,)},
+                        x={'shape': (3,)},
+                        z={'shape': (3,)})
+
+        p.model.add_subsystem('exec', exec)
+
+        p.model.add_design_var('exec.a', lower=-1000, upper=1000)
+        p.model.add_objective('exec.y', index=1)
+        p.model.add_constraint('exec.z', indices=[0], equals=25)
+        p.model.add_constraint('exec.z', indices=[-1], lower=20, alias="ALIAS_TEST")
+        p.model.add_constraint('exec.z', indices=[1], lower=0, alias="con|with->scaling", ref=11.0)
+
+        driver = p.driver = om.pyOptSparseDriver()
+        driver.recording_options['record_derivatives'] = True
+        driver.add_recorder(om.SqliteRecorder('cases.sql'))
+
+        p.setup()
+
+        p.set_val('exec.x', np.array([7.0, 2.0, 4.0]))
+
+        p.run_driver()
+
+        p.cleanup()
+        cr = om.CaseReader('cases.sql')
+        case = cr.get_case(1)
+        derivs = case.derivatives
+
+        assert_near_equal(derivs['exec.z', 'exec.a'].ravel(), 49.0)
+        assert_near_equal(derivs['ALIAS_TEST', 'exec.a'].ravel(), 16.0)
+        assert_near_equal(derivs['con|with->scaling', 'exec.a'].ravel(), 4.0/11.0)
+
+        cons = case.get_constraints()
+        con_vals = driver.get_constraint_values()
+
+        cons['ALIAS_TEST']
+
+        assert_near_equal(cons['exec.z'], con_vals['exec.z'])
+        assert_near_equal(cons['ALIAS_TEST'], con_vals['ALIAS_TEST'])
+        assert_near_equal(cons['con|with->scaling'], con_vals['con|with->scaling'])
+
 
 @use_tempdirs
 class TestFeatureSqliteReader(unittest.TestCase):
