@@ -29,7 +29,7 @@ jobs:
             PAROPT: true
             SNOPT: 7.7
             OPTIONAL: '[all]'
-            JAX: true
+            JAX: '0.3.22'
             BANDIT: true
             TESTS: true
 
@@ -44,7 +44,7 @@ jobs:
             # PAROPT: true
             # SNOPT: 7.7
             OPTIONAL: '[all]'
-            JAX: true
+            JAX: '0.3.22'
             TESTS: true
 
           # test latest versions
@@ -55,10 +55,10 @@ jobs:
             SCIPY: 1
             PETSc: 3
             PYOPTSPARSE: 'latest'
-            PAROPT: true
+            # PAROPT: true
             SNOPT: 7.7
             OPTIONAL: '[all]'
-            JAX: true
+            JAX: 'dev'
             TESTS: true
 
           # test minimal install
@@ -95,7 +95,7 @@ jobs:
             PYOPTSPARSE: 'v2.8.3'
             SNOPT: 7.7
             OPTIONAL: '[all]'
-            JAX: true
+            JAX: '0.3.22'
             BUILD_DOCS: true
 
     runs-on: ${{ matrix.OS }}
@@ -139,6 +139,7 @@ jobs:
         uses: conda-incubator/setup-miniconda@v2
         with:
           python-version: ${{ matrix.PY }}
+          conda-version: "*"
           channels: conda-forge,defaults
           channel-priority: true
 
@@ -146,14 +147,14 @@ jobs:
         run: |
           conda install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
 
+          python -m pip install --upgrade pip
+
           if [[ "${{ matrix.OPTIONAL }}" == "[all]" ]]; then
             echo "============================================================="
-            echo "Install jupyter dependencies with conda"
+            echo "Pre-install jupyter dependencies"
             echo "============================================================="
-            conda install jupyter jupyter-book 'lxml>=4.9.1'
+            python -m pip install 'jupyter-core>=4.11.2' git+https://github.com/executablebooks/jupyter-book
           fi
-
-          python -m pip install --upgrade pip
 
           echo "============================================================="
           echo "Install OpenMDAO"
@@ -166,28 +167,43 @@ jobs:
           echo "============================================================="
           echo "Install jax"
           echo "============================================================="
-          python -m pip install jax jaxlib
+
+          if [[ "${{ matrix.JAX }}" == "dev" ]]; then
+            python -m pip install git+https://github.com/google/jax
+          else
+            python -m pip install jaxlib jax=='${{ matrix.JAX}}'
+          fi
 
       - name: Install PETSc
         if: matrix.PETSc
         run: |
           echo "============================================================="
-          echo "Install PETSc"
+          echo "Install compilers for PETSc"
           echo "============================================================="
           if [[ "${{ matrix.OPENMPI }}" ]]; then
             COMPILERS="cython compilers openmpi-mpicc=${{ matrix.OPENMPI }}"
           else
             COMPILERS="cython compilers openmpi-mpicc"
           fi
+          conda install $COMPILERS -q -y
 
-          if [[ "${{ matrix.MPI4PY }}" ]]; then
-            MPI4PY="mpi4py=${{ matrix.MPI4PY }}"
+          echo "============================================================="
+          echo "Install PETSc"
+          echo "============================================================="
+          if [[ "${{ matrix.PETSc }}" == "3" ]]; then
+            python -m pip install git+https://github.com/mpi4py/mpi4py
+            python -m pip install petsc petsc4py
           else
-            MPI4PY="mpi4py"
+            if [[ "${{ matrix.MPI4PY }}" ]]; then
+              conda install mpi4py=${{ matrix.MPI4PY }} petsc4py=${{ matrix.PETSc }} -q -y
+            else
+              conda install mpi4py petsc4py=${{ matrix.PETSc }} -q -y
+            fi
           fi
 
-          conda install $COMPILERS $MPI4PY petsc4py=${{ matrix.PETSc }} -q -y
-
+          echo "============================================================="
+          echo "Check MPI and PETSc installation"
+          echo "============================================================="
           export OMPI_MCA_rmaps_base_oversubscribe=1
           echo "-----------------------"
           echo "Quick test of mpi4py:"
@@ -219,7 +235,7 @@ jobs:
 
             conda install -c conda-forge pyoptsparse
           else
-            pip install git+https://github.com/OpenMDAO/build_pyoptsparse
+            python -m pip install git+https://github.com/OpenMDAO/build_pyoptsparse
 
             if [[ "${{ matrix.PYOPTSPARSE }}" == "latest" ]]; then
               LATEST_URL=`curl -fsSLI -o /dev/null -w %{url_effective} https://github.com/mdolab/pyoptsparse/releases/latest`
@@ -437,12 +453,12 @@ jobs:
         run: |
           conda install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
 
+          python -m pip install --upgrade pip
+
           echo "============================================================="
-          echo "Install jupyter dependencies with conda"
+          echo "Pre-install jupyter dependencies"
           echo "============================================================="
           conda install jupyter jupyter-book 'lxml>=4.9.1'
-
-          python -m pip install --upgrade pip
 
           echo "============================================================="
           echo "Install OpenMDAO"
