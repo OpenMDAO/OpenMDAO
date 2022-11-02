@@ -17,14 +17,15 @@ with open(Path(__file__).parent / "README.md", encoding="utf-8") as f:
 optional_dependencies = {
     'docs': [
         'matplotlib',
-        'jupyter',
-        'nbconvert',
-        'testflo',
-        'ipyparallel',
         'numpydoc>=1.1',
-        'jupyter-book<0.13',
+        'jupyter-core>=4.11.2',
+        'jupyter-book>=0.8.0,<0.13',
+        'jupyter-client>=7.4.0',
+        'jupyter',
         'jupyter-sphinx',
-        'sphinx-sitemap'
+        'sphinx-sitemap',
+        'ipyparallel',
+        'nbconvert>=6.3'
     ],
     'doe': [
         'pyDOE2'
