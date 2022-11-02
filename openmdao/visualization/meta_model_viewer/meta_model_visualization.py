@@ -492,8 +492,8 @@ class MetaModelVisualization(object):
                       (self.output_select.value, "@z")], tools='')
         contour_plot.x_range.range_padding = 0
         contour_plot.y_range.range_padding = 0
-        contour_plot.plot_width = 600
-        contour_plot.plot_height = 500
+        contour_plot.width = 600
+        contour_plot.height = 500
         contour_plot.xaxis.axis_label = self.x_input_select.value
         contour_plot.yaxis.axis_label = self.y_input_select.value
         contour_plot.min_border_left = 0
@@ -576,7 +576,7 @@ class MetaModelVisualization(object):
 
         # Create and format figure
         self.right_plot_fig = right_plot_fig = figure(
-            plot_width=250, plot_height=500,
+            width=250, height=500,
             title="{} vs {}".format(y_idx, self.output_select.value), tools="pan")
         right_plot_fig.xaxis.axis_label = self.output_select.value
         right_plot_fig.yaxis.axis_label = y_idx
@@ -664,7 +664,7 @@ class MetaModelVisualization(object):
 
         # Create and format figure
         self.bottom_plot_fig = bottom_plot_fig = figure(
-            plot_width=550, plot_height=250,
+            width=550, height=250,
             title="{} vs {}".format(x_idx, self.output_select.value), tools="")
         bottom_plot_fig.xaxis.axis_label = x_idx
         bottom_plot_fig.yaxis.axis_label = self.output_select.value
