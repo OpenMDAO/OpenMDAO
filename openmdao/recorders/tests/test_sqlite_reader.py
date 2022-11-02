@@ -3427,6 +3427,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         for i, src in enumerate(sources):
             self.assertEqual(reader.list_cases(src, recurse=False, out_stream=None), [cases[i]])
 
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_constraints_with_aliases(self):
         p = om.Problem()
 
@@ -3466,8 +3468,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cons = case.get_constraints()
         con_vals = driver.get_constraint_values()
-
-        cons['ALIAS_TEST']
 
         assert_near_equal(cons['exec.z'], con_vals['exec.z'])
         assert_near_equal(cons['ALIAS_TEST'], con_vals['ALIAS_TEST'])
