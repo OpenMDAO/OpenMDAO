@@ -17,21 +17,25 @@ with open(Path(__file__).parent / "README.md", encoding="utf-8") as f:
 optional_dependencies = {
     'docs': [
         'matplotlib',
-        'jupyter',
-        'nbconvert',
-        'testflo',
-        'ipyparallel',
         'numpydoc>=1.1',
-        'jupyter-book<0.13',
+        'jupyter-core>=4.11.2',
+        'jupyter-book>=0.8.0,<0.13',
+        'jupyter-client>=7.4.0',
+        'jupyter',
         'jupyter-sphinx',
-        'sphinx-sitemap'
+        'sphinx-sitemap',
+        'ipyparallel',
+        'nbconvert>=6.3'
+    ],
+    'doe': [
+        'pyDOE2'
     ],
     'notebooks': [
         'notebook',
         'ipython',
         'ipywidgets>=7.6.5',
         'ipympl',
-	'myst_nb'
+        'myst_nb'
     ],
     'visualization': [
         'bokeh>=1.3.4',
@@ -42,7 +46,7 @@ optional_dependencies = {
         'parameterized',
         'numpydoc>=1.1',
         'pycodestyle>=2.4.0',
-        'pydocstyle==2.0.0',
+        'pydocstyle>=2.0.0',
         'testflo>=1.3.6',
         'websockets>8',
         'aiounittest',
@@ -186,7 +190,6 @@ setup(
     install_requires=[
         'networkx>=2.0',
         'numpy',
-        'pyDOE2',
         'pyparsing',
         'scipy',
         'requests',

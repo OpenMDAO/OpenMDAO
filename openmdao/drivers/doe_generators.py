@@ -7,7 +7,11 @@ import re
 from collections import OrderedDict
 
 import numpy as np
-import pyDOE2
+
+try:
+    import pyDOE2
+except ImportError:
+    pyDOE2 = None
 
 from openmdao.utils.name_maps import prom_name2abs_name
 
@@ -295,6 +299,12 @@ class _pyDOE_Generator(DOEGenerator):
         """
         Initialize the _pyDOE_Generator.
         """
+        if pyDOE2 is None:
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE2' package, "
+                               "which can be installed with one of the following commands:\n"
+                               "    pip install openmdao[doe]\n"
+                               "    pip install pyDOE2")
+
         super().__init__()
         self._levels = levels
         self._sizes = None
