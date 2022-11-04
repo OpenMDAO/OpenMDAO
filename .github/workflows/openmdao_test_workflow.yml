@@ -32,7 +32,7 @@ jobs:
             PAROPT: true
             SNOPT: 7.7
             OPTIONAL: '[all]'
-            JAX: '0.3.22'
+            JAX: '0.3.24'
             BANDIT: true
             TESTS: true
 
@@ -47,7 +47,7 @@ jobs:
             # PAROPT: true
             # SNOPT: 7.7
             OPTIONAL: '[all]'
-            JAX: '0.3.22'
+            JAX: '0.3.24'
             TESTS: true
 
           # test latest versions
@@ -98,7 +98,7 @@ jobs:
             PYOPTSPARSE: 'v2.8.3'
             SNOPT: 7.7
             OPTIONAL: '[all]'
-            JAX: '0.3.22'
+            JAX: '0.3.24'
             BUILD_DOCS: true
 
     runs-on: ${{ matrix.OS }}
