@@ -156,7 +156,7 @@ jobs:
             echo "============================================================="
             echo "Pre-install jupyter dependencies"
             echo "============================================================="
-            conda install jupyter-book -q -y
+            python -m pip install git+https://github.com/executablebooks/jupyter-book
           fi
 
           echo "============================================================="
