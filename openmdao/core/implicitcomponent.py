@@ -321,7 +321,7 @@ class ImplicitComponent(Component):
             # Computing the approximation before the call to compute_partials allows users to
             # override FD'd values.
             for approximation in self._approx_schemes.values():
-                approximation.compute_approximations(self, jac=self._jac_wrapper)
+                approximation.compute_approximations(self, jac=self._jacobian)
 
             self._linearize_wrapper()
 
@@ -535,10 +535,6 @@ class ImplicitComponent(Component):
             'of' and 'wrt' variable lists.
         """
         of = list(self._var_allprocs_prom2abs_list['output'])
-        if use_resname and self._declared_residuals:
-            res = list(self._declared_residuals)
-        else:
-            res = of
         wrt = list(self._var_allprocs_prom2abs_list['input'])
 
         # filter out any discrete inputs or outputs
@@ -546,6 +542,11 @@ class ImplicitComponent(Component):
             of = [n for n in of if n not in self._discrete_outputs]
         if self._discrete_inputs:
             wrt = [n for n in wrt if n not in self._discrete_inputs]
+
+        if use_resname and self._declared_residuals:
+            res = list(self._declared_residuals)
+        else:
+            res = of
 
         # wrt should include implicit states
         return res, of + wrt
