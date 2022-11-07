@@ -215,6 +215,7 @@ class ImplicitComponent(Component):
 
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
             d_inputs, d_outputs, d_residuals = vecs
+            d_residuals = self._dresiduals_wrapper
 
             # Jacobian and vectors are all scaled, unitless
             jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
@@ -262,7 +263,7 @@ class ImplicitComponent(Component):
 
         else:
             d_outputs = self._doutputs
-            d_residuals = self._dresiduals
+            d_residuals = self._dresiduals_wrapper
 
             with self._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
                 # set appropriate vectors to read_only to help prevent user error
@@ -722,8 +723,8 @@ class ImplicitComponent(Component):
 
 class _ResidsWrapper(object):
     def __init__(self, vec, name2slice_shape):
-        self._vec = vec
-        self._dct = name2slice_shape
+        self.__dict__['_vec'] = vec
+        self.__dict__['_dct'] = name2slice_shape
 
     def __getitem__(self, name):
         arr = self._vec.asarray(copy=False)
@@ -738,7 +739,7 @@ class _ResidsWrapper(object):
     def __setitem__(self, name, val):
         arr = self._vec.asarray(copy=False)
         if name in self._dct:
-            slc, shape = self._dct[name]
+            slc, _ = self._dct[name]
             arr[slc] = np.asarray(val).flat
             return
 
@@ -747,11 +748,14 @@ class _ResidsWrapper(object):
     def __getattr__(self, name):
         return getattr(self._vec, name)
 
+    def __setattr__(self, name, val):
+        setattr(self._vec, name, val)
+
 
 class _JacobianWrapper(object):
     def __init__(self, jac, res2outmap):
-        self._jac = jac
-        self._dct = res2outmap
+        self.__dict__['_jac'] = jac
+        self.__dict__['_dct'] = res2outmap
 
     def __getitem__(self, key):
         res, wrt = key
@@ -765,9 +769,12 @@ class _JacobianWrapper(object):
     def __setitem__(self, key, val):
         res, wrt = key
 
-        for of, setslc, getslc in self._dct[res]:
+        for of, _, getslc in self._dct[res]:
             v = val[getslc]
             self._jac.__setitem__((of, wrt), v)
 
     def __getattr__(self, name):
         return getattr(self._jac, name)
+
+    def __setattr__(self, name, val):
+        setattr(self._jac, name, val)
