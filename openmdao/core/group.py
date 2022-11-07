@@ -772,7 +772,7 @@ class Group(System):
             dist_ins = (n for n, m in all_abs2meta_in.items() if m['distributed'] or
                         (conns[n].startswith('_auto_ivc.') and
                          all_abs2meta_out[conns[n]]['distributed']))
-            dcomp_names = set(d.rsplit('.', 1)[0] for d in dist_ins)
+            dcomp_names = set(d.rpartition('.')[0] for d in dist_ins)
             if dcomp_names:
                 added_src_inds = []
                 for comp in self.system_iter(recurse=True, typ=Component):

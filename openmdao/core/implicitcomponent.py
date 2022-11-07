@@ -1,12 +1,41 @@
 """Define the ImplicitComponent class."""
 
+import numpy as np
+
 from openmdao.core.component import Component
-from openmdao.core.constants import _UNDEFINED
+from openmdao.core.constants import _UNDEFINED, _SetupStatus
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.class_util import overrides_method
+from openmdao.utils.array_utils import shape_to_len
 
 
 _inst_functs = ['apply_linear']
+
+
+def _get_slice_shape_dict(name_shape_iter):
+    """
+    Return a dict of (slice, shape) tuples using provided names and shapes.
+
+    Parameters
+    ----------
+    name_shape_iter : iterator
+        An iterator yielding (name, shape) pairs
+
+    Returns
+    -------
+    dict
+        A dict of (slice, shape) tuples using provided names and shapes.
+    """
+    dct = {}
+
+    start = end = 0
+    for name, shape in name_shape_iter:
+        size = shape_to_len(shape)
+        end += size
+        dct[name] = (slice(start, end), shape)
+        start = end
+
+    return dct
 
 
 class ImplicitComponent(Component):
@@ -22,12 +51,16 @@ class ImplicitComponent(Component):
     ----------
     _inst_functs : dict
         Dictionary of names mapped to bound methods.
+    _declared_residuals : dict
+        Contains absolute residual names mapped to metadata.  Only used in ImplicitComponent but
+        included here to simplify some code.
     """
 
     def __init__(self, **kwargs):
         """
         Store some bound methods so we can detect runtime overrides.
         """
+        self._declared_residuals = {}
         super().__init__(**kwargs)
 
         self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
@@ -52,7 +85,7 @@ class ImplicitComponent(Component):
         """
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
             with self._call_user_function('apply_nonlinear', protect_outputs=True):
-                args = [self._inputs, self._outputs, self._residuals]
+                args = [self._inputs, self._outputs, self._residuals_wrapper]
                 if self._discrete_inputs or self._discrete_outputs:
                     args += [self._discrete_inputs, self._discrete_outputs]
 
@@ -118,10 +151,12 @@ class ImplicitComponent(Component):
 
                     with self._call_user_function('guess_nonlinear', protect_residuals=True):
                         if self._discrete_inputs or self._discrete_outputs:
-                            self.guess_nonlinear(self._inputs, self._outputs, self._residuals,
+                            self.guess_nonlinear(self._inputs, self._outputs,
+                                                 self._residuals_wrapper,
                                                  self._discrete_inputs, self._discrete_outputs)
                         else:
-                            self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
+                            self.guess_nonlinear(self._inputs, self._outputs,
+                                                 self._residuals_wrapper)
             finally:
                 if complex_step:
                     self._inputs.set_complex_step_mode(True)
@@ -254,7 +289,7 @@ class ImplicitComponent(Component):
         Call linearize based on the value of the "run_root_only" option.
         """
         with self._call_user_function('linearize', protect_outputs=True):
-            args = [self._inputs, self._outputs, self._jacobian]
+            args = [self._inputs, self._outputs, self._jac_wrapper]
             if self._discrete_inputs or self._discrete_outputs:
                 args += [self._discrete_inputs, self._discrete_outputs]
 
@@ -264,7 +299,7 @@ class ImplicitComponent(Component):
                     self.comm.bcast(list(self._jacobian.items()), root=0)
                 else:
                     for key, val in self.comm.bcast(None, root=0):
-                        self._jacobian[key] = val
+                        self._jac_wrapper[key] = val
             else:
                 self.linearize(*args)
 
@@ -285,7 +320,7 @@ class ImplicitComponent(Component):
             # Computing the approximation before the call to compute_partials allows users to
             # override FD'd values.
             for approximation in self._approx_schemes.values():
-                approximation.compute_approximations(self, jac=self._jacobian)
+                approximation.compute_approximations(self, jac=self._jac_wrapper)
 
             self._linearize_wrapper()
 
@@ -316,6 +351,203 @@ class ImplicitComponent(Component):
         metadata['tags'].add('openmdao:allow_desvar')
 
         return metadata
+
+    def add_residual(self, name, shape=(), units=None, desc='', ref=1.0):
+        """
+        Add an residual variable to the component.
+
+        Note that the total size of the residual vector must match the total size of
+        the outputs vector for this component.
+
+        Parameters
+        ----------
+        name : str
+            Name of the residual in this component's namespace.
+        shape : int or tuple
+            Shape of this residual.
+        units : str or None
+            Units in which this residual will be given to the user when requested.
+            Default is None, which means it has no units.
+        desc : str
+            Description of the residual.
+        ref : float or ndarray
+            Scaling parameter. The value in the user-defined units of this residual
+            when the scaled value is 1. Default is 1.
+
+        Returns
+        -------
+        dict
+            Metadata for the added residual.
+        """
+        if self._problem_meta is None:
+            raise RuntimeError(f"{self.msginfo}: "
+                               "A residual may only be added during component setup.")
+
+        metadict = self._declared_residuals
+
+        # Catch duplicated residuals
+        if name in metadict:
+            raise ValueError(f"{self.msginfo}: Residual name '{name}' already exists.")
+
+        if self._problem_meta is not None:
+            if self._problem_meta['setup_status'] >= _SetupStatus.POST_SETUP:
+                raise RuntimeError(f"{self.msginfo}: Can't add residual '{name}' after setup.")
+
+        metadict[name] = meta = {
+            'shape': shape,
+            'units': units,
+            'desc': desc,
+            'ref': ref,
+        }
+
+        return meta
+
+    def _setup_procs(self, pathname, comm, mode, prob_meta):
+        """
+        Execute first phase of the setup process.
+
+        Distribute processors, assign pathnames, and call setup on the component.
+
+        Parameters
+        ----------
+        pathname : str
+            Global name of the system, including the path.
+        comm : MPI.Comm or <FakeComm>
+            MPI communicator object.
+        mode : str
+            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
+            reverse (adjoint). Default is 'rev'.
+        prob_meta : dict
+            Problem level metadata.
+        """
+        self._declared_residuals = {}
+        super()._setup_procs(pathname, comm, mode, prob_meta)
+
+    def _resid_name_shape_iter(self):
+        for name, meta in self._declared_residuals.items():
+            yield name, meta['shape']
+
+    def _setup_vectors(self, root_vectors):
+        """
+        Compute all vectors for all vec names and assign excluded variables lists.
+
+        Parameters
+        ----------
+        root_vectors : dict of dict of Vector
+            Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        """
+        super()._setup_vectors(root_vectors)
+
+        if self._declared_residuals:
+            name2slcshape = _get_slice_shape_dict(self._resid_name_shape_iter())
+
+            if self._use_derivatives:
+                self._dresiduals_wrapper = _ResidsWrapper(self._dresiduals, name2slcshape)
+
+            self._residuals_wrapper = _ResidsWrapper(self._residuals, name2slcshape)
+            self._jac_wrapper = _JacobianWrapper(self._jacobian, self._resid2out_subjac_map)
+        else:
+            self._residuals_wrapper = self._residuals
+            self._dresiduals_wrapper = self._dresiduals
+            self._jac_wrapper = self._jacobian
+
+    def _output_range_iter(self):
+        plen = len(self.pathname) + 1 if self.pathname else 0
+        start = end = 0
+        for name, meta in self._var_allprocs_abs2meta['output'].items():
+            end += meta['size']
+            yield name[plen:], start, end
+            start = end
+
+    def _declare_partials(self, of, wrt, dct):
+        """
+        Store subjacobian metadata for later use.
+
+        Parameters
+        ----------
+        of : tuple of str
+            The names of the residuals that derivatives are being computed for.
+            May also contain glob patterns.
+        wrt : tuple of str
+            The names of the variables that derivatives are taken with respect to.
+            This can contain the name of any input or output variable.
+            May also contain glob patterns.
+        dct : dict
+            Metadata dict specifying shape, and/or approx properties.
+        """
+        if self._declared_residuals:
+            # if we have renamed resids, remap them to use output naming
+
+            # convert the 'of' patterns into specific resid names
+            resbundle = self._find_partial_matches(of, wrt, use_resname=True)[0]
+
+            oiter = self._output_range_iter()
+            oname, ostart, oend = next(oiter)
+
+            self._resid2out_subjac_map = rmap = {}
+            rstart = rend = 0
+
+            try:
+                for _, resids in resbundle:
+                    for resid in resids:
+                        meta = self._declared_residuals[resid]
+                        if resid not in rmap:
+                            rmap[resid] = []
+
+                        rsize = shape_to_len(meta['shape'])
+                        rend += rsize
+
+                        if rend < oend:
+                            setslc = slice(max(rstart - ostart, 0), min(oend, rend) - ostart)
+                            getslc = slice(max(ostart - rstart, 0), min(oend, rend) - rstart)
+                            rmap[resid].append((oname, setslc, getslc))
+                        else:
+                            while rend >= oend:
+                                setslc = slice(max(rstart - ostart, 0), min(oend, rend) - ostart)
+                                getslc = slice(max(ostart - rstart, 0), min(oend, rend) - rstart)
+                                rmap[resid].append((oname, setslc, getslc))
+                                oname, ostart, oend = next(oiter)
+            except StopIteration:
+                pass
+
+            for resid, lst in rmap.items():
+                for oname, _, getslc in lst:
+                    if 'val' in dct and dct['val'] is not None:
+                        newdct = dct.copy()
+                        newdct['val'] = dct['val'][getslc]
+                    super()._declare_partials([oname], wrt, dct)
+        else:
+            super()._declare_partials(of, wrt, dct)
+
+    def _get_partials_varlists(self, use_resname=False):
+        """
+        Get lists of 'of' and 'wrt' variables that form the partial jacobian.
+
+        Parameters
+        ----------
+        use_resname : bool
+            If True, 'of' will be a list of residual names instead of output names.
+
+        Returns
+        -------
+        tuple(list, list)
+            'of' and 'wrt' variable lists.
+        """
+        of = list(self._var_allprocs_prom2abs_list['output'])
+        if use_resname and self._declared_residuals:
+            res = list(self._declared_residuals)
+        else:
+            res = of
+        wrt = list(self._var_allprocs_prom2abs_list['input'])
+
+        # filter out any discrete inputs or outputs
+        if self._discrete_outputs:
+            of = [n for n in of if n not in self._discrete_outputs]
+        if self._discrete_inputs:
+            wrt = [n for n in wrt if n not in self._discrete_inputs]
+
+        # wrt should include implicit states
+        return res, of + wrt
 
     def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs=None,
                         discrete_outputs=None):
@@ -475,3 +707,67 @@ class ImplicitComponent(Component):
             List of all states.
         """
         return self._list_states()
+
+    def has_declared_resids(self):
+        """
+        Return True if this System has declared residuals.
+
+        Returns
+        -------
+        bool
+            True if this System has declared residuals.
+        """
+        return len(self._declared_residuals) > 0
+
+
+class _ResidsWrapper(object):
+    def __init__(self, vec, name2slice_shape):
+        self._vec = vec
+        self._dct = name2slice_shape
+
+    def __getitem__(self, name):
+        arr = self._vec.asarray(copy=False)
+        if name in self._dct:
+            slc, shape = self._dct[name]
+            view = arr[slc]
+            view.shape = shape
+            return view
+
+        return self._vec.__getitem__(name)  # handles errors
+
+    def __setitem__(self, name, val):
+        arr = self._vec.asarray(copy=False)
+        if name in self._dct:
+            slc, shape = self._dct[name]
+            arr[slc] = np.asarray(val).flat
+            return
+
+        self._vec.__setitem__(name, val)  # handles errors
+
+    def __getattr__(self, name):
+        return getattr(self._vec, name)
+
+
+class _JacobianWrapper(object):
+    def __init__(self, jac, res2outmap):
+        self._jac = jac
+        self._dct = res2outmap
+
+    def __getitem__(self, key):
+        res, wrt = key
+
+        vals = [self._jac.__getitem__((of, wrt))[slc] for of, slc, _ in self._dct[res]]
+        if len(vals) == 1:
+            return vals[0]
+
+        return np.vstack(vals)
+
+    def __setitem__(self, key, val):
+        res, wrt = key
+
+        for of, setslc, getslc in self._dct[res]:
+            v = val[getslc]
+            self._jac.__setitem__((of, wrt), v)
+
+    def __getattr__(self, name):
+        return getattr(self._jac, name)

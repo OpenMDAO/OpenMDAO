@@ -378,7 +378,7 @@ class Component(System):
         info : dict
             Coloring metadata dict.
         """
-        ofs, allwrt = self._get_partials_varlists()
+        _, allwrt = self._get_partials_varlists()
         wrt_patterns = info['wrt_patterns']
         if '*' in wrt_patterns or wrt_patterns is None:
             info['wrt_matches_rel'] = None
@@ -1285,7 +1285,7 @@ class Component(System):
         if not self._declared_partial_checks:
             return {}
         opts = {}
-        of, wrt = self._get_partials_varlists()
+        _, wrt = self._get_partials_varlists()
         invalid_wrt = []
         matrix_free = self.matrix_free
 
@@ -1482,7 +1482,7 @@ class Component(System):
 
                 self._subjacs_info[abs_key] = meta
 
-    def _find_partial_matches(self, of_pattern, wrt_pattern):
+    def _find_partial_matches(self, of_pattern, wrt_pattern, use_resname=False):
         """
         Find all partial derivative matches from of and wrt.
 
@@ -1495,6 +1495,8 @@ class Component(System):
             The relative name of the variables that derivatives are taken with respect to.
             This can contain the name of any input or output variable.
             May also contain a glob pattern.
+        use_resname : bool
+            If True, use residual names for 'of' patterns.
 
         Returns
         -------
@@ -1505,7 +1507,7 @@ class Component(System):
         """
         of_list = [of_pattern] if isinstance(of_pattern, str) else of_pattern
         wrt_list = [wrt_pattern] if isinstance(wrt_pattern, str) else wrt_pattern
-        ofs, wrts = self._get_partials_varlists()
+        ofs, wrts = self._get_partials_varlists(use_resname=use_resname)
 
         of_pattern_matches = [(pattern, find_matches(pattern, ofs)) for pattern in of_list]
         wrt_pattern_matches = [(pattern, find_matches(pattern, wrts)) for pattern in wrt_list]
