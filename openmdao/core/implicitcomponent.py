@@ -538,21 +538,41 @@ class ImplicitComponent(Component):
             outs_w_partial_res_overlap = defaultdict(list)
             for lst in self._resid2out_subjac_map.values():
                 for oname, wrt, outslc, resslc, dct in lst:
+                    newdct = dct
                     if 'val' in dct and dct['val'] is not None:
-                        val = dct['val']
-                        if isinstance(val, np.ndarray):
-                            dct = dct.copy()
-                            val = val[resslc]
-                            if outslc is _full_slice:
-                                dct['val'] = val
-                            else:
-                                # resid subjac is only a subset of the output subjac
-                                outs_w_partial_res_overlap[oname].append((lst, val))
-                                continue
-                    super()._declare_partials([oname], wrt, dct)
+                        if outslc is not _full_slice:
+                            # resid subjac is only a subset of the output subjac
+                            outs_w_partial_res_overlap[oname].append(lst)
+                            continue
 
-            if outs_w_partial_res_overlap:
-                raise RuntimeError("outputs with partial overlapping resids not supported.")
+                        val = dct['val']
+                        if resslc is not _full_slice:
+                            val = val[resslc]
+                            newdct = dct.copy()
+                            newdct['val'] = val
+
+                    super()._declare_partials(oname, wrt, newdct)
+
+            for oname, listlist in outs_w_partial_res_overlap.items():
+                ometa = self._var_abs2meta['output'][oname]
+                osize = ometa['size']
+                valparts = []
+                for _, wrt, outslc, resslc, dct in listlist:
+                    # we know 'val' is in dct else we wouldn't be here
+                    val = dct['val']
+                    if resslc is not _full_slice:
+                        val = val[resslc]
+                    valparts.append(val)
+
+                finalval = np.vstack(valparts)
+                if osize != finalval.shape[0]:
+                    raise ValueError(f"{self.msginfo}: Size ({osize}) of output '{oname}' doesn't "
+                                     f"match the number of rows ({finalval.shape[0]}) in the "
+                                     f"({oname} wrt {wrt}) subjacobian.")
+
+                newdct = dct.copy()
+                newdct['val'] = finalval
+                super()._declare_partials(oname, wrt, newdct)
 
     def _get_partials_varlists(self, use_resname=False):
         """
@@ -762,6 +782,8 @@ def _get_res_out_slices(oname, dct, wrt, ostart, oend, rstart, rend):
     if setslc.start == 0 and setslc.stop == (oend - ostart):
         setslc = _full_slice
     getslc = slice(max(ostart - rstart, 0), minend - rstart)
+    if getslc.start == 0 and getslc.stop == (rend - rstart):
+        getslc = _full_slice
     return oname, wrt, setslc, getslc, dct
 
 
