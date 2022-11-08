@@ -330,16 +330,11 @@ class Component(System):
             of, wrt = key
             self._declare_partials(of, wrt, dct)
 
-        self._finalize_declared_partials()
-
         if self.matrix_free and self._subjacs_info:
             issue_warning("matrix free component has declared the following "
                           f"partials: {sorted(self._subjacs_info)}, which will allocate "
                           "(possibly unnecessary) memory for each of those sub-jacobians.",
                           prefix=self.msginfo, category=DerivativesWarning)
-
-    def _finalize_declared_partials(self):
-        pass
 
     def setup_partials(self):
         """

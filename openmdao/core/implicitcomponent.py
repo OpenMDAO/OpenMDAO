@@ -3,11 +3,13 @@
 from collections import defaultdict
 import numpy as np
 
-from openmdao.core.component import Component
+from openmdao.core.component import Component, _allowed_types
 from openmdao.core.constants import _UNDEFINED, _SetupStatus
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.array_utils import shape_to_len
+from openmdao.utils.general_utils import format_as_float_or_array
+from openmdao.utils.units import simplify_unit
 
 
 _inst_functs = ['apply_linear']
@@ -396,14 +398,59 @@ class ImplicitComponent(Component):
             if self._problem_meta['setup_status'] >= _SetupStatus.POST_SETUP:
                 raise RuntimeError(f"{self.msginfo}: Can't add residual '{name}' after setup.")
 
+        # check ref shape
+        if ref is not None:
+            if np.isscalar(ref):
+                self._has_resid_scaling |= ref != 1.0
+            else:
+                self._has_resid_scaling |= np.any(ref != 1.0)
+
+                if not isinstance(ref, _allowed_types):
+                    raise TypeError(f'{self.msginfo}: The ref argument should be a '
+                                    'float, list, tuple, ndarray or Iterable')
+
+                it = np.atleast_1d(ref)
+                if shape is None:
+                    shape = it.shape
+                elif it.shape != shape:
+                    raise ValueError(f"{self.msginfo}: When adding residual '{name}', expected "
+                                        f"shape {shape} but got shape {it.shape} for argument "
+                                        f"'ref'.")
+
+        if units is not None:
+            if not isinstance(units, str):
+                raise TypeError(f"{self.msginfo}: The units argument should be a str or None")
+            units = simplify_unit(units, msginfo=self.msginfo)
+
         metadict[name] = meta = {
             'shape': shape,
             'units': units,
             'desc': desc,
-            'ref': ref,
+            'ref': format_as_float_or_array('ref', ref, flatten=True),
         }
 
         return meta
+
+    def _compute_root_scale_factors(self):
+        """
+        Compute scale factors for all variables.
+
+        Returns
+        -------
+        dict
+            Mapping of each absoute var name to its corresponding scaling factor tuple.
+        """
+        # make this a defaultdict to handle the case of access using unconnected inputs
+        if self._has_resid_scaling:
+            scale_factors = super()._compute_root_scale_factors()
+            prefix = self.pathname + '.' if self.pathname else ''
+            for resid, meta in self._declared_residuals.items():
+                ref = meta['ref']
+                if ref is not None:
+                    scale_factors[prefix + resid]['residual'] = (0.0, ref)
+            return scale_factors
+        else:
+            return super()._compute_root_scale_factors()
 
     def _setup_procs(self, pathname, comm, mode, prob_meta):
         """
@@ -530,49 +577,12 @@ class ImplicitComponent(Component):
                         rstart = rend
             except StopIteration:
                 pass
+
+            for lst in self._resid2out_subjac_map.values():
+                for oname, wrt, _, _, dct in lst:
+                    super()._declare_partials(oname, wrt, dct)
         else:
             super()._declare_partials(of, wrt, dct)
-
-    def _finalize_declared_partials(self):
-        if self._declared_residuals:
-            outs_w_partial_res_overlap = defaultdict(list)
-            for lst in self._resid2out_subjac_map.values():
-                for oname, wrt, outslc, resslc, dct in lst:
-                    newdct = dct
-                    if 'val' in dct and dct['val'] is not None:
-                        if outslc is not _full_slice:
-                            # resid subjac is only a subset of the output subjac
-                            outs_w_partial_res_overlap[oname].append(lst)
-                            continue
-
-                        val = dct['val']
-                        if resslc is not _full_slice:
-                            val = val[resslc]
-                            newdct = dct.copy()
-                            newdct['val'] = val
-
-                    super()._declare_partials(oname, wrt, newdct)
-
-            for oname, listlist in outs_w_partial_res_overlap.items():
-                ometa = self._var_abs2meta['output'][oname]
-                osize = ometa['size']
-                valparts = []
-                for _, wrt, outslc, resslc, dct in listlist:
-                    # we know 'val' is in dct else we wouldn't be here
-                    val = dct['val']
-                    if resslc is not _full_slice:
-                        val = val[resslc]
-                    valparts.append(val)
-
-                finalval = np.vstack(valparts)
-                if osize != finalval.shape[0]:
-                    raise ValueError(f"{self.msginfo}: Size ({osize}) of output '{oname}' doesn't "
-                                     f"match the number of rows ({finalval.shape[0]}) in the "
-                                     f"({oname} wrt {wrt}) subjacobian.")
-
-                newdct = dct.copy()
-                newdct['val'] = finalval
-                super()._declare_partials(oname, wrt, newdct)
 
     def _get_partials_varlists(self, use_resname=False):
         """
@@ -791,6 +801,15 @@ class _ResidsWrapper(object):
     def __init__(self, vec, name2slice_shape):
         self.__dict__['_vec'] = vec
         self.__dict__['_dct'] = name2slice_shape
+        # check that vec size matches mapped resids size
+        for slc, _ in name2slice_shape.values():
+            pass
+        if slc.stop != len(vec):
+            system = vec._system()
+            raise RuntimeError(f"{system.msginfo}: The number of residuals ({slc.stop}) doesn't "
+                               f"match number of outputs ({len(vec)}).  If any residuals are "
+                               "added using 'add_residuals', their total size must match the "
+                               "total size of the outputs.")
 
     def __getitem__(self, name):
         arr = self._vec.asarray(copy=False)

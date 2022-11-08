@@ -86,6 +86,54 @@ class MyCompApprox2(MyCompApprox):
         residuals['res2'] = (1.0 / (1.0 +  comb * temp ** 3 / CFL) + temp) * 0.5 - temp
 
 
+class MyCompBad1(MyCompApprox):
+    def setup(self):
+        self.add_input('mm', np.ones(1))
+        self.add_output('Re', np.ones((1, 1)))
+        self.add_output('temp', np.ones((1, 1)))
+        self.add_residual('res1', shape=(1,))
+        self.add_residual('res2', shape=(2,))
+
+    def setup_partials(self):
+        self.declare_partials('res1', ['Re', 'mm'], method='fd')
+        self.declare_partials('res2', ['temp', 'mm'], method='fd')
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        pass
+
+
+class MyCompBad2(MyCompApprox):
+    def setup(self):
+        self.add_input('mm', np.ones(1))
+        self.add_output('Re', np.ones((1, 1)))
+        self.add_output('temp', np.ones((1, 1)))
+        self.add_residual('res1', shape=(1,), ref=np.ones((1,2)))
+        self.add_residual('res2', shape=(1,))
+
+    def setup_partials(self):
+        self.declare_partials('res1', ['Re', 'mm'], method='fd')
+        self.declare_partials('res2', ['temp', 'mm'], method='fd')
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        pass
+
+
+class MyCompBad3(MyCompApprox):
+    def setup(self):
+        self.add_input('mm', np.ones(1))
+        self.add_output('Re', np.ones((1, 1)))
+        self.add_output('temp', np.ones((1, 1)))
+        self.add_residual('res1', shape=(1,), units="foobar/baz")
+        self.add_residual('res2', shape=(1,))
+
+    def setup_partials(self):
+        self.declare_partials('res1', ['Re', 'mm'], method='fd')
+        self.declare_partials('res2', ['temp', 'mm'], method='fd')
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        pass
+
+
 class MyCompAnalytic2(MyCompApprox2):
     def setup_partials(self):
         self.declare_partials('res1', ['Re', 'mm'])
@@ -145,6 +193,24 @@ class ResidNamingTestCase(unittest.TestCase):
         totals = prob.check_totals(method='cs', out_stream=None)
         for val in totals.values():
             assert_near_equal(val['rel error'][0], 0.0, 1e-10)
+
+    def test_size_mismatch(self):
+        with self.assertRaises(Exception) as cm:
+            prob = self._build_model(MyCompBad1)
+
+        self.assertEqual(cm.exception.args[0], "'MyComp' <class MyCompBad1>: The number of residuals (3) doesn't match number of outputs (2).  If any residuals are added using 'add_residuals', their total size must match the total size of the outputs.")
+
+    def test_ref_shape_mismatch(self):
+        with self.assertRaises(Exception) as cm:
+            prob = self._build_model(MyCompBad2)
+
+        self.assertEqual(cm.exception.args[0], "'MyComp' <class MyCompBad2>: When adding residual 'res1', expected shape (1,) but got shape (1, 2) for argument 'ref'.")
+
+    def test_bad_unit(self):
+        with self.assertRaises(Exception) as cm:
+            prob = self._build_model(MyCompBad3)
+
+        self.assertEqual(cm.exception.args[0], "'MyComp' <class MyCompBad3>: The units 'foobar/baz' are invalid.")
 
     def test_analytic(self):
         prob = self._build_model(MyCompAnalytic)
