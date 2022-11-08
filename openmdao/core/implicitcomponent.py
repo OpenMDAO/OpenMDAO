@@ -1,5 +1,6 @@
 """Define the ImplicitComponent class."""
 
+from collections import defaultdict
 import numpy as np
 
 from openmdao.core.component import Component
@@ -10,6 +11,7 @@ from openmdao.utils.array_utils import shape_to_len
 
 
 _inst_functs = ['apply_linear']
+_full_slice = slice(None)
 
 
 def _get_slice_shape_dict(name_shape_iter):
@@ -423,6 +425,8 @@ class ImplicitComponent(Component):
         """
         self._declared_residuals = {}
         super()._setup_procs(pathname, comm, mode, prob_meta)
+        self._resid2out_subjac_map = {}
+        self._resid_offsets = {}
 
     def _resid_name_shape_iter(self):
         for name, meta in self._declared_residuals.items():
@@ -452,6 +456,18 @@ class ImplicitComponent(Component):
             self._dresiduals_wrapper = self._dresiduals
             self._jac_wrapper = self._jacobian
 
+    def _setup_partials(self):
+        """
+        Process all partials and approximations that the user declared.
+        """
+        if self._declared_residuals:
+            offset = 0
+            for name, meta in self._declared_residuals.items():
+                self._resid_offsets[name] = offset
+                offset += shape_to_len(meta['shape'])
+
+        super()._setup_partials()
+
     def _output_range_iter(self):
         plen = len(self.pathname) + 1 if self.pathname else 0
         start = end = 0
@@ -479,46 +495,64 @@ class ImplicitComponent(Component):
         if self._declared_residuals:
             # if we have renamed resids, remap them to use output naming
 
-            # convert the 'of' patterns into specific resid names
             resbundle = self._find_partial_matches(of, wrt, use_resname=True)[0]
 
             oiter = self._output_range_iter()
             oname, ostart, oend = next(oiter)
 
-            self._resid2out_subjac_map = rmap = {}
-            rstart = rend = 0
+            rmap = self._resid2out_subjac_map
 
             try:
                 for _, resids in resbundle:
                     for resid in resids:
                         meta = self._declared_residuals[resid]
+
+                        rsize = shape_to_len(meta['shape'])
+                        rstart = self._resid_offsets[resid]
+                        rend = rstart + rsize
+
+                        # loop over outputs until there's some overlap
+                        while not (ostart <= rstart < oend or ostart <= rend < oend):
+                            oname, ostart, oend = next(oiter)
+
                         if resid not in rmap:
                             rmap[resid] = []
 
-                        rsize = shape_to_len(meta['shape'])
-                        rend += rsize
-
                         if rend < oend:
-                            setslc = slice(max(rstart - ostart, 0), min(oend, rend) - ostart)
-                            getslc = slice(max(ostart - rstart, 0), min(oend, rend) - rstart)
-                            rmap[resid].append((oname, setslc, getslc))
+                            rmap[resid].append(_get_res_out_slices(oname, dct, wrt, ostart,
+                                                                   oend, rstart, rend))
                         else:
                             while rend >= oend:
-                                setslc = slice(max(rstart - ostart, 0), min(oend, rend) - ostart)
-                                getslc = slice(max(ostart - rstart, 0), min(oend, rend) - rstart)
-                                rmap[resid].append((oname, setslc, getslc))
+                                rmap[resid].append(_get_res_out_slices(oname, dct, wrt, ostart,
+                                                                       oend, rstart, rend))
                                 oname, ostart, oend = next(oiter)
+
+                        rstart = rend
             except StopIteration:
                 pass
-
-            for resid, lst in rmap.items():
-                for oname, _, getslc in lst:
-                    if 'val' in dct and dct['val'] is not None:
-                        newdct = dct.copy()
-                        newdct['val'] = dct['val'][getslc]
-                    super()._declare_partials([oname], wrt, dct)
         else:
             super()._declare_partials(of, wrt, dct)
+
+    def _finalize_declared_partials(self):
+        if self._declared_residuals:
+            outs_w_partial_res_overlap = defaultdict(list)
+            for lst in self._resid2out_subjac_map.values():
+                for oname, wrt, outslc, resslc, dct in lst:
+                    if 'val' in dct and dct['val'] is not None:
+                        val = dct['val']
+                        if isinstance(val, np.ndarray):
+                            dct = dct.copy()
+                            val = val[resslc]
+                            if outslc is _full_slice:
+                                dct['val'] = val
+                            else:
+                                # resid subjac is only a subset of the output subjac
+                                outs_w_partial_res_overlap[oname].append((lst, val))
+                                continue
+                    super()._declare_partials([oname], wrt, dct)
+
+            if outs_w_partial_res_overlap:
+                raise RuntimeError("outputs with partial overlapping resids not supported.")
 
     def _get_partials_varlists(self, use_resname=False):
         """
@@ -722,6 +756,15 @@ class ImplicitComponent(Component):
         return len(self._declared_residuals) > 0
 
 
+def _get_res_out_slices(oname, dct, wrt, ostart, oend, rstart, rend):
+    minend = min(oend, rend)
+    setslc = slice(max(rstart - ostart, 0), minend - ostart)
+    if setslc.start == 0 and setslc.stop == (oend - ostart):
+        setslc = _full_slice
+    getslc = slice(max(ostart - rstart, 0), minend - rstart)
+    return oname, wrt, setslc, getslc, dct
+
+
 class _ResidsWrapper(object):
     def __init__(self, vec, name2slice_shape):
         self.__dict__['_vec'] = vec
@@ -770,9 +813,18 @@ class _JacobianWrapper(object):
     def __setitem__(self, key, val):
         res, wrt = key
 
-        for of, _, getslc in self._dct[res]:
-            v = val[getslc]
-            self._jac.__setitem__((of, wrt), v)
+        for of, _, outslc, resslc, _ in self._dct[res]:
+            if isinstance(val, np.ndarray):
+                v = val[resslc]
+            else:
+                v = val
+            if outslc is _full_slice:
+                self._jac[of, wrt] = v
+            else:
+                # setting only subset of the rows in the subjac
+                sjac = self._jac[of, wrt]
+                sjac[outslc] = v
+                self._jac[of, wrt] = sjac
 
     def __getattr__(self, name):
         return getattr(self._jac, name)
