@@ -77,12 +77,12 @@ class TestImplicitGroup(om.Group):
     """
 
     def __init__(self, lnSolverClass=om.LinearBlockGS,
-                       nlSolverClass=om.NonlinearBlockGS, compClass=Comp):
+                       nlSolverClass=om.NonlinearBlockGS):
 
         super().__init__()
 
-        self.add_subsystem("C1", compClass())
-        self.add_subsystem("C2", compClass())
+        self.add_subsystem("C1", Comp())
+        self.add_subsystem("C2", Comp())
 
         self.connect("C1.w", "C2.a")
         self.connect("C1.x", "C2.b")

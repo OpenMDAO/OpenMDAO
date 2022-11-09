@@ -56,8 +56,7 @@ class ImplicitComponent(Component):
     _inst_functs : dict
         Dictionary of names mapped to bound methods.
     _declared_residuals : dict
-        Contains absolute residual names mapped to metadata.  Only used in ImplicitComponent but
-        included here to simplify some code.
+        Contains local residual names mapped to metadata.
     """
 
     def __init__(self, **kwargs):
@@ -440,7 +439,6 @@ class ImplicitComponent(Component):
         dict
             Mapping of each absoute var name to its corresponding scaling factor tuple.
         """
-        # make this a defaultdict to handle the case of access using unconnected inputs
         if self._has_resid_scaling:
             scale_factors = super()._compute_root_scale_factors()
             prefix = self.pathname + '.' if self.pathname else ''
@@ -554,9 +552,8 @@ class ImplicitComponent(Component):
                     for resid in resids:
                         meta = self._declared_residuals[resid]
 
-                        rsize = shape_to_len(meta['shape'])
                         rstart = self._resid_offsets[resid]
-                        rend = rstart + rsize
+                        rend = rstart + shape_to_len(meta['shape'])
 
                         # loop over outputs until there's some overlap
                         while not (ostart <= rstart < oend or ostart <= rend < oend):
@@ -608,12 +605,9 @@ class ImplicitComponent(Component):
             wrt = [n for n in wrt if n not in self._discrete_inputs]
 
         if use_resname and self._declared_residuals:
-            res = list(self._declared_residuals)
-        else:
-            res = of
+            return list(self._declared_residuals), of + wrt
 
-        # wrt should include implicit states
-        return res, of + wrt
+        return of, of + wrt
 
     def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs=None,
                         discrete_outputs=None):
@@ -845,11 +839,11 @@ class _JacobianWrapper(object):
     def __getitem__(self, key):
         res, wrt = key
 
-        vals = [self._jac.__getitem__((of, wrt))[slc] for of, slc, _ in self._dct[res]]
-        if len(vals) == 1:
-            return vals[0]
+        if len(self._dct) == 1:
+            of, slc, _ = self._dct[res]
+            return self._jac[(of, wrt)][slc]
 
-        return np.vstack(vals)
+        return np.vstack([self._jac[(of, wrt)][slc] for of, slc, _ in self._dct[res]])
 
     def __setitem__(self, key, val):
         res, wrt = key
