@@ -4,7 +4,7 @@ from itertools import product
 from contextlib import contextmanager
 
 import numpy as np
-from numpy import ndarray, imag, complex as npcomplex
+from numpy import ndarray, imag, complex128 as npcomplex
 
 from openmdao.core.constants import INT_DTYPE
 from openmdao.core.explicitcomponent import ExplicitComponent
