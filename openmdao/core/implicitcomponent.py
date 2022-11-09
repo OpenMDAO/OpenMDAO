@@ -413,8 +413,7 @@ class ImplicitComponent(Component):
                     shape = it.shape
                 elif it.shape != shape:
                     raise ValueError(f"{self.msginfo}: When adding residual '{name}', expected "
-                                        f"shape {shape} but got shape {it.shape} for argument "
-                                        f"'ref'.")
+                                     f"shape {shape} but got shape {it.shape} for argument 'ref'.")
 
         if units is not None:
             if not isinstance(units, str):
