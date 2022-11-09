@@ -146,6 +146,7 @@ class Jacobian(object):
         """
         abs_key = self._get_abs_key(key)
         if abs_key is not None:
+
             # You can only set declared subjacobians.
             if abs_key not in self._subjacs_info:
                 msg = '{}: Variable name pair ("{}", "{}") must first be declared.'
