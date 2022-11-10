@@ -5,6 +5,7 @@ Surrogate Model based on second order response surface equations.
 
 from numpy import zeros, einsum
 import numpy as np
+from packaging.version import Version
 if Version(np.__version__) >= Version("1.20"):
     from numpy.linalg import lstsq
 else:
