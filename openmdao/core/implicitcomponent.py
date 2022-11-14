@@ -750,6 +750,25 @@ class ImplicitComponent(Component):
 
 
 def _range_iter(meta_dict, names=None):
+    """
+    Iterate over variables and their ranges, based on shape metadata for each variable.
+
+    Parameters
+    ----------
+    meta_dict : dict
+        Mapping of variable name to metadata (which contains shape information).
+    names : iter of str or None
+        If not None, restrict the ranges to those variables contained in names.
+
+    Yields
+    ------
+    str
+        Name of variable.
+    int
+        Starting index.
+    int
+        Ending index.
+    """
     start = end = 0
 
     if names is None:
@@ -769,6 +788,9 @@ def _range_iter(meta_dict, names=None):
 
 
 def _get_overlap_slices(ostart, oend, rstart, rend):
+    """
+    For an overlapping residual and output, return the slices where they overlap.
+    """
     minend = min(oend, rend)
     oslc = slice(max(rstart - ostart, 0), minend - ostart)
     if oslc.start == 0 and oslc.stop == (oend - ostart):
@@ -779,13 +801,15 @@ def _get_overlap_slices(ostart, oend, rstart, rend):
     return oslc, rslc
 
 
-def _overlap_iter(pathname, res_meta, out_meta, res_names=None, out_names=None):
-    oiter = _range_iter(out_meta, names=out_names)
+def _overlap_iter(pathname, res_meta_dict, out_meta_dict, res_names=None, out_names=None):
+    """
+    Yield names and slices of overlapping residuals and outputs.
+    """
+    oiter = _range_iter(out_meta_dict, names=out_names)
     ostart = oend = -1
     plen = len(pathname) + 1 if pathname else 0
 
-    for rname, rstart, rend in _range_iter(res_meta, names=res_names):
-
+    for rname, rstart, rend in _range_iter(res_meta_dict, names=res_names):
         try:
             while not (ostart <= rstart < oend or ostart <= rend < oend):
                 oname, ostart, oend = next(oiter)
