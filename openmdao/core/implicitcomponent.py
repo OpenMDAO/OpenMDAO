@@ -356,7 +356,7 @@ class ImplicitComponent(Component):
 
         return metadata
 
-    def add_residual(self, name, shape=(), units=None, desc='', ref=1.0):
+    def add_residual(self, name, shape=(), units=None, desc='', ref=None):
         """
         Add an residual variable to the component.
 
@@ -374,7 +374,7 @@ class ImplicitComponent(Component):
             Default is None, which means it has no units.
         desc : str
             Description of the residual.
-        ref : float or ndarray
+        ref : float or ndarray or None
             Scaling parameter. The value in the user-defined units of this residual
             when the scaled value is 1. Default is 1.
 
@@ -424,7 +424,7 @@ class ImplicitComponent(Component):
             'shape': shape,
             'units': units,
             'desc': desc,
-            'ref': format_as_float_or_array('ref', ref, flatten=True),
+            'ref': format_as_float_or_array('ref', ref, flatten=True, val_if_none=None),
         }
 
         return meta
@@ -470,7 +470,6 @@ class ImplicitComponent(Component):
         self._declared_residuals = {}
         super()._setup_procs(pathname, comm, mode, prob_meta)
         self._resid2out_subjac_map = {}
-        self._resid_offsets = {}
 
     def _resid_name_shape_iter(self):
         for name, meta in self._declared_residuals.items():
@@ -488,6 +487,7 @@ class ImplicitComponent(Component):
         super()._setup_vectors(root_vectors)
 
         if self._declared_residuals:
+            self._check_res_out_overlaps()
             name2slcshape = _get_slice_shape_dict(self._resid_name_shape_iter())
 
             if self._use_derivatives:
@@ -499,18 +499,6 @@ class ImplicitComponent(Component):
             self._residuals_wrapper = self._residuals
             self._dresiduals_wrapper = self._dresiduals
             self._jac_wrapper = self._jacobian
-
-    def _setup_partials(self):
-        """
-        Process all partials and approximations that the user declared.
-        """
-        if self._declared_residuals:
-            offset = 0
-            for name, meta in self._declared_residuals.items():
-                self._resid_offsets[name] = offset
-                offset += shape_to_len(meta['shape'])
-
-        super()._setup_partials()
 
     def _declare_partials(self, of, wrt, dct):
         """
@@ -533,22 +521,67 @@ class ImplicitComponent(Component):
 
             resbundle = self._find_partial_matches(of, wrt, use_resname=True)[0]
 
+            plen = len(self.pathname) + 1 if self.pathname else 0
             rmap = self._resid2out_subjac_map
             for _, resids in resbundle:
-                for oname, oslc, resid, rslc in _overlap_iter(self.pathname,
-                                                              self._declared_residuals,
-                                                              self._var_allprocs_abs2meta['output'],
-                                                              res_names=resids):
+                if not resids:
+                    continue
+                for tup in _overlap_range_iter(self._declared_residuals,
+                                               self._var_abs2meta['output'], names1=resids):
+                    resid, rstart, rend, oname, ostart, oend = tup
+
                     if resid not in rmap:
                         rmap[resid] = []
 
-                    rmap[resid].append((oname, wrt, dct, oslc, rslc))
+                    oslc, rslc = _get_overlap_slices(ostart, oend, rstart, rend)
+                    rmap[resid].append((oname[plen:], wrt, dct, oslc, rslc))
 
-            for lst in self._resid2out_subjac_map.values():
+            for resid, lst in self._resid2out_subjac_map.items():
                 for oname, wrt, dct, _, _ in lst:
                     super()._declare_partials(oname, wrt, dct)
         else:
             super()._declare_partials(of, wrt, dct)
+
+    def _check_res_vs_out_meta(self, resid, output):
+        """
+        Check for mismatch of 'ref' vs. 'res_ref' and 'units' vs. 'res_units'.
+
+        Raises an exception if a mismatch exists.
+
+        Parameters
+        ----------
+        resid : str
+            Local name of residual that overlaps the output.
+        output : str
+            Local name of the output.
+        """
+        resmeta = self._declared_residuals[resid]
+        outmeta = self._var_abs2meta['output'][output]
+        loc_out = output[len(self.pathname) + 1:] if self.pathname else output
+
+        ref = resmeta['ref']
+        res_ref = outmeta['res_ref']
+
+        if ref is not None and res_ref is not None:
+            ref_arr = isinstance(ref, np.ndarray)
+            res_ref_arr = isinstance(res_ref, np.ndarray)
+            if (ref_arr != res_ref_arr or (ref_arr and not np.all(ref == res_ref) or
+                                           (not ref_arr and ref != res_ref))):
+                raise ValueError(f"{self.msginfo}: ({ref} != {res_ref}), 'ref' for residual "
+                                 f"'{resid}' != 'res_ref' for output '{loc_out}'.")
+
+        units = resmeta['units']
+        res_units = outmeta['res_units']
+
+        # assume units and res_units are already simplified
+        if units is not None and res_units is not None and units != res_units:
+            raise ValueError(f"{self.msginfo}: residual units '{units}' for residual '{resid}' != "
+                             f"output res_units '{res_units}' for output '{loc_out}'.")
+
+    def _check_res_out_overlaps(self):
+        for resid, _, _, output, _, _ in _overlap_range_iter(self._declared_residuals,
+                                                             self._var_abs2meta['output']):
+            self._check_res_vs_out_meta(resid, output)
 
     def _get_partials_varlists(self, use_resname=False):
         """
@@ -723,7 +756,7 @@ class ImplicitComponent(Component):
             List of all states.
         """
         prefix = self.pathname + '.' if self.pathname else ''
-        return sorted(list(self._var_allprocs_abs2meta['output']) +
+        return sorted(list(self._var_abs2meta['output']) +
                       [prefix + n for n in self._var_discrete['output']])
 
     def _list_states_allprocs(self):
@@ -749,7 +782,7 @@ class ImplicitComponent(Component):
         return len(self._declared_residuals) > 0
 
 
-def _range_iter(meta_dict, names=None):
+def meta2range_iter(meta_dict, names=None, shp_name='shape'):
     """
     Iterate over variables and their ranges, based on shape metadata for each variable.
 
@@ -759,6 +792,8 @@ def _range_iter(meta_dict, names=None):
         Mapping of variable name to metadata (which contains shape information).
     names : iter of str or None
         If not None, restrict the ranges to those variables contained in names.
+    shp_name : str
+        Name of the shape metadata entry.  Defaults to 'shape', but could also be 'global_shape'.
 
     Yields
     ------
@@ -773,7 +808,7 @@ def _range_iter(meta_dict, names=None):
 
     if names is None:
         for name in meta_dict:
-            end += shape_to_len(meta_dict[name]['shape'])
+            end += shape_to_len(meta_dict[name][shp_name])
             yield name, start, end
             start = end
     else:
@@ -781,7 +816,7 @@ def _range_iter(meta_dict, names=None):
             names = set(names)
 
         for name in meta_dict:
-            end += shape_to_len(meta_dict[name]['shape'])
+            end += shape_to_len(meta_dict[name][shp_name])
             if name in names:
                 yield name, start, end
             start = end
@@ -792,36 +827,42 @@ def _get_overlap_slices(ostart, oend, rstart, rend):
     For an overlapping residual and output, return the slices where they overlap.
     """
     minend = min(oend, rend)
-    oslc = slice(max(rstart - ostart, 0), minend - ostart)
-    if oslc.start == 0 and oslc.stop == (oend - ostart):
+    start = max(rstart - ostart, 0)
+    stop = minend - ostart
+    if start == 0 and stop == (oend - ostart):
         oslc = _full_slice
-    rslc = slice(max(ostart - rstart, 0), minend - rstart)
-    if rslc.start == 0 and rslc.stop == (rend - rstart):
-        rslc = _full_slice
-    return oslc, rslc
+    else:
+        oslc = slice(start, stop)
+
+    start = max(ostart - rstart, 0)
+    stop = minend - rstart
+    if start == 0 and stop == (rend - rstart):
+        return oslc, _full_slice
+    else:
+        return oslc, slice(start, stop)
 
 
-def _overlap_iter(pathname, res_meta_dict, out_meta_dict, res_names=None, out_names=None):
+def _overlap_range_iter(meta_dict1, meta_dict2, names1=None, names2=None):
     """
-    Yield names and slices of overlapping residuals and outputs.
-    """
-    oiter = _range_iter(out_meta_dict, names=out_names)
-    ostart = oend = -1
-    plen = len(pathname) + 1 if pathname else 0
+    Yield names and ranges of overlapping variables from two metadata dictionaries.
 
-    for rname, rstart, rend in _range_iter(res_meta_dict, names=res_names):
+    The metadata dicts are assumed to contain a 'shape' entry, and the total size of the
+    variables in meta_dict1 must equal the total size of the variables in meta_dict2.
+    """
+    iter2 = meta2range_iter(meta_dict2, names=names2)
+    start2 = end2 = -1
+
+    for name1, start1, end1 in meta2range_iter(meta_dict1, names=names1):
         try:
-            while not (ostart <= rstart < oend or ostart <= rend < oend):
-                oname, ostart, oend = next(oiter)
+            while not (start2 <= start1 < end2 or start2 <= end1 < end2):
+                name2, start2, end2 = next(iter2)
 
-            if rend < oend:
-                oslc, rslc = _get_overlap_slices(ostart, oend, rstart, rend)
-                yield oname[plen:], oslc, rname, rslc
+            if end1 < end2:
+                yield name1, start1, end1, name2, start2, end2
             else:
-                while rend >= oend:
-                    oslc, rslc = _get_overlap_slices(ostart, oend, rstart, rend)
-                    yield oname[plen:], oslc, rname, rslc
-                    oname, ostart, oend = next(oiter)
+                while end1 >= end2:
+                    yield name1, start1, end1, name2, start2, end2
+                    name2, start2, end2 = next(iter2)
         except StopIteration:
             return
 

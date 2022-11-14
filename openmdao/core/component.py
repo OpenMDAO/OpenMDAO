@@ -619,7 +619,7 @@ class Component(System):
         return metadata
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, tags=None,
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,
                    shape_by_conn=False, copy_shape=None, distributed=None):
         """
         Add an output variable to the component.
@@ -725,7 +725,7 @@ class Component(System):
 
             # All refs: check the shape if necessary
             for item, item_name in zip([ref, ref0, res_ref], ['ref', 'ref0', 'res_ref']):
-                if not isscalar(item):
+                if item is not None and not isscalar(item):
                     if not isinstance(item, _allowed_types):
                         raise TypeError(f'{self.msginfo}: The {item_name} argument should be a '
                                         'float, list, tuple, ndarray or Iterable')
@@ -775,7 +775,7 @@ class Component(System):
             'tags': make_set(tags),
             'ref': format_as_float_or_array('ref', ref, flatten=True),
             'ref0': format_as_float_or_array('ref0', ref0, flatten=True),
-            'res_ref': format_as_float_or_array('res_ref', res_ref, flatten=True),
+            'res_ref': format_as_float_or_array('res_ref', res_ref, flatten=True, val_if_none=None),
             'lower': lower,
             'upper': upper,
             'shape_by_conn': shape_by_conn,

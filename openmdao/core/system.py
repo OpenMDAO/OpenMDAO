@@ -911,6 +911,9 @@ class System(object):
     def _setup_dynamic_shapes(self):
         pass
 
+    def _check_res_out_overlaps(self):
+        pass
+
     def _final_setup(self, comm):
         """
         Perform final setup for this system and its descendant systems.
@@ -1857,7 +1860,7 @@ class System(object):
             a1 = meta['ref'] - ref0
             scale_factors[abs_name] = {
                 'output': (a0, a1),
-                'residual': (0.0, res_ref),
+                'residual': (0.0, 1.0 if res_ref is None else res_ref),
             }
         return scale_factors
 

@@ -86,7 +86,7 @@ class MyCompApprox2(MyCompApprox):
         residuals['res2'] = (1.0 / (1.0 +  comb * temp ** 3 / CFL) + temp) * 0.5 - temp
 
 
-class MyCompBad1(MyCompApprox):
+class MyCompSizeMismatch(MyCompApprox):
     def setup(self):
         self.add_input('mm', np.ones(1))
         self.add_output('Re', np.ones((1, 1)))
@@ -102,7 +102,7 @@ class MyCompBad1(MyCompApprox):
         pass
 
 
-class MyCompBad2(MyCompApprox):
+class MyCompShapeMismatch(MyCompApprox):
     def setup(self):
         self.add_input('mm', np.ones(1))
         self.add_output('Re', np.ones((1, 1)))
@@ -118,12 +118,77 @@ class MyCompBad2(MyCompApprox):
         pass
 
 
-class MyCompBad3(MyCompApprox):
+class MyCompBadUnits(MyCompApprox):
     def setup(self):
         self.add_input('mm', np.ones(1))
         self.add_output('Re', np.ones((1, 1)))
         self.add_output('temp', np.ones((1, 1)))
         self.add_residual('res1', shape=(1,), units="foobar/baz")
+        self.add_residual('res2', shape=(1,))
+
+    def setup_partials(self):
+        self.declare_partials('res1', ['Re', 'mm'], method='fd')
+        self.declare_partials('res2', ['temp', 'mm'], method='fd')
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        pass
+
+class MyCompUnitsMismatchNoDerivs(MyCompApprox):
+    def setup(self):
+        self.add_input('mm', np.ones(1))
+        self.add_output('Re', np.ones((1, 1)), res_units='ft')
+        self.add_output('temp', np.ones((1, 1)))
+        self.add_residual('res1', shape=(1,), units="inch")
+        self.add_residual('res2', shape=(1,))
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        pass
+
+
+class MyCompUnitsMismatch(MyCompUnitsMismatchNoDerivs):
+    def setup_partials(self):
+        self.declare_partials('res1', ['Re', 'mm'], method='fd')
+        self.declare_partials('res2', ['temp', 'mm'], method='fd')
+
+
+class MyCompRefMismatch(MyCompApprox):
+    def setup(self):
+        self.add_input('mm', np.ones(1))
+        self.add_output('Re', np.ones((1, 1)), res_ref=3.)
+        self.add_output('temp', np.ones((1, 1)))
+        self.add_residual('res1', shape=(1,), ref=4.)
+        self.add_residual('res2', shape=(1,))
+
+    def setup_partials(self):
+        self.declare_partials('res1', ['Re', 'mm'], method='fd')
+        self.declare_partials('res2', ['temp', 'mm'], method='fd')
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        pass
+
+
+class MyCompRefMismatchDefault(MyCompApprox):
+    def setup(self):
+        self.add_input('mm', np.ones(1))
+        self.add_output('Re', np.ones((1, 1)))
+        self.add_output('temp', np.ones((1, 1)))
+        self.add_residual('res1', shape=(1,), ref=4.)
+        self.add_residual('res2', shape=(1,))
+
+    def setup_partials(self):
+        self.declare_partials('res1', ['Re', 'mm'], method='fd')
+        self.declare_partials('res2', ['temp', 'mm'], method='fd')
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        pass
+
+
+class MyCompRefMismatchDefault2(MyCompApprox):
+    def setup(self):
+        self.add_input('mm', np.ones(1))
+        self.add_output('Re', np.ones((1, 1)), res_ref=4.)
+        self.add_output('temp', np.ones((1, 1)))
+        self.add_residual('res1', shape=(1,))
         self.add_residual('res2', shape=(1,))
 
     def setup_partials(self):
@@ -196,21 +261,39 @@ class ResidNamingTestCase(unittest.TestCase):
 
     def test_size_mismatch(self):
         with self.assertRaises(Exception) as cm:
-            prob = self._build_model(MyCompBad1)
+            prob = self._build_model(MyCompSizeMismatch)
 
-        self.assertEqual(cm.exception.args[0], "'MyComp' <class MyCompBad1>: The number of residuals (3) doesn't match number of outputs (2).  If any residuals are added using 'add_residuals', their total size must match the total size of the outputs.")
+        self.assertEqual(cm.exception.args[0], "'MyComp' <class MyCompSizeMismatch>: The number of residuals (3) doesn't match number of outputs (2).  If any residuals are added using 'add_residuals', their total size must match the total size of the outputs.")
 
     def test_ref_shape_mismatch(self):
         with self.assertRaises(Exception) as cm:
-            prob = self._build_model(MyCompBad2)
+            prob = self._build_model(MyCompShapeMismatch)
 
-        self.assertEqual(cm.exception.args[0], "'MyComp' <class MyCompBad2>: When adding residual 'res1', expected shape (1,) but got shape (1, 2) for argument 'ref'.")
+        self.assertEqual(cm.exception.args[0], "'MyComp' <class MyCompShapeMismatch>: When adding residual 'res1', expected shape (1,) but got shape (1, 2) for argument 'ref'.")
 
     def test_bad_unit(self):
         with self.assertRaises(Exception) as cm:
-            prob = self._build_model(MyCompBad3)
+            prob = self._build_model(MyCompBadUnits)
 
-        self.assertEqual(cm.exception.args[0], "'MyComp' <class MyCompBad3>: The units 'foobar/baz' are invalid.")
+        self.assertEqual(cm.exception.args[0], "'MyComp' <class MyCompBadUnits>: The units 'foobar/baz' are invalid.")
+
+    def test_unit_mismatch(self):
+        with self.assertRaises(Exception) as cm:
+            prob = self._build_model(MyCompUnitsMismatch)
+
+        self.assertEqual(cm.exception.args[0], "'MyComp' <class MyCompUnitsMismatch>: residual units 'inch' for residual 'res1' != output res_units 'ft' for output 'Re'.")
+
+    def test_ref_mismatch(self):
+        with self.assertRaises(Exception) as cm:
+            prob = self._build_model(MyCompRefMismatch)
+
+        self.assertEqual(cm.exception.args[0], "'MyComp' <class MyCompRefMismatch>: (4.0 != 3.0), 'ref' for residual 'res1' != 'res_ref' for output 'Re'.")
+
+    def test_ref_mismatch_default_no_exception(self):
+        prob = self._build_model(MyCompRefMismatchDefault)
+
+    def test_ref_mismatch_default2_no_exception(self):
+        prob = self._build_model(MyCompRefMismatchDefault2)
 
     def test_analytic(self):
         prob = self._build_model(MyCompAnalytic)
