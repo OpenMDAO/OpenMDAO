@@ -512,14 +512,6 @@ class ImplicitComponent(Component):
 
         super()._setup_partials()
 
-    def _output_range_iter(self):
-        plen = len(self.pathname) + 1 if self.pathname else 0
-        start = end = 0
-        for name, meta in self._var_allprocs_abs2meta['output'].items():
-            end += meta['size']
-            yield name[plen:], start, end
-            start = end
-
     def _declare_partials(self, of, wrt, dct):
         """
         Store subjacobian metadata for later use.
@@ -541,41 +533,19 @@ class ImplicitComponent(Component):
 
             resbundle = self._find_partial_matches(of, wrt, use_resname=True)[0]
 
-            oiter = self._output_range_iter()
-            oname, ostart, oend = next(oiter)
-
             rmap = self._resid2out_subjac_map
+            for _, resids in resbundle:
+                for oname, oslc, resid, rslc in _overlap_iter(self.pathname,
+                                                              self._declared_residuals,
+                                                              self._var_allprocs_abs2meta['output'],
+                                                              res_names=resids):
+                    if resid not in rmap:
+                        rmap[resid] = []
 
-            try:
-                for _, resids in resbundle:
-                    for resid in resids:
-                        meta = self._declared_residuals[resid]
-
-                        rstart = self._resid_offsets[resid]
-                        rend = rstart + shape_to_len(meta['shape'])
-
-                        # loop over outputs until there's some overlap
-                        while not (ostart <= rstart < oend or ostart <= rend < oend):
-                            oname, ostart, oend = next(oiter)
-
-                        if resid not in rmap:
-                            rmap[resid] = []
-
-                        if rend < oend:
-                            rmap[resid].append(_get_res_out_slices(oname, dct, wrt, ostart,
-                                                                   oend, rstart, rend))
-                        else:
-                            while rend >= oend:
-                                rmap[resid].append(_get_res_out_slices(oname, dct, wrt, ostart,
-                                                                       oend, rstart, rend))
-                                oname, ostart, oend = next(oiter)
-
-                        rstart = rend
-            except StopIteration:
-                pass
+                    rmap[resid].append((oname, wrt, dct, oslc, rslc))
 
             for lst in self._resid2out_subjac_map.values():
-                for oname, wrt, _, _, dct in lst:
+                for oname, wrt, dct, _, _ in lst:
                     super()._declare_partials(oname, wrt, dct)
         else:
             super()._declare_partials(of, wrt, dct)
@@ -779,15 +749,57 @@ class ImplicitComponent(Component):
         return len(self._declared_residuals) > 0
 
 
-def _get_res_out_slices(oname, dct, wrt, ostart, oend, rstart, rend):
+def _range_iter(meta_dict, names=None):
+    start = end = 0
+
+    if names is None:
+        for name in meta_dict:
+            end += shape_to_len(meta_dict[name]['shape'])
+            yield name, start, end
+            start = end
+    else:
+        if not isinstance(names, (set, dict)):
+            names = set(names)
+
+        for name in meta_dict:
+            end += shape_to_len(meta_dict[name]['shape'])
+            if name in names:
+                yield name, start, end
+            start = end
+
+
+def _get_overlap_slices(ostart, oend, rstart, rend):
     minend = min(oend, rend)
-    setslc = slice(max(rstart - ostart, 0), minend - ostart)
-    if setslc.start == 0 and setslc.stop == (oend - ostart):
-        setslc = _full_slice
-    getslc = slice(max(ostart - rstart, 0), minend - rstart)
-    if getslc.start == 0 and getslc.stop == (rend - rstart):
-        getslc = _full_slice
-    return oname, wrt, setslc, getslc, dct
+    oslc = slice(max(rstart - ostart, 0), minend - ostart)
+    if oslc.start == 0 and oslc.stop == (oend - ostart):
+        oslc = _full_slice
+    rslc = slice(max(ostart - rstart, 0), minend - rstart)
+    if rslc.start == 0 and rslc.stop == (rend - rstart):
+        rslc = _full_slice
+    return oslc, rslc
+
+
+def _overlap_iter(pathname, res_meta, out_meta, res_names=None, out_names=None):
+    oiter = _range_iter(out_meta, names=out_names)
+    ostart = oend = -1
+    plen = len(pathname) + 1 if pathname else 0
+
+    for rname, rstart, rend in _range_iter(res_meta, names=res_names):
+
+        try:
+            while not (ostart <= rstart < oend or ostart <= rend < oend):
+                oname, ostart, oend = next(oiter)
+
+            if rend < oend:
+                oslc, rslc = _get_overlap_slices(ostart, oend, rstart, rend)
+                yield oname[plen:], oslc, rname, rslc
+            else:
+                while rend >= oend:
+                    oslc, rslc = _get_overlap_slices(ostart, oend, rstart, rend)
+                    yield oname[plen:], oslc, rname, rslc
+                    oname, ostart, oend = next(oiter)
+        except StopIteration:
+            return
 
 
 class _ResidsWrapper(object):
@@ -842,12 +854,12 @@ class _JacobianWrapper(object):
             of, slc, _ = self._dct[res]
             return self._jac[(of, wrt)][slc]
 
-        return np.vstack([self._jac[(of, wrt)][slc] for of, slc, _ in self._dct[res]])
+        return np.vstack([self._jac[(of, wrt)][slc] for of, _, _, slc, _ in self._dct[res]])
 
     def __setitem__(self, key, val):
         res, wrt = key
 
-        for of, _, outslc, resslc, _ in self._dct[res]:
+        for of, _, _, outslc, resslc in self._dct[res]:
             if isinstance(val, np.ndarray):
                 v = val[resslc]
             else:
