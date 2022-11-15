@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from collections import defaultdict
 
 import numpy as np
-from numpy import ndarray, imag, complex as npcomplex
+from numpy import ndarray, imag, complex128 as npcomplex
 
 from openmdao.core.system import _DEFAULT_COLORING_META
 from openmdao.utils.coloring import _ColSparsityJac, _compute_coloring

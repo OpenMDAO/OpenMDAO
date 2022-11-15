@@ -482,16 +482,6 @@ jobs:
           python -c "import scipy; assert str(scipy.__version__).startswith(str(${{ matrix.SCIPY }})), \
                     f'Scipy version {scipy.__version__} is not the requested version (${{ matrix.SCIPY }})'"
 
-      - name: Audit dependencies
-        run: |
-          python -m pip install pip-audit
-          echo "============================================================="
-          echo "Scan environment for packages with known vulnerabilities"
-          echo "(Temporarily ignoring PYSEC-2022-237, required by nbconvert)"
-          echo "(Temporarily ignoring OSV-2022-715, in Pillow, required by matplotlib)"
-          echo "============================================================="
-          python -m pip_audit --ignore-vuln OSV-2022-715 --ignore-vuln PYSEC-2022-237
-
       - name: Run tests
         run: |
           echo "============================================================="

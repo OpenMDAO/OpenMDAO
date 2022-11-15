@@ -2170,7 +2170,8 @@ class TestConnect(unittest.TestCase):
             self.sub.connect('cmp.x', 'tgt.x', src_indices=[1])
 
     def test_invalid_source(self):
-        msg = "'sub' <class Group>: Attempted to connect from 'src.z' to 'tgt.x', but 'src.z' doesn't exist."
+        msg = "'sub' <class Group>: Attempted to connect from 'src.z' to 'tgt.x', but 'src.z' doesn't exist." + \
+              " Perhaps you meant to connect to one of the following outputs: ['src.x', 'src.s', 'cmp.z']"
 
         # source and target names can't be checked until setup
         # because setup is not called until then
@@ -2237,7 +2238,8 @@ class TestConnect(unittest.TestCase):
         p['x']
 
     def test_invalid_target(self):
-        msg = "'sub' <class Group>: Attempted to connect from 'src.x' to 'tgt.z', but 'tgt.z' doesn't exist."
+        msg = "'sub' <class Group>: Attempted to connect from 'src.x' to 'tgt.z', but 'tgt.z' doesn't exist." + \
+              " Perhaps you meant to connect to one of the following inputs: ['tgt.x']"
 
         # source and target names can't be checked until setup
         # because setup is not called until then
