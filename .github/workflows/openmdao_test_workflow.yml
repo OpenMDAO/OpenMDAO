@@ -164,6 +164,8 @@ jobs:
           echo "============================================================="
           python -m pip install .${{ matrix.OPTIONAL }}
 
+          python -m pip install git+https://github.com/naylor-b/testflo.git@mpikill
+
       - name: Install jax
         if: matrix.JAX
         run: |
