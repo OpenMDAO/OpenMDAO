@@ -224,9 +224,12 @@ class TestPETScVector3Proc(unittest.TestCase):
         model.add_subsystem('des_vars', comp)
 
         sub = model.add_subsystem('pp', om.ParallelGroup())
-        sub.add_subsystem('calc1', om.ExecComp('y = 2.0*x', x=np.ones((3, )), y=np.ones((3, ))))
-        sub.add_subsystem('calc2', om.ExecComp('y = 5.0*x', x=np.ones((3, )), y=np.ones((3, ))))
-        sub.add_subsystem('calc3', om.ExecComp('y = 7.0*x', x=np.ones((3, )), y=np.ones((3, ))))
+        c1 = sub.add_subsystem('calc1', om.ExecComp('y = 2.0*x', x=np.ones((3, )), y=np.ones((3, ))))
+        c2 = sub.add_subsystem('calc2', om.ExecComp('y = 5.0*x', x=np.ones((3, )), y=np.ones((3, ))))
+        c3 = sub.add_subsystem('calc3', om.ExecComp('y = 7.0*x', x=np.ones((3, )), y=np.ones((3, ))))
+        c1.declare_coloring(wrt='*', method='cs')
+        c2.declare_coloring(wrt='*', method='cs')
+        c3.declare_coloring(wrt='*', method='cs')
 
         model.connect('des_vars.v1', 'pp.calc1.x')
         model.connect('des_vars.v1', 'pp.calc2.x')
