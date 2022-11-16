@@ -25,7 +25,7 @@ from openmdao.utils.general_utils import default_noraise
 from openmdao.utils.mpi import MPI
 from openmdao.utils.notebook_utils import notebook, display, HTML, IFrame, colab
 from openmdao.visualization.htmlpp import HtmlPreprocessor
-from openmdao.utils.om_warnings import issue_warning, warn_deprecation
+from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.reports_system import register_report
 from openmdao.core.constants import _UNDEFINED
 from openmdao import __version__ as openmdao_version
@@ -604,8 +604,8 @@ def n2(data_source, outfile=_default_n2_filename, case_id=None, show_browser=Tru
             f.write(err_msg)
     else:
         HtmlPreprocessor(os.path.join(vis_dir, "index.html"),
-                        outfile, allow_overwrite=True, var_dict=html_vars,
-                        json_dumps_default=default_noraise, verbose=False).run()
+                         outfile, allow_overwrite=True, var_dict=html_vars,
+                         json_dumps_default=default_noraise, verbose=False).run()
 
     if notebook:
         if display_in_notebook:
