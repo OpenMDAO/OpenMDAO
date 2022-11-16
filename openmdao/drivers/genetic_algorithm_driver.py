@@ -78,6 +78,7 @@ class SimpleGADriver(Driver):
         super().__init__(**kwargs)
 
         # What we support
+        self.supports['optimization'] = True
         self.supports['integer_design_vars'] = True
         self.supports['inequality_constraints'] = True
         self.supports['equality_constraints'] = True
