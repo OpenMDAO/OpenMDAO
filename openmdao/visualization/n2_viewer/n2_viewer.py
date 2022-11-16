@@ -367,8 +367,10 @@ def _get_viewer_data(data_source, case_id=None):
         root_group = data_source.model
 
         if not isinstance(root_group, Group):
-            issue_warning("The model is not a Group, viewer data is unavailable.")
-            return {}
+            # this function only makes sense when the model is a Group
+            msg = f"The model is of type {root_group.__class__.__name__}, " \
+                  "viewer data is only available if the model is a Group."
+            raise TypeError(msg)
 
         driver = data_source.driver
         driver_name = driver.__class__.__name__
@@ -391,8 +393,8 @@ def _get_viewer_data(data_source, case_id=None):
             driver_opt_settings = None
         else:
             # this function only makes sense when it is at the root
-            issue_warning(f"Viewer data is not available for sub-Group '{data_source.pathname}'.")
-            return {}
+            msg = f"Viewer data is not available for sub-Group '{data_source.pathname}'."
+            raise TypeError(msg)
 
     elif isinstance(data_source, str):
         if ',' in data_source:
@@ -566,7 +568,14 @@ def n2(data_source, outfile=_default_n2_filename, case_id=None, show_browser=Tru
         Defaults to True.
     """
     # grab the model viewer data
-    model_data = _get_viewer_data(data_source, case_id=case_id)
+    try:
+        model_data = _get_viewer_data(data_source, case_id=case_id)
+        err_msg = ''
+    except TypeError as err:
+        model_data = {}
+        err_msg = str(err)
+        issue_warning(err_msg)
+
     # if MPI is active only display one copy of the viewer
     if MPI and MPI.COMM_WORLD.rank != 0:
         return
@@ -590,9 +599,13 @@ def n2(data_source, outfile=_default_n2_filename, case_id=None, show_browser=Tru
         'model_data': model_data
     }
 
-    HtmlPreprocessor(os.path.join(vis_dir, "index.html"),
-                     outfile, allow_overwrite=True, var_dict=html_vars,
-                     json_dumps_default=default_noraise, verbose=False).run()
+    if err_msg:
+        with open(outfile, 'w') as f:
+            f.write(err_msg)
+    else:
+        HtmlPreprocessor(os.path.join(vis_dir, "index.html"),
+                        outfile, allow_overwrite=True, var_dict=html_vars,
+                        json_dumps_default=default_noraise, verbose=False).run()
 
     if notebook:
         if display_in_notebook:
