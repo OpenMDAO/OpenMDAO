@@ -458,6 +458,14 @@ jobs:
           echo "============================================================="
           python -m pip install .[all]
 
+      - name: Install pyOptSparse
+        if: matrix.PYOPTSPARSE
+        run: |
+          echo "============================================================="
+          echo "Install pyoptsparse from conda-forge"
+          echo "============================================================="
+          conda install -c conda-forge pyoptsparse
+
       - name: Install optional dependencies
         run: |
           echo "============================================================="
