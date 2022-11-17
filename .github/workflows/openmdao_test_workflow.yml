@@ -404,6 +404,7 @@ jobs:
             PY: 3
             NUMPY: 1
             SCIPY: 1
+            PYOPTSPARSE: '2.9.1'
 
     name: ${{ matrix.NAME }}
 
@@ -464,7 +465,7 @@ jobs:
           echo "============================================================="
           echo "Install pyoptsparse from conda-forge"
           echo "============================================================="
-          conda install -c conda-forge pyoptsparse
+          conda install -c conda-forge pyoptsparse=${{ matrix.PYOPTSPARSE }} -q -y
 
       - name: Install optional dependencies
         run: |
