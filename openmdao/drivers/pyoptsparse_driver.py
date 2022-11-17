@@ -203,6 +203,7 @@ class pyOptSparseDriver(Driver):
         super().__init__(**kwargs)
 
         # What we support
+        self.supports['optimization'] = True
         self.supports['inequality_constraints'] = True
         self.supports['equality_constraints'] = True
         self.supports['multiple_objectives'] = True

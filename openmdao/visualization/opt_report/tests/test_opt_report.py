@@ -163,8 +163,14 @@ class TestOptimizationReport(unittest.TestCase):
                                           )
         expect = {'obj_calls': 0, 'deriv_calls': 0}
         self.check_opt_result(expected=expect)
-        opt_report(self.prob)
-        self.check_opt_report(expected=expect)
+
+        expected_warning_msg = "The optimizer report is not applicable for the Driver Driver " \
+                               "which does not support optimization"
+        with assert_warning(DriverWarning, expected_warning_msg):
+            opt_report(self.prob)
+
+        outfilepath = str(pathlib.Path(self.prob.get_reports_dir()).joinpath(_default_optimizer_report_filename))
+        self.assertFalse(os.path.exists(outfilepath))
 
     def test_opt_report_scipyopt_SLSQP(self):
         self.setup_problem_and_run_driver(om.ScipyOptimizeDriver,

@@ -149,6 +149,7 @@ class Driver(object):
 
         # What the driver supports.
         self.supports = OptionsDictionary(parent_name=type(self).__name__)
+        self.supports.declare('optimization', types=bool, default=False)
         self.supports.declare('inequality_constraints', types=bool, default=False)
         self.supports.declare('equality_constraints', types=bool, default=False)
         self.supports.declare('linear_constraints', types=bool, default=False)
@@ -160,7 +161,6 @@ class Driver(object):
         self.supports.declare('simultaneous_derivatives', types=bool, default=False)
         self.supports.declare('total_jac_sparsity', types=bool, default=False)
         self.supports.declare('distributed_design_vars', types=bool, default=True)
-        self.supports.declare('optimization', types=bool, default=True)
 
         self.iter_count = 0
         self.cite = ""
