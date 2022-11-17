@@ -176,7 +176,12 @@ class TestComponentAsModel(unittest.TestCase):
 
     def test_promotes_component_as_model(self):
         """
-        Promotes error because theres nowhere to promote to, but that isn't necessarily clear.
+        This tests for an improved error message when 'promotes' args are inadvertantly passed
+        to the ExecComp constructor rather than to 'add_subsystem'.
+
+        The error came up in the context of using ExecComp as a model, but the error was unclear:
+
+        Promotes error because there's nowhere to promote to, but that isn't necessarily clear.
 
         The error is
 
