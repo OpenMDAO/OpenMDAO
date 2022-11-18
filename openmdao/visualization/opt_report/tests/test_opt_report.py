@@ -164,7 +164,7 @@ class TestOptimizationReport(unittest.TestCase):
         expect = {'obj_calls': 0, 'deriv_calls': 0}
         self.check_opt_result(expected=expect)
 
-        expected_warning_msg = "The optimizer report is not applicable for the Driver Driver " \
+        expected_warning_msg = "The optimizer report is not applicable for Driver type 'Driver', " \
                                "which does not support optimization"
         with assert_warning(DriverWarning, expected_warning_msg):
             opt_report(self.prob)
@@ -240,7 +240,7 @@ class TestOptimizationReport(unittest.TestCase):
 
         self.check_opt_result(prob.driver.opt_result, expected={'obj_calls': 0, 'deriv_calls': 0})
 
-        expected_warning_msg = "The optimizer report is not applicable for the DOEDriver Driver " \
+        expected_warning_msg = "The optimizer report is not applicable for Driver type 'DOEDriver', " \
                                "which does not support optimization"
         with assert_warning(DriverWarning, expected_warning_msg):
             opt_report(prob)

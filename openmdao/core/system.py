@@ -33,11 +33,10 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer
-from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, PromotionWarning,\
-    UnusedOptionWarning, warn_deprecation
-from openmdao.utils.general_utils import determine_adder_scaler, \
-    format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, \
-        conditional_error, env_truthy
+from openmdao.utils.om_warnings import issue_warning, warn_deprecation, \
+    DerivativesWarning, PromotionWarning, UnusedOptionWarning
+from openmdao.utils.general_utils import determine_adder_scaler, conditional_error, \
+    format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -815,6 +814,8 @@ class System(object):
         """
         Perform setup for this system and its descendant systems.
 
+        This is only called on the top-level model.
+
         Parameters
         ----------
         comm : MPI.Comm or <FakeComm> or None
@@ -863,7 +864,20 @@ class System(object):
 
         self._top_level_post_sizes()
 
-        self._problem_meta['relevant'] = self._init_relevance(mode)
+        # The try/except can be removed when support for the
+        # "Component as a model" deprecation is removed
+        try:
+            self._problem_meta['relevant'] = self._init_relevance(mode)
+        except RuntimeError as err:
+            from openmdao.core.group import Group
+            if "Output not found for design variable" in str(err) and not isinstance(self, Group):
+                msg = f"{str(err)}\nThe model is of type '{self.__class__.__name__}'. " \
+                      "Components must be placed in a Group in order for unconnected inputs " \
+                      "to be used as design variables. A future release will require that " \
+                      "the model be a Group or a sub-class of Group."
+                raise RuntimeError(msg)
+            else:
+                raise err
 
         # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()

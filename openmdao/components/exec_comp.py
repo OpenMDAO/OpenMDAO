@@ -356,10 +356,12 @@ class ExecComp(ExplicitComponent):
                 continue  # TODO should still do some checking here!
 
             if arg not in allvars:
-                raise RuntimeError("%s: arg '%s' in call to ExecComp() "
-                                   "does not refer to any variable in the "
-                                   "expressions %s" % (self.msginfo,
-                                                       arg, exprs))
+                msg = f"{self.msginfo}: arg '{arg}' in call to ExecComp() " \
+                      f"does not refer to any variable in the expressions {exprs}"
+                if arg in ('promotes', 'promotes_inputs', 'promotes_outputs'):
+                    msg += ". Did you intend to promote variables in the 'add_subsystem' call?"
+                raise RuntimeError(msg)
+
             if isinstance(val, dict):
                 diff = set(val.keys()) - _allowed_meta
                 if diff:

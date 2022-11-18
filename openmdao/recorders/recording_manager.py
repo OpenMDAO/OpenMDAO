@@ -3,6 +3,8 @@ RecordingManager class definition.
 """
 import time
 
+from openmdao.utils.om_warnings import issue_warning
+
 
 class RecordingManager(object):
     """
@@ -190,7 +192,12 @@ def record_viewer_data(problem):
     # if any recorders were found, get the viewer data and record it
     if recorders:
         from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
-        viewer_data = _get_viewer_data(problem)
+        try:
+            viewer_data = _get_viewer_data(problem)
+        except TypeError as err:
+            viewer_data = {}
+            issue_warning(str(err))
+
         viewer_data['md5_hash'] = problem.model._generate_md5_hash()
         viewer_data.pop('abs2prom', None)  # abs2prom already recorded in metadata table
         for recorder in recorders:

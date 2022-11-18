@@ -268,3 +268,8 @@ class TestN2Viewer(unittest.TestCase):
         self.assertEqual(x_val, np.array([1.]))
         self.assertEqual(y_val, np.array([1.]))
         self.assertEqual(f_xy_val, np.array([27.]))
+
+
+if __name__ == "__main__":
+    unittest.main()
+

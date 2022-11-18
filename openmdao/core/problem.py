@@ -1060,6 +1060,12 @@ class Problem(object):
             except AttributeError:
                 warn_deprecation(msg)
 
+        if not isinstance(self.model, Group):
+            warn_deprecation("The model for this Problem is of type "
+                             f"'{self.model.__class__.__name__}'. "
+                             "A future release will require that the model "
+                             "be a Group or a sub-class of Group.")
+
         # A distributed vector type is required for MPI
         if comm.size > 1:
             if distributed_vector_class is PETScVector and PETScVector is None:
