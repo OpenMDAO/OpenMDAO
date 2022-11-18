@@ -404,6 +404,7 @@ jobs:
             PY: 3
             NUMPY: 1
             SCIPY: 1
+            PYOPTSPARSE: '2.9.1'
 
     name: ${{ matrix.NAME }}
 
@@ -457,6 +458,14 @@ jobs:
           echo "Install OpenMDAO"
           echo "============================================================="
           python -m pip install .[all]
+
+      - name: Install pyOptSparse
+        if: matrix.PYOPTSPARSE
+        run: |
+          echo "============================================================="
+          echo "Install pyoptsparse from conda-forge"
+          echo "============================================================="
+          conda install -c conda-forge pyoptsparse=${{ matrix.PYOPTSPARSE }} -q -y
 
       - name: Install optional dependencies
         run: |
