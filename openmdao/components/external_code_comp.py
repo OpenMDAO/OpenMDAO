@@ -41,9 +41,9 @@ class ExternalCodeDelegate(object):
 
         comp.options.declare('command', [], types=(list, str),
                              desc="Command to be executed. If it is a string, then this is the "
-                                  "command line to execute and the "
-                                  ":class:`subprocess.Popen` ``shell`` argument is set True. "
-                                  "If it is a list; the first is the command to execute.")
+                                  "command line to execute and 'shell' argument to "
+                                  "'subprocess.Popen()'  is set True. "
+                                  "If it is a list; the first entry is the command to execute.")
         comp.options.declare('env_vars', {}, desc='Environment variables required by the command.')
         comp.options.declare('poll_delay', 0.0, lower=0.0,
                              desc='Delay between polling for command completion. '
