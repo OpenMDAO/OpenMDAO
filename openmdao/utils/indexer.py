@@ -9,7 +9,7 @@ from itertools import zip_longest
 
 from openmdao.utils.general_utils import shape2tuple
 from openmdao.utils.array_utils import shape_to_len
-from openmdao.utils.om_warnings import issue_warning, OMDeprecationWarning
+from openmdao.utils.om_warnings import issue_warning
 
 
 def array2slice(arr):
@@ -175,11 +175,6 @@ class Indexer(object):
         """
         return shape_to_len(self.indexed_src_shape)
 
-    def _check_ind_type(self, ind, types):
-        if not isinstance(ind, types):
-            raise TypeError(f"Can't create {type(self).__name__} using this "
-                            f"kind of index: {ind}.")
-
     def flat(self, copy=False):
         """
         Return index array or slice into a flat array.
@@ -318,7 +313,6 @@ class ShapedIntIndexer(Indexer):
         Initialize attributes.
         """
         super().__init__(flat_src)
-        self._check_ind_type(idx, Integral)
         self._idx = idx
 
     def __call__(self):
@@ -492,7 +486,6 @@ class ShapedSliceIndexer(Indexer):
         Initialize attributes.
         """
         super().__init__(flat_src)
-        self._check_ind_type(slc, slice)
         if slc.step is None:
             slc = slice(slc.start, slc.stop, 1)
         self._slice = slc

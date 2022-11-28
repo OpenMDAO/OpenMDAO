@@ -272,80 +272,64 @@ class TestConnectionsIndices(unittest.TestCase):
         # Should not be allowed because the source and target shapes do not match
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp')
 
-        expected = "<model> <class Group>: The source and target shapes do not match or are " + \
+        expected = "\nConnection errors for problem 'run_unittests_xml':\n   <model> <class Group>: The source and target shapes do not match or are " + \
                    "ambiguous for the connection 'idvp.blammo' to 'arraycomp.inp'. " + \
                    "The source shape is (1,) but the target shape is (2,)."
-
+        self.prob.setup()
         try:
-            self.prob.setup()
+            self.prob.run_model()
         except Exception as err:
             self.assertEqual(str(err), expected)
         else:
             self.fail('Exception expected.')
-
-        self.prob.model._raise_connection_errors = False
-
-        with assert_warning(UserWarning, expected):
-            self.prob.setup()
 
     def test_bad_length(self):
         # Should not be allowed because the length of src_indices is greater than
         # the shape of arraycomp.inp
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp', src_indices=[0, 0, 0])
 
-        expected = "<model> <class Group>: The source indices [0 0 0] do not specify a valid shape " + \
+        expected = "\nConnection errors for problem 'run_unittests_xml':\n   <model> <class Group>: The source indices [0 0 0] do not specify a valid shape " + \
                    "for the connection 'idvp.blammo' to 'arraycomp.inp'. The target shape is " + \
                    "(2,) but indices are shape (3,)."
 
+        self.prob.setup()
         try:
-            self.prob.setup()
-        except ValueError as err:
+            self.prob.run_model()
+        except Exception as err:
             self.assertEqual(str(err), expected)
         else:
             self.fail('Exception expected.')
-
-        self.prob.model._raise_connection_errors = False
-
-        with assert_warning(UserWarning, expected):
-            self.prob.setup()
 
     def test_bad_value(self):
         # Should not be allowed because the index value within src_indices is outside
         # the valid range for the source
         self.prob.model.connect('idvp.arrout', 'arraycomp.inp1', src_indices=[100000])
 
-        expected = "<model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp1': index 100000 is out of bounds for source dimension of size 5."
+        expected = "\nConnection errors for problem 'run_unittests_xml':\n   <model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp1': index 100000 is out of bounds for source dimension of size 5.\n   In connection from 'idvp.arrout' to 'arraycomp.inp1', error was: index 100000 is out of bounds for source dimension of size 5.\n   When accessing 'idvp.arrout' with src_shape (5,) from 'arraycomp.inp1' using src_indices [100000]: index 100000 is out of bounds for source dimension of size 5."
+
+        self.prob.setup()
 
         try:
-            self.prob.setup()
+            self.prob.run_model()
         except Exception as err:
             self.assertEqual(str(err), expected)
         else:
             self.fail('Exception expected.')
-
-        self.prob.model._raise_connection_errors = False
-
-        with assert_warning(om.SetupWarning, expected):
-            self.prob.setup()
 
     def test_bad_value_bug(self):
         # Should not be allowed because the 2nd index value within src_indices is outside
         # the valid range for the source.  A bug prevented this from being checked.
         self.prob.model.connect('idvp.arrout', 'arraycomp.inp', src_indices=[0, 100000])
 
-        expected = "<model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp': index 100000 is out of bounds for source dimension of size 5."
+        expected = "\nConnection errors for problem 'run_unittests_xml':\n   <model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp': index 100000 is out of bounds for source dimension of size 5.\n   In connection from 'idvp.arrout' to 'arraycomp.inp', error was: index 100000 is out of bounds for source dimension of size 5.\n   When accessing 'idvp.arrout' with src_shape (5,) from 'arraycomp.inp' using src_indices [     0 100000]: index 100000 is out of bounds for source dimension of size 5."
 
+        self.prob.setup()
         try:
-            self.prob.setup()
-        except IndexError as err:
+            self.prob.run_model()
+        except Exception as err:
             self.assertEqual(str(err), expected)
         else:
             self.fail('Exception expected.')
-
-        self.prob.model._raise_connection_errors = False
-
-        with assert_warning(UserWarning, expected):
-            self.prob.setup()
 
 
 class TestShapes(unittest.TestCase):
@@ -431,19 +415,15 @@ class TestShapes(unittest.TestCase):
                                                 y={'val': np.zeros((5, 2))}))
         p.model.connect('indep.x', 'C1.x')
 
-        expected = "<model> <class Group>: The source and target shapes do not match or are " + \
+        expected = "\nConnection errors for problem 'run_unittests_xml':\n   <model> <class Group>: The source and target shapes do not match or are " + \
                    "ambiguous for the connection 'indep.x' to 'C1.x'. The source shape is " + \
                    "(1, 10, 1, 1) but the target shape is (5, 2)."
 
+        p.setup()
         with self.assertRaises(Exception) as context:
-            p.setup()
+            p.run_model()
 
         self.assertEqual(str(context.exception), expected)
-
-        p.model._raise_connection_errors = False
-
-        with assert_warning(UserWarning, expected):
-            p.setup()
 
 
 class TestMultiConns(unittest.TestCase):
@@ -467,18 +447,14 @@ class TestMultiConns(unittest.TestCase):
         prob.model.connect('x', 'sub.x')
         prob.model.connect('y', 'sub.y')
 
-        expected = "<model> <class Group>: The following inputs have multiple connections: " + \
-                   "sub.c2.y from ['indeps.y', 'sub.c1.y']"
+        expected = "\nConnection errors for problem 'run_unittests_xml':\n   <model> <class Group>: The following inputs have multiple connections: " + \
+                   "sub.c2.y from ['indeps.y', 'sub.c1.y']."
 
+        prob.setup()
         with self.assertRaises(Exception) as context:
-            prob.setup()
+            prob.run_model()
 
         self.assertEqual(str(context.exception), expected)
-
-        prob.model._raise_connection_errors = False
-
-        with assert_warning(om.SetupWarning, expected):
-            prob.setup()
 
     def test_mixed_conns_same_level(self):
 
@@ -495,19 +471,15 @@ class TestMultiConns(unittest.TestCase):
         # make a second, explicit, connection to y (which is c2.y promoted)
         prob.model.connect('indeps.x', 'y')
 
-        expected = "<model> <class Group>: Input 'c2.y' cannot be connected to 'indeps.x' " + \
-                   "because it's already connected to 'c1.y'"
+        expected = "\nConnection errors for problem 'run_unittests_xml':\n   <model> <class Group>: Input 'c2.y' cannot be connected to 'indeps.x' " + \
+                   "because it's already connected to 'c1.y'."
 
         with self.assertRaises(Exception) as context:
             prob.setup()
             prob.final_setup()
+            prob.run_model()
 
         self.assertEqual(str(context.exception), expected)
-
-        prob.model._raise_connection_errors = False
-
-        with assert_warning(UserWarning, expected):
-            prob.setup()
 
     def test_auto_ivc_ambiguous_with_src_indices_msg(self):
 

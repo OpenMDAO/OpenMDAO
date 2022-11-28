@@ -23,6 +23,7 @@ from openmdao.core.component import Component
 from openmdao.core.driver import Driver, record_iteration, SaveOptResult
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group, System
+import openmdao.core.system as sysmod
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
@@ -774,6 +775,37 @@ class Problem(object):
         # Clean up cache
         self._initial_condition_cache = {}
 
+    def _check_collected_errors(self):
+        """
+        If any stored connection errors are found, raise an exception containing all of them.
+        """
+        if sysmod._saved_errors is None:
+            return
+
+        errors = sysmod._saved_errors
+
+        # set the errors to None so that all future calls will immediately raise an exception.
+        sysmod._saved_errors = None
+
+        if errors:
+            byprob = defaultdict(list)
+            for tup, info in errors.items():
+                _, msg = tup
+                probname, _, _ = info
+                byprob[probname].append((msg, info))
+
+            final_msg = []
+            for probname, lst in byprob.items():
+                final_msg.append(f"\nConnection errors for problem '{probname}':")
+                for msg, (_, exc_type, tback) in lst:
+                    final_msg.append(f"   {msg}")
+
+                # if there's only one error, include its traceback if there is one.
+                if len(errors) == 1:
+                    raise exc_type('\n'.join(final_msg)).with_traceback(tback)
+
+            raise RuntimeError('\n'.join(final_msg))
+
     def run_model(self, case_prefix=None, reset_iter_counts=True):
         """
         Run the model by calling the root system's solve_nonlinear.
@@ -804,6 +836,7 @@ class Problem(object):
                 self.model._reset_iter_counts()
 
             self.final_setup()
+            self._check_collected_errors()
 
             self._run_counter += 1
             record_model_options(self, self._run_counter)
@@ -848,6 +881,7 @@ class Problem(object):
                 self.model._reset_iter_counts()
 
             self.final_setup()
+            self._check_collected_errors()
 
             self._run_counter += 1
             record_model_options(self, self._run_counter)
@@ -881,6 +915,8 @@ class Problem(object):
         dict
             The total jacobian vector product, keyed by variable name.
         """
+        self._check_collected_errors()
+
         if mode == 'fwd':
             if len(wrt) != len(seed):
                 raise RuntimeError(self.msginfo +
@@ -1084,6 +1120,9 @@ class Problem(object):
         self._mode = self._orig_mode = mode
 
         model_comm = self.driver._setup_comm(comm)
+        # Use dict to keep order but avoid duplicates. if OPENMDAO_FAIL_FAST is set, set to None,
+        # which causes all errors to be immediately raised as exceptions.
+        sysmod._saved_errors = None if env_truthy('OPENMDAO_FAIL_FAST') else {}
 
         # this metadata will be shared by all Systems/Solvers in the system tree
         self._metadata = {

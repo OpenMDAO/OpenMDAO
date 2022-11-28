@@ -64,7 +64,6 @@ from openmdao.utils.entry_points import _list_installed_setup_parser, _list_inst
         _find_plugins_setup_parser, _find_plugins_exec
 from openmdao.utils.reports_system import _list_reports_setup_parser, _list_reports_cmd, \
     _view_reports_setup_parser, _view_reports_cmd
-from openmdao.utils.general_utils import ignore_errors
 
 
 def _n2_setup_parser(parser):
@@ -119,7 +118,6 @@ def _n2_cmd(options, user_args):
         # tell report system not to duplicate effort
         _register_cmdline_report('n2')
 
-        ignore_errors(True)
         _load_and_exec(options.file[0], user_args)
     else:
         # assume the file is a recording, run standalone
@@ -175,7 +173,6 @@ def _view_connections_cmd(options, user_args):
     hooks._register_hook(funcname, class_name='Problem', inst_id=options.problem, post=_viewconns,
                          exit=True)
 
-    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 
@@ -301,8 +298,6 @@ def _config_summary_cmd(options, user_args):
         Args to be passed to the user script.
     """
     hooks._register_hook('final_setup', 'Problem', post=config_summary, exit=True)
-
-    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 
@@ -412,8 +407,6 @@ def _tree_cmd(options, user_args):
         funcname = 'setup'
     hooks._register_hook(funcname, class_name='Problem', inst_id=options.problem, post=_tree,
                          exit=True)
-
-    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 
@@ -457,8 +450,6 @@ def _cite_cmd(options, user_args):
             print_citations(prob, classes=options.classes, out_stream=out)
 
     hooks._register_hook('setup', 'Problem', post=_cite, exit=True)
-
-    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 

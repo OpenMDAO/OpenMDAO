@@ -11,7 +11,7 @@ from openmdao.core.constants import _SetupStatus, INF_BOUND
 import openmdao.utils.hooks as hooks
 from openmdao.utils.mpi import MPI
 from openmdao.utils.webview import webview
-from openmdao.utils.general_utils import ignore_errors, default_noraise
+from openmdao.utils.general_utils import default_noraise
 from openmdao.utils.file_utils import _load_and_exec
 from openmdao.utils.reports_system import register_report
 
@@ -565,8 +565,6 @@ def _scaling_cmd(options, user_args):
     from openmdao.utils.reports_system import _register_cmdline_report
     # tell report system not to duplicate effort
     _register_cmdline_report('scaling')
-
-    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 

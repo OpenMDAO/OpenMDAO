@@ -936,7 +936,7 @@ class TestProblem(unittest.TestCase):
 
     def test_feature_get_set_with_units_diff_err(self):
 
-        prob = om.Problem()
+        prob = om.Problem(name="units_diff")
         prob.model.add_subsystem('C1', om.ExecComp('y=x*2.',
                                                      x={'val': 1.0, 'units': 'ft'},
                                                      y={'val': 0.0, 'units': 'ft'}),
@@ -946,10 +946,11 @@ class TestProblem(unittest.TestCase):
                                                      y={'val': 0.0, 'units': 'inch'}),
                                  promotes=['x'])
 
+        prob.setup()
         try:
-            prob.setup()
-        except RuntimeError as err:
-            self.assertEqual(str(err), "<model> <class Group>: The following inputs, ['C1.x', 'C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'val'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the model to remove the ambiguity.")
+            prob.run_model()
+        except Exception as err:
+            self.assertEqual(str(err), "\nConnection errors for problem 'units_diff':\n   <model> <class Group>: The following inputs, ['C1.x', 'C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'val'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the model to remove the ambiguity.")
         else:
             self.fail("Exception expected.")
 
@@ -2037,7 +2038,7 @@ class TestProblem(unittest.TestCase):
             prob.set_val('x', 0.)
 
     def test_design_var_connected_to_output_as_input_err(self):
-        prob = om.Problem()
+        prob = om.Problem(name='output_as_input_err')
         root = prob.model
 
         prob.driver = om.ScipyOptimizeDriver()
@@ -2052,10 +2053,12 @@ class TestProblem(unittest.TestCase):
 
         c1.add_design_var('x', lower=0, upper=5)
 
-        msg = "Design variable 'x' is connected to 'initial_comp.x', but 'initial_comp.x' is not an IndepVarComp or ImplicitComp output."
+        prob.setup()
 
         with self.assertRaises(RuntimeError) as cm:
-            prob.setup()
+            prob.run_model()
+            
+        msg = "\nConnection errors for problem 'output_as_input_err':\n   Design variable 'x' is connected to 'initial_comp.x', but 'initial_comp.x' is not an IndepVarComp or ImplicitComp output."
         self.assertEqual(str(cm.exception), msg)
 
     def test_design_var_connected_to_output(self):

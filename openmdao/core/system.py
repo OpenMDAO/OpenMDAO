@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from collections import defaultdict
 from itertools import chain
 from enum import IntEnum
+from inspect import getframeinfo, currentframe, getouterframes
 
 from fnmatch import fnmatchcase
 
@@ -33,10 +34,11 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer
+from openmdao.utils.general_utils import determine_adder_scaler, \
+    format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, env_truthy, \
+    make_traceback
 from openmdao.utils.om_warnings import issue_warning, warn_deprecation, \
     DerivativesWarning, PromotionWarning, UnusedOptionWarning
-from openmdao.utils.general_utils import determine_adder_scaler, conditional_error, \
-    format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -99,6 +101,10 @@ resp_size_checks = {
 }
 resp_types = {'con': 'constraint', 'obj': 'objective'}
 
+value_deprecated_msg = "The metadata key 'value' will be deprecated in 4.0. Please use 'val'."
+
+_saved_errors = None if env_truthy('OPENMDAO_FAIL_FAST') else {}
+
 
 class _MatchType(IntEnum):
     """
@@ -117,9 +123,6 @@ class _MatchType(IntEnum):
     NAME = 0
     RENAME = 1
     PATTERN = 2
-
-
-value_deprecated_msg = "The metadata key 'value' will be deprecated in 4.0. Please use 'val'."
 
 
 class _MetadataDict(dict):
@@ -1604,12 +1607,6 @@ class System(object):
     def _setup_global_connections(self, conns=None):
         """
         Compute dict of all connections between this system's inputs and outputs.
-
-        The connections come from 4 sources:
-        1. Implicit connections owned by the current system
-        2. Explicit connections declared by the current system
-        3. Explicit connections declared by parent systems
-        4. Implicit / explicit from subsystems
 
         Parameters
         ----------
@@ -3200,11 +3197,12 @@ class System(object):
                 if var in abs2meta_out and "openmdao:allow_desvar" not in abs2meta_out[var]['tags']:
                     src, tgt = outmeta['orig']
                     if src is None:
-                        conditional_error(f"Design variable '{tgt}' is connected to '{var}', but "
-                                          f"'{var}' is not an IndepVarComp or ImplicitComp output.")
+                        self._collect_error(f"Design variable '{tgt}' is connected to '{var}', but "
+                                            f"'{var}' is not an IndepVarComp or ImplicitComp "
+                                            "output.")
                     else:
-                        conditional_error(f"Design variable '{src}' is not an IndepVarComp or "
-                                          "ImplicitComp output.")
+                        self._collect_error(f"Design variable '{src}' is not an IndepVarComp or "
+                                            "ImplicitComp output.")
 
         return out
 
@@ -5563,3 +5561,35 @@ class System(object):
             tarr -= toffset
 
         return sarr, tarr, tsize, has_dist_data
+
+    def _collect_error(self, msg, exc_type=None, tback=None):
+        """
+        Save an error message to raise as an exception later.
+
+        Parameters
+        ----------
+        msg : str
+            The connection error message to be saved.
+        exc_type : class or None
+            The type of exception to be raised if this error is the only one collected.
+        tback : traceback or None
+            The traceback of a caught exception.
+        """
+        if exc_type is None:
+            exc_type = RuntimeError
+
+        if tback is None:
+            tback = make_traceback()
+
+        if self.msginfo not in msg:
+            msg = f"{self.msginfo}: {msg}"
+
+        if _saved_errors is None or env_truthy('OPENMDAO_FAIL_FAST'):
+            raise exc_type(msg).with_traceback(tback)
+
+        if self._problem_meta is None:
+            probname = None
+        else:
+            probname = self._problem_meta['name']
+
+        _saved_errors[(id(self), msg)] = (probname, exc_type, tback)
