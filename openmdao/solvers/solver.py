@@ -274,7 +274,7 @@ class Solver(object):
         depth : int
             depth of the current system (already incremented).
         """
-        if self._system:
+        if self._system and self._system != weakref.ref(system):
             raise RuntimeError(f"{type(self).__name__} has already been assigned to "
                                f"{self._system().msginfo} and cannot also be assigned to "
                                f"{system.msginfo}.")
