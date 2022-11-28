@@ -103,15 +103,10 @@ def _n2_cmd(options, user_args):
     filename = _to_filename(options.file[0])
 
     if filename.endswith('.py'):
-        # the file is a python script, run as a post_setup hook
-        def _noraise(prob):
-            prob.model._raise_connection_errors = False
-
         def _viewmod(prob):
             n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
                 title=options.title, embeddable=options.embeddable)
 
-        hooks._register_hook('setup', 'Problem', pre=_noraise, ncalls=1)
         hooks._register_hook('final_setup', 'Problem', post=_viewmod, exit=True)
 
         from openmdao.utils.reports_system import _register_cmdline_report

@@ -1,4 +1,5 @@
 import unittest
+from collections import defaultdict
 
 import numpy as np
 
@@ -406,7 +407,7 @@ class TestDynShapes(unittest.TestCase):
         # In this case, our dynamicaly shaped inputs that do copy_shape from other inputs are connected to
         # non-dynamically shaped outputs, and because they don't set shape_by_conn, they are unresolvable,
         # unlike the test above where they connected to dynamically shaped outputs.
-        p = om.Problem()
+        p = om.Problem(name='copy_shape_in_in_unresolvable')
         indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
         indep.add_output('x2', val=np.ones((2,3)))
         p.model.add_subsystem('comp', om.ExecComp('y1, y2 = x1*2, x2*2',
@@ -423,8 +424,9 @@ class TestDynShapes(unittest.TestCase):
         p.model.connect('indep.x2', 'comp.x2')
         p.model.connect('comp.y1', 'sink.x1')
         p.model.connect('comp.y2', 'sink.x2')
+        p.setup()
         with self.assertRaises(RuntimeError) as cm:
-            p.setup()
+            p.run_model()
 
         msg = "<model> <class Group>: Failed to resolve shapes for ['comp.x1', 'comp.x2']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
         self.assertEqual(cm.exception.args[0], msg)
@@ -541,7 +543,7 @@ class TestDynShapes(unittest.TestCase):
     def test_cycle_unresolved(self):
         # now put the DynShapeGroupSeries in a cycle (sink.y2 feeds back into Gdyn.C1.x2), but here,
         # sink.y2 is unsized, so no var in the '2' loop can get resolved.
-        p = om.Problem()
+        p = om.Problem(name='cycle_unresolved')
         indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
         p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3,2, DynShapeComp))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
@@ -553,27 +555,29 @@ class TestDynShapes(unittest.TestCase):
         p.model.connect('Gdyn.C3.y2', 'sink.x2')
         p.model.connect('sink.y2', 'Gdyn.C1.x2')
         p.model.connect('indep.x1', 'Gdyn.C1.x1')
-        with self.assertRaises(RuntimeError) as cm:
-            p.setup()
+        p.setup()
+        with self.assertRaises(Exception) as cm:
+            p.run_model()
 
         msg = "<model> <class Group>: Failed to resolve shapes for ['Gdyn.C1.x2', 'Gdyn.C1.y2', 'Gdyn.C2.x2', 'Gdyn.C2.y2', 'Gdyn.C3.x2', 'Gdyn.C3.y2', 'sink.x2', 'sink.y2']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
         self.assertEqual(str(cm.exception), msg)
 
     def test_bad_copy_shape_name(self):
-        p = om.Problem()
+        p = om.Problem(name='bad_copy_shape_name')
         indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
         p.model.add_subsystem('sink', om.ExecComp('y1 = x1*2',
                                                   x1={'shape_by_conn': True, 'copy_shape': 'y1'},
                                                   y1={'shape_by_conn': True, 'copy_shape': 'x11'}))
         p.model.connect('indep.x1', 'sink.x1')
-        with self.assertRaises(RuntimeError) as cm:
-            p.setup()
+        p.setup()
+        with self.assertRaises(Exception) as cm:
+            p.run_model()
 
-        msg = "<model> <class Group>: Can't copy shape of variable 'sink.x11'. Variable doesn't exist."
+        msg = "\nConnection errors for problem 'bad_copy_shape_name':\n   <model> <class Group>: Can't copy shape of variable 'sink.x11'. Variable doesn't exist."
         self.assertEqual(str(cm.exception), msg)
 
     def test_unconnected_var_dyn_shape(self):
-        p = om.Problem()
+        p = om.Problem(name='unconnected_var_dyn_shape')
         indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
         p.model.add_subsystem('sink', om.ExecComp('y1 = x1*2',
                                                   x1={'shape_by_conn': True, 'copy_shape': 'y1'},
@@ -922,7 +926,7 @@ class TestDynShapesWithInputConns(unittest.TestCase):
         assert_near_equal(prob['sub.comp2.y'], np.ones(2) * 21.)
 
     def test_shape_from_conn_input_mismatch(self):
-        prob = om.Problem()
+        prob = om.Problem(name='shape_from_conn_input_mismatch')
         sub = prob.model.add_subsystem('sub', om.Group())
         comp1 = sub.add_subsystem('comp1', om.ExecComp('y=3*x', x={'shape_by_conn': True}, y={'copy_shape': 'x'}),
                                   promotes_inputs=['x'])
@@ -931,16 +935,17 @@ class TestDynShapesWithInputConns(unittest.TestCase):
         comp3 = sub.add_subsystem('comp3', om.ExecComp('y=3*x', x=np.ones(3), y=np.zeros(3)),
                                   promotes_inputs=['x'])
 
-        with self.assertRaises(ValueError) as cm:
-            prob.setup()
+        prob.setup()
+        with self.assertRaises(Exception) as cm:
+            prob.run_model()
 
         # just make sure we still get a clear error msg
 
-        msg = "Shape of input 'sub.comp3.x', (3,), doesn't match shape (2,)."
+        msg = "\nConnection errors for problem 'shape_from_conn_input_mismatch':\n   <model> <class Group>: Shape of input 'sub.comp3.x', (3,), doesn't match shape (2,)."
         self.assertEqual(cm.exception.args[0], msg)
 
     def test_shape_from_conn_input_mismatch_group_inputs(self):
-        prob = om.Problem()
+        prob = om.Problem(name='shape_from_conn_input_mismatch_group_inputs')
         sub = prob.model.add_subsystem('sub', om.Group())
         comp1 = sub.add_subsystem('comp1', om.ExecComp('y=3*x', x={'shape_by_conn': True}, y={'copy_shape': 'x'}),
                                   promotes_inputs=['x'])
@@ -949,12 +954,13 @@ class TestDynShapesWithInputConns(unittest.TestCase):
 
         sub.set_input_defaults('x', src_shape=(3, ))
 
+        prob.setup()
         with self.assertRaises(ValueError) as cm:
-            prob.setup()
+            prob.run_model()
 
         # just make sure we still get a clear error msg
 
-        msg = "Shape of input 'sub.comp2.x', (2,), doesn't match shape (3,)."
+        msg = "\nConnection errors for problem 'shape_from_conn_input_mismatch_group_inputs':\n   <model> <class Group>: Shape of input 'sub.comp2.x', (2,), doesn't match shape (3,)."
         self.assertEqual(cm.exception.args[0], msg)
 
 

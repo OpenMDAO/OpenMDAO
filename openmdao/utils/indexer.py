@@ -54,6 +54,12 @@ def _truncate(s):
     return s
 
 
+class IndexerError(IndexError):
+    def __init__(self, msg, ident=None):
+        super().__init__(msg)
+        self.ident = ident
+
+
 class Indexer(object):
     """
     Abstract indexing class.
@@ -139,7 +145,7 @@ class Indexer(object):
         Indexer
             This indexer.
         """
-        self._src_shape = parent._src_shape
+        self.set_src_shape(parent._src_shape)
         self._flat_src = parent._flat_src
         self._dist_shape = parent._dist_shape
         return self
@@ -159,9 +165,9 @@ class Indexer(object):
             raise RuntimeError(f"Can't get indexed_src_shape of {self} because source shape "
                                "is unknown.")
         if self._flat_src:
-            return resolve_shape(shape_to_len(self._src_shape))[self.flat()]
+            return resolve_shape(shape_to_len(self._src_shape)).get_shape(self.flat(), id(self))
         else:
-            return resolve_shape(self._src_shape)[self()]
+            return resolve_shape(self._src_shape).get_shape(self(), id(self))
 
     @property
     def indexed_src_size(self):
@@ -219,8 +225,8 @@ class Indexer(object):
         """
         s = self.shaped_instance()
         if s is None:
-            raise ValueError(f"Can't get shaped array of {self} because it has "
-                             "no source shape.")
+            raise IndexerError(f"Can't get shaped array of {self} because it has "
+                               "no source shape.", ident=id(self))
         return s.as_array(copy=copy, flat=flat)
 
     def apply(self, subidxer):
@@ -256,14 +262,23 @@ class Indexer(object):
         Indexer
             Self is returned to allow chaining.
         """
-        self._src_shape, self._dist_shape, = self._get_shapes(shape, dist_shape)
+        sshape, self._dist_shape, = self._get_shapes(shape, dist_shape)
 
         if shape is not None:
             if self._flat_src is None:
-                self._flat_src = len(self._src_shape) <= 1
-            self._check_bounds()
+                self._flat_src = len(sshape) <= 1
 
-        self._shaped_inst = None
+        if sshape != self._src_shape:
+            self._src_shape = sshape
+            try:
+                self._check_bounds()
+            except Exception:
+                self._src_shape = None
+                self._dist_shape = None
+                raise
+            self._shaped_inst = None
+
+        self._src_shape = sshape
 
         return self
 
@@ -414,8 +429,8 @@ class ShapedIntIndexer(Indexer):
         """
         if self._src_shape is not None and (self._idx >= self._dist_shape[0] or
                                             self._idx < -self._dist_shape[0]):
-            raise IndexError(f"index {self._idx} is out of bounds of the source shape "
-                             f"{self._dist_shape}.")
+            raise IndexerError(f"index {self._idx} is out of bounds of the source shape "
+                               f"{self._dist_shape}.", ident=id(self))
 
     def to_json(self):
         """
@@ -602,8 +617,8 @@ class ShapedSliceIndexer(Indexer):
             sz = shape_to_len(self._dist_shape)
             if (start is not None and (start >= sz or start < -sz)
                     or (stop is not None and (stop > sz or stop < -sz))):
-                raise IndexError(f"{self._slice} is out of bounds of the source shape "
-                                 f"{self._dist_shape}.")
+                raise IndexerError(f"{self._slice} is out of bounds of the source shape "
+                                   f"{self._dist_shape}.", ident=id(self))
 
     def to_json(self):
         """
@@ -717,8 +732,9 @@ class ShapedArrayIndexer(Indexer):
 
         # check type
         if ndarr.dtype.kind not in ('i', 'u'):
-            raise TypeError(f"Can't create an index array using indices of "
-                            f"non-integral type '{ndarr.dtype.type.__name__}'.")
+            raise IndexerError(f"Can't create an index array using indices of "
+                               f"non-integral type '{ndarr.dtype.type.__name__}'.",
+                               ident=id(self))
 
         self._arr = ndarr
 
@@ -824,8 +840,8 @@ class ShapedArrayIndexer(Indexer):
                 if amin < 0 and -amin > src_size:
                     ob = amin
             if ob is not None:
-                raise IndexError(f"index {ob} is out of bounds for source dimension of size "
-                                 f"{src_size}.")
+                raise IndexerError(f"index {ob} is out of bounds for source dimension of size "
+                                   f"{src_size}.", ident=id(self))
 
     def to_json(self):
         """
@@ -913,8 +929,8 @@ class ShapedMultiIndexer(Indexer):
         Initialize attributes.
         """
         if flat_src and len(tup) > 1:
-            raise RuntimeError(f"Can't index into a flat array with an indexer expecting {len(tup)}"
-                               " dimensions.")
+            raise IndexerError(f"Can't index into a flat array with an indexer expecting {len(tup)}"
+                               " dimensions.", ident=id(self))
         super().__init__(flat_src)
         self._tup = tup
         self._set_idx_list()
@@ -989,7 +1005,8 @@ class ShapedMultiIndexer(Indexer):
             The index array into a flat array.
         """
         if self._src_shape is None:
-            raise ValueError(f"Can't determine extent of array because source shape is not known.")
+            raise IndexerError(f"Can't determine extent of array because source shape is not known.",
+                               ident=id(self))
 
         idxs = np.arange(shape_to_len(self._src_shape), dtype=np.int32).reshape(self._src_shape)
 
@@ -1046,8 +1063,8 @@ class ShapedMultiIndexer(Indexer):
 
     def _check_src_shape(self, shape):
         if shape is not None and not self._flat_src and len(shape) < len(self._idx_list):
-            raise ValueError(f"Can't set source shape to {shape} because indexer {self} expects "
-                             f"{len(self._idx_list)} dimensions.")
+            raise IndexerError(f"Can't set source shape to {shape} because indexer {self} expects "
+                               f"{len(self._idx_list)} dimensions.", ident=id(self))
 
     def _check_bounds(self):
         """
@@ -1398,7 +1415,7 @@ class resolve_shape(object):
         """
         self._shape = shape2tuple(shape)
 
-    def __getitem__(self, idx):
+    def get_shape(self, idx, ident):
         """
         Return the shape of the result of indexing into the source with index idx.
 
@@ -1424,7 +1441,8 @@ class resolve_shape(object):
                 break
 
         if len(self._shape) < len(idx):
-            raise ValueError(f"Index {idx} dimension too large to index into shape {self._shape}.")
+            raise IndexerError(f"Index {idx} dimension too large to index into shape {self._shape}.",
+                               ident=ident)
 
         lens = []
         seen_arr = False
@@ -1439,15 +1457,16 @@ class resolve_shape(object):
                     seen_arr = True
                     if ind.ndim > 1:
                         if arr_shape is not None and arr_shape != ind.shape:
-                            raise ValueError("Multi-index has index sub-arrays of different shapes "
-                                             f"({arr_shape} != {ind.shape}).")
+                            raise IndexerError("Multi-index has index sub-arrays of different shapes "
+                                               f"({arr_shape} != {ind.shape}).", ident=ident)
                         arr_shape = ind.shape
                     else:
                         # only first array idx counts toward shape
                         lens.append(ind.size)
             # int indexers don't count toward shape (scalar array has shape ())
             elif not isinstance(ind, Integral):
-                raise TypeError(f"Index {ind} of type '{type(ind).__name__}' is invalid.")
+                raise IndexerError(f"Index {ind} of type '{type(ind).__name__}' is invalid.",
+                                   ident=ident)
 
         if arr_shape is not None:
             return arr_shape

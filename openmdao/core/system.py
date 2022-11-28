@@ -3,12 +3,12 @@ import sys
 import os
 import hashlib
 import time
+import functools
 
 from contextlib import contextmanager
 from collections import defaultdict
 from itertools import chain
 from enum import IntEnum
-from inspect import getframeinfo, currentframe, getouterframes
 
 from fnmatch import fnmatchcase
 
@@ -33,7 +33,7 @@ from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.indexer import indexer
+from openmdao.utils.indexer import indexer, IndexerError
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, env_truthy, \
     make_traceback
@@ -103,8 +103,6 @@ resp_types = {'con': 'constraint', 'obj': 'objective'}
 
 value_deprecated_msg = "The metadata key 'value' will be deprecated in 4.0. Please use 'val'."
 
-_saved_errors = None if env_truthy('OPENMDAO_FAIL_FAST') else {}
-
 
 class _MatchType(IntEnum):
     """
@@ -148,6 +146,24 @@ class _MetadataDict(dict):
                 warn_deprecation(value_deprecated_msg)
             else:
                 raise
+
+
+def collect_errors(method):
+    """
+    """
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        try:
+            return method(self, *args, **kwargs)
+        except Exception:
+            if env_truthy('OPENMDAO_FAIL_FAST'):
+                raise
+
+            type_exc, exc, tb = sys.exc_info()
+            ident = exc.ident if isinstance(exc, IndexerError) else None
+            self._collect_error(str(exc), exc_type=type_exc, tback=tb, ident=ident)
+
+    return wrapper
 
 
 class System(object):
@@ -375,8 +391,9 @@ class System(object):
     _tot_jac : __TotalJacInfo or None
         If a total jacobian is being computed and this is the top level System, this will
         be a reference to the _TotalJacInfo object.
-    _raise_connection_errors : bool
-        Flag indicating whether connection related errors are raised as an Exception.
+    _saved_errors : list
+        Temporary storage for any saved errors that occur before this System is assigned
+        a parent Problem.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -518,7 +535,7 @@ class System(object):
         self._coloring_info = _DEFAULT_COLORING_META.copy()
         self._first_call_to_linearize = True   # will check in first call to _linearize
         self._tot_jac = None
-        self._raise_connection_errors = True
+        self._saved_errors = None if env_truthy('OPENMDAO_FAIL_FAST') else []
 
     @property
     def under_approx(self):
@@ -1542,7 +1559,7 @@ class System(object):
             Problem level options.
         """
         self.pathname = pathname
-        self._problem_meta = prob_meta
+        self._set_problem_meta(prob_meta)
         self._first_call_to_linearize = True
         self._is_local = True
         self._vectors = {}
@@ -5562,7 +5579,7 @@ class System(object):
 
         return sarr, tarr, tsize, has_dist_data
 
-    def _collect_error(self, msg, exc_type=None, tback=None):
+    def _collect_error(self, msg, exc_type=None, tback=None, ident=None):
         """
         Save an error message to raise as an exception later.
 
@@ -5574,6 +5591,8 @@ class System(object):
             The type of exception to be raised if this error is the only one collected.
         tback : traceback or None
             The traceback of a caught exception.
+        ident : int
+            Identifier of the object responsible for issuing the error.
         """
         if exc_type is None:
             exc_type = RuntimeError
@@ -5584,12 +5603,21 @@ class System(object):
         if self.msginfo not in msg:
             msg = f"{self.msginfo}: {msg}"
 
-        if _saved_errors is None or env_truthy('OPENMDAO_FAIL_FAST'):
+        saved_errors = self._get_saved_errors()
+
+        if saved_errors is None or env_truthy('OPENMDAO_FAIL_FAST'):
             raise exc_type(msg).with_traceback(tback)
 
-        if self._problem_meta is None:
-            probname = None
-        else:
-            probname = self._problem_meta['name']
+        saved_errors.append((ident, msg, exc_type, tback))
 
-        _saved_errors[(id(self), msg)] = (probname, exc_type, tback)
+    def _get_saved_errors(self):
+        if self._problem_meta is None:
+            return self._saved_errors
+        return self._problem_meta['saved_errors']
+
+    def _set_problem_meta(self, prob_meta):
+        self._problem_meta = prob_meta
+        # transfer any temporarily stored error msgs to the Problem
+        if self._saved_errors and prob_meta['saved_errors'] is not None:
+            prob_meta['saved_errors'].extend(self._saved_errors)
+        self._saved_errors = None if env_truthy('OPENMDAO_FAIL_FAST') else []

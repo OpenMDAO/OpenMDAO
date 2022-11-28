@@ -466,9 +466,6 @@ class TestViewModelData(unittest.TestCase):
 
         p = om.Problem(BadConnectionModel())
 
-        # this would be set by the command line hook
-        p.model._raise_connection_errors = False
-
         expected = "'sub' <class Group>: Attempted to connect from 'tgt.x' to 'cmp.x', but " + \
                    "'tgt.x' is an input. All connections must be from an output to an input."
 

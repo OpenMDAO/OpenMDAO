@@ -299,7 +299,7 @@ class SrcIndicesTestCase(unittest.TestCase):
         assert_near_equal(prob['y1'], [75.3*2]*4)
 
     def test_src_shape_mismatch(self):
-        p = om.Problem()
+        p = om.Problem(name='src_shape_mismatch')
         G = p.model.add_subsystem('G', om.Group(), promotes_inputs=['x'])
 
         G.set_input_defaults('x', src_shape=(3,2))
@@ -314,10 +314,11 @@ class SrcIndicesTestCase(unittest.TestCase):
 
         g2.promotes('C2', inputs=['x'], src_indices=[1,5], src_shape=(3,2), flat_src_indices=True)
 
-        with self.assertRaises(RuntimeError) as cm:
-            p.setup()
+        p.setup()
+        with self.assertRaises(Exception) as cm:
+            p.run_model()
 
-        self.assertEqual(cm.exception.args[0], "In connection from '_auto_ivc.v0' to 'G.g1.C1.x', error was: Promoted src_shape of (3, 3) for 'G.g1.C1.x' differs from src_shape (3, 2) for 'x'.")
+        self.assertEqual(cm.exception.args[0], "\nConnection errors for problem 'src_shape_mismatch':\n   <model> <class Group>: When connecting '_auto_ivc.v0' to 'G.g1.C1.x': Promoted src_shape of (3, 3) for 'G.g1.C1.x' differs from src_shape (3, 2) for 'x'.")
 
     def test_src_indices_on_promotes(self):
         src_shape = (3, 3)
@@ -335,19 +336,19 @@ class SrcIndicesTestCase(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = 2.0 * inputs['x']
 
-        p = om.Problem()
+        p = om.Problem(name='src_indices_on_promotes')
         p.model.add_subsystem('indeps', om.IndepVarComp('x', shape=src_shape))
         p.model.add_subsystem('C1', MyComp(tgt_shape))
         p.model.promotes('C1', any=['x'],
                             src_indices=src_indices,
                             flat_src_indices=flat_src_indices)
         p.model.set_input_defaults('x', src_shape=src_shape)
-
-        with self.assertRaises(IndexError) as cm:
-            p.setup()
+        p.setup()
+        with self.assertRaises(Exception) as cm:
+            p.run_model()
 
         self.assertEqual(cm.exception.args[0],
-                         "When promoting 'x' from system 'C1' with src_indices [4 5 7 9] and src_shape (3, 3): "
+                         "\nConnection errors for problem 'src_indices_on_promotes':\n   <model> <class Group>: When promoting 'x' from system 'C1' with src_indices [4 5 7 9] and src_shape (3, 3): "
                          "index 9 is out of bounds for source dimension of size 9.")
 
     def test_connect_slice_src_indices_not_full_size(self):

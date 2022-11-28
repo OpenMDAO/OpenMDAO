@@ -2,7 +2,6 @@
 import sys
 from collections import Counter, defaultdict
 from collections.abc import Iterable
-import functools
 
 from itertools import product, chain
 from numbers import Number
@@ -14,7 +13,7 @@ import numpy as np
 import networkx as nx
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.core.system import System
+from openmdao.core.system import System, collect_errors
 from openmdao.core.component import Component, _DictValues
 from openmdao.vectors.vector import _full_slice
 from openmdao.core.constants import _UNDEFINED, INT_DTYPE
@@ -31,7 +30,7 @@ from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismat
     _is_unitless, simplify_unit
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.indexer import indexer, Indexer
+from openmdao.utils.indexer import indexer, Indexer, IndexerError
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     SetupWarning, PromotionWarning, MPIWarning
 from openmdao.core.constants import _SetupStatus
@@ -64,7 +63,7 @@ class _PromotesInfo(object):
         self.src_shape = src_shape
         if src_indices is not None:
             if isinstance(src_indices, Indexer):
-                self.src_indices = src_indices.copy()
+                self.src_indices = src_indices
                 self.src_indices.set_src_shape(self.src_shape)
             else:
                 self.src_indices = indexer(src_indices, src_shape=self.src_shape, flat_src=flat)
@@ -89,7 +88,7 @@ class _PromotesInfo(object):
         return '.'.join((self.promoted_from, self.prom)) if self.promoted_from else self.prom
 
     def copy(self):
-        return _PromotesInfo(self.src_indices, self.flat, self.src_shape, self.promoted_from,
+        return _PromotesInfo(self.src_indices.copy(), self.flat, self.src_shape, self.promoted_from,
                              self.prom)
 
     def set_src_shape(self, shape):
@@ -905,18 +904,22 @@ class Group(System):
                         if pinfo.src_shape is None:
                             pinfo.set_src_shape(root_shape)
                         elif pinfo.src_indices is not None and root_shape != pinfo.src_shape:
-                            raise RuntimeError(f"Promoted src_shape of {pinfo.src_shape} for "
-                                               f"'{pinfo.prom_path()}' differs from src_shape "
-                                               f"{root_shape} for '{current_pinfo.prom_path()}'.")
+                            self._collect_error(f"When connecting '{conns[tgt]}' to "
+                                                f"'{pinfo.prom_path()}': Promoted src_shape of "
+                                                f"{pinfo.src_shape} for "
+                                                f"'{pinfo.prom_path()}' differs from src_shape "
+                                                f"{root_shape} for '{current_pinfo.prom_path()}'.",
+                                                ident=id(pinfo.src_indices))
                     except Exception:
                         type_exc, exc, tb = sys.exc_info()
-                        self._collect_error(f"In connection from '{conns[tgt]}' to "
-                                            f"'{pinfo.prom_path()}', error was: {exc}",
-                                            exc_type=type_exc, tback=tb)
+                        ident = exc.ident if isinstance(exc, IndexerError) else None
+                        self._collect_error(f"When connecting '{conns[tgt]}' to "
+                                            f"'{pinfo.prom_path()}': {exc}",
+                                            exc_type=type_exc, tback=tb,
+                                            ident=ident)
                     current_pinfo = pinfo
                     continue
                 elif pinfo.src_indices is None:
-                    pinfo = pinfo.copy()  # TODO: make sure we really need this copy here
                     pinfo.src_indices = current_pinfo.src_indices
                     if pinfo.src_shape is None:
                         pinfo.set_src_shape(current_pinfo.src_shape)
@@ -928,13 +931,15 @@ class Group(System):
                         sinds = convert_src_inds(current_pinfo.src_indices, current_pinfo.src_shape,
                                                  pinfo.src_indices, pinfo.src_shape)
                     except Exception:
-                        exc = sys.exc_info()
-                        raise exc[0](f"In connection from '{conns[tgt]}' to '{pinfo.prom_path()}', "
-                                     f"input '{current_pinfo.prom_path()}' src_indices are "
-                                     f"{current_pinfo.src_indices} and indexing into those failed "
-                                     f"using src_indices {pinfo.src_indices} from input "
-                                     f"'{pinfo.prom_path()}'. Error was: "
-                                     f"{exc[1]}").with_traceback(exc[2])
+                        type_exc, exc, tb = sys.exc_info()
+                        ident = exc.ident if isinstance(exc, IndexerError) else None
+                        self._collect_error(f"When connecting '{conns[tgt]}' to '{pinfo.prom_path()}': "
+                                            f"input '{current_pinfo.prom_path()}' src_indices are "
+                                            f"{current_pinfo.src_indices} and indexing into those failed "
+                                            f"using src_indices {pinfo.src_indices} from input "
+                                            f"'{pinfo.prom_path()}'. Error was: "
+                                            f"{exc}", exc_type=type_exc, tback=tb, ident=ident)
+                        continue
 
                     # final src_indices are wrt original full sized source and are flat,
                     # so use val.shape and flat_src=True
@@ -1482,7 +1487,7 @@ class Group(System):
                     guesses = get_close_matches(prom_in, list(allprocs_prom2abs_list_in.keys()) +
                                                 list(allprocs_discrete_in.keys()))
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
-                          f"'{prom_in}', but '{prom_in}' doesn't exist.  Perhaps you meant " + \
+                          f"'{prom_in}', but '{prom_in}' doesn't exist. Perhaps you meant " + \
                           f"to connect to one of the following inputs: {guesses}."
                 self._collect_error(msg)
                 continue
@@ -1509,6 +1514,7 @@ class Group(System):
                         self._collect_error(
                             f"{self.msginfo}: Setting of 'src_indices' along with 'shape_by_conn' "
                             f"or 'copy_shape' for variable '{abs_in}' is currently unsupported.")
+                        continue
 
                     if abs_in in abs2meta:
                         if abs_in not in abs_in2prom_info:
@@ -1520,9 +1526,10 @@ class Group(System):
                                                                             flat=flat, prom=abs_in)
                             except Exception:
                                 type_exc, exc, tb = sys.exc_info()
+                                ident = exc.ident if isinstance(exc, IndexerError) else None
                                 self._collect_error(
                                     f"When connecting from '{prom_out}' to '{prom_in}': {exc}",
-                                    exc_type=type_exc, tback=tb)
+                                    exc_type=type_exc, tback=tb, ident=ident)
                                 continue
 
                         meta = abs2meta[abs_in]
@@ -1651,6 +1658,7 @@ class Group(System):
                     self._collect_error(
                         f"{self.msginfo}: dynamic sizing of non-distributed {to_io} '{to_var}' "
                         f"from distributed {from_io} '{from_var}' is not supported.")
+                    return
                 else:  # serial_out <- dist_in
                     # all input rank sizes must be the same
                     if not np.all(distrib_sizes[from_var] == distrib_sizes[from_var][0]):
@@ -1659,6 +1667,7 @@ class Group(System):
                             f"from distributed {from_io} '{from_var}' is not supported because not "
                             f"all {from_var} ranks are the same size "
                             f"(sizes={distrib_sizes[from_var]}).")
+                        return
 
             all_to_meta['shape'] = from_shape
             all_to_meta['size'] = from_size
@@ -1874,6 +1883,7 @@ class Group(System):
                     self._collect_error(
                         f"{self.msginfo}: Can't connect discrete output '{abs_out}' "
                         f"to continuous input '{abs_in}'.")
+                    continue
                 else:
                     abs_in2out[abs_in] = abs_out
 
@@ -1958,6 +1968,7 @@ class Group(System):
                     self._collect_error(
                         f"{self.msginfo}: Output units of '{out_units}' for '{abs_out}' "
                         f"are incompatible with input units of '{in_units}' for '{abs_in}'.")
+                    continue
             elif in_units is not None:
                 if not _is_unitless(in_units):
                     msg = f"Input '{abs_in}' with units of '{in_units}' is " + \
@@ -1990,6 +2001,7 @@ class Group(System):
                             f"are ambiguous for the connection '{abs_out}' to '{abs_in}'. "
                             f"The source shape is {tuple([int(s) for s in out_shape])} "
                             f"but the target shape is {tuple([int(s) for s in in_shape])}.")
+                        continue
 
                 elif src_indices is not None:
 
@@ -1998,10 +2010,13 @@ class Group(System):
                                all_meta_out['global_shape'])
                         src_indices.set_src_shape(shp, dist_shape=out_shape)
                         src_indices = src_indices.shaped_instance()
-                    except Exception as err:
+                    except Exception:
+                        type_exc, exc, tb = sys.exc_info()
                         s, src, tgt = get_connection_owner(self, abs_in)
+                        ident = exc.ident if isinstance(exc, IndexerError) else None
                         self._collect_error(
-                            f"{s.msginfo}: When connecting '{src}' to '{tgt}': {str(err)}")
+                            f"{s.msginfo}: When connecting '{src}' to '{tgt}': {exc}",
+                            ident=ident, exc_type=type_exc, tback=tb)
                         continue
 
                     if src_indices.indexed_src_size == 0:
@@ -2015,12 +2030,15 @@ class Group(System):
                                     f"{self.msginfo}: The source indices {meta_in['src_indices']} "
                                     f"do not specify a valid shape for the connection '{abs_out}' "
                                     f"to '{abs_in}'. The target shape is {in_shape} but indices "
-                                    f"are shape {src_indices.indexed_src_shape}.")
+                                    f"are shape {src_indices.indexed_src_shape}.",
+                                    ident=id(src_indices))
                                 break
                         else:
                             self._collect_error(
                                 f"{self.msginfo}: src_indices shape {src_indices.indexed_src_shape}"
-                                f" does not match {abs_in} shape {in_shape}.")
+                                f" does not match {abs_in} shape {in_shape}.",
+                                ident=id(src_indices))
+                        continue
 
                     # any remaining dimension of indices must match shape of source
                     if not src_indices._flat_src and (len(src_indices.indexed_src_shape) >
@@ -2029,7 +2047,8 @@ class Group(System):
                             f"{self.msginfo}: The source indices {meta_in['src_indices']} do not "
                             f"specify a valid shape for the connection '{abs_out}' to '{abs_in}'. "
                             f"The source has {len(out_shape)} dimensions but the indices expect at "
-                            f"least {len(src_indices.indexed_src_shape)}.")
+                            f"least {len(src_indices.indexed_src_shape)}.",
+                            ident=id(src_indices))
 
     def _transfer(self, vec_name, mode, sub=None):
         """
@@ -3574,17 +3593,23 @@ class Group(System):
         """
         all_abs2meta_in = self._var_allprocs_abs2meta['input']
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
-        a2prom_inf = self._problem_meta['abs_in2prom_info']
-        for tgt, src in self._conn_global_abs_in2out.items():
-            if tgt in a2prom_inf and a2prom_inf[tgt][0] is not None:
-                if src in all_abs2meta_out:
-                    try:
-                        # a2prom_inf[tgt][0] is the top level _PromotesInfo object
-                        a2prom_inf[tgt][0].set_src_shape(all_abs2meta_out[src]['global_shape'])
-                    except Exception:
-                        type_exc, exc, tb = sys.exc_info()
-                        self._collect_error(f"{self.msginfo}: When connecting '{src}' to '{tgt}': "
-                                               f"{exc}", exc_type=type_exc, tback=tb)
+        # a2prom_inf = self._problem_meta['abs_in2prom_info']
+        # fail = False
+        # for tgt, src in self._conn_global_abs_in2out.items():
+        #     if tgt in a2prom_inf and a2prom_inf[tgt][0] is not None:
+        #         if src in all_abs2meta_out:
+        #             try:
+        #                 # a2prom_inf[tgt][0] is the top level _PromotesInfo object
+        #                 a2prom_inf[tgt][0].set_src_shape(all_abs2meta_out[src]['global_shape'])
+        #             except Exception:
+        #                 type_exc, exc, tb = sys.exc_info()
+        #                 ident = exc.ident if isinstance(exc, IndexerError) else None
+        #                 self._collect_error(f"{self.msginfo}: When connecting '{src}' to '{tgt}': "
+        #                                     f"{exc}", exc_type=type_exc, tback=tb, ident=ident)
+        #                 fail = True
+
+        # if fail:
+        #     return
 
         abs2prom = self._var_allprocs_abs2prom['input']
         abs2meta_in = self._var_abs2meta['input']

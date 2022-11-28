@@ -22,8 +22,8 @@ from openmdao.core.constants import _SetupStatus
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver, record_iteration, SaveOptResult
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.core.group import Group, System
-import openmdao.core.system as sysmod
+from openmdao.core.group import Group
+from openmdao.core.system import System
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
@@ -779,26 +779,21 @@ class Problem(object):
         """
         If any stored connection errors are found, raise an exception containing all of them.
         """
-        if sysmod._saved_errors is None:
+        if self._metadata['saved_errors'] is None:
             return
 
-        errors = sysmod._saved_errors
+        errors = self._metadata['saved_errors']
 
         # set the errors to None so that all future calls will immediately raise an exception.
-        sysmod._saved_errors = None
+        self._metadata['saved_errors'] = None
 
         if errors:
-            byprob = defaultdict(list)
-            for tup, info in errors.items():
-                _, msg = tup
-                probname, _, _ = info
-                byprob[probname].append((msg, info))
-
-            final_msg = []
-            for probname, lst in byprob.items():
-                final_msg.append(f"\nConnection errors for problem '{probname}':")
-                for msg, (_, exc_type, tback) in lst:
+            final_msg = [f"\nConnection errors for problem '{self._name}':"]
+            seen = set()
+            for ident, msg, exc_type, tback in errors:
+                if ident not in seen:
                     final_msg.append(f"   {msg}")
+                    seen.add(ident)
 
                 # if there's only one error, include its traceback if there is one.
                 if len(errors) == 1:
@@ -1120,9 +1115,6 @@ class Problem(object):
         self._mode = self._orig_mode = mode
 
         model_comm = self.driver._setup_comm(comm)
-        # Use dict to keep order but avoid duplicates. if OPENMDAO_FAIL_FAST is set, set to None,
-        # which causes all errors to be immediately raised as exceptions.
-        sysmod._saved_errors = None if env_truthy('OPENMDAO_FAIL_FAST') else {}
 
         # this metadata will be shared by all Systems/Solvers in the system tree
         self._metadata = {
@@ -1158,9 +1150,8 @@ class Problem(object):
                                      # a, a.b, and a.b.c, with one of the Nones replaced
                                      # by promotes info.  Dict entries are only created if
                                      # src_indices are applied to the variable somewhere.
-            'raise_connection_errors': True,  # If False, connection related errors in setup will
-                                              # be converted to warnings.
             'reports_dir': self.get_reports_dir(),  # directory where reports will be written
+            'saved_errors': [],  # store setup errors here until after final_setup
         }
         model._setup(model_comm, mode, self._metadata)
 

@@ -11,7 +11,7 @@ from numpy import ndarray, isscalar, ndim, atleast_1d, atleast_2d, promote_types
 from scipy.sparse import issparse, coo_matrix
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
-    global_meta_names, _MetadataDict
+    global_meta_names, _MetadataDict, collect_errors
 from openmdao.core.constants import INT_DTYPE
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.array_utils import shape_to_len
@@ -20,7 +20,7 @@ from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_name2abs
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     find_matches, make_set, convert_src_inds
-from openmdao.utils.indexer import Indexer, indexer
+from openmdao.utils.indexer import Indexer, IndexerError, indexer
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
     DerivativesWarning, SetupWarning, warn_deprecation
@@ -1625,10 +1625,11 @@ class Component(System):
                                 self._var_prom2inds[abs2prom[tgt]] = [shape, inds, flat]
                         except Exception:
                             type_exc, exc, tb = sys.exc_info()
+                            ident = exc.ident if isinstance(exc, IndexerError) else None
                             self._collect_error(f"When accessing '{conns[tgt]}' with src_shape "
                                                 f"{shape} from '{pinfo.prom_path()}' using "
                                                 f"src_indices {inds}: {exc}", exc_type=type_exc,
-                                                tback=tb)
+                                                tback=tb, ident=ident)
 
             elif meta['add_input_src_indices']:
                 self._var_prom2inds[abs2prom[tgt]] = [meta['shape'], meta['src_indices'],
