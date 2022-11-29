@@ -7,8 +7,8 @@ import numpy as np
 import openmdao.api as om
 
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_no_warning
-from openmdao.test_suite.components.sellar import SellarDerivatives
-from openmdao.test_suite.components.double_sellar import DoubleSellar, SubSellar
+from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped
+from openmdao.test_suite.components.double_sellar import DoubleSellar
 
 
 class TestSolverFeatures(unittest.TestCase):
@@ -31,6 +31,28 @@ class TestSolverFeatures(unittest.TestCase):
 
         assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
         assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
+
+    def test_reuse_solver(self):
+
+        prob = om.Problem()
+        model = prob.model = SellarDerivativesGrouped()
+
+        newton = om.NewtonSolver(solve_subsystems=False)
+
+        model.nonlinear_solver = newton
+
+        prob.setup()
+
+        # reusing newton solver is not allowed
+        model.mda.nonlinear_solver = newton
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.run_model()
+
+        self.assertEqual(str(context.exception),
+                         "NewtonSolver has already been assigned to "
+                         "<model> <class SellarDerivativesGrouped> "
+                         "and cannot also be assigned to 'mda' <class Group>.")
 
     def test_specify_subgroup_solvers(self):
 
