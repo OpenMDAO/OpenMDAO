@@ -448,7 +448,7 @@ class DiscreteTestCase(unittest.TestCase):
         ])
 
     def test_float_to_discrete_error(self):
-        prob = om.Problem()
+        prob = om.Problem(name='float_to_discrete_error')
         model = prob.model
 
         indep = model.add_subsystem('indep', om.IndepVarComp())
@@ -460,10 +460,10 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.setup()
         self.assertEqual(str(ctx.exception),
-                         "<model> <class Group>: Can't connect continuous output 'indep.x' to discrete input 'comp.x'.")
+                         "\nConnection errors for problem 'float_to_discrete_error':\n   <model> <class Group>: Can't connect continuous output 'indep.x' to discrete input 'comp.x'.")
 
     def test_discrete_to_float_error(self):
-        prob = om.Problem()
+        prob = om.Problem(name='discrete_to_float_error')
         model = prob.model
 
         indep = model.add_subsystem('indep', om.IndepVarComp())
@@ -475,10 +475,10 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.setup()
         self.assertEqual(str(ctx.exception),
-                         "<model> <class Group>: Can't connect discrete output 'indep.x' to continuous input 'comp.x'.")
+                         "\nConnection errors for problem 'discrete_to_float_error':\n   <model> <class Group>: Can't connect discrete output 'indep.x' to continuous input 'comp.x'.")
 
     def test_discrete_mismatch_error(self):
-        prob = om.Problem()
+        prob = om.Problem(name='discrete_mismatch_error')
         model = prob.model
 
         indep = model.add_subsystem('indep', om.IndepVarComp())
@@ -490,7 +490,7 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.setup()
         self.assertEqual(str(ctx.exception),
-                         "<model> <class Group>: Type 'str' of output 'indep.x' is incompatible with type 'int' of input 'comp.x'.")
+                         "\nConnection errors for problem 'discrete_mismatch_error':\n   <model> <class Group>: Type 'str' of output 'indep.x' is incompatible with type 'int' of input 'comp.x'.")
 
     def test_driver_discrete_enforce_int(self):
         # Drivers require discrete vars to be int or ndarrays of int.
@@ -618,7 +618,7 @@ class DiscreteTestCase(unittest.TestCase):
                          "Total derivative with respect to 'indep.x' depends upon discrete output variables ['G.G1.C1.y'].")
 
     def test_connection_to_output(self):
-        prob = om.Problem()
+        prob = om.Problem(name='connection_to_output')
         model = prob.model
 
         model.add_subsystem('C1', ModCompEx(modval=2))
@@ -629,12 +629,12 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.setup()
 
-        msg = ("<model> <class Group>: Attempted to connect from 'C1.y' to 'C2.y', "
+        msg = ("\nConnection errors for problem 'connection_to_output':\n   <model> <class Group>: Attempted to connect from 'C1.y' to 'C2.y', "
                "but 'C2.y' is an output. All connections must be from an output to an input.")
         self.assertEqual(str(cm.exception), msg)
 
     def test_connection_from_input(self):
-        prob = om.Problem()
+        prob = om.Problem(name='connection_from_input')
         model = prob.model
 
         model.add_subsystem('C1', ModCompEx(modval=2))
@@ -645,7 +645,7 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.setup()
 
-        msg = ("<model> <class Group>: Attempted to connect from 'C1.x' to 'C2.x', "
+        msg = ("\nConnection errors for problem 'connection_from_input':\n   <model> <class Group>: Attempted to connect from 'C1.x' to 'C2.x', "
                "but 'C1.x' is an input. All connections must be from an output to an input.")
         self.assertEqual(str(cm.exception), msg)
 

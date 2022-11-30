@@ -566,25 +566,25 @@ class TestUnitConversion(unittest.TestCase):
                 self.add_output('x3', 100.0)
 
         # Explicit Connection
-        prob = om.Problem()
+        prob = om.Problem(name='incompatible_connections')
         prob.model.add_subsystem('src', SrcComp())
         prob.model.add_subsystem('dest', BadComp())
         prob.model.connect('src.x2', 'dest.x2')
         with self.assertRaises(Exception) as cm:
             prob.setup()
 
-        expected_msg = "<model> <class Group>: Output units of 'degC' for 'src.x2' are incompatible with input units of 'm' for 'dest.x2'."
+        expected_msg = "\nConnection errors for problem 'incompatible_connections':\n   <model> <class Group>: Output units of 'degC' for 'src.x2' are incompatible with input units of 'm' for 'dest.x2'."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
         # Implicit Connection
-        prob = om.Problem()
+        prob = om.Problem(name='incompatible_connections2')
         prob.model.add_subsystem('src', SrcComp(), promotes=['x2'])
         prob.model.add_subsystem('dest', BadComp(),promotes=['x2'])
         with self.assertRaises(Exception) as cm:
             prob.setup()
 
-        expected_msg = "<model> <class Group>: Output units of 'degC' for 'src.x2' are incompatible with input units of 'm' for 'dest.x2'."
+        expected_msg = "\nConnection errors for problem 'incompatible_connections2':\n   <model> <class Group>: Output units of 'degC' for 'src.x2' are incompatible with input units of 'm' for 'dest.x2'."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -899,7 +899,7 @@ class TestUnitConversion(unittest.TestCase):
 
     def test_promotes_non_equivalent_units(self):
         # multiple Group.set_input_defaults calls at same tree level with conflicting units args
-        p = om.Problem()
+        p = om.Problem(name='promotes_non_equivalent_units')
 
         g1 = p.model.add_subsystem("G1", om.Group(), promotes_inputs=['x'])
         g1.add_subsystem("C1", om.ExecComp("y = 2. * x * z",
@@ -913,9 +913,9 @@ class TestUnitConversion(unittest.TestCase):
                                             z={'val': 1.0, 'units': 'J/s'}),
                                             promotes_inputs=['x', 'z'])
         # trying to convert J/s/s to m/s**2 should cause Incompatible units TypeError exception
-        with self.assertRaises(TypeError) as e:
+        with self.assertRaises(Exception) as e:
             p.setup()
-        self.assertEqual(str(e.exception), "Units 'm/s**2' and 'J/s**2' are incompatible.")
+        self.assertEqual(str(e.exception), "\nConnection errors for problem 'promotes_non_equivalent_units':\n   <model> <class Group>: Units 'm/s**2' and 'J/s**2' are incompatible.")
 
     def test_input_defaults_unit_compat(self):
         p = om.Problem()

@@ -55,7 +55,26 @@ def _truncate(s):
 
 
 class IndexerError(IndexError):
+    """
+    Exception that tracks the id of the indexer.
+
+    Parameters
+    ----------
+    msg : str
+        The error message.
+    ident : int or None
+        Identifier of the raising Indexer.
+
+    Attributes
+    ----------
+    ident : int or None
+        Identifier of the raising Indexer.
+    """
+
     def __init__(self, msg, ident=None):
+        """
+        Initialize attributes.
+        """
         super().__init__(msg)
         self.ident = ident
 
@@ -1005,8 +1024,8 @@ class ShapedMultiIndexer(Indexer):
             The index array into a flat array.
         """
         if self._src_shape is None:
-            raise IndexerError(f"Can't determine extent of array because source shape is not known.",
-                               ident=id(self))
+            raise IndexerError(f"Can't determine extent of array because source shape is not "
+                               f"known.", ident=id(self))
 
         idxs = np.arange(shape_to_len(self._src_shape), dtype=np.int32).reshape(self._src_shape)
 
@@ -1423,6 +1442,8 @@ class resolve_shape(object):
         ----------
         idx : int, slice, tuple, ndarray
             The index into the source.
+        ident : int
+            Identifier of the calling object.
 
         Returns
         -------
@@ -1441,8 +1462,8 @@ class resolve_shape(object):
                 break
 
         if len(self._shape) < len(idx):
-            raise IndexerError(f"Index {idx} dimension too large to index into shape {self._shape}.",
-                               ident=ident)
+            raise IndexerError(f"Index {idx} dimension too large to index into shape "
+                               f"{self._shape}.", ident=ident)
 
         lens = []
         seen_arr = False
@@ -1457,8 +1478,8 @@ class resolve_shape(object):
                     seen_arr = True
                     if ind.ndim > 1:
                         if arr_shape is not None and arr_shape != ind.shape:
-                            raise IndexerError("Multi-index has index sub-arrays of different shapes "
-                                               f"({arr_shape} != {ind.shape}).", ident=ident)
+                            raise IndexerError("Multi-index has index sub-arrays of different "
+                                               f"shapes ({arr_shape} != {ind.shape}).", ident=ident)
                         arr_shape = ind.shape
                     else:
                         # only first array idx counts toward shape

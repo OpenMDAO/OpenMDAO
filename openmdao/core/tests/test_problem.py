@@ -946,9 +946,8 @@ class TestProblem(unittest.TestCase):
                                                      y={'val': 0.0, 'units': 'inch'}),
                                  promotes=['x'])
 
-        prob.setup()
         try:
-            prob.run_model()
+            prob.setup()
         except Exception as err:
             self.assertEqual(str(err), "\nConnection errors for problem 'get_set_with_units_diff_err':\n   <model> <class Group>: The following inputs, ['C1.x', 'C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'val'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the model to remove the ambiguity.")
         else:
@@ -2053,10 +2052,8 @@ class TestProblem(unittest.TestCase):
 
         c1.add_design_var('x', lower=0, upper=5)
 
-        prob.setup()
-
         with self.assertRaises(Exception) as cm:
-            prob.run_model()
+            prob.setup()
 
         msg = "\nConnection errors for problem 'output_as_input_err':\n   <model> <class Group>: Design variable 'x' is connected to 'initial_comp.x', but 'initial_comp.x' is not an IndepVarComp or ImplicitComp output."
         self.assertEqual(str(cm.exception), msg)

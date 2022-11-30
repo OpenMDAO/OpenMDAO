@@ -150,6 +150,17 @@ class _MetadataDict(dict):
 
 def collect_errors(method):
     """
+    Decorate a method so that it will collect any exceptions for later display.
+
+    Parameters
+    ----------
+    method : method
+        The method to be decorated.
+
+    Returns
+    -------
+    method
+        The wrapped method.
     """
     @functools.wraps(method)
     def wrapper(self, *args, **kwargs):
@@ -1632,6 +1643,7 @@ class System(object):
         """
         pass
 
+    @collect_errors
     def _init_relevance(self, mode):
         """
         Create the relevance dictionary.

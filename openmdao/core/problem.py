@@ -831,7 +831,6 @@ class Problem(object):
                 self.model._reset_iter_counts()
 
             self.final_setup()
-            self._check_collected_errors()
 
             self._run_counter += 1
             record_model_options(self, self._run_counter)
@@ -876,7 +875,6 @@ class Problem(object):
                 self.model._reset_iter_counts()
 
             self.final_setup()
-            self._check_collected_errors()
 
             self._run_counter += 1
             record_model_options(self, self._run_counter)
@@ -910,8 +908,6 @@ class Problem(object):
         dict
             The total jacobian vector product, keyed by variable name.
         """
-        self._check_collected_errors()
-
         if mode == 'fwd':
             if len(wrt) != len(seed):
                 raise RuntimeError(self.msginfo +
@@ -1163,6 +1159,8 @@ class Problem(object):
         self._logger = logger
 
         self._metadata['setup_status'] = _SetupStatus.POST_SETUP
+
+        self._check_collected_errors()
 
         return self
 

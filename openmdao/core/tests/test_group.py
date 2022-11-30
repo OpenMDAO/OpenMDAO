@@ -185,9 +185,8 @@ class TestGroup(unittest.TestCase):
         expected = "\nConnection errors for problem 'double_promote_conns':\n   'gouter' <class Group>: The following inputs have multiple connections: " \
                    "gouter.g.c0.x from ['gouter.couter.xx', 'gouter.g.ivc.x']."
 
-        p.setup()
         with self.assertRaises(RuntimeError) as cm:
-            p.run_model()
+            p.setup()
 
         self.assertEqual(str(cm.exception), expected)
 
@@ -510,9 +509,8 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('C1', SlicerComp())
         p.model.connect('indep.x', 'C1.x', src_indices=[1, 0, 2])
 
-        p.setup()
         with self.assertRaises(Exception) as context:
-            p.run_model()
+            p.setup()
         self.assertEqual(str(context.exception),
                          "\nConnection errors for problem 'double_src_indices':\n   <model> <class Group>: src_indices has been defined in both connect('indep.x', 'C1.x') and add_input('C1.x', ...).")
 
@@ -542,9 +540,8 @@ class TestGroup(unittest.TestCase):
 
         msg = "\nConnection errors for problem 'src_indices_error':\n   'phase' <class Phase>: src_indices shape (1,) does not match phase.comp2.x shape (1, 2)."
 
-        p.setup()
         with self.assertRaises(Exception) as context:
-            p.run_model()
+            p.setup()
 
         self.assertEqual(str(context.exception), msg)
 
@@ -1384,9 +1381,8 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('c2', om.ExecComp('y2=x', x={'units': 's'}),
                               promotes=['*'])
 
-        p.setup()
         with self.assertRaises(Exception) as cm:
-            p.run_model()
+            p.setup()
 
         self.assertEqual(cm.exception.args[0],
                          "\nConnection errors for problem 'promote_units_and_none':\n   <model> <class Group>: The following inputs, ['c1.x', 'c2.x'], promoted to 'x', are connected but their metadata entries ['units', 'val'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the model to remove the ambiguity.")
@@ -1428,9 +1424,8 @@ class TestGroup(unittest.TestCase):
         p.model.set_input_defaults('G.test_param', val=7.0)
 
         msg = "\nConnection errors for problem 'input_defaults_promotes_error':\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection '_auto_ivc.v0' to 'G.foo.test_param'. The source shape is (1,) but the target shape is (5,)."
-        p.setup()
         with self.assertRaises(Exception) as cm:
-            p.run_model()
+            p.setup()
 
         self.assertEqual(cm.exception.args[0], msg)
 
@@ -1630,9 +1625,8 @@ class TestGroupPromotes(unittest.TestCase):
 
         top = om.Problem(model=TopGroup(), name='alias_from_parent')
 
-        top.setup()
         with self.assertRaises(RuntimeError) as context:
-            top.run_model()
+            top.setup()
 
         self.assertEqual(str(context.exception),
                          "\nConnection errors for problem 'alias_from_parent':\n   'sub' <class SubGroup>: Trying to promote 'b' when it has been aliased to 'bb'.")
@@ -1821,13 +1815,13 @@ class TestGroupPromotes(unittest.TestCase):
             def configure(self):
                 self.promotes('comp', inputs='a')
 
-        top = om.Problem(model=SimpleGroup())
+        top = om.Problem(model=SimpleGroup(), name='promotes_bad_spec')
 
-        with self.assertRaises(RuntimeError) as cm:
+        with self.assertRaises(Exception) as cm:
             top.setup()
 
         self.assertEqual(str(cm.exception),
-            "<model> <class SimpleGroup>: Trying to promote inputs='a', "
+            "\nConnection errors for problem 'promotes_bad_spec':\n   <model> <class SimpleGroup>: Trying to promote inputs='a', "
             "but an iterator of strings and/or tuples is required.")
 
     def test_promotes_src_indices_bad_type(self):
@@ -1841,9 +1835,8 @@ class TestGroupPromotes(unittest.TestCase):
 
         top = om.Problem(model=SimpleGroup(), name='src_indices_bad_type')
 
-        top.setup()
         with self.assertRaises(Exception) as cm:
-            top.run_model()
+            top.setup()
 
         self.assertEqual(str(cm.exception),
             "\nConnection errors for problem 'src_indices_bad_type':\n   <model> <class SimpleGroup>: When promoting ['a'] from 'comp2': Can't create an index array using indices of non-integral type 'float64'.")
@@ -1859,9 +1852,8 @@ class TestGroupPromotes(unittest.TestCase):
 
         top = om.Problem(model=SimpleGroup(), name='promotes_src_indices_bad_dtype')
 
-        top.setup()
         with self.assertRaises(Exception) as cm:
-            top.run_model()
+            top.setup()
 
         self.assertEqual(str(cm.exception),
             "\nConnection errors for problem 'promotes_src_indices_bad_dtype':\n   <model> <class SimpleGroup>: When promoting ['a'] from 'comp2': Can't create an index array using indices of non-integral type 'complex128'.")
@@ -1879,9 +1871,8 @@ class TestGroupPromotes(unittest.TestCase):
 
         p = om.Problem(model=SimpleGroup(), name='src_indices_bad_shape')
 
-        p.setup()
-        with self.assertRaises(ValueError) as cm:
-            p.run_model()
+        with self.assertRaises(Exception) as cm:
+            p.setup()
 
         self.assertEqual(str(cm.exception),
             "\nConnection errors for problem 'src_indices_bad_shape':\n   <model> <class SimpleGroup>: The source indices [0 1 2] do not specify a valid shape for the connection '_auto_ivc.v0' to 'comp1.a'. The target shape is (5,) but indices have shape (3,).")
@@ -2033,9 +2024,8 @@ class TestGroupPromotes(unittest.TestCase):
 
         p = om.Problem(model=SimpleGroup(), name='src_indices_wildcard_output')
 
-        p.setup()
         with self.assertRaises(RuntimeError) as cm:
-            p.run_model()
+            p.setup()
 
         self.assertEqual(str(cm.exception),
             "\nConnection errors for problem 'src_indices_wildcard_output':\n   <model> <class SimpleGroup>: Trying to promote outputs ['*'] "
@@ -2065,10 +2055,9 @@ class TestGroupPromotes(unittest.TestCase):
                 self.promotes('sub', inputs=['a'], src_indices=[0, 1, 2])
 
         p = om.Problem(model=TopGroup(), name='promotes_src_indices_collision')
-        p.setup()
         
         with self.assertRaises(Exception) as cm:
-            p.run_model()
+            p.setup()
 
         self.assertEqual(str(cm.exception),
             "\nConnection errors for problem 'promotes_src_indices_collision':\n   <model> <class TopGroup>: When connecting 'ind.a' to 'sub.comp.a': input 'sub.a' src_indices are [0 1 2] and indexing into those failed using src_indices [0 2 4] from input 'sub.comp.a'. Error was: index 4 is out of bounds for source dimension of size 3.")
@@ -2161,8 +2150,7 @@ class TestConnect(unittest.TestCase):
         self.assertEquals(str(cm.exception), msg)
 
     def test_src_indices_as_str(self):
-        msg = "'sub' <class Group>: src_indices must be a slice, int, or index array, did you mean connect('src.x', ['tgt.x', 'cmp.x'])?"
-
+        msg = "'sub' <class Group>: src_indices must be a slice, int, or index array. Did you mean connect('src.x', ['tgt.x', 'cmp.x'])?"
         with set_env_vars_context(OPENMDAO_FAIL_FAST='1'):
             with self.assertRaisesRegex(Exception, msg):
                 self.sub.connect('src.x', 'tgt.x', 'cmp.x')
@@ -2186,9 +2174,8 @@ class TestConnect(unittest.TestCase):
         # because setup is not called until then
         self.sub.connect('src.z', 'tgt.x', src_indices=[1])
 
-        self.prob.setup()
         with self.assertRaises(Exception) as context:
-            self.prob.run_model()
+            self.prob.setup()
 
         self.assertEqual(str(context.exception), msg)
 
@@ -2202,9 +2189,8 @@ class TestConnect(unittest.TestCase):
         # because setup is not called until then
         self.sub.connect('tgt.y', 'cmp.z')
 
-        self.prob.setup()
         with self.assertRaises(Exception) as context:
-            self.prob.run_model()
+            self.prob.setup()
 
         self.assertEqual(str(context.exception), msg)
 
@@ -2217,9 +2203,8 @@ class TestConnect(unittest.TestCase):
         # source and target names can't be checked until setup
         # because setup is not called until then
         self.sub.connect('tgt.x', 'cmp.x')
-        self.prob.setup()
         with self.assertRaises(Exception) as context:
-            self.prob.run_model()
+            self.prob.setup()
 
         self.assertEqual(str(context.exception), msg)
 
@@ -2244,9 +2229,8 @@ class TestConnect(unittest.TestCase):
         # because setup is not called until then
         self.sub.connect('src.x', 'tgt.z', src_indices=[1])
 
-        self.prob.setup()
         with self.assertRaises(Exception) as context:
-            self.prob.run_model()
+            self.prob.setup()
 
         self.assertEqual(str(context.exception), msg)
 
@@ -2268,9 +2252,8 @@ class TestConnect(unittest.TestCase):
         msg = "\nConnection errors for problem 'connect_within_system_with_promotes':\n   'sub' <class Group>: Output and input are in the same System for " + \
               "connection from 'y' to 'tgt.x'."
 
-        prob.setup()
         with self.assertRaises(Exception) as ctx:
-            prob.run_model()
+            prob.setup()
 
         self.assertEqual(str(ctx.exception), msg)
 
@@ -2304,9 +2287,8 @@ class TestConnect(unittest.TestCase):
         prob.model.connect('px1.x1', 'src.x1')
         prob.model.connect('src.x2', 'tgt.x')
 
-        prob.setup()
         with self.assertRaises(Exception) as context:
-            prob.run_model()
+            prob.setup()
 
         self.assertEqual(str(context.exception), msg)
 
@@ -2403,9 +2385,8 @@ class TestConnect(unittest.TestCase):
               "for the connection 'sub.src.s' to 'sub.arr.x'. The source shape is (1,) " + \
               "but the target shape is (2,)."
 
-        self.prob.setup()
         with self.assertRaises(Exception) as context:
-            self.prob.run_model()
+            self.prob.setup()
 
         self.assertEqual(str(context.exception), msg)
 
@@ -2420,9 +2401,8 @@ class TestConnect(unittest.TestCase):
               "for the connection 'IV.x' to 'C1.x'. The target shape is (2, 2) but " + \
               "indices are shape (1,)."
 
-        p.setup()
         with self.assertRaises(Exception) as context:
-            p.run_model()
+            p.setup()
 
         self.assertEqual(str(context.exception), msg)
 
@@ -2432,9 +2412,8 @@ class TestConnect(unittest.TestCase):
                          flat_src_indices=False)
 
         msg = "\nConnection errors for problem 'bad_indices_dimensions':\n   <model> <class Group>: When connecting 'sub.src.x' to 'sub.arr.x': Can't set source shape to (5, 3) because indexer ([2, 2], [-1, 2], [2, 2]) expects 3 dimensions.\n   'sub.arr' <class ExecComp>: When accessing 'sub.src.x' with src_shape (5, 3) from 'sub.arr.x' using src_indices ([2, 2], [-1, 2], [2, 2]): Can't set source shape to (5, 3) because indexer ([2, 2], [-1, 2], [2, 2]) expects 3 dimensions."
-        self.prob.setup()
         try:
-            self.prob.run_model()
+            self.prob.setup()
         except Exception as err:
             self.assertEqual(str(err), msg)
         else:
@@ -2448,9 +2427,8 @@ class TestConnect(unittest.TestCase):
 
         msg = "\nConnection errors for problem 'bad_indices_index':\n   <model> <class Group>: When connecting 'sub.src.x' to 'sub.arr.x': index 4 is out of bounds for source dimension of size 3."
 
-        self.prob.setup()
         try:
-            self.prob.run_model()
+            self.prob.setup()
         except Exception as err:
             self.assertEqual(str(err), msg)
         else:
@@ -2472,7 +2450,6 @@ class TestSrcIndices(unittest.TestCase):
             prob.model.connect('indeps.x', 'C1.x', src_indices=src_indices,
                                flat_src_indices=flat_src_indices)
 
-        prob.setup()
         return prob
 
     def test_src_indices_shape(self):
@@ -2487,7 +2464,7 @@ class TestSrcIndices(unittest.TestCase):
                             src_indices=[4, 7, 5, 9],
                             flat_src_indices=True, name='src_indices_shape_bad_idx_flat')
         try:
-            p.run_model()
+            p.setup()
         except Exception as err:
             self.assertEqual(str(err), msg)
         else:
@@ -2499,7 +2476,7 @@ class TestSrcIndices(unittest.TestCase):
                             flat_src_indices=True, promotes=['x'], name='src_indices_shape_bad_idx_flat_promotes')
         msg = "\nConnection errors for problem 'src_indices_shape_bad_idx_flat_promotes':\n   'C1' <class MyComp>: When accessing 'indeps.x' with src_shape (3, 3) from 'x' using src_indices [4 5 7 9]: index 9 is out of bounds for source dimension of size 9."
         try:
-            p.run_model()
+            p.setup()
         except Exception as err:
             self.assertEqual(str(err), msg)
         else:
@@ -2511,7 +2488,7 @@ class TestSrcIndices(unittest.TestCase):
                             src_indices=[-10, 5, 7, 8],
                             flat_src_indices=True, name='src_indices_shape_bad_idx_flat_neg')
         try:
-            p.run_model()
+            p.setup()
         except Exception as err:
             self.assertEqual(str(err), msg)
         else:
@@ -2527,9 +2504,8 @@ class TestSrcIndices(unittest.TestCase):
         # the 4 should be a 3
         p.model.connect('indep.x', 'row4_comp.x', src_indices=om.slicer[4, ...])
 
-        p.setup()
         with self.assertRaises(Exception) as err:
-            p.run_model()
+            p.setup()
 
         expected_error_msg = "\nConnection errors for problem 'slice_with_ellipsis_error_in_connect':\n   <model> <class Group>: When connecting 'indep.x' to 'row4_comp.x': index 4 is out of bounds of the source shape (4,).\n   'row4_comp' <class SlicerComp>: When accessing 'indep.x' with src_shape (4, 4) from 'row4_comp.x' using src_indices (4, Ellipsis): index 4 is out of bounds of the source shape (4,).\n   <model> <class Group>: When connecting 'indep.x' to 'row4_comp.x': index 4 is out of bounds of the source shape (4,)."
         self.assertEqual(str(err.exception), expected_error_msg)
@@ -2612,9 +2588,8 @@ class TestGroupAddInput(unittest.TestCase):
                                             y={'val': 1.0, 'units': 'inch'}),
                                             promotes_inputs=['x'])
 
-        p.setup()
         with self.assertRaises(Exception) as cm:
-           p.run_model()
+            p.setup()
 
         self.assertEqual(cm.exception.args[0],
                          "\nConnection errors for problem 'missing_diff_units':\n   <model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'val'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the Group named 'par' to remove the ambiguity.")
@@ -2627,9 +2602,8 @@ class TestGroupAddInput(unittest.TestCase):
         par.add_subsystem('C1', om.ExecComp('y = 3. * x', x=1.0), promotes_inputs=['x'])
         par.add_subsystem('C2', om.ExecComp('y = 5. * x', x=1.1), promotes_inputs=['x'])
 
-        p.setup()
         with self.assertRaises(Exception) as cm:
-            p.run_model()
+            p.setup()
 
         self.assertEqual(cm.exception.args[0],
                          "\nConnection errors for problem 'missing_diff_vals':\n   <model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['val'] differ. Call <group>.set_input_defaults('x', val=?), where <group> is the Group named 'par' to remove the ambiguity.")
@@ -2650,9 +2624,8 @@ class TestGroupAddInput(unittest.TestCase):
         g5 = model._get_subsystem('par.G5')
         g5.set_input_defaults('x', units='ft')
 
-        p.setup()
         with self.assertRaises(Exception) as cm:
-            p.run_model()
+            p.setup()
 
         self.assertEqual(cm.exception.args[0], "\nConnection errors for problem 'conflicting_units':\n   <model> <class Group>: The subsystems G1.G2 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
 
@@ -2675,9 +2648,8 @@ class TestGroupAddInput(unittest.TestCase):
         g1 = model._get_subsystem('G1')
         g1.set_input_defaults('x', units='inch')
 
-        p.setup()
         with self.assertRaises(Exception) as cm:
-            p.run_model()
+            p.setup()
 
         self.assertEqual(cm.exception.args[0], "\nConnection errors for problem 'conflicting_units_multi_level':\n   <model> <class Group>: The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
 
@@ -2793,9 +2765,8 @@ class TestGroupAddInput(unittest.TestCase):
         par = model._get_subsystem('par')
         par.set_input_defaults('x', units='inch')
 
-        p.setup()
         with self.assertRaises(Exception) as cm:
-            p.run_model()
+            p.setup()
 
         self.assertEqual(cm.exception.args[0],
                          "\nConnection errors for problem 'conflicting_units_multi_level_par':\n   <model> <class Group>: The subsystems G1.G2 and par called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
@@ -2838,9 +2809,8 @@ class TestGroupAddInput(unittest.TestCase):
         g1 = model._get_subsystem('G1')
         g1.set_input_defaults('x', val=4.0)
 
-        p.setup()
         with self.assertRaises(Exception) as cm:
-            p.run_model()
+            p.setup()
 
         self.assertEqual(cm.exception.args[0], "\nConnection errors for problem 'conflicting_val':\n   <model> <class Group>: The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'val'. Call <group>.set_input_defaults('x', val=?), where <group> is the model to remove the ambiguity.")
 

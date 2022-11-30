@@ -286,6 +286,7 @@ class Component(System):
         else:
             self._discrete_inputs = self._discrete_outputs = ()
 
+    @collect_errors
     def _setup_var_sizes(self):
         """
         Compute the arrays of variable sizes for all variables/procs on this system.
@@ -298,7 +299,8 @@ class Component(System):
                                                    dtype=INT_DTYPE)
 
             for i, (name, metadata) in enumerate(self._var_allprocs_abs2meta[io].items()):
-                sizes[iproc, i] = metadata['size']
+                sz = metadata['size']
+                sizes[iproc, i] = 0 if sz is None else sz
                 abs2idx[name] = i
 
             if self.comm.size > 1:

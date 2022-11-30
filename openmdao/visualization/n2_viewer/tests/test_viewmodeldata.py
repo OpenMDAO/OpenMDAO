@@ -464,13 +464,15 @@ class TestViewModelData(unittest.TestCase):
         """
         from openmdao.test_suite.scripts.bad_connection import BadConnectionModel
 
-        p = om.Problem(BadConnectionModel())
+        p = om.Problem(BadConnectionModel(), name='n2_connection_error')
 
-        expected = "'sub' <class Group>: Attempted to connect from 'tgt.x' to 'cmp.x', but " + \
-                   "'tgt.x' is an input. All connections must be from an output to an input."
+        msg = "\nConnection errors for problem 'n2_connection_error':\n   'sub' <class Group>: Attempted to connect from 'tgt.x' to 'cmp.x', but " + \
+              "'tgt.x' is an input. All connections must be from an output to an input."
 
-        with assert_warning(UserWarning, expected):
+        with self.assertRaises(Exception) as cm:
             p.setup()
+
+        self.assertEqual(cm.exception.args[0], msg)
 
         n2(p, outfile=self.conn_html_filename, show_browser=DEBUG_BROWSER,
            title="Bad Connection")

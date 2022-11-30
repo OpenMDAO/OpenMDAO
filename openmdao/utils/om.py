@@ -27,7 +27,7 @@ else:
 
 
 import openmdao.utils.hooks as hooks
-from openmdao.visualization.n2_viewer.n2_viewer import n2
+from openmdao.visualization.n2_viewer.n2_viewer import _n2_setup_parser, _n2_cmd
 from openmdao.visualization.connection_viewer.viewconns import view_connections
 from openmdao.visualization.scaling_viewer.scaling_report import _scaling_setup_parser, \
     _scaling_cmd
@@ -58,66 +58,12 @@ from openmdao.utils.coloring import _total_coloring_setup_parser, _total_colorin
     _partial_coloring_setup_parser, _partial_coloring_cmd, \
     _view_coloring_setup_parser, _view_coloring_exec
 from openmdao.utils.scaffold import _scaffold_setup_parser, _scaffold_exec
-from openmdao.utils.file_utils import _load_and_exec, _to_filename, _iter_entry_points
+from openmdao.utils.file_utils import _load_and_exec, _iter_entry_points
 from openmdao.utils.entry_points import _list_installed_setup_parser, _list_installed_cmd, \
     split_ep, _compute_entry_points_setup_parser, _compute_entry_points_exec, \
         _find_plugins_setup_parser, _find_plugins_exec
 from openmdao.utils.reports_system import _list_reports_setup_parser, _list_reports_cmd, \
     _view_reports_setup_parser, _view_reports_cmd
-
-
-def _n2_setup_parser(parser):
-    """
-    Set up the openmdao subparser for the 'openmdao n2' command.
-
-    Parameters
-    ----------
-    parser : argparse subparser
-        The parser we're adding options to.
-    """
-    parser.add_argument('file', nargs=1,
-                        help='Python script or recording containing the model. '
-                        'If metadata from a parallel run was recorded in a separate file, '
-                        'specify both database filenames delimited with a comma.')
-    parser.add_argument('-o', default='n2.html', action='store', dest='outfile',
-                        help='html output file.')
-    parser.add_argument('--no_browser', action='store_true', dest='no_browser',
-                        help="don't display in a browser.")
-    parser.add_argument('--embed', action='store_true', dest='embeddable',
-                        help="create embeddable version.")
-    parser.add_argument('--title', default=None,
-                        action='store', dest='title', help='diagram title.')
-
-
-def _n2_cmd(options, user_args):
-    """
-    Process command line args and call n2 on the specified file.
-
-    Parameters
-    ----------
-    options : argparse Namespace
-        Command line options.
-    user_args : list of str
-        Command line options after '--' (if any).  Passed to user script.
-    """
-    filename = _to_filename(options.file[0])
-
-    if filename.endswith('.py'):
-        def _viewmod(prob):
-            n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
-                title=options.title, embeddable=options.embeddable)
-
-        hooks._register_hook('final_setup', 'Problem', post=_viewmod, exit=True)
-
-        from openmdao.utils.reports_system import _register_cmdline_report
-        # tell report system not to duplicate effort
-        _register_cmdline_report('n2')
-
-        _load_and_exec(options.file[0], user_args)
-    else:
-        # assume the file is a recording, run standalone
-        n2(filename, outfile=options.outfile, title=options.title,
-            show_browser=not options.no_browser, embeddable=options.embeddable)
 
 
 def _view_connections_setup_parser(parser):

@@ -314,9 +314,8 @@ class SrcIndicesTestCase(unittest.TestCase):
 
         g2.promotes('C2', inputs=['x'], src_indices=[1,5], src_shape=(3,2), flat_src_indices=True)
 
-        p.setup()
         with self.assertRaises(Exception) as cm:
-            p.run_model()
+            p.setup()
 
         self.assertEqual(cm.exception.args[0], "\nConnection errors for problem 'src_shape_mismatch':\n   <model> <class Group>: When connecting '_auto_ivc.v0' to 'G.g1.C1.x': Promoted src_shape of (3, 3) for 'G.g1.C1.x' differs from src_shape (3, 2) for 'x'.")
 
@@ -343,9 +342,8 @@ class SrcIndicesTestCase(unittest.TestCase):
                             src_indices=src_indices,
                             flat_src_indices=flat_src_indices)
         p.model.set_input_defaults('x', src_shape=src_shape)
-        p.setup()
         with self.assertRaises(Exception) as cm:
-            p.run_model()
+            p.setup()
 
         self.assertEqual(cm.exception.args[0],
                          "\nConnection errors for problem 'src_indices_on_promotes':\n   <model> <class Group>: When promoting 'x' from system 'C1' with src_indices [4 5 7 9] and src_shape (3, 3): "
