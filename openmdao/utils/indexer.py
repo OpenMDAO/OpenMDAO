@@ -164,7 +164,7 @@ class Indexer(object):
         Indexer
             This indexer.
         """
-        self.set_src_shape(parent._src_shape)
+        self._src_shape = parent._src_shape
         self._flat_src = parent._flat_src
         self._dist_shape = parent._dist_shape
         return self
