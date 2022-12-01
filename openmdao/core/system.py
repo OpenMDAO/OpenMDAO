@@ -36,9 +36,10 @@ from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, warn_deprecation, \
     DerivativesWarning, PromotionWarning, UnusedOptionWarning
 from openmdao.utils.general_utils import determine_adder_scaler, conditional_error, \
-    format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs
+    format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, ensure_compatible
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
+
 
 
 _empty_frozen_set = frozenset()
@@ -517,6 +518,9 @@ class System(object):
         self._tot_jac = None
         self._raise_connection_errors = True
 
+
+        self._output_solver_options = {}
+
     @property
     def under_approx(self):
         """
@@ -680,6 +684,655 @@ class System(object):
         `initialize` method available for user-defined options.
         """
         pass
+
+    def set_output_solver_options(self, name, lower=_UNDEFINED, upper=_UNDEFINED,
+                              ref=_UNDEFINED, ref0=_UNDEFINED, res_ref=_UNDEFINED):
+
+        if self._problem_meta is not None and self._problem_meta['setup_status'] >= \
+                _SetupStatus.POST_SETUP:
+            raise RuntimeError('Cannot call set_output_solver_options after setup.')
+
+        # Cache the solver options for use later in the setup process
+        # They are applied in the System._apply_output_solver_options method
+        # The System._apply_output_solver_options method is called in System._setup
+        output_solver_options = {}
+
+        # from openmdao.core.group import Group
+        # need to make sure name points to a valid output variable
+        # if isinstance(self, Group):
+        #     subsys_path, name = name.rsplit('.', 1)
+        #     subsys = self._get_subsystem(subsys_path)
+        # else:
+        #     subsys = self
+
+        if lower is not _UNDEFINED:
+            output_solver_options['lower'] = lower
+        if upper is not _UNDEFINED:
+            output_solver_options['upper'] = upper
+        if ref is not _UNDEFINED:
+            output_solver_options['ref'] = ref
+        if ref0 is not _UNDEFINED:
+            output_solver_options['ref0'] = ref0
+        if res_ref is not _UNDEFINED:
+            output_solver_options['res_ref'] = res_ref
+
+        self._output_solver_options[name] = output_solver_options
+
+        return
+
+    def set_design_var_options(self, name, lower=_UNDEFINED,
+                               upper=_UNDEFINED, scaler=_UNDEFINED,
+                               adder=_UNDEFINED, ref=_UNDEFINED, ref0=_UNDEFINED):
+
+        if self._problem_meta is not None and self._problem_meta['setup_status'] >= _SetupStatus.POST_SETUP:
+            raise RuntimeError('Cannot call set_design_var_options after setup.')
+
+        # Name must be a string
+        if not isinstance(name, str):
+            raise TypeError('{}: The name argument should be a string, got {}'.format(self.msginfo,
+                                                                                      name))
+        if self._static_mode:
+            design_vars = self._static_design_vars
+        else:
+            design_vars = self._design_vars
+
+        if name not in design_vars:
+            msg = "{}: set_design_var_options called with design variable '{}' that does not exist."
+            raise RuntimeError(msg.format(self.msginfo, name))
+
+        existing_dv = design_vars[name]
+
+        if lower == _UNDEFINED:
+            lower = existing_dv['lower']
+        if upper == _UNDEFINED:
+            upper = existing_dv['upper']
+
+        # If any of the scaling params are passed in, then throw away the existing
+        #  scaling params and re-compute them in the code below
+        if scaler != _UNDEFINED or adder != _UNDEFINED or ref != _UNDEFINED or ref0 != _UNDEFINED:
+            # Need to unscale the lower and upper values
+            # But only if there were scaling before
+            if existing_dv['scaler'] is not None and existing_dv['adder'] is not None:
+                if lower is not None:
+                    lower = lower / existing_dv['scaler'] - existing_dv['adder']
+                if upper is not None:
+                    upper = upper / existing_dv['scaler'] - existing_dv['adder']
+
+            existing_dv['scaler'] = None
+            existing_dv['adder'] = None
+            existing_dv['ref'] = None
+            existing_dv['ref0'] = None
+
+        # If values are not being set by this call, use the values that already exist
+        if scaler == _UNDEFINED:
+            scaler = existing_dv['scaler']
+        if adder == _UNDEFINED:
+            adder = existing_dv['adder']
+        if ref == _UNDEFINED:
+            ref = existing_dv['ref']
+        if ref0 == _UNDEFINED:
+            ref0 = existing_dv['ref0']
+
+        dv = {}
+
+        # Convert ref/ref0 to ndarray/float as necessary
+        ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
+        ref0 = format_as_float_or_array('ref0', ref0, val_if_none=None, flatten=True)
+
+        # determine adder and scaler based on args
+        adder, scaler = determine_adder_scaler(ref0, ref, adder, scaler)
+
+        if lower is None:
+            # if not set, set lower to -INF_BOUND and don't apply adder/scaler
+            lower = -INF_BOUND
+        else:
+            # Convert lower to ndarray/float as necessary
+            lower = format_as_float_or_array('lower', lower, flatten=True)
+            # Apply scaler/adder
+            lower = (lower + adder) * scaler
+
+        if upper is None:
+            # if not set, set upper to INF_BOUND and don't apply adder/scaler
+            upper = INF_BOUND
+        else:
+            # Convert upper to ndarray/float as necessary
+            upper = format_as_float_or_array('upper', upper, flatten=True)
+            # Apply scaler/adder
+            upper = (upper + adder) * scaler
+
+        if isinstance(scaler, np.ndarray):
+            if np.all(scaler == 1.0):
+                scaler = None
+        elif scaler == 1.0:
+            scaler = None
+        dv['scaler'] = scaler
+
+        if isinstance(adder, np.ndarray):
+            if not np.any(adder):
+                adder = None
+        elif adder == 0.0:
+            adder = None
+        dv['adder'] = adder
+
+        dv['name'] = name   # TODO shouldn't need this, right?
+        dv['upper'] = upper
+        dv['lower'] = lower
+        dv['ref'] = ref
+        dv['ref0'] = ref0
+
+        design_vars[name].update(dv)
+
+
+    def set_objective_options(self, name, ref=_UNDEFINED, ref0=_UNDEFINED,
+                      adder=_UNDEFINED, scaler=_UNDEFINED, alias=_UNDEFINED):
+
+        if self._problem_meta is not None and self._problem_meta['setup_status'] >= _SetupStatus.POST_SETUP:
+            raise RuntimeError('Cannot call set_objective_options after setup.')
+
+        # Name must be a string
+        if not isinstance(name, str):
+            raise TypeError('{}: The name argument should be a string, got {}'.format(self.msginfo,
+                                                                                      name))
+        if self._static_mode:
+            responses = self._static_responses
+        else:
+            responses = self._responses
+
+        if alias is not _UNDEFINED:  # TODO? Should this be _UNDEFINED ?
+            name = alias
+
+        if name not in responses:
+            msg = "{}: set_objective_options called with objective variable '{}' that does not exist."
+            raise RuntimeError(msg.format(self.msginfo, name))
+
+        existing_responses = responses[name]
+
+        # If any of the scaling params are passed in, then throw away the existing
+        #  scaling params and re-compute them in the code below
+        if scaler != _UNDEFINED or adder != _UNDEFINED or ref != _UNDEFINED or ref0 != _UNDEFINED:
+            existing_responses['scaler'] = None
+            existing_responses['adder'] = None
+            existing_responses['ref'] = None
+            existing_responses['ref0'] = None
+
+        # If values are not being set by this call, use the values that already exist
+        if scaler == _UNDEFINED:
+            scaler = existing_responses['scaler']
+        if adder == _UNDEFINED:
+            adder = existing_responses['adder']
+        if ref == _UNDEFINED:
+            ref = existing_responses['ref']
+        if ref0 == _UNDEFINED:
+            ref0 = existing_responses['ref0']
+
+        new_obj_metadata = {}
+
+        # Convert ref/ref0 to ndarray/float as necessary
+        ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
+        ref0 = format_as_float_or_array('ref0', ref0, val_if_none=None, flatten=True)
+
+        # determine adder and scaler based on args
+        adder, scaler = determine_adder_scaler(ref0, ref, adder, scaler)
+
+        if isinstance(scaler, np.ndarray):
+            if np.all(scaler == 1.0):
+                scaler = None
+        elif scaler == 1.0:
+            scaler = None
+        new_obj_metadata['scaler'] = scaler
+
+        if isinstance(adder, np.ndarray):
+            if not np.any(adder):
+                adder = None
+        elif adder == 0.0:
+            adder = None
+        new_obj_metadata['adder'] = adder
+
+        # new_obj_metadata['name'] = name   # TODO need this? NO! It messes things up
+        new_obj_metadata['ref'] = ref
+        new_obj_metadata['ref0'] = ref0
+
+        responses[name].update(new_obj_metadata)
+
+    def set_constraint_options(self, name, ref=_UNDEFINED, ref0=_UNDEFINED,
+                               # TODO name can be name or alias
+                               equals=_UNDEFINED, lower=_UNDEFINED, upper=_UNDEFINED,
+                               adder=_UNDEFINED, scaler=_UNDEFINED, alias=_UNDEFINED):
+
+
+        if self._problem_meta is not None and self._problem_meta['setup_status'] >= _SetupStatus.POST_SETUP:
+            raise RuntimeError('Cannot call set_constraint_options after setup.')
+
+
+        if not isinstance(name, str):
+            raise TypeError('{}: The name argument should be a string, '
+                            'got {}'.format(self.msginfo, name))
+
+        # A constraint cannot be an equality and inequality constraint
+        if equals is not _UNDEFINED and (lower is not _UNDEFINED or upper is not _UNDEFINED):
+            msg = "{}: Constraint '{}' cannot be both equality and inequality."
+            raise ValueError(msg.format(self.msginfo, name))
+
+
+        # TODO also cannot set both scaler/adder and ref/ref0
+
+
+        if self._static_mode:
+            responses = self._static_responses
+        else:
+            responses = self._responses
+
+        # Look through responses to see if there are multiple responses with that name
+        aliases = [resp['alias'] for key, resp in responses.items() if resp['name'] == name]
+
+        if len(aliases) > 1 and alias is _UNDEFINED:  # TODO should this be None
+            msg = "{}: set_constraint_options called with constraint variable '{}' that has multiple aliases: {}. Call set_objective_options with the 'alias' argument set to one of those aliases."
+            raise RuntimeError(msg.format(self.msginfo, name, aliases))
+
+        if len(aliases)  == 0:    # TODO what if called without alias ?
+            msg = "{}: set_constraint_options called with constraint variable '{}' that does not " \
+                  "exist."
+            raise RuntimeError(msg.format(self.msginfo, name))
+
+
+        if alias is not _UNDEFINED:  # TODO? Should this be _UNDEFINED ?
+            name = alias
+
+        curr_cons_meta = responses[name]
+
+        new_cons_meta = curr_cons_meta.copy()
+
+        # If values are not being set by this call, use the values that already exist
+        if lower == _UNDEFINED:
+            new_cons_meta['lower'] = curr_cons_meta['lower']   # TODO don't need to do this since it is a copy
+        else:
+            new_cons_meta['lower'] = lower
+        if upper == _UNDEFINED:
+            new_cons_meta['upper'] = curr_cons_meta['upper']
+        else:
+            new_cons_meta['upper'] = upper
+        if scaler == _UNDEFINED:
+            new_cons_meta['scaler'] = curr_cons_meta['scaler']
+        else:
+            new_cons_meta['scaler'] = scaler
+        if adder == _UNDEFINED:
+            new_cons_meta['adder'] = curr_cons_meta['adder']
+        else:
+            new_cons_meta['adder'] = adder
+        if ref == _UNDEFINED:
+            new_cons_meta['ref'] = curr_cons_meta['ref']
+        else:
+            new_cons_meta['ref'] = ref
+        if ref0 == _UNDEFINED:
+            new_cons_meta['ref0'] = curr_cons_meta['ref0']
+        else:
+            new_cons_meta['ref0'] = ref0
+        if equals == _UNDEFINED:
+            new_cons_meta['equals'] = curr_cons_meta['equals']
+        else:
+            new_cons_meta['equals'] = equals
+
+        # If any of the scaling params are passed in, then throw away the existing
+        #  scaling params and re-compute them in the code below
+        if scaler != _UNDEFINED or adder != _UNDEFINED or ref != _UNDEFINED or ref0 != _UNDEFINED:
+
+            # Need to unscale the lower and upper values
+            # But only if there were scaling before
+            if curr_cons_meta['scaler'] is not None and curr_cons_meta['adder'] is not None:
+                if new_cons_meta['lower'] is not None:
+                    new_cons_meta['lower'] = new_cons_meta['lower'] / curr_cons_meta['scaler'] - \
+                                             curr_cons_meta['adder']
+                if new_cons_meta['upper'] is not None:
+                    new_cons_meta['upper'] = new_cons_meta['upper'] / curr_cons_meta['scaler'] - \
+                                             curr_cons_meta['adder']
+
+            if scaler != _UNDEFINED or adder != _UNDEFINED:
+                new_cons_meta['ref'] = None
+                new_cons_meta['ref0'] = None
+            if ref != _UNDEFINED or ref0 != _UNDEFINED:
+                new_cons_meta['scaler'] = None
+                new_cons_meta['adder'] = None
+
+        # If any of the boundary conditions are set, throw away the existing boundary conditions
+        if equals is not _UNDEFINED :
+            new_cons_meta['lower'] = None
+            new_cons_meta['upper'] = None
+        if lower is not _UNDEFINED or upper is not _UNDEFINED:
+            new_cons_meta['equals'] = None
+
+        # Convert ref/ref0 to ndarray/float as necessary
+        new_cons_meta['ref'] = format_as_float_or_array('ref', new_cons_meta['ref'],
+                                                        val_if_none=None,
+                                                        flatten=True)
+        new_cons_meta['ref0'] = format_as_float_or_array('ref0', new_cons_meta['ref0'],
+                                                         val_if_none=None, flatten=True)
+
+        # determine adder and scaler based on args
+        new_cons_meta['adder'], new_cons_meta['scaler'] = determine_adder_scaler(
+            new_cons_meta['ref0'],
+            new_cons_meta['ref'],
+            new_cons_meta['adder'],
+            new_cons_meta[
+                'scaler'])
+
+        # Convert lower to ndarray/float as necessary
+        try:
+            if new_cons_meta['lower'] is None:
+                # don't apply adder/scaler if lower not set
+                new_cons_meta['lower'] = -INF_BOUND
+            else:
+                new_cons_meta['lower'] = format_as_float_or_array('lower', new_cons_meta['lower'],
+                                                                  flatten=True)
+                if new_cons_meta['lower'] != - INF_BOUND:
+                    new_cons_meta['lower'] = (new_cons_meta['lower'] + new_cons_meta['adder']) * \
+                                             new_cons_meta['scaler']
+        except (TypeError, ValueError):
+            raise TypeError("Argument 'lower' can not be a string ('{}' given). You can not "
+                            "specify a variable as lower bound. You can only provide constant "
+                            "float values".format(new_cons_meta['lower']))
+
+        # Convert upper to ndarray/float as necessary
+        try:
+            if new_cons_meta['upper'] is None:
+                # don't apply adder/scaler if upper not set
+                new_cons_meta['upper'] = INF_BOUND
+            else:
+                new_cons_meta['upper'] = format_as_float_or_array('upper', new_cons_meta['upper'],
+                                                                  flatten=True)
+                if new_cons_meta['upper'] != INF_BOUND:
+                    new_cons_meta['upper'] = (new_cons_meta['upper'] + new_cons_meta['adder']) * \
+                                             new_cons_meta['scaler']
+        except (TypeError, ValueError):
+            raise TypeError("Argument 'upper' can not be a string ('{}' given). You can not "
+                            "specify a variable as upper bound. You can only provide constant "
+                            "float values".format(new_cons_meta['upper']))
+        # Convert equals to ndarray/float as necessary
+        if new_cons_meta['equals'] is not None:
+            try:
+                new_cons_meta['equals'] = format_as_float_or_array('equals',
+                                                                   new_cons_meta['equals'],
+                                                                   flatten=True)
+            except (TypeError, ValueError):
+                raise TypeError("Argument 'equals' can not be a string ('{}' given). You can "
+                                "not specify a variable as equals bound. You can only provide "
+                                "constant float values".format(new_cons_meta['equals']))
+            new_cons_meta['equals'] = (new_cons_meta['equals'] + new_cons_meta['adder']) * \
+                                      new_cons_meta['scaler']
+
+        if isinstance(scaler, np.ndarray):
+            if np.all(new_cons_meta['scaler'] == 1.0):
+                new_cons_meta['scaler'] = None
+        elif new_cons_meta['scaler'] == 1.0:
+            new_cons_meta['scaler'] = None
+
+        if isinstance(new_cons_meta['adder'], np.ndarray):
+            if not np.any(new_cons_meta['adder']):
+                new_cons_meta['adder'] = None
+        elif new_cons_meta['adder'] == 0.0:
+            new_cons_meta['adder'] = None
+
+        responses[name] = new_cons_meta
+
+    # def set_constraint_options(self, name, ref=_UNDEFINED, ref0=_UNDEFINED,  # TODO name can be
+    #  name or alias
+    #                            equals=_UNDEFINED, lower=_UNDEFINED, upper=_UNDEFINED,
+    #                             adder=_UNDEFINED, scaler=_UNDEFINED, alias=None):
+    #
+    #
+    #     # TODO - handle conflicting constraints due to aliases
+    #
+    #     if not isinstance(name, str):
+    #         raise TypeError('{}: The name argument should be a string, '
+    #                         'got {}'.format(self.msginfo, name))
+    #
+    #     # A constraint cannot be an equality and inequality constraint
+    #     if equals is not _UNDEFINED and (lower is not _UNDEFINED or upper is not _UNDEFINED):
+    #         msg = "{}: Constraint '{}' cannot be both equality and inequality."
+    #         raise ValueError(msg.format(self.msginfo, name))
+    #
+    #     if self._static_mode:
+    #         responses = self._static_responses
+    #     else:
+    #         responses = self._responses
+    #
+    #     if name not in responses:
+    #         msg = "{}: set_objective_options called with objective variable '{}' that does not exist exists."
+    #         raise RuntimeError(msg.format(self.msginfo, name))
+    #
+    #     existing_responses = responses[name]
+    #
+    #     if lower == _UNDEFINED:
+    #         lower = existing_responses['lower']
+    #     if upper == _UNDEFINED:
+    #         upper = existing_responses['upper']
+    #
+    #     # If any of the scaling params are passed in, then throw away the existing
+    #     #  scaling params and re-compute them in the code below
+    #     if scaler != _UNDEFINED or adder != _UNDEFINED or ref != _UNDEFINED or ref0 != _UNDEFINED:
+    #
+    #         # Need to unscale the lower and upper values
+    #         # But only if there were scaling before
+    #         if existing_responses['scaler'] is not None and existing_responses['adder'] is not None:
+    #             if lower is not None:
+    #                 lower = lower / existing_responses['scaler'] - existing_responses['adder']
+    #             if upper is not None:
+    #                 upper = upper / existing_responses['scaler'] - existing_responses['adder']
+    #
+    #
+    #         existing_responses['scaler'] = None
+    #         existing_responses['adder'] = None
+    #         existing_responses['ref'] = None
+    #         existing_responses['ref0'] = None
+    #
+    #     # If any of the boundary conditions are set, throw away the existing boundary conditions
+    #     if equals is not _UNDEFINED or lower is not _UNDEFINED or upper is not _UNDEFINED:
+    #         existing_responses['equals'] = None
+    #         existing_responses['lower'] = None
+    #         existing_responses['upper'] = None
+    #
+    #     # If values are not being set by this call, use the values that already exist
+    #     if scaler == _UNDEFINED:
+    #         scaler = existing_responses['scaler']
+    #     if adder == _UNDEFINED:
+    #         adder = existing_responses['adder']
+    #     if ref == _UNDEFINED:
+    #         ref = existing_responses['ref']
+    #     if ref0 == _UNDEFINED:
+    #         ref0 = existing_responses['ref0']
+    #     if lower == _UNDEFINED:
+    #         lower = existing_responses['lower']
+    #     if equals == _UNDEFINED:
+    #         equals = existing_responses['equals']
+    #     # resp = {}
+    #
+    #     # if (name in self._responses or name in self._static_responses) and alias is None:
+    #     #     msg = ("{}: {} '{}' already exists. Use the 'alias' argument to apply a second "
+    #     #            "constraint".format(self.msginfo, 'Constraint', name))
+    #     #     raise RuntimeError(msg.format(name))
+    #
+    #     # resp['name'] = name
+    #     # resp['alias'] = alias
+    #     if alias is not None:  # TODO? Need this ?
+    #         name = alias
+    #
+    #     new_cons_metadata = {}
+    #
+    #
+    #     # Convert ref/ref0 to ndarray/float as necessary
+    #     ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
+    #     ref0 = format_as_float_or_array('ref0', ref0, val_if_none=None, flatten=True)
+    #
+    #     # determine adder and scaler based on args
+    #     adder, scaler = determine_adder_scaler(ref0, ref, adder, scaler)
+    #
+    #     # Convert lower to ndarray/float as necessary
+    #     try:
+    #         if lower is None:
+    #             # don't apply adder/scaler if lower not set
+    #             lower = -INF_BOUND
+    #         else:
+    #             lower = format_as_float_or_array('lower', lower, flatten=True)
+    #             lower = (lower + adder) * scaler
+    #     except (TypeError, ValueError):
+    #         raise TypeError("Argument 'lower' can not be a string ('{}' given). You can not "
+    #                         "specify a variable as lower bound. You can only provide constant "
+    #                         "float values".format(lower))
+    #
+    #     # Convert upper to ndarray/float as necessary
+    #     try:
+    #         if upper is None:
+    #             # don't apply adder/scaler if upper not set
+    #             upper = INF_BOUND
+    #         else:
+    #             upper = format_as_float_or_array('upper', upper, flatten=True)
+    #             upper = (upper + adder) * scaler
+    #     except (TypeError, ValueError):
+    #         raise TypeError("Argument 'upper' can not be a string ('{}' given). You can not "
+    #                         "specify a variable as upper bound. You can only provide constant "
+    #                         "float values".format(upper))
+    #     # Convert equals to ndarray/float as necessary
+    #     if equals is not None:
+    #         try:
+    #             equals = format_as_float_or_array('equals', equals, flatten=True)
+    #         except (TypeError, ValueError):
+    #             raise TypeError("Argument 'equals' can not be a string ('{}' given). You can "
+    #                             "not specify a variable as equals bound. You can only provide "
+    #                             "constant float values".format(equals))
+    #         equals = (equals + adder) * scaler
+    #
+    #     new_cons_metadata['lower'] = lower
+    #     new_cons_metadata['upper'] = upper
+    #     new_cons_metadata['equals'] = equals
+    #
+    #     if isinstance(scaler, np.ndarray):
+    #         if np.all(scaler == 1.0):
+    #             scaler = None
+    #     elif scaler == 1.0:
+    #         scaler = None
+    #     new_cons_metadata['scaler'] = scaler
+    #
+    #     if isinstance(adder, np.ndarray):
+    #         if not np.any(adder):
+    #             adder = None
+    #     elif adder == 0.0:
+    #         adder = None
+    #     new_cons_metadata['adder'] = adder
+    #
+    #     new_cons_metadata['ref'] = ref
+    #     new_cons_metadata['ref0'] = ref0
+    #
+    #     if alias in responses:
+    #         raise TypeError(f"Constraint alias '{alias}' is a duplicate of an existing alias or "
+    #                         "variable name.")
+    #
+    #     responses[name].update(new_cons_metadata)
+
+    def _apply_output_solver_options(self):
+        """
+        Solver options can be set using the System.set_output_solver_options method.
+        These cannot be set immediately when that method is called. So they are cached.
+        They are then applied in System._setup using this method
+        """
+        from openmdao.core.group import Group
+
+        for name, options in self._output_solver_options.items():
+
+            # Does not work if self is a Component
+            if isinstance(self, Group):
+                subsys_path = name.rsplit('.', 1)[0]
+                subsys = self._get_subsystem(subsys_path)
+            else:
+                subsys = self
+
+            prefix = self.pathname + '.' if self.pathname else ''
+            abs_name = prefix + name
+
+            # Do I need to do this for self for subsys ? TODO
+
+            # Will need to set both of these
+            # _var_allprocs_abs2meta is a partial copy of _var_abs2meta
+            abs2meta = subsys._var_abs2meta['output']
+            allprocs_abs2meta = subsys._var_allprocs_abs2meta['output']
+
+            if abs_name not in abs2meta:
+                raise RuntimeError(f"Output solver options set using System.set_output_solver_options for non-existent variable '{abs_name}' in System '{self.pathname}'.")
+
+            metadatadict_abs2meta = abs2meta[abs_name]
+            metadatadict_allprocs_abs2meta = allprocs_abs2meta[abs_name]
+
+            # Have to update _has_output_scaling, _has_output_adder,
+            #   _has_resid_scaling,
+            for meta_key in ['ref', 'ref0', 'res_ref', 'lower', 'upper']:
+                # if meta_key in options and options[meta_key] is not None:
+                if meta_key in options:
+                    if options[meta_key] is None:
+                        val_as_float_or_array_or_none = None
+                    else:
+                        shape = metadatadict_abs2meta['shape']
+                        val = ensure_compatible(name, options[meta_key], shape)[0]
+                        val_as_float_or_array_or_none = format_as_float_or_array(meta_key, val,
+                                                                                 flatten=True)
+
+                    # Setting both here because the copying of _var_abs2meta to
+                    #   _var_allprocs_abs2meta happens before this. Need to keep both up to date
+                    metadatadict_abs2meta.update({
+                        meta_key: val_as_float_or_array_or_none,
+                    })
+                    metadatadict_allprocs_abs2meta.update({
+                        meta_key: val_as_float_or_array_or_none,
+                    })
+
+        # recalculate has scaling and bounds vars across all outputs
+        # Since you are allowed to reference multiple subsystems from set_output_solver_options,
+        #    need to loop over all of the ones that got modified by those calls.
+        for name, options in self._output_solver_options.items():
+
+            # Does not work if self is a Component
+            if isinstance(self, Group):
+                subsys_path = name.rsplit('.', 1)[0]
+                subsys = self._get_subsystem(subsys_path)
+            else:
+                subsys = self
+
+            prefix = self.pathname + '.' if self.pathname else ''
+            # abs_name = prefix + name
+
+            subsys._has_output_scaling = False
+            subsys._has_output_adder = False
+            subsys._has_resid_scaling = False
+            subsys._has_bounds = False
+
+            for abs_name, metadata in abs2meta.items():   # Loop over outputs
+                ref = metadata['ref']
+                if np.isscalar(ref):
+                    # self._has_output_scaling |= ref != 1.0
+                    subsys._has_output_scaling |= ref != 1.0
+                else:
+                    # self._has_output_scaling |= np.any(ref != 1.0)
+                    subsys._has_output_scaling |= np.any(ref != 1.0)
+
+                ref0 = metadata['ref0']
+                if np.isscalar(ref0):
+                    # self._has_output_scaling |= ref0 != 0.0
+                    # self._has_output_adder |= ref0 != 0.0
+                    subsys._has_output_scaling |= ref0 != 0.0
+                    subsys._has_output_adder |= ref0 != 0.0
+                else:
+                    # self._has_output_scaling |= np.any(ref0)
+                    # self._has_output_adder |= np.any(ref0)
+                    subsys._has_output_scaling |= np.any(ref0)
+                    subsys._has_output_adder |= np.any(ref0)
+
+                res_ref = metadata['res_ref']
+                if np.isscalar(res_ref):
+                    # self._has_resid_scaling |= res_ref != 1.0
+                    subsys._has_resid_scaling |= res_ref != 1.0
+                else:
+                    # self._has_resid_scaling |= np.any(res_ref != 1.0)
+                    subsys._has_resid_scaling |= np.any(res_ref != 1.0)
+
+                if metadata['lower'] is not None or metadata['upper'] is not None:
+                    subsys._has_bounds = True
 
     def initialize(self):
         """
@@ -850,6 +1503,23 @@ class System(object):
         self._configure_check()
 
         self._setup_var_data()
+
+        # have to do this again because we are passed the point in
+        # # _setup_var_data when this happens
+        self._has_output_scaling = False
+        self._has_output_adder  = False
+        self._has_resid_scaling  = False
+        self._has_bounds  = False
+
+        self._apply_output_solver_options()
+        for subsys in self._subsystems_myproc:
+            subsys._apply_output_solver_options()
+
+            # Do we need to initialize these to false first ?
+            self._has_output_scaling |= subsys._has_output_scaling
+            self._has_output_adder |= subsys._has_output_adder
+            self._has_resid_scaling |= subsys._has_resid_scaling
+            self._has_bounds |= subsys._has_bounds
 
         # promoted names must be known to determine implicit connections so this must be
         # called after _setup_var_data, and _setup_var_data will have to be partially redone
