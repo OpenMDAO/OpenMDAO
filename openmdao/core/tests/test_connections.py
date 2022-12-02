@@ -306,7 +306,7 @@ class TestConnectionsIndices(unittest.TestCase):
         self.build_model('bad_value')
         self.prob.model.connect('idvp.arrout', 'arraycomp.inp1', src_indices=[100000])
 
-        expected = "\nConnection errors for problem 'bad_value':\n   <model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp1': index 100000 is out of bounds for source dimension of size 5.\n   'arraycomp' <class ArrayComp>: When accessing 'idvp.arrout' with src_shape (5,) from 'arraycomp.inp1' using src_indices [100000]: index 100000 is out of bounds for source dimension of size 5."
+        expected = "\nConnection errors for problem 'bad_value':\n   <model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp1': index 100000 is out of bounds for source dimension of size 5."
 
         try:
             self.prob.setup()
@@ -321,7 +321,7 @@ class TestConnectionsIndices(unittest.TestCase):
         self.build_model('bad_value_bug')
         self.prob.model.connect('idvp.arrout', 'arraycomp.inp', src_indices=[0, 100000])
 
-        expected = "\nConnection errors for problem 'bad_value_bug':\n   <model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp': index 100000 is out of bounds for source dimension of size 5.\n   'arraycomp' <class ArrayComp>: When accessing 'idvp.arrout' with src_shape (5,) from 'arraycomp.inp' using src_indices [     0 100000]: index 100000 is out of bounds for source dimension of size 5."
+        expected = "\nConnection errors for problem 'bad_value_bug':\n   <model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp': index 100000 is out of bounds for source dimension of size 5."
 
         try:
             self.prob.setup()

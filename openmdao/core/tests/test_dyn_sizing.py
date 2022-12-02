@@ -938,7 +938,7 @@ class TestDynShapesWithInputConns(unittest.TestCase):
 
         # just make sure we still get a clear error msg
 
-        msg = "\nConnection errors for problem 'shape_from_conn_input_mismatch':\n   <model> <class Group>: Shape of input 'sub.comp3.x', (3,), doesn't match shape (2,).\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection '_auto_ivc.v0' to 'sub.comp3.x'. The source shape is (2,) but the target shape is (3,)."
+        msg = "\nConnection errors for problem 'shape_from_conn_input_mismatch':\n   <model> <class Group>: Shape of input 'sub.comp3.x', (3,), doesn't match shape (2,)."
         self.assertEqual(cm.exception.args[0], msg)
 
     def test_shape_from_conn_input_mismatch_group_inputs(self):
@@ -956,7 +956,7 @@ class TestDynShapesWithInputConns(unittest.TestCase):
 
         # just make sure we still get a clear error msg
 
-        msg = "\nConnection errors for problem 'shape_from_conn_input_mismatch_group_inputs':\n   <model> <class Group>: Shape of input 'sub.comp2.x', (2,), doesn't match shape (3,).\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection '_auto_ivc.v0' to 'sub.comp2.x'. The source shape is (3,) but the target shape is (2,)."
+        msg = "\nConnection errors for problem 'shape_from_conn_input_mismatch_group_inputs':\n   <model> <class Group>: Shape of input 'sub.comp2.x', (2,), doesn't match shape (3,)."
         self.assertEqual(cm.exception.args[0], msg)
 
 

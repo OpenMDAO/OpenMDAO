@@ -2411,7 +2411,7 @@ class TestConnect(unittest.TestCase):
         self.sub.connect('src.x', 'arr.x', src_indices=[[2,2],[-1,2],[2,2]],
                          flat_src_indices=False)
 
-        msg = "\nConnection errors for problem 'bad_indices_dimensions':\n   <model> <class Group>: When connecting 'sub.src.x' to 'sub.arr.x': Can't set source shape to (5, 3) because indexer ([2, 2], [-1, 2], [2, 2]) expects 3 dimensions.\n   'sub.arr' <class ExecComp>: When accessing 'sub.src.x' with src_shape (5, 3) from 'sub.arr.x' using src_indices ([2, 2], [-1, 2], [2, 2]): Can't set source shape to (5, 3) because indexer ([2, 2], [-1, 2], [2, 2]) expects 3 dimensions."
+        msg = "\nConnection errors for problem 'bad_indices_dimensions':\n   <model> <class Group>: When connecting 'sub.src.x' to 'sub.arr.x': Can't set source shape to (5, 3) because indexer ([2, 2], [-1, 2], [2, 2]) expects 3 dimensions."
         try:
             self.prob.setup()
         except Exception as err:
@@ -2458,7 +2458,7 @@ class TestSrcIndices(unittest.TestCase):
                             flat_src_indices=True)
 
     def test_src_indices_shape_bad_idx_flat(self):
-        msg = "\nConnection errors for problem 'src_indices_shape_bad_idx_flat':\n   <model> <class Group>: When connecting 'indeps.x' to 'C1.x': index 9 is out of bounds for source dimension of size 9.\n   'C1' <class MyComp>: When accessing 'indeps.x' with src_shape (3, 3) from 'C1.x' using src_indices [4 7 5 9]: index 9 is out of bounds for source dimension of size 9."
+        msg = "\nConnection errors for problem 'src_indices_shape_bad_idx_flat':\n   <model> <class Group>: When connecting 'indeps.x' to 'C1.x': index 9 is out of bounds for source dimension of size 9."
 
         p = self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
                             src_indices=[4, 7, 5, 9],
@@ -2483,7 +2483,7 @@ class TestSrcIndices(unittest.TestCase):
             self.fail("Exception expected.")
 
     def test_src_indices_shape_bad_idx_flat_neg(self):
-        msg = "\nConnection errors for problem 'src_indices_shape_bad_idx_flat_neg':\n   <model> <class Group>: When connecting 'indeps.x' to 'C1.x': index -10 is out of bounds for source dimension of size 9.\n   'C1' <class MyComp>: When accessing 'indeps.x' with src_shape (3, 3) from 'C1.x' using src_indices [-10   5   7   8]: index -10 is out of bounds for source dimension of size 9."
+        msg = "\nConnection errors for problem 'src_indices_shape_bad_idx_flat_neg':\n   <model> <class Group>: When connecting 'indeps.x' to 'C1.x': index -10 is out of bounds for source dimension of size 9."
         p = self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
                             src_indices=[-10, 5, 7, 8],
                             flat_src_indices=True, name='src_indices_shape_bad_idx_flat_neg')
@@ -2507,7 +2507,7 @@ class TestSrcIndices(unittest.TestCase):
         with self.assertRaises(Exception) as err:
             p.setup()
 
-        expected_error_msg = "\nConnection errors for problem 'slice_with_ellipsis_error_in_connect':\n   <model> <class Group>: When connecting 'indep.x' to 'row4_comp.x': index 4 is out of bounds of the source shape (4,).\n   'row4_comp' <class SlicerComp>: When accessing 'indep.x' with src_shape (4, 4) from 'row4_comp.x' using src_indices (4, Ellipsis): index 4 is out of bounds of the source shape (4,).\n   <model> <class Group>: When connecting 'indep.x' to 'row4_comp.x': index 4 is out of bounds of the source shape (4,)."
+        expected_error_msg = "\nConnection errors for problem 'slice_with_ellipsis_error_in_connect':\n   <model> <class Group>: When connecting 'indep.x' to 'row4_comp.x': index 4 is out of bounds of the source shape (4,)."
         self.assertEqual(str(err.exception), expected_error_msg)
 
 

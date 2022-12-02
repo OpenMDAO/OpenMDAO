@@ -30,7 +30,7 @@ from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismat
     _is_unitless, simplify_unit
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.indexer import indexer, Indexer, IndexerError
+from openmdao.utils.indexer import indexer, Indexer
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     PromotionWarning, MPIWarning
 from openmdao.core.constants import _SetupStatus
@@ -892,19 +892,17 @@ class Group(System):
                         if pinfo.src_shape is None:
                             pinfo.set_src_shape(root_shape)
                         elif pinfo.src_indices is not None and root_shape != pinfo.src_shape:
-                            self._collect_error(f"When connecting '{conns[tgt]}' to "
+                            self._collect_error(f"When connecting '{src}' to "
                                                 f"'{pinfo.prom_path()}': Promoted src_shape of "
                                                 f"{pinfo.src_shape} for "
                                                 f"'{pinfo.prom_path()}' differs from src_shape "
                                                 f"{root_shape} for '{current_pinfo.prom_path()}'.",
-                                                ident=id(pinfo.src_indices))
+                                                ident=(src, tgt))
                     except Exception:
                         type_exc, exc, tb = sys.exc_info()
-                        ident = exc.ident if isinstance(exc, IndexerError) else None
-                        self._collect_error(f"When connecting '{conns[tgt]}' to "
+                        self._collect_error(f"When connecting '{src}' to "
                                             f"'{pinfo.prom_path()}': {exc}",
-                                            exc_type=type_exc, tback=tb,
-                                            ident=ident)
+                                            exc_type=type_exc, tback=tb, ident=(src, tgt))
                     current_pinfo = pinfo
                     continue
                 elif pinfo.src_indices is None:
@@ -920,14 +918,14 @@ class Group(System):
                                                  pinfo.src_indices, pinfo.src_shape)
                     except Exception:
                         type_exc, exc, tb = sys.exc_info()
-                        ident = exc.ident if isinstance(exc, IndexerError) else None
                         self._collect_error(f"When connecting '{conns[tgt]}' to "
                                             f"'{pinfo.prom_path()}': input "
                                             f"'{current_pinfo.prom_path()}' src_indices are "
                                             f"{current_pinfo.src_indices} and indexing into those "
                                             f"failed using src_indices {pinfo.src_indices} from "
                                             f"input '{pinfo.prom_path()}'. Error was: "
-                                            f"{exc}", exc_type=type_exc, tback=tb, ident=ident)
+                                            f"{exc}", exc_type=type_exc, tback=tb,
+                                            ident=(conns[tgt], tgt))
                         continue
 
                     # final src_indices are wrt original full sized source and are flat,
@@ -1519,10 +1517,9 @@ class Group(System):
                                                                             flat=flat, prom=abs_in)
                             except Exception:
                                 type_exc, exc, tb = sys.exc_info()
-                                ident = exc.ident if isinstance(exc, IndexerError) else None
                                 self._collect_error(
                                     f"When connecting from '{prom_out}' to '{prom_in}': {exc}",
-                                    exc_type=type_exc, tback=tb, ident=ident)
+                                    exc_type=type_exc, tback=tb, ident=(abs_out, abs_in))
                                 continue
 
                         meta = abs2meta[abs_in]
@@ -2014,10 +2011,10 @@ class Group(System):
                     except Exception:
                         type_exc, exc, tb = sys.exc_info()
                         s, src, tgt = get_connection_owner(self, abs_in)
-                        ident = exc.ident if isinstance(exc, IndexerError) else None
+                        abs_out = self._conn_global_abs_in2out[tgt]
                         self._collect_error(
                             f"{s.msginfo}: When connecting '{src}' to '{tgt}': {exc}",
-                            ident=ident, exc_type=type_exc, tback=tb)
+                            exc_type=type_exc, tback=tb, ident=(abs_out, abs_in))
                         continue
 
                     if src_indices.indexed_src_size == 0:
@@ -2435,10 +2432,8 @@ class Group(System):
                 src_indices = indexer(src_indices, flat_src=flat_src_indices)
             except Exception:
                 type_exc, exc, tb = sys.exc_info()
-                ident = exc.ident if isinstance(exc, IndexerError) else None
                 self._collect_error(f"{self.msginfo}: When connecting from '{src_name}' to "
-                                    f"'{tgt_name}': {exc}", exc_type=type_exc, tback=tb,
-                                    ident=ident)
+                                    f"'{tgt_name}': {exc}", exc_type=type_exc, tback=tb)
                 return
 
         # target should not already be connected
@@ -3388,12 +3383,14 @@ class Group(System):
                     val = value
                 elif np.ndim(value) == 0:
                     if val.size > 1:
+                        src = self._conn_global_abs_in2out[tgt]
                         self._collect_error(f"Shape of input '{tgt}', (), doesn't match shape "
-                                            f"{val.shape}.", ident=(self.pathname, tgt))
+                                            f"{val.shape}.", ident=(src, tgt))
                         continue
                 elif np.squeeze(val).shape != np.squeeze(value).shape:
+                    src = self._conn_global_abs_in2out[tgt]
                     self._collect_error(f"Shape of input '{tgt}', {value.shape}, doesn't match "
-                                        f"shape {val.shape}.", ident=(self.pathname, tgt))
+                                        f"shape {val.shape}.", ident=(src, tgt))
                     continue
 
                 if val is not value:

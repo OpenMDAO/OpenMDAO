@@ -170,7 +170,7 @@ class TestReportsSystem(unittest.TestCase):
             path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
             self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
 
-            msg = "\nConnection errors for problem 'error_problem':\n   <model> <class Group>: When connecting 'p1.x' to 'comp.x': index 1 is out of bounds for source dimension of size 1.\n   'comp' <class Paraboloid>: When accessing 'p1.x' with src_shape (1,) from 'comp.x' using src_indices [0 1]: index 1 is out of bounds for source dimension of size 1."
+            msg = "\nConnection errors for problem 'error_problem':\n   <model> <class Group>: When connecting 'p1.x' to 'comp.x': index 1 is out of bounds for source dimension of size 1."
             self.assertEqual(str(err), msg)
         else:
             self.fail("exception expected")

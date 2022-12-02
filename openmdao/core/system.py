@@ -33,7 +33,7 @@ from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.indexer import indexer, IndexerError
+from openmdao.utils.indexer import indexer
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, env_truthy, \
     make_traceback
@@ -175,8 +175,7 @@ def collect_errors(method):
                 # it's likely the result of an earlier error, so ignore it
                 return
 
-            ident = None  # exc.ident if isinstance(exc, IndexerError) else None
-            self._collect_error(str(exc), exc_type=type_exc, tback=tb, ident=ident)
+            self._collect_error(str(exc), exc_type=type_exc, tback=tb)
 
     return wrapper
 

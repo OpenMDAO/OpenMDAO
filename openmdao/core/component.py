@@ -20,7 +20,7 @@ from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_name2abs
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     find_matches, make_set, convert_src_inds
-from openmdao.utils.indexer import Indexer, IndexerError, indexer
+from openmdao.utils.indexer import Indexer, indexer
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
     DerivativesWarning, SetupWarning, warn_deprecation
@@ -1628,11 +1628,10 @@ class Component(System):
                                 self._var_prom2inds[abs2prom[tgt]] = [shape, inds, flat]
                         except Exception:
                             type_exc, exc, tb = sys.exc_info()
-                            ident = exc.ident if isinstance(exc, IndexerError) else None
                             self._collect_error(f"When accessing '{conns[tgt]}' with src_shape "
                                                 f"{shape} from '{pinfo.prom_path()}' using "
                                                 f"src_indices {inds}: {exc}", exc_type=type_exc,
-                                                tback=tb, ident=ident)
+                                                tback=tb, ident=(conns[tgt], tgt))
 
             elif meta['add_input_src_indices']:
                 self._var_prom2inds[abs2prom[tgt]] = [meta['shape'], meta['src_indices'],
