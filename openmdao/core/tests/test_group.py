@@ -1629,7 +1629,7 @@ class TestGroupPromotes(unittest.TestCase):
             top.setup()
 
         self.assertEqual(str(context.exception),
-                         "\nConnection errors for problem 'alias_from_parent':\n   'sub' <class SubGroup>: Trying to promote 'b' when it has been aliased to 'bb'.")
+                         "\nConnection errors for problem 'alias_from_parent':\n   'sub' <class SubGroup>: Trying to promote 'b' when it has been aliased to 'bb'.\n   'sub' <class SubGroup>: Trying to promote 'b' when it has been aliased to 'b'.\n   'sub.comp1' <class ExecComp>: Can't alias promoted input 'b' to 'b' because 'b' has already been promoted as '('bb', 'b')'.")
 
     def test_promotes_alias_src_indices(self):
 
@@ -1875,7 +1875,7 @@ class TestGroupPromotes(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(cm.exception),
-            "\nConnection errors for problem 'src_indices_bad_shape':\n   <model> <class SimpleGroup>: The source indices [0 1 2] do not specify a valid shape for the connection '_auto_ivc.v0' to 'comp1.a'. The target shape is (5,) but indices have shape (3,).")
+            "\nConnection errors for problem 'src_indices_bad_shape':\n   <model> <class SimpleGroup>: The source indices [0 1 2] do not specify a valid shape for the connection '_auto_ivc.v0' to 'comp1.a'. (target shape=(5,), indices_shape=(3,)): shape mismatch: value array of shape (5,) could not be broadcast to indexing result of shape (3,)")
 
     def test_promotes_src_indices_different(self):
 
@@ -2651,7 +2651,7 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "\nConnection errors for problem 'conflicting_units_multi_level':\n   <model> <class Group>: The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
+        self.assertEqual(cm.exception.args[0], "\nConnection errors for problem 'conflicting_units_multi_level':\n   <model> <class Group>: The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.\n   <model> <class Group>: The subsystems G1 and par.G5 called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.\n   <model> <class Group>: The following inputs, ['G1.G2.C1.x', 'G1.G2.C2.x', 'G1.G3.C3.x', 'G1.G3.C4.x', 'par.G4.C5.x', 'par.G4.C6.x', 'par.G5.C7.x', 'par.G5.C8.x'], promoted to 'x', are connected but their metadata entries ['val'] differ. Call <group>.set_input_defaults('x', val=?), where <group> is the model to remove the ambiguity.")
 
     def test_override_units(self):
         # multiple Group.set_input_defaults calls at different tree levels with conflicting units args
@@ -2769,10 +2769,10 @@ class TestGroupAddInput(unittest.TestCase):
             p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "\nConnection errors for problem 'conflicting_units_multi_level_par':\n   <model> <class Group>: The subsystems G1.G2 and par called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
+                         "\nConnection errors for problem 'conflicting_units_multi_level_par':\n   <model> <class Group>: The subsystems G1.G2 and par called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.\n   <model> <class Group>: The following inputs, ['G1.G2.C1.x', 'G1.G2.C2.x', 'G1.G3.C3.x', 'G1.G3.C4.x', 'par.G4.C5.x', 'par.G4.C6.x', 'par.G5.C7.x', 'par.G5.C8.x'], promoted to 'x', are connected but their metadata entries ['val'] differ. Call <group>.set_input_defaults('x', val=?), where <group> is the model to remove the ambiguity.")
 
     def test_group_input_not_found(self):
-        p = self._make_tree_model(diff_units=True)
+        p = self._make_tree_model(diff_units=True, name='group_input_not_found')
         model = p.model
         g2 = model._get_subsystem('G1.G2')
         g2.set_input_defaults('xx', units='ft')
@@ -2789,7 +2789,7 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "'G1.G2' <class Group>: The following group inputs, passed to set_input_defaults(), could not be found: ['xx'].")
+        self.assertEqual(cm.exception.args[0], "\nConnection errors for problem 'group_input_not_found':\n   'G1.G2' <class Group>: The following group inputs, passed to set_input_defaults(), could not be found: ['xx'].\n   'G1' <class Group>: The following group inputs, passed to set_input_defaults(), could not be found: ['G2.xx'].\n   <model> <class Group>: The following group inputs, passed to set_input_defaults(), could not be found: ['G1.G2.xx'].\n   <model> <class Group>: The following inputs, ['G1.G2.C1.x', 'G1.G2.C2.x', 'G1.G3.C3.x', 'G1.G3.C4.x', 'par.G4.C5.x', 'par.G4.C6.x', 'par.G5.C7.x', 'par.G5.C8.x'], promoted to 'x', are connected but their metadata entries ['val'] differ. Call <group>.set_input_defaults('x', val=?), where <group> is the model to remove the ambiguity.")
 
     def test_conflicting_val(self):
         p = self._make_tree_model(diff_vals=True, name='conflicting_val')
@@ -2812,7 +2812,7 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "\nConnection errors for problem 'conflicting_val':\n   <model> <class Group>: The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'val'. Call <group>.set_input_defaults('x', val=?), where <group> is the model to remove the ambiguity.")
+        self.assertEqual(cm.exception.args[0], "\nConnection errors for problem 'conflicting_val':\n   <model> <class Group>: The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'val'. Call <group>.set_input_defaults('x', val=?), where <group> is the model to remove the ambiguity.\n   <model> <class Group>: The subsystems G1 and par.G5 called set_input_defaults for promoted input 'x' with conflicting values for 'val'. Call <group>.set_input_defaults('x', val=?), where <group> is the model to remove the ambiguity.")
 
 
 class MultComp(om.ExplicitComponent):

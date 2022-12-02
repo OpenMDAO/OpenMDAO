@@ -114,6 +114,10 @@ def _default_prob_name():
     str
         The default problem name.
     """
+    def_prob_name = os.environ.get('OPENMDAO_DEFAULT_PROBLEM', '')
+    if def_prob_name:
+        return def_prob_name
+
     name = _get_top_script()
     if name is None or env_truthy('TESTFLO_RUNNING'):
         return 'problem'
@@ -791,7 +795,7 @@ class Problem(object):
             final_msg = [f"\nConnection errors for problem '{self._name}':"]
             seen = set()
             for ident, msg, exc_type, tback in errors:
-                if ident not in seen:
+                if ident is None or ident not in seen:
                     final_msg.append(f"   {msg}")
                     seen.add(ident)
 

@@ -741,7 +741,7 @@ class TestAddConstraintMPI(unittest.TestCase):
 
     def test_add_bad_con(self):
         # From a bug, this message didn't work in mpi.
-        prob = om.Problem()
+        prob = om.Problem(name='add_bad_con')
         model = prob.model
 
         sub = model.add_subsystem('sub', SellarDerivatives())
@@ -752,7 +752,7 @@ class TestAddConstraintMPI(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.setup(mode='rev')
 
-        msg = "'sub' <class SellarDerivatives>: Output not found for response 'd1.junk'."
+        msg = "\nConnection errors for problem 'add_bad_con':\n   <model> <class Group>: 'sub' <class SellarDerivatives>: Output not found for response 'd1.junk'."
         self.assertEqual(str(context.exception), msg)
 
 

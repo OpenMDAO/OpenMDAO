@@ -219,7 +219,7 @@ class TestPassSizeDistributed(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.setup()
 
-        msg = "\nConnection errors for problem 'serial_start':\n   <model> <class Group>: dynamic sizing of non-distributed input 'E.in' from distributed output 'D.out' is not supported."
+        msg = "\nConnection errors for problem 'serial_start':\n   <model> <class Group>: dynamic sizing of non-distributed input 'E.in' from distributed output 'D.out' is not supported.\n   <model> <class Group>: Can't connect distributed output 'D.out' to non-distributed input 'E.in' without specifying src_indices.\n   <model> <class Group>: The source indices slice(None, None, 1) do not specify a valid shape for the connection 'B.out' to 'C.in'. The target shape is (4,) but indices are shape (12,)."
         self.assertEquals(str(cm.exception), msg)
 
     def test_distributed_start(self):
@@ -246,7 +246,7 @@ class TestPassSizeDistributed(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.setup()
 
-        msg = "\nConnection errors for problem 'distributed_start':\n   <model> <class Group>: dynamic sizing of non-distributed output 'A.out' from distributed input 'B.in' is not supported because not all B.in ranks are the same size (sizes=[1 2 0])."
+        msg = "\nConnection errors for problem 'distributed_start':\n   <model> <class Group>: dynamic sizing of non-distributed output 'A.out' from distributed input 'B.in' is not supported because not all B.in ranks are the same size (sizes=[1 2 0]).\n   <model> <class Group>: dynamic sizing of non-distributed input 'E.in' from distributed output 'D.out' is not supported.\n   'B' <class B_distrib>: Can't determine src_indices automatically for input 'B.in'. They must be supplied manually.\n   <model> <class Group>: Can't connect distributed output 'D.out' to non-distributed input 'E.in' without specifying src_indices."
         self.assertEquals(str(cm.exception), msg)
 
 class ResizableComp(om.ExplicitComponent):
@@ -427,7 +427,7 @@ class TestDynShapes(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
 
-        msg = "\nConnection errors for problem 'copy_shape_in_in_unresolvable':\n   <model> <class Group>: Failed to resolve shapes for ['comp.x1', 'comp.x2']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
+        msg = "\nConnection errors for problem 'copy_shape_in_in_unresolvable':\n   <model> <class Group>: Failed to resolve shapes for ['comp.x1', 'comp.x2']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x1' to 'comp.x1'. The source shape is (2, 3) but the target shape is None.\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x2' to 'comp.x2'. The source shape is (2, 3) but the target shape is None."
         self.assertEqual(cm.exception.args[0], msg)
 
     def test_mismatched_dyn_shapes(self):
@@ -448,7 +448,7 @@ class TestDynShapes(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        msg = "\nConnection errors for problem 'mismatched_dyn_shapes':\n   <model> <class Group>: Shape mismatch, (3, 2) vs. (4, 2) for variable 'sink.x2' during dynamic shape determination."
+        msg = "\nConnection errors for problem 'mismatched_dyn_shapes':\n   <model> <class Group>: Shape mismatch, (3, 2) vs. (4, 2) for variable 'sink.x2' during dynamic shape determination.\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'Gdyn.C3.y2' to 'sink.x2'. The source shape is (4, 2) but the target shape is (3, 2)."
         self.assertEqual(str(cm.exception), msg)
 
     def test_baseline_conn_inputs(self):
@@ -612,6 +612,7 @@ class TestDistribDynShapes(unittest.TestCase):
 
         cname = 'G1' if p.model.comm.rank <= 1 else 'G2'
         msg = f"\nConnection errors for problem 'remote_distrib':\n   'par.{cname}.C1' <class DistribDynShapeComp>: Can't determine src_indices automatically for input 'par.{cname}.C1.x1'. They must be supplied manually."
+        msg = f"\nConnection errors for problem 'remote_distrib':\n   'par.{cname}.C1' <class DistribDynShapeComp>: Can't determine src_indices automatically for input 'par.{cname}.C1.x1'. They must be supplied manually.\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x1' to 'par.{cname}.C1.x1'. The source shape is (32,) but the target shape is (8,).\n   <model> <class Group>: The source indices slice(None, None, 1) do not specify a valid shape for the connection 'par.G1.C2.y1' to 'sink.x1'. The target shape is (8,) but indices are shape (16,).\n   <model> <class Group>: The source indices slice(None, None, 1) do not specify a valid shape for the connection 'par.G2.C2.y1' to 'sink.x2'. The target shape is (8,) but indices are shape (16,)."
         self.assertEqual(str(cm.exception), msg)
 
 
@@ -755,8 +756,8 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         p.model.connect('indeps.x', 'comp.x')
         with self.assertRaises(Exception) as cm:
             p.setup()
-        self.assertEquals(cm.exception.args[0],
-                          "\nConnection errors for problem 'ser_unknown_dist_known_err':\n   <model> <class Group>: dynamic sizing of non-distributed output 'indeps.x' from distributed input 'comp.x' is not supported because not all comp.x ranks are the same size (sizes=[3 6 9]).")
+        msg = f"\nConnection errors for problem 'ser_unknown_dist_known_err':\n   <model> <class Group>: dynamic sizing of non-distributed output 'indeps.x' from distributed input 'comp.x' is not supported because not all comp.x ranks are the same size (sizes=[3 6 9]).\n   'comp' <class DistCompDiffSizeKnownInput>: Can't determine src_indices automatically for input 'comp.x'. They must be supplied manually."
+        self.assertEquals(cm.exception.args[0], msg)
 
     def test_dist_known_ser_unknown(self):
         p = om.Problem(name='dist_known_ser_unknown')
@@ -769,7 +770,7 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
         self.assertEquals(cm.exception.args[0],
-                          "\nConnection errors for problem 'dist_known_ser_unknown':\n   <model> <class Group>: dynamic sizing of non-distributed input 'comp.x' from distributed output 'indeps.x' is not supported.")
+                          "\nConnection errors for problem 'dist_known_ser_unknown':\n   <model> <class Group>: dynamic sizing of non-distributed input 'comp.x' from distributed output 'indeps.x' is not supported.\n   <model> <class Group>: Can't connect distributed output 'indeps.x' to non-distributed input 'comp.x' without specifying src_indices.")
 
     def test_dist_unknown_ser_known(self):
         p = om.Problem(name='dist_unknown_ser_known')
@@ -937,7 +938,7 @@ class TestDynShapesWithInputConns(unittest.TestCase):
 
         # just make sure we still get a clear error msg
 
-        msg = "\nConnection errors for problem 'shape_from_conn_input_mismatch':\n   <model> <class Group>: Shape of input 'sub.comp3.x', (3,), doesn't match shape (2,)."
+        msg = "\nConnection errors for problem 'shape_from_conn_input_mismatch':\n   <model> <class Group>: Shape of input 'sub.comp3.x', (3,), doesn't match shape (2,).\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection '_auto_ivc.v0' to 'sub.comp3.x'. The source shape is (2,) but the target shape is (3,)."
         self.assertEqual(cm.exception.args[0], msg)
 
     def test_shape_from_conn_input_mismatch_group_inputs(self):
@@ -955,7 +956,7 @@ class TestDynShapesWithInputConns(unittest.TestCase):
 
         # just make sure we still get a clear error msg
 
-        msg = "\nConnection errors for problem 'shape_from_conn_input_mismatch_group_inputs':\n   <model> <class Group>: Shape of input 'sub.comp2.x', (2,), doesn't match shape (3,)."
+        msg = "\nConnection errors for problem 'shape_from_conn_input_mismatch_group_inputs':\n   <model> <class Group>: Shape of input 'sub.comp2.x', (2,), doesn't match shape (3,).\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection '_auto_ivc.v0' to 'sub.comp2.x'. The source shape is (3,) but the target shape is (2,)."
         self.assertEqual(cm.exception.args[0], msg)
 
 

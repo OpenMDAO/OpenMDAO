@@ -940,9 +940,10 @@ class Component(System):
 
                     # total sizes differ and output is distributed, so can't determine mapping
                     if offset is None:
-                        raise RuntimeError(f"{self.msginfo}: Can't determine src_indices "
-                                           f"automatically for input '{iname}'. They must be "
-                                           "supplied manually.")
+                        self._collect_error(f"{self.msginfo}: Can't determine src_indices "
+                                            f"automatically for input '{iname}'. They must be "
+                                            "supplied manually.", ident=(self.pathname, iname))
+                        continue
 
                     if dist_in and not dist_out:
                         src_shape = self._get_full_dist_shape(src, all_abs2meta_out[src]['shape'])

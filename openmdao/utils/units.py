@@ -1092,7 +1092,10 @@ def _has_val_mismatch(units1, val1, units2, val2):
             return True
 
         # convert units
-        val1 = convert_units(val1, units1, new_units=units2)
+        try:
+            val1 = convert_units(val1, units1, new_units=units2)
+        except TypeError:
+            return True  # units are not compatible
 
     rtol = 1e-10
     val1 = np.asarray(val1)

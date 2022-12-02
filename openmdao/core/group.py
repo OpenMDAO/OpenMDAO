@@ -25,14 +25,14 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len
 from openmdao.utils.general_utils import common_subpath, \
-    convert_src_inds, ContainsAll, shape2tuple, get_connection_owner, env_truthy
+    convert_src_inds, ContainsAll, shape2tuple, get_connection_owner
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer, IndexerError
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
-    SetupWarning, PromotionWarning, MPIWarning
+    PromotionWarning, MPIWarning
 from openmdao.core.constants import _SetupStatus
 
 # regex to check for valid names.
@@ -815,7 +815,7 @@ class Group(System):
                             if shaped is None:
                                 self._collect_error(f"For connection from '{abs_out}' to '{abs_in}'"
                                                     f", src_indices {src_inds} have no source "
-                                                    "shape.")
+                                                    "shape.", ident=(abs_out, abs_in))
                                 continue
                             else:
                                 src_inds = shaped
@@ -841,11 +841,13 @@ class Group(System):
                     if err == 1:
                         self._collect_error(f"{self.msginfo}: Can't connect distributed output "
                                             f"'{abs_out}' to non-distributed input '{abs_in}' "
-                                            "because src_indices differ on different ranks.")
+                                            "because src_indices differ on different ranks.",
+                                            ident=(abs_out, abs_in))
                     elif err == -1:
                         self._collect_error(f"{self.msginfo}: Can't connect distributed output "
                                             f"'{abs_out}' to non-distributed input '{abs_in}' "
-                                            "without specifying src_indices.")
+                                            "without specifying src_indices.",
+                                            ident=(abs_out, abs_in))
 
     @collect_errors
     def _resolve_src_indices(self):
@@ -1539,7 +1541,8 @@ class Group(System):
                 if abs_in in abs_in2out:
                     self._collect_error(
                         f"{self.msginfo}: Input '{abs_in}' cannot be connected to '{abs_out}' "
-                        f"because it's already connected to '{abs_in2out[abs_in]}'.")
+                        f"because it's already connected to '{abs_in2out[abs_in]}'.",
+                        ident=(abs_out, abs_in))
                     continue
 
                 abs_in2out[abs_in] = abs_out
@@ -1652,11 +1655,15 @@ class Group(System):
                 else:  # serial_out <- dist_in
                     # all input rank sizes must be the same
                     if not np.all(distrib_sizes[from_var] == distrib_sizes[from_var][0]):
+                        if from_io == 'output':
+                            ident = (from_var, to_var)
+                        else:
+                            ident = (to_var, from_var)
                         self._collect_error(
                             f"{self.msginfo}: dynamic sizing of non-distributed {to_io} '{to_var}' "
                             f"from distributed {from_io} '{from_var}' is not supported because not "
                             f"all {from_var} ranks are the same size "
-                            f"(sizes={distrib_sizes[from_var]}).")
+                            f"(sizes={distrib_sizes[from_var]}).", ident=ident)
                         return
 
             all_to_meta['shape'] = from_shape
@@ -1873,7 +1880,7 @@ class Group(System):
                 elif abs_out in allprocs_discrete_out:
                     self._collect_error(
                         f"{self.msginfo}: Can't connect discrete output '{abs_out}' "
-                        f"to continuous input '{abs_in}'.")
+                        f"to continuous input '{abs_in}'.", ident=(abs_out, abs_in))
                     continue
                 else:
                     abs_in2out[abs_in] = abs_out
@@ -1929,13 +1936,14 @@ class Group(System):
             except KeyError:
                 self._collect_error(
                     f"{self.msginfo}: Can't connect continuous output '{abs_out}' "
-                    f"to discrete input '{abs_in}'.")
+                    f"to discrete input '{abs_in}'.", ident=(abs_out, abs_in))
                 continue
 
             if not issubclass(in_type, out_type):
                 self._collect_error(
                     f"{self.msginfo}: Type '{out_type.__name__}' of output '{abs_out}' is "
-                    f"incompatible with type '{in_type.__name__}' of input '{abs_in}'.")
+                    f"incompatible with type '{in_type.__name__}' of input '{abs_in}'.",
+                    ident=(abs_out, abs_in))
 
         # check unit/shape compatibility, but only for connections that are
         # either owned by (implicit) or declared by (explicit) this Group.
@@ -1958,7 +1966,8 @@ class Group(System):
                 elif not is_compatible(in_units, out_units):
                     self._collect_error(
                         f"{self.msginfo}: Output units of '{out_units}' for '{abs_out}' "
-                        f"are incompatible with input units of '{in_units}' for '{abs_in}'.")
+                        f"are incompatible with input units of '{in_units}' for '{abs_in}'.",
+                        ident=(abs_out, abs_in))
                     continue
             elif in_units is not None:
                 if not _is_unitless(in_units):
@@ -1986,12 +1995,13 @@ class Group(System):
 
                 if src_indices is None and out_shape != in_shape:
                     # out_shape != in_shape is allowed if there's no ambiguity in storage order
-                    if not array_connection_compatible(in_shape, out_shape):
+                    if (in_shape is None or out_shape is None or
+                            not array_connection_compatible(in_shape, out_shape)):
                         self._collect_error(
                             f"{self.msginfo}: The source and target shapes do not match or "
                             f"are ambiguous for the connection '{abs_out}' to '{abs_in}'. "
-                            f"The source shape is {tuple([int(s) for s in out_shape])} "
-                            f"but the target shape is {tuple([int(s) for s in in_shape])}.")
+                            f"The source shape is {out_shape} "
+                            f"but the target shape is {in_shape}.", ident=(abs_out, abs_in))
                         continue
 
                 elif src_indices is not None:
@@ -2022,13 +2032,13 @@ class Group(System):
                                     f"do not specify a valid shape for the connection '{abs_out}' "
                                     f"to '{abs_in}'. The target shape is {in_shape} but indices "
                                     f"are shape {src_indices.indexed_src_shape}.",
-                                    ident=id(src_indices))
+                                    ident=(abs_out, abs_in))
                                 break
                         else:
                             self._collect_error(
                                 f"{self.msginfo}: src_indices shape {src_indices.indexed_src_shape}"
                                 f" does not match {abs_in} shape {in_shape}.",
-                                ident=id(src_indices))
+                                ident=(abs_out, abs_in))
                         continue
 
                     # any remaining dimension of indices must match shape of source
@@ -2039,7 +2049,7 @@ class Group(System):
                             f"specify a valid shape for the connection '{abs_out}' to '{abs_in}'. "
                             f"The source has {len(out_shape)} dimensions but the indices expect at "
                             f"least {len(src_indices.indexed_src_shape)}.",
-                            ident=id(src_indices))
+                            ident=(abs_out, abs_in))
 
     def _transfer(self, vec_name, mode, sub=None):
         """
@@ -2216,7 +2226,8 @@ class Group(System):
             except Exception:
                 type_exc, exc, tb = sys.exc_info()
                 self._collect_error(f"{self.msginfo}: When promoting {promoted} from "
-                                    f"'{subsys_name}': {exc}", exc_type=type_exc, tback=tb)
+                                    f"'{subsys_name}': {exc}", exc_type=type_exc, tback=tb,
+                                    ident=(self.pathname, tuple(promoted)))
 
             if outputs:
                 self._collect_error(f"{self.msginfo}: Trying to promote outputs {outputs} while "
@@ -2231,7 +2242,9 @@ class Group(System):
                     lst.extend(any)
                 if inputs is not None:
                     lst.extend(inputs)
-                raise err.__class__(f"{self.msginfo}: When promoting {sorted(lst)}: {err}")
+                self._collect_error(f"{self.msginfo}: When promoting {sorted(lst)}: {err}",
+                                    ident=(self.pathname, tuple(lst)))
+                return
 
         subsys = getattr(self, subsys_name)
         if any:
@@ -3251,7 +3264,6 @@ class Group(System):
 
         return graph
 
-    @collect_errors
     def _get_auto_ivc_out_val(self, tgts, vars_to_gather, abs2meta_in):
         # all tgts are continuous variables
         # only called from top level group
@@ -3297,6 +3309,7 @@ class Group(System):
         if val_shape is not None:
             start_val = val = np.ones(val_shape)
 
+        info = None
         for tgt in tgts:
             # if tgt in vars_to_gather and tgt not in abs2meta_in:
             if tgt in vars_to_gather and self.comm.rank != vars_to_gather[tgt]:
@@ -3329,10 +3342,11 @@ class Group(System):
                                     inds.set_src_shape(shape)
                                 except IndexError:
                                     exc_class, exc, tb = sys.exc_info()
-                                    raise exc_class(f"When promoting '{pinfo.prom}' from system "
-                                                    f"'{pinfo.promoted_from}' with src_indices "
-                                                    f"{inds} and src_shape {shape}: {exc}"
-                                                    ).with_traceback(tb)
+                                    self._collect_error(f"When promoting '{pinfo.prom}' from system"
+                                                        f" '{pinfo.promoted_from}' with src_indices"
+                                                        f" {inds} and src_shape {shape}: {exc}",
+                                                        exc_type=exc_class, tback=tb,
+                                                        ident=(pinfo.prom, pinfo.promoted_from))
 
                         if src_indices is None:
                             src_indices = inds
@@ -3359,25 +3373,28 @@ class Group(System):
                             val.ravel()[src_indices.flat()] = value.flat
                         else:
                             val[src_indices()] = value
-                    except ValueError as err:
+                    except Exception as err:
                         src = self._conn_global_abs_in2out[tgt]
                         msg = f"{self.msginfo}: The source indices " + \
                               f"{src_indices} do not specify a " + \
                               f"valid shape for the connection '{src}' to " + \
-                              f"'{tgt}'. The target shape is " + \
-                              f"{meta['shape']} but indices have shape " + \
-                              f"{src_indices.indexed_src_shape}."
-                        raise ValueError(msg)
+                              f"'{tgt}'. (target shape=" + \
+                              f"{meta['shape']}, indices_shape=" + \
+                              f"{src_indices.indexed_src_shape}): {err}"
+                        self._collect_error(msg, ident=(src, tgt))
+                        continue
             else:
                 if val is None:
                     val = value
                 elif np.ndim(value) == 0:
                     if val.size > 1:
-                        raise ValueError(f"Shape of input '{tgt}', (), doesn't match shape "
-                                         f"{val.shape}.")
+                        self._collect_error(f"Shape of input '{tgt}', (), doesn't match shape "
+                                            f"{val.shape}.", ident=(self.pathname, tgt))
+                        continue
                 elif np.squeeze(val).shape != np.squeeze(value).shape:
-                    raise ValueError(f"Shape of input '{tgt}', {value.shape}, doesn't match shape "
-                                     f"{val.shape}.")
+                    self._collect_error(f"Shape of input '{tgt}', {value.shape}, doesn't match "
+                                        f"shape {val.shape}.", ident=(self.pathname, tgt))
+                    continue
 
                 if val is not value:
                     if val.shape:
@@ -3398,11 +3415,14 @@ class Group(System):
             val = start_val
 
         if src_idx_found:  # auto_ivc connected to local vars with src_indices
-            raise RuntimeError("Attaching src_indices to inputs requires that the shape of the "
-                               "source variable is known, but the source shape for inputs "
-                               f"{src_idx_found} is unknown. You can specify the src shape for "
-                               "these inputs by setting 'val' or 'src_shape' in a call to "
-                               "set_input_defaults, or by adding an IndepVarComp as the source.")
+            self._collect_error("Attaching src_indices to inputs requires that the shape of the "
+                                "source variable is known, but the source shape for inputs "
+                                f"{src_idx_found} is unknown. You can specify the src shape for "
+                                "these inputs by setting 'val' or 'src_shape' in a call to "
+                                "set_input_defaults, or by adding an IndepVarComp as the source.",
+                                ident=(self.pathname, tuple(src_idx_found)))
+            return None
+
         return info
 
     def _setup_auto_ivcs(self, mode):

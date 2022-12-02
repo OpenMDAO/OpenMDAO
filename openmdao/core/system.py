@@ -166,6 +166,9 @@ def collect_errors(method):
     def wrapper(self, *args, **kwargs):
         try:
             return method(self, *args, **kwargs)
+        except KeyError:
+            if not self._get_saved_errors():
+                raise
         except Exception:
             if env_truthy('OPENMDAO_FAIL_FAST'):
                 raise
@@ -899,16 +902,19 @@ class System(object):
         # "Component as a model" deprecation is removed
         try:
             self._problem_meta['relevant'] = self._init_relevance(mode)
-        except RuntimeError as err:
+        except RuntimeError:
+            type_exc, exc, tb = sys.exc_info()
             from openmdao.core.group import Group
-            if "Output not found for design variable" in str(err) and not isinstance(self, Group):
-                msg = f"{str(err)}\nThe model is of type '{self.__class__.__name__}'. " \
+            if not isinstance(self, Group) and "Output not found for design variable" in str(exc):
+                msg = f"The model is of type '{self.__class__.__name__}'. " \
                       "Components must be placed in a Group in order for unconnected inputs " \
                       "to be used as design variables. A future release will require that " \
                       "the model be a Group or a sub-class of Group."
-                raise RuntimeError(msg)
+                self._collect_error(str(exc), exc_type=type_exc, tback=tb)
+                self._collect_error(msg)
+                return
             else:
-                raise err
+                self._collect_error(str(exc), exc_type=type_exc, tback=tb)
 
         # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
@@ -1643,7 +1649,6 @@ class System(object):
         """
         pass
 
-    @collect_errors
     def _init_relevance(self, mode):
         """
         Create the relevance dictionary.
@@ -2046,33 +2051,38 @@ class System(object):
             bool
                 If True, ignore the new match, else replace the old with the new.
             """
-            old_name, old_key, old_info, old_match_type = matches[io][name]
-            _, info = tup
-            if old_match_type == _MatchType.RENAME:
-                old_key = (old_name, old_key)
-            else:
-                old_using = f"'{old_key}'"
-            if match_type == _MatchType.RENAME:
-                new_using = (name, tup[0])
-            else:
-                new_using = f"'{tup[0]}'"
+            try:
+                old_name, old_key, old_info, old_match_type = matches[io][name]
+                _, info = tup
+                if old_match_type == _MatchType.RENAME:
+                    old_key = (old_name, old_key)
+                else:
+                    old_using = f"'{old_key}'"
+                if match_type == _MatchType.RENAME:
+                    new_using = (name, tup[0])
+                else:
+                    new_using = f"'{tup[0]}'"
 
-            mismatch = info.compare(old_info) if info is not None and old_info is not None else ()
-            if mismatch:
-                raise RuntimeError(f"{self.msginfo}: {io} variable '{name}', promoted using "
-                                   f"{new_using}, was already promoted using {old_using} with "
-                                   f"different values for {mismatch}.")
+                diff = info.compare(old_info) if info is not None and old_info is not None else ()
+                if diff:
+                    raise RuntimeError(f"{self.msginfo}: {io} variable '{name}', promoted using "
+                                       f"{new_using}, was already promoted using {old_using} with "
+                                       f"different values for {diff}.")
 
-            if old_match_type != _MatchType.PATTERN:
-                if old_key != tup[0]:
-                    raise RuntimeError(f"{self.msginfo}: Can't alias promoted {io} '{name}' to "
-                                       f"'{tup[0]}' because '{name}' has already been promoted as "
-                                       f"'{old_key}'.")
+                if old_match_type != _MatchType.PATTERN:
+                    if old_key != tup[0]:
+                        raise RuntimeError(f"{self.msginfo}: Can't alias promoted {io} '{name}' to "
+                                           f"'{tup[0]}' because '{name}' has already been promoted "
+                                           f"as '{old_key}'.")
 
-            if old_key != '*':
-                msg = f"{io} variable '{name}', promoted using {new_using}, " \
-                      f"was already promoted using {old_using}."
-                issue_warning(msg, prefix=self.msginfo, category=PromotionWarning)
+                if old_key != '*':
+                    msg = f"{io} variable '{name}', promoted using {new_using}, " \
+                        f"was already promoted using {old_using}."
+                    issue_warning(msg, prefix=self.msginfo, category=PromotionWarning)
+            except Exception:
+                type_exc, exc, tb = sys.exc_info()
+                self._collect_error(str(exc), exc_type=type_exc, tback=tb)
+                return False
 
             return match_type == _MatchType.PATTERN
 
@@ -5488,7 +5498,12 @@ class System(object):
 
         # assume that all but the first dimension of the shape of a
         # distributed variable is the same on all procs
-        high_dims = meta['shape'][1:]
+        shape = meta['shape']
+        if shape is None and self._get_saved_errors():
+            # a setup error has occurred earlier that caused shape to be None.  Just return (0,)
+            # to avoid a confusing KeyError
+            return (0,)
+        high_dims = shape[1:]
         with multi_proc_exception_check(self.comm):
             if high_dims:
                 high_size = shape_to_len(high_dims)

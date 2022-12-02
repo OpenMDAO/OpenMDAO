@@ -1885,7 +1885,7 @@ class TestProblem(unittest.TestCase):
     def test_constraint_alias_duplicate_errors(self):
         size = 7
 
-        prob = om.Problem()
+        prob = om.Problem(name='constraint_alias_duplicate_errors')
         model = prob.model
 
         model.add_subsystem('comp1', om.ExecComp('f = x',
@@ -1903,13 +1903,13 @@ class TestProblem(unittest.TestCase):
         model.add_constraint('f', indices=[5], flat_indices=True, alias='g', lower=0.5)
 
         msg = "Constraint alias 'f' is a duplicate of an existing alias or variable name."
-        with self.assertRaises(TypeError) as cm:
+        with self.assertRaises(Exception) as cm:
             model.add_constraint('f', indices=[3], flat_indices=True, alias='f', lower=0.5)
 
         self.assertEqual(str(cm.exception), msg)
 
-        msg = "Constraint alias 'g' on 'comp1.f' is the same name as an existing variable."
-        with self.assertRaises(RuntimeError) as cm:
+        msg = "\nConnection errors for problem 'constraint_alias_duplicate_errors':\n   <model> <class Group>: Constraint alias 'g' on 'comp1.f' is the same name as an existing variable."
+        with self.assertRaises(Exception) as cm:
             prob.setup()
 
         self.assertEqual(str(cm.exception), msg)

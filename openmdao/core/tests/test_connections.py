@@ -506,10 +506,8 @@ class TestMultiConns(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup()
 
-        msg = "\nConnection errors for problem 'auto_ivc_ambiguous_with_src_indices_msg':\n   <model> <class Group>: Attaching src_indices to inputs requires that the shape of the source variable is known, but the source shape for inputs ['c1.x', 'c2.x'] is unknown. You can specify the src shape for these inputs by setting 'val' or 'src_shape' in a call to set_input_defaults, or by adding an IndepVarComp as the source."
-
-        err_msg = str(context.exception)
-        self.assertEqual(err_msg, msg)
+        msg = "\nConnection errors for problem 'auto_ivc_ambiguous_with_src_indices_msg':\n   <model> <class Group>: Attaching src_indices to inputs requires that the shape of the source variable is known, but the source shape for inputs ['c1.x', 'c2.x'] is unknown. You can specify the src shape for these inputs by setting 'val' or 'src_shape' in a call to set_input_defaults, or by adding an IndepVarComp as the source.\n   <model> <class Group>: Attaching src_indices to inputs requires that the shape of the source variable is known, but the source shape for inputs ['d1.x', 'd2.x'] is unknown. You can specify the src shape for these inputs by setting 'val' or 'src_shape' in a call to set_input_defaults, or by adding an IndepVarComp as the source."
+        self.assertEqual(str(context.exception), msg)
 
 
 class TestAutoIVCAllowableShapeMismatch(unittest.TestCase):
@@ -585,17 +583,17 @@ class TestConnectionsDistrib(unittest.TestCase):
             def compute_partials(self, inputs, J):
                 J['y', 'x'] = np.ones((2,))
 
-        prob = om.Problem()
+        prob = om.Problem(name='serial_mpi_error')
         model = prob.model
         model.add_subsystem('p1', om.IndepVarComp('x', np.array([1.0, 3.0])))
         model.add_subsystem('c3', TestComp())
         model.connect("p1.x", "c3.x")
 
-        expected = f"Exception raised on rank 0: When accessing 'p1.x' with src_shape (2,) from 'c3.x' using src_indices [1 2]: index 2 is out of bounds for source dimension of size 2."
+        expected = f"\nConnection errors for problem 'serial_mpi_error':\n   'c3' <class TestComp>: When accessing 'p1.x' with src_shape (2,) from 'c3.x' using src_indices [1 2]: index 2 is out of bounds for source dimension of size 2."
         try:
             prob.setup()
         except Exception as err:
-            self.assertEqual(str(err).splitlines()[-1], expected)
+            self.assertEqual(str(err), expected)
         else:
             self.fail('Exception expected.')
 
@@ -614,18 +612,18 @@ class TestConnectionsDistrib(unittest.TestCase):
             def compute_partials(self, inputs, J):
                 J['y', 'x'] = np.ones((2,))
 
-        prob = om.Problem()
+        prob = om.Problem(name='serial_mpi_error_flat')
         model = prob.model
         model.add_subsystem('p1', om.IndepVarComp('x', np.array([1.0, 3.0])))
         model.add_subsystem('c3', TestComp())
         model.connect("p1.x", "c3.x")
 
-        expected = f"Exception raised on rank 0: When accessing 'p1.x' with src_shape (2,) from 'c3.x' using src_indices [1 2]: index 2 is out of bounds for source dimension of size 2."
+        expected = f"\nConnection errors for problem 'serial_mpi_error_flat':\n   'c3' <class TestComp>: When accessing 'p1.x' with src_shape (2,) from 'c3.x' using src_indices [1 2]: index 2 is out of bounds for source dimension of size 2."
 
         try:
             prob.setup()
         except Exception as err:
-            self.assertEqual(str(err).splitlines()[-1], expected)
+            self.assertEqual(str(err), expected)
         else:
             self.fail('Exception expected.')
 
@@ -658,7 +656,7 @@ class TestConnectionsError(unittest.TestCase):
             def compute_partials(self, inputs, J):
                 J['y', 'x'] = np.eye(2)
 
-        prob = om.Problem()
+        prob = om.Problem(name='incompatible_src_indices')
         model = prob.model
 
         rank = prob.comm.rank
@@ -677,7 +675,7 @@ class TestConnectionsError(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup(check=False, mode='fwd')
         self.assertEqual(str(context.exception),
-                         "Exception raised on rank 0: When accessing 'p1.x' with src_shape (2,) from 'c3.x' using src_indices [1 2]: index 2 is out of bounds for source dimension of size 2.")
+                         "\nConnection errors for problem 'incompatible_src_indices':\n   'c3' <class TestComp>: When accessing 'p1.x' with src_shape (2,) from 'c3.x' using src_indices [1 2]: index 2 is out of bounds for source dimension of size 2.")
 
 
 @unittest.skipUnless(MPI, "MPI is required.")

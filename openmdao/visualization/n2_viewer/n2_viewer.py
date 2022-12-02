@@ -692,6 +692,7 @@ def _install_n2_hooks(outfile=_default_n2_fname, show_browser=True, embeddable=F
     def _view_model_w_errors(prob):
         errs = prob._metadata['saved_errors']
         if errs:
+            print("n2 w errs: cwd=", os.getcwd())
             # only run the n2 here if we've had setup errors. Normally we'd wait until
             # after final_setup in order to have correct values for all of the I/O variables.
             n2(prob, outfile=outfile, show_browser=show_browser, title=title, embeddable=embeddable)
