@@ -159,9 +159,9 @@ class Indexer(object):
             raise RuntimeError(f"Can't get indexed_src_shape of {self} because source shape "
                                "is unknown.")
         if self._flat_src:
-            return resolve_shape(shape_to_len(self._src_shape)).get_shape(self.flat(), id(self))
+            return resolve_shape(shape_to_len(self._src_shape)).get_shape(self.flat())
         else:
-            return resolve_shape(self._src_shape).get_shape(self(), id(self))
+            return resolve_shape(self._src_shape).get_shape(self())
 
     @property
     def indexed_src_size(self):
@@ -1406,7 +1406,7 @@ class resolve_shape(object):
         """
         self._shape = shape2tuple(shape)
 
-    def get_shape(self, idx, ident):
+    def get_shape(self, idx):
         """
         Return the shape of the result of indexing into the source with index idx.
 
@@ -1414,8 +1414,6 @@ class resolve_shape(object):
         ----------
         idx : int, slice, tuple, ndarray
             The index into the source.
-        ident : int
-            Identifier of the calling object.
 
         Returns
         -------

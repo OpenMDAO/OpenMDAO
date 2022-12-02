@@ -208,11 +208,6 @@ def activate_report(name, instance=None):
         raise ValueError(f"A report with the name '{name}' for instance '{inst_id}' is already "
                          "active.")
 
-    # if report_filename is not None:
-    #     kwargs = {'report_filename': report_filename}
-    # else:
-    #     kwargs = {}
-
     report.register_hooks(instance)
     _active_reports.add((name, inst_id))
 
@@ -259,7 +254,7 @@ def list_reports(default=False, outfile=None, max_width=80):
     # if it *has* already been initialized, this call will do nothing.
     _load_report_plugins()
 
-    headers = ['name', 'description', 'class name', 'method', 'pre_or_post']
+    headers = ['name', 'description', 'class name', 'method', 'pre or post']
 
     if default:
         reg = {r: _reports_registry[r] for r in _default_reports}
@@ -526,11 +521,6 @@ def clear_reports(instance=None):
         elif inst_id != active_inst_id:
             continue
         _reports_registry[name].unregister_hooks()
-        # func, _, class_name, _, method, pre_or_post, _ = _reports_registry[name]
-        # if pre_or_post == "pre":
-        #     _unregister_hook(method, class_name, inst_id=inst_id, pre=func)
-        # else:
-        #     _unregister_hook(method, class_name, inst_id=inst_id, post=func)
         to_remove.add((name, active_inst_id))
 
     _active_reports -= to_remove
