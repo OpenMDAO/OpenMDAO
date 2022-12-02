@@ -34,7 +34,7 @@ from openmdao import __version__ as openmdao_version
 
 _MAX_ARRAY_SIZE_FOR_REPR_VAL = 1000  # If var has more elements than this do not pass to N2
 
-_default_n2_fname = 'n2.html'
+_default_n2_filename = 'n2.html'
 
 
 def _convert_nans_in_nested_list(val_as_list):
@@ -548,7 +548,7 @@ def _get_viewer_data(data_source, case_id=None):
     return data_dict
 
 
-def n2(data_source, outfile=_default_n2_fname, case_id=None, show_browser=True, embeddable=False,
+def n2(data_source, outfile=_default_n2_filename, case_id=None, show_browser=True, embeddable=False,
        title=None, display_in_notebook=True):
     """
     Generate an HTML file containing a tree viewer.
@@ -630,7 +630,7 @@ def n2(data_source, outfile=_default_n2_fname, case_id=None, show_browser=True, 
 
 
 # N2 report definition
-def _run_n2_report(prob, report_filename=_default_n2_fname):
+def _run_n2_report(prob, report_filename=_default_n2_filename):
 
     n2_filepath = str(pathlib.Path(prob.get_reports_dir()).joinpath(report_filename))
     try:
@@ -642,7 +642,7 @@ def _run_n2_report(prob, report_filename=_default_n2_fname):
             raise err
 
 
-def _run_n2_report_w_errors(prob, report_filename=_default_n2_fname):
+def _run_n2_report_w_errors(prob, report_filename=_default_n2_filename):
     errs = prob._metadata['saved_errors']
     if errs:
         n2_filepath = str(pathlib.Path(prob.get_reports_dir()).joinpath(report_filename))
@@ -660,7 +660,7 @@ def _run_n2_report_w_errors(prob, report_filename=_default_n2_fname):
 
 def _n2_report_register():
     register_report_hook('n2', 'final_setup', 'Problem', post=_run_n2_report,
-                         description='N2 diagram', report_filename=_default_n2_fname)
+                         description='N2 diagram', report_filename=_default_n2_filename)
     register_report_hook('n2', '_check_collected_errors', 'Problem', pre=_run_n2_report_w_errors,
                          description='N2 diagram')
 
@@ -678,7 +678,7 @@ def _n2_setup_parser(parser):
                         help='Python script or recording containing the model. '
                         'If metadata from a parallel run was recorded in a separate file, '
                         'specify both database filenames delimited with a comma.')
-    parser.add_argument('-o', default='n2.html', action='store', dest='outfile',
+    parser.add_argument('-o', default=_default_n2_filename, action='store', dest='outfile',
                         help='html output file.')
     parser.add_argument('--no_browser', action='store_true', dest='no_browser',
                         help="don't display in a browser.")
@@ -686,23 +686,6 @@ def _n2_setup_parser(parser):
                         help="create embeddable version.")
     parser.add_argument('--title', default=None,
                         action='store', dest='title', help='diagram title.')
-
-
-def _install_n2_hooks(outfile=_default_n2_fname, show_browser=True, embeddable=False, title=None):
-    def _view_model_w_errors(prob):
-        errs = prob._metadata['saved_errors']
-        if errs:
-            print("n2 w errs: cwd=", os.getcwd())
-            # only run the n2 here if we've had setup errors. Normally we'd wait until
-            # after final_setup in order to have correct values for all of the I/O variables.
-            n2(prob, outfile=outfile, show_browser=show_browser, title=title, embeddable=embeddable)
-            # errors will result in exit at the end of the _check_collected_errors method
-
-    def _view_model_no_errors(prob):
-        n2(prob, outfile=outfile, show_browser=show_browser, title=title, embeddable=embeddable)
-
-    hooks._register_hook('_check_collected_errors', 'Problem', pre=_view_model_w_errors)
-    hooks._register_hook('final_setup', 'Problem', post=_view_model_no_errors, exit=True)
 
 
 def _n2_cmd(options, user_args):
@@ -719,8 +702,21 @@ def _n2_cmd(options, user_args):
     filename = _to_filename(options.file[0])
 
     if filename.endswith('.py'):
-        _install_n2_hooks(outfile=options.outfile, show_browser=not options.no_browser,
-                          title=options.title, embeddable=options.embeddable)
+        def _view_model_w_errors(prob):
+            errs = prob._metadata['saved_errors']
+            if errs:
+                # only run the n2 here if we've had setup errors. Normally we'd wait until
+                # after final_setup in order to have correct values for all of the I/O variables.
+                n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
+                   title=options.title, embeddable=options.embeddable)
+                # errors will result in exit at the end of the _check_collected_errors method
+
+        def _view_model_no_errors(prob):
+            n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
+               title=options.title, embeddable=options.embeddable)
+
+        hooks._register_hook('_check_collected_errors', 'Problem', pre=_view_model_w_errors)
+        hooks._register_hook('final_setup', 'Problem', post=_view_model_no_errors, exit=True)
 
         from openmdao.utils.reports_system import _register_cmdline_report
         # tell report system not to duplicate effort

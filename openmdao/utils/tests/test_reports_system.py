@@ -17,7 +17,7 @@ from openmdao.utils.reports_system import set_reports_dir, _reports_dir, registe
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
 from openmdao.utils.tests.test_hooks import hooks_active
-from openmdao.visualization.n2_viewer.n2_viewer import _default_n2_fname, _run_n2_report
+from openmdao.visualization.n2_viewer.n2_viewer import _default_n2_filename, _run_n2_report
 from openmdao.visualization.scaling_viewer.scaling_report import _default_scaling_filename
 from openmdao.visualization.opt_report.opt_report import _default_optimizer_report_filename
 
@@ -35,7 +35,7 @@ if OPTIMIZER:
 @use_tempdirs
 class TestReportsSystem(unittest.TestCase):
     def setUp(self):
-        self.n2_filename = _default_n2_fname
+        self.n2_filename = _default_n2_filename
         self.scaling_filename = _default_scaling_filename
         self.optimizer_filename = _default_optimizer_report_filename
 
@@ -555,7 +555,7 @@ class TestReportsSystemMPI(unittest.TestCase):
     N_PROCS = 2
 
     def setUp(self):
-        self.n2_filename = _default_n2_fname
+        self.n2_filename = _default_n2_filename
         self.scaling_filename = _default_scaling_filename
         self.optimizer_filename = _default_optimizer_report_filename
 
