@@ -166,15 +166,16 @@ def collect_errors(method):
     def wrapper(self, *args, **kwargs):
         try:
             return method(self, *args, **kwargs)
-        except KeyError:
-            if not self._get_saved_errors():
-                raise
         except Exception:
             if env_truthy('OPENMDAO_FAIL_FAST'):
                 raise
 
             type_exc, exc, tb = sys.exc_info()
-            ident = exc.ident if isinstance(exc, IndexerError) else None
+            if isinstance(exc, KeyError) and self._get_saved_errors():
+                # it's likely the result of an earlier error, so ignore it
+                return
+
+            ident = None  # exc.ident if isinstance(exc, IndexerError) else None
             self._collect_error(str(exc), exc_type=type_exc, tback=tb, ident=ident)
 
     return wrapper
