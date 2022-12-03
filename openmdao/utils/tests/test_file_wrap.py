@@ -13,11 +13,17 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_equal_arrays
 import numpy
 from numpy import array, isnan, isinf
 
-from openmdao.utils.file_wrap import InputFileGenerator, FileParser
+try:
+    import pyparsing
+    from openmdao.utils.file_wrap import InputFileGenerator, FileParser
+except ImportError:
+    pyparsing = None
+
 
 DIRECTORY = os.path.dirname((os.path.abspath(__file__)))
 
 
+@unittest.skipUnless(pyparsing is not None, "Test requires pyparsing to be installed. (pip install pyparsing).")
 class TestCase(unittest.TestCase):
     """ Test file wrapping functions. """
 
@@ -611,6 +617,7 @@ class TestCase(unittest.TestCase):
         self.assertEqual(val, '#$%')
 
 
+@unittest.skipUnless(pyparsing is not None, "Test requires pyparsing to be installed. (pip install pyparsing).")
 class FileGenFeature(unittest.TestCase):
 
     # output data for each test
@@ -725,6 +732,7 @@ class FileGenFeature(unittest.TestCase):
                          '\n'.join(self.output_data[self._testMethodName]))
 
 
+@unittest.skipUnless(pyparsing is not None, "Test requires pyparsing to be installed. (pip install pyparsing).")
 class FileParserFeature(unittest.TestCase):
 
     def setUp(self):
@@ -804,6 +812,7 @@ class FileParserFeature(unittest.TestCase):
         ]))
 
 
+@unittest.skipUnless(pyparsing is not None, "Test requires pyparsing to be installed. (pip install pyparsing).")
 class FileParser2dFeature(unittest.TestCase):
 
     def setUp(self):
@@ -836,6 +845,7 @@ class FileParser2dFeature(unittest.TestCase):
         ]))
 
 
+@unittest.skipUnless(pyparsing is not None, "Test requires pyparsing to be installed. (pip install pyparsing).")
 class FileParserDelimFeature(unittest.TestCase):
 
     def setUp(self):
@@ -864,6 +874,7 @@ class FileParserDelimFeature(unittest.TestCase):
         self.assertEqual((var, type(var)), (7, int))
 
 
+@unittest.skipUnless(pyparsing is not None, "Test requires pyparsing to be installed. (pip install pyparsing).")
 class FileParserColumnsFeature(unittest.TestCase):
 
     def setUp(self):
@@ -889,6 +900,7 @@ class FileParserColumnsFeature(unittest.TestCase):
         self.assertEqual((var1, var2, var3), ('F', 3.7, -9.4434967))
 
 
+@unittest.skipUnless(pyparsing is not None, "Test requires pyparsing to be installed. (pip install pyparsing).")
 class FileParserArrayColumnsFeature(unittest.TestCase):
 
     def setUp(self):

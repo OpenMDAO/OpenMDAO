@@ -270,7 +270,7 @@ jobs:
           echo "============================================================="
           echo "Install additional packages for testing/coverage"
           echo "============================================================="
-          python -m pip install psutil objgraph git+https://github.com/mdolab/pyxdsm
+          python -m pip install pyparsing psutil objgraph git+https://github.com/mdolab/pyxdsm
 
       - name: Display environment info
         run: |
