@@ -312,20 +312,20 @@ class ImplicitComponent(Component):
             if self._run_root_only():
                 if self.comm.rank == 0:
                     if self._discrete_inputs or self._discrete_outputs:
-                        self.linearize(self._inputs, self._outputs, self._jacobian,
+                        self.linearize(self._inputs, self._outputs, self._jac_wrapper,
                                        self._discrete_inputs, self._discrete_outputs)
                     else:
-                        self.linearize(self._inputs, self._outputs, self._jacobian)
+                        self.linearize(self._inputs, self._outputs, self._jac_wrapper)
                     self.comm.bcast(list(self._jacobian.items()), root=0)
                 else:
                     for key, val in self.comm.bcast(None, root=0):
                         self._jac_wrapper[key] = val
             else:
                 if self._discrete_inputs or self._discrete_outputs:
-                    self.linearize(self._inputs, self._outputs, self._jacobian,
+                    self.linearize(self._inputs, self._outputs, self._jac_wrapper,
                                    self._discrete_inputs, self._discrete_outputs)
                 else:
-                    self.linearize(self._inputs, self._outputs, self._jacobian)
+                    self.linearize(self._inputs, self._outputs, self._jac_wrapper)
 
     def _linearize(self, jac=None, sub_do_ln=True):
         """
