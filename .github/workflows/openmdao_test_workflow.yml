@@ -300,7 +300,7 @@ jobs:
           echo "###################################################"
           cp .coveragerc $HOME
           cd $HOME
-          testflo -n 2 openmdao --timeout=120 --show_skipped --coverage --coverpkg openmdao --durations=20
+          testflo -n 2 openmdao.vectors.tests.test_vector --timeout=60 --show_skipped --coverage --coverpkg openmdao --durations=20
 
       - name: Submit coverage
         if: matrix.TESTS
@@ -498,7 +498,7 @@ jobs:
           echo "============================================================="
           copy .coveragerc $HOME
           cd $HOME
-          testflo -n 2 openmdao --timeout=120 --show_skipped --coverage  --coverpkg openmdao --durations=20
+          testflo -n 2 openmdao.vectors.tests.test_vector --timeout=60 --show_skipped --coverage  --coverpkg openmdao --durations=20
 
       - name: Submit coverage
         env:
