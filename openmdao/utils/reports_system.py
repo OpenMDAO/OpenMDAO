@@ -123,6 +123,19 @@ def register_report(name, func, desc, class_name, method, pre_or_post, filename=
                          ncalls=1, **kwargs)
 
 
+def unregister_report(name):
+    """
+    Unregister a report with the reporting system.
+
+    Parameters
+    ----------
+    name : str
+        Name of report. Report names must be unique across all reports.
+    """
+    global _reports_registry
+    del _reports_registry[name]
+
+
 def register_report_hook(name, fname, class_name, inst_id=None, pre=None, post=None, filename=None,
                          description='', **kwargs):
     """

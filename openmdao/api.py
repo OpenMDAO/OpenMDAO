@@ -118,8 +118,8 @@ from openmdao.utils.general_utils import wing_dbg, env_truthy
 from openmdao.utils.array_utils import shape_to_len
 
 # Reports System
-from openmdao.utils.reports_system import register_report, get_reports_dir, list_reports, \
-    clear_reports
+from openmdao.utils.reports_system import register_report, unregister_report, get_reports_dir, \
+    list_reports, clear_reports
 
 import os
 
