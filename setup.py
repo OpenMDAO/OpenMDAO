@@ -190,7 +190,6 @@ setup(
     install_requires=[
         'networkx>=2.0',
         'numpy',
-        'pyparsing',
         'scipy',
         'requests',
         'packaging'

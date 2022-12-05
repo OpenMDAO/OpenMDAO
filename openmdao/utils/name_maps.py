@@ -289,11 +289,11 @@ def abs_key_iter(system, rel_ofs, rel_wrts):
     abs_wrt
         Absolute 'wrt' name.
     """
-    pname = system.pathname
+    pname = system.pathname + '.' if system.pathname else ''
     if pname:
-        abs_wrts = [pname + '.' + r for r in rel_wrts]
+        abs_wrts = [pname + r for r in rel_wrts]
         for rel_of in rel_ofs:
-            abs_of = pname + '.' + rel_of
+            abs_of = pname + rel_of
             for abs_wrt in abs_wrts:
                 yield abs_of, abs_wrt
     else:

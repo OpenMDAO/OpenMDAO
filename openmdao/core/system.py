@@ -33,11 +33,10 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer
-from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, PromotionWarning,\
-    UnusedOptionWarning, warn_deprecation
-from openmdao.utils.general_utils import determine_adder_scaler, \
-    format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, \
-        conditional_error, env_truthy
+from openmdao.utils.om_warnings import issue_warning, warn_deprecation, \
+    DerivativesWarning, PromotionWarning, UnusedOptionWarning
+from openmdao.utils.general_utils import determine_adder_scaler, conditional_error, \
+    format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -712,13 +711,14 @@ class System(object):
         # Check for complex step to set vectors up appropriately.
         # If any subsystem needs complex step, then we need to allocate it everywhere.
         nl_alloc_complex = force_alloc_complex
-        for sub in self.system_iter(include_self=True, recurse=True):
-            nl_alloc_complex |= 'cs' in sub._approx_schemes
-            if nl_alloc_complex:
-                break
+        if not nl_alloc_complex:
+            for sub in self.system_iter(include_self=True, recurse=True):
+                nl_alloc_complex |= 'cs' in sub._approx_schemes
+                if nl_alloc_complex:
+                    break
 
         # Linear vectors allocated complex only if subsolvers require derivatives.
-        if nl_alloc_complex:
+        if nl_alloc_complex and self._use_derivatives:
             from openmdao.error_checking.check_config import check_allocate_complex_ln
             ln_alloc_complex = check_allocate_complex_ln(self, force_alloc_complex)
         else:
@@ -815,6 +815,8 @@ class System(object):
         """
         Perform setup for this system and its descendant systems.
 
+        This is only called on the top-level model.
+
         Parameters
         ----------
         comm : MPI.Comm or <FakeComm> or None
@@ -863,7 +865,20 @@ class System(object):
 
         self._top_level_post_sizes()
 
-        self._problem_meta['relevant'] = self._init_relevance(mode)
+        # The try/except can be removed when support for the
+        # "Component as a model" deprecation is removed
+        try:
+            self._problem_meta['relevant'] = self._init_relevance(mode)
+        except RuntimeError as err:
+            from openmdao.core.group import Group
+            if "Output not found for design variable" in str(err) and not isinstance(self, Group):
+                msg = f"{str(err)}\nThe model is of type '{self.__class__.__name__}'. " \
+                      "Components must be placed in a Group in order for unconnected inputs " \
+                      "to be used as design variables. A future release will require that " \
+                      "the model be a Group or a sub-class of Group."
+                raise RuntimeError(msg)
+            else:
+                raise err
 
         # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
@@ -908,6 +923,9 @@ class System(object):
         pass
 
     def _setup_dynamic_shapes(self):
+        pass
+
+    def _check_res_out_overlaps(self):
         pass
 
     def _final_setup(self, comm):
@@ -1868,7 +1886,7 @@ class System(object):
             a1 = meta['ref'] - ref0
             scale_factors[abs_name] = {
                 'output': (a0, a1),
-                'residual': (0.0, res_ref),
+                'residual': (0.0, 1.0 if res_ref is None else res_ref),
             }
         return scale_factors
 
@@ -4339,27 +4357,6 @@ class System(object):
         if self._linear_solver:
             self._linear_solver.cleanup()
 
-    def _get_partials_varlists(self):
-        """
-        Get lists of 'of' and 'wrt' variables that form the partial jacobian.
-
-        Returns
-        -------
-        tuple(list, list)
-            'of' and 'wrt' variable lists.
-        """
-        of = list(self._var_allprocs_prom2abs_list['output'])
-        wrt = list(self._var_allprocs_prom2abs_list['input'])
-
-        # filter out any discrete inputs or outputs
-        if self._discrete_outputs:
-            of = [n for n in of if n not in self._discrete_outputs]
-        if self._discrete_inputs:
-            wrt = [n for n in wrt if n not in self._discrete_inputs]
-
-        # wrt should include implicit states
-        return of, of + wrt
-
     def _get_gradient_nl_solver_systems(self):
         """
         Return a set of all Systems, including this one, that have a gradient nonlinear solver.
@@ -5583,6 +5580,17 @@ class System(object):
         -------
         bool
             True if this System should have fast relative variable name lookup in vectors.
+        """
+        return False
+
+    def has_declared_resids(self):
+        """
+        Return True if this System has declared residuals.
+
+        Returns
+        -------
+        bool
+            True if this System has declared residuals.
         """
         return False
 

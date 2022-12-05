@@ -773,7 +773,7 @@ class Group(System):
             dist_ins = (n for n, m in all_abs2meta_in.items() if m['distributed'] or
                         (conns[n].startswith('_auto_ivc.') and
                          all_abs2meta_out[conns[n]]['distributed']))
-            dcomp_names = set(d.rsplit('.', 1)[0] for d in dist_ins)
+            dcomp_names = set(d.rpartition('.')[0] for d in dist_ins)
             if dcomp_names:
                 added_src_inds = []
                 for comp in self.system_iter(recurse=True, typ=Component):
@@ -1888,34 +1888,10 @@ class Group(System):
                 out_units = allprocs_abs2meta_out[abs_out]['units']
                 in_units = allprocs_abs2meta_in[abs_in]['units']
 
-                # if units are defined and different, we need input scaling.
-                needs_input_scaling = (in_units and out_units and in_units != out_units)
-
-                # we also need it if a connected output has any scaling.
-                if not needs_input_scaling:
-                    out_meta = allprocs_abs2meta_out[abs_out]
-
-                    ref = out_meta['ref']
-                    if np.isscalar(ref):
-                        needs_input_scaling = ref != 1.0
-                    else:
-                        needs_input_scaling = np.any(ref != 1.0)
-
-                    if not needs_input_scaling:
-                        ref0 = out_meta['ref0']
-                        if np.isscalar(ref0):
-                            needs_input_scaling = ref0 != 0.0
-                        else:
-                            needs_input_scaling = np.any(ref0)
-
-                        if not needs_input_scaling:
-                            res_ref = out_meta['res_ref']
-                            if np.isscalar(res_ref):
-                                needs_input_scaling = res_ref != 1.0
-                            else:
-                                needs_input_scaling = np.any(res_ref != 1.0)
-
-                self._has_input_scaling = needs_input_scaling
+                # if units are defined and different, or if a connected output has any scaling,
+                # we need input scaling.
+                self._has_input_scaling = self._has_output_scaling or self._has_resid_scaling or \
+                    (in_units and out_units and in_units != out_units)
 
         # check compatability for any discrete connections
         for abs_in, abs_out in self._conn_discrete_in2out.items():

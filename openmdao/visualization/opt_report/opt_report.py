@@ -116,7 +116,7 @@ def opt_report(prob, outfile=None):
     driver = prob.driver
     if not driver.supports['optimization']:
         driver_class = type(driver).__name__
-        issue_warning(f"The optimizer report is not applicable for the {driver_class} Driver "
+        issue_warning(f"The optimizer report is not applicable for Driver type '{driver_class}', "
                       "which does not support optimization", category=DriverWarning)
         return
 
