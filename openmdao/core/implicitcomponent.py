@@ -95,10 +95,12 @@ class ImplicitComponent(Component):
                 if self._run_root_only():
                     if self.comm.rank == 0:
                         if self._discrete_inputs or self._discrete_outputs:
-                            self.apply_nonlinear(self._inputs, self._outputs, self._residuals,
+                            self.apply_nonlinear(self._inputs, self._outputs,
+                                                 self._residuals_wrapper,
                                                  self._discrete_inputs, self._discrete_outputs)
                         else:
-                            self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
+                            self.apply_nonlinear(self._inputs, self._outputs,
+                                                 self._residuals_wrapper)
                         self.comm.bcast([self._residuals.asarray(), self._discrete_outputs], root=0)
                     else:
                         new_res, new_disc_outs = self.comm.bcast(None, root=0)
@@ -108,10 +110,10 @@ class ImplicitComponent(Component):
                                 self._discrete_outputs[name] = val
                 else:
                     if self._discrete_inputs or self._discrete_outputs:
-                        self.apply_nonlinear(self._inputs, self._outputs, self._residuals,
+                        self.apply_nonlinear(self._inputs, self._outputs, self._residuals_wrapper,
                                              self._discrete_inputs, self._discrete_outputs)
                     else:
-                        self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
+                        self.apply_nonlinear(self._inputs, self._outputs, self._residuals_wrapper)
 
         self.iter_count_apply += 1
 
