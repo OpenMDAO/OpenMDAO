@@ -182,8 +182,8 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
                         if not np.allclose(error_val, 0.0, atol=tolerance):
 
                             if error_type == 'rel error' and mode == 'fwd-fd' and \
-                               np.allclose(pair_data['J_fwd'], 0.0, atol=atol) and \
-                               np.allclose(pair_data['J_fd'], 0.0, atol=atol):
+                                    np.allclose(pair_data['J_fwd'], 0.0, atol=atol) and \
+                                    np.allclose(pair_data['J_fd'], 0.0, atol=atol):
                                 # Special case: both fd and fwd are really tiny, so we want to
                                 # ignore the rather large relative errors.
                                 in_error = False
@@ -474,24 +474,34 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
         The error.
     """
 
+    if type(actual) in [int, float, np.int32]:
+        actual = np.atleast_1d(actual)
+    if type(desired) in [int, float, np.int32]:
+        desired = np.atleast_1d(desired)
+
     NoneType = type(None)
-    _supported_types = [dict, list, str, int, bool, np.int32, float, np.ndarray, NoneType ]
-
-
+    _supported_types = [dict, list, str, int, bool, np.int32, float, np.ndarray, NoneType]
 
     # if type(actual) != type(desired):   # TODO - do I want to do this ?
     #     raise ValueError('actual %s, desired %s have different types' % (actual, desired))
 
     if type(actual) not in _supported_types:
-        warnings.warn(f"The function, assert_near_equal, does not support the type: '{type(actual)}'.")
+        warnings.warn(
+            f"The function, assert_near_equal, does not support the actual value type: '"
+            f"{type(actual)}'.")
+        return 0
+
+    if type(desired) not in _supported_types:
+        warnings.warn(
+            f"The function, assert_near_equal, does not support the desired value type: '"
+            f"{type(actual)}'.")
         return 0
 
     # if desired is numeric list, make ndarray
-    if isinstance(desired, list):   # TODO need to check if numeric!!
+    if isinstance(desired, list):  # TODO need to check if numeric!!
         desired = np.asarray(desired)
 
     if isinstance(actual, dict) and isinstance(desired, dict):
-
         actual_keys = set(actual.keys())
         desired_keys = set(desired.keys())
 
@@ -528,7 +538,8 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
 
     elif isinstance(actual, str) and isinstance(desired, str):
         if actual != desired:
-            raise ValueError('actual %s, desired %s strings have different values' % (actual, desired))
+            raise ValueError(
+                'actual %s, desired %s strings have different values' % (actual, desired))
         error = 0.0
 
     elif isinstance(actual, (int, np.int32)) and isinstance(desired, (int, np.int32)):
@@ -538,7 +549,8 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
 
     elif isinstance(actual, bool) and isinstance(desired, bool):
         if actual != desired:
-            raise ValueError('actual %s, desired %s booleans have different values' % (actual, desired))
+            raise ValueError(
+                'actual %s, desired %s booleans have different values' % (actual, desired))
         error = 0.0
 
     elif actual is None and desired is None:
@@ -579,7 +591,8 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
             new_error = assert_near_equal(act, des, tolerance)
             error = max(error, new_error)
     else:
-        raise ValueError('actual and desired have unexpected types: %s, %s' % (type(actual), type(desired)))
+        raise ValueError(
+            'actual and desired have unexpected types: %s, %s' % (type(actual), type(desired)))
 
     # else:  # Mismatched types
     #     raise ValueError('actual %s, desired %s have different types' % (actual, desired))
