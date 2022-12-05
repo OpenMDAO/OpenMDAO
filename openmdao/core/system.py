@@ -711,13 +711,14 @@ class System(object):
         # Check for complex step to set vectors up appropriately.
         # If any subsystem needs complex step, then we need to allocate it everywhere.
         nl_alloc_complex = force_alloc_complex
-        for sub in self.system_iter(include_self=True, recurse=True):
-            nl_alloc_complex |= 'cs' in sub._approx_schemes
-            if nl_alloc_complex:
-                break
+        if not nl_alloc_complex:
+            for sub in self.system_iter(include_self=True, recurse=True):
+                nl_alloc_complex |= 'cs' in sub._approx_schemes
+                if nl_alloc_complex:
+                    break
 
         # Linear vectors allocated complex only if subsolvers require derivatives.
-        if nl_alloc_complex:
+        if nl_alloc_complex and self._use_derivatives:
             from openmdao.error_checking.check_config import check_allocate_complex_ln
             ln_alloc_complex = check_allocate_complex_ln(self, force_alloc_complex)
         else:
@@ -922,6 +923,9 @@ class System(object):
         pass
 
     def _setup_dynamic_shapes(self):
+        pass
+
+    def _check_res_out_overlaps(self):
         pass
 
     def _final_setup(self, comm):
@@ -1870,7 +1874,7 @@ class System(object):
             a1 = meta['ref'] - ref0
             scale_factors[abs_name] = {
                 'output': (a0, a1),
-                'residual': (0.0, res_ref),
+                'residual': (0.0, 1.0 if res_ref is None else res_ref),
             }
         return scale_factors
 
@@ -4328,27 +4332,6 @@ class System(object):
         if self._linear_solver:
             self._linear_solver.cleanup()
 
-    def _get_partials_varlists(self):
-        """
-        Get lists of 'of' and 'wrt' variables that form the partial jacobian.
-
-        Returns
-        -------
-        tuple(list, list)
-            'of' and 'wrt' variable lists.
-        """
-        of = list(self._var_allprocs_prom2abs_list['output'])
-        wrt = list(self._var_allprocs_prom2abs_list['input'])
-
-        # filter out any discrete inputs or outputs
-        if self._discrete_outputs:
-            of = [n for n in of if n not in self._discrete_outputs]
-        if self._discrete_inputs:
-            wrt = [n for n in wrt if n not in self._discrete_inputs]
-
-        # wrt should include implicit states
-        return of, of + wrt
-
     def _get_gradient_nl_solver_systems(self):
         """
         Return a set of all Systems, including this one, that have a gradient nonlinear solver.
@@ -5563,3 +5546,14 @@ class System(object):
             tarr -= toffset
 
         return sarr, tarr, tsize, has_dist_data
+
+    def has_declared_resids(self):
+        """
+        Return True if this System has declared residuals.
+
+        Returns
+        -------
+        bool
+            True if this System has declared residuals.
+        """
+        return False
