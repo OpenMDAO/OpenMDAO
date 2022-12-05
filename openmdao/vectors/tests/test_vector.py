@@ -150,43 +150,6 @@ class SerialLinear(om.ImplicitComponent):
         x[:] = np.linalg.inv(A).dot(y)
 
 
-class MultComp(om.ExplicitComponent):
-    def initialize(self):
-        self.options.declare('size', types=int, default=1, desc="Size of input and output vectors.")
-        self.options.declare('mult', types=float, default=1., desc="Multiplier.")
-
-    def setup(self):
-        size = self.options['size']
-        self.add_input('x', np.ones(size, float))
-        self.add_output('y', np.ones(size, float))
-
-    def compute(self, inputs, outputs):
-        outputs['y'] = inputs['x'] * self.options['mult']
-
-    # def compute_partials(self, inputs, partials):
-    #     partials['y', 'x'] = self.options['mult']
-
-
-class TestMultComp(unittest.TestCase):
-    def test_mult_comp(self):
-        prob = om.Problem()
-        model = prob.model
-
-        comp = om.IndepVarComp()
-        comp.add_output('v1', val=np.array([3.0, 5.0, 8.0]))
-        model.add_subsystem('des_vars', comp)
-
-        c1 = model.add_subsystem('calc1', MultComp(size=3, mult=2.))
-        c1.declare_coloring(wrt='*', method='cs')
-
-        model.connect('des_vars.v1', 'calc1.x')
-
-        prob.setup()
-        prob.run_model()
-        partials = prob.check_partials(method='fd', out_stream=None)
-        assert_check_partials(partials)
-
-
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestPETScVector2Proc(unittest.TestCase):
 
@@ -264,17 +227,6 @@ class TestPETScVector3Proc(unittest.TestCase):
         c1 = sub.add_subsystem('calc1', om.ExecComp('y = 2.0*x', x=np.ones((3, )), y=np.ones((3, ))))
         c2 = sub.add_subsystem('calc2', om.ExecComp('y = 5.0*x', x=np.ones((3, )), y=np.ones((3, ))))
         c3 = sub.add_subsystem('calc3', om.ExecComp('y = 7.0*x', x=np.ones((3, )), y=np.ones((3, ))))
-        # c1.declare_coloring(wrt='*', method='cs')
-        # c2.declare_coloring(wrt='*', method='cs')
-        # c3.declare_coloring(wrt='*', method='cs')
-
-        # it passes with these lines uncommented (and the above commented)
-        # c1 = sub.add_subsystem('calc1', MultComp(size=3, mult=2.))
-        # c2 = sub.add_subsystem('calc2', MultComp(size=3, mult=5.))
-        # c3 = sub.add_subsystem('calc3', MultComp(size=3, mult=7.))
-        # c1.declare_coloring(wrt='*', method='cs')
-        # c2.declare_coloring(wrt='*', method='cs')
-        # c3.declare_coloring(wrt='*', method='cs')
 
         model.connect('des_vars.v1', 'pp.calc1.x')
         model.connect('des_vars.v1', 'pp.calc2.x')
