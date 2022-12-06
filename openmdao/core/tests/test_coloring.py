@@ -20,7 +20,7 @@ from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.array_utils import array_viz
 from openmdao.utils.coloring import _compute_coloring, compute_total_coloring, Coloring
-from openmdao.utils.mpi import MPI
+from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.testing_utils import use_tempdirs, set_env_vars
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder
 from openmdao.utils.general_utils import run_driver
@@ -163,7 +163,7 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
     if 'method' in options:
         p.model.approx_totals(method=options['method'])
         del options['method']
-        
+
     min_improve_pct = options.get('min_improve_pct', 5.)
     if 'min_improve_pct' in options:
         del options['min_improve_pct']
@@ -694,7 +694,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         # coloring saves 16 solves per driver iter  (5 vs 21)
         self.assertEqual(p.model._solve_count, 21)
         self.assertEqual(p_color.model._solve_count, 5)
-        
+
     def test_min_improve_pct(self):
         # first, run w/o coloring
         p = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False)
@@ -1161,11 +1161,13 @@ class MatMultMultipointTestCase(unittest.TestCase):
 
         for i in range(num_pts):
             cname = 'par2.comp%d' % i
-            vname = cname + '.A'
-            A1 = p.get_val('par1.comp%d.A'%i, get_remote=True)
-            A2 = p.get_val('par2.comp%d.A'%i, get_remote=True)
+            with multi_proc_exception_check(p.comm):
+                A1 = p.get_val('par1.comp%d.A'%i, get_remote=True)
+            with multi_proc_exception_check(p.comm):
+                A2 = p.get_val('par2.comp%d.A'%i, get_remote=True)
             norm = np.linalg.norm(J['par2.comp%d.y'%i,'indep%d.x'%i] - A2.dot(A1))
-            self.assertLess(norm, 1.e-7)
+            with multi_proc_exception_check(p.comm):
+                self.assertLess(norm, 1.e-7)
 
         print("final obj:", p['obj.y'])
 
