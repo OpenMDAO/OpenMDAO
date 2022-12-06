@@ -269,7 +269,9 @@ class TestDesvarOnModel(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.setup()
 
-        self.assertEqual(str(context.exception), "\nConnection errors for problem 'design_var_not_exist':\n   <model> <class SellarDerivatives>: Output not found for design variable 'junk'.")
+        self.assertEqual(str(context.exception),
+           "\nCollected errors for problem 'design_var_not_exist':"
+           "\n   <model> <class SellarDerivatives>: Output not found for design variable 'junk'.")
 
     def test_desvar_affine_and_scaleradder(self):
 
@@ -412,7 +414,9 @@ class TestConstraintOnModel(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup()
 
-        self.assertEqual(str(context.exception), "\nConnection errors for problem 'constraint_not_exist':\n   <model> <class SellarDerivatives>: Output not found for response 'junk'.")
+        self.assertEqual(str(context.exception),
+           "\nCollected errors for problem 'constraint_not_exist':"
+           "\n   <model> <class SellarDerivatives>: Output not found for response 'junk'.")
 
     def test_constraint_affine_and_scaleradder(self):
 
@@ -752,8 +756,10 @@ class TestAddConstraintMPI(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.setup(mode='rev')
 
-        msg = "\nConnection errors for problem 'add_bad_con':\n   <model> <class Group>: 'sub' <class SellarDerivatives>: Output not found for response 'd1.junk'."
-        self.assertEqual(str(context.exception), msg)
+        self.assertEqual(str(context.exception),
+           "\nCollected errors for problem 'add_bad_con':"
+           "\n   <model> <class Group>: 'sub' <class SellarDerivatives>: Output not found for "
+           "response 'd1.junk'.")
 
 
 class TestObjectiveOnModel(unittest.TestCase):
@@ -771,7 +777,7 @@ class TestObjectiveOnModel(unittest.TestCase):
             prob.setup()
 
         self.assertEqual(str(context.exception),
-                         "\nConnection errors for problem 'obective_not_exist':\n   <model> <class SellarDerivatives>: Output not found for response 'junk'.")
+                         "\nCollected errors for problem 'obective_not_exist':\n   <model> <class SellarDerivatives>: Output not found for response 'junk'.")
 
     def test_objective_affine_and_scaleradder(self):
 

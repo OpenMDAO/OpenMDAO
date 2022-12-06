@@ -2356,12 +2356,14 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_constraint('exec.z', indices=[0, 1], equals=25)
 
         # Need to fix up this test to run right
-        msg = "\nConnection errors for problem 'overlapping_response_indices':\n   <model> <class Group>: Indices for aliases ['ALIAS_TEST'] are overlapping constraint/objective 'exec.z'."
         with self.assertRaises(RuntimeError) as ctx:
             p.model.add_constraint('exec.z', indices=om.slicer[1:10], lower=20, alias="ALIAS_TEST")
             p.setup()
 
-        self.assertEqual(str(ctx.exception), msg)
+        self.assertEqual(str(ctx.exception),
+           "\nCollected errors for problem 'overlapping_response_indices':"
+           "\n   <model> <class Group>: Indices for aliases ['ALIAS_TEST'] are overlapping "
+           "constraint/objective 'exec.z'.")
 
         p = om.Problem(name='overlapping_response_indices2')
 
@@ -2378,12 +2380,14 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_objective('exec.y', index=50)
         p.model.add_constraint('exec.z', indices=[0, 1], equals=25)
 
-        msg = "\nConnection errors for problem 'overlapping_response_indices2':\n   <model> <class Group>: Indices for aliases ['ALIAS_TEST'] are overlapping constraint/objective 'exec.z'."
         with self.assertRaises(RuntimeError) as ctx:
             p.model.add_constraint('exec.z', indices=[0], lower=20, alias="ALIAS_TEST")
             p.setup()
 
-        self.assertEqual(str(ctx.exception), msg)
+        self.assertEqual(str(ctx.exception),
+           "\nCollected errors for problem 'overlapping_response_indices2':"
+           "\n   <model> <class Group>: Indices for aliases ['ALIAS_TEST'] are overlapping "
+           "constraint/objective 'exec.z'.")
 
         p = om.Problem(name='overlapping_response_indices3')
 
@@ -2400,12 +2404,14 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_objective('exec.y', index=50)
         p.model.add_constraint('exec.z', indices=[0, 1], equals=25)
 
-        msg = "\nConnection errors for problem 'overlapping_response_indices3':\n   <model> <class Group>: Indices for aliases ['ALIAS_TEST'] are overlapping constraint/objective 'exec.z'."
         with self.assertRaises(RuntimeError) as ctx:
             p.model.add_constraint('exec.z', indices=[1, 2], lower=20, alias="ALIAS_TEST")
             p.setup()
 
-        self.assertEqual(str(ctx.exception), msg)
+        self.assertEqual(str(ctx.exception),
+           "\nCollected errors for problem 'overlapping_response_indices3':"
+           "\n   <model> <class Group>: Indices for aliases ['ALIAS_TEST'] are overlapping "
+           "constraint/objective 'exec.z'.")
 
         p = om.Problem(name='overlapping_response_indices4')
 
@@ -2422,12 +2428,14 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_objective('exec.y', index=50)
         p.model.add_constraint('exec.z', indices=[0, 100], equals=25)
 
-        msg = "\nConnection errors for problem 'overlapping_response_indices4':\n   <model> <class Group>: Indices for aliases ['ALIAS_TEST'] are overlapping constraint/objective 'exec.z'."
         with self.assertRaises(RuntimeError) as ctx:
             p.model.add_constraint('exec.z', indices=[-1], lower=20, alias="ALIAS_TEST")
             p.setup()
 
-        self.assertEqual(str(ctx.exception), msg)
+        self.assertEqual(str(ctx.exception),
+            "\nCollected errors for problem 'overlapping_response_indices4':"
+            "\n   <model> <class Group>: Indices for aliases ['ALIAS_TEST'] are overlapping "
+            "constraint/objective 'exec.z'.")
 
     def test_constraint_aliases_standalone(self):
         size = 7

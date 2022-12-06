@@ -25,17 +25,50 @@ _reports_dir = os.environ.get('OPENMDAO_REPORTS_DIR', './reports')  # top dir fo
 _plugins_loaded = False  # use this to ensure plugins only loaded once
 
 
-class _Report(object):
-    def __init__(self, name, filename=None, description=''):
+class Report(object):
+    """
+    A class to manage the resistration of hooks associated with a particular named report.
+
+    Parameters
+    ----------
+    name : str
+        The name of the corresponding report.
+    description : str
+        The description displayed when reports are listed using the `list_reports` command.
+
+    Attributes
+    ----------
+    name : str
+        The name of the corresponding report.
+    description : str
+        The description displayed when reports are listed using the `list_reports` command.
+    hooks : list
+        List of (*args, **kwargs) to be passed to the `register_hook` function when the report
+        corresponding to this instance is activated.
+    """
+    def __init__(self, name, description=''):
         self.name = name
-        self.filename = filename
         self.description = description
         self.hooks = []
 
-    def register_hook(self, *args, **kwargs):
+    def register_hook_args(self, *args, **kwargs):
+        r"""
+        Store positional and named args to be passed to the `register_hook` function when the
+        report corresponding to this instance is activated.
+
+        Parameters
+        ----------
+        *args : list
+            The positional args to be passed to `register_hook`.
+        **kwargs : dict
+            The named args to be passed to `register_hook`.
+        """
         self.hooks.append((args, kwargs))
 
     def register_hooks(self, instance):
+        """
+        Register the hook(s) associated with the report corresponding with this instance.
+        """
         if hasattr(instance, '_has_active_report') and not instance._has_active_report(self.name):
             return
 
@@ -46,12 +79,23 @@ class _Report(object):
             _register_hook(*hook_args, **kw)
 
     def unregister_hooks(self):
+        """
+        Unregister all hooks associated with this report.
+        """
         keep = {'fname', 'class_name', 'inst_id', 'pre', 'post'}
         for args, kw in self.hooks:
             kwargs = {k: v for k, v in kw.items() if k in keep}
             _unregister_hook(*args, **kwargs)
 
     def __getattr__(self, name):
+        """
+        Return the named attribute from our stored hook args.
+
+        Parameters
+        ----------
+        name : str
+            The name of the attribute.
+        """
         for args, kwargs in self.hooks:
             if name in kwargs:
                 return kwargs[name]
@@ -80,8 +124,7 @@ def reports_active():
     return not env_truthy('TESTFLO_RUNNING')
 
 
-def register_report(name, func, desc, class_name, method, pre_or_post, filename=None, inst_id=None,
-                    **kwargs):
+def register_report(name, func, desc, class_name, method, pre_or_post, inst_id=None, **kwargs):
     """
     Register a report with the reporting system.
 
@@ -99,8 +142,6 @@ def register_report(name, func, desc, class_name, method, pre_or_post, filename=
         In which method of class_name should this be run.
     pre_or_post : str
         Valid values are 'pre' and 'post'. Indicates when to run the report in the method.
-    filename : str or None
-        Name of file to use when saving the report.
     inst_id : str or None
         Either the instance ID of an OpenMDAO object (e.g. Problem, Driver) or None.
         If None, then this report will be run for all objects of type class_name.
@@ -115,12 +156,12 @@ def register_report(name, func, desc, class_name, method, pre_or_post, filename=
         raise ValueError("The argument 'pre_or_post' can only have values of 'pre' or 'post', "
                          f"but {pre_or_post} was given")
 
-    _reports_registry[name] = report = _Report(name, filename, desc)
+    _reports_registry[name] = report = Report(name, desc)
 
     pre = func if pre_or_post == 'pre' else None
     post = func if pre_or_post == 'post' else None
-    report.register_hook(fname=method, class_name=class_name, inst_id=inst_id, pre=pre, post=post,
-                         ncalls=1, **kwargs)
+    report.register_hook_args(fname=method, class_name=class_name, inst_id=inst_id, pre=pre,
+                              post=post, ncalls=1, **kwargs)
 
 
 def unregister_report(name):
@@ -136,8 +177,8 @@ def unregister_report(name):
     del _reports_registry[name]
 
 
-def register_report_hook(name, fname, class_name, inst_id=None, pre=None, post=None, filename=None,
-                         description='', **kwargs):
+def register_report_hook(name, fname, class_name, inst_id=None, pre=None, post=None, description='',
+                         **kwargs):
     """
     Register a hook with a specific report name in the reporting system.
 
@@ -156,11 +197,9 @@ def register_report_hook(name, fname, class_name, inst_id=None, pre=None, post=N
     inst_id : str or None
         The name of the instance owning the method where the hook will be applied.
     pre : function (None)
-        If not None, this hook will run before the named function runs.
+        If not None, this hook will run before the function named by fname runs.
     post : function (None)
-        If not None, this hook will run after the named function runs.
-    filename : str or None
-        Name of file to use when saving the report.
+        If not None, this hook will run after the function named by fname runs.
     description : str
         A description of the report.
     **kwargs : dict of keyword arguments
@@ -169,15 +208,14 @@ def register_report_hook(name, fname, class_name, inst_id=None, pre=None, post=N
     global _reports_registry
 
     if name not in _reports_registry:
-        _reports_registry[name] = report = _Report(name, filename, description)
+        _reports_registry[name] = report = Report(name, description)
     else:
         report = _reports_registry[name]
-        if filename is not None:
-            report.filename = filename
         if description is not None:
             report.description = description
 
-    report.register_hook(fname, class_name, inst_id=inst_id, pre=pre, post=post, ncalls=1, **kwargs)
+    report.register_hook_args(fname, class_name, inst_id=inst_id, pre=pre, post=post, ncalls=1,
+                              **kwargs)
 
 
 def activate_report(name, instance=None):

@@ -273,7 +273,7 @@ class TestConnectionsIndices(unittest.TestCase):
         # Should not be allowed because the source and target shapes do not match
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp')
 
-        expected = "\nConnection errors for problem 'bad_shapes':\n   <model> <class Group>: The source and target shapes do not match or are " + \
+        expected = "\nCollected errors for problem 'bad_shapes':\n   <model> <class Group>: The source and target shapes do not match or are " + \
                    "ambiguous for the connection 'idvp.blammo' to 'arraycomp.inp'. " + \
                    "The source shape is (1,) but the target shape is (2,)."
         try:
@@ -289,7 +289,7 @@ class TestConnectionsIndices(unittest.TestCase):
         self.build_model('bad_length')
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp', src_indices=[0, 0, 0])
 
-        expected = "\nConnection errors for problem 'bad_length':\n   <model> <class Group>: The source indices [0 0 0] do not specify a valid shape " + \
+        expected = "\nCollected errors for problem 'bad_length':\n   <model> <class Group>: The source indices [0 0 0] do not specify a valid shape " + \
                    "for the connection 'idvp.blammo' to 'arraycomp.inp'. The target shape is " + \
                    "(2,) but indices are shape (3,)."
 
@@ -306,12 +306,13 @@ class TestConnectionsIndices(unittest.TestCase):
         self.build_model('bad_value')
         self.prob.model.connect('idvp.arrout', 'arraycomp.inp1', src_indices=[100000])
 
-        expected = "\nConnection errors for problem 'bad_value':\n   <model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp1': index 100000 is out of bounds for source dimension of size 5."
-
         try:
             self.prob.setup()
         except Exception as err:
-            self.assertEqual(str(err), expected)
+            self.assertEqual(str(err),
+               "\nCollected errors for problem 'bad_value':"
+               "\n   <model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp1': "
+               "index 100000 is out of bounds for source dimension of size 5.")
         else:
             self.fail('Exception expected.')
 
@@ -321,12 +322,13 @@ class TestConnectionsIndices(unittest.TestCase):
         self.build_model('bad_value_bug')
         self.prob.model.connect('idvp.arrout', 'arraycomp.inp', src_indices=[0, 100000])
 
-        expected = "\nConnection errors for problem 'bad_value_bug':\n   <model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp': index 100000 is out of bounds for source dimension of size 5."
-
         try:
             self.prob.setup()
         except Exception as err:
-            self.assertEqual(str(err), expected)
+            self.assertEqual(str(err),
+               "\nCollected errors for problem 'bad_value_bug':"
+               "\n   <model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp': "
+               "index 100000 is out of bounds for source dimension of size 5.")
         else:
             self.fail('Exception expected.')
 
@@ -414,7 +416,7 @@ class TestShapes(unittest.TestCase):
                                                 y={'val': np.zeros((5, 2))}))
         p.model.connect('indep.x', 'C1.x')
 
-        expected = "\nConnection errors for problem 'connect_incompatible_shapes':\n   <model> <class Group>: The source and target shapes do not match or are " + \
+        expected = "\nCollected errors for problem 'connect_incompatible_shapes':\n   <model> <class Group>: The source and target shapes do not match or are " + \
                    "ambiguous for the connection 'indep.x' to 'C1.x'. The source shape is " + \
                    "(1, 10, 1, 1) but the target shape is (5, 2)."
 
@@ -445,13 +447,13 @@ class TestMultiConns(unittest.TestCase):
         prob.model.connect('x', 'sub.x')
         prob.model.connect('y', 'sub.y')
 
-        expected = "\nConnection errors for problem 'mult_conns':\n   <model> <class Group>: The following inputs have multiple connections: " + \
-                   "sub.c2.y from ['indeps.y', 'sub.c1.y']."
-
         with self.assertRaises(Exception) as context:
             prob.setup()
 
-        self.assertEqual(str(context.exception), expected)
+        self.assertEqual(str(context.exception),
+           "\nCollected errors for problem 'mult_conns':"
+           "\n   <model> <class Group>: The following inputs have multiple connections: "
+                   "sub.c2.y from ['indeps.y', 'sub.c1.y'].")
 
     def test_mixed_conns_same_level(self):
 
@@ -468,15 +470,15 @@ class TestMultiConns(unittest.TestCase):
         # make a second, explicit, connection to y (which is c2.y promoted)
         prob.model.connect('indeps.x', 'y')
 
-        expected = "\nConnection errors for problem 'mixed_conns_same_level':\n   <model> <class Group>: Input 'c2.y' cannot be connected to 'indeps.x' " + \
-                   "because it's already connected to 'c1.y'."
-
         with self.assertRaises(Exception) as context:
             prob.setup()
             prob.final_setup()
             prob.run_model()
 
-        self.assertEqual(str(context.exception), expected)
+        self.assertEqual(str(context.exception),
+           "\nCollected errors for problem 'mixed_conns_same_level':"
+           "\n   <model> <class Group>: Input 'c2.y' cannot be connected to 'indeps.x' "
+                   "because it's already connected to 'c1.y'.")
 
     def test_auto_ivc_ambiguous_with_src_indices_msg(self):
 
@@ -506,8 +508,16 @@ class TestMultiConns(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup()
 
-        msg = "\nConnection errors for problem 'auto_ivc_ambiguous_with_src_indices_msg':\n   <model> <class Group>: Attaching src_indices to inputs requires that the shape of the source variable is known, but the source shape for inputs ['c1.x', 'c2.x'] is unknown. You can specify the src shape for these inputs by setting 'val' or 'src_shape' in a call to set_input_defaults, or by adding an IndepVarComp as the source.\n   <model> <class Group>: Attaching src_indices to inputs requires that the shape of the source variable is known, but the source shape for inputs ['d1.x', 'd2.x'] is unknown. You can specify the src shape for these inputs by setting 'val' or 'src_shape' in a call to set_input_defaults, or by adding an IndepVarComp as the source."
-        self.assertEqual(str(context.exception), msg)
+        self.assertEqual(str(context.exception),
+           "\nCollected errors for problem 'auto_ivc_ambiguous_with_src_indices_msg':"
+           "\n   <model> <class Group>: Attaching src_indices to inputs requires that the shape "
+           "of the source variable is known, but the source shape for inputs ['c1.x', 'c2.x'] is "
+           "unknown. You can specify the src shape for these inputs by setting 'val' or 'src_shape' "
+           "in a call to set_input_defaults, or by adding an IndepVarComp as the source."
+           "\n   <model> <class Group>: Attaching src_indices to inputs requires that the shape of "
+           "the source variable is known, but the source shape for inputs ['d1.x', 'd2.x'] is "
+           "unknown. You can specify the src shape for these inputs by setting 'val' or 'src_shape' "
+           "in a call to set_input_defaults, or by adding an IndepVarComp as the source.")
 
 
 class TestAutoIVCAllowableShapeMismatch(unittest.TestCase):
@@ -589,11 +599,13 @@ class TestConnectionsDistrib(unittest.TestCase):
         model.add_subsystem('c3', TestComp())
         model.connect("p1.x", "c3.x")
 
-        expected = f"\nConnection errors for problem 'serial_mpi_error':\n   'c3' <class TestComp>: When accessing 'p1.x' with src_shape (2,) from 'c3.x' using src_indices [1 2]: index 2 is out of bounds for source dimension of size 2."
         try:
             prob.setup()
         except Exception as err:
-            self.assertEqual(str(err), expected)
+            self.assertEqual(str(err),
+               "\nCollected errors for problem 'serial_mpi_error':"
+               "\n   'c3' <class TestComp>: When accessing 'p1.x' with src_shape (2,) from 'c3.x' "
+               "using src_indices [1 2]: index 2 is out of bounds for source dimension of size 2.")
         else:
             self.fail('Exception expected.')
 
@@ -618,12 +630,13 @@ class TestConnectionsDistrib(unittest.TestCase):
         model.add_subsystem('c3', TestComp())
         model.connect("p1.x", "c3.x")
 
-        expected = f"\nConnection errors for problem 'serial_mpi_error_flat':\n   'c3' <class TestComp>: When accessing 'p1.x' with src_shape (2,) from 'c3.x' using src_indices [1 2]: index 2 is out of bounds for source dimension of size 2."
-
         try:
             prob.setup()
         except Exception as err:
-            self.assertEqual(str(err), expected)
+            self.assertEqual(str(err),
+               "\nCollected errors for problem 'serial_mpi_error_flat':"
+               "\n   'c3' <class TestComp>: When accessing 'p1.x' with src_shape (2,) from 'c3.x' "
+               "using src_indices [1 2]: index 2 is out of bounds for source dimension of size 2.")
         else:
             self.fail('Exception expected.')
 
@@ -675,7 +688,9 @@ class TestConnectionsError(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup(check=False, mode='fwd')
         self.assertEqual(str(context.exception),
-                         "\nConnection errors for problem 'incompatible_src_indices':\n   'c3' <class TestComp>: When accessing 'p1.x' with src_shape (2,) from 'c3.x' using src_indices [1 2]: index 2 is out of bounds for source dimension of size 2.")
+            "\nCollected errors for problem 'incompatible_src_indices':"
+            "\n   'c3' <class TestComp>: When accessing 'p1.x' with src_shape (2,) from 'c3.x' "
+            "using src_indices [1 2]: index 2 is out of bounds for source dimension of size 2.")
 
 
 @unittest.skipUnless(MPI, "MPI is required.")

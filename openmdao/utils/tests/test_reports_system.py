@@ -170,8 +170,10 @@ class TestReportsSystem(unittest.TestCase):
             path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
             self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
 
-            msg = "\nConnection errors for problem 'error_problem':\n   <model> <class Group>: When connecting 'p1.x' to 'comp.x': index 1 is out of bounds for source dimension of size 1."
-            self.assertEqual(str(err), msg)
+            self.assertEqual(str(err),
+                "\nCollected errors for problem 'error_problem':"
+                "\n   <model> <class Group>: When connecting 'p1.x' to 'comp.x': index 1 is out of "
+                "bounds for source dimension of size 1.")
         else:
             self.fail("exception expected")
 

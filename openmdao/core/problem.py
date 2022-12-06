@@ -781,7 +781,7 @@ class Problem(object):
 
     def _check_collected_errors(self):
         """
-        If any stored connection errors are found, raise an exception containing all of them.
+        If any collected errors are found, raise an exception containing all of them.
         """
         if self._metadata['saved_errors'] is None:
             return
@@ -792,7 +792,7 @@ class Problem(object):
         self._metadata['saved_errors'] = None
 
         if errors:
-            final_msg = [f"\nConnection errors for problem '{self._name}':"]
+            final_msg = [f"\nCollected errors for problem '{self._name}':"]
             seen = set()
             for ident, msg, exc_type, tback in errors:
                 if ident is None or ident not in seen:

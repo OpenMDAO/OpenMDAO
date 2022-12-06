@@ -949,7 +949,12 @@ class TestProblem(unittest.TestCase):
         try:
             prob.setup()
         except Exception as err:
-            self.assertEqual(str(err), "\nConnection errors for problem 'get_set_with_units_diff_err':\n   <model> <class Group>: The following inputs, ['C1.x', 'C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'val'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the model to remove the ambiguity.")
+            self.assertEqual(str(err),
+               "\nCollected errors for problem 'get_set_with_units_diff_err':"
+               "\n   <model> <class Group>: The following inputs, ['C1.x', 'C2.x'], promoted to "
+               "'x', are connected but their metadata entries ['units', 'val'] differ. "
+               "Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the model "
+               "to remove the ambiguity.")
         else:
             self.fail("Exception expected.")
 
@@ -1908,7 +1913,9 @@ class TestProblem(unittest.TestCase):
 
         self.assertEqual(str(cm.exception), msg)
 
-        msg = "\nConnection errors for problem 'constraint_alias_duplicate_errors':\n   <model> <class Group>: Constraint alias 'g' on 'comp1.f' is the same name as an existing variable."
+        msg = "\nCollected errors for problem 'constraint_alias_duplicate_errors':" + \
+              "\n   <model> <class Group>: Constraint alias 'g' on 'comp1.f' is the same name as " + \
+              "an existing variable."
         with self.assertRaises(Exception) as cm:
             prob.setup()
 
@@ -2055,7 +2062,9 @@ class TestProblem(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.setup()
 
-        msg = "\nConnection errors for problem 'output_as_input_err':\n   <model> <class Group>: Design variable 'x' is connected to 'initial_comp.x', but 'initial_comp.x' is not an IndepVarComp or ImplicitComp output."
+        msg = "\nCollected errors for problem 'output_as_input_err':" + \
+              "\n   <model> <class Group>: Design variable 'x' is connected to 'initial_comp.x', " + \
+              "but 'initial_comp.x' is not an IndepVarComp or ImplicitComp output."
         self.assertEqual(str(cm.exception), msg)
 
     def test_design_var_connected_to_output(self):

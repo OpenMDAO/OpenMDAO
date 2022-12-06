@@ -466,7 +466,8 @@ class TestViewModelData(unittest.TestCase):
 
         p = om.Problem(BadConnectionModel(), name='n2_connection_error')
 
-        msg = "\nConnection errors for problem 'n2_connection_error':\n   'sub' <class Group>: Attempted to connect from 'tgt.x' to 'cmp.x', but " + \
+        msg = "\nCollected errors for problem 'n2_connection_error':" \
+              "\n   'sub' <class Group>: Attempted to connect from 'tgt.x' to 'cmp.x', but " \
               "'tgt.x' is an input. All connections must be from an output to an input."
 
         with self.assertRaises(Exception) as cm:

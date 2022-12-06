@@ -317,7 +317,10 @@ class SrcIndicesTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "\nConnection errors for problem 'src_shape_mismatch':\n   <model> <class Group>: When connecting '_auto_ivc.v0' to 'G.g1.C1.x': Promoted src_shape of (3, 3) for 'G.g1.C1.x' differs from src_shape (3, 2) for 'x'.")
+        self.assertEqual(cm.exception.args[0],
+           "\nCollected errors for problem 'src_shape_mismatch':"
+           "\n   <model> <class Group>: When connecting '_auto_ivc.v0' to 'G.g1.C1.x': Promoted "
+           "src_shape of (3, 3) for 'G.g1.C1.x' differs from src_shape (3, 2) for 'x'.")
 
     def test_src_indices_on_promotes(self):
         src_shape = (3, 3)
@@ -346,7 +349,12 @@ class SrcIndicesTestCase(unittest.TestCase):
             p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "\nConnection errors for problem 'src_indices_on_promotes':\n   <model> <class Group>: When promoting 'x' from system 'C1' with src_indices [4 5 7 9] and src_shape (3, 3): index 9 is out of bounds for source dimension of size 9.\n   <model> <class Group>: The source indices [4 5 7 9] do not specify a valid shape for the connection '_auto_ivc.v0' to 'C1.x'. (target shape=(2, 2), indices_shape=(4,)): index 9 is out of bounds for axis 0 with size 9")
+            "\nCollected errors for problem 'src_indices_on_promotes':"
+            "\n   <model> <class Group>: When promoting 'x' from system 'C1' with src_indices "
+            "[4 5 7 9] and src_shape (3, 3): index 9 is out of bounds for source dimension of size 9."
+            "\n   <model> <class Group>: The source indices [4 5 7 9] do not specify a valid shape "
+            "for the connection '_auto_ivc.v0' to 'C1.x'. (target shape=(2, 2), indices_shape=(4,)):"
+            " index 9 is out of bounds for axis 0 with size 9")
 
     def test_connect_slice_src_indices_not_full_size(self):
         p = om.Problem()

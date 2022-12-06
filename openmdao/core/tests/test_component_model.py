@@ -217,7 +217,7 @@ class TestComponentAsModel(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.setup()
 
-        msg = "\nConnection errors for problem 'optimize_component_as_model':\n   <model> <class ExecComp>: Output not found for design variable 'x'.\n" \
+        msg = "\nCollected errors for problem 'optimize_component_as_model':\n   <model> <class ExecComp>: Output not found for design variable 'x'.\n" \
               "   <model> <class ExecComp>: The model is of type 'ExecComp'. Components must be placed in a Group " \
               "in order for unconnected inputs to be used as design variables. " \
               "A future release will require that the model be a Group or a sub-class of Group."

@@ -388,7 +388,8 @@ class TestModuleFunctions(unittest.TestCase):
                                                        x={'units': None}, y={'units': 'ft'}),
                               promotes_inputs=['x', 'y'])
 
-        msg = ("\nConnection errors for problem 'incompatible_units':\n   <model> <class Group>: Output units of 'Hz*s' for 'indeps.y' are incompatible with input "
+        msg = ("\nCollected errors for problem 'incompatible_units':"
+               "\n   <model> <class Group>: Output units of 'Hz*s' for 'indeps.y' are incompatible with input "
                "units of 'ft' for 'exec_comp.y'.")
 
         with self.assertRaises(RuntimeError) as cm:
@@ -412,7 +413,8 @@ class TestUnitless(unittest.TestCase):
             'exec_comp',om.ExecComp('z = x', z={'units': 'm'}, x={'units': 'm'}),
             promotes_inputs=['x'])
 
-        msg = ("\nConnection errors for problem 'unitless_connection_error':\n   <model> <class Group>: Output units of 'unitless' for 'indeps.x' are incompatible with input "
+        msg = ("\nCollected errors for problem 'unitless_connection_error':"
+               "\n   <model> <class Group>: Output units of 'unitless' for 'indeps.x' are incompatible with input "
                "units of 'm' for 'exec_comp.x'.")
 
         with self.assertRaises(RuntimeError) as cm:
