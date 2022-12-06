@@ -1157,18 +1157,18 @@ class MatMultMultipointTestCase(unittest.TestCase):
 
         p.run_driver()
 
-        # J = p.compute_totals()
+        J = p.compute_totals()
 
-        # for i in range(num_pts):
-        #     with multi_proc_exception_check(p.comm):
-        #         A1 = p.get_val('par1.comp%d.A'%i, get_remote=True)
-        #     with multi_proc_exception_check(p.comm):
-        #         A2 = p.get_val('par2.comp%d.A'%i, get_remote=True)
-        #     norm = np.linalg.norm(J['par2.comp%d.y'%i,'indep%d.x'%i] - A2.dot(A1))
-        #     with multi_proc_exception_check(p.comm):
-        #         self.assertLess(norm, 1.e-7)
+        for i in range(num_pts):
+            with multi_proc_exception_check(p.comm):
+                A1 = p.get_val('par1.comp%d.A'%i, get_remote=True)
+            with multi_proc_exception_check(p.comm):
+                A2 = p.get_val('par2.comp%d.A'%i, get_remote=True)
+            norm = np.linalg.norm(J['par2.comp%d.y'%i,'indep%d.x'%i] - A2.dot(A1))
+            with multi_proc_exception_check(p.comm):
+                self.assertLess(norm, 1.e-7)
 
-        # print("final obj:", p['obj.y'])
+        print("final obj:", p['obj.y'])
 
 
 # use_tempdirs is inherited
