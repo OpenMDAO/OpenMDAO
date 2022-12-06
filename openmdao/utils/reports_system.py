@@ -46,15 +46,20 @@ class Report(object):
         List of (*args, **kwargs) to be passed to the `register_hook` function when the report
         corresponding to this instance is activated.
     """
+
     def __init__(self, name, description=''):
+        """
+        Initialize attributes.
+        """
         self.name = name
         self.description = description
         self.hooks = []
 
     def register_hook_args(self, *args, **kwargs):
         r"""
-        Store positional and named args to be passed to the `register_hook` function when the
-        report corresponding to this instance is activated.
+        Store positional and named args to be passed to the `register_hook` function.
+
+        This will only happen if the report corresponding to this instance is activated.
 
         Parameters
         ----------
@@ -68,6 +73,11 @@ class Report(object):
     def register_hooks(self, instance):
         """
         Register the hook(s) associated with the report corresponding with this instance.
+
+        Parameters
+        ----------
+        instance : object
+            The instance where hooks may be registered.
         """
         if hasattr(instance, '_has_active_report') and not instance._has_active_report(self.name):
             return

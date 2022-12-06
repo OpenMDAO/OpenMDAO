@@ -250,7 +250,7 @@ class TestPassSizeDistributed(unittest.TestCase):
             prob.setup()
 
         self.assertEquals(str(cm.exception),
-           "\nCollected errors for problem 'distributed_start'"
+           "\nCollected errors for problem 'distributed_start':"
            "\n   <model> <class Group>: dynamic sizing of non-distributed output 'A.out' from "
            "distributed input 'B.in' is not supported because not all B.in ranks are the same size "
            "(sizes=[1 2 0])."
