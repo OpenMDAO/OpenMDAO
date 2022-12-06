@@ -1155,9 +1155,9 @@ class MatMultMultipointTestCase(unittest.TestCase):
 
         p.setup()
 
-        raise RuntimeError("after setup")
-
         p.run_driver()
+
+        raise RuntimeError("after run_driver")
 
         J = p.compute_totals()
 
