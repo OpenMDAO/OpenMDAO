@@ -1157,9 +1157,9 @@ class MatMultMultipointTestCase(unittest.TestCase):
 
         p.run_driver()
 
-        raise RuntimeError("after run_driver")
-
         J = p.compute_totals()
+
+        raise RuntimeError("after compute_totals")
 
         for i in range(num_pts):
             cname = 'par2.comp%d' % i
