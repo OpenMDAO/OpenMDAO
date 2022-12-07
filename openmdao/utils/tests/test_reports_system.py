@@ -13,7 +13,7 @@ import openmdao.core.problem as probmod
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.reports_system import set_reports_dir, _reports_dir, register_report, \
-    list_reports, clear_reports, _reset_reports_dir, activate_report
+    list_reports, clear_reports, _reset_reports_dir, activate_report, _reports_registry
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
 from openmdao.utils.tests.test_hooks import hooks_active
@@ -356,6 +356,12 @@ class TestReportsSystem(unittest.TestCase):
         path = pathlib.Path(_reports_dir).joinpath(prob._name, user_report_filename)
 
         self.assertTrue(path.is_file(), f'The user report file, {str(path)} was not found')
+
+        # test unregister_report
+        self.assertTrue('User report' in _reports_registry, "'User report' not found in registry.")
+        om.unregister_report('User report')
+        self.assertFalse('User report' in _reports_registry, "'User report' found in registry.")
+
 
     @hooks_active
     def test_report_generation_various_locations(self):
