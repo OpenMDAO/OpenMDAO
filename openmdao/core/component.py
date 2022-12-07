@@ -11,7 +11,7 @@ from numpy import ndarray, isscalar, ndim, atleast_1d, atleast_2d, promote_types
 from scipy.sparse import issparse, coo_matrix
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
-    global_meta_names, _MetadataDict
+    global_meta_names, _MetadataDict, collect_errors
 from openmdao.core.constants import INT_DTYPE
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.array_utils import shape_to_len
@@ -19,7 +19,7 @@ from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    find_matches, make_set, convert_src_inds, conditional_error
+    find_matches, make_set, convert_src_inds
 from openmdao.utils.indexer import Indexer, indexer
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
@@ -286,6 +286,7 @@ class Component(System):
         else:
             self._discrete_inputs = self._discrete_outputs = ()
 
+    @collect_errors
     def _setup_var_sizes(self):
         """
         Compute the arrays of variable sizes for all variables/procs on this system.
@@ -298,7 +299,8 @@ class Component(System):
                                                    dtype=INT_DTYPE)
 
             for i, (name, metadata) in enumerate(self._var_allprocs_abs2meta[io].items()):
-                sizes[iproc, i] = metadata['size']
+                sz = metadata['size']
+                sizes[iproc, i] = 0 if sz is None else sz
                 abs2idx[name] = i
 
             if self.comm.size > 1:
@@ -938,9 +940,10 @@ class Component(System):
 
                     # total sizes differ and output is distributed, so can't determine mapping
                     if offset is None:
-                        raise RuntimeError(f"{self.msginfo}: Can't determine src_indices "
-                                           f"automatically for input '{iname}'. They must be "
-                                           "supplied manually.")
+                        self._collect_error(f"{self.msginfo}: Can't determine src_indices "
+                                            f"automatically for input '{iname}'. They must be "
+                                            "supplied manually.", ident=(self.pathname, iname))
+                        continue
 
                     if dist_in and not dist_out:
                         src_shape = self._get_full_dist_shape(src, all_abs2meta_out[src]['shape'])
@@ -1626,12 +1629,11 @@ class Component(System):
                                 inds.set_src_shape(shape)
                                 self._var_prom2inds[abs2prom[tgt]] = [shape, inds, flat]
                         except Exception:
-                            exc = sys.exc_info()
-                            conditional_error(f"When accessing '{conns[tgt]}' with src_shape "
-                                              f"{shape} from '{pinfo.prom_path()}' using "
-                                              f"src_indices {inds}: {exc[1]}",
-                                              exc=exc, category=SetupWarning,
-                                              err=self._raise_connection_errors)
+                            type_exc, exc, tb = sys.exc_info()
+                            self._collect_error(f"When accessing '{conns[tgt]}' with src_shape "
+                                                f"{shape} from '{pinfo.prom_path()}' using "
+                                                f"src_indices {inds}: {exc}", exc_type=type_exc,
+                                                tback=tb, ident=(conns[tgt], tgt))
 
             elif meta['add_input_src_indices']:
                 self._var_prom2inds[abs2prom[tgt]] = [meta['shape'], meta['src_indices'],

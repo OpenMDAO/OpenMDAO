@@ -9,7 +9,7 @@ from itertools import zip_longest
 
 from openmdao.utils.general_utils import shape2tuple
 from openmdao.utils.array_utils import shape_to_len
-from openmdao.utils.om_warnings import issue_warning, OMDeprecationWarning
+from openmdao.utils.om_warnings import issue_warning
 
 
 def array2slice(arr):
@@ -159,9 +159,9 @@ class Indexer(object):
             raise RuntimeError(f"Can't get indexed_src_shape of {self} because source shape "
                                "is unknown.")
         if self._flat_src:
-            return resolve_shape(shape_to_len(self._src_shape))[self.flat()]
+            return resolve_shape(shape_to_len(self._src_shape)).get_shape(self.flat())
         else:
-            return resolve_shape(self._src_shape)[self()]
+            return resolve_shape(self._src_shape).get_shape(self())
 
     @property
     def indexed_src_size(self):
@@ -174,11 +174,6 @@ class Indexer(object):
             Size of flattened indices.
         """
         return shape_to_len(self.indexed_src_shape)
-
-    def _check_ind_type(self, ind, types):
-        if not isinstance(ind, types):
-            raise TypeError(f"Can't create {type(self).__name__} using this "
-                            f"kind of index: {ind}.")
 
     def flat(self, copy=False):
         """
@@ -224,8 +219,7 @@ class Indexer(object):
         """
         s = self.shaped_instance()
         if s is None:
-            raise ValueError(f"Can't get shaped array of {self} because it has "
-                             "no source shape.")
+            raise ValueError(f"Can't get shaped array of {self} because it has no source shape.")
         return s.as_array(copy=copy, flat=flat)
 
     def apply(self, subidxer):
@@ -261,14 +255,23 @@ class Indexer(object):
         Indexer
             Self is returned to allow chaining.
         """
-        self._src_shape, self._dist_shape, = self._get_shapes(shape, dist_shape)
+        sshape, self._dist_shape, = self._get_shapes(shape, dist_shape)
 
         if shape is not None:
             if self._flat_src is None:
-                self._flat_src = len(self._src_shape) <= 1
-            self._check_bounds()
+                self._flat_src = len(sshape) <= 1
 
-        self._shaped_inst = None
+        if sshape != self._src_shape:
+            self._src_shape = sshape
+            try:
+                self._check_bounds()
+            except Exception:
+                self._src_shape = None
+                self._dist_shape = None
+                raise
+            self._shaped_inst = None
+
+        self._src_shape = sshape
 
         return self
 
@@ -318,7 +321,6 @@ class ShapedIntIndexer(Indexer):
         Initialize attributes.
         """
         super().__init__(flat_src)
-        self._check_ind_type(idx, Integral)
         self._idx = idx
 
     def __call__(self):
@@ -492,7 +494,6 @@ class ShapedSliceIndexer(Indexer):
         Initialize attributes.
         """
         super().__init__(flat_src)
-        self._check_ind_type(slc, slice)
         if slc.step is None:
             slc = slice(slc.start, slc.stop, 1)
         self._slice = slc
@@ -1405,7 +1406,7 @@ class resolve_shape(object):
         """
         self._shape = shape2tuple(shape)
 
-    def __getitem__(self, idx):
+    def get_shape(self, idx):
         """
         Return the shape of the result of indexing into the source with index idx.
 
@@ -1446,8 +1447,8 @@ class resolve_shape(object):
                     seen_arr = True
                     if ind.ndim > 1:
                         if arr_shape is not None and arr_shape != ind.shape:
-                            raise ValueError("Multi-index has index sub-arrays of different shapes "
-                                             f"({arr_shape} != {ind.shape}).")
+                            raise ValueError("Multi-index has index sub-arrays of different "
+                                             f"shapes ({arr_shape} != {ind.shape}).")
                         arr_shape = ind.shape
                     else:
                         # only first array idx counts toward shape

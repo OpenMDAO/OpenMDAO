@@ -13,7 +13,7 @@ import numpy as np
 import networkx as nx
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.core.system import System
+from openmdao.core.system import System, collect_errors
 from openmdao.core.component import Component, _DictValues
 from openmdao.vectors.vector import _full_slice
 from openmdao.core.constants import _UNDEFINED, INT_DTYPE
@@ -25,15 +25,14 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len
 from openmdao.utils.general_utils import common_subpath, \
-    conditional_error, convert_src_inds, ContainsAll, \
-    shape2tuple, get_connection_owner, conditional_error
+    convert_src_inds, ContainsAll, shape2tuple, get_connection_owner
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
-    SetupWarning, PromotionWarning, MPIWarning
+    PromotionWarning, MPIWarning
 from openmdao.core.constants import _SetupStatus
 
 # regex to check for valid names.
@@ -64,7 +63,7 @@ class _PromotesInfo(object):
         self.src_shape = src_shape
         if src_indices is not None:
             if isinstance(src_indices, Indexer):
-                self.src_indices = src_indices.copy()
+                self.src_indices = src_indices
                 self.src_indices.set_src_shape(self.src_shape)
             else:
                 self.src_indices = indexer(src_indices, src_shape=self.src_shape, flat_src=flat)
@@ -89,7 +88,7 @@ class _PromotesInfo(object):
         return '.'.join((self.promoted_from, self.prom)) if self.promoted_from else self.prom
 
     def copy(self):
-        return _PromotesInfo(self.src_indices, self.flat, self.src_shape, self.promoted_from,
+        return _PromotesInfo(self.src_indices.copy(), self.flat, self.src_shape, self.promoted_from,
                              self.prom)
 
     def set_src_shape(self, shape):
@@ -814,8 +813,10 @@ class Group(System):
                         if src_inds is not None:
                             shaped = src_inds.shaped_instance()
                             if shaped is None:
-                                raise RuntimeError(f"For connection from '{abs_out}' to '{abs_in}',"
-                                                   f" src_indices {src_inds} have no source shape.")
+                                self._collect_error(f"For connection from '{abs_out}' to '{abs_in}'"
+                                                    f", src_indices {src_inds} have no source "
+                                                    "shape.", ident=(abs_out, abs_in))
+                                continue
                             else:
                                 src_inds = shaped
                     else:
@@ -838,14 +839,17 @@ class Group(System):
                         self.comm.gather(src_inds, root=owner)
                         err = self.comm.bcast(None, root=owner)
                     if err == 1:
-                        raise RuntimeError(f"{self.msginfo}: Can't connect distributed output "
-                                           f"'{abs_out}' to non-distributed input '{abs_in}' "
-                                           "because src_indices differ on different ranks.")
+                        self._collect_error(f"{self.msginfo}: Can't connect distributed output "
+                                            f"'{abs_out}' to non-distributed input '{abs_in}' "
+                                            "because src_indices differ on different ranks.",
+                                            ident=(abs_out, abs_in))
                     elif err == -1:
-                        raise RuntimeError(f"{self.msginfo}: Can't connect distributed output "
-                                           f"'{abs_out}' to non-distributed input '{abs_in}' "
-                                           "without specifying src_indices.")
+                        self._collect_error(f"{self.msginfo}: Can't connect distributed output "
+                                            f"'{abs_out}' to non-distributed input '{abs_in}' "
+                                            "without specifying src_indices.",
+                                            ident=(abs_out, abs_in))
 
+    @collect_errors
     def _resolve_src_indices(self):
         """
         Populate the promotes info list for each absolute input.
@@ -888,18 +892,20 @@ class Group(System):
                         if pinfo.src_shape is None:
                             pinfo.set_src_shape(root_shape)
                         elif pinfo.src_indices is not None and root_shape != pinfo.src_shape:
-                            raise RuntimeError(f"Promoted src_shape of {pinfo.src_shape} for "
-                                               f"'{pinfo.prom_path()}' differs from src_shape "
-                                               f"{root_shape} for '{current_pinfo.prom_path()}'.")
+                            self._collect_error(f"When connecting '{src}' to "
+                                                f"'{pinfo.prom_path()}': Promoted src_shape of "
+                                                f"{pinfo.src_shape} for "
+                                                f"'{pinfo.prom_path()}' differs from src_shape "
+                                                f"{root_shape} for '{current_pinfo.prom_path()}'.",
+                                                ident=(src, tgt))
                     except Exception:
-                        exc = sys.exc_info()
-                        conditional_error(f"In connection from '{conns[tgt]}' to "
-                                          f"'{pinfo.prom_path()}', error was: {exc[1]}", exc=exc,
-                                          category=SetupWarning, err=self._raise_connection_errors)
+                        type_exc, exc, tb = sys.exc_info()
+                        self._collect_error(f"When connecting '{src}' to "
+                                            f"'{pinfo.prom_path()}': {exc}",
+                                            exc_type=type_exc, tback=tb, ident=(src, tgt))
                     current_pinfo = pinfo
                     continue
                 elif pinfo.src_indices is None:
-                    pinfo = pinfo.copy()  # TODO: make sure we really need this copy here
                     pinfo.src_indices = current_pinfo.src_indices
                     if pinfo.src_shape is None:
                         pinfo.set_src_shape(current_pinfo.src_shape)
@@ -911,13 +917,16 @@ class Group(System):
                         sinds = convert_src_inds(current_pinfo.src_indices, current_pinfo.src_shape,
                                                  pinfo.src_indices, pinfo.src_shape)
                     except Exception:
-                        exc = sys.exc_info()
-                        raise exc[0](f"In connection from '{conns[tgt]}' to '{pinfo.prom_path()}', "
-                                     f"input '{current_pinfo.prom_path()}' src_indices are "
-                                     f"{current_pinfo.src_indices} and indexing into those failed "
-                                     f"using src_indices {pinfo.src_indices} from input "
-                                     f"'{pinfo.prom_path()}'. Error was: "
-                                     f"{exc[1]}").with_traceback(exc[2])
+                        type_exc, exc, tb = sys.exc_info()
+                        self._collect_error(f"When connecting '{conns[tgt]}' to "
+                                            f"'{pinfo.prom_path()}': input "
+                                            f"'{current_pinfo.prom_path()}' src_indices are "
+                                            f"{current_pinfo.src_indices} and indexing into those "
+                                            f"failed using src_indices {pinfo.src_indices} from "
+                                            f"input '{pinfo.prom_path()}'. Error was: "
+                                            f"{exc}", exc_type=type_exc, tback=tb,
+                                            ident=(conns[tgt], tgt))
+                        continue
 
                     # final src_indices are wrt original full sized source and are flat,
                     # so use val.shape and flat_src=True
@@ -1104,9 +1113,9 @@ class Group(System):
 
         for prom_name, abs_list in allprocs_prom2abs_list['output'].items():
             if len(abs_list) > 1:
-                raise RuntimeError("{}: Output name '{}' refers to "
-                                   "multiple outputs: {}.".format(self.msginfo, prom_name,
-                                                                  sorted(abs_list)))
+                self._collect_error("{}: Output name '{}' refers to "
+                                    "multiple outputs: {}.".format(self.msginfo, prom_name,
+                                                                   sorted(abs_list)))
 
         for io in ('input', 'output'):
             a2p = self._var_allprocs_abs2prom[io]
@@ -1127,8 +1136,8 @@ class Group(System):
                     else:
                         ex.add(e)
                 if ex:
-                    raise RuntimeError(f"{self.msginfo}: The following group inputs, passed to "
-                                       f"set_input_defaults(), could not be found: {sorted(ex)}.")
+                    self._collect_error(f"{self.msginfo}: The following group inputs, passed to "
+                                        f"set_input_defaults(), could not be found: {sorted(ex)}.")
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
@@ -1217,13 +1226,13 @@ class Group(System):
                                                     break
 
                                     gname = f"Group named '{common}'" if common else 'model'
-                                    conditional_error(f"{self.msginfo}: The subsystems {origin} "
-                                                      f"and {submeta['path']} called "
-                                                      f"set_input_defaults for promoted input "
-                                                      f"{prm} with conflicting values for "
-                                                      f"'{key}'. Call <group>.set_input_defaults("
-                                                      f"'{prom}', {key}=?), where <group> is the "
-                                                      f"{gname} to remove the ambiguity.")
+                                    self._collect_error(f"{self.msginfo}: The subsystems {origin} "
+                                                        f"and {submeta['path']} called "
+                                                        f"set_input_defaults for promoted input "
+                                                        f"{prm} with conflicting values for "
+                                                        f"'{key}'. Call <group>.set_input_defaults("
+                                                        f"'{prom}', {key}=?), where <group> is the "
+                                                        f"{gname} to remove the ambiguity.")
 
             # update all metadata dicts with any missing metadata that was filled in elsewhere
             # and update src_shape and use_tgt in abs_in2prom_info
@@ -1250,12 +1259,12 @@ class Group(System):
                                     # must match the promoted src_shape from one level
                                     # deeper in the tree.
                                     if p2.src_shape is not None and p2.src_shape != src_shape:
-                                        raise RuntimeError(f"{self.msginfo}: src_shape {src_shape} "
-                                                           f"set by set_input_defaults('{prom}', "
-                                                           f"...) in group '{meta['path']}' "
-                                                           "conflicts with src_shape of "
-                                                           f"{pinfo.src_shape} for promoted input "
-                                                           f"'{pinfo.prom_path()}")
+                                        self._collect_error(f"{self.msginfo}: src_shape {src_shape}"
+                                                            f" set by set_input_defaults('{prom}', "
+                                                            f"...) in group '{meta['path']}' "
+                                                            "conflicts with src_shape of "
+                                                            f"{pinfo.src_shape} for promoted input "
+                                                            f"'{pinfo.prom_path()}")
                                     p2.set_src_shape(src_shape)
                             else:
                                 abs_in2prom_info[tgt][tree_level] = \
@@ -1305,26 +1314,30 @@ class Group(System):
 
         return remote_vars
 
+    @collect_errors
     def _setup_var_sizes(self):
         """
         Compute the arrays of variable sizes for all variables/procs on this system.
         """
         self._var_offsets = None
         abs2idx = self._var_allprocs_abs2idx = {}
+        all_abs2meta = self._var_allprocs_abs2meta
+        self._var_sizes = {
+            'input': np.zeros((self.comm.size, len(all_abs2meta['input'])), dtype=INT_DTYPE),
+            'output': np.zeros((self.comm.size, len(all_abs2meta['output'])), dtype=INT_DTYPE),
+        }
 
         for subsys in self._subsystems_myproc:
             subsys._setup_var_sizes()
 
-        all_abs2meta = self._var_allprocs_abs2meta
         iproc = self.comm.rank
-        for io in ('input', 'output'):
-            sizes = self._var_sizes[io] = np.zeros((self.comm.size, len(all_abs2meta[io])),
-                                                   dtype=INT_DTYPE)
+        for io, sizes in self._var_sizes.items():
             abs2meta = self._var_abs2meta[io]
             for i, name in enumerate(self._var_allprocs_abs2meta[io]):
                 abs2idx[name] = i
                 if name in abs2meta:
-                    sizes[iproc, i] = abs2meta[name]['size']
+                    sz = abs2meta[name]['size']
+                    sizes[iproc, i] = 0 if sz is None else sz
 
             if self.comm.size > 1:
                 my_sizes = sizes[iproc, :].copy()
@@ -1380,20 +1393,11 @@ class Group(System):
         """
         Compute dict of all connections between this system's inputs and outputs.
 
-        The connections come from 4 sources:
-        1. Implicit connections owned by the current system
-        2. Explicit connections declared by the current system
-        3. Explicit connections declared by parent systems
-        4. Implicit / explicit from subsystems
-
         Parameters
         ----------
         conns : dict
             Dictionary of connections passed down from parent group.
         """
-        if not self._raise_connection_errors:
-            self._set_subsys_connection_errors(False)
-
         global_abs_in2out = self._conn_global_abs_in2out = {}
 
         allprocs_prom2abs_list_in = self._var_allprocs_prom2abs_list['input']
@@ -1456,36 +1460,28 @@ class Group(System):
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_out}' is an input. " + \
                           "All connections must be from an output to an input."
-                    conditional_error(msg, exc=NameError, category=SetupWarning,
-                                      err=self._raise_connection_errors)
-                    continue
                 else:
                     guesses = get_close_matches(prom_out, list(allprocs_prom2abs_list_out.keys()) +
                                                 list(allprocs_discrete_out.keys()))
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_out}' doesn't exist. Perhaps you meant " + \
-                          f"to connect to one of the following outputs: {guesses}"
-                    conditional_error(msg, exc=NameError, category=SetupWarning,
-                                      err=self._raise_connection_errors)
-                    continue
+                          f"to connect to one of the following outputs: {guesses}."
+                self._collect_error(msg)
+                continue
 
             if not (prom_in in allprocs_prom2abs_list_in or prom_in in allprocs_discrete_in):
                 if (prom_in in allprocs_prom2abs_list_out or prom_in in allprocs_discrete_out):
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_in}' is an output. " + \
                           "All connections must be from an output to an input."
-                    conditional_error(msg, exc=NameError, category=SetupWarning,
-                                      err=self._raise_connection_errors)
-                    continue
                 else:
                     guesses = get_close_matches(prom_in, list(allprocs_prom2abs_list_in.keys()) +
                                                 list(allprocs_discrete_in.keys()))
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_in}' doesn't exist. Perhaps you meant " + \
-                          f"to connect to one of the following inputs: {guesses}"
-                    conditional_error(msg, exc=NameError, category=SetupWarning,
-                                      err=self._raise_connection_errors)
-                    continue
+                          f"to connect to one of the following inputs: {guesses}."
+                self._collect_error(msg)
+                continue
 
             # Throw an exception if output and input are in the same system
             # (not traceable to a connect statement, so provide context)
@@ -1498,35 +1494,40 @@ class Group(System):
                 inparts = abs_in.split('.')
                 in_subsys = inparts[:-1]
                 if out_subsys == in_subsys:
-                    msg = f"{self.msginfo}: Output and input are in the same System for " + \
-                          f"connection from '{prom_out}' to '{prom_in}'."
-                    conditional_error(msg, exc=RuntimeError, category=SetupWarning,
-                                      err=self._raise_connection_errors)
+                    self._collect_error(
+                        f"{self.msginfo}: Output and input are in the same System for connection "
+                        f"from '{prom_out}' to '{prom_in}'.")
                     continue
 
                 if src_indices is not None:
                     a2m = allprocs_abs2meta_in[abs_in]
                     if (a2m['shape_by_conn'] or a2m['copy_shape']):
-                        raise ValueError(f"{self.msginfo}: Setting of 'src_indices' along with "
-                                         f"'shape_by_conn' or 'copy_shape' for variable '{abs_in}' "
-                                         "is currently unsupported.")
+                        self._collect_error(
+                            f"{self.msginfo}: Setting of 'src_indices' along with 'shape_by_conn' "
+                            f"or 'copy_shape' for variable '{abs_in}' is currently unsupported.")
+                        continue
 
                     if abs_in in abs2meta:
                         if abs_in not in abs_in2prom_info:
                             abs_in2prom_info[abs_in] = [None for s in abs_in.split('.')]
                         # place a _PromotesInfo at the top level to handle the src_indices
                         if abs_in2prom_info[abs_in][0] is None:
-                            abs_in2prom_info[abs_in][0] = _PromotesInfo(src_indices=src_indices,
-                                                                        flat=flat, prom=abs_in)
+                            try:
+                                abs_in2prom_info[abs_in][0] = _PromotesInfo(src_indices=src_indices,
+                                                                            flat=flat, prom=abs_in)
+                            except Exception:
+                                type_exc, exc, tb = sys.exc_info()
+                                self._collect_error(
+                                    f"When connecting from '{prom_out}' to '{prom_in}': {exc}",
+                                    exc_type=type_exc, tback=tb, ident=(abs_out, abs_in))
+                                continue
 
                         meta = abs2meta[abs_in]
                         if meta['src_indices'] is not None:
-                            msg = f"{self.msginfo}: src_indices has been defined in both " + \
-                                  f"connect('{prom_out}', '{prom_in}') and " + \
-                                  f"add_input('{prom_in}', ...)."
-                            conditional_error(msg, exc=RuntimeError, category=SetupWarning,
-                                              err=self._raise_connection_errors)
-                            continue
+                            self._collect_error(
+                                f"{self.msginfo}: src_indices has been defined in both "
+                                f"connect('{prom_out}', '{prom_in}') and "
+                                f"add_input('{prom_in}', ...).")
 
                         meta['manual_connection'] = True
                         meta['src_indices'] = src_indices
@@ -1535,10 +1536,10 @@ class Group(System):
                     src_ind_inputs.add(abs_in)
 
                 if abs_in in abs_in2out:
-                    msg = f"{self.msginfo}: Input '{abs_in}' cannot be connected to " + \
-                          f"'{abs_out}' because it's already connected to '{abs_in2out[abs_in]}'"
-                    conditional_error(msg, exc=RuntimeError, category=SetupWarning,
-                                      err=self._raise_connection_errors)
+                    self._collect_error(
+                        f"{self.msginfo}: Input '{abs_in}' cannot be connected to '{abs_out}' "
+                        f"because it's already connected to '{abs_in2out[abs_in]}'.",
+                        ident=(abs_out, abs_in))
                     continue
 
                 abs_in2out[abs_in] = abs_out
@@ -1573,10 +1574,8 @@ class Group(System):
             dup_info = [(n, srcs) for n, srcs in dup_info.items() if len(srcs) > 1]
             if dup_info:
                 dup = ["%s from %s" % (tgt, sorted(srcs)) for tgt, srcs in dup_info]
-                msg = f"{self.msginfo}: The following inputs have multiple connections: " + \
-                      f"{', '.join(dup)}"
-                conditional_error(msg, exc=RuntimeError, category=SetupWarning,
-                                  err=self._raise_connection_errors)
+                self._collect_error(f"{self.msginfo}: The following inputs have multiple "
+                                    f"connections: {', '.join(dup)}.")
 
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             # If running in parallel, allgather
@@ -1646,17 +1645,23 @@ class Group(System):
             # possible if we assume 'always local' transfer (see POEM 46).
             if from_dist and not to_dist:
                 if from_io == 'output':
-                    raise RuntimeError(f"{self.msginfo}: dynamic sizing of non-distributed {to_io} "
-                                       f"'{to_var}' from distributed {from_io} '{from_var}' is not "
-                                       "supported.")
+                    self._collect_error(
+                        f"{self.msginfo}: dynamic sizing of non-distributed {to_io} '{to_var}' "
+                        f"from distributed {from_io} '{from_var}' is not supported.")
+                    return
                 else:  # serial_out <- dist_in
                     # all input rank sizes must be the same
                     if not np.all(distrib_sizes[from_var] == distrib_sizes[from_var][0]):
-                        raise RuntimeError(f"{self.msginfo}: dynamic sizing of non-distributed "
-                                           f"{to_io} '{to_var}' from distributed {from_io} "
-                                           f"'{from_var}' is not supported because not all "
-                                           f"{from_var} ranks are the same size "
-                                           f"(sizes={distrib_sizes[from_var]}).")
+                        if from_io == 'output':
+                            ident = (from_var, to_var)
+                        else:
+                            ident = (to_var, from_var)
+                        self._collect_error(
+                            f"{self.msginfo}: dynamic sizing of non-distributed {to_io} '{to_var}' "
+                            f"from distributed {from_io} '{from_var}' is not supported because not "
+                            f"all {from_var} ranks are the same size "
+                            f"(sizes={distrib_sizes[from_var]}).", ident=ident)
+                        return
 
             all_to_meta['shape'] = from_shape
             all_to_meta['size'] = from_size
@@ -1732,8 +1737,9 @@ class Group(System):
                                                     graph.add_edge(n, name)
                                                     break
                             if fail:
-                                raise RuntimeError(f"{self.msginfo}: 'shape_by_conn' was set for "
-                                                   f"unconnected variable '{name}'.")
+                                self._collect_error(
+                                    f"{self.msginfo}: 'shape_by_conn' was set for "
+                                    f"unconnected variable '{name}'.")
 
                 if meta['copy_shape']:
                     # variable whose shape is being copied must be on the same component, and
@@ -1746,8 +1752,8 @@ class Group(System):
                         if a2m[abs_from]['shape'] is not None:
                             knowns.add(abs_from)
                     else:
-                        raise RuntimeError(f"{self.msginfo}: Can't copy shape of variable "
-                                           f"'{abs_from}'. Variable doesn't exist.")
+                        self._collect_error(f"{self.msginfo}: Can't copy shape of variable "
+                                            f"'{abs_from}'. Variable doesn't exist.")
 
                 # store known distributed size info needed for computing shapes
                 if nprocs > 1:
@@ -1808,9 +1814,9 @@ class Group(System):
                         # can't compare shapes if one is dist and other is not. The mismatch
                         # will be caught later in setup_connections in that case.
                         if shape != known_shape and not (dist ^ known_dist):
-                            conditional_error(f"{self.msginfo}: Shape mismatch, {shape} vs. "
-                                              f"{known_shape} for variable '{node}' during "
-                                              "dynamic shape determination.")
+                            self._collect_error(f"{self.msginfo}: Shape mismatch, {shape} vs. "
+                                                f"{known_shape} for variable '{node}' during "
+                                                "dynamic shape determination.")
                     else:
                         # transfer the known shape info to the unshaped variable
                         copy_var_meta(known, node, distrib_sizes, grp_shapes)
@@ -1823,10 +1829,11 @@ class Group(System):
 
         if unresolved:
             unresolved = sorted(unresolved)
-            conditional_error(f"{self.msginfo}: Failed to resolve shapes for {unresolved}. "
-                              "To see the dynamic shape dependency graph, "
-                              "do 'openmdao view_dyn_shapes <your_py_file>'.")
+            self._collect_error(f"{self.msginfo}: Failed to resolve shapes for {unresolved}. "
+                                "To see the dynamic shape dependency graph, "
+                                "do 'openmdao view_dyn_shapes <your_py_file>'.")
 
+    @collect_errors
     @check_mpi_exceptions
     def _setup_connections(self):
         """
@@ -1868,10 +1875,10 @@ class Group(System):
                 if abs_in in allprocs_discrete_in:
                     self._conn_discrete_in2out[abs_in] = abs_out
                 elif abs_out in allprocs_discrete_out:
-                    msg = f"{self.msginfo}: Can't connect discrete output '{abs_out}' " + \
-                          f"to continuous input '{abs_in}'."
-                    conditional_error(msg, exc=RuntimeError, category=SetupWarning,
-                                      err=self._raise_connection_errors)
+                    self._collect_error(
+                        f"{self.msginfo}: Can't connect discrete output '{abs_out}' "
+                        f"to continuous input '{abs_in}'.", ident=(abs_out, abs_in))
+                    continue
                 else:
                     abs_in2out[abs_in] = abs_out
 
@@ -1900,15 +1907,16 @@ class Group(System):
             try:
                 out_type = self._var_allprocs_discrete['output'][abs_out]['type']
             except KeyError:
-                msg = f"{self.msginfo}: Can't connect continuous output '{abs_out}' " + \
-                      f"to discrete input '{abs_in}'."
-                conditional_error(msg, exc=RuntimeError, category=SetupWarning,
-                                  err=self._raise_connection_errors)
+                self._collect_error(
+                    f"{self.msginfo}: Can't connect continuous output '{abs_out}' "
+                    f"to discrete input '{abs_in}'.", ident=(abs_out, abs_in))
+                continue
+
             if not issubclass(in_type, out_type):
-                msg = f"{self.msginfo}: Type '{out_type.__name__}' of output '{abs_out}' is " + \
-                      f"incompatible with type '{in_type.__name__}' of input '{abs_in}'."
-                conditional_error(msg, exc=RuntimeError, category=SetupWarning,
-                                  err=self._raise_connection_errors)
+                self._collect_error(
+                    f"{self.msginfo}: Type '{out_type.__name__}' of output '{abs_out}' is "
+                    f"incompatible with type '{in_type.__name__}' of input '{abs_in}'.",
+                    ident=(abs_out, abs_in))
 
         # check unit/shape compatibility, but only for connections that are
         # either owned by (implicit) or declared by (explicit) this Group.
@@ -1929,10 +1937,11 @@ class Group(System):
                             f"is connected to input '{abs_in}' which has no units."
                         issue_warning(msg, prefix=self.msginfo, category=UnitsWarning)
                 elif not is_compatible(in_units, out_units):
-                    msg = f"{self.msginfo}: Output units of '{out_units}' for '{abs_out}' " + \
-                          f"are incompatible with input units of '{in_units}' for '{abs_in}'."
-                    conditional_error(msg, exc=RuntimeError, category=SetupWarning,
-                                      err=self._raise_connection_errors)
+                    self._collect_error(
+                        f"{self.msginfo}: Output units of '{out_units}' for '{abs_out}' "
+                        f"are incompatible with input units of '{in_units}' for '{abs_in}'.",
+                        ident=(abs_out, abs_in))
+                    continue
             elif in_units is not None:
                 if not _is_unitless(in_units):
                     msg = f"Input '{abs_in}' with units of '{in_units}' is " + \
@@ -1959,13 +1968,14 @@ class Group(System):
 
                 if src_indices is None and out_shape != in_shape:
                     # out_shape != in_shape is allowed if there's no ambiguity in storage order
-                    if not array_connection_compatible(in_shape, out_shape):
-                        msg = f"{self.msginfo}: The source and target shapes do not match or " + \
-                              f"are ambiguous for the connection '{abs_out}' to '{abs_in}'. " + \
-                              f"The source shape is {tuple([int(s) for s in out_shape])} " + \
-                              f"but the target shape is {tuple([int(s) for s in in_shape])}."
-                        conditional_error(msg, exc=ValueError, category=SetupWarning,
-                                          err=self._raise_connection_errors)
+                    if (in_shape is None or out_shape is None or
+                            not array_connection_compatible(in_shape, out_shape)):
+                        self._collect_error(
+                            f"{self.msginfo}: The source and target shapes do not match or "
+                            f"are ambiguous for the connection '{abs_out}' to '{abs_in}'. "
+                            f"The source shape is {out_shape} "
+                            f"but the target shape is {in_shape}.", ident=(abs_out, abs_in))
+                        continue
 
                 elif src_indices is not None:
 
@@ -1974,11 +1984,13 @@ class Group(System):
                                all_meta_out['global_shape'])
                         src_indices.set_src_shape(shp, dist_shape=out_shape)
                         src_indices = src_indices.shaped_instance()
-                    except Exception as err:
+                    except Exception:
+                        type_exc, exc, tb = sys.exc_info()
                         s, src, tgt = get_connection_owner(self, abs_in)
-                        conditional_error(f"{s.msginfo}: When connecting '{src}' to '{tgt}': "
-                                          f"{str(err)}", exc=err.__class__, category=SetupWarning,
-                                          err=s._raise_connection_errors)
+                        abs_out = self._conn_global_abs_in2out[tgt]
+                        self._collect_error(
+                            f"{s.msginfo}: When connecting '{src}' to '{tgt}': {exc}",
+                            exc_type=type_exc, tback=tb, ident=(abs_out, abs_in))
                         continue
 
                     if src_indices.indexed_src_size == 0:
@@ -1988,54 +2000,29 @@ class Group(System):
                         # initial dimensions of indices shape must be same shape as target
                         for idx_d, inp_d in zip(src_indices.indexed_src_shape, in_shape):
                             if idx_d != inp_d:
-                                msg = (f"{self.msginfo}: The source indices "
-                                       f"{meta_in['src_indices']} do not specify a "
-                                       f"valid shape for the connection '{abs_out}' to "
-                                       f"'{abs_in}'. The target shape is "
-                                       f"{in_shape} but indices are shape "
-                                       f"{src_indices.indexed_src_shape}.")
-                                if self._raise_connection_errors:
-                                    raise ValueError(msg)
-                                else:
-                                    issue_warning(msg, category=SetupWarning)
-                                    continue
+                                self._collect_error(
+                                    f"{self.msginfo}: The source indices {meta_in['src_indices']} "
+                                    f"do not specify a valid shape for the connection '{abs_out}' "
+                                    f"to '{abs_in}'. The target shape is {in_shape} but indices "
+                                    f"are shape {src_indices.indexed_src_shape}.",
+                                    ident=(abs_out, abs_in))
+                                break
                         else:
-                            msg = (f"{self.msginfo}: src_indices shape "
-                                   f"{src_indices.indexed_src_shape} does not match {abs_in} shape "
-                                   f"{in_shape}.")
-                            if self._raise_connection_errors:
-                                raise ValueError(msg)
-                            else:
-                                issue_warning(msg, category=SetupWarning)
+                            self._collect_error(
+                                f"{self.msginfo}: src_indices shape {src_indices.indexed_src_shape}"
+                                f" does not match {abs_in} shape {in_shape}.",
+                                ident=(abs_out, abs_in))
+                        continue
 
                     # any remaining dimension of indices must match shape of source
                     if not src_indices._flat_src and (len(src_indices.indexed_src_shape) >
                                                       len(out_shape)):
-                        msg = f"{self.msginfo}: The source indices " + \
-                              f"{meta_in['src_indices']} do not specify a " + \
-                              f"valid shape for the connection '{abs_out}' to '{abs_in}'. " + \
-                              f"The source has {len(out_shape)} dimensions but the " + \
-                              f"indices expect at least {len(src_indices.indexed_src_shape)}."
-                        if self._raise_connection_errors:
-                            raise ValueError(msg)
-                        else:
-                            issue_warning(msg, category=SetupWarning)
-                            continue
-
-    def _set_subsys_connection_errors(self, val=True):
-        """
-        Set flag in all subgroups indicating whether connection errors just issue a Warning.
-
-        Parameters
-        ----------
-        val : bool
-            If True, connection errors will raise an Exception. If False, connection errors
-            will issue a warning and the offending connection will be ignored.
-        """
-        for sub, _ in self._subsystems_allprocs.values():
-            sub._raise_connection_errors = val
-            if isinstance(sub, Group):
-                sub._set_subsys_connection_errors(val)
+                        self._collect_error(
+                            f"{self.msginfo}: The source indices {meta_in['src_indices']} do not "
+                            f"specify a valid shape for the connection '{abs_out}' to '{abs_in}'. "
+                            f"The source has {len(out_shape)} dimensions but the indices expect at "
+                            f"least {len(src_indices.indexed_src_shape)}.",
+                            ident=(abs_out, abs_in))
 
     def _transfer(self, vec_name, mode, sub=None):
         """
@@ -2148,6 +2135,7 @@ class Group(System):
         if self._conn_discrete_in2out:
             self._vector_class.TRANSFER._setup_discrete_transfers(self)
 
+    @collect_errors
     def promotes(self, subsys_name, any=None, inputs=None, outputs=None,
                  src_indices=None, flat_src_indices=None, src_shape=None):
         """
@@ -2183,14 +2171,17 @@ class Group(System):
             Assumed shape of any connected source or higher level promoted input.
         """
         if isinstance(any, str):
-            raise RuntimeError(f"{self.msginfo}: Trying to promote any='{any}', "
-                               "but an iterator of strings and/or tuples is required.")
+            self._collect_error(f"{self.msginfo}: Trying to promote any='{any}', "
+                                "but an iterator of strings and/or tuples is required.")
+            return
         if isinstance(inputs, str):
-            raise RuntimeError(f"{self.msginfo}: Trying to promote inputs='{inputs}', "
-                               "but an iterator of strings and/or tuples is required.")
+            self._collect_error(f"{self.msginfo}: Trying to promote inputs='{inputs}', "
+                                "but an iterator of strings and/or tuples is required.")
+            return
         if isinstance(outputs, str):
-            raise RuntimeError(f"{self.msginfo}: Trying to promote outputs='{outputs}', "
-                               "but an iterator of strings and/or tuples is required.")
+            self._collect_error(f"{self.msginfo}: Trying to promote outputs='{outputs}', "
+                                "but an iterator of strings and/or tuples is required.")
+            return
 
         src_shape = shape2tuple(src_shape)
 
@@ -2206,14 +2197,15 @@ class Group(System):
             try:
                 src_indices = indexer(src_indices, flat_src=flat_src_indices)
             except Exception:
-                exc = sys.exc_info()
-                conditional_error(f"{self.msginfo}: When promoting {promoted} from '{subsys_name}':"
-                                  f" {exc[1]}", exc=exc, category=SetupWarning,
-                                  err=self._raise_connection_errors)
+                type_exc, exc, tb = sys.exc_info()
+                self._collect_error(f"{self.msginfo}: When promoting {promoted} from "
+                                    f"'{subsys_name}': {exc}", exc_type=type_exc, tback=tb,
+                                    ident=(self.pathname, tuple(promoted)))
 
             if outputs:
-                raise RuntimeError(f"{self.msginfo}: Trying to promote outputs {outputs} while "
-                                   f"specifying src_indices {src_indices} is not meaningful.")
+                self._collect_error(f"{self.msginfo}: Trying to promote outputs {outputs} while "
+                                    f"specifying src_indices {src_indices} is not meaningful.")
+                return
 
             try:
                 prominfo = _PromotesInfo(src_indices, flat_src_indices, src_shape)
@@ -2223,7 +2215,9 @@ class Group(System):
                     lst.extend(any)
                 if inputs is not None:
                     lst.extend(inputs)
-                raise err.__class__(f"{self.msginfo}: When promoting {sorted(lst)}: {err}")
+                self._collect_error(f"{self.msginfo}: When promoting {sorted(lst)}: {err}",
+                                    ident=(self.pathname, tuple(lst)))
+                return
 
         subsys = getattr(self, subsys_name)
         if any:
@@ -2240,8 +2234,9 @@ class Group(System):
         for original, new in list_comp:
             for original_inside, new_inside in list_comp:
                 if original == original_inside and new != new_inside:
-                    raise RuntimeError("%s: Trying to promote '%s' when it has been aliased to "
-                                       "'%s'." % (self.msginfo, original_inside, new))
+                    self._collect_error("%s: Trying to promote '%s' when it has been aliased to "
+                                        "'%s'." % (self.msginfo, original_inside, new))
+                    continue
 
         # if this was called during configure(), mark this group as modified
         if self._problem_meta is not None:
@@ -2398,8 +2393,9 @@ class Group(System):
             if isinstance(tgt_name, str):
                 tgt_name = [tgt_name]
             tgt_name.append(src_indices)
-            raise TypeError("%s: src_indices must be an index array, did you mean"
-                            " connect('%s', %s)?" % (self.msginfo, src_name, tgt_name))
+            self._collect_error(f"{self.msginfo}: src_indices must be a slice, int, or index array."
+                                f" Did you mean connect('{src_name}', '{tgt_name}')?")
+            return
 
         # if multiple targets are given, recursively connect to each
         if not isinstance(tgt_name, str) and isinstance(tgt_name, Iterable):
@@ -2411,23 +2407,24 @@ class Group(System):
             try:
                 src_indices = indexer(src_indices, flat_src=flat_src_indices)
             except Exception:
-                exc = sys.exc_info()
-                conditional_error(f"{self.msginfo}: When connecting from '{src_name}' to "
-                                  f"'{tgt_name}': {exc[1]}", exc=exc, category=SetupWarning,
-                                  err=self._raise_connection_errors)
+                type_exc, exc, tb = sys.exc_info()
+                self._collect_error(f"{self.msginfo}: When connecting from '{src_name}' to "
+                                    f"'{tgt_name}': {exc}", exc_type=type_exc, tback=tb)
+                return
 
         # target should not already be connected
         for manual_connections in [self._manual_connections, self._static_manual_connections]:
             if tgt_name in manual_connections:
                 srcname = manual_connections[tgt_name][0]
-                raise RuntimeError("%s: Input '%s' is already connected to '%s'." %
-                                   (self.msginfo, tgt_name, srcname))
+                self._collect_error(f"{self.msginfo}: Input '{tgt_name}' is already connected to "
+                                    f"'{srcname}'.")
+                return
 
         # source and target should not be in the same system
         if src_name.rsplit('.', 1)[0] == tgt_name.rsplit('.', 1)[0]:
-            raise RuntimeError("{}: Output and input are in the same System for "
-                               "connection from '{}' to '{}'.".format(self.msginfo,
-                                                                      src_name, tgt_name))
+            self._collect_error(f"{self.msginfo}: Output and input are in the same System for "
+                                f"connection from '{src_name}' to '{tgt_name}'.")
+            return
 
         if self._static_mode:
             manual_connections = self._static_manual_connections
@@ -3283,6 +3280,7 @@ class Group(System):
         if val_shape is not None:
             start_val = val = np.ones(val_shape)
 
+        info = None
         for tgt in tgts:
             # if tgt in vars_to_gather and tgt not in abs2meta_in:
             if tgt in vars_to_gather and self.comm.rank != vars_to_gather[tgt]:
@@ -3313,12 +3311,13 @@ class Group(System):
                             if inds._src_shape is None:
                                 try:
                                     inds.set_src_shape(shape)
-                                except IndexError as err:
-                                    exc = sys.exc_info()
-                                    raise exc[0](f"When promoting '{pinfo.prom}' from system "
-                                                 f"'{pinfo.promoted_from}' with src_indices {inds}"
-                                                 f" and src_shape {shape}: {err}"
-                                                 ).with_traceback(exc[2])
+                                except IndexError:
+                                    exc_class, exc, tb = sys.exc_info()
+                                    self._collect_error(f"When promoting '{pinfo.prom}' from system"
+                                                        f" '{pinfo.promoted_from}' with src_indices"
+                                                        f" {inds} and src_shape {shape}: {exc}",
+                                                        exc_type=exc_class, tback=tb,
+                                                        ident=(pinfo.prom, pinfo.promoted_from))
 
                         if src_indices is None:
                             src_indices = inds
@@ -3345,25 +3344,30 @@ class Group(System):
                             val.ravel()[src_indices.flat()] = value.flat
                         else:
                             val[src_indices()] = value
-                    except ValueError as err:
+                    except Exception as err:
                         src = self._conn_global_abs_in2out[tgt]
                         msg = f"{self.msginfo}: The source indices " + \
                               f"{src_indices} do not specify a " + \
                               f"valid shape for the connection '{src}' to " + \
-                              f"'{tgt}'. The target shape is " + \
-                              f"{meta['shape']} but indices have shape " + \
-                              f"{src_indices.indexed_src_shape}."
-                        raise ValueError(msg)
+                              f"'{tgt}'. (target shape=" + \
+                              f"{meta['shape']}, indices_shape=" + \
+                              f"{src_indices.indexed_src_shape}): {err}"
+                        self._collect_error(msg, ident=(src, tgt))
+                        continue
             else:
                 if val is None:
                     val = value
                 elif np.ndim(value) == 0:
                     if val.size > 1:
-                        raise ValueError(f"Shape of input '{tgt}', (), doesn't match shape "
-                                         f"{val.shape}.")
+                        src = self._conn_global_abs_in2out[tgt]
+                        self._collect_error(f"Shape of input '{tgt}', (), doesn't match shape "
+                                            f"{val.shape}.", ident=(src, tgt))
+                        continue
                 elif np.squeeze(val).shape != np.squeeze(value).shape:
-                    raise ValueError(f"Shape of input '{tgt}', {value.shape}, doesn't match shape "
-                                     f"{val.shape}.")
+                    src = self._conn_global_abs_in2out[tgt]
+                    self._collect_error(f"Shape of input '{tgt}', {value.shape}, doesn't match "
+                                        f"shape {val.shape}.", ident=(src, tgt))
+                    continue
 
                 if val is not value:
                     if val.shape:
@@ -3384,11 +3388,14 @@ class Group(System):
             val = start_val
 
         if src_idx_found:  # auto_ivc connected to local vars with src_indices
-            raise RuntimeError("Attaching src_indices to inputs requires that the shape of the "
-                               "source variable is known, but the source shape for inputs "
-                               f"{src_idx_found} is unknown. You can specify the src shape for "
-                               "these inputs by setting 'val' or 'src_shape' in a call to "
-                               "set_input_defaults, or by adding an IndepVarComp as the source.")
+            self._collect_error("Attaching src_indices to inputs requires that the shape of the "
+                                "source variable is known, but the source shape for inputs "
+                                f"{src_idx_found} is unknown. You can specify the src shape for "
+                                "these inputs by setting 'val' or 'src_shape' in a call to "
+                                "set_input_defaults, or by adding an IndepVarComp as the source.",
+                                ident=(self.pathname, tuple(src_idx_found)))
+            return None
+
         return info
 
     def _setup_auto_ivcs(self, mode):
@@ -3445,7 +3452,10 @@ class Group(System):
 
         for src, tgts in auto2tgt.items():
             prom = self._var_allprocs_abs2prom['input'][tgts[0]]
-            tgt, val, remote = self._get_auto_ivc_out_val(tgts, vars2gather, abs2meta_in)
+            ret = self._get_auto_ivc_out_val(tgts, vars2gather, abs2meta_in)
+            if ret is None:  # setup error occurred. Try to continue
+                continue
+            tgt, val, remote = ret
             prom = abs2prom[tgt]
             if prom not in self._group_inputs:
                 self._group_inputs[prom] = [{'use_tgt': tgt, 'auto': True, 'path': self.pathname,
@@ -3574,6 +3584,7 @@ class Group(System):
 
         return auto_ivc
 
+    @collect_errors
     def _resolve_ambiguous_input_meta(self):
         """
         Resolve ambiguous input units and values for auto_ivcs with multiple targets.
@@ -3582,18 +3593,6 @@ class Group(System):
         """
         all_abs2meta_in = self._var_allprocs_abs2meta['input']
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
-        a2prom_inf = self._problem_meta['abs_in2prom_info']
-        for tgt, src in self._conn_global_abs_in2out.items():
-            if tgt in a2prom_inf and a2prom_inf[tgt][0] is not None:
-                if src in all_abs2meta_out:
-                    try:
-                        # a2prom_inf[tgt][0] is the top level _PromotesInfo object
-                        a2prom_inf[tgt][0].set_src_shape(all_abs2meta_out[src]['global_shape'])
-                    except Exception:
-                        exc = sys.exc_info()
-                        conditional_error(f"{self.msginfo}: When connecting '{src}' to '{tgt}': "
-                                          f"{exc[1]}", exc=exc, category=SetupWarning,
-                                          err=self._raise_connection_errors)
 
         abs2prom = self._var_allprocs_abs2prom['input']
         abs2meta_in = self._var_abs2meta['input']
@@ -3684,10 +3683,10 @@ class Group(System):
 
         gname = f"Group named '{gpath}'" if gpath else 'model'
         args = ', '.join([f'{n}=?' for n in errs])
-        conditional_error(f"{self.msginfo}: The following inputs, {inputs}, promoted "
-                          f"to '{prom}', are connected but their metadata entries {meta}"
-                          f" differ. Call <group>.set_input_defaults('{gprom}', {args}), "
-                          f"where <group> is the {gname} to remove the ambiguity.")
+        self._collect_error(f"{self.msginfo}: The following inputs, {inputs}, promoted "
+                            f"to '{prom}', are connected but their metadata entries {meta}"
+                            f" differ. Call <group>.set_input_defaults('{gprom}', {args}), "
+                            f"where <group> is the {gname} to remove the ambiguity.")
 
     def _ordered_comp_name_iter(self):
         """

@@ -217,7 +217,7 @@ class set_env_vars(object):
 @contextmanager
 def set_env_vars_context(**kwargs):
     """
-    Decorate a function to temporarily set some environment variables.
+    Context to temporarily set some environment variables.
 
     Parameters
     ----------

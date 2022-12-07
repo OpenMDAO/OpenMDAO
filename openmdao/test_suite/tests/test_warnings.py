@@ -128,7 +128,7 @@ class TestWarnings(unittest.TestCase):
                 outputs['y'] = inputs['a'] * inputs['x'] + inputs['b']
                 outputs['z'] = inputs['b'] * inputs['x']
 
-        p = om.Problem()
+        p = om.Problem(name='error_on_openmdao_warning')
 
         p.model.add_subsystem('a_comp', AComp())
         p.model.add_subsystem('exec_comp',
@@ -145,10 +145,11 @@ class TestWarnings(unittest.TestCase):
             warnings.filterwarnings('error', category=om.OpenMDAOWarning)
             warnings.filterwarnings("ignore", r'.*OpenMDAO support for Python version .* will end soon.*')
 
-            with self.assertRaises(om.UnitsWarning) as e:
+            with self.assertRaises(Exception) as e:
                 p.setup()
 
-        expected = "<model> <class Group>: Output 'a_comp.y' with units of 'm' is connected to " \
+        expected = "\nCollected errors for problem 'error_on_openmdao_warning':" \
+                   "\n   <model> <class Group>: Output 'a_comp.y' with units of 'm' is connected to " \
                    "input 'exec_comp.y' which has no units."
 
         self.assertEqual(expected, str(e.exception), )

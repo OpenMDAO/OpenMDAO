@@ -73,9 +73,8 @@ def _setup_hooks(obj):
         for instmeta in instmetas:
             for funcname, fmeta in instmeta.items():
                 method = getattr(obj, funcname, None)
-                # if _hashook_ attr is present, we've already wrapped this method.  We don't need
-                # to combine pre/post hook data for inst and None hooks here because it has
-                # already been done earlier (in register_hook/_get_hook_list_iters).
+                # We don't need to combine pre/post hook data for inst and None hooks here
+                # because it has already been done earlier (in register_hook/_get_hook_list_iters).
                 if method is not None and not hasattr(method, '_hashook_'):
                     setattr(obj, funcname, _hook_decorator(method, obj, fmeta))
 
@@ -133,7 +132,7 @@ def _hook_decorator(f, inst, hookmeta):
         _run_hooks(post_hooks, inst)
         return ret
 
-    execute_hooks._hashook_ = True  # to prevent multiple decoration of same function
+    execute_hooks._hashook_ = f  # to prevent multiple decoration of same function
 
     return wraps(f)(execute_hooks)
 
@@ -295,7 +294,6 @@ def _unregister_hook(fname, class_name, inst_id=None, pre=True, post=True):
     try:
         classhooks = _hooks[class_name]
     except KeyError:
-        warnings.warn(f"No hooks found for class '{class_name}'.")
         return
 
     todel = []
