@@ -243,7 +243,7 @@ def activate_report(name, instance=None):
     global _reports_registry, _active_reports
 
     if name not in _reports_registry:
-        issue_warning(f"No report with the name {name} is registered.")
+        issue_warning(f"No report with the name '{name}' is registered.")
         return
     if name in _cmdline_reports:
         return  # skip it if it's already being run from the command line
@@ -581,7 +581,11 @@ def clear_reports(instance=None):
             inst_id = active_inst_id
         elif inst_id != active_inst_id:
             continue
-        _reports_registry[name].unregister_hooks()
+        if name in _reports_registry:
+            _reports_registry[name].unregister_hooks()
+        else:
+            issue_warning(f"No report with the name '{name}' is registered.")
+
         to_remove.add((name, active_inst_id))
 
     _active_reports -= to_remove
