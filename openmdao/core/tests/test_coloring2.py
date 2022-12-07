@@ -2,10 +2,13 @@
 import unittest
 import numpy as np
 
+from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.testing_utils import use_tempdirs
 
 from openmdao.core.tests.test_coloring import build_multipoint_problem
+
+OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -14,7 +17,7 @@ except ImportError:
 
 
 @use_tempdirs
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@unittest.skipUnless(MPI and PETScVector and OPTIMIZER, "MPI, PETSc, and pyOptSparse are required.")
 class MatMultMultipointMPI2TestCase(unittest.TestCase):
     N_PROCS = 2
 
