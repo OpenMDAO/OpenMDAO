@@ -450,11 +450,15 @@ def clear_reports(instance=None):
             inst_id = active_inst_id
         elif inst_id != active_inst_id:
             continue
-        func, _, class_name, _, method, pre_or_post, _ = _reports_registry[name]
-        if pre_or_post == "pre":
-            _unregister_hook(method, class_name, inst_id=inst_id, pre=func)
+        if name in _reports_registry:
+            func, _, class_name, _, method, pre_or_post, _ = _reports_registry[name]
+            if pre_or_post == "pre":
+                _unregister_hook(method, class_name, inst_id=inst_id, pre=func)
+            else:
+                _unregister_hook(method, class_name, inst_id=inst_id, post=func)
         else:
-            _unregister_hook(method, class_name, inst_id=inst_id, post=func)
+            issue_warning(f"No report with the name '{name}' is registered.")
+
         to_remove.add((name, active_inst_id))
 
     _active_reports -= to_remove
