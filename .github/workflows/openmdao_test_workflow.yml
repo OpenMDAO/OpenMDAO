@@ -35,6 +35,7 @@ jobs:
             JAX: '0.3.24'
             BANDIT: true
             TESTS: true
+            DEBUG: true
 
           # test baseline versions on MacOS
           - NAME: MacOS Baseline
@@ -290,6 +291,7 @@ jobs:
                     f'Scipy version {scipy.__version__} is not the requested version (${{ matrix.SCIPY }})'"
 
       - name: Setup tmate session
+        if: matrix.DEBUG
         uses: mxschmitt/action-tmate@v3
 
       - name: Run tests
