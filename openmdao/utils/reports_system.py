@@ -43,7 +43,7 @@ class Report(object):
     description : str
         The description displayed when reports are listed using the `list_reports` command.
     hooks : list
-        List of (*args, **kwargs) to be passed to the `register_hook` function when the report
+        List of (args, kwargs) to be passed to the `register_hook` function when the report
         corresponding to this instance is activated.
     """
 
