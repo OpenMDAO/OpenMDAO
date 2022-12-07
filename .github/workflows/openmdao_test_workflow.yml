@@ -35,7 +35,17 @@ jobs:
             JAX: '0.3.24'
             BANDIT: true
             TESTS: true
-            DEBUG: true
+            # set DEBUG to create an interactive debugging session just before testflo is run.
+            # Note that the workflow will run until you cancel the debugging session.
+            #   To access the terminal through the web-interface:
+            #     1. Click on the web-browser link printed out in this action from the github
+            #        workflow terminal
+            #     2. Press cntrl + c in the new tab that opens up to reveal the terminal
+            #     3. To activate the conda environment run:
+            #         $ source $CONDA/etc/profile.d/conda.sh
+            #         $ conda activate test
+            # See https://github.com/mxschmitt/action-tmate for more details
+            # DEBUG: true
 
           # test baseline versions on MacOS
           - NAME: MacOS Baseline
