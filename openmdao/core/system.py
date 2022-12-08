@@ -683,16 +683,23 @@ class System(object):
         """
         pass
 
+    def _have_output_solver_options_been_applied(self):
+        been_applied = True
+        for subsys in [self] + self._subsystems_myproc:
+            if subsys._output_solver_options:
+                been_applied = False
+        return been_applied
+
     def set_output_solver_options(self, name, lower=_UNDEFINED, upper=_UNDEFINED,
                                   ref=_UNDEFINED, ref0=_UNDEFINED, res_ref=_UNDEFINED):
 
-        if self._problem_meta is not None and self._problem_meta['setup_status'] >= \
-                _SetupStatus.POST_SETUP:
-            raise RuntimeError('Cannot call set_output_solver_options after setup.')
-
-        # Cache the solver options for use later in the setup process
-        # They are applied in the System._apply_output_solver_options method
-        # The System._apply_output_solver_options method is called in System._setup
+        # Cache the solver options for use later in the setup process.
+        # Since this can be called before setup, there is no way to
+        # update the self._var_allprocs_abs2meta['output'] values since that
+        # has not been setup yet.
+        # These values are applied in the System._apply_output_solver_options method
+        # The System._apply_output_solver_options method is called in System._setup,
+        # which is only called by the top model
         output_solver_options = {}
 
         if lower is not _UNDEFINED:
@@ -714,14 +721,16 @@ class System(object):
                                upper=_UNDEFINED, scaler=_UNDEFINED,
                                adder=_UNDEFINED, ref=_UNDEFINED, ref0=_UNDEFINED):
 
-        if self._problem_meta is not None and self._problem_meta['setup_status'] >= \
-                _SetupStatus.POST_SETUP:
-            raise RuntimeError('Cannot call set_design_var_options after setup.')
-
+        # Check inputs
         # Name must be a string
         if not isinstance(name, str):
             raise TypeError('{}: The name argument should be a string, got {}'.format(self.msginfo,
                                                                                       name))
+        if scaler == _UNDEFINED and adder == _UNDEFINED and ref == _UNDEFINED and ref0 == \
+                _UNDEFINED and lower == _UNDEFINED and upper == _UNDEFINED:
+            raise RuntimeError(
+                'Must set a value for at least one argument in call to set_design_var_options.')
+
         if self._static_mode:
             design_vars = self._static_design_vars
         else:
@@ -764,8 +773,6 @@ class System(object):
         if ref0 == _UNDEFINED:
             ref0 = existing_dv['ref0']
 
-        dv = {}
-
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
         ref0 = format_as_float_or_array('ref0', ref0, val_if_none=None, flatten=True)
@@ -791,33 +798,31 @@ class System(object):
             # Apply scaler/adder
             upper = (upper + adder) * scaler
 
+        new_desvar_metadata = {}
+
         if isinstance(scaler, np.ndarray):
             if np.all(scaler == 1.0):
                 scaler = None
         elif scaler == 1.0:
             scaler = None
-        dv['scaler'] = scaler
+        new_desvar_metadata['scaler'] = scaler
 
         if isinstance(adder, np.ndarray):
             if not np.any(adder):
                 adder = None
         elif adder == 0.0:
             adder = None
-        dv['adder'] = adder
+        new_desvar_metadata['adder'] = adder
 
-        dv['upper'] = upper
-        dv['lower'] = lower
-        dv['ref'] = ref
-        dv['ref0'] = ref0
+        new_desvar_metadata['upper'] = upper
+        new_desvar_metadata['lower'] = lower
+        new_desvar_metadata['ref'] = ref
+        new_desvar_metadata['ref0'] = ref0
 
-        design_vars[name].update(dv)
+        design_vars[name].update(new_desvar_metadata)
 
     def set_objective_options(self, name, ref=_UNDEFINED, ref0=_UNDEFINED,
                               adder=_UNDEFINED, scaler=_UNDEFINED, alias=_UNDEFINED):
-
-        if self._problem_meta is not None and self._problem_meta['setup_status'] >= \
-                _SetupStatus.POST_SETUP:
-            raise RuntimeError('Cannot call set_objective_options after setup.')
 
         # Check inputs
         # Name must be a string
@@ -884,20 +889,22 @@ class System(object):
                                equals=_UNDEFINED, lower=_UNDEFINED, upper=_UNDEFINED,
                                adder=_UNDEFINED, scaler=_UNDEFINED, alias=_UNDEFINED):
 
-        if self._problem_meta is not None and self._problem_meta['setup_status'] >= \
-                _SetupStatus.POST_SETUP:
-            raise RuntimeError('Cannot call set_constraint_options after setup.')
-
+        # Check inputs
         if not isinstance(name, str):
             raise TypeError('{}: The name argument should be a string, '
                             'got {}'.format(self.msginfo, name))
+
+        # At least one of the scaling parameters must be set or why bother calling this function?
+        if scaler == _UNDEFINED and adder == _UNDEFINED and ref == _UNDEFINED and ref0 == \
+                _UNDEFINED and upper == _UNDEFINED and lower == _UNDEFINED and equals == _UNDEFINED:
+            raise RuntimeError(
+                'Must set a value for at least one argument in call to set_constraint_options.')
 
         # A constraint cannot be an equality and inequality constraint
         if equals is not _UNDEFINED and (lower is not _UNDEFINED or upper is not _UNDEFINED):
             msg = "{}: Constraint '{}' cannot be both equality and inequality."
             raise ValueError(msg.format(self.msginfo, name))
 
-        # TODO also cannot set both scaler/adder and ref/ref0
         if self._static_mode:
             responses = self._static_responses
         else:
@@ -905,19 +912,18 @@ class System(object):
 
         # Look through responses to see if there are multiple responses with that name
         aliases = [resp['alias'] for key, resp in responses.items() if resp['name'] == name]
-
-        if len(aliases) > 1 and alias is _UNDEFINED:  # TODO should this be None
+        if len(aliases) > 1 and alias is _UNDEFINED:
             msg = "{}: set_constraint_options called with constraint variable '{}' that has " \
                   "multiple aliases: {}. Call set_objective_options with the 'alias' argument " \
                   "set to one of those aliases."
             raise RuntimeError(msg.format(self.msginfo, name, aliases))
 
-        if len(aliases) == 0:  # TODO what if called without alias ?
+        if len(aliases) == 0:
             msg = "{}: set_constraint_options called with constraint variable '{}' that does not " \
                   "exist."
             raise RuntimeError(msg.format(self.msginfo, name))
 
-        if alias is not _UNDEFINED:  # TODO? Should this be _UNDEFINED ?
+        if alias is not _UNDEFINED:
             name = alias
 
         curr_cons_meta = responses[name]
@@ -926,7 +932,7 @@ class System(object):
 
         # If values are not being set by this call, use the values that already exist
         if lower == _UNDEFINED:
-            new_cons_meta['lower'] = curr_cons_meta['lower']  # TODO need to do this since it's copy
+            new_cons_meta['lower'] = curr_cons_meta['lower']  # need to do this since it's a copy
         else:
             new_cons_meta['lower'] = lower
         if upper == _UNDEFINED:
@@ -1089,10 +1095,7 @@ class System(object):
             metadatadict_abs2meta = abs2meta[abs_name]
             metadatadict_allprocs_abs2meta = allprocs_abs2meta[abs_name]
 
-            # Have to update _has_output_scaling, _has_output_adder,
-            #   _has_resid_scaling,
             for meta_key in ['ref', 'ref0', 'res_ref', 'lower', 'upper']:
-                # if meta_key in options and options[meta_key] is not None:
                 if meta_key in options:
                     if options[meta_key] is None:
                         val_as_float_or_array_or_none = None
@@ -1111,59 +1114,55 @@ class System(object):
                         meta_key: val_as_float_or_array_or_none,
                     })
 
-        # recalculate has scaling and bounds vars across all outputs
+        # recalculate has scaling and bounds vars (_has_output_scaling, _has_output_adder,
+        # _has_resid_scaling, _has_bounds ) across all outputs
         # Since you are allowed to reference multiple subsystems from set_output_solver_options,
         #    need to loop over all of the ones that got modified by those calls.
+        # Loop over all the options set. Each one of these could be referencing a different
+        #    subsystem since the name could be a path
         for name, options in self._output_solver_options.items():
-
-            # Does not work if self is a Component
             if isinstance(self, Group):
                 subsys_path = name.rsplit('.', 1)[0]
                 subsys = self._get_subsystem(subsys_path)
             else:
                 subsys = self
 
-            # prefix = self.pathname + '.' if self.pathname else ''
-            # abs_name = prefix + name
-
-            abs2meta = subsys._var_abs2meta['output']
-
+            # Now that we know which subsystem was affected. We have to recalculate
+            #   _has_output_scaling, _has_output_adder, _has_resid_scaling, _has_bounds
+            #   across all the outputs of that subsystem, since the changes might have
+            #   affected them
             subsys._has_output_scaling = False
             subsys._has_output_adder = False
             subsys._has_resid_scaling = False
             subsys._has_bounds = False
 
+            abs2meta = subsys._var_abs2meta['output']
             for abs_name, metadata in abs2meta.items():  # Loop over outputs
                 ref = metadata['ref']
                 if np.isscalar(ref):
-                    # self._has_output_scaling |= ref != 1.0
                     subsys._has_output_scaling |= ref != 1.0
                 else:
-                    # self._has_output_scaling |= np.any(ref != 1.0)
                     subsys._has_output_scaling |= np.any(ref != 1.0)
 
                 ref0 = metadata['ref0']
                 if np.isscalar(ref0):
-                    # self._has_output_scaling |= ref0 != 0.0
-                    # self._has_output_adder |= ref0 != 0.0
                     subsys._has_output_scaling |= ref0 != 0.0
                     subsys._has_output_adder |= ref0 != 0.0
                 else:
-                    # self._has_output_scaling |= np.any(ref0)
-                    # self._has_output_adder |= np.any(ref0)
                     subsys._has_output_scaling |= np.any(ref0)
                     subsys._has_output_adder |= np.any(ref0)
 
                 res_ref = metadata['res_ref']
                 if np.isscalar(res_ref):
-                    # self._has_resid_scaling |= res_ref != 1.0
                     subsys._has_resid_scaling |= res_ref != 1.0
                 else:
-                    # self._has_resid_scaling |= np.any(res_ref != 1.0)
                     subsys._has_resid_scaling |= np.any(res_ref != 1.0)
 
                 if metadata['lower'] is not None or metadata['upper'] is not None:
                     subsys._has_bounds = True
+
+        # Indicate that the cached values have been applied
+        self._output_solver_options = {}
 
     def initialize(self):
         """
@@ -1341,7 +1340,7 @@ class System(object):
         self._has_output_adder = False
         self._has_resid_scaling = False
         self._has_bounds = False
-
+        #
         self._apply_output_solver_options()
         for subsys in self._subsystems_myproc:
             subsys._apply_output_solver_options()
@@ -1351,6 +1350,7 @@ class System(object):
             self._has_output_adder |= subsys._has_output_adder
             self._has_resid_scaling |= subsys._has_resid_scaling
             self._has_bounds |= subsys._has_bounds
+
 
         # promoted names must be known to determine implicit connections so this must be
         # called after _setup_var_data, and _setup_var_data will have to be partially redone
