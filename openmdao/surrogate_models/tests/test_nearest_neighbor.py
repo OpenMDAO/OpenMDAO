@@ -174,12 +174,102 @@ class TestWeightedInterpolator1D(unittest.TestCase):
         assert_near_equal(mu, expected_y, 1e-8)
 
     def test_jacobian(self):
+
+        def assert_near_equal_old(actual, desired, tolerance=1e-15):
+            """
+            Check relative error.
+
+            Determine that the relative error between `actual` and `desired`
+            is within `tolerance`. If `desired` is zero, then use absolute error.
+
+            Parameters
+            ----------
+            actual : float, array-like, dict
+                The value from the test.
+            desired : float, array-like, dict
+                The value expected.
+            tolerance : float
+                Maximum relative error ``(actual - desired) / desired``.
+
+            Returns
+            -------
+            float
+                The error.
+            """
+            if isinstance(actual, dict) and isinstance(desired, dict):
+
+                actual_keys = set(actual.keys())
+                desired_keys = set(desired.keys())
+
+                if actual_keys.symmetric_difference(desired_keys):
+                    msg = 'Actual and desired keys differ. Actual extra keys: {}, Desired extra ' \
+                          'keys: {}'
+                    actual_extra = actual_keys.difference(desired_keys)
+                    desired_extra = desired_keys.difference(actual_keys)
+                    raise KeyError(msg.format(actual_extra, desired_extra))
+
+                error = 0.
+
+                for key in actual_keys:
+                    try:
+                        new_error = assert_near_equal(
+                            actual[key], desired[key], tolerance)
+                        error = max(error, new_error)
+                    except ValueError as exception:
+                        msg = '{}: '.format(key) + str(exception)
+                        raise ValueError(msg) from None
+                    except KeyError as exception:
+                        msg = '{}: '.format(key) + str(exception)
+                        raise KeyError(msg) from None
+
+            elif isinstance(actual, float) and isinstance(desired, float):
+                from math import isnan
+                if isnan(actual) and not isnan(desired):
+                    raise ValueError('actual nan, desired %s' % desired)
+                if desired != 0:
+                    error = (actual - desired) / desired
+                else:
+                    error = actual
+                if abs(error) > tolerance:
+                    raise ValueError('actual %s, desired %s, rel error %s, tolerance %s'
+                                     % (actual, desired, error, tolerance))
+
+            # array values
+            else:
+                actual = np.atleast_1d(actual)
+                desired = np.atleast_1d(desired)
+                if actual.shape != desired.shape:
+                    raise ValueError(
+                        'actual and desired have differing shapes.'
+                        ' actual {}, desired {}'.format(actual.shape, desired.shape))
+                if not np.all(np.isnan(actual) == np.isnan(desired)):
+                    if actual.size == 1 and desired.size == 1:
+                        raise ValueError('actual %s, desired %s' % (actual, desired))
+                    else:
+                        raise ValueError('actual and desired values have non-matching nan'
+                                         ' values')
+
+                if np.linalg.norm(desired) == 0:
+                    error = np.linalg.norm(actual)
+                else:
+                    error = np.linalg.norm(actual - desired) / np.linalg.norm(desired)
+
+                if abs(error) > tolerance:
+                    if actual.size < 10 and desired.size < 10:
+                        raise ValueError('actual %s, desired %s, rel error %s, tolerance %s'
+                                         % (actual, desired, error, tolerance))
+                    else:
+                        raise ValueError('arrays do not match, rel error %.3e > tol (%.3e)' %
+                                         (error, tolerance))
+
+            return error
+
         test_x = np.array([[0.5], [1.5], [2.5]])
         expected_deriv = np.array([[1.92797784], [0.06648199], [-1.92797784]])
 
         for x0, y0 in zip(test_x, expected_deriv):
             jac = self.surrogate.linearize(x0, num_neighbors=3)
-            assert_near_equal(jac, [y0], 1e-6)
+            assert_near_equal_old(jac, [y0], 1e-6)
 
     def test_pt_cache(self):
         test_x = np.array([[0.5]])

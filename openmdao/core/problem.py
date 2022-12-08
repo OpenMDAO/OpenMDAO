@@ -841,6 +841,11 @@ class Problem(object):
             raise RuntimeError(self.msginfo +
                                ": The `setup` method must be called before `run_driver`.")
 
+        if not self.model._have_output_solver_options_been_applied():
+            raise RuntimeError(self.msginfo +
+                               ": Before calling `run_driver`, the `setup` method must be called "
+                               "if set_output_solver_options has been called.")
+
         old_prefix = self._recording_iter.prefix
 
         if case_prefix is not None:
