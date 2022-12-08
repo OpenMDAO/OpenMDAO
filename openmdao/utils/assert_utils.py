@@ -498,6 +498,9 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
         return 0
 
     # if desired is numeric list, make ndarray
+    if isinstance(actual, list):  # TODO need to check if numeric!!
+        actual = np.asarray(actual)
+
     if isinstance(desired, list):  # TODO need to check if numeric!!
         desired = np.asarray(desired)
 
