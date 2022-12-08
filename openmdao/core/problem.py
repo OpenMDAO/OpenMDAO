@@ -22,7 +22,8 @@ from openmdao.core.constants import _SetupStatus
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver, record_iteration, SaveOptResult
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.core.group import Group, System
+from openmdao.core.group import Group
+from openmdao.core.system import System
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
@@ -113,6 +114,10 @@ def _default_prob_name():
     str
         The default problem name.
     """
+    def_prob_name = os.environ.get('OPENMDAO_DEFAULT_PROBLEM', '')
+    if def_prob_name:
+        return def_prob_name
+
     name = _get_top_script()
     if name is None or env_truthy('TESTFLO_RUNNING'):
         return 'problem'
@@ -774,6 +779,32 @@ class Problem(object):
         # Clean up cache
         self._initial_condition_cache = {}
 
+    def _check_collected_errors(self):
+        """
+        If any collected errors are found, raise an exception containing all of them.
+        """
+        if self._metadata['saved_errors'] is None:
+            return
+
+        errors = self._metadata['saved_errors']
+
+        # set the errors to None so that all future calls will immediately raise an exception.
+        self._metadata['saved_errors'] = None
+
+        if errors:
+            final_msg = [f"\nCollected errors for problem '{self._name}':"]
+            seen = set()
+            for ident, msg, exc_type, tback in errors:
+                if ident is None or ident not in seen:
+                    final_msg.append(f"   {msg}")
+                    seen.add(ident)
+
+                # if there's only one error, include its traceback if there is one.
+                if len(errors) == 1:
+                    raise exc_type('\n'.join(final_msg)).with_traceback(tback)
+
+            raise RuntimeError('\n'.join(final_msg))
+
     def run_model(self, case_prefix=None, reset_iter_counts=True):
         """
         Run the model by calling the root system's solve_nonlinear.
@@ -1130,9 +1161,8 @@ class Problem(object):
                                      # a, a.b, and a.b.c, with one of the Nones replaced
                                      # by promotes info.  Dict entries are only created if
                                      # src_indices are applied to the variable somewhere.
-            'raise_connection_errors': True,  # If False, connection related errors in setup will
-                                              # be converted to warnings.
             'reports_dir': self.get_reports_dir(),  # directory where reports will be written
+            'saved_errors': [],  # store setup errors here until after final_setup
         }
         model._setup(model_comm, mode, self._metadata)
 
@@ -1144,6 +1174,8 @@ class Problem(object):
         self._logger = logger
 
         self._metadata['setup_status'] = _SetupStatus.POST_SETUP
+
+        self._check_collected_errors()
 
         return self
 

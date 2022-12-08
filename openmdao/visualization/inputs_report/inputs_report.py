@@ -130,7 +130,7 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
                           category=OMDeprecationWarning)
 
         rows.append([target, prom, src, src_is_ivc, src in desvars, '', None, sorted(meta['tags']),
-                     val, None, None])
+                     val, None, None, src])
 
     if not rows:
         column_meta = []
