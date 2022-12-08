@@ -719,7 +719,7 @@ class TestSystemSetObjectiveOptions(unittest.TestCase):
         assert_near_equal(prob['comp.x'], comp_x_using_add_objective, 1e-4)
         assert_near_equal(prob['comp.y'], comp_y_using_add_objective, 1e-4)
 
-    def test_set_objective_options_without_using_alias(self):  # TODO
+    def test_set_objective_options_without_using_alias(self):
         prob = Problem()
         model = prob.model
         model.add_subsystem('comp', ParaboloidObjConsArray(), promotes=['*'])
@@ -727,8 +727,14 @@ class TestSystemSetObjectiveOptions(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.model.add_constraint('fg_xy', indices=[1], alias='g_xy', lower=0, upper=10)
         prob.model.add_objective('fg_xy', index=0, alias='f_xy')
-        prob.model.set_objective_options(name='fg_xy', ref=3.0, ref0=2.0)
-        prob.setup()
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.model.set_objective_options(name='fg_xy', ref=3.0, ref0=2.0)
+        msg = "<class Group>: set_objective_options called with objective variable 'fg_xy' that " \
+              "has multiple aliases: ['g_xy', 'f_xy']. Call set_objective_options with the " \
+              "'alias' argument set to one of those aliases."
+        self.assertEqual(str(cm.exception), msg)
+
 
 
 class ImplCompTwoStatesNoMetadataSetInAddOutput(ImplicitComponent):
