@@ -9,38 +9,16 @@ from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.drivers.scipy_optimizer import ScipyOptimizeDriver
 from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.solvers.nonlinear.broyden import BroydenSolver
-from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
+from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.indexer import slicer
 
 
 class TestSystemSetSolverDesvarConstraintObjectiveOutputOptions(unittest.TestCase):
     # this class is for tests that cut across all set_xxxxx_options methods
-    def test_set_options_called_after_setup(self):
-
-        prob = Problem()
-        prob.model = SellarDerivatives()
-        prob.setup()
-
-        with self.assertRaises(RuntimeError) as ctx:
-            prob.model.set_output_solver_options(name='d1.x', ref=1e2, res_ref=1e5)
-        self.assertEqual(str(ctx.exception), "Cannot call set_output_solver_options after setup.")
-
-        with self.assertRaises(RuntimeError) as ctx:
-            prob.model.set_design_var_options(name='z', lower=-100, upper=100)
-        self.assertEqual(str(ctx.exception), "Cannot call set_design_var_options after setup.")
-
-        with self.assertRaises(RuntimeError) as ctx:
-            prob.model.set_constraint_options('con1', ref0=-2.0, ref=20)
-        self.assertEqual(str(ctx.exception), "Cannot call set_constraint_options after setup.")
-
-        with self.assertRaises(RuntimeError) as ctx:
-            prob.model.set_objective_options(name='obj', ref0=-2.0, ref=20)
-        self.assertEqual(str(ctx.exception), "Cannot call set_objective_options after setup.")
-
     def test_set_options_called_with_nonexistant_var(self):
         prob = Problem()
         prob.model.add_subsystem('comp', ImplCompTwoStatesNoMetadataSetInAddOutput())
@@ -53,10 +31,16 @@ class TestSystemSetSolverDesvarConstraintObjectiveOutputOptions(unittest.TestCas
 
         prob = Problem()
         prob.model = SellarDerivatives()
+        prob.model.add_design_var('x')
+        prob.model.add_design_var('y')
+        prob.model.add_constraint('con1')
+        prob.model.add_constraint('con2')
+        prob.model.add_objective('obj')
         with self.assertRaises(RuntimeError) as ctx:
             prob.model.set_design_var_options(name='bad_var', lower=-100, upper=100)
         self.assertEqual(str(ctx.exception),
-                         "<class SellarDerivatives>: set_design_var_options called with design variable 'bad_var' "
+                         "<class SellarDerivatives>: set_design_var_options called with design "
+                         "variable 'bad_var' "
                          "that does not exist.")
 
         with self.assertRaises(RuntimeError) as ctx:
@@ -77,8 +61,7 @@ class TestSystemSetSolverOutputOptions(unittest.TestCase):
     # Some tests run models that are from other tests in which the
     #   the metadata is set using add_output arguments. Checking to see if we get same results
     #   when setting the metadata when using set_output_solver_options vs. add_output
-
-    def _setup_model_for_lower_upper_tests(self,comp_class):
+    def _setup_model_for_lower_upper_tests(self, comp_class):
         prob = Problem()
         prob.model.add_subsystem('comp', comp_class(),
                                  promotes=['*'])
@@ -142,7 +125,6 @@ class TestSystemSetSolverOutputOptions(unittest.TestCase):
     def test_set_output_solver_options_set_lower_upper_to_none(self):
         # test the ability to override values set with add_output
         #  In this case, set the lower and upper to None, to see if the code handles that
-        #  correctly
         prob = self._setup_model_for_lower_upper_tests(ImplCompTwoStates)
         prob.model.set_output_solver_options(name='comp.z', lower=None, upper=None)
         prob.setup()
@@ -172,9 +154,9 @@ class TestSystemSetSolverOutputOptions(unittest.TestCase):
         prob.setup()
 
         # See if values were set in the metadata
-        comp_z_meta = model._var_allprocs_abs2meta['output']['comp.y1']
-        self.assertEqual(comp_z_meta['ref'], 1e2)
-        self.assertEqual(comp_z_meta['res_ref'], 1e5)
+        comp_y1_meta = model._var_allprocs_abs2meta['output']['comp.y1']
+        self.assertEqual(comp_y1_meta['ref'], 1e2)
+        self.assertEqual(comp_y1_meta['res_ref'], 1e5)
 
         prob.run_model()
         model.run_apply_nonlinear()
@@ -184,32 +166,11 @@ class TestSystemSetSolverOutputOptions(unittest.TestCase):
             val = model.comp._residuals['y1']
             assert_near_equal(val, [-.995])
             val = model.comp._residuals['y2']
-            assert_near_equal(val, [(1-6000.)/6000.])
+            assert_near_equal(val, [(1 - 6000.) / 6000.])
 
     def test_set_output_solver_affect_on_has_scaling_and_bounds_attributes(self):
         # make sure bounds and scaling attributes get set correctly with different
         #  combinations of setting via add_output and set_output_solver_options
-        class ScalingExample3ForTesting(ImplicitComponent):
-            def __init__(self, ref1=1.0, lower1=None, ref2=1.0, lower2=None):
-                super().__init__()
-                self.ref1 = ref1
-                self.lower1 = lower1
-                self.ref2 = ref2
-                self.lower2 = lower2
-
-            def setup(self):
-                self.add_input('x1', val=100.0)
-                self.add_input('x2', val=5000.0)
-                self.add_output('y1', val=200., ref=self.ref1, lower=self.lower1)
-                self.add_output('y2', val=200., ref=self.ref2, lower=self.lower2)
-
-            def apply_nonlinear(self, inputs, outputs, residuals):
-                x1 = inputs['x1']
-                x2 = inputs['x2']
-                y1 = outputs['y1']
-                y2 = outputs['y2']
-                residuals['y1'] = 1e5 * (x1 - y1) / y1
-                residuals['y2'] = 1e-5 * (x2 - y2) / y2
 
         # ref and lower not set either in add_output of set_output_solver_options
         prob = Problem()
@@ -217,13 +178,6 @@ class TestSystemSetSolverOutputOptions(unittest.TestCase):
         prob.setup()
         self.assertFalse(comp._has_bounds)
         self.assertFalse(comp._has_output_scaling)
-
-        # ref and lower set with add_output
-        prob = Problem()
-        comp = prob.model.add_subsystem('comp', ScalingExample3ForTesting(ref1=1.2, lower1=2.0))
-        prob.setup()
-        self.assertTrue(comp._has_bounds)
-        self.assertTrue(comp._has_output_scaling)
 
         # ref and lower set with set_output_solver_options
         prob = Problem()
@@ -254,6 +208,32 @@ class TestSystemSetSolverOutputOptions(unittest.TestCase):
         self.assertFalse(comp._has_bounds)
         self.assertFalse(comp._has_output_scaling)
 
+    def test_set_output_solver_options_after_initial_run(self):
+        # Testing to see if the error message occurs when the user runs a model
+        #   and then calls set_output_solver_options, then tries to run model again
+        #   without first running setup again
+        prob = Problem()
+        prob.model.add_subsystem('comp', ScalingExample3())
+        prob.model.set_output_solver_options(name='comp.y1', ref=3)
+        prob.setup()
+        prob.run_model()
+        prob.model.set_output_solver_options(name='comp.y1', ref=4)
+        msg = "Problem .*: Before calling `run_model`, the `setup` method must be called if " \
+              "set_output_solver_options has been called."
+        with self.assertRaisesRegex(RuntimeError, msg) as cm:
+            prob.run_model()
+
+        # also make sure it doesn't raise an error if done correctly with an additional call
+        #  to setup
+        prob = Problem()
+        prob.model.add_subsystem('comp', ScalingExample3())
+        prob.model.set_output_solver_options(name='comp.y1', ref=3)
+        prob.setup()
+        prob.run_model()
+        prob.model.set_output_solver_options(name='comp.y1', ref=4)
+        prob.setup()
+        prob.run_model()
+
     def test_set_output_solver_options_override_all_options(self):
         # Just another test to check setting all metadata in one call
         prob = Problem()
@@ -266,13 +246,14 @@ class TestSystemSetSolverOutputOptions(unittest.TestCase):
                                         ref=3, res_ref=6, ref0=9, lower=12, upper=15)
         prob.setup()
 
-        #check that they were all set
+        # check that they were all set
         comp_y1_meta = model._var_allprocs_abs2meta['output']['comp.y1']
         self.assertEqual(comp_y1_meta['ref'], 3)
         self.assertEqual(comp_y1_meta['res_ref'], 6)
         self.assertEqual(comp_y1_meta['ref0'], 9)
         self.assertEqual(comp_y1_meta['lower'], 12)
         self.assertEqual(comp_y1_meta['upper'], 15)
+
 
 class TestSystemSetDesignVarOptions(unittest.TestCase):
 
@@ -362,6 +343,45 @@ class TestSystemSetDesignVarOptions(unittest.TestCase):
 
         assert_near_equal(des_vars_using_add_design_var, des_vars_using_set_design_var_options)
 
+    def test_set_design_var_options_post_setup_run_driver_compare_outputs(self):
+        # Check to make sure that set_design_var_options can be called after setup
+        #   and have the same effect as if setting the metadata were part of add_design_var
+        prob = Problem()
+        model = prob.model
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+        prob.set_solver_print(level=0)
+        prob.driver = ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=0.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', lower=15.0, linear=True)
+        model.set_input_defaults('x', val=0.0)
+        model.set_input_defaults('y', val=0.0)
+        prob.setup()
+        prob.run_driver()
+        x_when_setting_using_add_design_var = prob['x']
+        y_when_setting_using_add_design_var = prob['y']
+
+        # now do the same but set the constraint using set_design_var_options
+        prob = Problem()
+        model = prob.model
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+        prob.set_solver_print(level=0)
+        prob.driver = ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
+        model.add_design_var('x')
+        model.add_design_var('y')
+        model.add_objective('f_xy')
+        model.add_constraint('c', lower=15.0, linear=True)
+        model.set_input_defaults('x', val=0.0)
+        model.set_input_defaults('y', val=0.0)
+        prob.setup()
+        model.set_design_var_options('x',lower=-50.0, upper=50.0 )
+        model.set_design_var_options('y',lower= 0.0, upper=50.0 )
+        prob.run_driver()
+        assert_near_equal(prob['x'], x_when_setting_using_add_design_var, 1e-6)
+        assert_near_equal(prob['y'], y_when_setting_using_add_design_var, 1e-6)
 
 class TestSystemSetConstraintsOptions(unittest.TestCase):
 
@@ -394,23 +414,20 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         prob.setup()
         constraints_using_add_constraint = prob.model.get_constraints()
 
-        # Then set it using an override via set_constraint_options
+        # Then set am equals constraint using an override via set_constraint_options
         prob = Problem()
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
         prob.model.add_constraint('con1', lower=-100, upper=100)
         prob.model.add_constraint('con2')
         prob.model.set_constraint_options('con1', equals=345.)
         prob.setup()
         constraints_using_set_constraint_options = prob.model.get_constraints()
-
         self.assertEqual(constraints_using_add_constraint, constraints_using_set_constraint_options)
 
     def test_set_constraints_options_lower_upper_overrides_equals(self):
         # First set lower and upper in add_constraint
         prob = Problem()
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
         prob.model.add_constraint('con1', lower=-100, upper=100)
         prob.model.add_constraint('con2')
         prob.setup()
@@ -419,7 +436,6 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         # Then set it using an override via set_constraint_options
         prob = Problem()
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
         prob.model.add_constraint('con1', equals=345.)
         prob.model.add_constraint('con2')
         prob.model.set_constraint_options('con1', lower=-100, upper=100)
@@ -460,7 +476,6 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         # then set the options using set_constraint_options
         prob = Problem()
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
         prob.model.add_constraint('con1')
         prob.model.add_constraint('con2')
         prob.model.set_constraint_options(name='con1', adder=3, scaler=10)
@@ -488,11 +503,12 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         prob.model = SellarDerivatives()
         prob.model.add_constraint('con1', ref0=-2.0, ref=20, lower=-100, upper=100)
         prob.model.add_constraint('con2')
-        prob.model.set_constraint_options(name='con1', scaler=3.5, adder=77.0)   # TODO - what if lower and upper also set
+        prob.model.set_constraint_options(name='con1', scaler=3.5, adder=77.0)
         prob.setup()
         constraints_using_set_constraint_options = prob.model.get_constraints()
 
-        assert_near_equal(constraints_using_add_constraint, constraints_using_set_constraint_options)
+        assert_near_equal(constraints_using_add_constraint,
+                          constraints_using_set_constraint_options)
 
         # first set the options for ref and ref0 using add_constraint
         prob = Problem()
@@ -502,7 +518,7 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         prob.setup()
         constraints_using_add_constraint = prob.model.get_constraints()
 
-        # then set the options for ref and ref0 using set_design_var_options
+        # then set the options for ref and ref0 using set_constraint_options
         prob = Problem()
         prob.model = SellarDerivatives()
         prob.model.add_constraint('con1', scaler=3.5, adder=77.0, lower=-100, upper=100)
@@ -511,21 +527,8 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         prob.setup()
         constraints_using_set_constraint_options = prob.model.get_constraints()
 
-        assert_near_equal(constraints_using_add_constraint, constraints_using_set_constraint_options)
-
-    def test_set_constraint_options_error_calling_without_aliases(self):
-        prob = Problem()
-        exec_comp = prob.model.add_subsystem('exec', ExecComp())
-        exec_comp.add_expr('y = x**2', y={'shape': (10, 3)}, x={'shape': (10, 3)})
-        prob.model.add_constraint('exec.y', alias='y0', indices=slicer[0, -1], scaler=3.5, adder=77.0)
-        prob.model.add_constraint('exec.y', alias='yf', indices=slicer[-1, 0], equals=0)
-
-        with self.assertRaises(RuntimeError) as cm:
-            prob.model.set_constraint_options('exec.y', ref0=-2.0, ref=20)
-        msg = "<class Group>: set_constraint_options called with constraint variable 'exec.y' " \
-              "that has multiple aliases: ['y0', 'yf']. Call set_objective_options with the " \
-              "'alias' argument set to one of those aliases."
-        self.assertEqual(str(cm.exception), msg)
+        assert_near_equal(constraints_using_add_constraint,
+                          constraints_using_set_constraint_options)
 
     def test_set_constraint_options_with_aliases(self):
         # One complication is the path to constraints in set_constraint_options, since a single
@@ -550,7 +553,23 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         prob.setup()
 
         constraints_using_set_constraint_options = prob.model.get_constraints()
-        assert_near_equal(constraints_using_add_constraint, constraints_using_set_constraint_options)
+        assert_near_equal(constraints_using_add_constraint,
+                          constraints_using_set_constraint_options)
+
+    def test_set_constraint_options_error_calling_without_aliases(self):
+        prob = Problem()
+        exec_comp = prob.model.add_subsystem('exec', ExecComp())
+        exec_comp.add_expr('y = x**2', y={'shape': (10, 3)}, x={'shape': (10, 3)})
+        prob.model.add_constraint('exec.y', alias='y0', indices=slicer[0, -1], scaler=3.5,
+                                  adder=77.0)
+        prob.model.add_constraint('exec.y', alias='yf', indices=slicer[-1, 0], equals=0)
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.model.set_constraint_options('exec.y', ref0=-2.0, ref=20)
+        msg = "<class Group>: set_constraint_options called with constraint variable 'exec.y' " \
+              "that has multiple aliases: ['y0', 'yf']. Call set_objective_options with the " \
+              "'alias' argument set to one of those aliases."
+        self.assertEqual(str(cm.exception), msg)
 
 class TestSystemSetObjectiveOptions(unittest.TestCase):
     def test_set_objective_options_scaler_adder_ref_ref0(self):
@@ -627,37 +646,12 @@ class TestSystemSetObjectiveOptions(unittest.TestCase):
         assert_near_equal(objective_using_add_objective, objective_using_set_objective_options)
 
     def test_set_objective_options_with_alias(self):
-        # Check to make sure setting options on the objective, where the objective is an alias, works
+        # Check to make sure setting options on the objective, where the objective is an alias,
+        # works.
         # Testing both ref and ref0 plus scaler and adder
         # Optimize a problem with both using add_objective to set the options and also
         #   by using set_objective_options. Compare the optimization results and also the
         #   objective metadata
-        class ParaboloidObjConsArray(ExplicitComponent):
-            def setup(self):
-                self.add_input('x', val=0.0)
-                self.add_input('y', val=0.0)
-                self.add_output('fg_xy', val=np.array([0., 0.]))
-
-            def setup_partials(self):
-                self.declare_partials('*', '*')
-
-            def compute_partials(self, inputs, partials):
-                x = inputs['x']
-                y = inputs['y']
-
-                partials['fg_xy', 'x'][0] = 2 * (x - 3) + y
-                partials['fg_xy', 'x'][1] = 1.0
-
-                partials['fg_xy', 'y'][0] = x + 2 * (y + 4)
-                partials['fg_xy', 'y'][1] = 1.0
-
-            def compute(self, inputs, outputs):
-                x = inputs['x']
-                y = inputs['y']
-                outputs['fg_xy'] = [
-                    (x - 3.0) ** 2 + x * y + (y + 4.0) ** 2 - 3.0,
-                    x + y
-                    ]
 
         def _build_model():
             prob = Problem()
@@ -728,19 +722,13 @@ class TestSystemSetObjectiveOptions(unittest.TestCase):
     def test_set_objective_options_without_using_alias(self):  # TODO
         prob = Problem()
         model = prob.model
-
-        model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2, ))))
-        model.add_subsystem('comp', DoubleArrayComp())
-        model.connect('px.x', 'comp.x1')
-
-        model.add_design_var('px.x', ref=np.array([2.0, 3.0]), ref0=np.array([0.5, 1.5]))
-        model.add_objective('comp.y1', ref=np.array([[7.0, 11.0]]), ref0=np.array([5.2, 6.3]))
-        model.add_constraint('comp.y2', lower=0.0, upper=1.0, ref=np.array([[2.0, 4.0]]),
-                             ref0=np.array([1.2, 2.3]))
-
+        model.add_subsystem('comp', ParaboloidObjConsArray(), promotes=['*'])
+        prob.driver = ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
+        prob.set_solver_print(level=0)
+        prob.model.add_constraint('fg_xy', indices=[1], alias='g_xy', lower=0, upper=10)
+        prob.model.add_objective('fg_xy', index=0, alias='f_xy')
+        prob.model.set_objective_options(name='fg_xy', ref=3.0, ref0=2.0)
         prob.setup()
-        prob.run_driver()
-
 
 
 class ImplCompTwoStatesNoMetadataSetInAddOutput(ImplicitComponent):
@@ -766,8 +754,8 @@ class ImplCompTwoStatesNoMetadataSetInAddOutput(ImplicitComponent):
         y = outputs['y']
         z = outputs['z']
 
-        residuals['y'] = y - x - 2.0*z
-        residuals['z'] = x*z + z - 4.0
+        residuals['y'] = y - x - 2.0 * z
+        residuals['z'] = x * z + z - 4.0
 
     def linearize(self, inputs, outputs, jac):
         jac[('y', 'x')] = -1.0
@@ -795,6 +783,7 @@ class ScalingExample3(ImplicitComponent):
         residuals['y1'] = 1e5 * (x1 - y1) / y1
         residuals['y2'] = 1e-5 * (x2 - y2) / y2
 
+
 class ScalingExample3NoMetadataSetInAddOutput(ImplicitComponent):
     def setup(self):
         self.add_input('x1', val=100.0)
@@ -811,6 +800,54 @@ class ScalingExample3NoMetadataSetInAddOutput(ImplicitComponent):
         residuals['y1'] = 1e5 * (x1 - y1) / y1
         residuals['y2'] = 1e-5 * (x2 - y2) / y2
 
+class ScalingExample3ForTesting(ImplicitComponent):
+    def __init__(self, ref1=1.0, lower1=None, ref2=1.0, lower2=None):
+        super().__init__()
+        self.ref1 = ref1
+        self.lower1 = lower1
+        self.ref2 = ref2
+        self.lower2 = lower2
+
+    def setup(self):
+        self.add_input('x1', val=100.0)
+        self.add_input('x2', val=5000.0)
+        self.add_output('y1', val=200., ref=self.ref1, lower=self.lower1)
+        self.add_output('y2', val=200., ref=self.ref2, lower=self.lower2)
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        x1 = inputs['x1']
+        x2 = inputs['x2']
+        y1 = outputs['y1']
+        y2 = outputs['y2']
+        residuals['y1'] = 1e5 * (x1 - y1) / y1
+        residuals['y2'] = 1e-5 * (x2 - y2) / y2
+
+class ParaboloidObjConsArray(ExplicitComponent):
+    def setup(self):
+        self.add_input('x', val=0.0)
+        self.add_input('y', val=0.0)
+        self.add_output('fg_xy', val=np.array([0., 0.]))
+
+    def setup_partials(self):
+        self.declare_partials('*', '*')
+
+    def compute_partials(self, inputs, partials):
+        x = inputs['x']
+        y = inputs['y']
+
+        partials['fg_xy', 'x'][0] = 2 * (x - 3) + y
+        partials['fg_xy', 'x'][1] = 1.0
+
+        partials['fg_xy', 'y'][0] = x + 2 * (y + 4)
+        partials['fg_xy', 'y'][1] = 1.0
+
+    def compute(self, inputs, outputs):
+        x = inputs['x']
+        y = inputs['y']
+        outputs['fg_xy'] = [
+            (x - 3.0) ** 2 + x * y + (y + 4.0) ** 2 - 3.0,
+            x + y
+        ]
 
 if __name__ == "__main__":
     unittest.main()
