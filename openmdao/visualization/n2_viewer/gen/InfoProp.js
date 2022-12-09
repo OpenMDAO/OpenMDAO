@@ -203,6 +203,13 @@ class InfoPropArray extends InfoPropDefault {
         this.values = values;
     }
 
+    addRow(tbody, node) {
+        if (this.canShow(node)) {
+            InfoPropDefault.addRowWithVal(tbody, this.desc,
+                this.output(node[this.key], node))
+        }
+    }
+
     /**
      * Convert the array to a string that can be displayed in the info panel. Save
      * the array value, the string, and a Python version of the string in the
@@ -210,7 +217,7 @@ class InfoPropArray extends InfoPropDefault {
      * @param {Array} array The array to display and save.
      * @returns {String} A string representation of the array.
      */
-    output(array) {
+    output(array, node) {
         if (array == null) { return 'Value too large to include in diagram'; }
 
         const valStr = InfoPropDefault.valToString(array);
@@ -227,6 +234,10 @@ class InfoPropArray extends InfoPropDefault {
         // Store the original value and formatted value so they can be passed if the panel is pinned.
         this.values[this.key] = {
             'val': array,
+            'min': node.val_min,
+            'min_idx': node.val_min_indices,
+            'max': node.val_max,
+            'max_idx': node.val_max_indices,
             'str': valStr,
             'copyStr': InfoPropDefault.valToCopyString(array),
             'isTruncated': isTruncated
