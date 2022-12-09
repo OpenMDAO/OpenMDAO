@@ -5,12 +5,15 @@ from copy import deepcopy
 import numpy as np
 
 from openmdao.api import Problem, IndepVarComp, ExecComp, ExplicitComponent
+from openmdao.components.linear_system_comp import LinearSystemComp
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.drivers.scipy_optimizer import ScipyOptimizeDriver
 from openmdao.solvers.linear.direct import DirectSolver
+from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
 from openmdao.solvers.nonlinear.broyden import BroydenSolver
+from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
-from openmdao.test_suite.components.sellar import SellarDerivatives
+from openmdao.test_suite.components.sellar import SellarDerivatives, SellarProblem
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.utils.assert_utils import assert_near_equal
@@ -253,6 +256,21 @@ class TestSystemSetSolverOutputOptions(unittest.TestCase):
         self.assertEqual(comp_y1_meta['ref0'], 9)
         self.assertEqual(comp_y1_meta['lower'], 12)
         self.assertEqual(comp_y1_meta['upper'], 15)
+
+    def test_set_output_solver_options_no_setup_after_call_to_set_output_solver_options(self):
+        prob = SellarProblem(nonlinear_solver=NonlinearBlockGS,
+                             linear_solver=LinearBlockGS)
+        lscomp = prob.model.add_subsystem('lscomp', LinearSystemComp())
+        lscomp.nonlinear_solver = NonlinearBlockGS(maxiter=5)
+        prob.model.set_output_solver_options(name='lscomp.x', ref=3)
+        prob.setup()
+        prob.run_driver()
+
+        prob.model.set_output_solver_options(name='lscomp.x', ref=5)
+        msg = "Problem .*: Before calling `run_driver`, the `setup` method must be called if " \
+              "set_output_solver_options has been called."
+        with self.assertRaisesRegex(RuntimeError, msg) as cm:
+            prob.run_driver()
 
 
 class TestSystemSetDesignVarOptions(unittest.TestCase):
