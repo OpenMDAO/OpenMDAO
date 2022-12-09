@@ -50,7 +50,7 @@ from openmdao.utils.array_utils import scatter_dist_to_local
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
     clear_reports, get_reports_dir, _load_report_plugins
 from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable, \
-    _find_dict_meta, env_truthy, add_border
+    _find_dict_meta, env_truthy, add_border, match_includes_excludes
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
@@ -1339,23 +1339,8 @@ class Problem(object):
 
             name = comp.pathname
 
-            # Process includes
-            if includes is not None:
-                for pattern in includes:
-                    if fnmatchcase(name, pattern):
-                        break
-                else:
-                    continue
-
-            # Process excludes
-            if excludes is not None:
-                match = False
-                for pattern in excludes:
-                    if fnmatchcase(name, pattern):
-                        match = True
-                        break
-                if match:
-                    continue
+            if not match_includes_excludes(name, includes, excludes):
+                continue
 
             comps.append(comp)
 
@@ -1573,6 +1558,7 @@ class Problem(object):
                                                 out_dist = meta_out[out_abs]['distributed']
                                             else:
                                                 out_dist = meta_in[out_abs]['distributed']
+                                            # FIXME: remove this mult to change to new transfer std
                                             if out_dist:
                                                 derivs *= mult
 
@@ -2488,7 +2474,7 @@ def _errors_above_tol(deriv_info, abs_error_tol, rel_error_tol):
 
 
 def _iter_derivs(derivatives, sys_name, show_only_incorrect, global_options, totals,
-                 matrix_free, abs_error_tol, rel_error_tol):
+                 matrix_free, abs_error_tol=1e-6, rel_error_tol=1e-6):
     """
     Iterate over all of the derivatives.
 
@@ -2540,7 +2526,8 @@ def _iter_derivs(derivatives, sys_name, show_only_incorrect, global_options, tot
             fd_opts = global_options['']
         else:
             fd_opts = global_options[sys_name][wrt]
-        directional = fd_opts.get('directional')
+
+        directional = bool(fd_opts) and fd_opts.get('directional')
 
         fd_norm = _compute_deriv_errors(derivative_info, matrix_free, directional, totals)
 

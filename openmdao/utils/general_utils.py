@@ -782,7 +782,7 @@ def make_set(str_data, name=None):
 
 def match_includes_excludes(name, includes=None, excludes=None):
     """
-    Check to see if the variable names pass through the includes and excludes filter.
+    Check to see if the variable name passes through the includes and excludes filter.
 
     Parameters
     ----------
@@ -814,6 +814,30 @@ def match_includes_excludes(name, includes=None, excludes=None):
                 return True
 
     return False
+
+
+def filtered_name_iter(name_iter, includes=None, excludes=None):
+    """
+    Yield names that pass through the includes and excludes filters.
+
+    Parameters
+    ----------
+    name_iter : iter of str
+        Iterator over names to be checked for match.
+    includes : iter of str or None
+        Glob patterns for name to include in the filtering.  None, the default, means
+        include all.
+    excludes : iter of str or None
+        Glob patterns for name to exclude in the filtering.
+
+    Yields
+    ------
+    str
+        Each name that passes through the filters.
+    """
+    for name in name_iter:
+        if match_includes_excludes(name, includes, excludes):
+            yield name
 
 
 def match_prom_or_abs(name, prom_name, includes=None, excludes=None):
