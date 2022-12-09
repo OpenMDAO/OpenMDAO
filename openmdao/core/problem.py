@@ -818,7 +818,6 @@ class Problem(object):
         reset_iter_counts : bool
             If True and model has been run previously, reset all iteration counters.
         """
-
         if not self.model._have_output_solver_options_been_applied():
             raise RuntimeError(self.msginfo +
                                ": Before calling `run_model`, the `setup` method must be called "

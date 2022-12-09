@@ -34,14 +34,11 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer
-from openmdao.utils.general_utils import determine_adder_scaler, \
-    format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, env_truthy, \
-    make_traceback
 from openmdao.utils.om_warnings import issue_warning, warn_deprecation, \
     DerivativesWarning, PromotionWarning, UnusedOptionWarning
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, \
-    ensure_compatible
+    ensure_compatible, env_truthy, make_traceback
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -62,13 +59,13 @@ _supported_methods = {
 
 _DEFAULT_COLORING_META = {
     'wrt_patterns': ('*',),  # patterns used to match wrt variables
-    'method': 'fd',  # finite differencing method  ('fd' or 'cs')
-    'wrt_matches': None,  # where matched wrt names are stored
-    'per_instance': True,  # assume each instance can have a different coloring
-    'coloring': None,  # this will contain the actual Coloring object
-    'dynamic': False,  # True if dynamic coloring is being used
-    'static': None,  # either _STD_COLORING_FNAME, a filename, or a Coloring object
-    # if use_fixed_coloring was called
+    'method': 'fd',          # finite differencing method  ('fd' or 'cs')
+    'wrt_matches': None,     # where matched wrt names are stored
+    'per_instance': True,    # assume each instance can have a different coloring
+    'coloring': None,        # this will contain the actual Coloring object
+    'dynamic': False,        # True if dynamic coloring is being used
+    'static': None,          # either _STD_COLORING_FNAME, a filename, or a Coloring object
+                             # if use_fixed_coloring was called
 }
 
 _DEFAULT_COLORING_META.update(_DEF_COMP_SPARSITY_ARGS)
@@ -410,6 +407,7 @@ class System(object):
     _saved_errors : list
         Temporary storage for any saved errors that occur before this System is assigned
         a parent Problem.
+    _output_solver_options : dict
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -441,7 +439,7 @@ class System(object):
                                        Uses fnmatch wildcards')
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
-                                            '(processed post-includes). Uses fnmatch wildcards')
+                                       '(processed post-includes). Uses fnmatch wildcards')
         self.recording_options.declare('options_excludes', types=list, default=[],
                                        desc='User-defined metadata to exclude in recording')
 
@@ -549,7 +547,7 @@ class System(object):
         self._filtered_vars_to_record = {}
         self._owning_rank = None
         self._coloring_info = _DEFAULT_COLORING_META.copy()
-        self._first_call_to_linearize = True  # will check in first call to _linearize
+        self._first_call_to_linearize = True   # will check in first call to _linearize
         self._tot_jac = None
         self._saved_errors = None if env_truthy('OPENMDAO_FAIL_FAST') else []
 
@@ -720,6 +718,9 @@ class System(object):
         pass
 
     def _have_output_solver_options_been_applied(self):
+        """
+        Check to see if the cached output solver options were applied.
+        """
         been_applied = True
         for subsys in [self] + self._subsystems_myproc:
             if subsys._output_solver_options:
@@ -728,16 +729,42 @@ class System(object):
 
     def set_output_solver_options(self, name, lower=_UNDEFINED, upper=_UNDEFINED,
                                   ref=_UNDEFINED, ref0=_UNDEFINED, res_ref=_UNDEFINED):
+        """
+        Set solver output options.
 
-        # Cache the solver options for use later in the setup process.
-        # Since this can be called before setup, there is no way to
-        # update the self._var_allprocs_abs2meta['output'] values since that
-        # has not been setup yet.
-        # These values are applied in the System._apply_output_solver_options method
-        # The System._apply_output_solver_options method is called in System._setup,
-        # which is only called by the top model
+        Cache the solver options for use later in the setup process.
+        Since this can be called before setup, there is no way to update the
+        self._var_allprocs_abs2meta['output'] values since those have not been setup yet.
+        These values are applied in the System._apply_output_solver_options method.
+        The System._apply_output_solver_options method is called in System._setup,
+        which is only called by the top model.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable in this system's namespace.
+        lower : float or list or tuple or ndarray or None
+            Lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
+            consistent with the shape arg (if given), or (3) an array_like matching the shape of
+            val, if val is array_like. A value of None means this output has no lower bound.
+            Default is None.
+        upper : float or list or tuple or ndarray or None
+            Upper bound(s) in user-defined units. It can be (1) a float, (2) an array_like
+            consistent with the shape arg (if given), or (3) an array_like matching the shape of
+            val, if val is array_like. A value of None means this output has no upper bound.
+            Default is None.
+        ref : float
+            Scaling parameter. The value in the user-defined units of this output variable when
+            the scaled value is 1. Default is 1.
+        ref0 : float
+            Scaling parameter. The value in the user-defined units of this output variable when
+            the scaled value is 0. Default is 0.
+        res_ref : float
+            Scaling parameter. The value in the user-defined res_units of this output's residual
+            when the scaled value is 1. Default is None, which means residual scaling matches
+            output scaling.
+        """
         output_solver_options = {}
-
         if lower is not _UNDEFINED:
             output_solver_options['lower'] = lower
         if upper is not _UNDEFINED:
@@ -748,15 +775,36 @@ class System(object):
             output_solver_options['ref0'] = ref0
         if res_ref is not _UNDEFINED:
             output_solver_options['res_ref'] = res_ref
-
         self._output_solver_options[name] = output_solver_options
-
         return
 
     def set_design_var_options(self, name, lower=_UNDEFINED,
                                upper=_UNDEFINED, scaler=_UNDEFINED,
                                adder=_UNDEFINED, ref=_UNDEFINED, ref0=_UNDEFINED):
+        """
+        Set options for design vars in the model.
 
+        Parameters
+        ----------
+        name : str
+            Name of the variable in this system's namespace.
+        lower : float or ndarray, optional
+            Lower boundary for the input.
+        upper : upper or ndarray, optional
+            Upper boundary for the input.
+        scaler : float or ndarray, optional
+            Value to multiply the model value to get the scaled value for the driver. scaler
+            is second in precedence. adder and scaler are an alterantive to using ref
+            and ref0.
+        adder : float or ndarray, optional
+            Value to add to the model value to get the scaled value for the driver. adder
+            is first in precedence.  adder and scaler are an alterantive to using ref
+            and ref0.
+        ref : float or ndarray, optional
+            Value of design var that scales to 1.0 in the driver.
+        ref0 : float or ndarray, optional
+            Value of design var that scales to 0.0 in the driver.
+        """
         # Check inputs
         # Name must be a string
         if not isinstance(name, str):
@@ -859,12 +907,34 @@ class System(object):
 
     def set_objective_options(self, name, ref=_UNDEFINED, ref0=_UNDEFINED,
                               adder=_UNDEFINED, scaler=_UNDEFINED, alias=_UNDEFINED):
+        """
+        Set options for objectives in the model.
 
+        Parameters
+        ----------
+        name : str
+            Name of the response variable in the system.
+        ref : float or ndarray, optional
+            Value of response variable that scales to 1.0 in the driver.
+        ref0 : float or ndarray, optional
+            Value of response variable that scales to 0.0 in the driver.
+        adder : float or ndarray, optional
+            Value to add to the model value to get the scaled value for the driver. adder
+            is first in precedence.  adder and scaler are an alterantive to using ref
+            and ref0.
+        scaler : float or ndarray, optional
+            Value to multiply the model value to get the scaled value for the driver. scaler
+            is second in precedence. adder and scaler are an alterantive to using ref
+            and ref0.
+        alias : str
+            Alias for this response. Necessary when adding multiple objectives on different
+            indices or slices of a single variable.
+        """
         # Check inputs
         # Name must be a string
         if not isinstance(name, str):
             raise TypeError('{}: The name argument should be a string, got {}'.format(self.msginfo,
-                                                                                      name));
+                                                                                      name))
         # At least one of the scaling parameters must be set or why bother calling this function?
         if scaler == _UNDEFINED and adder == _UNDEFINED and ref == _UNDEFINED and ref0 == \
                 _UNDEFINED:
@@ -891,11 +961,6 @@ class System(object):
 
         if alias is not _UNDEFINED:
             name = alias
-
-        # if name not in responses:
-        #     msg = "{}: set_objective_options called with objective variable '{}' that does not " \
-        #           "exist."
-        #     raise RuntimeError(msg.format(self.msginfo, name))
 
         if scaler == _UNDEFINED:
             scaler = None
@@ -937,7 +1002,35 @@ class System(object):
     def set_constraint_options(self, name, ref=_UNDEFINED, ref0=_UNDEFINED,
                                equals=_UNDEFINED, lower=_UNDEFINED, upper=_UNDEFINED,
                                adder=_UNDEFINED, scaler=_UNDEFINED, alias=_UNDEFINED):
+        """
+        Set options for objectives in the model.
 
+        Parameters
+        ----------
+        name : str
+            Name of the response variable in the system.
+        ref : float or ndarray, optional
+            Value of response variable that scales to 1.0 in the driver.
+        ref0 : float or ndarray, optional
+            Value of response variable that scales to 0.0 in the driver.
+        equals : float or ndarray, optional
+            Equality constraint value for the variable.
+        lower : float or ndarray, optional
+            Lower boundary for the variable.
+        upper : float or ndarray, optional
+            Upper boundary for the variable.
+        adder : float or ndarray, optional
+            Value to add to the model value to get the scaled value for the driver. adder
+            is first in precedence.  adder and scaler are an alterantive to using ref
+            and ref0.
+        scaler : float or ndarray, optional
+            Value to multiply the model value to get the scaled value for the driver. scaler
+            is second in precedence. adder and scaler are an alterantive to using ref
+            and ref0.
+        alias : str, optional
+            Alias for this response. Necessary when adding multiple constraints on different
+            indices or slices of a single variable.
+        """
         # Check inputs
         if not isinstance(name, str):
             raise TypeError('{}: The name argument should be a string, '
@@ -974,7 +1067,6 @@ class System(object):
 
         if alias is not _UNDEFINED:
             name = alias
-
 
         curr_cons_meta = responses[name]
 
@@ -1019,10 +1111,10 @@ class System(object):
             if curr_cons_meta['scaler'] is not None and curr_cons_meta['adder'] is not None:
                 if new_cons_meta['lower'] is not None:
                     new_cons_meta['lower'] = new_cons_meta['lower'] / curr_cons_meta['scaler'] - \
-                                             curr_cons_meta['adder']
+                        curr_cons_meta['adder']
                 if new_cons_meta['upper'] is not None:
                     new_cons_meta['upper'] = new_cons_meta['upper'] / curr_cons_meta['scaler'] - \
-                                             curr_cons_meta['adder']
+                        curr_cons_meta['adder']
 
             if scaler != _UNDEFINED or adder != _UNDEFINED:
                 new_cons_meta['ref'] = None
@@ -1063,7 +1155,7 @@ class System(object):
                                                                   flatten=True)
                 if new_cons_meta['lower'] != - INF_BOUND:
                     new_cons_meta['lower'] = (new_cons_meta['lower'] + new_cons_meta['adder']) * \
-                                             new_cons_meta['scaler']
+                        new_cons_meta['scaler']
         except (TypeError, ValueError):
             raise TypeError("Argument 'lower' can not be a string ('{}' given). You can not "
                             "specify a variable as lower bound. You can only provide constant "
@@ -1079,7 +1171,7 @@ class System(object):
                                                                   flatten=True)
                 if new_cons_meta['upper'] != INF_BOUND:
                     new_cons_meta['upper'] = (new_cons_meta['upper'] + new_cons_meta['adder']) * \
-                                             new_cons_meta['scaler']
+                        new_cons_meta['scaler']
         except (TypeError, ValueError):
             raise TypeError("Argument 'upper' can not be a string ('{}' given). You can not "
                             "specify a variable as upper bound. You can only provide constant "
@@ -1095,7 +1187,7 @@ class System(object):
                                 "not specify a variable as equals bound. You can only provide "
                                 "constant float values".format(new_cons_meta['equals']))
             new_cons_meta['equals'] = (new_cons_meta['equals'] + new_cons_meta['adder']) * \
-                                      new_cons_meta['scaler']
+                new_cons_meta['scaler']
 
         if isinstance(scaler, np.ndarray):
             if np.all(new_cons_meta['scaler'] == 1.0):
@@ -1113,12 +1205,13 @@ class System(object):
 
     def _apply_output_solver_options(self):
         """
+        Apply the cached output solver options.
+
         Solver options can be set using the System.set_output_solver_options method.
         These cannot be set immediately when that method is called. So they are cached
         so that they can be applied later in the setup process.
         They are applied in System._setup using this method
         """
-
         for name, options in self._output_solver_options.items():
             from openmdao.core.group import Group
             if isinstance(self, Group):
@@ -1209,7 +1302,7 @@ class System(object):
                 if metadata['lower'] is not None or metadata['upper'] is not None:
                     subsys._has_bounds = True
 
-        # Indicate that the cached values have been applied
+        # Clear the cached to indicate that the cached values have been applied
         self._output_solver_options = {}
 
     def initialize(self):
@@ -1300,7 +1393,7 @@ class System(object):
         if method not in _supported_methods:
             msg = '{}: Method "{}" is not supported, method must be one of {}'
             raise ValueError(msg.format(self.msginfo, method,
-                                        [m for m in _supported_methods if m != 'exact']))
+                             [m for m in _supported_methods if m != 'exact']))
         if method not in self._approx_schemes:
             self._approx_schemes[method] = _supported_methods[method]()
         return self._approx_schemes[method]
@@ -1399,7 +1492,6 @@ class System(object):
             self._has_output_adder |= subsys._has_output_adder
             self._has_resid_scaling |= subsys._has_resid_scaling
             self._has_bounds |= subsys._has_bounds
-
 
         # promoted names must be known to determine implicit connections so this must be
         # called after _setup_var_data, and _setup_var_data will have to be partially redone
@@ -3462,7 +3554,7 @@ class System(object):
                        ref=None, ref0=None, adder=None, scaler=None, units=None,
                        indices=None, linear=False, parallel_deriv_color=None,
                        cache_linear_solution=False, flat_indices=False, alias=None):
-        r"""
+        """
         Add a constraint variable to this system.
 
         Parameters
@@ -4728,7 +4820,7 @@ class System(object):
         """
         if MPI:
             raise RuntimeError(self.msginfo + ": Recording of Systems when running parallel "
-                                              "code is not supported yet")
+                               "code is not supported yet")
 
         self._rec_mgr.append(recorder)
 
@@ -5030,7 +5122,7 @@ class System(object):
         if get_remote and (distrib or abs_name in vars_to_gather) and self.comm.size > 1:
             owner = self._owning_rank[abs_name]
             myrank = self.comm.rank
-            if rank is None:  # bcast
+            if rank is None:   # bcast
                 if distrib:
                     idx = self._var_allprocs_abs2idx[abs_name]
                     sizes = self._var_sizes[typ][:, idx]
@@ -5051,7 +5143,7 @@ class System(object):
                     # TODO: use Bcast if not discrete for speed
                     new_val = self.comm.bcast(val, root=owner)
                     val = new_val
-            else:  # retrieve to rank
+            else:   # retrieve to rank
                 if distrib:
                     idx = self._var_allprocs_abs2idx[abs_name]
                     sizes = self._var_sizes[typ][:, idx]
@@ -5369,7 +5461,7 @@ class System(object):
             else:
                 val = self.convert2units(abs_name, val, units)
         elif (vmeta['units'] is not None and smeta['units'] is not None and
-              vmeta['units'] != smeta['units']):
+                vmeta['units'] != smeta['units']):
             val = self.convert2units(src, val, vmeta['units'])
 
         return val

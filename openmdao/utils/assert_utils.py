@@ -473,7 +473,6 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
     float
         The error.
     """
-
     if type(actual) in [int, float, np.int32]:
         actual = np.atleast_1d(actual)
     if type(desired) in [int, float, np.int32]:
