@@ -143,20 +143,24 @@ def _get_var_dict(system, typ, name, is_parallel, is_implicit):
         else:
             var_dict['units'] = meta['units']
 
-        if val.size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
-            if not MPI:
-                # Get the current value
-                _get_array_info(system, vec, name, prom, var_dict, from_src=True)
+        try:
+            if val.size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
+                if not MPI:
+                    # Get the current value
+                    _get_array_info(system, vec, name, prom, var_dict, from_src=True)
 
-            elif is_parallel or is_dist:
-                # we can't access non-local values, so just get the initial value
-                var_dict['val'] = val
-                var_dict['initial_value'] = True
+                elif is_parallel or is_dist:
+                    # we can't access non-local values, so just get the initial value
+                    var_dict['val'] = val
+                    var_dict['initial_value'] = True
+                else:
+                    # get the current value but don't try to get it from the source,
+                    # which could be remote under MPI
+                    _get_array_info(system, vec, name, prom, var_dict, from_src=False)
             else:
-                # get the current value but don't try to get it from the source,
-                # which could be remote under MPI
-                _get_array_info(system, vec, name, prom, var_dict, from_src=False)
-        else:
+                var_dict['val'] = None
+        except Exception as err:
+            issue_warning(str(err))
             var_dict['val'] = None
     else:  # discrete
         meta = system._var_discrete[typ][name]
