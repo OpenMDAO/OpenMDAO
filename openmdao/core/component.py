@@ -11,7 +11,7 @@ from numpy import ndarray, isscalar, ndim, atleast_1d, atleast_2d, promote_types
 from scipy.sparse import issparse, coo_matrix
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
-    global_meta_names, _MetadataDict
+    global_meta_names, _MetadataDict, collect_errors
 from openmdao.core.constants import INT_DTYPE
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.array_utils import shape_to_len
@@ -19,7 +19,7 @@ from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    find_matches, make_set, convert_src_inds, conditional_error
+    find_matches, make_set, convert_src_inds
 from openmdao.utils.indexer import Indexer, indexer
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
@@ -286,6 +286,7 @@ class Component(System):
         else:
             self._discrete_inputs = self._discrete_outputs = ()
 
+    @collect_errors
     def _setup_var_sizes(self):
         """
         Compute the arrays of variable sizes for all variables/procs on this system.
@@ -298,7 +299,8 @@ class Component(System):
                                                    dtype=INT_DTYPE)
 
             for i, (name, metadata) in enumerate(self._var_allprocs_abs2meta[io].items()):
-                sizes[iproc, i] = metadata['size']
+                sz = metadata['size']
+                sizes[iproc, i] = 0 if sz is None else sz
                 abs2idx[name] = i
 
             if self.comm.size > 1:
@@ -378,7 +380,7 @@ class Component(System):
         info : dict
             Coloring metadata dict.
         """
-        ofs, allwrt = self._get_partials_varlists()
+        _, allwrt = self._get_partials_varlists()
         wrt_patterns = info['wrt_patterns']
         if '*' in wrt_patterns or wrt_patterns is None:
             info['wrt_matches_rel'] = None
@@ -619,7 +621,7 @@ class Component(System):
         return metadata
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, tags=None,
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,
                    shape_by_conn=False, copy_shape=None, distributed=None):
         """
         Add an output variable to the component.
@@ -725,7 +727,7 @@ class Component(System):
 
             # All refs: check the shape if necessary
             for item, item_name in zip([ref, ref0, res_ref], ['ref', 'ref0', 'res_ref']):
-                if not isscalar(item):
+                if item is not None and not isscalar(item):
                     if not isinstance(item, _allowed_types):
                         raise TypeError(f'{self.msginfo}: The {item_name} argument should be a '
                                         'float, list, tuple, ndarray or Iterable')
@@ -775,7 +777,7 @@ class Component(System):
             'tags': make_set(tags),
             'ref': format_as_float_or_array('ref', ref, flatten=True),
             'ref0': format_as_float_or_array('ref0', ref0, flatten=True),
-            'res_ref': format_as_float_or_array('res_ref', res_ref, flatten=True),
+            'res_ref': format_as_float_or_array('res_ref', res_ref, flatten=True, val_if_none=None),
             'lower': lower,
             'upper': upper,
             'shape_by_conn': shape_by_conn,
@@ -938,9 +940,10 @@ class Component(System):
 
                     # total sizes differ and output is distributed, so can't determine mapping
                     if offset is None:
-                        raise RuntimeError(f"{self.msginfo}: Can't determine src_indices "
-                                           f"automatically for input '{iname}'. They must be "
-                                           "supplied manually.")
+                        self._collect_error(f"{self.msginfo}: Can't determine src_indices "
+                                            f"automatically for input '{iname}'. They must be "
+                                            "supplied manually.", ident=(self.pathname, iname))
+                        continue
 
                     if dist_in and not dist_out:
                         src_shape = self._get_full_dist_shape(src, all_abs2meta_out[src]['shape'])
@@ -1285,7 +1288,7 @@ class Component(System):
         if not self._declared_partial_checks:
             return {}
         opts = {}
-        of, wrt = self._get_partials_varlists()
+        _, wrt = self._get_partials_varlists()
         invalid_wrt = []
         matrix_free = self.matrix_free
 
@@ -1482,7 +1485,7 @@ class Component(System):
 
                 self._subjacs_info[abs_key] = meta
 
-    def _find_partial_matches(self, of_pattern, wrt_pattern):
+    def _find_partial_matches(self, of_pattern, wrt_pattern, use_resname=False):
         """
         Find all partial derivative matches from of and wrt.
 
@@ -1495,6 +1498,8 @@ class Component(System):
             The relative name of the variables that derivatives are taken with respect to.
             This can contain the name of any input or output variable.
             May also contain a glob pattern.
+        use_resname : bool
+            If True, use residual names for 'of' patterns.
 
         Returns
         -------
@@ -1505,7 +1510,7 @@ class Component(System):
         """
         of_list = [of_pattern] if isinstance(of_pattern, str) else of_pattern
         wrt_list = [wrt_pattern] if isinstance(wrt_pattern, str) else wrt_pattern
-        ofs, wrts = self._get_partials_varlists()
+        ofs, wrts = self._get_partials_varlists(use_resname=use_resname)
 
         of_pattern_matches = [(pattern, find_matches(pattern, ofs)) for pattern in of_list]
         wrt_pattern_matches = [(pattern, find_matches(pattern, wrts)) for pattern in wrt_list]
@@ -1624,12 +1629,11 @@ class Component(System):
                                 inds.set_src_shape(shape)
                                 self._var_prom2inds[abs2prom[tgt]] = [shape, inds, flat]
                         except Exception:
-                            exc = sys.exc_info()
-                            conditional_error(f"When accessing '{conns[tgt]}' with src_shape "
-                                              f"{shape} from '{pinfo.prom_path()}' using "
-                                              f"src_indices {inds}: {exc[1]}",
-                                              exc=exc, category=SetupWarning,
-                                              err=self._raise_connection_errors)
+                            type_exc, exc, tb = sys.exc_info()
+                            self._collect_error(f"When accessing '{conns[tgt]}' with src_shape "
+                                                f"{shape} from '{pinfo.prom_path()}' using "
+                                                f"src_indices {inds}: {exc}", exc_type=type_exc,
+                                                tback=tb, ident=(conns[tgt], tgt))
 
             elif meta['add_input_src_indices']:
                 self._var_prom2inds[abs2prom[tgt]] = [meta['shape'], meta['src_indices'],

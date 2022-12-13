@@ -2,11 +2,13 @@
 import os
 import re
 import sys
+import types
 import unittest
 from contextlib import contextmanager
 from fnmatch import fnmatchcase
 from io import StringIO
 from numbers import Integral
+from inspect import currentframe, getouterframes
 
 from collections.abc import Iterable
 
@@ -16,10 +18,6 @@ from openmdao.core.constants import INF_BOUND
 from openmdao.utils.om_warnings import issue_warning, warn_deprecation
 from openmdao.utils.array_utils import shape_to_len
 
-
-# Certain command line tools can make use of this to allow visualization of models when errors
-# are present that would normally cause setup to abort.
-_ignore_errors = False
 
 _float_inf = float('inf')
 
@@ -43,75 +41,6 @@ def _convert_auto_ivc_to_conn_name(conns_dict, name):
     for key, val in conns_dict.items():
         if val == name:
             return key
-
-
-def ignore_errors(flag=None):
-    """
-    Disable certain errors that will prevent setup from completing.
-
-    Parameters
-    ----------
-    flag : bool or None
-        If not None, set the value of _ignore_errors to this value.
-
-    Returns
-    -------
-    bool
-        The current value of _ignore_errors.
-    """
-    global _ignore_errors
-    if flag is not None:
-        _ignore_errors = flag
-    return _ignore_errors
-
-
-def conditional_error(msg, exc=RuntimeError, category=UserWarning, err=None):
-    """
-    Raise an exception or issue a warning, depending on the value of _ignore_errors.
-
-    Parameters
-    ----------
-    msg : str
-        The error/warning message.
-    exc : Exception class or exception info tuple (exception class, exception instance, traceback)
-        This exception class is used to create the exception to be raised, or an exception info
-        tuple from a previously raised exception that is to be re-raised, contingent on the value
-        of 'err'.
-    category : warning class
-        This category is the class of warning to be issued.
-    err : bool
-        If None, use ignore_errors(), otherwise use value of err to determine whether to
-        raise an exception (err=True) or issue a warning (err=False).
-    """
-    if (err is None and ignore_errors()) or err is False:
-        issue_warning(msg, category=category)
-    else:
-        if isinstance(exc, tuple):
-            raise exc[0](msg).with_traceback(exc[2])
-        else:
-            raise exc(msg)
-
-
-@contextmanager
-def ignore_errors_context(flag=True):
-    """
-    Set ignore_errors to the given flag in this context.
-
-    Parameters
-    ----------
-    flag : bool
-        If not None, set ignore_errors to this value.
-
-    Yields
-    ------
-    None
-    """
-    save = ignore_errors()
-    ignore_errors(flag)
-    try:
-        yield
-    finally:
-        ignore_errors(save)
 
 
 def simple_warning(msg, category=UserWarning, stacklevel=2):
@@ -1304,3 +1233,18 @@ class LocalRangeIterable(object):
             An iterator over our indices.
         """
         return self._iter()
+
+
+def make_traceback():
+    """
+    Create a traceback for use later with an exception.
+
+    The traceback will begin at the stack frame *above* the caller of make_traceback.
+
+    Returns
+    -------
+    traceback
+        The newly constructed traceback.
+    """
+    finfo = getouterframes(currentframe())[2]
+    return types.TracebackType(None, finfo.frame, finfo.frame.f_lasti, finfo.frame.f_lineno)

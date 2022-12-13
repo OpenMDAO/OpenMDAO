@@ -101,7 +101,8 @@ class IndepVarComp(ExplicitComponent):
         """
         Do any error checking on i/o configuration.
         """
-        if len(self._static_var_rel2meta) + len(self._var_rel2meta) == 0:
+        errs = self._get_saved_errors()
+        if len(self._static_var_rel2meta) + len(self._var_rel2meta) == 0 and not errs:
             raise RuntimeError(f"{self.msginfo}: No outputs (independent variables) have been "
                                "declared. They must either be declared during instantiation or "
                                "by calling add_output or add_discrete_output afterwards.")

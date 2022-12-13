@@ -7,9 +7,7 @@ from operator import itemgetter
 import networkx as nx
 import numpy as np
 
-from openmdao.components.exec_comp import ExecComp
-from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
-from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
+import openmdao.utils.hooks as hooks
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.parallel_group import ParallelGroup
@@ -17,6 +15,10 @@ from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.component import Component
 from openmdao.core.implicitcomponent import ImplicitComponent
+from openmdao.core.constants import _UNDEFINED
+from openmdao.components.exec_comp import ExecComp
+from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
+from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
 from openmdao.drivers.doe_driver import DOEDriver
 from openmdao.recorders.case_reader import CaseReader
 from openmdao.solvers.nonlinear.newton import NewtonSolver
@@ -24,10 +26,10 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import default_noraise
 from openmdao.utils.mpi import MPI
 from openmdao.utils.notebook_utils import notebook, display, HTML, IFrame, colab
-from openmdao.visualization.htmlpp import HtmlPreprocessor
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.reports_system import register_report
-from openmdao.core.constants import _UNDEFINED
+from openmdao.utils.reports_system import register_report_hook
+from openmdao.utils.file_utils import _load_and_exec, _to_filename
+from openmdao.visualization.htmlpp import HtmlPreprocessor
 from openmdao import __version__ as openmdao_version
 
 _MAX_ARRAY_SIZE_FOR_REPR_VAL = 1000  # If var has more elements than this do not pass to N2
@@ -77,6 +79,8 @@ def _convert_ndarray_to_support_nans_in_json(val):
     object : list, possibly nested
         The equivalent list with any nan values replaced with the string "nan".
     """
+    val = np.asarray(val)
+
     # do a quick check for any nans or infs and if not we can avoid the slow check
     nans = np.where(np.isnan(val))
     infs = np.where(np.isinf(val))
@@ -111,7 +115,7 @@ def _get_var_dict(system, typ, name, is_parallel, is_implicit):
     if name in system._var_abs2meta[typ]:
         meta = system._var_abs2meta[typ][name]
         prom = system._var_abs2prom[typ][name]
-        val = meta['val']
+        val = np.asarray(meta['val'])
         is_dist = MPI is not None and meta['distributed']
 
         var_dict = {
@@ -149,6 +153,7 @@ def _get_var_dict(system, typ, name, is_parallel, is_implicit):
                     # Get the current value
                     _get_array_info(system, vec, name, prom, var_dict, from_src=True)
 
+
                 elif is_parallel or is_dist:
                     # we can't access non-local values, so just get the initial value
                     var_dict['val'] = val
@@ -157,6 +162,7 @@ def _get_var_dict(system, typ, name, is_parallel, is_implicit):
                     # get the current value but don't try to get it from the source,
                     # which could be remote under MPI
                     _get_array_info(system, vec, name, prom, var_dict, from_src=False)
+
             else:
                 var_dict['val'] = None
         except Exception as err:
@@ -648,5 +654,88 @@ def _run_n2_report(prob, report_filename=_default_n2_filename):
             raise err
 
 
+def _run_n2_report_w_errors(prob, report_filename=_default_n2_filename):
+    errs = prob._metadata['saved_errors']
+    if errs:
+        n2_filepath = str(pathlib.Path(prob.get_reports_dir()).joinpath(report_filename))
+        # only run the n2 here if we've had setup errors. Normally we'd wait until
+        # after final_setup in order to have correct values for all of the I/O variables.
+        try:
+            n2(prob, show_browser=False, outfile=n2_filepath, display_in_notebook=False)
+        except RuntimeError as err:
+            # We ignore this error
+            if str(err) != "Can't compute total derivatives unless " \
+                           "both 'of' or 'wrt' variables have been specified.":
+                prob.model._collect_error(str(err))
+        # errors will result in exit at the end of the _check_collected_errors method
+
+
 def _n2_report_register():
-    register_report('n2', _run_n2_report, 'N2 diagram', 'Problem', 'final_setup', 'post')
+    register_report_hook('n2', 'final_setup', 'Problem', post=_run_n2_report,
+                         description='N2 diagram', report_filename=_default_n2_filename)
+    register_report_hook('n2', '_check_collected_errors', 'Problem', pre=_run_n2_report_w_errors,
+                         description='N2 diagram')
+
+
+def _n2_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao n2' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('file', nargs=1,
+                        help='Python script or recording containing the model. '
+                        'If metadata from a parallel run was recorded in a separate file, '
+                        'specify both database filenames delimited with a comma.')
+    parser.add_argument('-o', default=_default_n2_filename, action='store', dest='outfile',
+                        help='html output file.')
+    parser.add_argument('--no_browser', action='store_true', dest='no_browser',
+                        help="don't display in a browser.")
+    parser.add_argument('--embed', action='store_true', dest='embeddable',
+                        help="create embeddable version.")
+    parser.add_argument('--title', default=None,
+                        action='store', dest='title', help='diagram title.')
+
+
+def _n2_cmd(options, user_args):
+    """
+    Process command line args and call n2 on the specified file.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+    user_args : list of str
+        Command line options after '--' (if any).  Passed to user script.
+    """
+    filename = _to_filename(options.file[0])
+
+    if filename.endswith('.py'):
+        def _view_model_w_errors(prob):
+            errs = prob._metadata['saved_errors']
+            if errs:
+                # only run the n2 here if we've had setup errors. Normally we'd wait until
+                # after final_setup in order to have correct values for all of the I/O variables.
+                n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
+                   title=options.title, embeddable=options.embeddable)
+                # errors will result in exit at the end of the _check_collected_errors method
+
+        def _view_model_no_errors(prob):
+            n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
+               title=options.title, embeddable=options.embeddable)
+
+        hooks._register_hook('_check_collected_errors', 'Problem', pre=_view_model_w_errors)
+        hooks._register_hook('final_setup', 'Problem', post=_view_model_no_errors, exit=True)
+
+        from openmdao.utils.reports_system import _register_cmdline_report
+        # tell report system not to duplicate effort
+        _register_cmdline_report('n2')
+
+        _load_and_exec(options.file[0], user_args)
+    else:
+        # assume the file is a recording, run standalone
+        n2(filename, outfile=options.outfile, title=options.title,
+           show_browser=not options.no_browser, embeddable=options.embeddable)

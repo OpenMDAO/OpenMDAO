@@ -13,7 +13,7 @@ import openmdao.core.problem as probmod
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.reports_system import set_reports_dir, _reports_dir, register_report, \
-    list_reports, clear_reports, _reset_reports_dir, activate_report
+    list_reports, clear_reports, _reset_reports_dir, activate_report, _reports_registry
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
 from openmdao.utils.tests.test_hooks import hooks_active
@@ -74,11 +74,39 @@ class TestReportsSystem(unittest.TestCase):
 
         if driver:
             prob.driver = driver
-
         else:
             prob.driver = om.ScipyOptimizeDriver()
 
-        prob.setup(False)
+        prob.setup(check=False)
+        prob.run_driver()
+        prob.cleanup()
+
+        return prob
+
+    def setup_problem_w_errors(self, prob_name, driver=None, reports=_UNDEFINED, reports_dir=_UNDEFINED):
+        if reports_dir is not _UNDEFINED:
+            set_reports_dir(reports_dir)
+
+        prob = om.Problem(reports=reports, name=prob_name)
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0))
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0))
+        model.add_subsystem('comp', Paraboloid(), promotes_outputs=['f_xy'])
+
+        model.connect('p1.x', 'comp.x', src_indices=[0,1])
+        model.connect('p2.y', 'comp.y')
+
+        model.add_design_var('p1.x', lower=0.0, upper=1.0)
+        model.add_design_var('p2.y', lower=0.0, upper=1.0)
+        model.add_objective('f_xy')
+
+        if driver:
+            prob.driver = driver
+        else:
+            prob.driver = om.ScipyOptimizeDriver()
+
+        prob.setup(check=False)
         prob.run_driver()
         prob.cleanup()
 
@@ -129,6 +157,25 @@ class TestReportsSystem(unittest.TestCase):
         self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
         path = pathlib.Path(problem_reports_dir).joinpath(self.optimizer_filename)
         self.assertTrue(path.is_file(), f'The optimizer report file, {str(path)}, was not found')
+
+    @hooks_active
+    def test_report_generation_on_error(self):
+        prob_name = 'error_problem'
+        try:
+            prob = self.setup_problem_w_errors(prob_name)
+        except Exception as err:
+            # get the path to the problem subdirectory
+            problem_reports_dir = pathlib.Path(_reports_dir).joinpath(prob_name)
+
+            path = pathlib.Path(problem_reports_dir).joinpath(self.n2_filename)
+            self.assertTrue(path.is_file(), f'The N2 report file, {str(path)} was not found')
+
+            self.assertEqual(str(err),
+                "\nCollected errors for problem 'error_problem':"
+                "\n   <model> <class Group>: When connecting 'p1.x' to 'comp.x': index 1 is out of "
+                "bounds for source dimension of size 1.")
+        else:
+            self.fail("exception expected")
 
     @hooks_active
     @unittest.skipUnless(OPTIMIZER, "This test requires pyOptSparseDriver.")
@@ -302,13 +349,19 @@ class TestReportsSystem(unittest.TestCase):
 
         register_report("User report", user_defined_report,
                         "user report description",
-                        'Problem', 'setup', 'pre', user_report_filename)
+                        'Problem', 'setup', 'pre', report_filename=user_report_filename)
 
         prob = self.setup_and_run_simple_problem()
 
         path = pathlib.Path(_reports_dir).joinpath(prob._name, user_report_filename)
 
         self.assertTrue(path.is_file(), f'The user report file, {str(path)} was not found')
+
+        # test unregister_report
+        self.assertTrue('User report' in _reports_registry, "'User report' not found in registry.")
+        om.unregister_report('User report')
+        self.assertFalse('User report' in _reports_registry, "'User report' found in registry.")
+
 
     @hooks_active
     def test_report_generation_various_locations(self):
@@ -331,7 +384,7 @@ class TestReportsSystem(unittest.TestCase):
                 repname = f"User defined report {method} {pre_or_post}"
                 register_report(repname, user_defined_report,
                                 "user defined report", 'Problem', method, pre_or_post,
-                                user_report_filename)
+                                report_filename=user_report_filename)
                 activate_report(repname)
 
         prob = self.setup_and_run_simple_problem()
@@ -364,7 +417,7 @@ class TestReportsSystem(unittest.TestCase):
         # to simplify things, just do n2.
         clear_reports()
         register_report("n2_report", _run_n2_report, 'N2 diagram', 'Problem', 'final_setup', 'post',
-                        self.n2_filename,
+                        report_filename=self.n2_filename,
                         inst_id=_default_prob_name() + '2')
 
         probname, subprobname = self.setup_and_run_model_with_subproblem()

@@ -49,7 +49,6 @@ cmd_tests = [
     ('openmdao list_installed component command nl_solver lin_solver driver', {}),
     ('openmdao list_installed component -d', {}),
     ('openmdao n2 --no_browser {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
-    ('openmdao n2 --no_browser {}'.format(os.path.join(scriptdir, 'bad_connection.py')), {}),
     ('openmdao n2 --no_browser {} -- -f bar'.format(os.path.join(scriptdir, 'circle_coloring_needs_args.py')), {}),
     ('openmdao partial_coloring {}'.format(os.path.join(scriptdir, 'circle_coloring_dynpartials.py')), {}),
     ('openmdao scaffold -b ExplicitComponent -c Foo', {}),
@@ -90,6 +89,32 @@ class CmdlineTestCase(unittest.TestCase):
         except subprocess.CalledProcessError as err:
             self.fail("Command '{}' failed.  Return code: {}".format(cmd, err.returncode))
 
+    def test_n2_err(self):
+        # command should raise exception but still produce an n2 html file
+        cmd = f'openmdao n2 --no_browser {scriptdir}/bad_connection.py'
+        workdir = os.getcwd()
+        n2file = os.path.join(workdir, 'n2.html')
+        if os.path.isfile(n2file):
+            os.remove(n2file)
+        proc = subprocess.Popen(cmd.split(),  # nosec: trusted input
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            outs, errs = proc.communicate(timeout=30)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            outs, errs = proc.communicate()
+
+        if not os.path.isfile(n2file):
+            self.fail(f"File '{n2file}' was not created: {errs}")
+
+        lines = errs.splitlines()
+        for i, line in enumerate(lines):
+            if b"Collected errors for problem" in line:
+                self.assertEqual(lines[i+1],
+                    b"   'sub' <class Group>: Attempted to connect from 'tgt.x' to 'cmp.x', but 'tgt.x' is an input. All connections must be from an output to an input.")
+                break
+        else:
+            self.fail("Didn't find expected err msg in output.")
 
 class CmdlineTestCaseCheck(unittest.TestCase):
     def test_auto_ivc_warnings_check(self):
