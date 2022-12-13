@@ -153,7 +153,6 @@ def _get_var_dict(system, typ, name, is_parallel, is_implicit):
                     # Get the current value
                     _get_array_info(system, vec, name, prom, var_dict, from_src=True)
 
-
                 elif is_parallel or is_dist:
                     # we can't access non-local values, so just get the initial value
                     var_dict['val'] = val
