@@ -495,14 +495,6 @@
     white-space: nowrap;
 }
 
-.window-theme-value-info .window-body table tbody tr.even td {
-    background-color:white;
-}
-
-.window-theme-value-info .window-body table tbody tr.odd td {
-    background-color: #e8ffe8;
-}
-
 .show_value_button {
     background-color: #c1c1c1;
  }

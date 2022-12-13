@@ -115,15 +115,32 @@ class ValueInfo extends WindowResizable {
             .data(function (row) { return row; })
             .enter()
             .append('td')
-            .style('background-color', d => {
+            .attr('style', d => {
+                // Since several CSS elements need to be computed at once,
+                // use the style attr instead of setting a single style.
+                let style = 'border: '
+                if ( d == self.val_min) style += '3px dashed #ff00ff; font-weight: bold';
+                else if ( d == self.val_max) style += '3px dashed yellow; font-weight: bold';
+                else style += 'none'
+
+                style += '; background-color: rgb(';
                 let percent = (d - self.val_min) / self.val_range;
+                let color = 'black';
                 if ( percent < 0.5 ) {
                     const whiteness = 255 * percent * 2;
-                    return `rgb(${whiteness},${whiteness},255)`;
+                    style += `${whiteness},${whiteness},255`;
+                    if ( percent < 0.25 ) color = 'white';
                 }
-                percent = (percent - 0.5) * 2;
-                const whiteness = 255 * (1 - percent);
-                return `rgb(255,${whiteness},${whiteness})`;
+                else {
+                    if ( percent > 0.75 ) color = 'white';
+                    percent = (percent - 0.5) * 2;
+                    const whiteness = 255 * (1 - percent);
+                    style += `255,${whiteness},${whiteness}`;
+                }
+
+                style += `); color: ${color};`;
+
+                return style;
             })
             .text(function (d) { return InfoPropDefault.floatFormatter(d); });
 
