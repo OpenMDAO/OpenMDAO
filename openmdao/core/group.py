@@ -2063,7 +2063,9 @@ class Group(System):
             if xfer is not None:
                 if self._has_input_scaling:
                     vec_inputs.scale_to_norm(mode='rev')
+                    # print(f"rev xfer to {sub}: {vec_name} output {self._vectors['output'][vec_name]._data}")
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
+                    # print(f"after update, inputs: {vec_inputs._data}")
                     vec_inputs.scale_to_phys(mode='rev')
                 else:
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)

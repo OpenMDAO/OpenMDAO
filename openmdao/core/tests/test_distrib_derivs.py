@@ -1615,11 +1615,7 @@ class Distrib_Derivs_Matfree(Distrib_Derivs):
                     d_inputs['in_nd'] += np.tile(df_dIs, local_size).reshape((local_size, size)).T.dot(d_outputs['out_dist'])
             if 'out_nd' in d_outputs:
                 if 'in_dist' in d_inputs:
-                    full = np.zeros(d_outputs['out_nd'].size)
-                    # add up contributions from the non-distributed variable that is duplicated over
-                    # all of the procs.
-                    self.comm.Allreduce(d_outputs['out_nd'], full, op=MPI.SUM)
-                    d_inputs['in_dist'] += np.tile(dg_dId, size).reshape((size, local_size)).T.dot(full)
+                    d_inputs['in_dist'] += np.tile(dg_dId, size).reshape((size, local_size)).T.dot(d_outputs['out_nd'])
                 if 'in_nd' in d_inputs:
                     d_inputs['in_nd'] += (2.0 * Is + 3.0) * d_outputs['out_nd']
 
@@ -1713,9 +1709,7 @@ class Distrib_Derivs_Prod_Matfree(Distrib_Derivs_Prod):
                     d_inputs['in_nd'] += d_dIs.T.dot(d_outputs['out_dist'])
             if 'out_nd' in d_outputs:
                 if 'in_dist' in d_inputs:
-                    full = np.zeros(d_outputs['out_nd'].size)
-                    self.comm.Allreduce(d_outputs['out_nd'], full, op=MPI.SUM)
-                    d_inputs['in_dist'] += d_dId.T.dot(full)
+                    d_inputs['in_dist'] += d_dId.T.dot(d_outputs['out_nd'])
                 if 'in_nd' in d_inputs:
                     d_inputs['in_nd'] += (2.0 * Is + 3.0) * d_outputs['out_nd']
 

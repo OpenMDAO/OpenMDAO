@@ -1351,6 +1351,7 @@ class Problem(object):
         #   program errs out
         requested_method = method
         alloc_complex = model._outputs._alloc_complex
+        abs2meta_in = model._var_allprocs_abs2meta['input']
 
         for comp in comps:
             local_opts = comp._get_check_partial_options()
@@ -1428,9 +1429,6 @@ class Problem(object):
         # Directional derivative directions for matrix free comps.
         mfree_directions = {}
 
-        meta_in = model._var_allprocs_abs2meta['input']
-        meta_out = model._var_allprocs_abs2meta['output']
-
         # Analytic Jacobians
         print_reverse = False
         for mode in ('fwd', 'rev'):
@@ -1487,11 +1485,6 @@ class Problem(object):
                                 # Implicit state
                                 flat_view = dstate._abs_get_val(inp_abs)
 
-                            if inp_abs in meta_in:
-                                in_dist = meta_in[inp_abs]['distributed']
-                            else:
-                                in_dist = meta_out[inp_abs]['distributed']
-
                             if directional:
                                 n_in = 1
                                 idxs = range(1)
@@ -1508,15 +1501,6 @@ class Problem(object):
                                 n_in = len(flat_view)
                                 idxs = LocalRangeIterable(comp, inp_abs, use_vec_offset=False)
                                 perturb = 1.0
-
-                            if not in_dist and mode == 'rev':
-                                # in rev mode, if in_dist is False that means that the 'of' var
-                                # is serial.  In cases where 'of' is serial and 'wrt' is
-                                # distributed, the component must do an internal Allreduce in
-                                # order for the total derivatives to be correct, so here we compute
-                                # a correction to undo this so we get the correct answer when
-                                # checking partials.
-                                mult = 1.0 / comp.comm.size
 
                             for idx in idxs:
 
@@ -1553,15 +1537,6 @@ class Problem(object):
                                             deriv[jac_key][:, idx] = derivs
 
                                     else:  # rev
-                                        if not in_dist:
-                                            if out_abs in meta_out:
-                                                out_dist = meta_out[out_abs]['distributed']
-                                            else:
-                                                out_dist = meta_in[out_abs]['distributed']
-                                            # FIXME: remove this mult to change to new transfer std
-                                            if out_dist:
-                                                derivs *= mult
-
                                         key = inp, out
                                         deriv = partials_data[c_name][key]
 
@@ -1573,6 +1548,13 @@ class Problem(object):
                                             dhat = partials_data[c_name][inp, out]['J_fwd'][:, idx]
 
                                             deriv['directional_fwd_rev'] = mhat.dot(m) - dhat.dot(d)
+                                        else:
+                                            if (not abs2meta_in[out_abs]['distributed'] and not
+                                                    consistent_across_procs(comp.comm, derivs)):
+                                                if 'inconsistent' not in deriv:
+                                                    deriv['inconsistent'] = set()
+                                                deriv['inconsistent'].add(key)
+                                                print("inconsistent:", key)
 
                                         # Allocate first time
                                         if jac_key not in deriv:
@@ -2997,3 +2979,45 @@ def _get_fd_options(var, global_method, local_opts, global_step, global_form, gl
                 fd_options[name] = value
 
     return fd_options, could_not_cs
+
+def consistent_across_procs(comm, arr, tol=1e-15):
+    """
+    Check serial deriv values across ranks.
+
+    This should only be run after _apply_linear.
+
+    Parameters
+    ----------
+    comm : MPI communicator
+        Communicator belonging to the component that owns the derivs array.
+    arr : ndarray
+        The array being checked for consistency across processes.
+    tol : float
+        Tolerance to determine if diff is 0.
+
+    Returns
+    -------
+    bool
+        True if values are consistent across all processes in the communicator.
+    """
+    if comm.size < 2:
+        return True
+
+    myrank = comm.rank
+
+    if myrank == 0:
+        result = True
+        for rank, val in enumerate(comm.gather(arr, root=0)):
+            if rank == 0:
+                baseval = val
+            else:
+                if not np.all(np.abs(baseval - val) < tol):
+                    result = False
+                    break
+
+        comm.bcast(result, root=0)
+    else:
+        comm.gather(arr, root=0)
+        result = comm.bcast(None, root=0)
+
+    return result

@@ -354,6 +354,8 @@ class ExplicitComponent(Component):
                 self.compute_jacvec_product(inputs, d_inputs, d_resids, mode, discrete_inputs)
             else:
                 self.compute_jacvec_product(inputs, d_inputs, d_resids, mode)
+                if mode == 'rev':
+                    print("d_inputs:", {k:v for k,v in d_inputs._views.items() if not self._var_abs2meta['input'][k]['distributed']})
 
     def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
         """

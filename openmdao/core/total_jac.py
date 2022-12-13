@@ -676,7 +676,7 @@ class _TotalJacInfo(object):
                 relev = None
 
             if in_var_meta['distributed']:
-                ndups = 1
+                ndups = 1  # we don't divide by ndups for distributed inputs
             else:
                 # if the var is not distributed, convert the indices to global.
                 # We don't iterate over the full distributed size in this case.
