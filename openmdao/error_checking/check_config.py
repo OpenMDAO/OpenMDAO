@@ -17,7 +17,7 @@ from openmdao.utils.logger_utils import get_logger
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook
-from openmdao.utils.general_utils import printoptions, ignore_errors
+from openmdao.utils.general_utils import printoptions
 from openmdao.utils.units import _has_val_mismatch
 from openmdao.utils.file_utils import _load_and_exec, text2html
 from openmdao.utils.om_warnings import issue_warning, SetupWarning
@@ -765,7 +765,6 @@ def _check_config_cmd(options, user_args):
     _register_hook('final_setup', class_name='Problem', inst_id=options.problem, post=_check_config,
                    exit=True)
 
-    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 

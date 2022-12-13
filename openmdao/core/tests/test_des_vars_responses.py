@@ -259,7 +259,7 @@ class TestDesvarOnModel(unittest.TestCase):
 
     def test_design_var_not_exist(self):
 
-        prob = om.Problem()
+        prob = om.Problem(name='design_var_not_exist')
 
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = om.NonlinearBlockGS()
@@ -269,7 +269,9 @@ class TestDesvarOnModel(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.setup()
 
-        self.assertEqual(str(context.exception), "<model> <class SellarDerivatives>: Output not found for design variable 'junk'.")
+        self.assertEqual(str(context.exception),
+           "\nCollected errors for problem 'design_var_not_exist':"
+           "\n   <model> <class SellarDerivatives>: Output not found for design variable 'junk'.")
 
     def test_desvar_affine_and_scaleradder(self):
 
@@ -402,17 +404,19 @@ class TestConstraintOnModel(unittest.TestCase):
 
     def test_constraint_not_exist(self):
 
-        prob = om.Problem()
+        prob = om.Problem(name='constraint_not_exist')
 
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_constraint('junk')
 
-        with self.assertRaises(RuntimeError) as context:
+        with self.assertRaises(Exception) as context:
             prob.setup()
 
-        self.assertEqual(str(context.exception), "<model> <class SellarDerivatives>: Output not found for response 'junk'.")
+        self.assertEqual(str(context.exception),
+           "\nCollected errors for problem 'constraint_not_exist':"
+           "\n   <model> <class SellarDerivatives>: Output not found for response 'junk'.")
 
     def test_constraint_affine_and_scaleradder(self):
 
@@ -608,12 +612,12 @@ class TestConstraintOnModel(unittest.TestCase):
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
-        with self.assertRaises(TypeError) as context:
+        with self.assertRaises(Exception) as context:
             prob.model.add_constraint('con1', lower=0.0, upper=5.0, indices='foo')
 
         self.assertEqual(str(context.exception), "<class SellarDerivatives>: Invalid indices foo for constraint 'con1'.")
 
-        with self.assertRaises(TypeError) as context:
+        with self.assertRaises(Exception) as context:
             prob.model.add_constraint('con3', lower=0.0, upper=5.0, indices=[1, 'k'])
 
         self.assertEqual(str(context.exception), "<class SellarDerivatives>: Invalid indices [1, 'k'] for constraint 'con3'.")
@@ -741,7 +745,7 @@ class TestAddConstraintMPI(unittest.TestCase):
 
     def test_add_bad_con(self):
         # From a bug, this message didn't work in mpi.
-        prob = om.Problem()
+        prob = om.Problem(name='add_bad_con')
         model = prob.model
 
         sub = model.add_subsystem('sub', SellarDerivatives())
@@ -752,15 +756,17 @@ class TestAddConstraintMPI(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.setup(mode='rev')
 
-        msg = "'sub' <class SellarDerivatives>: Output not found for response 'd1.junk'."
-        self.assertEqual(str(context.exception), msg)
+        self.assertEqual(str(context.exception),
+           "\nCollected errors for problem 'add_bad_con':"
+           "\n   <model> <class Group>: 'sub' <class SellarDerivatives>: Output not found for "
+           "response 'd1.junk'.")
 
 
 class TestObjectiveOnModel(unittest.TestCase):
 
     def test_obective_not_exist(self):
 
-        prob = om.Problem()
+        prob = om.Problem(name='obective_not_exist')
 
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = om.NonlinearBlockGS()
@@ -771,7 +777,7 @@ class TestObjectiveOnModel(unittest.TestCase):
             prob.setup()
 
         self.assertEqual(str(context.exception),
-                         "<model> <class SellarDerivatives>: Output not found for response 'junk'.")
+                         "\nCollected errors for problem 'obective_not_exist':\n   <model> <class SellarDerivatives>: Output not found for response 'junk'.")
 
     def test_objective_affine_and_scaleradder(self):
 

@@ -6,7 +6,6 @@ import networkx as nx
 
 from openmdao.core.problem import Problem
 from openmdao.utils.mpi import MPI
-from openmdao.utils.general_utils import ignore_errors
 from openmdao.utils.file_utils import _load_and_exec
 import openmdao.utils.hooks as hooks
 from openmdao.utils.general_utils import common_subpath
@@ -56,8 +55,6 @@ def _view_dyn_shapes_cmd(options, user_args):
 
     # register the hooks
     hooks._register_hook('setup', 'Problem', pre=_set_dyn_hook, ncalls=1)
-
-    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 
