@@ -1418,8 +1418,6 @@ class Group(System):
             nparts = len(pathname.split('.'))
         else:
             path_len = nparts = 0
-            if not self._raise_connection_errors:
-                self._problem_meta['raise_connection_errors'] = False
 
         if conns is not None:
             for abs_in, abs_out in conns.items():
