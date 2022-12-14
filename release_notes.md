@@ -11,10 +11,9 @@ The dependencies on pyDOE2 and pyparsing are no longer required unless the user
 attempts to use an OpenMDAO feature that requires them. In this case, that means
 the DOEDriver or the external code file-wrapping capabilities, respectively.
 
-Setting `prob.model` to a component is now deprecated. Doing so would break the way in which OpenMDAO automatically adds
-an `IndepVarComp` to provide outputs for otherwise-unconnected inputs in a model.
+Setting `prob.model` to a component is now deprecated, as the technical burden of supporting this corner case has outweighed its usefulness. The `model` assigned to a Problem should now always be a Group.
 
-OpenMDAO will now raise an exception if a single solver is attached to multiple systems.
+OpenMDAO will now raise an exception if a single solver instance is attached to multiple systems.
 
 We've implemented several [POEMs](https://github.com/OpenMDAO/POEMs) in this release.
 POEM 74 is implemented, and OpenMDAO will suggest closely-matching connection targets if you happen to misspell it during the `connect` call.
@@ -40,7 +39,7 @@ Users were sometimes confused that the existing implementation seemed to associa
 - Added a command line test for the scaling report. [#2657](https://github.com/OpenMDAO/OpenMDAO/pull/2657)
 - Changed ImplicitComponent.apply_nonlinear() to raise NotImplementedError [#2664](https://github.com/OpenMDAO/OpenMDAO/pull/2664)
 - Changed check_partials to skip components with no outputs or no inputs [#2667](https://github.com/OpenMDAO/OpenMDAO/pull/2667)
-- OpenMDAO will now consider relevance information when running _linearize [#2675](https://github.com/OpenMDAO/OpenMDAO/pull/2675)
+- OpenMDAO will now consider relevance information when running _linearize. As a result of this change, a component with finite differenced or complex stepped partials will not compute them for inputs that do not contribute to the model relevancy (as measured from the model's objectives and constraints to the design variables.) [#2675](https://github.com/OpenMDAO/OpenMDAO/pull/2675)
 - **POEM 74** implementation: Suggest variables for failed connection [#2681](https://github.com/OpenMDAO/OpenMDAO/pull/2681)
 - Made pyDOE2 an optional dependency. [#2689](https://github.com/OpenMDAO/OpenMDAO/pull/2689)
 - Added support for constraint alias in the case reader. [#2698](https://github.com/OpenMDAO/OpenMDAO/pull/2698)
