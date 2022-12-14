@@ -1309,15 +1309,15 @@ class System(object):
                 scaler = None
         elif scaler == 1.0:
             scaler = None
-        new_obj_metadata['scaler'] = scaler
 
         if isinstance(adder, np.ndarray):
             if not np.any(adder):
                 adder = None
         elif adder == 0.0:
             adder = None
-        new_obj_metadata['adder'] = adder
 
+        new_obj_metadata['scaler'] = scaler
+        new_obj_metadata['adder'] = adder
         new_obj_metadata['ref'] = ref
         new_obj_metadata['ref0'] = ref0
 
