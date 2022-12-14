@@ -3564,7 +3564,7 @@ class System(object):
                        ref=None, ref0=None, adder=None, scaler=None, units=None,
                        indices=None, linear=False, parallel_deriv_color=None,
                        cache_linear_solution=False, flat_indices=False, alias=None):
-        """
+        r"""
         Add a constraint variable to this system.
 
         Parameters
