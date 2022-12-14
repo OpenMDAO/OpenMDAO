@@ -732,11 +732,8 @@ class System(object):
         """
         Set solver output options.
 
-        Cache the solver options for use later in the setup process.
-        Since this can be called before setup, there is no way to update the
-        self._var_allprocs_abs2meta['output'] values since those have not been setup yet.
-        These values are applied in the System._apply_output_solver_options method
-        which is called in System._setup. That method is only called by the top model.
+        Allows the user to set output solver options after the output has been defined and
+        metadata set using the add_ouput method.
 
         Parameters
         ----------
@@ -763,6 +760,12 @@ class System(object):
             when the scaled value is 1. Default is None, which means residual scaling matches
             output scaling.
         """
+        # Cache the solver options for use later in the setup process.
+        # Since this can be called before setup, there is no way to update the
+        # self._var_allprocs_abs2meta['output'] values since those have not been setup yet.
+        # These values are applied in the System._apply_output_solver_options method
+        # which is called in System._setup. That method is only called by the top model.
+
         output_solver_options = {}
         if lower is not _UNDEFINED:
             output_solver_options['lower'] = lower
@@ -777,12 +780,118 @@ class System(object):
         self._output_solver_options[name] = output_solver_options
         return
 
+    def _apply_output_solver_options(self):
+        """
+        Apply the cached output solver options.
+
+        Solver options can be set using the System.set_output_solver_options method.
+        These cannot be set immediately when that method is called because not
+        all the variables have been setup at the time a user could potentially want to call it.
+        So they are cached so that they can be applied later in the setup process.
+        They are applied in System._setup using this method.
+        """
+        # Loop through the output solver options that have been set on this System
+        for name, options in self._output_solver_options.items():
+            from openmdao.core.group import Group
+            if isinstance(self, Group):
+                subsys_path = name.rsplit('.', 1)[0]
+                subsys = self._get_subsystem(subsys_path)
+            else:
+                subsys = self
+
+            prefix = self.pathname + '.' if self.pathname else ''
+            abs_name = prefix + name
+
+            # Will need to set both of these dicts to keep them both up-to-date
+            # _var_allprocs_abs2meta is a partial copy of _var_abs2meta
+            abs2meta = subsys._var_abs2meta['output']
+            allprocs_abs2meta = subsys._var_allprocs_abs2meta['output']
+
+            if abs_name not in abs2meta:
+                raise RuntimeError(
+                    f"Output solver options set using System.set_output_solver_options for "
+                    f"non-existent variable '{abs_name}' in System '{self.pathname}'.")
+
+            metadatadict_abs2meta = abs2meta[abs_name]
+            metadatadict_allprocs_abs2meta = allprocs_abs2meta[abs_name]
+
+            # Update the metadata that was set
+            for meta_key in options:
+                if options[meta_key] is None:
+                    val_as_float_or_array_or_none = None
+                else:
+                    shape = metadatadict_abs2meta['shape']
+                    val = ensure_compatible(name, options[meta_key], shape)[0]
+                    val_as_float_or_array_or_none = format_as_float_or_array(meta_key, val,
+                                                                             flatten=True)
+
+                # Setting both here because the copying of _var_abs2meta to
+                #   _var_allprocs_abs2meta happens before this. Need to keep both up to date
+                metadatadict_abs2meta.update({
+                    meta_key: val_as_float_or_array_or_none,
+                })
+                metadatadict_allprocs_abs2meta.update({
+                    meta_key: val_as_float_or_array_or_none,
+                })
+
+        # recalculate the _has scaling and bounds vars (_has_output_scaling, _has_output_adder,
+        # _has_resid_scaling, _has_bounds ) across all outputs.
+        # Since you are allowed to reference multiple subsystems from set_output_solver_options,
+        #    need to loop over all of the ones that got modified by those calls.
+        # Loop over all the options set. Each one of these could be referencing a different
+        #    subsystem since the name could be a path
+        for name, options in self._output_solver_options.items():
+            if isinstance(self, Group):
+                subsys_path = name.rsplit('.', 1)[0]
+                subsys = self._get_subsystem(subsys_path)
+            else:
+                subsys = self
+
+            # Now that we know which subsystem was affected. We have to recalculate
+            #   _has_output_scaling, _has_output_adder, _has_resid_scaling, _has_bounds
+            #   across all the outputs of that subsystem, since the changes might have
+            #   affected their values
+            subsys._has_output_scaling = False
+            subsys._has_output_adder = False
+            subsys._has_resid_scaling = False
+            subsys._has_bounds = False
+
+            abs2meta = subsys._var_abs2meta['output']
+            for abs_name, metadata in abs2meta.items():  # Loop over all outputs for that subsystem
+                ref = metadata['ref']
+                if np.isscalar(ref):
+                    subsys._has_output_scaling |= ref != 1.0
+                else:
+                    subsys._has_output_scaling |= np.any(ref != 1.0)
+
+                ref0 = metadata['ref0']
+                if np.isscalar(ref0):
+                    subsys._has_output_scaling |= ref0 != 0.0
+                    subsys._has_output_adder |= ref0 != 0.0
+                else:
+                    subsys._has_output_scaling |= np.any(ref0)
+                    subsys._has_output_adder |= np.any(ref0)
+
+                res_ref = metadata['res_ref']
+                if np.isscalar(res_ref):
+                    subsys._has_resid_scaling |= res_ref != 1.0
+                else:
+                    subsys._has_resid_scaling |= np.any(res_ref != 1.0)
+
+                if metadata['lower'] is not None or metadata['upper'] is not None:
+                    subsys._has_bounds = True
+
+        # Clear the cached to indicate that the cached values have been applied
+        self._output_solver_options = {}
+
     def set_design_var_options(self, name,
                                lower=_UNDEFINED, upper=_UNDEFINED,
                                scaler=_UNDEFINED, adder=_UNDEFINED,
                                ref=_UNDEFINED, ref0=_UNDEFINED):
         """
         Set options for design vars in the model.
+
+        Can be used to set the options outside of setting them when calling add_design_var
 
         Parameters
         ----------
@@ -806,12 +915,13 @@ class System(object):
             Value of design var that scales to 0.0 in the driver.
         """
         # Check inputs
+
         # Name must be a string
         if not isinstance(name, str):
             raise TypeError('{}: The name argument should be a string, got {}'.format(self.msginfo,
                                                                                       name))
         are_new_bounds = lower != _UNDEFINED or upper != _UNDEFINED
-        are_new_scaling = scaler != _UNDEFINED or scaler != _UNDEFINED or ref != _UNDEFINED or \
+        are_new_scaling = scaler != _UNDEFINED or adder != _UNDEFINED or ref != _UNDEFINED or \
             ref0 != _UNDEFINED
 
         # Must set at least one argument for this function to do something
@@ -837,10 +947,10 @@ class System(object):
         are_existing_bounds = existing_dv_meta['lower'] is not None or \
             existing_dv_meta['upper'] is not None
 
-        # figure out the bounds (equals, lower, upper) based on what is passed to this
+        # figure out the bounds (lower, upper) based on what is passed to this
         #   method and what were the existing bounds
         if are_new_bounds:
-            # wipe the slate clean and only use what is set by the arguments to this call
+            # wipe out all the bounds and only use what is set by the arguments to this call
             if lower == _UNDEFINED:
                 lower = None
             if upper == _UNDEFINED:
@@ -851,7 +961,7 @@ class System(object):
 
         if are_new_scaling and are_existing_scaling and are_existing_bounds and not are_new_bounds:
             # need to unscale bounds using the existing scaling so the new scaling can
-            # be applied
+            # be applied. But if no new bounds, no need to
             if lower is not None:
                 lower = lower / existing_dv_meta['scaler'] - existing_dv_meta['adder']
             if upper is not None:
@@ -868,10 +978,10 @@ class System(object):
             if ref0 is _UNDEFINED:
                 ref0 = None
         else:
-            scaler = None
-            adder = None
-            ref = None
-            ref0 = None
+            scaler = existing_dv_meta['scaler']
+            adder = existing_dv_meta['adder']
+            ref = existing_dv_meta['ref']
+            ref0 = existing_dv_meta['ref0']
 
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
@@ -929,6 +1039,8 @@ class System(object):
         """
         Set options for objectives in the model.
 
+        Can be used to set options that were set using add_constraint.
+
         Parameters
         ----------
         name : str
@@ -961,7 +1073,7 @@ class System(object):
                             'got {}'.format(self.msginfo, name))
 
         are_new_bounds = equals != _UNDEFINED or lower != _UNDEFINED or upper != _UNDEFINED
-        are_new_scaling = scaler != _UNDEFINED or scaler != _UNDEFINED or ref != _UNDEFINED or \
+        are_new_scaling = scaler != _UNDEFINED or adder != _UNDEFINED or ref != _UNDEFINED or \
             ref0 != _UNDEFINED
 
         # At least one of the scaling or bounds parameters must be set or function won't do anything
@@ -1030,7 +1142,6 @@ class System(object):
                 equals = equals / existing_cons_meta['scaler'] - existing_cons_meta['adder']
 
         # Now figure out scaling
-
         if are_new_scaling:
             if scaler is _UNDEFINED:
                 scaler = None
@@ -1041,10 +1152,10 @@ class System(object):
             if ref0 is _UNDEFINED:
                 ref0 = None
         else:
-            scaler = None
-            adder = None
-            ref = None
-            ref0 = None
+            scaler = existing_cons_meta['scaler']
+            adder = existing_cons_meta['adder']
+            ref = existing_cons_meta['ref']
+            ref0 = existing_cons_meta['ref0']
 
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
@@ -1118,6 +1229,8 @@ class System(object):
                               adder=_UNDEFINED, scaler=_UNDEFINED, alias=_UNDEFINED):
         """
         Set options for objectives in the model.
+
+        Can be used to set options after they have been set by add_objective.
 
         Parameters
         ----------
@@ -1209,111 +1322,6 @@ class System(object):
         new_obj_metadata['ref0'] = ref0
 
         responses[name].update(new_obj_metadata)
-
-    def _apply_output_solver_options(self):
-        """
-        Apply the cached output solver options.
-
-        Solver options can be set using the System.set_output_solver_options method.
-        These cannot be set immediately when that method is called because not
-        all the variables have been setup at the time a user could potentially want to call it.
-        So they are cached so that they can be applied later in the setup process.
-        They are applied in System._setup using this method
-        """
-        # Loop through the output solver options that have been set on this System
-        for name, options in self._output_solver_options.items():
-            from openmdao.core.group import Group
-            if isinstance(self, Group):
-                subsys_path = name.rsplit('.', 1)[0]
-                subsys = self._get_subsystem(subsys_path)
-            else:
-                subsys = self
-
-            prefix = self.pathname + '.' if self.pathname else ''
-            abs_name = prefix + name
-
-            # Will need to set both of these dicts.
-            # _var_allprocs_abs2meta is a partial copy of _var_abs2meta
-            abs2meta = subsys._var_abs2meta['output']
-            allprocs_abs2meta = subsys._var_allprocs_abs2meta['output']
-
-            if abs_name not in abs2meta:
-                raise RuntimeError(
-                    f"Output solver options set using System.set_output_solver_options for "
-                    f"non-existent variable '{abs_name}' in System '{self.pathname}'.")
-
-            metadatadict_abs2meta = abs2meta[abs_name]
-            metadatadict_allprocs_abs2meta = allprocs_abs2meta[abs_name]
-
-            # Update the metadata that was set
-            for meta_key in ['ref', 'ref0', 'res_ref', 'lower', 'upper']:
-                if meta_key in options:
-                    if options[meta_key] is None:
-                        val_as_float_or_array_or_none = None
-                    else:
-                        shape = metadatadict_abs2meta['shape']
-                        val = ensure_compatible(name, options[meta_key], shape)[0]
-                        val_as_float_or_array_or_none = format_as_float_or_array(meta_key, val,
-                                                                                 flatten=True)
-
-                    # Setting both here because the copying of _var_abs2meta to
-                    #   _var_allprocs_abs2meta happens before this. Need to keep both up to date
-                    metadatadict_abs2meta.update({
-                        meta_key: val_as_float_or_array_or_none,
-                    })
-                    metadatadict_allprocs_abs2meta.update({
-                        meta_key: val_as_float_or_array_or_none,
-                    })
-
-        # recalculate the _has scaling and bounds vars (_has_output_scaling, _has_output_adder,
-        # _has_resid_scaling, _has_bounds ) across all outputs.
-        # Since you are allowed to reference multiple subsystems from set_output_solver_options,
-        #    need to loop over all of the ones that got modified by those calls.
-        # Loop over all the options set. Each one of these could be referencing a different
-        #    subsystem since the name could be a path
-        for name, options in self._output_solver_options.items():
-            if isinstance(self, Group):
-                subsys_path = name.rsplit('.', 1)[0]
-                subsys = self._get_subsystem(subsys_path)
-            else:
-                subsys = self
-
-            # Now that we know which subsystem was affected. We have to recalculate
-            #   _has_output_scaling, _has_output_adder, _has_resid_scaling, _has_bounds
-            #   across all the outputs of that subsystem, since the changes might have
-            #   affected their values
-            subsys._has_output_scaling = False
-            subsys._has_output_adder = False
-            subsys._has_resid_scaling = False
-            subsys._has_bounds = False
-
-            abs2meta = subsys._var_abs2meta['output']
-            for abs_name, metadata in abs2meta.items():  # Loop over all outputs for that subsystem
-                ref = metadata['ref']
-                if np.isscalar(ref):
-                    subsys._has_output_scaling |= ref != 1.0
-                else:
-                    subsys._has_output_scaling |= np.any(ref != 1.0)
-
-                ref0 = metadata['ref0']
-                if np.isscalar(ref0):
-                    subsys._has_output_scaling |= ref0 != 0.0
-                    subsys._has_output_adder |= ref0 != 0.0
-                else:
-                    subsys._has_output_scaling |= np.any(ref0)
-                    subsys._has_output_adder |= np.any(ref0)
-
-                res_ref = metadata['res_ref']
-                if np.isscalar(res_ref):
-                    subsys._has_resid_scaling |= res_ref != 1.0
-                else:
-                    subsys._has_resid_scaling |= np.any(res_ref != 1.0)
-
-                if metadata['lower'] is not None or metadata['upper'] is not None:
-                    subsys._has_bounds = True
-
-        # Clear the cached to indicate that the cached values have been applied
-        self._output_solver_options = {}
 
     def initialize(self):
         """

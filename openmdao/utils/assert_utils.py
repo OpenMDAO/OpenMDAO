@@ -482,24 +482,23 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
     if type(desired) in [int, float, np.int64, np.float64, np.int32, np.complex128]:
         desired = np.atleast_1d(desired)
 
-    # if desired is numeric list, make ndarray
-    if isinstance(actual, (list, tuple)):  # TODO need to check if numeric!!
+    # if desired is numeric list or tuple, make ndarray out of it
+    if isinstance(actual, (list, tuple)):
         actual = np.asarray(actual)
-    if isinstance(desired, (list, tuple)):  # TODO need to check if numeric!!
+    if isinstance(desired, (list, tuple)):
         desired = np.asarray(desired)
 
+    # In case they are PromAbsDict and other dict-like objects
     if isinstance(actual, dict) and type(actual) != dict:
         actual = dict(actual)
-
     if isinstance(desired, dict) and type(desired) != dict:
         desired = dict(desired)
 
-    if type(actual) != type(desired):   # TODO - do I want to do this ?
+    if type(actual) != type(desired):
         raise ValueError('actual %s, desired %s have different types' % (actual, desired))
 
-    # Can only handle some generic data types
-    _supported_types = [dict, list, str, bool, np.ndarray, type(None)]
-    # _supported_types = [dict, list, str, int, bool, np.int32, float, np.ndarray, type(None)]
+    # The code below can only handle these data types
+    _supported_types = [dict, str, bool, np.ndarray, type(None)]
     if type(actual) not in _supported_types:
         warnings.warn(
             f"The function, assert_near_equal, does not support the actual value type: '"
@@ -535,17 +534,6 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
                 msg = '{}: '.format(key) + str(exception)
                 raise KeyError(msg) from None
 
-    # elif isinstance(actual, float) and isinstance(desired, float):
-    #     if isnan(actual) and not isnan(desired):
-    #         raise ValueError('actual nan, desired %s' % desired)
-    #     if desired != 0:
-    #         error = (actual - desired) / desired
-    #     else:
-    #         error = actual
-    #     if abs(error) > tolerance:
-    #         raise ValueError('actual %s, desired %s, rel error %s, tolerance %s'
-    #                          % (actual, desired, error, tolerance))
-    #
     elif isinstance(actual, str) and isinstance(desired, str):
         if actual != desired:
             raise ValueError(
@@ -611,9 +599,6 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
     else:
         raise ValueError(
             'actual and desired have unexpected types: %s, %s' % (type(actual), type(desired)))
-
-    # else:  # Mismatched types
-    #     raise ValueError('actual %s, desired %s have different types' % (actual, desired))
 
     return error
 

@@ -4,7 +4,7 @@ from copy import deepcopy
 
 import numpy as np
 
-from openmdao.api import Problem, IndepVarComp, ExecComp, ExplicitComponent
+from openmdao.api import Problem, ExecComp, ExplicitComponent
 from openmdao.components.linear_system_comp import LinearSystemComp
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.drivers.scipy_optimizer import ScipyOptimizeDriver
@@ -14,7 +14,6 @@ from openmdao.solvers.nonlinear.broyden import BroydenSolver
 from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarProblem
-from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.indexer import slicer
@@ -274,7 +273,6 @@ class TestSystemSetSolverOutputOptions(unittest.TestCase):
 
 
 class TestSystemSetDesignVarOptions(unittest.TestCase):
-
     def test_set_design_var_options_scaler_adder_ref_ref0(self):
         # See if setting options for des vars results in the same metadata whether
         #   they are set using add_design_var or set_design_var_options
@@ -754,14 +752,12 @@ class TestSystemSetObjectiveOptions(unittest.TestCase):
         self.assertEqual(str(cm.exception), msg)
 
 
-
 class ImplCompTwoStatesNoMetadataSetInAddOutput(ImplicitComponent):
     """
     A Simple Implicit Component with an additional output equation.
 
     This version has no metadata set in the calls to add_ouput
     """
-
     def setup(self):
         self.add_input('x', 0.5)
         self.add_output('y', 0.0)
@@ -791,7 +787,6 @@ class ImplCompTwoStatesNoMetadataSetInAddOutput(ImplicitComponent):
 
 
 class ScalingExample3(ImplicitComponent):
-
     def setup(self):
         self.add_input('x1', val=100.0)
         self.add_input('x2', val=5000.0)
