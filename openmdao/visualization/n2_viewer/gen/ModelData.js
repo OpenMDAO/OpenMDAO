@@ -39,8 +39,6 @@ class ModelData {
         this.root = this.tree = modelJSON.tree = this._adoptNodes(modelJSON.tree);
         this._setDepth(this.root, 1);
 
-        console.log(this.tree)
-
         for (const conn of this.conns) {
             this.connObjs.push(this._newConnectionObj(conn));
         }
