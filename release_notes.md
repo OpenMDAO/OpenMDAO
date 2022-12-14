@@ -1,4 +1,81 @@
 ***********************************
+# Release Notes for OpenMDAO 3.22.0
+
+December 14, 2022
+
+OpenMDAO 3.22.0 contains a variety of new user-facing capabilities and bug fixes.
+Here are some of the highlights:
+
+We've removed our dependency on the tabulate package.
+The dependencies on pyDOE2 and pyparsing are no longer required unless the user
+attempts to use an OpenMDAO feature that requires them. In this case, that means
+the DOEDriver or the external code file-wrapping capabilities, respectively.
+
+OpenMDAO will now raise an exception if a single solver instance is attached to multiple systems.
+
+We've implemented several [POEMs](https://github.com/OpenMDAO/POEMs) in this release.
+POEM 74 is implemented, and OpenMDAO will suggest closely-matching connection targets if you happen to misspell it during the `connect` call.
+POEM 70 adds a new _inputs report_ (`inputs.html`) that allows the user to quickly view the available inputs in a model, see which are ultimately connected to IndepVarComps, and to see which are design variables controlled by the Driver.
+POEM 69 allows users to provide more clear names for the residuals associated with implicit outputs, rather than assigning them the same name.
+Users were sometimes confused that the existing implementation seemed to associate some residuals specifically with some outputs, when in reality it often just matters that a solver be given `N` implicit outputs and `N` corresponding residuals.
+
+## New Deprecations
+
+- Setting `prob.model` to a component is now deprecated, as the technical burden of supporting this corner case has outweighed its usefulness. The `model` assigned to a Problem should now always be a Group.
+
+## Backwards Incompatible API Changes
+
+- None
+
+## Backwards Incompatible Non-API Changes
+
+- None
+
+## New Features
+
+- **POEM 70** implementation: Added the inputs report, and a generate_table function to eliminate dependency on the tabulate package. [#2655](https://github.com/OpenMDAO/OpenMDAO/pull/2655)
+- Added a command line test for the scaling report. [#2657](https://github.com/OpenMDAO/OpenMDAO/pull/2657)
+- Changed ImplicitComponent.apply_nonlinear() to raise NotImplementedError [#2664](https://github.com/OpenMDAO/OpenMDAO/pull/2664)
+- Changed check_partials to skip components with no outputs or no inputs [#2667](https://github.com/OpenMDAO/OpenMDAO/pull/2667)
+- OpenMDAO will now consider relevance information when running _linearize. As a result of this change, a component with finite differenced or complex stepped partials will not compute them for inputs that do not contribute to the model relevancy (as measured from the model's objectives and constraints to the design variables.) [#2675](https://github.com/OpenMDAO/OpenMDAO/pull/2675)
+- **POEM 74** implementation: Suggest variables for failed connection [#2681](https://github.com/OpenMDAO/OpenMDAO/pull/2681)
+- Made pyDOE2 an optional dependency. [#2689](https://github.com/OpenMDAO/OpenMDAO/pull/2689)
+- Added support for constraint alias in the case reader. [#2698](https://github.com/OpenMDAO/OpenMDAO/pull/2698)
+- **POEM 69** implementation: Allow residual names to be different from the corresponding implicit output names. [#2709](https://github.com/OpenMDAO/OpenMDAO/pull/2709)
+- Changed default for Driver supports['optimization'] to False [#2715](https://github.com/OpenMDAO/OpenMDAO/pull/2715)
+- Deprecated Component as a model, handle gracefully. [#2716](https://github.com/OpenMDAO/OpenMDAO/pull/2716)
+- Added pyoptsparse to windows build on GitHub Actions. [#2718](https://github.com/OpenMDAO/OpenMDAO/pull/2718)
+- Removed pyparsing as an explicit OpenMDAO dependency. [#2723](https://github.com/OpenMDAO/OpenMDAO/pull/2723)
+- OpenMDAO will now raise an exception if a solver is assigned to more than one System [#2724](https://github.com/OpenMDAO/OpenMDAO/pull/2724)
+- Cached setup errors so they can be raised at one time. [#2726](https://github.com/OpenMDAO/OpenMDAO/pull/2726)
+
+## Bug Fixes
+
+- Added `indep_var` tag to work with inputs report for backward compatibility. [#2683](https://github.com/OpenMDAO/OpenMDAO/pull/2683)
+- Fixed an issue with embedded newlines in tables and added some '*grid' formats. [#2679](https://github.com/OpenMDAO/OpenMDAO/pull/2679)
+- Fixed doc for linking [#2680](https://github.com/OpenMDAO/OpenMDAO/pull/2680)
+- Fixed an issue with hang in guess_nonlinear in ParallelGroup [#2671](https://github.com/OpenMDAO/OpenMDAO/pull/2671)
+- Fixed various numpy deprecation warnings. [#2708](https://github.com/OpenMDAO/OpenMDAO/pull/2708)
+
+## Miscellaneous
+
+- Moved filterwarnings into catch_warnings context. [#2677](https://github.com/OpenMDAO/OpenMDAO/pull/2677)
+- Dropped required Python version back to 3.7. [#2662](https://github.com/OpenMDAO/OpenMDAO/pull/2662)
+- Changed map test to use weighted interpolant. [#2658](https://github.com/OpenMDAO/OpenMDAO/pull/2658)
+- Incremented version in issue template. [#2661](https://github.com/OpenMDAO/OpenMDAO/pull/2661)
+- Added document describing how to contribute to OpenMDAO via issues, POEMS and pull requests. [#2663](https://github.com/OpenMDAO/OpenMDAO/pull/2663)
+- Added "Debugging your Optimizations" document. [#2672](https://github.com/OpenMDAO/OpenMDAO/pull/2672)
+- Updated CI to use conda vs mamba due to Python 3.11 release [#2687](https://github.com/OpenMDAO/OpenMDAO/pull/2687)
+- Updated GitHub workflow to work properly with Python 3.11 [#2699](https://github.com/OpenMDAO/OpenMDAO/pull/2699)
+- Separated vulnerabilities check from the CI build process [#2703](https://github.com/OpenMDAO/OpenMDAO/pull/2703)
+- Updated GitHub test workflow [#2704](https://github.com/OpenMDAO/OpenMDAO/pull/2704)
+- Updated version of JAX used in GitHub workflow [#2705](https://github.com/OpenMDAO/OpenMDAO/pull/2705)
+- Removed audit step from Windows job in GitHub workflow [#2707](https://github.com/OpenMDAO/OpenMDAO/pull/2707)
+- Fixed description of ExternalCodeComp 'command' option. [#2719](https://github.com/OpenMDAO/OpenMDAO/pull/2719)
+
+
+
+***********************************
 # Release Notes for OpenMDAO 3.21.0
 
 September 28, 2022
