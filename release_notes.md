@@ -11,8 +11,6 @@ The dependencies on pyDOE2 and pyparsing are no longer required unless the user
 attempts to use an OpenMDAO feature that requires them. In this case, that means
 the DOEDriver or the external code file-wrapping capabilities, respectively.
 
-Setting `prob.model` to a component is now deprecated, as the technical burden of supporting this corner case has outweighed its usefulness. The `model` assigned to a Problem should now always be a Group.
-
 OpenMDAO will now raise an exception if a single solver instance is attached to multiple systems.
 
 We've implemented several [POEMs](https://github.com/OpenMDAO/POEMs) in this release.
@@ -23,7 +21,7 @@ Users were sometimes confused that the existing implementation seemed to associa
 
 ## New Deprecations
 
-- None
+- Setting `prob.model` to a component is now deprecated, as the technical burden of supporting this corner case has outweighed its usefulness. The `model` assigned to a Problem should now always be a Group.
 
 ## Backwards Incompatible API Changes
 
