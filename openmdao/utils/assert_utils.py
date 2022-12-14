@@ -459,6 +459,8 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
     Determine that the relative error between `actual` and `desired`
     is within `tolerance`. If `desired` is zero, then use absolute error.
 
+    Can handle some data structures. Generates warnings for data types it cannot handle.
+
     Parameters
     ----------
     actual : float, array-like, dict
@@ -473,35 +475,41 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
     float
         The error.
     """
-    if type(actual) in [int, float, np.int32]:
+    # Try to make similar things of the same type so they can be compared
+    # make arrays out of scalars
+    if type(actual) in [int, float, np.int64, np.float64, np.int32, np.complex128]:
         actual = np.atleast_1d(actual)
-    if type(desired) in [int, float, np.int32]:
+    if type(desired) in [int, float, np.int64, np.float64, np.int32, np.complex128]:
         desired = np.atleast_1d(desired)
 
-    NoneType = type(None)
-    _supported_types = [dict, list, str, int, bool, np.int32, float, np.ndarray, NoneType]
+    # if desired is numeric list, make ndarray
+    if isinstance(actual, (list,tuple)):  # TODO need to check if numeric!!
+        actual = np.asarray(actual)
+    if isinstance(desired, (list, tuple)):  # TODO need to check if numeric!!
+            desired = np.asarray(desired)
 
-    # if type(actual) != type(desired):   # TODO - do I want to do this ?
-    #     raise ValueError('actual %s, desired %s have different types' % (actual, desired))
+    if isinstance(actual, dict) and type(actual) != dict:
+        actual = dict(actual)
 
+    if isinstance(desired, dict) and type(desired) != dict:
+        desired = dict(desired)
+
+    if type(actual) != type(desired):   # TODO - do I want to do this ?
+        raise ValueError('actual %s, desired %s have different types' % (actual, desired))
+
+    # Can only handle some generic data types
+    _supported_types = [dict, list, str, bool, np.ndarray, type(None)]
+    # _supported_types = [dict, list, str, int, bool, np.int32, float, np.ndarray, type(None)]
     if type(actual) not in _supported_types:
         warnings.warn(
             f"The function, assert_near_equal, does not support the actual value type: '"
             f"{type(actual)}'.")
         return 0
-
     if type(desired) not in _supported_types:
         warnings.warn(
             f"The function, assert_near_equal, does not support the desired value type: '"
             f"{type(actual)}'.")
         return 0
-
-    # if desired is numeric list, make ndarray
-    if isinstance(actual, list):  # TODO need to check if numeric!!
-        actual = np.asarray(actual)
-
-    if isinstance(desired, list):  # TODO need to check if numeric!!
-        desired = np.asarray(desired)
 
     if isinstance(actual, dict) and isinstance(desired, dict):
         actual_keys = set(actual.keys())
@@ -527,27 +535,27 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
                 msg = '{}: '.format(key) + str(exception)
                 raise KeyError(msg) from None
 
-    elif isinstance(actual, float) and isinstance(desired, float):
-        if isnan(actual) and not isnan(desired):
-            raise ValueError('actual nan, desired %s' % desired)
-        if desired != 0:
-            error = (actual - desired) / desired
-        else:
-            error = actual
-        if abs(error) > tolerance:
-            raise ValueError('actual %s, desired %s, rel error %s, tolerance %s'
-                             % (actual, desired, error, tolerance))
-
+    # elif isinstance(actual, float) and isinstance(desired, float):
+    #     if isnan(actual) and not isnan(desired):
+    #         raise ValueError('actual nan, desired %s' % desired)
+    #     if desired != 0:
+    #         error = (actual - desired) / desired
+    #     else:
+    #         error = actual
+    #     if abs(error) > tolerance:
+    #         raise ValueError('actual %s, desired %s, rel error %s, tolerance %s'
+    #                          % (actual, desired, error, tolerance))
+    #
     elif isinstance(actual, str) and isinstance(desired, str):
         if actual != desired:
             raise ValueError(
                 'actual %s, desired %s strings have different values' % (actual, desired))
         error = 0.0
 
-    elif isinstance(actual, (int, np.int32)) and isinstance(desired, (int, np.int32)):
-        if actual != desired:
-            raise ValueError('actual %s, desired %s ints have different values' % (actual, desired))
-        error = 0.0
+    # elif isinstance(actual, (int, np.int32)) and isinstance(desired, (int, np.int32)):
+    #     if actual != desired:
+    #         raise ValueError('actual %s, desired %s ints have different values' % (actual, desired))
+    #     error = 0.0
 
     elif isinstance(actual, bool) and isinstance(desired, bool):
         if actual != desired:
@@ -560,33 +568,44 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
 
     # array values
     elif isinstance(actual, np.ndarray) and isinstance(desired, np.ndarray):
-        actual = np.atleast_1d(actual)
-        desired = np.atleast_1d(desired)
-        if actual.shape != desired.shape:
-            raise ValueError(
-                'actual and desired have differing shapes.'
-                ' actual {}, desired {}'.format(actual.shape, desired.shape))
-        # check to see if the entire array is made of floats. If not, loop through all values
-
-        if not np.all(np.isnan(actual) == np.isnan(desired)):
-            if actual.size == 1 and desired.size == 1:
-                raise ValueError('actual %s, desired %s' % (actual, desired))
-            else:
-                raise ValueError('actual and desired values have non-matching nan'
-                                 ' values')
-
-        if np.linalg.norm(desired) == 0:
-            error = np.linalg.norm(actual)
+        if actual.dtype == object or desired.dtype == object:
+            if actual.dtype == object:
+                warnings.warn(
+                f"The function, assert_near_equal, does not support the actual value ndarray type of: '"
+                f"{type(actual.dtype)}'.")
+            if desired.dtype == object:
+                warnings.warn(
+                    f"The function, assert_near_equal, does not support the desired value ndarray type of: '"
+                    f"{type(desired.dtype)}'.")
+            error = 0.0
         else:
-            error = np.linalg.norm(actual - desired) / np.linalg.norm(desired)
 
-        if abs(error) > tolerance:
-            if actual.size < 10 and desired.size < 10:
-                raise ValueError('actual %s, desired %s, rel error %s, tolerance %s'
-                                 % (actual, desired, error, tolerance))
+            actual = np.atleast_1d(actual)
+            desired = np.atleast_1d(desired)
+            if actual.shape != desired.shape:
+                raise ValueError(
+                    'actual and desired have differing shapes.'
+                    ' actual {}, desired {}'.format(actual.shape, desired.shape))
+            # check to see if the entire array is made of floats. If not, loop through all values
+
+            if not np.all(np.isnan(actual) == np.isnan(desired)):
+                if actual.size == 1 and desired.size == 1:
+                    raise ValueError('actual %s, desired %s' % (actual, desired))
+                else:
+                    raise ValueError('actual and desired values have non-matching nan'
+                                     ' values')
+            if np.linalg.norm(desired) == 0:
+                error = np.linalg.norm(actual)
             else:
-                raise ValueError('arrays do not match, rel error %.3e > tol (%.3e)' %
-                                 (error, tolerance))
+                error = np.linalg.norm(actual - desired) / np.linalg.norm(desired)
+
+            if abs(error) > tolerance:
+                if actual.size < 10 and desired.size < 10:
+                    raise ValueError('actual %s, desired %s, rel error %s, tolerance %s'
+                                     % (actual, desired, error, tolerance))
+                else:
+                    raise ValueError('arrays do not match, rel error %.3e > tol (%.3e)' %
+                                     (error, tolerance))
     elif isinstance(actual, tuple) and isinstance(desired, tuple):
         error = 0.0
         for act, des in zip(actual, desired):
