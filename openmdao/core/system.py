@@ -1708,12 +1708,19 @@ class System(object):
         """
         abs2meta = self._var_allprocs_abs2meta['output']
 
+        print("======================================================")
+
         dv = self._design_vars
+
+        print(f"{self.msginfo} {list(dv.keys())=}")
+
         for name, meta in dv.items():
 
             units = meta['units']
             dv[name]['total_adder'] = dv[name]['adder']
             dv[name]['total_scaler'] = dv[name]['scaler']
+
+            print(f"{self.msginfo} {name=} {units=}")
 
             if units is not None:
                 # If derivatives are not being calculated, then you reach here before source
@@ -1723,8 +1730,15 @@ class System(object):
                 except KeyError:
                     units_src = self.get_source(name)
 
-                var_units = abs2meta[units_src]['units']
+                if units_src in abs2meta:
+                    var_units = abs2meta[units_src]['units']
+                else:
+                    # source for design var is outside of this System/Group
+                    # unit errors will be caught elsewhere?
+                    print(f"********** {self.pathname=} des_var {name=} {units_src=}")
+                    continue
 
+                print(f"{self.msginfo} {name=} {units=} {units_src=} {var_units=}")
                 if var_units == units:
                     continue
 
@@ -1742,6 +1756,8 @@ class System(object):
                 base_adder, base_scaler = determine_adder_scaler(None, None,
                                                                  dv[name]['adder'],
                                                                  dv[name]['scaler'])
+
+                print(f"********* {self.msginfo} {factor=} {offset=} {base_adder=} {base_scaler=}")
 
                 dv[name]['total_adder'] = offset + base_adder / factor
                 dv[name]['total_scaler'] = base_scaler * factor
@@ -1762,7 +1778,13 @@ class System(object):
                 except KeyError:
                     units_src = self.get_source(name)
 
-                var_units = abs2meta[units_src]['units']
+                if units_src in abs2meta:
+                    var_units = abs2meta[units_src]['units']
+                else:
+                    # source for design var is outside of this System/Group
+                    # unit errors will be caught elsewhere?
+                    print(f"********** {self.pathname=} response {name=} {units_src=}")
+                    continue
 
                 if var_units == units:
                     continue
