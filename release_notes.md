@@ -17,10 +17,10 @@ an `IndepVarComp` to provide outputs for otherwise-unconnected inputs in a model
 OpenMDAO will now raise an exception if a single solver is attached to multiple systems.
 
 We've implemented several [POEMs](https://github.com/OpenMDAO/POEMs) in this release.
-POEM 74 is implemented, and OpenMDAO will suggest closely-matching connection targets if you happen to misspell it during the `add_connection` call.
+POEM 74 is implemented, and OpenMDAO will suggest closely-matching connection targets if you happen to misspell it during the `connect` call.
 POEM 70 adds a new _inputs report_ (`inputs.html`) that allows the user to quickly view the available inputs in a model, see which are ultimately connected to IndepVarComps, and to see which are design variables controlled by the Driver.
 POEM 69 allows users to provide more clear names for the residuals associated with implicit outputs, rather than assigning them the same name.
-Users were sometimes confused that the existing impelmentation seemed to associate some residuals specifically with some outputs, when in reality it often just matteres that a solver be given `N` implicit outputs and `N` corresponding residuals.
+Users were sometimes confused that the existing implementation seemed to associate some residuals specifically with some outputs, when in reality it often just matters that a solver be given `N` implicit outputs and `N` corresponding residuals.
 
 ## New Deprecations
 
