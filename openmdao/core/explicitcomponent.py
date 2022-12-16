@@ -8,6 +8,7 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE, _UNDEFINED
+from openmdao.utils.general_utils import dprint
 
 _inst_functs = ['compute_jacvec_product']
 
@@ -354,8 +355,6 @@ class ExplicitComponent(Component):
                 self.compute_jacvec_product(inputs, d_inputs, d_resids, mode, discrete_inputs)
             else:
                 self.compute_jacvec_product(inputs, d_inputs, d_resids, mode)
-                if mode == 'rev':
-                    print("d_inputs:", {k:v for k,v in d_inputs._views.items() if not self._var_abs2meta['input'][k]['distributed']})
 
     def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
         """

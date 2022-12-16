@@ -164,7 +164,7 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
         len_wrt_width = len(wrt_header)
         len_norm_width = len(norm_value_header)
         bad_derivs = []
-        inconsistent_derivs = []
+        inconsistent_derivs = set()
 
         # Find all derivatives whose errors exceed tolerance.
         # Also, size the output to precompute column extents.
@@ -173,7 +173,7 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
             for error_type, tolerance in [('abs error', atol), ('rel error', rtol), ]:
                 actual = pair_data[error_type]
                 if 'inconsistent' in pair_data:
-                    inconsistent_derivs.append(pair_data['inconsistent'])
+                    inconsistent_derivs.update(pair_data['inconsistent'])
 
                 for error_val, mode in zip(actual, norm_types):
                     in_error = False
@@ -218,7 +218,9 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
                     comp_error_string += err_msg
 
             if inconsistent_derivs:
-                comp_error_string += f"\nInconsistent derivs across procs: {inconsistent_derivs}."
+                comp_error_string += \
+                    "\nInconsistent derivs across processes for keys: " \
+                    f"{sorted(inconsistent_derivs)}.\n"
 
             name_header = 'Component: {}\n'.format(comp)
             len_name_header = len(name_header)

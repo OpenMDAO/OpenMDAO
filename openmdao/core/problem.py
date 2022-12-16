@@ -50,7 +50,7 @@ from openmdao.utils.array_utils import scatter_dist_to_local
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
     clear_reports, get_reports_dir, _load_report_plugins
 from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable, \
-    _find_dict_meta, env_truthy, add_border, match_includes_excludes
+    _find_dict_meta, env_truthy, add_border, match_includes_excludes, dprint
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
@@ -1352,6 +1352,7 @@ class Problem(object):
         requested_method = method
         alloc_complex = model._outputs._alloc_complex
         abs2meta_in = model._var_allprocs_abs2meta['input']
+        abs2meta_out = model._var_allprocs_abs2meta['output']
 
         for comp in comps:
             local_opts = comp._get_check_partial_options()
@@ -1549,12 +1550,13 @@ class Problem(object):
 
                                             deriv['directional_fwd_rev'] = mhat.dot(m) - dhat.dot(d)
                                         else:
-                                            if (not abs2meta_in[out_abs]['distributed'] and not
-                                                    consistent_across_procs(comp.comm, derivs)):
-                                                if 'inconsistent' not in deriv:
-                                                    deriv['inconsistent'] = set()
-                                                deriv['inconsistent'].add(key)
-                                                print("inconsistent:", key)
+                                            meta = abs2meta_in[out_abs] if out_abs in abs2meta_in \
+                                                else abs2meta_out[out_abs]
+                                            if not meta['distributed']:
+                                                if not consistent_across_procs(comp.comm, derivs):
+                                                    if 'inconsistent' not in deriv:
+                                                        deriv['inconsistent'] = set()
+                                                    deriv['inconsistent'].add(key)
 
                                         # Allocate first time
                                         if jac_key not in deriv:
@@ -2979,6 +2981,7 @@ def _get_fd_options(var, global_method, local_opts, global_step, global_form, gl
                 fd_options[name] = value
 
     return fd_options, could_not_cs
+
 
 def consistent_across_procs(comm, arr, tol=1e-15):
     """

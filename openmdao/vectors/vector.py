@@ -2,6 +2,7 @@
 from copy import deepcopy
 import weakref
 import hashlib
+from io import StringIO
 
 import numpy as np
 from numpy import ndim

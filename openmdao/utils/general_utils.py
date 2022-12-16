@@ -1272,3 +1272,31 @@ def make_traceback():
     """
     finfo = getouterframes(currentframe())[2]
     return types.TracebackType(None, finfo.frame, finfo.frame.f_lasti, finfo.frame.f_lineno)
+
+
+if env_truthy('OM_DBG'):
+    def dprint(*args, **kwargs):
+        """
+        Print only if OM_DBG is truthy in the environment.
+
+        Parameters
+        ----------
+        args : list
+            Positional args.
+        kwargs : dict
+            Named args.
+        """
+        print(*args, **kwargs)
+else:
+    def dprint(*args, **kwargs):
+        """
+        Print only if OM_DBG is truthy in the environment.
+
+        Parameters
+        ----------
+        args : list
+            Positional args.
+        kwargs : dict
+            Named args.
+        """
+        pass
