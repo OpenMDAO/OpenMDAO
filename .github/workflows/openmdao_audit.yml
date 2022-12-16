@@ -126,7 +126,7 @@ jobs:
           echo "Scan environment for packages with known vulnerabilities"
           echo "found in the Open Source Vulnerability database"
           echo "======================================================================="
-          python -m pip_audit -s osv
+          python -m pip_audit -s osv --ignore-vuln GHSA-hcpj-qp55-gfph
 
       - name: Notify slack
         uses: act10ns/slack@v1.6.0
