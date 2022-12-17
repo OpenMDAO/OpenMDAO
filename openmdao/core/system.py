@@ -721,11 +721,10 @@ class System(object):
         """
         Check to see if the cached output solver options were applied.
         """
-        been_applied = True
-        for subsys in [self] + self._subsystems_myproc:
+        for subsys in self.system_iter(include_self=True, recurse=True):
             if subsys._output_solver_options:  # If options dict not empty, has not been applied
-                been_applied = False
-        return been_applied
+                return False  # No need to look for more
+        return True
 
     def set_output_solver_options(self, name, lower=_UNDEFINED, upper=_UNDEFINED,
                                   ref=_UNDEFINED, ref0=_UNDEFINED, res_ref=_UNDEFINED):
@@ -791,15 +790,11 @@ class System(object):
         They are applied in System._setup using this method.
         """
         # Loop through the output solver options that have been set on this System
+        prefix = self.pathname + '.' if self.pathname else ''
         for name, options in self._output_solver_options.items():
-            from openmdao.core.group import Group
-            if isinstance(self, Group):
-                subsys_path = name.rsplit('.', 1)[0]
-                subsys = self._get_subsystem(subsys_path)
-            else:
-                subsys = self
+            subsys_path = name.rpartition('.')[0]
+            subsys = self._get_subsystem(subsys_path) if subsys_path else self
 
-            prefix = self.pathname + '.' if self.pathname else ''
             abs_name = prefix + name
 
             # Will need to set both of these dicts to keep them both up-to-date
@@ -841,11 +836,8 @@ class System(object):
         # Loop over all the options set. Each one of these could be referencing a different
         #    subsystem since the name could be a path
         for name, options in self._output_solver_options.items():
-            if isinstance(self, Group):
-                subsys_path = name.rsplit('.', 1)[0]
-                subsys = self._get_subsystem(subsys_path)
-            else:
-                subsys = self
+            subsys_path = name.rpartition('.')[0]
+            subsys = self._get_subsystem(subsys_path) if subsys_path else self
 
             # Now that we know which subsystem was affected. We have to recalculate
             #   _has_output_scaling, _has_output_adder, _has_resid_scaling, _has_bounds
@@ -1501,8 +1493,9 @@ class System(object):
         self._has_resid_scaling = False
         self._has_bounds = False
         #
-        self._apply_output_solver_options()
-        for subsys in self._subsystems_myproc:
+        # self._apply_output_solver_options()
+        for subsys in self.system_iter(include_self=True, recurse=True):
+        # for subsys in self._subsystems_myproc:
             subsys._apply_output_solver_options()
 
             # Do we need to initialize these to false first ?
