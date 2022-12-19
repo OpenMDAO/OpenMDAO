@@ -992,7 +992,6 @@ class Group(System):
 
         self._has_distrib_vars = False
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
-        self._promotes_src_indices = {}
 
         for subsys in self._subsystems_myproc:
             self._has_output_scaling |= subsys._has_output_scaling
@@ -1841,9 +1840,6 @@ class Group(System):
 
         Also, check shapes of connected variables.
         """
-        # clean up promotion maps since we don't need them any more
-        self._promotes_src_indices = None
-
         abs_in2out = self._conn_abs_in2out = {}
         self._conn_discrete_in2out = {}
         global_abs_in2out = self._conn_global_abs_in2out

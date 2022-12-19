@@ -770,17 +770,6 @@ class ImplicitComponent(Component):
         """
         return self._list_states()
 
-    def has_declared_resids(self):
-        """
-        Return True if this System has declared residuals.
-
-        Returns
-        -------
-        bool
-            True if this System has declared residuals.
-        """
-        return len(self._declared_residuals) > 0
-
 
 def meta2range_iter(meta_dict, names=None, shp_name='shape'):
     """

@@ -189,8 +189,6 @@ class Problem(object):
         Problem name. If no name given, a default name of the form 'problemN', where N is an
         integer, will be given to the problem so it can be referenced in command line tools
         that have an optional problem name argument
-    _system_options_recorded : bool
-        A flag to indicate whether the system options for all the systems have been recorded
     _metadata : dict
         Problem level metadata.
     _run_counter : int
@@ -275,7 +273,6 @@ class Problem(object):
 
         self._metadata = None
         self._run_counter = -1
-        self._system_options_recorded = False
         self._rec_mgr = RecordingManager()
 
         # General options

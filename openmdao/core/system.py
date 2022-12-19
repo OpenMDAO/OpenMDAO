@@ -5631,14 +5631,3 @@ class System(object):
         if self._saved_errors and prob_meta['saved_errors'] is not None:
             prob_meta['saved_errors'].extend(self._saved_errors)
         self._saved_errors = None if env_truthy('OPENMDAO_FAIL_FAST') else []
-
-    def has_declared_resids(self):
-        """
-        Return True if this System has declared residuals.
-
-        Returns
-        -------
-        bool
-            True if this System has declared residuals.
-        """
-        return False
