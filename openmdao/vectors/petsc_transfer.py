@@ -1,6 +1,5 @@
 """Define the PETSc Transfer class."""
 from openmdao.utils.mpi import check_mpi_env
-from openmdao.utils.general_utils import dprint
 
 use_mpi = check_mpi_env()
 
@@ -193,12 +192,10 @@ else:
             for sname, inds in fwd_xfer_in.items():
                 fwd_xfer_in[sname] = _merge(inds)
                 fwd_xfer_out[sname] = _merge(fwd_xfer_out[sname])
-                dprint(f"FWD({sname}): in: {fwd_xfer_in[sname]}, out: {fwd_xfer_out[sname]}")
             if rev:
                 for sname, inds in rev_xfer_out.items():
                     rev_xfer_in[sname] = _merge(rev_xfer_in[sname])
                     rev_xfer_out[sname] = _merge(inds)
-                    dprint(f"REV({sname}): in: {rev_xfer_in[sname]}, out: {rev_xfer_out[sname]}")
 
             if fwd_xfer_in:
                 xfer_in = np.concatenate(list(fwd_xfer_in.values()))

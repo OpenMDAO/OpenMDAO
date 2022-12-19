@@ -8,7 +8,6 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE, _UNDEFINED
-from openmdao.utils.general_utils import dprint
 
 _inst_functs = ['compute_jacvec_product']
 
