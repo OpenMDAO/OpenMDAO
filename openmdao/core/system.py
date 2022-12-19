@@ -1492,10 +1492,8 @@ class System(object):
         self._has_output_adder = False
         self._has_resid_scaling = False
         self._has_bounds = False
-        #
-        # self._apply_output_solver_options()
+
         for subsys in self.system_iter(include_self=True, recurse=True):
-        # for subsys in self._subsystems_myproc:
             subsys._apply_output_solver_options()
 
             # Do we need to initialize these to false first ?
