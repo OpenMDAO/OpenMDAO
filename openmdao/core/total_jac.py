@@ -338,9 +338,9 @@ class _TotalJacInfo(object):
             scratch2 = scratch.copy()
             self.jac_scratch = {}
             if 'fwd' in modes:
-                self.jac_scratch['fwd'] = (scratch[:J.shape[0]], scratch2[:J.shape[0]])
+                self.jac_scratch['fwd'] = [scratch[:J.shape[0]], scratch2[:J.shape[0]]]
             if 'rev' in modes:
-                self.jac_scratch['rev'] = (scratch[:J.shape[1]], scratch2[:J.shape[1]])
+                self.jac_scratch['rev'] = [scratch[:J.shape[1]], scratch2[:J.shape[1]]]
                 if self.has_output_dist['rev']:
                     sizes = model._var_sizes['output']
                     abs2idx = model._var_allprocs_abs2idx
@@ -1214,16 +1214,18 @@ class _TotalJacInfo(object):
             # duplication of their seed values by dividing by the number of duplications.
             ndups, _, _ = self.in_idx_map[mode][i]
             if self.get_remote:
-                scratch2, scratch = self.jac_scratch['rev']
+                # don't use scratch[0] here because it may be in use by simul_coloring_jac_setter
+                # which calls this method.
+                scratch = self.jac_scratch['rev'][1]
                 scratch[:] = self.J[i]
 
                 self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
 
                 if ndups > 1:
                     if self.jac_dist_col_mask is not None:
-                        scratch2[:] = (1.0 / ndups)
-                        scratch2[self.jac_dist_col_mask] = 1.0
-                        self.J[i] *= scratch2
+                        scratch[:] = (1.0 / ndups)
+                        scratch[self.jac_dist_col_mask] = 1.0
+                        self.J[i] *= scratch
                     else:
                         self.J[i] *= (1.0 / ndups)
             else:

@@ -176,7 +176,6 @@ class MixedDistrib2(om.ExplicitComponent):  # for double diamond case
                 if 'in_dist' in d_inputs:
                     d_inputs['in_dist'] += df_dId * d_outputs['out_dist']
                 if 'in_nd' in d_inputs:
-                    # d_inputs['in_nd'] += np.tile(df_dIs, nId).reshape((nId, nIs)).T.dot(d_outputs['out_dist'])
                     deriv = np.tile(df_dIs, nId).reshape((nId, nIs)).T.dot(d_outputs['out_dist'])
                     full = np.zeros(deriv.size)
                     self.comm.Allreduce(deriv, full, op=MPI.SUM)
@@ -185,9 +184,6 @@ class MixedDistrib2(om.ExplicitComponent):  # for double diamond case
             if 'out_nd' in d_outputs:
                 if 'out_nd' in d_outputs:
                     if 'in_dist' in d_inputs:
-                        # full = np.zeros(d_outputs['out_nd'].size)
-                        # self.comm.Allreduce(d_outputs['out_nd'], full, op=MPI.SUM)
-                        # d_inputs['in_dist'] += np.tile(dg_dId, nIs).reshape((nIs, nId)).T.dot(full)
                         d_inputs['in_dist'] += np.tile(dg_dId, nIs).reshape((nIs, nId)).T.dot(d_outputs['out_nd'])
                 if 'in_nd' in d_inputs:
                     d_inputs['in_nd'] += dg_dIs * d_outputs['out_nd']
@@ -1625,9 +1621,6 @@ class Distrib_Derivs(om.ExplicitComponent):
         Id = inputs['in_dist']
         Is = inputs['in_nd']
 
-        # print("in_dist shape:", Id.shape)
-        # print("in_nd shape:", Is.shape)
-
         # Our local distributed output is a function of the local distributed input and
         # the non-distributed input.
         outputs['out_dist'] = f_out_dist(Id, Is)
@@ -1741,8 +1734,6 @@ class Distrib_Derivs_Prod_Matfree(Distrib_Derivs_Prod):
 
         idx = self._var_allprocs_abs2idx[rel_name2abs_name(self, 'in_dist')]
         sizes = self._var_sizes['input'][:, idx]
-        offsets = np.zeros(len(sizes), dtype=int)
-        offsets[1:] = np.cumsum(sizes[:-1])
         start = np.sum(sizes[:self.comm.rank])
         end = start + sizes[self.comm.rank]
 

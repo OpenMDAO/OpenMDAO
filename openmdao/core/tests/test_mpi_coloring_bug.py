@@ -507,8 +507,6 @@ class TestMPIColoringBug(unittest.TestCase):
         p.run_driver()
 
         J = p.driver._compute_totals(of=of, wrt=wrt, return_format='dict')
-        import pprint
-        pprint.pprint(J)
         dd = J['phases.burn1.collocation_constraint.defects:deltav']['phases.burn1.indep_states.states:deltav']
 
         assert_near_equal(dd, np.array([[-0.75, 0.75]]), 1e-6)
