@@ -338,9 +338,9 @@ class _TotalJacInfo(object):
             scratch2 = scratch.copy()
             self.jac_scratch = {}
             if 'fwd' in modes:
-                self.jac_scratch['fwd'] = [scratch[:J.shape[0]], scratch2[:J.shape[0]]]
+                self.jac_scratch['fwd'] = (scratch[:J.shape[0]], scratch2[:J.shape[0]])
             if 'rev' in modes:
-                self.jac_scratch['rev'] = [scratch[:J.shape[1]], scratch2[:J.shape[1]]]
+                self.jac_scratch['rev'] = (scratch[:J.shape[1]], scratch2[:J.shape[1]])
                 if self.has_output_dist['rev']:
                     sizes = model._var_sizes['output']
                     abs2idx = model._var_allprocs_abs2idx
