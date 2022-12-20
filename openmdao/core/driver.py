@@ -429,10 +429,13 @@ class Driver(object):
         if not env_truthy('OPENMDAO_ALLOW_INVALID_DESVAR'):
             desvar_errors = []
             for var, meta in self._designvars.items():
-                lower = meta['lower']
-                upper = meta['upper']
                 val = self._problem().get_val(var, units=meta['units'])
                 idxs = meta['indices']() if meta['indices'] else None
+                scaler = meta['scaler'] or 1.
+                adder = meta['adder'] or 0.
+                lower = meta['lower'] / scaler - adder
+                upper = meta['upper'] / scaler - adder
+
                 if (val[idxs] < lower).any() or (val[idxs] > upper).any():
                     desvar_errors.append((var, val, lower, upper))
             if desvar_errors:

@@ -1390,9 +1390,6 @@ class TestStaticColoring(unittest.TestCase):
 
         prob.setup(check=False, mode='fwd')
 
-        prob.set_val('indeps.x0', [1.03, 1.04, 1.05])
-        prob.set_val('indeps.x1', [1.06, 1.07])
-
         prob.set_solver_print(level=0)
         prob.run_model()
 
