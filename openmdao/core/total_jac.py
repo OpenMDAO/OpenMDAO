@@ -97,7 +97,7 @@ class _TotalJacInfo(object):
     """
 
     def __init__(self, problem, of, wrt, use_abs_names, return_format, approx=False,
-                 debug_print=False, driver_scaling=True, get_remote=True):
+                 debug_print=False, driver_scaling=True, get_remote=True, checking=False):
         """
         Initialize object.
 
@@ -123,6 +123,8 @@ class _TotalJacInfo(object):
             and responses were added. If False, leave them unscaled.
         get_remote : bool
             Whether to get remote variables if using MPI.
+        checking : bool
+            If True, this was called from check_totals.
         """
         driver = problem.driver
         prom2abs = problem.model._var_allprocs_prom2abs_list['output']
@@ -139,6 +141,7 @@ class _TotalJacInfo(object):
         self.debug_print = debug_print
         self.par_deriv_printnames = {}
         self.get_remote = get_remote
+        self.checking = checking
 
         if isinstance(wrt, str):
             wrt = [wrt]

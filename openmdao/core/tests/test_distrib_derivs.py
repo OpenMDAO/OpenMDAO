@@ -1681,6 +1681,48 @@ class Distrib_Derivs_Matfree(Distrib_Derivs):
                     d_inputs['in_nd'] += (2.0 * Is + 3.0) * d_outputs['out_nd']
 
 
+class Distrib_Derivs_Matfree_Old(Distrib_Derivs):
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        Id = inputs['in_dist']
+        Is = inputs['in_nd']
+
+        size = len(Is)
+        local_size = len(Id)
+
+        df_dIs = 3. * Is
+        dg_dId = 3. * Id
+
+        if mode == 'fwd':
+            if 'out_dist' in d_outputs:
+                if 'in_dist' in d_inputs:
+                    d_outputs['out_dist'] += (2.0 * Id - 2.0) * d_inputs['in_dist']
+                if 'in_nd' in d_inputs:
+                    d_outputs['out_dist'] += np.tile(df_dIs, local_size).reshape((local_size, size)).dot(d_inputs['in_nd'])
+            if 'out_nd' in d_outputs:
+                if 'in_dist' in d_inputs:
+                    deriv = np.tile(dg_dId, size).reshape((size, local_size)).dot(d_inputs['in_dist'])
+                    deriv_sum = np.zeros(deriv.size)
+                    self.comm.Allreduce(deriv, deriv_sum, op=MPI.SUM)
+                    d_outputs['out_nd'] += deriv_sum
+                if 'in_nd' in d_inputs:
+                    d_outputs['out_nd'] += (2.0 * Is + 3.0) * d_inputs['in_nd']
+        else:  # rev
+            if 'out_dist' in d_outputs:
+                if 'in_dist' in d_inputs:
+                    d_inputs['in_dist'] += (2.0 * Id - 2.0) * d_outputs['out_dist']
+                if 'in_nd' in d_inputs:
+                    d_inputs['in_nd'] += 2. * np.tile(df_dIs, local_size).reshape((local_size, size)).T.dot(d_outputs['out_dist'])
+            if 'out_nd' in d_outputs:
+                if 'in_dist' in d_inputs:
+                    full = np.zeros(d_outputs['out_nd'].size)
+                    # add up contributions from the non-distributed variable that is duplicated over
+                    # all of the procs.
+                    self.comm.Allreduce(d_outputs['out_nd'], full, op=MPI.SUM)
+                    d_inputs['in_dist'] += .5 * np.tile(dg_dId, size).reshape((size, local_size)).T.dot(full)
+                if 'in_nd' in d_inputs:
+                    d_inputs['in_nd'] += (2.0 * Is + 3.0) * d_outputs['out_nd']
+
+
 class Distrib_DerivsFD(Distrib_Derivs):
 
     def setup_partials(self):
@@ -1875,6 +1917,17 @@ class TestDistribBugs(unittest.TestCase):
         totals = prob.check_totals(method='cs', out_stream=None, of=['D1.out_nd', 'D1.out_dist'],
                                                    wrt=['indep.x_serial', 'indep.x_dist'])
         self._compare_totals(totals)
+
+    def test_check_totals_rev_old(self):
+        prob = self.get_problem(Distrib_Derivs_Matfree_Old, mode='rev')
+        data = prob.check_totals(method='cs', out_stream=None, of=['D1.out_nd', 'D1.out_dist'],
+                                                   wrt=['indep.x_serial', 'indep.x_dist'])
+        assert_check_totals(data)
+
+    def test_check_partials_cs_old(self):
+        prob = self.get_problem(Distrib_Derivs_Matfree_Old)
+        data = prob.check_partials(method='cs', show_only_incorrect=True)
+        assert_check_partials(data)
 
     def test_check_totals_prod_rev(self):
         prob = self.get_problem(Distrib_Derivs_Prod_Matfree, mode='rev')

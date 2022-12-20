@@ -1552,9 +1552,9 @@ class Problem(object):
                                         else:
                                             meta = abs2meta_in[out_abs] if out_abs in abs2meta_in \
                                                 else abs2meta_out[out_abs]
-                                            if not meta['distributed']:
-                                                if not consistent_across_procs(comp.comm, derivs):
-                                                    deriv['rank_inconsistent'] = True
+                                            # if not meta['distributed']:
+                                            #     if not consistent_across_procs(comp.comm, derivs):
+                                            #         deriv['rank_inconsistent'] = True
 
                                         # Allocate first time
                                         if jac_key not in deriv:
@@ -1870,12 +1870,12 @@ class Problem(object):
         if model._owns_approx_jac:
             # Support this, even though it is a bit silly (though you could compare fd with cs.)
             total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
-                                       approx=True, driver_scaling=driver_scaling)
+                                       approx=True, driver_scaling=driver_scaling, checking=True)
             Jcalc = total_info.compute_totals_approx(initialize=True)
 
         else:
             total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
-                                       driver_scaling=driver_scaling)
+                                       driver_scaling=driver_scaling, checking=True)
             Jcalc = total_info.compute_totals()
 
         if step is None:
@@ -2461,7 +2461,8 @@ def _iter_derivs(derivatives, sys_name, show_only_incorrect, global_options, tot
     Iterate over all of the derivatives.
 
     If show_only_incorrect is True, only the derivatives with abs or rel errors outside of
-    tolerance will be returned.
+    tolerance or derivatives wrt serial variables that are inconsistent across ranks will be
+    returned.
 
     Parameters
     ----------
@@ -2514,11 +2515,12 @@ def _iter_derivs(derivatives, sys_name, show_only_incorrect, global_options, tot
         fd_norm = _compute_deriv_errors(derivative_info, matrix_free, directional, totals)
 
         above_abs, above_rel = _errors_above_tol(derivative_info, abs_error_tol, rel_error_tol)
+        inconsistent = derivative_info.get('rank_inconsistent', False)
 
-        if show_only_incorrect and not (above_abs or above_rel):
+        if show_only_incorrect and not (above_abs or above_rel or inconsistent):
             continue
 
-        yield key, fd_norm, fd_opts, directional, above_abs, above_rel
+        yield key, fd_norm, fd_opts, directional, above_abs, above_rel, inconsistent
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
@@ -2665,7 +2667,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 out_buffer.write(header + '\n')
                 out_buffer.write('-' * len(header) + '\n\n')
 
-        for key, fd_norm, fd_opts, directional, above_abs, above_rel in \
+        for key, fd_norm, fd_opts, directional, above_abs, above_rel, inconsistent in \
                 _iter_derivs(derivatives, sys_name, show_only_incorrect,
                              global_options, totals, matrix_free,
                              abs_error_tol, rel_error_tol):
@@ -2682,7 +2684,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             do_rev = not totals and matrix_free and not directional
             do_rev_dp = not totals and matrix_free and directional
 
-            if above_abs or above_rel:
+            if above_abs or above_rel or inconsistent:
                 num_bad_jacs += 1
 
             # Informative output for responses that were declared with an index.
@@ -2758,6 +2760,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         out_buffer.write(' >ABS_TOL')
                     if above_rel:
                         out_buffer.write(' >REL_TOL')
+                    if inconsistent:
+                        out_buffer.write(' <RANK INCONSISTENT>')
                     out_buffer.write('\n')
 
                 else:  # not compact print
@@ -2830,8 +2834,11 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
                         out_buffer.write(f'    Relative Error {desc}: {error_str}\n')
 
+                    if inconsistent:
+                        out_buffer.write('\n    * Inconsistent value across ranks *\n')
+
                     if MPI and MPI.COMM_WORLD.size > 1:
-                        out_buffer.write(f'    MPI Rank {MPI.COMM_WORLD.rank}\n')
+                        out_buffer.write(f'\n    MPI Rank {MPI.COMM_WORLD.rank}\n')
                     out_buffer.write('\n')
 
                     # Raw Derivatives
@@ -2843,14 +2850,12 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         else:
                             out_buffer.write('    Raw Analytic')
                         out_buffer.write(' Derivative (Jfor)\n')
-                    out_buffer.write(str(forward) + '\n')
-                    out_buffer.write('\n')
+                    out_buffer.write(str(forward) + '\n\n')
 
                     if not totals and matrix_free and not directional:
                         reverse = derivative_info.get('J_rev')
                         out_buffer.write('    Raw Reverse Derivative (Jrev)\n')
-                        out_buffer.write(str(reverse) + '\n')
-                        out_buffer.write('\n')
+                        out_buffer.write(str(reverse) + '\n\n')
 
                     try:
                         fd = derivative_info['J_fd']
