@@ -172,8 +172,9 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
             var, wrt = key
             for error_type, tolerance in [('abs error', atol), ('rel error', rtol), ]:
                 actual = pair_data[error_type]
-                if 'inconsistent' in pair_data:
-                    inconsistent_derivs.update(pair_data['inconsistent'])
+                incon = pair_data.get('rank_inconsistent')
+                if incon:
+                    inconsistent_derivs.update(key)
 
                 for error_val, mode in zip(actual, norm_types):
                     in_error = False

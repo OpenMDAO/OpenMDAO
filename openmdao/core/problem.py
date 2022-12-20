@@ -1296,12 +1296,15 @@ class Problem(object):
             Second key:
                 is the (output, input) tuple of strings;
             Third key:
-                is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev'];
+                is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev',
+                           'rank_inconsistent'];
 
             For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
                 forward - fd, adjoint - fd, forward - adjoint.
             For 'J_fd', 'J_fwd', 'J_rev' the value is: A numpy array representing the computed
                 Jacobian for the three different methods of computation.
+            'rank_inconsistent' is a boolean indicating if the derivative wrt a serial variable is
+            inconsistent across MPI ranks if MPI is active.
         """
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             self.final_setup()
@@ -1543,7 +1546,7 @@ class Problem(object):
                                             m = mfree_directions[c_name][out]
                                             d = mfree_directions[c_name][inp]
                                             mhat = derivs
-                                            dhat = partials_data[c_name][inp, out]['J_fwd'][:, idx]
+                                            dhat = deriv['J_fwd'][:, idx]
 
                                             deriv['directional_fwd_rev'] = mhat.dot(m) - dhat.dot(d)
                                         else:
@@ -1551,9 +1554,7 @@ class Problem(object):
                                                 else abs2meta_out[out_abs]
                                             if not meta['distributed']:
                                                 if not consistent_across_procs(comp.comm, derivs):
-                                                    if 'inconsistent' not in deriv:
-                                                        deriv['inconsistent'] = set()
-                                                    deriv['inconsistent'].add(key)
+                                                    deriv['rank_inconsistent'] = True
 
                                         # Allocate first time
                                         if jac_key not in deriv:
