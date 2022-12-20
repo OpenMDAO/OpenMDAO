@@ -293,6 +293,7 @@ class DifferentialEvolutionDriver(Driver):
         Pc = self.options['Pc']
 
         self._check_for_missing_objective()
+        self._check_for_invalid_desvar_values()
 
         # Size design variables.
         desvars = self._designvars

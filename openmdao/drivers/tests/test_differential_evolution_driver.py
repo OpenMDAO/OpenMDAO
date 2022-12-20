@@ -17,7 +17,7 @@ from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.components.sellar_feature import SellarMDA
 
 from openmdao.utils.general_utils import run_driver
-from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.utils.testing_utils import use_tempdirs, set_env_vars_context
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI
 try:
@@ -225,6 +225,9 @@ class TestDifferentialEvolution(unittest.TestCase):
         prob.driver.options['max_gen'] = 75
 
         prob.setup()
+
+        prob.set_val('x', [0.3, -0.3])
+
         prob.run_driver()
 
         if extra_prints:
@@ -261,7 +264,7 @@ class TestDifferentialEvolution(unittest.TestCase):
 
         indeps = prob.model.add_subsystem('indeps', om.IndepVarComp())
         indeps.add_output('x', 3)
-        indeps.add_output('y', [4.0, -4])
+        indeps.add_output('y', [4.0, 1.0])
 
         prob.model.add_subsystem('paraboloid1',
                                  om.ExecComp('f = (x+5)**2- 3'))
@@ -308,6 +311,59 @@ class TestDifferentialEvolution(unittest.TestCase):
         msg = "Driver requires objective to be declared"
 
         self.assertEqual(exception.args[0], msg)
+
+    def test_invalid_desvar_values(self):
+
+        for allow_invalid in [True, False]:
+            with self.subTest(f'OPENMDAO_ALLOW_INVALID_DESVAR = {int(allow_invalid)}'):
+                with set_env_vars_context(OPENMDAO_ALLOW_INVALID_DESVAR=f'{int(allow_invalid)}'):
+
+                    prob = om.Problem()
+
+                    indeps = prob.model.add_subsystem('indeps', om.IndepVarComp())
+                    indeps.add_output('x', 3)
+                    indeps.add_output('y', [4.0, 3.1])
+
+                    prob.model.add_subsystem('paraboloid1',
+                                             om.ExecComp('f = (x+5)**2- 3'))
+                    prob.model.add_subsystem('paraboloid2',
+                                             om.ExecComp('f = (y[0]-3)**2 + (y[1]-1)**2 - 3',
+                                                         y=[0, 0]))
+                    prob.model.connect('indeps.x', 'paraboloid1.x')
+                    prob.model.connect('indeps.y', 'paraboloid2.y')
+
+                    prob.driver = om.DifferentialEvolutionDriver()
+
+                    prob.model.add_design_var('indeps.x', lower=-5, upper=5)
+                    prob.model.add_design_var('indeps.y', lower=[-10, 0], upper=[10, 3])
+                    prob.model.add_objective('paraboloid1.f')
+                    prob.model.add_objective('paraboloid2.f')
+                    prob.setup()
+
+                    # run the optimization
+                    if allow_invalid:
+                        prob.run_driver()
+
+                        if extra_prints:
+                            print('indeps.x', prob['indeps.x'])
+                            print('indeps.y', prob['indeps.y'])
+
+                        np.testing.assert_array_almost_equal(prob['indeps.x'], -5)
+                        np.testing.assert_array_almost_equal(prob['indeps.y'], [3, 1])
+                    else:
+                        with self.assertRaises(ValueError) as ctx:
+                            prob.run_driver()
+
+                        expected_err = ("The following design variable initial conditions are out of their specified "
+                                        "bounds:"
+                                        "\n  indeps.y"
+                                        "\n    val: [4.  3.1]"
+                                        "\n    lower: [-10.   0.]"
+                                        "\n    upper: [10.  3.]"
+                                        "\nSet the initial value of the design varaible to a valid value or set the "
+                                        "environment variable OPENMDAO_ALLOW_INVALID_DESVAR to '1', 'true', "
+                                        "'yes', or 'on'.")
+                        self.assertEqual(str(ctx.exception), expected_err)
 
     @parameterized.expand([
         (None, None),

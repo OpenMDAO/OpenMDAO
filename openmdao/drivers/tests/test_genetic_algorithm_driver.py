@@ -18,7 +18,7 @@ from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
 
 from openmdao.utils.general_utils import run_driver
-from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.utils.testing_utils import use_tempdirs, set_env_vars_context
 from openmdao.utils.assert_utils import assert_near_equal
 try:
     from parameterized import parameterized
@@ -418,7 +418,7 @@ class TestSimpleGA(unittest.TestCase):
 
         indeps = prob.model.add_subsystem('indeps', om.IndepVarComp())
         indeps.add_output('x', 3)
-        indeps.add_output('y', [4.0, -4])
+        indeps.add_output('y', [4.0, 1.0])
 
         prob.model.add_subsystem('paraboloid1',
                                  om.ExecComp('f = (x+5)**2- 3'))
@@ -464,6 +464,54 @@ class TestSimpleGA(unittest.TestCase):
         msg = "Driver requires objective to be declared"
 
         self.assertEqual(exception.args[0], msg)
+
+    def test_scipy_invalid_desvar_values(self):
+
+        for allow_invalid in [True, False]:
+            with self.subTest(f'OPENMDAO_ALLOW_INVALID_DESVAR = {int(allow_invalid)}'):
+                with set_env_vars_context(OPENMDAO_ALLOW_INVALID_DESVAR=f'{int(allow_invalid)}'):
+
+                    # build the model
+                    prob = om.Problem()
+                    model = prob.model
+
+                    model.add_subsystem('comp', Branin(),
+                                        promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
+
+                    model.add_design_var('xI', lower=-5.0, upper=10.0)
+                    model.add_design_var('xC', lower=0.0, upper=15.0)
+                    model.add_objective('comp.f')
+
+                    prob.driver = om.SimpleGADriver()
+                    prob.driver.options['bits'] = {'xC': 8}
+                    prob.driver.options['pop_size'] = 10
+
+                    prob.setup()
+
+                    prob.set_val('xC', 15.1)
+                    prob.set_val('xI', -6)
+
+                    # run the optimization
+                    if allow_invalid:
+                        prob.run_driver()
+                    else:
+                        with self.assertRaises(ValueError) as ctx:
+                            prob.run_driver()
+
+                        expected_err = ("The following design variable initial conditions are out of their specified "
+                                        "bounds:"
+                                        "\n  xI"
+                                        "\n    val: [-6.]"
+                                        "\n    lower: -5.0"
+                                        "\n    upper: 10.0"
+                                        "\n  xC"
+                                        "\n    val: [15.1]"
+                                        "\n    lower: 0.0"
+                                        "\n    upper: 15.0"
+                                        "\nSet the initial value of the design varaible to a valid value or set the "
+                                        "environment variable OPENMDAO_ALLOW_INVALID_DESVAR to '1', 'true', "
+                                        "'yes', or 'on'.")
+                        self.assertEqual(str(ctx.exception), expected_err)
 
     @parameterized.expand([
         (None, None),

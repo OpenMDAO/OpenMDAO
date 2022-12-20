@@ -14,7 +14,7 @@ from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
 from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
-from openmdao.utils.testing_utils import use_tempdirs, require_pyoptsparse
+from openmdao.utils.testing_utils import use_tempdirs, require_pyoptsparse, set_env_vars_context
 from openmdao.utils.mpi import MPI
 
 
@@ -1899,6 +1899,56 @@ class TestPyoptSparse(unittest.TestCase):
         msg = "Driver requires objective to be declared"
 
         self.assertEqual(exception.args[0], msg)
+
+    def test_pyoptsparse_invalid_desvar_values(self):
+
+        for allow_invalid in [True, False]:
+            with self.subTest(f'OPENMDAO_ALLOW_INVALID_DESVAR = {int(allow_invalid)}'):
+                with set_env_vars_context(OPENMDAO_ALLOW_INVALID_DESVAR=f'{int(allow_invalid)}'):
+
+                    # build the model
+                    prob = om.Problem()
+
+                    prob.model.add_subsystem('paraboloid', om.ExecComp('f = (x-3)**2 + x*y + (y+4)**2 - 3'))
+
+                    # setup the optimization
+                    prob.driver = pyOptSparseDriver(print_results=False)
+                    prob.driver.options['optimizer'] = 'SLSQP'
+
+                    prob.model.add_design_var('paraboloid.x', lower=-50, upper=50)
+                    prob.model.add_design_var('paraboloid.y', lower=-50, upper=50)
+                    prob.model.add_objective('paraboloid.f')
+
+                    prob.setup()
+
+                    # Set initial values.
+                    prob.set_val('paraboloid.x', 100.0)
+                    prob.set_val('paraboloid.y', -200.0)
+
+                    # run the optimization
+                    if allow_invalid:
+                        prob.run_driver()
+                        assert_near_equal(prob.get_val('paraboloid.x'), 6.66666666, tolerance=1.0E-5)
+                        assert_near_equal(prob.get_val('paraboloid.y'), -7.33333333, tolerance=1.0E-5)
+                        assert_near_equal(prob.get_val('paraboloid.f'), -27.33333333, tolerance=1.0E-5)
+                    else:
+                        with self.assertRaises(ValueError) as ctx:
+                            prob.run_driver()
+
+                        expected_err = ("The following design variable initial conditions are out of their specified "
+                                        "bounds:"
+                                        "\n  paraboloid.x"
+                                        "\n    val: [100.]"
+                                        "\n    lower: -50.0"
+                                        "\n    upper: 50.0"
+                                        "\n  paraboloid.y"
+                                        "\n    val: [-200.]"
+                                        "\n    lower: -50.0"
+                                        "\n    upper: 50.0"
+                                        "\nSet the initial value of the design varaible to a valid value or set the "
+                                        "environment variable OPENMDAO_ALLOW_INVALID_DESVAR to '1', 'true', "
+                                        "'yes', or 'on'.")
+                        self.assertEqual(str(ctx.exception), expected_err)
 
     def test_signal_handler_SNOPT(self):
         _, local_opt = set_pyoptsparse_opt('SNOPT')

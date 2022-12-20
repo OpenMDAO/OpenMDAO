@@ -14,7 +14,7 @@ from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.hooks import _setup_hooks
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.general_utils import _src_name_iter
+from openmdao.utils.general_utils import _src_name_iter, env_truthy
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
@@ -417,6 +417,33 @@ class Driver(object):
         if len(self._objs) == 0:
             msg = "Driver requires objective to be declared"
             raise RuntimeError(msg)
+
+    def _check_for_invalid_desvar_values(self):
+        """
+        Check for design variable values that exceed their bounds.
+
+        This method may be disabled by setting environment variable
+        `OPENMDAO_ALLOW_INVALID_DESVAR` to a value that is not "falsey,"
+        eg `'1'`, '`true'`', `'yes'`, or `'on'`.
+        """
+        if not env_truthy('OPENMDAO_ALLOW_INVALID_DESVAR'):
+            desvar_errors = []
+            for var, meta in self._designvars.items():
+                lower = meta['lower']
+                upper = meta['upper']
+                val = self._problem().get_val(var, units=meta['units'])
+                if (val < lower).any() or (val > upper).any():
+                    desvar_errors.append((var, val, lower, upper))
+            if desvar_errors:
+                s = 'The following design variable initial conditions are out of their ' \
+                    'specified bounds:'
+                for var, val, lower, upper in desvar_errors:
+                    s += f'\n  {var}\n    val: {val.ravel()}' \
+                         f'\n    lower: {lower}\n    upper: {upper}'
+                s += '\nSet the initial value of the design varaible to a valid value or set ' \
+                     'the environment variable OPENMDAO_ALLOW_INVALID_DESVAR to ' \
+                     '\'1\', \'true\', \'yes\', or \'on\'.'
+                raise ValueError(s)
 
     def _get_vars_to_record(self, recording_options):
         """

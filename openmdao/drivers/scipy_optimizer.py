@@ -269,6 +269,7 @@ class ScipyOptimizeDriver(Driver):
         self._total_jac = None
 
         self._check_for_missing_objective()
+        self._check_for_invalid_desvar_values()
 
         # Initial Run
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
