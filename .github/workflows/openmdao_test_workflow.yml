@@ -70,7 +70,7 @@ jobs:
             PY: 3
             NUMPY: 1
             SCIPY: 1
-            PYOPTSPARSE: 'conda-forge'
+#            PYOPTSPARSE: 'latest'
             OPTIONAL: '[test]'
             TESTS: true
 
