@@ -440,7 +440,7 @@ class Driver(object):
                 for var, val, lower, upper in desvar_errors:
                     s += f'\n  {var}\n    val: {val.ravel()}' \
                          f'\n    lower: {lower}\n    upper: {upper}'
-                s += '\nSet the initial value of the design varaible to a valid value or set ' \
+                s += '\nSet the initial value of the design variable to a valid value or set ' \
                      'the environment variable OPENMDAO_ALLOW_INVALID_DESVAR to ' \
                      '\'1\', \'true\', \'yes\', or \'on\'.'
                 raise ValueError(s)
