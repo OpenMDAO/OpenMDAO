@@ -20,7 +20,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import sizes2offsets
 from openmdao.vectors.vector import _full_slice
-from openmdao.utils.indexer import indexer
+from openmdao.utils.indexer import indexer, slicer
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 import openmdao.utils.coloring as c_mod
 
@@ -432,7 +432,8 @@ class Driver(object):
                 lower = meta['lower']
                 upper = meta['upper']
                 val = self._problem().get_val(var, units=meta['units'])
-                if (val < lower).any() or (val > upper).any():
+                idxs = meta['indices']() if meta['indices'] else None
+                if (val[idxs] < lower).any() or (val[idxs] > upper).any():
                     desvar_errors.append((var, val, lower, upper))
             if desvar_errors:
                 s = 'The following design variable initial conditions are out of their ' \
