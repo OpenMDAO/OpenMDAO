@@ -70,7 +70,7 @@ jobs:
             PY: 3
             NUMPY: 1
             SCIPY: 1
-#            PYOPTSPARSE: 'latest'
+            # PYOPTSPARSE: 'latest'
             OPTIONAL: '[test]'
             TESTS: true
 
@@ -401,9 +401,9 @@ jobs:
         include:
           # baseline versions
           - NAME: Windows Baseline
-            PY: 3
-            NUMPY: 1
-            SCIPY: 1
+            PY: 3.10
+            NUMPY: 1.23
+            SCIPY: 1.9.0
             PYOPTSPARSE: '2.9.1'
 
     name: ${{ matrix.NAME }}
