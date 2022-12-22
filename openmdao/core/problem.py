@@ -50,7 +50,7 @@ from openmdao.utils.array_utils import scatter_dist_to_local
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
     clear_reports, get_reports_dir, _load_report_plugins
 from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable, \
-    _find_dict_meta, env_truthy, add_border, match_includes_excludes
+    _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
@@ -1149,6 +1149,7 @@ class Problem(object):
                                      # src_indices are applied to the variable somewhere.
             'reports_dir': self.get_reports_dir(),  # directory where reports will be written
             'saved_errors': [],  # store setup errors here until after final_setup
+            'checking': False,  # True if check_totals or check_partials is running
         }
         model._setup(model_comm, mode, self._metadata)
 
@@ -1552,9 +1553,11 @@ class Problem(object):
                                         else:
                                             meta = abs2meta_in[out_abs] if out_abs in abs2meta_in \
                                                 else abs2meta_out[out_abs]
-                                            # if not meta['distributed']:
-                                            #     if not consistent_across_procs(comp.comm, derivs):
-                                            #         deriv['rank_inconsistent'] = True
+                                            if not meta['distributed']:  # serial input or state
+                                                inc = inconsistent_across_procs(comp.comm, derivs,
+                                                                                return_array=False)
+                                                if inc:
+                                                    deriv['rank_inconsistent'] = True
 
                                         # Allocate first time
                                         if jac_key not in deriv:
@@ -1870,13 +1873,17 @@ class Problem(object):
         if model._owns_approx_jac:
             # Support this, even though it is a bit silly (though you could compare fd with cs.)
             total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
-                                       approx=True, driver_scaling=driver_scaling, checking=True)
+                                       approx=True, driver_scaling=driver_scaling)
             Jcalc = total_info.compute_totals_approx(initialize=True)
 
         else:
             total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
-                                       driver_scaling=driver_scaling, checking=True)
-            Jcalc = total_info.compute_totals()
+                                       driver_scaling=driver_scaling)
+            self._metadata['checking'] = True
+            try:
+                Jcalc = total_info.compute_totals()
+            finally:
+                self._metadata['checking'] = False
 
         if step is None:
             if method == 'cs':
@@ -1899,12 +1906,12 @@ class Problem(object):
 
         model.approx_totals(method=method, step=step, form=form,
                             step_calc=step_calc if method == 'fd' else None)
-        total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True,
+        fd_tot_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True,
                                    driver_scaling=driver_scaling)
         if show_progress:
-            Jfd = total_info.compute_totals_approx(initialize=True, progress_out_stream=out_stream)
+            Jfd = fd_tot_info.compute_totals_approx(initialize=True, progress_out_stream=out_stream)
         else:
-            Jfd = total_info.compute_totals_approx(initialize=True)
+            Jfd = fd_tot_info.compute_totals_approx(initialize=True)
 
         # reset the _owns_approx_jac flag after approximation is complete.
         if not approx:
@@ -1930,7 +1937,7 @@ class Problem(object):
             out_stream = sys.stdout
 
         _assemble_derivative_data(data, rel_err_tol, abs_err_tol, out_stream, compact_print,
-                                  [model], {'': fd_args}, totals=True, lcons=lcons,
+                                  [model], {'': fd_args}, totals=total_info, lcons=lcons,
                                   show_only_incorrect=show_only_incorrect)
         return data['']
 
@@ -2353,8 +2360,8 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
         True if the current dirivatives are computed in a matrix free manner.
     directional : bool
         True if the current dirivtives are directional.
-    totals : bool
-        True if the current derivatives are total derivatives.
+    totals : bool or _TotalJacInfo
+        _TotalJacInfo if the current derivatives are total derivatives.
 
     Returns
     -------
@@ -2455,8 +2462,8 @@ def _errors_above_tol(deriv_info, abs_error_tol, rel_error_tol):
     return above_abs, above_rel
 
 
-def _iter_derivs(derivatives, sys_name, show_only_incorrect, global_options, totals,
-                 matrix_free, abs_error_tol=1e-6, rel_error_tol=1e-6):
+def _iter_derivs(system, derivatives, sys_name, show_only_incorrect, global_options, totals,
+                 matrix_free, abs_error_tol=1e-6, rel_error_tol=1e-6, incon_keys=()):
     """
     Iterate over all of the derivatives.
 
@@ -2466,6 +2473,8 @@ def _iter_derivs(derivatives, sys_name, show_only_incorrect, global_options, tot
 
     Parameters
     ----------
+    system : System
+        Active system.
     derivatives : dict
         Dict of metadata for derivative groups, keyed on (of, wrt) pairs.
     sys_name : str
@@ -2474,14 +2483,16 @@ def _iter_derivs(derivatives, sys_name, show_only_incorrect, global_options, tot
         If True, yield only derivatives with errors outside of tolerance.
     global_options : dict
         Dictionary containing the options for the approximation.
-    totals : bool
-        Set to True if we are doing check_totals to skip a bunch of stuff.
+    totals : bool or _TotalJacInfo
+        Set to _TotalJacInfo if we are doing check_totals to skip a bunch of stuff.
     matrix_free : bool
         True if the system computes matrix free derivatives.
     abs_error_tol : float
         Absolute error tolerance.
     rel_error_tol : float
         Relative error tolerance.
+    incon_keys : set or tuple
+        Keys where there are serial d_inputs variables that are inconsistent across processes.
 
     Yields
     ------
@@ -2497,25 +2508,33 @@ def _iter_derivs(derivatives, sys_name, show_only_incorrect, global_options, tot
         True if the differences for the current derivatives are above the absolute error tolerance.
     bool
         True if the differences for the current derivatives are above the relative error tolerance.
+    bool
+        True if the current derivative was computed where some serial d_inputs variables were not
+        consistent across processes.
     """
     # Sorted keys ensures deterministic ordering
     sorted_keys = sorted(derivatives)
 
     for key in sorted_keys:
         of, wrt = key
+        if incon_keys:
+            abs_key = rel_key2abs_key(system, key)
+
+        inconsistent = False
         derivative_info = derivatives[key]
 
         if totals:
             fd_opts = global_options['']
         else:
             fd_opts = global_options[sys_name][wrt]
+            if key in incon_keys:
+                inconsistent = True
 
         directional = bool(fd_opts) and fd_opts.get('directional')
 
         fd_norm = _compute_deriv_errors(derivative_info, matrix_free, directional, totals)
 
         above_abs, above_rel = _errors_above_tol(derivative_info, abs_error_tol, rel_error_tol)
-        inconsistent = derivative_info.get('rank_inconsistent', False)
 
         if show_only_incorrect and not (above_abs or above_rel or inconsistent):
             continue
@@ -2547,8 +2566,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         The systems (in the proper order) that were checked.
     global_options : dict
         Dictionary containing the options for the approximation.
-    totals : bool
-        Set to True if we are doing check_totals to skip a bunch of stuff.
+    totals : bool or _TotalJacInfo
+        Set to _TotalJacInfo if we are doing check_totals to skip a bunch of stuff.
     indep_key : dict of sets, optional
         Keyed by component name, contains the of/wrt keys that are declared not dependent.
     print_reverse : bool, optional
@@ -2578,6 +2597,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
     worst_subjac_rel_err = 0.0
     worst_subjac = None
+    incon_keys = ()
 
     for system in system_list:
 
@@ -2602,6 +2622,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
         if totals:
             sys_name = 'Full Model'
+
+        incon_keys = system._get_inconsistent_keys()
 
         num_bad_jacs = 0  # Keep track of number of bad derivative values for each component
 
@@ -2668,9 +2690,9 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 out_buffer.write('-' * len(header) + '\n\n')
 
         for key, fd_norm, fd_opts, directional, above_abs, above_rel, inconsistent in \
-                _iter_derivs(derivatives, sys_name, show_only_incorrect,
+                _iter_derivs(system, derivatives, sys_name, show_only_incorrect,
                              global_options, totals, matrix_free,
-                             abs_error_tol, rel_error_tol):
+                             abs_error_tol, rel_error_tol, incon_keys):
 
             # Skip printing the non-dependent keys if the derivatives are fine.
             if not compact_print:
@@ -2879,14 +2901,27 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
     # End of for system in system_list
 
-    if not suppress_output and compact_print and not totals:
-        if worst_subjac:
+    if not suppress_output:
+        if compact_print and not totals and worst_subjac:
             _, class_name, name = worst_subjac
             worst_header = f"Sub Jacobian with Largest Relative Error: {class_name} '{name}'"
             print(f"\n{add_border(worst_header, '#')}\n", file=out_stream)
             print(header, file=out_stream)
             print('-' * len(header), file=out_stream)
             print(worst_subjac_line, file=out_stream)
+
+    if incon_keys and totals:
+        # stick incon_keys into the first key's dict in order to avoid breaking existing code
+        for key, dct in derivative_data[''].items():
+            dct['inconsistent_keys'] = incon_keys
+            break
+        if not suppress_output:
+            print("\nDuring computation of totals, the following partial derivatives resulted in\n"
+                  "inconsistent values across processes for certain serial inputs:\n"
+                  f"{sorted(incon_keys)}.\nThis can happen if a component 'compute_jacvec_product' "
+                  "or 'apply_linear'\nmethod does not properly reduce the value of a distributed "
+                  "output when computing the\nderivative of that output with respect to a serial "
+                  "input.")
 
 
 def _format_if_not_matrix_free(matrix_free, val):
@@ -2984,46 +3019,3 @@ def _get_fd_options(var, global_method, local_opts, global_step, global_form, gl
                 fd_options[name] = value
 
     return fd_options, could_not_cs
-
-
-def consistent_across_procs(comm, arr, tol=1e-15):
-    """
-    Check serial deriv values across ranks.
-
-    This should only be run after _apply_linear.
-
-    Parameters
-    ----------
-    comm : MPI communicator
-        Communicator belonging to the component that owns the derivs array.
-    arr : ndarray
-        The array being checked for consistency across processes.
-    tol : float
-        Tolerance to determine if diff is 0.
-
-    Returns
-    -------
-    bool
-        True if values are consistent across all processes in the communicator.
-    """
-    if comm.size < 2:
-        return True
-
-    myrank = comm.rank
-
-    if myrank == 0:
-        result = True
-        for rank, val in enumerate(comm.gather(arr, root=0)):
-            if rank == 0:
-                baseval = val
-            else:
-                if not np.all(np.abs(baseval - val) < tol):
-                    result = False
-                    break
-
-        comm.bcast(result, root=0)
-    else:
-        comm.gather(arr, root=0)
-        result = comm.bcast(None, root=0)
-
-    return result

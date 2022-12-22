@@ -19,11 +19,11 @@ from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    find_matches, make_set, convert_src_inds
+    find_matches, make_set, convert_src_inds, inconsistent_across_procs
 from openmdao.utils.indexer import Indexer, indexer
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
-    DerivativesWarning, SetupWarning, warn_deprecation
+    DerivativesWarning, warn_deprecation
 
 _forbidden_chars = {'.', '*', '?', '!', '[', ']'}
 _whitespace = {' ', '\t', '\r', '\n'}
@@ -103,6 +103,7 @@ class Component(System):
         self._declared_partials = defaultdict(dict)
         self._declared_partial_checks = []
         self._no_check_partials = False
+        self._has_distrib_outputs = False
 
     def _declare_options(self):
         """
@@ -167,7 +168,7 @@ class Component(System):
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2meta = {}
         if comm.size == 1:
-            self._has_distrib_vars = False
+            self._has_distrib_vars = self._has_distrib_outputs = False
 
         for meta in self._static_var_rel2meta.values():
             # variable isn't distributed if we're only running on 1 proc
@@ -286,6 +287,9 @@ class Component(System):
         else:
             self._discrete_inputs = self._discrete_outputs = ()
 
+        self._serial_idxs = None
+        self._inconsistent_keys = set()
+
     @collect_errors
     def _setup_var_sizes(self):
         """
@@ -347,6 +351,18 @@ class Component(System):
         all variables.
         """
         pass
+
+    @property
+    def checking(self):
+        """
+        Return True if check_partials or check_totals is executing.
+
+        Returns
+        -------
+        bool
+            True if we're running within check_partials or check_totals.
+        """
+        return self._problem_meta is not None and self._problem_meta['checking']
 
     def _run_root_only(self):
         """
@@ -786,6 +802,7 @@ class Component(System):
 
         # this will get reset later if comm size is 1
         self._has_distrib_vars |= metadata['distributed']
+        self._has_distrib_outputs |= metadata['distributed']
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
@@ -1639,6 +1656,78 @@ class Component(System):
                 self._var_prom2inds[abs2prom[tgt]] = [meta['shape'], meta['src_indices'],
                                                       meta['src_indices']._flat_src]
 
+    def _check_consistent_serial_dinputs(self, nz_dist_outputs):
+        """
+        Check consistency across ranks for serial d_inputs variables.
+
+        This is used primarily to test that `compute_jacvec_product` and `apply_linear` methods
+        follow the OpenMDAO convention that in reverse mode, the component should perform
+        'allreduce' sorts of operations only for derivatives of distributed outputs with-respect-to
+        serial inputs.  This should result in serial input derivatives being consistent across all
+        ranks in the Component's communicator.
+
+        Parameters
+        ----------
+        nz_dist_outputs : set or list
+            Set of distributed outputs with nonzero values for the most recent _apply_linear call.
+        """
+        if not self._has_distrib_outputs or not self.checking or self.comm.size < 2:
+            return
+
+        if self._serial_idxs is None:
+            ranges = defaultdict(list)
+            for name, offset, end, vec, slc, dist_sizes in self._jac_wrt_iter():
+                if dist_sizes is None:  # not distributed
+                    if offset != end:
+                        ranges[vec].append(range(offset, end))
+
+            self._serial_idxs = []
+            for vec, rlist in ranges.items():
+                if rlist:
+                    self._serial_idxs.append((vec, np.hstack(rlist)))
+
+        for vec, inds in self._serial_idxs:
+            # _jac_wrt_iter gives us _input and possibly _output vecs (for implicit comps), but we
+            # want to check _dinputs and _doutputs
+            v = self._dinputs if vec is self._inputs else self._doutputs
+            result = inconsistent_across_procs(self.comm, v.asarray()[inds])
+            if self.comm.rank == 0 and np.any(result):
+                bad_inds = np.arange(len(v), dtype=INT_DTYPE)[inds][result]
+                bad_mask = np.zeros(len(v), dtype=bool)
+                bad_mask[bad_inds] = True
+                for inname, slc in v.get_slice_dict().items():
+                    if np.any(bad_mask[slc]):
+                        for outname in nz_dist_outputs:
+                            key = (outname, inname)
+                            self._inconsistent_keys.add(key)
+
+
+    def _get_dist_nz_dresids(self):
+        """
+        Get names of distributed resids that are non-zero prior to computing derivatives.
+
+        This should only be called when 'rev' mode is active.
+
+        Returns
+        -------
+        list of str
+            List of names of distributed resids that have nonzero entries.
+        """
+        nzresids = []
+        dresids = self._dresiduals.asarray()
+        for of, start, end, _full_slice, dist_sizes in self._jac_of_iter():
+            if dist_sizes is not None:
+                if np.any(dresids[start:end]):
+                    nzresids.append(of)
+
+        full_nzresids = set()
+        if self.comm.rank == 0:
+            for nzoutlist in self.comm.gather(nzresids, root=0):
+                full_nzresids.update(nzoutlist)
+            return full_nzresids
+
+        self.comm.gather(nzresids, root=0)
+        return nzresids
 
 class _DictValues(object):
     """

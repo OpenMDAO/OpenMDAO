@@ -174,7 +174,7 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
                 actual = pair_data[error_type]
                 incon = pair_data.get('rank_inconsistent')
                 if incon:
-                    inconsistent_derivs.update(key)
+                    inconsistent_derivs.add(key)
 
                 for error_val, mode in zip(actual, norm_types):
                     in_error = False
@@ -219,9 +219,10 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
                     comp_error_string += err_msg
 
             if inconsistent_derivs:
-                comp_error_string += \
-                    "\nInconsistent derivs across processes for keys: " \
-                    f"{sorted(inconsistent_derivs)}.\n"
+                comp_error_string += (
+                    "\nInconsistent derivs across processes for keys: "
+                    f"{sorted(inconsistent_derivs)}.\nCheck that distributed outputs are properly "
+                    "reduced when computing\nderivatives of serial inputs.")
 
             name_header = 'Component: {}\n'.format(comp)
             len_name_header = len(name_header)
@@ -276,15 +277,19 @@ def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6):
         Relative error. Default is 1e-6.
     """
     fails = []
-    for key, val in totals_data.items():
+    incon_keys = set()
+    for key, dct in totals_data.items():
+        if 'inconsistent_keys' in dct:
+            incon_keys = dct['inconsistent_keys']
+
         try:
-            val['J_fwd']
-            val['J_fd']
+            dct['J_fwd']
+            dct['J_fd']
         except Exception as err:
             raise err.__class__(f"For key {key}: {err}")
         try:
             for i in range(3):
-                erel, eabs = val['rel error'][i], val['abs error'][i]
+                erel, eabs = dct['rel error'][i], dct['abs error'][i]
                 if erel is not None and not np.isnan(erel):
                     if erel > rtol:
                         raise ValueError(f"rel tolerance of {erel} > allowed rel tolerance "
@@ -294,11 +299,22 @@ def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6):
                         raise ValueError(f"abs tolerance of {eabs} > allowed abs tolerance "
                                          f"of {atol}.")
         except ValueError as err:
-            fails.append((key, val, err))
+            fails.append((key, dct, err))
+
+    fail_list = []
+
     if fails:
-        raise ValueError('\n\n'.join(
-            [f"Totals differ for {key}:\nAnalytic:\n{val['J_fwd']}\nFD:\n{val['J_fd']}\n{err}"
-             for key, val, err in fails]))
+        fail_list.extend(
+            [f"Totals differ for {key}:\nAnalytic:\n{dct['J_fwd']}\nFD:\n{dct['J_fd']}\n{err}"
+             for key, dct, err in fails])
+
+    if incon_keys:
+        fail_list.append(f"During total derivative computation, the following partial derivatives "
+                         "resulted in serial inputs that were inconsistent across processes: "
+                         f"{sorted(incon_keys)}.")
+
+    if fails or incon_keys:
+        raise ValueError('\n\n'.join(fail_list))
 
 
 def assert_no_approx_partials(system, include_self=True, recurse=True, method='any', excludes=None):

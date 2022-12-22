@@ -192,7 +192,15 @@ class ImplicitComponent(Component):
                     d_inputs.set_val(new_ins)
                     d_outputs.set_val(new_outs)
         else:
+            dochk = mode == 'rev' and self._problem_meta['checking']
+
+            if dochk:
+                nzdresids = self._get_dist_nz_dresids()
+
             self.apply_linear(inputs, outputs, d_inputs, d_outputs, d_residuals, mode)
+
+            if dochk:
+                self._check_consistent_serial_dinputs(nzdresids)
 
     def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
         """

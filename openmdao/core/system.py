@@ -678,7 +678,6 @@ class System(object):
         """
         toidx = self._var_allprocs_abs2idx
         sizes_in = self._var_sizes['input']
-        sizes_out = self._var_sizes['output']
 
         tometa_in = self._var_allprocs_abs2meta['input']
 
@@ -5631,3 +5630,19 @@ class System(object):
         if self._saved_errors and prob_meta['saved_errors'] is not None:
             prob_meta['saved_errors'].extend(self._saved_errors)
         self._saved_errors = None if env_truthy('OPENMDAO_FAIL_FAST') else []
+
+    def _get_inconsistent_keys(self):
+        keys = set()
+        if self.comm.size > 1:
+            from openmdao.core.component import Component
+            if isinstance(self, Component):
+                keys.update(self._inconsistent_keys)
+            else:
+                for comp in self.system_iter(recurse=True, include_self=True, typ=Component):
+                    keys.update(comp._inconsistent_keys)
+            myrank = self.comm.rank
+
+            for rank, proc_keys in enumerate(self.comm.allgather(keys)):
+                if rank != myrank:
+                    keys.update(proc_keys)
+        return keys

@@ -1300,3 +1300,50 @@ else:
             Named args.
         """
         pass
+
+
+def inconsistent_across_procs(comm, arr, tol=1e-15, return_array=True):
+    """
+    Check serial deriv values across ranks.
+
+    This should only be run after _apply_linear.
+
+    Parameters
+    ----------
+    comm : MPI communicator
+        Communicator belonging to the component that owns the derivs array.
+    arr : ndarray
+        The array being checked for consistency across processes.
+    tol : float
+        Tolerance to determine if diff is 0.
+    return_array : bool
+        If True, return a boolean array on rank 0 indicating which indices are inconsistent.
+
+    Returns
+    -------
+    ndarray on rank 0, boolean elsewhere, or bool everywhere if return_array is False
+        On rank 0, boolean array with True in entries that are not consistent across all processes
+        in the communicator.  On other ranks, True if there are inconsistent entries.
+    """
+    if comm.size < 2:
+        return np.zeros(0, dtype=bool) if return_array and comm.rank == 0 else False
+
+    if comm.rank == 0:
+        result = np.zeros(arr.size, dtype=bool) if return_array else False
+        vals = comm.gather(arr, root=0)
+        for rank, val in enumerate(vals):
+            if rank == 0:
+                baseval = val
+            elif return_array:
+                result |= (np.abs(baseval - val) > tol).flat
+            else:
+                result |= np.any(np.abs(baseval - val) > tol)
+
+        if return_array:
+            comm.bcast(np.any(result), root=0)
+        else:
+            comm.bcast(result, root=0)
+        return result
+
+    comm.gather(arr, root=0)
+    return comm.bcast(None, root=0)

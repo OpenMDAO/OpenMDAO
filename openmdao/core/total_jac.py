@@ -16,7 +16,6 @@ from openmdao.utils.general_utils import ContainsAll, _src_or_alias_dict
 from openmdao.utils.mpi import MPI, check_mpi_env
 from openmdao.utils.coloring import _initialize_model_approx, Coloring
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
-from openmdao.vectors.vector import _full_slice
 
 
 use_mpi = check_mpi_env()
@@ -97,7 +96,7 @@ class _TotalJacInfo(object):
     """
 
     def __init__(self, problem, of, wrt, use_abs_names, return_format, approx=False,
-                 debug_print=False, driver_scaling=True, get_remote=True, checking=False):
+                 debug_print=False, driver_scaling=True, get_remote=True):
         """
         Initialize object.
 
@@ -123,8 +122,6 @@ class _TotalJacInfo(object):
             and responses were added. If False, leave them unscaled.
         get_remote : bool
             Whether to get remote variables if using MPI.
-        checking : bool
-            If True, this was called from check_totals.
         """
         driver = problem.driver
         prom2abs = problem.model._var_allprocs_prom2abs_list['output']
@@ -141,7 +138,6 @@ class _TotalJacInfo(object):
         self.debug_print = debug_print
         self.par_deriv_printnames = {}
         self.get_remote = get_remote
-        self.checking = checking
 
         if isinstance(wrt, str):
             wrt = [wrt]
@@ -347,7 +343,7 @@ class _TotalJacInfo(object):
                 if self.has_output_dist['rev']:
                     sizes = model._var_sizes['output']
                     abs2idx = model._var_allprocs_abs2idx
-                    self.jac_dist_col_mask = mask = np.zeros(J.shape[1], dtype=bool)
+                    self.jac_dist_col_mask = mask = np.ones(J.shape[1], dtype=bool)
                     start = end = 0
                     for name in self.wrt:
                         meta = abs2meta_out[name]
@@ -357,7 +353,7 @@ class _TotalJacInfo(object):
                             # remote vars, which are zero everywhere except for one proc
                             sz = sizes[:, abs2idx[name]]
                             if np.count_nonzero(sz) > 1:
-                                mask[start:end] = True
+                                mask[start:end] = False
                         start = end
 
         if not approx:
@@ -759,10 +755,10 @@ class _TotalJacInfo(object):
                 relsystems = relevant[path]['@all'][1]
                 if self.total_relevant_systems is not _contains_all:
                     self.total_relevant_systems.update(relsystems)
-                tup = (ndups, relsystems, cache_lin_sol)
+                tup = (ndups, relsystems, cache_lin_sol, name)
             else:
                 self.total_relevant_systems = _contains_all
-                tup = (ndups, _contains_all, cache_lin_sol)
+                tup = (ndups, _contains_all, cache_lin_sol, name)
 
             idx_map.extend([tup] * (end - start))
             start = end
@@ -782,7 +778,7 @@ class _TotalJacInfo(object):
             locs = None
             for ilist in simul_coloring.color_iter(mode):
                 for i in ilist:
-                    _, rel_systems, cache_lin_sol = idx_map[i]
+                    _, rel_systems, cache_lin_sol, _ = idx_map[i]
                     _update_rel_systems(all_rel_systems, rel_systems)
                     cache |= cache_lin_sol
 
@@ -1079,7 +1075,7 @@ class _TotalJacInfo(object):
         int or None
             key used for storage of cached linear solve (if active, else None).
         """
-        _, rel_systems, cache_lin_sol = self.in_idx_map[mode][idx]
+        _, rel_systems, cache_lin_sol, _ = self.in_idx_map[mode][idx]
 
         self._zero_vecs(mode)
 
@@ -1215,7 +1211,7 @@ class _TotalJacInfo(object):
         elif mode == 'rev':
             # for rows corresponding to serial 'of' vars, we need to correct for
             # duplication of their seed values by dividing by the number of duplications.
-            ndups, _, _ = self.in_idx_map[mode][i]
+            ndups, _, _, oname = self.in_idx_map[mode][i]
             if self.get_remote:
                 # don't use scratch[0] here because it may be in use by simul_coloring_jac_setter
                 # which calls this method.
@@ -1226,8 +1222,8 @@ class _TotalJacInfo(object):
 
                 if ndups > 1:
                     if self.jac_dist_col_mask is not None:
-                        scratch[:] = (1.0 / ndups)
-                        scratch[self.jac_dist_col_mask] = 1.0
+                        scratch[:] = 1.0
+                        scratch[self.jac_dist_col_mask] = (1.0 / ndups)
                         self.J[i] *= scratch
                     else:
                         self.J[i] *= (1.0 / ndups)
@@ -1830,9 +1826,9 @@ def _fix_pdc_lengths(idx_iter_dict):
                     else:
                         range_list[i] = np.arange(start, end, dtype=INT_DTYPE)
             else:
-                # just convert all (start, end) tuples to aranges
+                # just convert all (start, end) tuples to ranges
                 for i, (start, end) in enumerate(range_list):
-                    range_list[i] = np.arange(start, end, dtype=INT_DTYPE)
+                    range_list[i] = range(start, end)
 
 
 def _update_rel_systems(all_rel_systems, rel_systems):
