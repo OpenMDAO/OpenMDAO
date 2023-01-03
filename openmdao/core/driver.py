@@ -702,7 +702,7 @@ class Driver(object):
                     # Setting an integer value with a 1D array - don't want to convert to array.
                     value = int(value)
                 else:
-                    value = value.astype(np.int)
+                    value = value.astype(int)
 
             problem.model._discrete_outputs[src_name] = value
 

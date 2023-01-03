@@ -311,7 +311,7 @@ class Jacobian(object):
         """
         for meta in self._subjacs_info.values():
             if active:
-                meta['val'] = meta['val'].astype(np.complex)
+                meta['val'] = meta['val'].astype(complex)
             else:
                 meta['val'] = meta['val'].real
 

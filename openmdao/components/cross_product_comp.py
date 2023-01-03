@@ -72,7 +72,7 @@ class CrossProductComp(ExplicitComponent):
 
         self._k = np.array([[0, 0, 0, -1, 0, 1],
                             [0, 1, 0, 0, -1, 0],
-                            [-1, 0, 1, 0, 0, 0]], dtype=np.float64)
+                            [-1, 0, 1, 0, 0, 0]], dtype=float)
 
     def add_product(self, c_name, a_name='a', b_name='b',
                     c_units=None, a_units=None, b_units=None,

@@ -304,8 +304,8 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
               [ 0.3914706 ,  0.09852519],
               [ 0.86565585,  0.85350002],
               [ 0.40806563,  0.91465314]]]
-        y = np.array([[branin(case) for case in x[0]],
-                      [branin_low_fidelity(case) for case in x[1]]])
+        y = [[branin(case) for case in x[0]],
+             [branin_low_fidelity(case) for case in x[1]]]
 
         mm.options['train_x'] = x[0]
         mm.options['train_y'] = y[0]
