@@ -92,6 +92,25 @@ def _convert_ndarray_to_support_nans_in_json(val):
     return val_as_list
 
 
+def _get_array_info(system, vec, name, prom, var_dict, from_src=True):
+    ndarray_to_convert = vec._abs_get_val(name, flat=False) if vec else \
+        system.get_val(prom, from_src=from_src)
+
+    var_dict['val'] = _convert_ndarray_to_support_nans_in_json(ndarray_to_convert)
+
+    # Find the minimum indices and value
+    min_indices = np.unravel_index(np.nanargmin(ndarray_to_convert, axis=None),
+                                   ndarray_to_convert.shape)
+    var_dict['val_min_indices'] = min_indices
+    var_dict['val_min'] = ndarray_to_convert[min_indices]
+
+    # Find the maximum indices and value
+    max_indices = np.unravel_index(np.nanargmax(ndarray_to_convert, axis=None),
+                                   ndarray_to_convert.shape)
+    var_dict['val_max_indices'] = max_indices
+    var_dict['val_max'] = ndarray_to_convert[max_indices]
+
+
 def _get_var_dict(system, typ, name, is_parallel, is_implicit):
     if name in system._var_abs2meta[typ]:
         meta = system._var_abs2meta[typ][name]
@@ -131,13 +150,9 @@ def _get_var_dict(system, typ, name, is_parallel, is_implicit):
         try:
             if val.size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
                 if not MPI:
-                    # get the current value
-                    if vec:
-                        var_dict['val'] = _convert_ndarray_to_support_nans_in_json(
-                            vec._abs_get_val(name, flat=False))
-                    else:
-                        var_dict['val'] = _convert_ndarray_to_support_nans_in_json(
-                            system.get_val(prom))
+                    # Get the current value
+                    _get_array_info(system, vec, name, prom, var_dict, from_src=True)
+
                 elif is_parallel or is_dist:
                     # we can't access non-local values, so just get the initial value
                     var_dict['val'] = val
@@ -145,12 +160,8 @@ def _get_var_dict(system, typ, name, is_parallel, is_implicit):
                 else:
                     # get the current value but don't try to get it from the source,
                     # which could be remote under MPI
-                    if vec:
-                        var_dict['val'] = _convert_ndarray_to_support_nans_in_json(
-                            vec._abs_get_val(name, flat=False))
-                    else:
-                        var_dict['val'] = _convert_ndarray_to_support_nans_in_json(
-                            system.get_val(prom, from_src=False))
+                    _get_array_info(system, vec, name, prom, var_dict, from_src=False)
+
             else:
                 var_dict['val'] = None
         except Exception as err:
