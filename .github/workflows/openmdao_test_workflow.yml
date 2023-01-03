@@ -70,7 +70,7 @@ jobs:
             PY: 3
             NUMPY: 1
             SCIPY: 1
-            PYOPTSPARSE: 'conda-forge'
+            # PYOPTSPARSE: 'latest'
             OPTIONAL: '[test]'
             TESTS: true
 
@@ -401,9 +401,9 @@ jobs:
         include:
           # baseline versions
           - NAME: Windows Baseline
-            PY: 3
-            NUMPY: 1
-            SCIPY: 1
+            PY: '3.10'
+            NUMPY: 1.22
+            SCIPY: 1.7
             PYOPTSPARSE: '2.9.1'
 
     name: ${{ matrix.NAME }}

@@ -13,6 +13,7 @@ try:
         TokenConverter, Word, nums, oneOf, printables, ParserElement, alphanums
 except ImportError:
     pyparsing = None
+    TokenConverter = object
 
 import numpy as np
 

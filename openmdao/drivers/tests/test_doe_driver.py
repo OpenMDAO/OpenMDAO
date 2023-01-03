@@ -78,7 +78,7 @@ class ParaboloidDiscreteArray(om.ExplicitComponent):
         x = discrete_inputs['x']
         y = discrete_inputs['y']
         f_xy = (x - 3.0)**2 + x * y + (y + 4.0)**2 - 3.0
-        discrete_outputs['f_xy'] = f_xy.astype(np.int)
+        discrete_outputs['f_xy'] = f_xy.astype(int)
 
 
 class TestErrors(unittest.TestCase):
@@ -1255,8 +1255,8 @@ class TestDOEDriver(unittest.TestCase):
 
         # Add independent variables
         indeps = model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
-        indeps.add_discrete_output('x', np.ones((2, ), dtype=np.int))
-        indeps.add_discrete_output('y', np.ones((2, ), dtype=np.int))
+        indeps.add_discrete_output('x', np.ones((2, ), dtype=int))
+        indeps.add_discrete_output('y', np.ones((2, ), dtype=int))
 
         # Add components
         model.add_subsystem('parab', ParaboloidDiscreteArray(), promotes=['*'])
@@ -1311,8 +1311,8 @@ class TestDOEDriver(unittest.TestCase):
 
         prob.setup()
 
-        prob.set_val('x', np.ones((2, ), dtype=np.int))
-        prob.set_val('y', np.ones((2, ), dtype=np.int))
+        prob.set_val('x', np.ones((2, ), dtype=int))
+        prob.set_val('y', np.ones((2, ), dtype=int))
 
         prob.run_driver()
         prob.cleanup()

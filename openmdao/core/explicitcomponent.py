@@ -78,9 +78,14 @@ class ExplicitComponent(Component):
             (new_jacvec_prod is not None and
              new_jacvec_prod != self._inst_functs['compute_jacvec_product']))
 
-    def _get_partials_varlists(self):
+    def _get_partials_varlists(self, use_resname=False):
         """
         Get lists of 'of' and 'wrt' variables that form the partial jacobian.
+
+        Parameters
+        ----------
+        use_resname : bool
+            Ignored for explicit components.
 
         Returns
         -------
@@ -143,8 +148,6 @@ class ExplicitComponent(Component):
         Call setup_partials in components.
         """
         super()._setup_partials()
-
-        abs2prom_out = self._var_abs2prom['output']
 
         # Note: These declare calls are outside of setup_partials so that users do not have to
         # call the super version of setup_partials. This is still in the final setup.

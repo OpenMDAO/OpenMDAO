@@ -380,7 +380,7 @@ class TestModuleFunctions(unittest.TestCase):
         assert_near_equal(p.get_val('exec_comp.z'), 15.0)
 
     def test_incompatible(self):
-        p = om.Problem()
+        p = om.Problem(name='incompatible_units')
         ivc = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['x', 'y'])
         ivc.add_output('x', val=5.0, units='1/s*s')
         ivc.add_output('y', val=10.0, units='Hz*s')
@@ -388,7 +388,8 @@ class TestModuleFunctions(unittest.TestCase):
                                                        x={'units': None}, y={'units': 'ft'}),
                               promotes_inputs=['x', 'y'])
 
-        msg = ("<model> <class Group>: Output units of 'Hz*s' for 'indeps.y' are incompatible with input "
+        msg = ("\nCollected errors for problem 'incompatible_units':"
+               "\n   <model> <class Group>: Output units of 'Hz*s' for 'indeps.y' are incompatible with input "
                "units of 'ft' for 'exec_comp.y'.")
 
         with self.assertRaises(RuntimeError) as cm:
@@ -405,14 +406,15 @@ class TestUnitless(unittest.TestCase):
         assert_near_equal(margin_percent, 5)
 
     def test_unitless_connection_error(self):
-        p = om.Problem()
+        p = om.Problem(name='unitless_connection_error')
         ivc = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
         ivc.add_output('x', val=5.0, units='unitless')
         p.model.add_subsystem(
             'exec_comp',om.ExecComp('z = x', z={'units': 'm'}, x={'units': 'm'}),
             promotes_inputs=['x'])
 
-        msg = ("<model> <class Group>: Output units of 'unitless' for 'indeps.x' are incompatible with input "
+        msg = ("\nCollected errors for problem 'unitless_connection_error':"
+               "\n   <model> <class Group>: Output units of 'unitless' for 'indeps.x' are incompatible with input "
                "units of 'm' for 'exec_comp.x'.")
 
         with self.assertRaises(RuntimeError) as cm:

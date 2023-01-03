@@ -3,6 +3,7 @@ import sys
 import os
 import hashlib
 import time
+import functools
 
 from contextlib import contextmanager
 from collections import defaultdict
@@ -33,10 +34,11 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer
+from openmdao.utils.general_utils import determine_adder_scaler, \
+    format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, env_truthy, \
+    make_traceback
 from openmdao.utils.om_warnings import issue_warning, warn_deprecation, \
     DerivativesWarning, PromotionWarning, UnusedOptionWarning
-from openmdao.utils.general_utils import determine_adder_scaler, conditional_error, \
-    format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -99,6 +101,8 @@ resp_size_checks = {
 }
 resp_types = {'con': 'constraint', 'obj': 'objective'}
 
+value_deprecated_msg = "The metadata key 'value' will be deprecated in 4.0. Please use 'val'."
+
 
 class _MatchType(IntEnum):
     """
@@ -117,9 +121,6 @@ class _MatchType(IntEnum):
     NAME = 0
     RENAME = 1
     PATTERN = 2
-
-
-value_deprecated_msg = "The metadata key 'value' will be deprecated in 4.0. Please use 'val'."
 
 
 class _MetadataDict(dict):
@@ -145,6 +146,38 @@ class _MetadataDict(dict):
                 warn_deprecation(value_deprecated_msg)
             else:
                 raise
+
+
+def collect_errors(method):
+    """
+    Decorate a method so that it will collect any exceptions for later display.
+
+    Parameters
+    ----------
+    method : method
+        The method to be decorated.
+
+    Returns
+    -------
+    method
+        The wrapped method.
+    """
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        try:
+            return method(self, *args, **kwargs)
+        except Exception:
+            if env_truthy('OPENMDAO_FAIL_FAST'):
+                raise
+
+            type_exc, exc, tb = sys.exc_info()
+            if isinstance(exc, KeyError) and self._get_saved_errors():
+                # it's likely the result of an earlier error, so ignore it
+                return
+
+            self._collect_error(str(exc), exc_type=type_exc, tback=tb)
+
+    return wrapper
 
 
 class System(object):
@@ -372,8 +405,9 @@ class System(object):
     _tot_jac : __TotalJacInfo or None
         If a total jacobian is being computed and this is the top level System, this will
         be a reference to the _TotalJacInfo object.
-    _raise_connection_errors : bool
-        Flag indicating whether connection related errors are raised as an Exception.
+    _saved_errors : list
+        Temporary storage for any saved errors that occur before this System is assigned
+        a parent Problem.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -515,7 +549,7 @@ class System(object):
         self._coloring_info = _DEFAULT_COLORING_META.copy()
         self._first_call_to_linearize = True   # will check in first call to _linearize
         self._tot_jac = None
-        self._raise_connection_errors = True
+        self._saved_errors = None if env_truthy('OPENMDAO_FAIL_FAST') else []
 
     @property
     def under_approx(self):
@@ -711,13 +745,14 @@ class System(object):
         # Check for complex step to set vectors up appropriately.
         # If any subsystem needs complex step, then we need to allocate it everywhere.
         nl_alloc_complex = force_alloc_complex
-        for sub in self.system_iter(include_self=True, recurse=True):
-            nl_alloc_complex |= 'cs' in sub._approx_schemes
-            if nl_alloc_complex:
-                break
+        if not nl_alloc_complex:
+            for sub in self.system_iter(include_self=True, recurse=True):
+                nl_alloc_complex |= 'cs' in sub._approx_schemes
+                if nl_alloc_complex:
+                    break
 
         # Linear vectors allocated complex only if subsolvers require derivatives.
-        if nl_alloc_complex:
+        if nl_alloc_complex and self._use_derivatives:
             from openmdao.error_checking.check_config import check_allocate_complex_ln
             ln_alloc_complex = check_allocate_complex_ln(self, force_alloc_complex)
         else:
@@ -868,16 +903,19 @@ class System(object):
         # "Component as a model" deprecation is removed
         try:
             self._problem_meta['relevant'] = self._init_relevance(mode)
-        except RuntimeError as err:
+        except RuntimeError:
+            type_exc, exc, tb = sys.exc_info()
             from openmdao.core.group import Group
-            if "Output not found for design variable" in str(err) and not isinstance(self, Group):
-                msg = f"{str(err)}\nThe model is of type '{self.__class__.__name__}'. " \
+            if not isinstance(self, Group) and "Output not found for design variable" in str(exc):
+                msg = f"The model is of type '{self.__class__.__name__}'. " \
                       "Components must be placed in a Group in order for unconnected inputs " \
                       "to be used as design variables. A future release will require that " \
                       "the model be a Group or a sub-class of Group."
-                raise RuntimeError(msg)
+                self._collect_error(str(exc), exc_type=type_exc, tback=tb)
+                self._collect_error(msg)
+                return
             else:
-                raise err
+                self._collect_error(str(exc), exc_type=type_exc, tback=tb)
 
         # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
@@ -922,6 +960,9 @@ class System(object):
         pass
 
     def _setup_dynamic_shapes(self):
+        pass
+
+    def _check_res_out_overlaps(self):
         pass
 
     def _final_setup(self, comm):
@@ -1539,7 +1580,7 @@ class System(object):
             Problem level options.
         """
         self.pathname = pathname
-        self._problem_meta = prob_meta
+        self._set_problem_meta(prob_meta)
         self._first_call_to_linearize = True
         self._is_local = True
         self._vectors = {}
@@ -1604,12 +1645,6 @@ class System(object):
     def _setup_global_connections(self, conns=None):
         """
         Compute dict of all connections between this system's inputs and outputs.
-
-        The connections come from 4 sources:
-        1. Implicit connections owned by the current system
-        2. Explicit connections declared by the current system
-        3. Explicit connections declared by parent systems
-        4. Implicit / explicit from subsystems
 
         Parameters
         ----------
@@ -1892,7 +1927,7 @@ class System(object):
             a1 = meta['ref'] - ref0
             scale_factors[abs_name] = {
                 'output': (a0, a1),
-                'residual': (0.0, res_ref),
+                'residual': (0.0, 1.0 if res_ref is None else res_ref),
             }
         return scale_factors
 
@@ -2042,33 +2077,38 @@ class System(object):
             bool
                 If True, ignore the new match, else replace the old with the new.
             """
-            old_name, old_key, old_info, old_match_type = matches[io][name]
-            _, info = tup
-            if old_match_type == _MatchType.RENAME:
-                old_key = (old_name, old_key)
-            else:
-                old_using = f"'{old_key}'"
-            if match_type == _MatchType.RENAME:
-                new_using = (name, tup[0])
-            else:
-                new_using = f"'{tup[0]}'"
+            try:
+                old_name, old_key, old_info, old_match_type = matches[io][name]
+                _, info = tup
+                if old_match_type == _MatchType.RENAME:
+                    old_key = (old_name, old_key)
+                else:
+                    old_using = f"'{old_key}'"
+                if match_type == _MatchType.RENAME:
+                    new_using = (name, tup[0])
+                else:
+                    new_using = f"'{tup[0]}'"
 
-            mismatch = info.compare(old_info) if info is not None and old_info is not None else ()
-            if mismatch:
-                raise RuntimeError(f"{self.msginfo}: {io} variable '{name}', promoted using "
-                                   f"{new_using}, was already promoted using {old_using} with "
-                                   f"different values for {mismatch}.")
+                diff = info.compare(old_info) if info is not None and old_info is not None else ()
+                if diff:
+                    raise RuntimeError(f"{self.msginfo}: {io} variable '{name}', promoted using "
+                                       f"{new_using}, was already promoted using {old_using} with "
+                                       f"different values for {diff}.")
 
-            if old_match_type != _MatchType.PATTERN:
-                if old_key != tup[0]:
-                    raise RuntimeError(f"{self.msginfo}: Can't alias promoted {io} '{name}' to "
-                                       f"'{tup[0]}' because '{name}' has already been promoted as "
-                                       f"'{old_key}'.")
+                if old_match_type != _MatchType.PATTERN:
+                    if old_key != tup[0]:
+                        raise RuntimeError(f"{self.msginfo}: Can't alias promoted {io} '{name}' to "
+                                           f"'{tup[0]}' because '{name}' has already been promoted "
+                                           f"as '{old_key}'.")
 
-            if old_key != '*':
-                msg = f"{io} variable '{name}', promoted using {new_using}, " \
-                      f"was already promoted using {old_using}."
-                issue_warning(msg, prefix=self.msginfo, category=PromotionWarning)
+                if old_key != '*':
+                    msg = f"{io} variable '{name}', promoted using {new_using}, " \
+                        f"was already promoted using {old_using}."
+                    issue_warning(msg, prefix=self.msginfo, category=PromotionWarning)
+            except Exception:
+                type_exc, exc, tb = sys.exc_info()
+                self._collect_error(str(exc), exc_type=type_exc, tback=tb)
+                return False
 
             return match_type == _MatchType.PATTERN
 
@@ -3222,11 +3262,12 @@ class System(object):
                 if var in abs2meta_out and "openmdao:allow_desvar" not in abs2meta_out[var]['tags']:
                     src, tgt = outmeta['orig']
                     if src is None:
-                        conditional_error(f"Design variable '{tgt}' is connected to '{var}', but "
-                                          f"'{var}' is not an IndepVarComp or ImplicitComp output.")
+                        self._collect_error(f"Design variable '{tgt}' is connected to '{var}', but "
+                                            f"'{var}' is not an IndepVarComp or ImplicitComp "
+                                            "output.")
                     else:
-                        conditional_error(f"Design variable '{src}' is not an IndepVarComp or "
-                                          "ImplicitComp output.")
+                        self._collect_error(f"Design variable '{src}' is not an IndepVarComp or "
+                                            "ImplicitComp output.")
 
         return out
 
@@ -4350,27 +4391,6 @@ class System(object):
         if self._linear_solver:
             self._linear_solver.cleanup()
 
-    def _get_partials_varlists(self):
-        """
-        Get lists of 'of' and 'wrt' variables that form the partial jacobian.
-
-        Returns
-        -------
-        tuple(list, list)
-            'of' and 'wrt' variable lists.
-        """
-        of = list(self._var_allprocs_prom2abs_list['output'])
-        wrt = list(self._var_allprocs_prom2abs_list['input'])
-
-        # filter out any discrete inputs or outputs
-        if self._discrete_outputs:
-            of = [n for n in of if n not in self._discrete_outputs]
-        if self._discrete_inputs:
-            wrt = [n for n in wrt if n not in self._discrete_inputs]
-
-        # wrt should include implicit states
-        return of, of + wrt
-
     def _get_gradient_nl_solver_systems(self):
         """
         Return a set of all Systems, including this one, that have a gradient nonlinear solver.
@@ -5483,7 +5503,12 @@ class System(object):
 
         # assume that all but the first dimension of the shape of a
         # distributed variable is the same on all procs
-        high_dims = meta['shape'][1:]
+        shape = meta['shape']
+        if shape is None and self._get_saved_errors():
+            # a setup error has occurred earlier that caused shape to be None.  Just return (0,)
+            # to avoid a confusing KeyError
+            return (0,)
+        high_dims = shape[1:]
         with multi_proc_exception_check(self.comm):
             if high_dims:
                 high_size = shape_to_len(high_dims)
@@ -5585,3 +5610,57 @@ class System(object):
             tarr -= toffset
 
         return sarr, tarr, tsize, has_dist_data
+
+    def _collect_error(self, msg, exc_type=None, tback=None, ident=None):
+        """
+        Save an error message to raise as an exception later.
+
+        Parameters
+        ----------
+        msg : str
+            The connection error message to be saved.
+        exc_type : class or None
+            The type of exception to be raised if this error is the only one collected.
+        tback : traceback or None
+            The traceback of a caught exception.
+        ident : int
+            Identifier of the object responsible for issuing the error.
+        """
+        if exc_type is None:
+            exc_type = RuntimeError
+
+        if tback is None:
+            tback = make_traceback()
+
+        if self.msginfo not in msg:
+            msg = f"{self.msginfo}: {msg}"
+
+        saved_errors = self._get_saved_errors()
+
+        if saved_errors is None or env_truthy('OPENMDAO_FAIL_FAST'):
+            raise exc_type(msg).with_traceback(tback)
+
+        saved_errors.append((ident, msg, exc_type, tback))
+
+    def _get_saved_errors(self):
+        if self._problem_meta is None:
+            return self._saved_errors
+        return self._problem_meta['saved_errors']
+
+    def _set_problem_meta(self, prob_meta):
+        self._problem_meta = prob_meta
+        # transfer any temporarily stored error msgs to the Problem
+        if self._saved_errors and prob_meta['saved_errors'] is not None:
+            prob_meta['saved_errors'].extend(self._saved_errors)
+        self._saved_errors = None if env_truthy('OPENMDAO_FAIL_FAST') else []
+
+    def has_declared_resids(self):
+        """
+        Return True if this System has declared residuals.
+
+        Returns
+        -------
+        bool
+            True if this System has declared residuals.
+        """
+        return False
