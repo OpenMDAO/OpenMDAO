@@ -2000,7 +2000,8 @@ class Problem(object):
             Derivatives in form requested by 'return_format'.
         """
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-            self.final_setup()
+            with multi_proc_exception_check(self.comm):
+                self.final_setup()
 
         if wrt is None:
             wrt = list(self.driver._designvars)
