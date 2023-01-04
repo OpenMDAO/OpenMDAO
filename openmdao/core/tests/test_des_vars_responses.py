@@ -254,7 +254,7 @@ class TestDesVarsResponses(unittest.TestCase):
         G1.add_design_var('x', units='ft*ft/ft')
         self.assertEqual(G1._static_design_vars['x']['units'], 'ft')
 
-    def test_component_desvar_units(self):
+    def test_component_desvar_units1(self):
 
         class Paraboloid(om.ExplicitComponent):
             """
@@ -270,7 +270,6 @@ class TestDesVarsResponses(unittest.TestCase):
                 self.add_design_var('y', lower=-50, upper=50, units='m')
 
             def setup_partials(self):
-                # Finite difference all partials.
                 self.declare_partials('*', '*', method='fd')
 
             def compute(self, inputs, outputs):
@@ -306,10 +305,6 @@ class TestDesVarsResponses(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        print(f"{prob['x']=}")
-        print(f"{prob['y']=}")
-        print(f"{prob['parab.f_xy']=}")
-
         assert_near_equal(prob.get_val('parab.f_xy'), -27., 1e-6)
         assert_near_equal(prob.get_val('x'), 7, 1e-4)
         assert_near_equal(prob.get_val('y'), -7, 1e-4)
@@ -321,19 +316,7 @@ class TestDesVarsResponses(unittest.TestCase):
         prob.model.set_input_defaults('y', 4*ft_per_m, units='ft')
 
         prob.setup()
-
-        from pprint import pprint
-        print("-------------------------------------------")
-        print("-------------------------------------------")
-        pprint(prob.model._get_subsystem('_auto_ivc')._var_allprocs_abs2meta['output'])
-        # pprint(prob.model._design_vars)
-        print("-------------------------------------------")
-        print("-------------------------------------------")
         prob.run_driver()
-
-        print(f"{prob['x']=}")
-        print(f"{prob['y']=}")
-        print(f"{prob['parab.f_xy']=}")
 
         # minimum value (still in meters)
         assert_near_equal(prob.get_val('parab.f_xy'), -27., 1e-6)
@@ -342,12 +325,9 @@ class TestDesVarsResponses(unittest.TestCase):
         assert_near_equal(prob.get_val('x'), 7*ft_per_m, 1e-4)
         assert_near_equal(prob.get_val('y'), -7*ft_per_m, 1e-4)
 
-    def test_component_desvar_units(self):
+    def test_component_desvar_units2(self):
 
         class Double(om.ExplicitComponent):
-            """
-            Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3.
-            """
             def setup(self):
                 self.add_input('x', val=0.0, units='degF')
                 self.add_output('y', val=0.0, units='degF')
@@ -364,12 +344,10 @@ class TestDesVarsResponses(unittest.TestCase):
 
         prob.setup()
 
-        print(f"{model.get_source('x')=}")
-
         with self.assertRaises(RuntimeError) as context:
             prob.final_setup()
 
-        msg = "<model> <class Group>: Target for design variable x has 'degF' units, but 'ft' units were specified."
+        msg = "'comp' <class Double>: Target for design variable x has 'degF' units, but 'ft' units were specified."
         self.assertEqual(str(context.exception), msg)
 
 
