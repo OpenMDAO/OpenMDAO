@@ -1,11 +1,15 @@
 """Define the ExecComp class, a component that evaluates an expression."""
 import re
+import time
 from itertools import product
 from contextlib import contextmanager
+from collections import defaultdict
 
 import numpy as np
 from numpy import ndarray, imag, complex128 as npcomplex
 
+from openmdao.core.system import _DEFAULT_COLORING_META
+from openmdao.utils.coloring import _ColSparsityJac, _compute_coloring
 from openmdao.core.constants import INT_DTYPE
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.units import valid_units
@@ -23,7 +27,10 @@ _allowed_meta = {'value', 'val', 'shape', 'units', 'res_units', 'desc',
 
 # Names that are not allowed for input or output variables (keywords for options)
 _disallowed_names = {'has_diag_partials', 'units', 'shape', 'shape_by_conn', 'run_root_only',
-                     'constant'}
+                     'constant', 'do_coloring'}
+
+
+_randgen = np.random.default_rng()
 
 
 def check_option(option, value):
@@ -107,6 +114,17 @@ class ExecComp(ExplicitComponent):
     _constants : dict of dicts
         Constants defined in the expressions. The key is the name of the constant and the value
         is a dict of metadata.
+    _coloring_declared : bool
+        If True, coloring has been declared manually.
+    _inarray : ndarray or None
+        If using internal CS, this is a complex array containing input values.
+    _outarray : ndarray or None
+        If using internal CS, this is a complex array containing output values.
+    _indict : dict or None
+        If using internal CS, this maps input variable views in _inarray to input names.
+    _viewdict : dict or None
+        If using internal CS, this maps input, output, and constant names to their corresponding
+        views/values.
     """
 
     def __init__(self, exprs=[], **kwargs):
@@ -210,6 +228,10 @@ class ExecComp(ExplicitComponent):
 
         super().__init__(**options)
 
+        # change default coloring values
+        self._coloring_info['method'] = 'cs'
+        self._coloring_info['num_full_jacs'] = 2
+
         # if complex step is used for derivatives, this is the stepsize
         self.complex_stepsize = 1.e-40
 
@@ -225,6 +247,11 @@ class ExecComp(ExplicitComponent):
         self._no_check_partials = True
 
         self._constants = {}
+        self._coloring_declared = False
+        self._inarray = None
+        self._outarray = None
+        self._indict = None
+        self._viewdict = None
 
     def initialize(self):
         """
@@ -249,6 +276,10 @@ class ExecComp(ExplicitComponent):
         self.options.declare('shape_by_conn', types=bool, default=False,
                              desc='If True, shape all inputs and outputs based on their '
                                   'connection. Default is False.')
+
+        self.options.declare('do_coloring', types=bool, default=True,
+                             desc='If True (the default), compute the partial jacobian '
+                             'coloring for this component.')
 
     @classmethod
     def register(cls, name, callable_obj, complex_safe):
@@ -302,30 +333,44 @@ class ExecComp(ExplicitComponent):
         exprs = self._exprs
         kwargs = self._kwargs
 
-        units = self.options['units']
         shape = self.options['shape']
         shape_by_conn = self.options['shape_by_conn']
-
-        warned = False
 
         if shape is not None and shape_by_conn:
             raise RuntimeError(f"{self.msginfo}: Can't set both shape and shape_by_conn.")
 
+        self._exprs_info = exprs_info = []
         outs = set()
         allvars = set()
-
-        self._exprs_info = exprs_info = [(self._parse_for_out_vars(expr.split('=', 1)[0]),
-                                          self._parse_for_names(expr, **kwargs)) for expr in exprs]
-
         self._requires_fd = {}
 
-        # find all of the variables and which ones are outputs
-        for onames, names in exprs_info:
+        for expr in exprs:
+            lhs, _, rhs = expr.partition('=')
+            onames = self._parse_for_out_vars(lhs)
+            vnames, fnames = self._parse_for_names(rhs)
+
+            # remove constants
+            vnames = vnames.difference(
+                [n for n, val in kwargs.items()
+                 if isinstance(val, dict) and 'constant' in val and val['constant']]
+            )
+
+            allvars.update(vnames)
             outs.update(onames)
-            allvars.update(names[0])
-            if _not_complex_safe.intersection(names[1]):
+
+            if onames.intersection(allvars):
+                # we have a used-before-calculated output
+                violators = sorted([n for n in onames if n in allvars])
+                raise RuntimeError(f"{self.msginfo}: Outputs {violators} are used before "
+                                   "being calculated, so this ExecComp is not a valid explicit "
+                                   "component.")
+
+            exprs_info.append((onames, vnames, fnames))
+            if _not_complex_safe.intersection(fnames):
                 for o in onames:
-                    self._requires_fd[o] = names
+                    self._requires_fd[o] = (vnames, fnames)
+
+        allvars.update(outs)
 
         if self._requires_fd:
             inps = []
@@ -338,6 +383,8 @@ class ExecComp(ExplicitComponent):
 
         kwargs2 = {}
         init_vals = {}
+        units = self.options['units']
+        warned = False
 
         # make sure all kwargs are legit
         for arg, val in kwargs.items():
@@ -508,17 +555,17 @@ class ExecComp(ExplicitComponent):
 
     def _compile_exprs(self, exprs):
         compiled = []
-        outputs = []
+        outputs = set()
         for i, expr in enumerate(exprs):
 
             # Quick dupe check.
-            lhs_name = expr.split('=', 1)[0].strip()
+            lhs_name = expr.partition('=')[0].strip()
             if lhs_name in outputs:
                 # Can't add two equations with the same output.
                 raise RuntimeError(f"{self.msginfo}: The output '{lhs_name}' has already been "
                                    "defined by an expression.")
             else:
-                outputs.append(lhs_name)
+                outputs.add(lhs_name)
 
             try:
                 compiled.append(compile(expr, expr, 'exec'))
@@ -537,14 +584,11 @@ class ExecComp(ExplicitComponent):
                                 "function or constant." % (self.msginfo, v))
         return vnames
 
-    def _parse_for_names(self, s, **kwargs):
+    def _parse_for_names(self, s):
         names = [x.strip() for x in re.findall(VAR_RGX, s) if not x.startswith('.')]
         vnames = set()
         for n in names:
             if n.endswith('('):
-                continue
-            if n in kwargs and isinstance(kwargs[n], dict) and 'constant' in kwargs[n] \
-                    and kwargs[n]['constant']:
                 continue
             vnames.add(n)
         fnames = [n[:-1] for n in names if n[-1] == '(']
@@ -610,7 +654,7 @@ class ExecComp(ExplicitComponent):
         dict
             Metadata dict for the specified partial(s).
         """
-        if 'method' not in kwargs or kwargs['method'] == 'exact':
+        if 'method' not in kwargs or kwargs['method'] not in ('cs', 'fd'):
             raise RuntimeError(f"{self.msginfo}: declare_partials must be called with method='cs' "
                                "or method='fd'.")
         if self.options['has_diag_partials']:
@@ -620,22 +664,50 @@ class ExecComp(ExplicitComponent):
         self._manual_decl_partials = True
         return super().declare_partials(*args, **kwargs)
 
+    def _get_coloring(self):
+        """
+        Get the Coloring for this system.
+
+        If necessary, load the Coloring from a file or dynamically generate it.
+
+        Returns
+        -------
+        Coloring or None
+            Coloring object, possible loaded from a file or dynamically generated, or None
+        """
+        if self.options['do_coloring']:
+            return super()._get_coloring()
+
     def _setup_partials(self):
         """
         Check that all partials are declared.
         """
+        has_diag_partials = self.options['has_diag_partials']
         if not self._manual_decl_partials:
+            if self.options['do_coloring'] and not has_diag_partials:
+                rank = self.comm.rank
+                sizes = self._var_sizes
+                if not self._has_distrib_vars and (sum(sizes['input'][rank]) > 1 and
+                                                   sum(sizes['output'][rank]) > 1):
+                    if not self._coloring_declared:
+                        super().declare_coloring(wrt=None, method='cs')
+                        self._coloring_info['dynamic'] = True
+                        self._manual_decl_partials = False  # this gets reset in declare_partials
+                        self._declared_partials = defaultdict(dict)
+                else:
+                    self.options['do_coloring'] = False
+                    self._coloring_info['dynamic'] = False
+
             meta = self._var_rel2meta
             decl_partials = super().declare_partials
-            for i, (outs, tup) in enumerate(self._exprs_info):
-                vs, funcs = tup
+            for outs, vs, _ in self._exprs_info:
                 ins = sorted(set(vs).difference(outs))
                 for out in sorted(outs):
                     for inp in ins:
-                        if self.options['has_diag_partials']:
+                        if has_diag_partials:
                             ival = meta[inp]['val']
-                            iarray = isinstance(ival, ndarray) and ival.size > 1
                             oval = meta[out]['val']
+                            iarray = isinstance(ival, ndarray) and ival.size > 1
                             if iarray and isinstance(oval, ndarray) and oval.size > 1:
                                 if oval.size != ival.size:
                                     raise RuntimeError(
@@ -651,10 +723,10 @@ class ExecComp(ExplicitComponent):
                             decl_partials(of=out, wrt=inp)
 
         super()._setup_partials()
+
         if self._manual_decl_partials:
             undeclared = []
-            for i, (outs, tup) in enumerate(self._exprs_info):
-                vs, funcs = tup
+            for outs, vs, _ in self._exprs_info:
                 ins = sorted(set(vs).difference(outs))
                 for out in sorted(outs):
                     out = '.'.join((self.pathname, out)) if self.pathname else out
@@ -670,6 +742,57 @@ class ExecComp(ExplicitComponent):
                               f"declared so they are assumed to be zero: [{undeclared}].",
                               prefix=self.msginfo, category=DerivativesWarning)
 
+    def _setup_vectors(self, root_vectors):
+        """
+        Compute all vectors for all vec names.
+
+        Parameters
+        ----------
+        root_vectors : dict of dict of Vector
+            Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        """
+        super()._setup_vectors(root_vectors)
+
+        if not self._use_derivatives:
+            self._manual_decl_partials = True  # prevents attempts to use _viewdict in compute
+
+        self._iodict = _IODict(self._outputs, self._inputs, self._constants)
+
+        self._relcopy = False
+
+        if not self._manual_decl_partials:
+            if self._force_alloc_complex:
+                # we can use the internal Vector complex arrays
+
+                # set complex_step_mode so we'll get the full complex array
+                self._inputs.set_complex_step_mode(True)
+                self._outputs.set_complex_step_mode(True)
+
+                self._indict = self._inputs._get_local_views()
+                outdict = self._outputs._get_local_views()
+
+                self._inarray = self._inputs.asarray(copy=False)
+                self._outarray = self._outputs.asarray(copy=False)
+
+                self._inputs.set_complex_step_mode(False)
+                self._outputs.set_complex_step_mode(False)
+
+            else:
+                # we make our own complex 'copy' of the Vector arrays
+                self._inarray = np.zeros(len(self._inputs), dtype=complex)
+                self._outarray = np.zeros(len(self._outputs), dtype=complex)
+
+                self._indict = self._inputs._get_local_views(self._inarray)
+                outdict = self._outputs._get_local_views(self._outarray)
+
+                self._relcopy = True
+
+            # combine lookup dicts for faster exec calls
+            viewdict = self._indict.copy()
+            viewdict.update(outdict)
+            viewdict.update(self._constants)
+            self._viewdict = _ViewDict(viewdict)
+
     def compute(self, inputs, outputs):
         """
         Execute this component's assignment statements.
@@ -682,10 +805,27 @@ class ExecComp(ExplicitComponent):
         outputs : `Vector`
             `Vector` containing outputs.
         """
+        if not self._manual_decl_partials:
+            if self._relcopy:
+                self._inarray[:] = self._inputs.asarray(copy=False)
+                self._exec()
+                outs = outputs.asarray(copy=False)
+                if outs.dtype == self._outarray.dtype:
+                    outs[:] = self._outarray
+                else:
+                    outs[:] = self._outarray.real
+            else:
+                self._exec()
+
+            return
+
+        if self._iodict._inputs is not inputs:
+            self._iodict = _IODict(outputs, inputs, self._constants)
+
         for i, expr in enumerate(self._codes):
             try:
                 #  inputs, outputs, and _constants are vectors
-                exec(expr, _expr_dict, _IODict(outputs, inputs, self._constants))  # nosec:
+                exec(expr, _expr_dict, self._iodict)  # nosec:
                 # limited to _expr_dict
             except Exception as err:
                 raise RuntimeError(f"{self.msginfo}: Error occurred evaluating '{self._exprs[i]}':"
@@ -719,124 +859,301 @@ class ExecComp(ExplicitComponent):
 
         super()._linearize(jac, sub_do_ln)
 
+    def declare_coloring(self,
+                         wrt=_DEFAULT_COLORING_META['wrt_patterns'],
+                         method=_DEFAULT_COLORING_META['method'],
+                         form=None,
+                         step=None,
+                         per_instance=_DEFAULT_COLORING_META['per_instance'],
+                         num_full_jacs=_DEFAULT_COLORING_META['num_full_jacs'],
+                         tol=_DEFAULT_COLORING_META['tol'],
+                         orders=_DEFAULT_COLORING_META['orders'],
+                         perturb_size=_DEFAULT_COLORING_META['perturb_size'],
+                         min_improve_pct=_DEFAULT_COLORING_META['min_improve_pct'],
+                         show_summary=_DEFAULT_COLORING_META['show_summary'],
+                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity']):
+        """
+        Set options for deriv coloring of a set of wrt vars matching the given pattern(s).
+
+        Parameters
+        ----------
+        wrt : str or list of str
+            The name or names of the variables that derivatives are taken with respect to.
+            This can contain input names, output names, or glob patterns.
+        method : str
+            Method used to compute derivative: "fd" for finite difference, "cs" for complex step.
+        form : str
+            Finite difference form, can be "forward", "central", or "backward". Leave
+            undeclared to keep unchanged from previous or default value.
+        step : float
+            Step size for finite difference. Leave undeclared to keep unchanged from previous
+            or default value.
+        per_instance : bool
+            If True, a separate coloring will be generated for each instance of a given class.
+            Otherwise, only one coloring for a given class will be generated and all instances
+            of that class will use it.
+        num_full_jacs : int
+            Number of times to repeat partial jacobian computation when computing sparsity.
+        tol : float
+            Tolerance used to determine if an array entry is nonzero during sparsity determination.
+        orders : int
+            Number of orders above and below the tolerance to check during the tolerance sweep.
+        perturb_size : float
+            Size of input/output perturbation during generation of sparsity.
+        min_improve_pct : float
+            If coloring does not improve (decrease) the number of solves more than the given
+            percentage, coloring will not be used.
+        show_summary : bool
+            If True, display summary information after generating coloring.
+        show_sparsity : bool
+            If True, display sparsity with coloring info after generating coloring.
+        """
+        super().declare_coloring(wrt, method, form, step, per_instance, num_full_jacs,
+                                 tol, orders, perturb_size, min_improve_pct,
+                                 show_summary, show_sparsity)
+        self._coloring_declared = True
+        self._manual_decl_partials = True
+
+    def _exec(self):
+        for i, expr in enumerate(self._codes):
+            try:
+                exec(expr, _expr_dict, self._viewdict)  # nosec:
+            except Exception as err:
+                raise RuntimeError(f"{self.msginfo}: Error occurred evaluating "
+                                   f"'{self._exprs[i]}':\n{err}")
+
+    def _compute_coloring(self, recurse=False, **overrides):
+        """
+        Compute a coloring of the partial jacobian.
+
+        This assumes that the current System is in a proper state for computing derivatives.
+
+        Parameters
+        ----------
+        recurse : bool
+            Ignored.
+        **overrides : dict
+            Any args that will override either default coloring settings or coloring settings
+            resulting from an earlier call to declare_coloring.
+
+        Returns
+        -------
+        list of Coloring
+            The computed colorings.
+        """
+        if self._manual_decl_partials:
+            # use framework approx coloring
+            return super()._compute_coloring(recurse=recurse, **overrides)
+
+        info = self._coloring_info
+        info.update(**overrides)
+        if isinstance(info['wrt_patterns'], str):
+            info['wrt_patterns'] = [info['wrt_patterns']]
+
+        if not self._coloring_declared and info['method'] is None:
+            info['method'] = 'cs'
+
+        if info['method'] != 'cs':
+            raise RuntimeError(f"{self.msginfo}: 'method' for coloring must be 'cs' if partials "
+                               "and/or coloring are not declared manually using declare_partials "
+                               "or declare_coloring.")
+
+        if info['coloring'] is None and info['static'] is None:
+            info['dynamic'] = True
+
+        # match everything
+        info['wrt_matches_rel'] = None
+        info['wrt_matches'] = None
+
+        sparsity_start_time = time.perf_counter()
+
+        step = self.complex_stepsize * 1j
+        inv_stepsize = 1.0 / self.complex_stepsize
+        inarr = self._inarray
+        oarr = self._outarray
+
+        if self.options['has_diag_partials']:
+            # we should never get here
+            raise NotImplementedError("has_diag_partials not supported with coloring yet")
+
+        # compute perturbations
+        starting_inputs = self._inputs.asarray(copy=not self._relcopy)
+        in_offsets = starting_inputs.copy()
+        in_offsets[in_offsets == 0.0] = 1.0
+        in_offsets *= info['perturb_size']
+
+        # use special sparse jacobian to collect sparsity info
+        jac = _ColSparsityJac(self, info)
+
+        for i in range(info['num_full_jacs']):
+            inarr[:] = starting_inputs + in_offsets * _randgen.random(in_offsets.size)
+
+            for i in range(inarr.size):
+                inarr[i] += step
+                self._exec()
+                jac.set_col(self, i, imag(oarr * inv_stepsize))
+                inarr[i] -= step
+
+        if not self._relcopy:
+            self._inputs.set_val(starting_inputs)
+
+        sparsity, sp_info = jac.get_sparsity(self)
+        sparsity_time = time.perf_counter() - sparsity_start_time
+
+        coloring = _compute_coloring(sparsity, 'fwd')
+
+        if not self._finalize_coloring(coloring, info, sp_info, sparsity_time):
+            return [None]
+
+        # compute mapping of col index to wrt varname
+        self._col_idx2name = idxnames = [None] * len(self._inputs)
+        plen = len(self.pathname) + 1 if self.pathname else 0
+        for name, slc in self._inputs.get_slice_dict().items():
+            name = name[plen:]
+            for i in range(slc.start, slc.stop):
+                idxnames[i] = name
+
+        # get slice dicts using relative name keys
+        self._out_slices = {n[plen:]: slc for n, slc in self._outputs.get_slice_dict().items()}
+        self._in_slices = {n[plen:]: slc for n, slc in self._inputs.get_slice_dict().items()}
+
+        return [coloring]
+
+    def _compute_colored_partials(self, partials):
+        """
+        Use complex step method with coloring to update the given Jacobian.
+
+        Parameters
+        ----------
+        partials : `Jacobian`
+            Contains sub-jacobians.
+        """
+        step = self.complex_stepsize * 1j
+        inv_stepsize = 1.0 / self.complex_stepsize
+        inarr = self._inarray
+        oarr = self._outarray
+        out_names = self._var_rel_names['output']
+
+        inarr[:] = self._inputs.asarray(copy=False)
+        scratch = np.zeros(oarr.size)
+        idx2name = self._col_idx2name
+        out_slices = self._out_slices
+        in_slices = self._in_slices
+
+        for icols, nzrowlists in self._coloring_info['coloring'].color_nonzero_iter('fwd'):
+            # set a complex input value
+            inarr[icols] += step
+
+            # solve with complex input value
+            self._exec()
+
+            imag_oar = imag(oarr * inv_stepsize)
+
+            for icol, rows in zip(icols, nzrowlists):
+                scratch[rows] = imag_oar[rows]
+                inp = idx2name[icol]
+                loc_i = icol - in_slices[inp].start
+                for u in out_names:
+                    key = (u, inp)
+                    if key in self._declared_partials:
+                        # set the column in the Jacobian entry
+                        part = scratch[out_slices[u]]
+                        partials[key][:, loc_i] = part
+                        part[:] = 0.
+
+            # restore old input value
+            inarr[icols] -= step
+
     def compute_partials(self, inputs, partials):
         """
         Use complex step method to update the given Jacobian.
 
         Parameters
         ----------
-        inputs : `VecWrapper`
-            `VecWrapper` containing parameters (p).
+        inputs : Vector or dict
+            Vector containing parameters (p).
         partials : `Jacobian`
             Contains sub-jacobians.
         """
         if self._manual_decl_partials:
             return
 
+        if self.under_complex_step:
+            raise RuntimeError(f"{self.msginfo}: Can't compute complex step partials when higher "
+                               "level system is using complex step unless you manually call "
+                               "declare_partials and/or declare_coloring on this ExecComp.")
+
+        if self._coloring_info['coloring'] is not None:
+            self._compute_colored_partials(partials)
+            return
+
         step = self.complex_stepsize * 1j
         out_names = self._var_rel_names['output']
         inv_stepsize = 1.0 / self.complex_stepsize
         has_diag_partials = self.options['has_diag_partials']
+        inarr = self._inarray
+        indict = self._indict
+        vdict = self._viewdict
 
-        for inp in inputs:
+        inarr[:] = self._inputs.asarray(copy=False)
 
-            pwrap = _TmpDict(inputs)
-            pval = inputs[inp]
-            psize = pval.size
-            pwrap[inp] = np.asarray(pval, npcomplex)
+        for inp, ival in indict.items():
+            psize = ival.size
 
             if has_diag_partials or psize == 1:
                 # set a complex inpup value
-                pwrap[inp] += step
-
-                uwrap = _TmpDict(self._outputs, return_complex=True)
+                ival += step
 
                 # solve with complex input value
-                self._residuals.set_val(0.0)
-                self.compute(pwrap, uwrap)
+                self._exec()
 
                 for u in out_names:
                     if (u, inp) in self._declared_partials:
-                        partials[(u, inp)] = imag(uwrap[u] * inv_stepsize).flat
+                        partials[u, inp] = imag(vdict[u] * inv_stepsize).flat
 
                 # restore old input value
-                pwrap[inp] -= step
+                ival -= step
             else:
-                for i, idx in enumerate(array_idx_iter(pwrap[inp].shape)):
+                for i, idx in enumerate(array_idx_iter(ival.shape)):
                     # set a complex input value
-                    pwrap[inp][idx] += step
-
-                    uwrap = _TmpDict(self._outputs, return_complex=True)
+                    ival[idx] += step
 
                     # solve with complex input value
-                    self._residuals.set_val(0.0)
-                    self.compute(pwrap, uwrap)
+                    self._exec()
 
                     for u in out_names:
                         if (u, inp) in self._declared_partials:
                             # set the column in the Jacobian entry
-                            partials[(u, inp)][:, i] = imag(uwrap[u] * inv_stepsize).flat
+                            partials[u, inp][:, i] = imag(vdict[u] * inv_stepsize).flat
 
                     # restore old input value
-                    pwrap[inp][idx] -= step
+                    ival[idx] -= step
 
 
-class _TmpDict(object):
-    """
-    Dict wrapper that allows modification without changing the wrapped dict.
-
-    It will allow getting of values
-    from its inner dict unless those values get modified via
-    __setitem__.  After values have been modified they are managed
-    thereafter by the wrapper.  This protects the inner dict from
-    modification.
-
-    Attributes
-    ----------
-    _inner : dict-like
-        The dictionary to be wrapped.
-    _changed : dict-like
-        The key names for the values that were changed.
-    _complex : bool
-        If True, return a complex version of values from __getitem__.
-    """
-
-    def __init__(self, inner, return_complex=False):
-        """
-        Construct the dictionary object.
-
-        Parameters
-        ----------
-        inner : dict-like
-            The dictionary to be wrapped.
-        return_complex : bool, optional
-            If True, return a complex version of values from __getitem__
-        """
-        self._inner = inner
-        self._changed = {}
-        self._complex = return_complex
+class _ViewDict(object):
+    def __init__(self, dct):
+        self.dct = dct
 
     def __getitem__(self, name):
-        if name in self._changed:
-            return self._changed[name]
-        elif self._complex:
-            val = self._inner[name]
-            if isinstance(val, ndarray):
-                self._changed[name] = np.asarray(val, dtype=npcomplex)
-            else:
-                self._changed[name] = npcomplex(val)
-            return self._changed[name]
-        else:
-            return self._inner[name]
+        return self.dct[name]
 
     def __setitem__(self, name, value):
-        self._changed[name] = value
+        try:
+            self.dct[name][:] = value
+        except ValueError:
+            # see if value fits if size 1 dimensions are removed
+            sqz = np.squeeze(value)
+            if np.squeeze(self.dct[name]).shape == sqz.shape:
+                self.dct[name][:] = sqz
+            else:
+                raise
 
+    # need __contains__ here else we get weird KeyErrors in certain situations when evaluating
+    # the compiled expressions.  Non-compiled expressions evaluate just fine, but after compilation,
+    # and only in rare circumstances (like running under om trace), KeyErrors for 0, 1, ...
+    # are mysteriously generated.
     def __contains__(self, name):
-        return name in self._inner or name in self._changed
-
-    def __getattr__(self, name):
-        return getattr(self._inner, name)
+        return name in self.dct
 
 
 class _IODict(object):
@@ -885,10 +1202,18 @@ class _IODict(object):
                 return self._constants[name]
 
     def __setitem__(self, name, value):
-        self._outputs[name] = value
+        try:
+            self._outputs[name][:] = value
+        except ValueError:
+            # see if value fits if size 1 dimensions are removed
+            sqz = np.squeeze(value)
+            if np.squeeze(self._outputs[name]).shape == sqz.shape:
+                self._outputs[name][:] = sqz
+            else:
+                raise
 
     def __contains__(self, name):
-        return name in self._outputs or name in self._inputs or name in self._constants
+        return name in self._inputs or name in self._outputs or name in self._constants
 
 
 def _import_functs(mod, dct, names=None):

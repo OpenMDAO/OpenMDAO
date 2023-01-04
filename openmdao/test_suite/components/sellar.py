@@ -261,14 +261,20 @@ class SellarDerivatives(om.Group):
         self.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         self.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        self.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)', obj=0.0,
+        obj = self.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)', obj=0.0,
                                                   x=0.0, z=np.array([0.0, 0.0]), y1=0.0, y2=0.0),
                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-        self.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1', con1=0.0, y1=0.0),
+        con1 = self.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1', con1=0.0, y1=0.0),
                            promotes=['con1', 'y1'])
-        self.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0),
+        con2 = self.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0),
                            promotes=['con2', 'y2'])
+
+        # manually declare partials to allow graceful fallback to FD when nested under a higher
+        # level complex step approximation.
+        obj.declare_partials(of='*', wrt='*', method='cs')
+        con1.declare_partials(of='*', wrt='*', method='cs')
+        con2.declare_partials(of='*', wrt='*', method='cs')
 
         self.set_input_defaults('x', 1.0)
         self.set_input_defaults('z', np.array([5.0, 2.0]))

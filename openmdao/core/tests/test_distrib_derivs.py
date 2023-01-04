@@ -1922,12 +1922,20 @@ class TestDistribBugs(unittest.TestCase):
         prob = self.get_problem(Distrib_Derivs_Matfree_Old, mode='rev')
         data = prob.check_totals(method='cs', out_stream=None, of=['D1.out_nd', 'D1.out_dist'],
                                                    wrt=['indep.x_serial', 'indep.x_dist'])
-        assert_check_totals(data)
+        with self.assertRaises(ValueError) as cm:
+            assert_check_totals(data)
+
+        msg = "During total derivative computation, the following partial derivatives resulted in serial inputs that were inconsistent across processes: ['D1.out_dist wrt D1.in_nd']."
+        self.assertEquals(str(cm.exception), msg)
 
     def test_check_partials_cs_old(self):
         prob = self.get_problem(Distrib_Derivs_Matfree_Old)
         data = prob.check_partials(method='cs', show_only_incorrect=True)
-        assert_check_partials(data)
+        with self.assertRaises(ValueError) as cm:
+            assert_check_partials(data)
+
+        msg = "Inconsistent derivs across processes for keys: [('out_dist', 'in_nd')].\nCheck that distributed outputs are properly reduced when computing\nderivatives of serial inputs."
+        self.assertTrue(str(cm.exception).endswith(msg))
 
     def test_check_totals_prod_rev(self):
         prob = self.get_problem(Distrib_Derivs_Prod_Matfree, mode='rev')

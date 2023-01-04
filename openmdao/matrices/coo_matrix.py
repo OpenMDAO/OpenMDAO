@@ -273,7 +273,7 @@ class COOMatrix(Matrix):
                 self._coo.dtype = complex
         else:
             self._coo.data = self._coo.data.real
-            self._coo.dtype = np.float
+            self._coo.dtype = float
 
     def _convert_mask(self, mask):
         """

@@ -1975,7 +1975,8 @@ class Problem(object):
             Derivatives in form requested by 'return_format'.
         """
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-            self.final_setup()
+            with multi_proc_exception_check(self.comm):
+                self.final_setup()
 
         if wrt is None:
             wrt = list(self.driver._designvars)
@@ -2916,9 +2917,10 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             dct['inconsistent_keys'] = incon_keys
             break
         if not suppress_output:
+            ders = [f"{sof} wrt {swrt}" for sof, swrt in sorted(incon_keys)]
             print("\nDuring computation of totals, the following partial derivatives resulted in\n"
                   "inconsistent values across processes for certain serial inputs:\n"
-                  f"{sorted(incon_keys)}.\nThis can happen if a component 'compute_jacvec_product' "
+                  f"{ders}.\nThis can happen if a component 'compute_jacvec_product' "
                   "or 'apply_linear'\nmethod does not properly reduce the value of a distributed "
                   "output when computing the\nderivative of that output with respect to a serial "
                   "input.")

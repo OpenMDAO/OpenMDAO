@@ -206,7 +206,7 @@ class KSComp(ExplicitComponent):
                                 ref0=opts['ref0'], ref=opts['ref'],
                                 parallel_deriv_color=opts['parallel_deriv_color'])
 
-        rows = np.zeros(width, dtype=np.int)
+        rows = np.zeros(width, dtype=int)
         cols = range(width)
         rows = np.tile(rows, vec_size) + np.repeat(np.arange(vec_size), width)
         cols = np.tile(cols, vec_size) + np.repeat(np.arange(vec_size), width) * width

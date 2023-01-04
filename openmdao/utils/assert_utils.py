@@ -309,9 +309,10 @@ def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6):
              for key, dct, err in fails])
 
     if incon_keys:
+        ders = [f"{sof} wrt {swrt}" for sof, swrt in sorted(incon_keys)]
         fail_list.append(f"During total derivative computation, the following partial derivatives "
                          "resulted in serial inputs that were inconsistent across processes: "
-                         f"{sorted(incon_keys)}.")
+                         f"{ders}.")
 
     if fails or incon_keys:
         raise ValueError('\n\n'.join(fail_list))

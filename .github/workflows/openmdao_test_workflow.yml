@@ -35,6 +35,17 @@ jobs:
             JAX: '0.3.24'
             BANDIT: true
             TESTS: true
+            # set DEBUG to create an interactive debugging session just before testflo is run.
+            # Note that the workflow will run until you cancel the debugging session.
+            #   To access the terminal through the web-interface:
+            #     1. Click on the web-browser link printed out in this action from the github
+            #        workflow terminal
+            #     2. Press cntrl + c in the new tab that opens up to reveal the terminal
+            #     3. To activate the conda environment run:
+            #         $ source $CONDA/etc/profile.d/conda.sh
+            #         $ conda activate test
+            # See https://github.com/mxschmitt/action-tmate for more details
+            # DEBUG: true
 
           # test baseline versions on MacOS
           - NAME: MacOS Baseline
@@ -70,7 +81,7 @@ jobs:
             PY: 3
             NUMPY: 1
             SCIPY: 1
-            PYOPTSPARSE: 'conda-forge'
+            # PYOPTSPARSE: 'latest'
             OPTIONAL: '[test]'
             TESTS: true
 
@@ -289,6 +300,10 @@ jobs:
           python -c "import scipy; assert str(scipy.__version__).startswith(str(${{ matrix.SCIPY }})), \
                     f'Scipy version {scipy.__version__} is not the requested version (${{ matrix.SCIPY }})'"
 
+      - name: Setup tmate session
+        if: matrix.DEBUG
+        uses: mxschmitt/action-tmate@v3
+
       - name: Run tests
         if: matrix.TESTS
         run: |
@@ -300,7 +315,7 @@ jobs:
           echo "###################################################"
           cp .coveragerc $HOME
           cd $HOME
-          testflo -n 2 openmdao --timeout=120 --show_skipped --coverage --coverpkg openmdao --durations=20
+          testflo -n 2 openmdao --timeout=240 --show_skipped --coverage --coverpkg openmdao --durations=20
 
       - name: Submit coverage
         if: matrix.TESTS
@@ -401,9 +416,9 @@ jobs:
         include:
           # baseline versions
           - NAME: Windows Baseline
-            PY: 3
-            NUMPY: 1
-            SCIPY: 1
+            PY: '3.10'
+            NUMPY: 1.22
+            SCIPY: 1.7
             PYOPTSPARSE: '2.9.1'
 
     name: ${{ matrix.NAME }}
@@ -498,7 +513,7 @@ jobs:
           echo "============================================================="
           copy .coveragerc $HOME
           cd $HOME
-          testflo -n 2 openmdao --timeout=120 --show_skipped --coverage  --coverpkg openmdao --durations=20
+          testflo -n 2 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20
 
       - name: Submit coverage
         env:

@@ -60,6 +60,14 @@
                     "val": [
                         5.0,
                         2.0
+                    ],
+                    "val_min": 2.0,
+                    "val_min_indices": [
+                        1
+                    ],
+                    "val_max": 5.0,
+                    "val_max_indices": [
+                        0
                     ]
                 },
                 {
@@ -73,6 +81,14 @@
                     "is_discrete": false,
                     "val": [
                         1.0
+                    ],
+                    "val_min": 1.0,
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_max": 1.0,
+                    "val_max_indices": [
+                        0
                     ]
                 }
             ],
@@ -164,6 +180,14 @@
                                     "is_discrete": false,
                                     "val": [
                                         1.0
+                                    ],
+                                    "val_min": 1.0,
+                                    "val_min_indices": [
+                                        0
+                                    ],
+                                    "val_max": 1.0,
+                                    "val_max_indices": [
+                                        0
                                     ]
                                 },
                                 {
@@ -177,6 +201,14 @@
                                     "is_discrete": false,
                                     "val": [
                                         1.0
+                                    ],
+                                    "val_min": 1.0,
+                                    "val_min_indices": [
+                                        0
+                                    ],
+                                    "val_max": 1.0,
+                                    "val_max_indices": [
+                                        0
                                     ]
                                 }
                             ],
@@ -215,6 +247,14 @@
                             "val": [
                                 5.0,
                                 2.0
+                            ],
+                            "val_min": 2.0,
+                            "val_min_indices": [
+                                1
+                            ],
+                            "val_max": 5.0,
+                            "val_max_indices": [
+                                0
                             ]
                         },
                         {
@@ -227,6 +267,14 @@
                             "is_discrete": false,
                             "val": [
                                 1.0
+                            ],
+                            "val_min": 1.0,
+                            "val_min_indices": [
+                                0
+                            ],
+                            "val_max": 1.0,
+                            "val_max_indices": [
+                                0
                             ]
                         },
                         {
@@ -239,6 +287,14 @@
                             "is_discrete": false,
                             "val": [
                                 1.0
+                            ],
+                            "val_min": 1.0,
+                            "val_min_indices": [
+                                0
+                            ],
+                            "val_max": 1.0,
+                            "val_max_indices": [
+                                0
                             ]
                         },
                         {
@@ -252,6 +308,14 @@
                             "is_discrete": false,
                             "val": [
                                 1.0
+                            ],
+                            "val_min": 1.0,
+                            "val_min_indices": [
+                                0
+                            ],
+                            "val_max": 1.0,
+                            "val_max_indices": [
+                                0
                             ]
                         }
                     ],
@@ -284,6 +348,14 @@
                             "val": [
                                 5.0,
                                 2.0
+                            ],
+                            "val_min": 2.0,
+                            "val_min_indices": [
+                                1
+                            ],
+                            "val_max": 5.0,
+                            "val_max_indices": [
+                                0
                             ]
                         },
                         {
@@ -296,6 +368,14 @@
                             "is_discrete": false,
                             "val": [
                                 1.0
+                            ],
+                            "val_min": 1.0,
+                            "val_min_indices": [
+                                0
+                            ],
+                            "val_max": 1.0,
+                            "val_max_indices": [
+                                0
                             ]
                         },
                         {
@@ -309,6 +389,14 @@
                             "is_discrete": false,
                             "val": [
                                 1.0
+                            ],
+                            "val_min": 1.0,
+                            "val_min_indices": [
+                                0
+                            ],
+                            "val_max": 1.0,
+                            "val_max_indices": [
+                                0
                             ]
                         }
                     ],
@@ -347,6 +435,14 @@
                     "is_discrete": false,
                     "val": [
                         1.0
+                    ],
+                    "val_min": 1.0,
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_max": 1.0,
+                    "val_max_indices": [
+                        0
                     ]
                 },
                 {
@@ -359,6 +455,14 @@
                     "is_discrete": false,
                     "val": [
                         1.0
+                    ],
+                    "val_min": 1.0,
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_max": 1.0,
+                    "val_max_indices": [
+                        0
                     ]
                 },
                 {
@@ -371,6 +475,14 @@
                     "is_discrete": false,
                     "val": [
                         1.0
+                    ],
+                    "val_min": 1.0,
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_max": 1.0,
+                    "val_max_indices": [
+                        0
                     ]
                 },
                 {
@@ -384,6 +496,14 @@
                     "val": [
                         5.0,
                         2.0
+                    ],
+                    "val_min": 2.0,
+                    "val_min_indices": [
+                        1
+                    ],
+                    "val_max": 5.0,
+                    "val_max_indices": [
+                        0
                     ]
                 },
                 {
@@ -397,6 +517,14 @@
                     "is_discrete": false,
                     "val": [
                         1.0
+                    ],
+                    "val_min": 1.0,
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_max": 1.0,
+                    "val_max_indices": [
+                        0
                     ]
                 }
             ],
@@ -406,8 +534,9 @@
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,
-                "shape_by_conn": false
-            }
+                "shape_by_conn": false,
+                "do_coloring": false
+                }
         },
         {
             "name": "con_cmp1",
@@ -434,6 +563,14 @@
                     "is_discrete": false,
                     "val": [
                         1.0
+                    ],
+                    "val_min": 1.0,
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_max": 1.0,
+                    "val_max_indices": [
+                        0
                     ]
                 },
                 {
@@ -447,6 +584,14 @@
                     "is_discrete": false,
                     "val": [
                         1.0
+                    ],
+                    "val_min": 1.0,
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_max": 1.0,
+                    "val_max_indices": [
+                        0
                     ]
                 }
             ],
@@ -456,7 +601,8 @@
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,
-                "shape_by_conn": false
+                "shape_by_conn": false,
+                "do_coloring": false
             }
         },
         {
@@ -484,6 +630,14 @@
                     "is_discrete": false,
                     "val": [
                         1.0
+                    ],
+                    "val_min": 1.0,
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_max": 1.0,
+                    "val_max_indices": [
+                        0
                     ]
                 },
                 {
@@ -497,6 +651,14 @@
                     "is_discrete": false,
                     "val": [
                         1.0
+                    ],
+                    "val_min": 1.0,
+                    "val_min_indices": [
+                        0
+                    ],
+                    "val_max": 1.0,
+                    "val_max_indices": [
+                        0
                     ]
                 }
             ],
@@ -506,7 +668,8 @@
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,
-                "shape_by_conn": false
+                "shape_by_conn": false,
+                "do_coloring": false
             }
         }
     ],

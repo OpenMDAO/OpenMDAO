@@ -83,9 +83,11 @@ class DistribInputComp(om.ExplicitComponent):
 
     def compute(self, inputs, outputs):
         if MPI:
+            out = np.ascontiguousarray(outputs['outvec'])
             self.comm.Allgatherv(inputs['invec']*2.0,
-                                 [outputs['outvec'], self.sizes,
+                                 [out, self.sizes,
                                   self.offsets, MPI.DOUBLE])
+            outputs.set_var('outvec', out)
         else:
             outputs['outvec'] = inputs['invec'] * 2.0
 
