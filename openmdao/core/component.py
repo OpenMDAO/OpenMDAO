@@ -86,6 +86,8 @@ class Component(System):
         Cached storage of user-declared check partial options.
     _no_check_partials : bool
         If True, the check_partials function will ignore this component.
+    _has_distrib_outputs : bool
+        If True, this component has at least one distributed output.
     """
 
     def __init__(self, **kwargs):
@@ -151,7 +153,6 @@ class Component(System):
         """
         super()._setup_procs(pathname, comm, mode, prob_meta)
 
-        orig_comm = comm
         if self._num_par_fd > 1:
             if comm.size > 1:
                 comm = self._setup_par_fd_procs(comm)

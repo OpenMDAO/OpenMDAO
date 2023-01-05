@@ -2,6 +2,7 @@
 
 
 import sys
+import os
 import pathlib
 from io import StringIO
 
@@ -14,6 +15,9 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.om_warnings import issue_warning, MPIWarning
 from openmdao.utils.reports_system import register_report
 from openmdao.utils.file_utils import text2html
+
+
+startdir = os.getcwd()
 
 
 class _NoColor(object):
@@ -441,15 +445,15 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
     if sys.getprofile() is not None:
         raise RuntimeError("another profile function is already active.")
 
-    my_fname = fname + '.' + str(MPI.COMM_WORLD.rank)
+    my_fname = os.path.join(startdir, fname + '.' + str(MPI.COMM_WORLD.rank))
 
     outfile = open(my_fname, 'w')
 
     stack = []
 
     _c_map = {
-        'c_call': '(c) -->',
-        'c_return': '(c) <--',
+        'c_call': '--> (c) ',
+        'c_return': '<-- (c) ',
         'c_exception': '(c_exception)',
     }
 
@@ -458,10 +462,9 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
         s = str(arg)
         if 'mpi4py' in s or 'petsc4py' in s:
             c = arg.__self__.__class__
-            print('   ' * len(stack), typestr, "%s.%s.%s" %
-                    (c.__module__, c.__name__, arg.__name__),
-                    "%s:%d" % (frame.f_code.co_filename, frame.f_code.co_firstlineno),
-                    file=outfile, flush=True)
+            print('   ' * len(stack), typestr, f"{c.__module__}.{c.__name__}.{arg.__name__}",
+                  f"{frame.f_code.co_filename}:{frame.f_code.co_firstlineno}",
+                  file=outfile, flush=True)
 
 
     def _mpi_trace_callback(frame, event, arg):
@@ -486,8 +489,8 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
                         print('   ' * len(stack), commsize, pname, file=outfile, flush=flush)
                     else:
                         stack[-1][1] += 1
-                print('   ' * len(stack), '-->', frame.f_code.co_name, "%s:%d" %
-                      (frame.f_code.co_filename, frame.f_code.co_firstlineno),
+                print('   ' * len(stack), '-->', frame.f_code.co_name,
+                      f"{frame.f_code.co_filename}:{frame.f_code.co_firstlineno}",
                       file=outfile, flush=flush)
         elif event == 'return':
             if 'openmdao' in frame.f_code.co_filename:
@@ -502,8 +505,8 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
                         commsize = frame.f_locals['self'].comm.size
                     except:
                         pass
-                print('   ' * len(stack), '<--', frame.f_code.co_name, "%s:%d" %
-                      (frame.f_code.co_filename, frame.f_code.co_firstlineno),
+                print('   ' * len(stack), '<--', frame.f_code.co_name,
+                      f"{frame.f_code.co_filename}:{frame.f_code.co_firstlineno}",
                       file=outfile, flush=flush)
                 if pname is not None and stack and pname == stack[-1][0]:
                     stack[-1][1] -= 1
@@ -516,6 +519,22 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
             _print_c_func(frame, arg, _c_map[event])
 
     sys.setprofile(_mpi_trace_callback)
+
+
+def analyse_mpi_trace(fname='mpi_trace'):
+    stack = []
+    with open(fname, 'r') as f:
+        for line in f:
+            if line.startswith('-->'):
+                stack.append(line.partition(' ')[2])
+            elif line.startswith('<--'):
+                s = line.partition(' ')[2]
+                if s == stack[-1]:
+                    stack.pop()
+                else:
+                    print(f"******* {s} != top of stack")
+            else:
+                pass
 
 
 def prom_info_dump(system, tgt):

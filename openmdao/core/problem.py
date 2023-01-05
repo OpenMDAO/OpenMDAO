@@ -1907,7 +1907,7 @@ class Problem(object):
         model.approx_totals(method=method, step=step, form=form,
                             step_calc=step_calc if method == 'fd' else None)
         fd_tot_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True,
-                                   driver_scaling=driver_scaling)
+                                    driver_scaling=driver_scaling)
         if show_progress:
             Jfd = fd_tot_info.compute_totals_approx(initialize=True, progress_out_stream=out_stream)
         else:
