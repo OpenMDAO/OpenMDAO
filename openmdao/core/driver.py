@@ -21,7 +21,7 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import sizes2offsets
 from openmdao.vectors.vector import _full_slice
 from openmdao.utils.indexer import indexer, slicer
-from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, DriverWarning
 import openmdao.utils.coloring as c_mod
 
 
@@ -114,6 +114,15 @@ class Driver(object):
                              desc="List of what type of Driver variables to print at each "
                                   "iteration.",
                              default=[])
+
+        default_desvar_behavior = os.environ.get('OPENMDAO_INVALID_DESVAR_BEHAVIOR', 'warn').lower()
+
+        self.options.declare('invalid_desvar_behavior', values=('warn', 'raise', 'ignore'),
+                             desc='Behavior of driver if the initial value of a design '
+                                  'variable exceeds its bounds. The default value may be'
+                                  'set using the `OPENMDAO_INVALID_DESVAR_BEHAVIOR` environment variable '
+                                  'to one of the valid options.',
+                             default=default_desvar_behavior)
 
         # Case recording options
         self.recording_options = OptionsDictionary(parent_name=type(self).__name__)
@@ -422,12 +431,16 @@ class Driver(object):
         """
         Check for design variable values that exceed their bounds.
 
-        This method may be disabled by setting environment variable
-        `OPENMDAO_ALLOW_INVALID_DESVAR` to a value that is not "falsey,"
-        eg `'1'`, '`true'`', `'yes'`, or `'on'`.
+        This method's behavior is controlled by the OPENMDAO_INVALID_DESVAR environment variable,
+        which may take on values 'ignore', 'error', 'warn'.
+        - 'ignore' : Proceed without checking desvar bounds.
+        - 'warn' : Issue a warning if one or more desvar values exceed bounds.
+        - 'raise' : Raise an exception if one or more desvar values exceed bounds.
+
+        These options are case insensitive.
         """
-        if not env_truthy('OPENMDAO_ALLOW_INVALID_DESVAR'):
-            desvar_errors = []
+        if self.options['invalid_desvar_behavior'] != 'ignore':
+            invalid_desvar_data = []
             for var, meta in self._designvars.items():
                 val = self._problem().get_val(var, units=meta['units'])
                 idxs = meta['indices']() if meta['indices'] else None
@@ -437,17 +450,19 @@ class Driver(object):
                 upper = meta['upper'] / scaler - adder
 
                 if (val[idxs] < lower).any() or (val[idxs] > upper).any():
-                    desvar_errors.append((var, val, lower, upper))
-            if desvar_errors:
+                    invalid_desvar_data.append((var, val, lower, upper))
+            if invalid_desvar_data:
                 s = 'The following design variable initial conditions are out of their ' \
                     'specified bounds:'
-                for var, val, lower, upper in desvar_errors:
+                for var, val, lower, upper in invalid_desvar_data:
                     s += f'\n  {var}\n    val: {val.ravel()}' \
                          f'\n    lower: {lower}\n    upper: {upper}'
                 s += '\nSet the initial value of the design variable to a valid value or set ' \
-                     'the environment variable OPENMDAO_ALLOW_INVALID_DESVAR to ' \
-                     '\'1\', \'true\', \'yes\', or \'on\'.'
-                raise ValueError(s)
+                     'the driver option[\'invalid_desvar_behavior\'] to \'ignore\'.'
+                if self.options['invalid_desvar_behavior'] == 'raise':
+                    raise ValueError(s)
+                else:
+                    issue_warning(s, category=DriverWarning)
 
     def _get_vars_to_record(self, recording_options):
         """

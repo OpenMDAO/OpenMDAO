@@ -1902,53 +1902,58 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_pyoptsparse_invalid_desvar_values(self):
 
-        for allow_invalid in [True, False]:
-            with self.subTest(f'OPENMDAO_ALLOW_INVALID_DESVAR = {int(allow_invalid)}'):
-                with set_env_vars_context(OPENMDAO_ALLOW_INVALID_DESVAR=f'{int(allow_invalid)}'):
+        expected_err = ("The following design variable initial conditions are out of their specified "
+                        "bounds:"
+                        "\n  paraboloid.x"
+                        "\n    val: [100.]"
+                        "\n    lower: -50.0"
+                        "\n    upper: 50.0"
+                        "\n  paraboloid.y"
+                        "\n    val: [-200.]"
+                        "\n    lower: -50.0"
+                        "\n    upper: 50.0"
+                        "\nSet the initial value of the design variable to a valid value or set "
+                        "the driver option['invalid_desvar_behavior'] to 'ignore'.")
 
-                    # build the model
-                    prob = om.Problem()
+        for option in ['warn', 'raise', 'ignore', None]:
+            with self.subTest(f'invalid_desvar_behavior = {option}'):
+                # build the model
+                prob = om.Problem()
 
-                    prob.model.add_subsystem('paraboloid', om.ExecComp('f = (x-3)**2 + x*y + (y+4)**2 - 3'))
+                prob.model.add_subsystem('paraboloid', om.ExecComp('f = (x-3)**2 + x*y + (y+4)**2 - 3'))
 
-                    # setup the optimization
+                # setup the optimizationi
+                if option is None:
                     prob.driver = pyOptSparseDriver(print_results=False)
-                    prob.driver.options['optimizer'] = 'SLSQP'
+                else:
+                    prob.driver = pyOptSparseDriver(print_results=False, invalid_desvar_behavior=option)
+                prob.driver.options['optimizer'] = 'SLSQP'
 
-                    prob.model.add_design_var('paraboloid.x', lower=-50, upper=50)
-                    prob.model.add_design_var('paraboloid.y', lower=-50, upper=50)
-                    prob.model.add_objective('paraboloid.f')
+                prob.model.add_design_var('paraboloid.x', lower=-50, upper=50)
+                prob.model.add_design_var('paraboloid.y', lower=-50, upper=50)
+                prob.model.add_objective('paraboloid.f')
 
-                    prob.setup()
+                prob.setup()
 
-                    # Set initial values.
-                    prob.set_val('paraboloid.x', 100.0)
-                    prob.set_val('paraboloid.y', -200.0)
+                # Set initial values.
+                prob.set_val('paraboloid.x', 100.0)
+                prob.set_val('paraboloid.y', -200.0)
 
-                    # run the optimization
-                    if allow_invalid:
+                # run the optimization
+                if option == 'ignore':
+                    prob.run_driver()
+                elif option == 'raise':
+                    with self.assertRaises(ValueError) as ctx:
                         prob.run_driver()
-                        assert_near_equal(prob.get_val('paraboloid.x'), 6.66666666, tolerance=1.0E-5)
-                        assert_near_equal(prob.get_val('paraboloid.y'), -7.33333333, tolerance=1.0E-5)
-                        assert_near_equal(prob.get_val('paraboloid.f'), -27.33333333, tolerance=1.0E-5)
-                    else:
-                        with self.assertRaises(ValueError) as ctx:
-                            prob.run_driver()
+                    self.assertEqual(str(ctx.exception), expected_err)
+                else:
+                    with assert_warning(om.DriverWarning, expected_err):
+                        prob.run_driver()
 
-                        expected_err = ("The following design variable initial conditions are out of their specified "
-                                        "bounds:"
-                                        "\n  paraboloid.x"
-                                        "\n    val: [100.]"
-                                        "\n    lower: -50.0"
-                                        "\n    upper: 50.0"
-                                        "\n  paraboloid.y"
-                                        "\n    val: [-200.]"
-                                        "\n    lower: -50.0"
-                                        "\n    upper: 50.0"
-                                        "\nSet the initial value of the design varaible to a valid value or set the "
-                                        "environment variable OPENMDAO_ALLOW_INVALID_DESVAR to '1', 'true', "
-                                        "'yes', or 'on'.")
-                        self.assertEqual(str(ctx.exception), expected_err)
+                if option != 'raise':
+                    assert_near_equal(prob.get_val('paraboloid.x'), 6.66666666, tolerance=1.0E-5)
+                    assert_near_equal(prob.get_val('paraboloid.y'), -7.33333333, tolerance=1.0E-5)
+                    assert_near_equal(prob.get_val('paraboloid.f'), -27.33333333, tolerance=1.0E-5)
 
     def test_signal_handler_SNOPT(self):
         _, local_opt = set_pyoptsparse_opt('SNOPT')
