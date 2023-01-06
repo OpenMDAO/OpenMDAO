@@ -407,6 +407,18 @@ class _TotalJacInfo(object):
             self.prom_design_vars = {prom_wrt[i]: design_vars[dv] for i, dv in enumerate(wrt)}
             self.prom_responses = {prom_of[i]: responses[r] for i, r in enumerate(of)}
 
+    @property
+    def msginfo(self):
+        """
+        Our class name.  For use in error messages/tracers.
+
+        Returns
+        -------
+        str
+            Either our instance pathname or class name.
+        """
+        return f"<class {type(self).__name__}>"
+
     def _compute_jac_scatters(self, mode, rowcol_size, get_remote):
         """
         Compute scatter between a given local jacobian row/col to others in other procs.

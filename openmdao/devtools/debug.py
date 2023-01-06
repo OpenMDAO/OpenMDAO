@@ -489,7 +489,11 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
                         print('   ' * len(stack), commsize, pname, file=outfile, flush=flush)
                     else:
                         stack[-1][1] += 1
-                print('   ' * len(stack), '-->', frame.f_code.co_name,
+                if stack:
+                    ind = len(stack) + stack[-1][1]
+                else:
+                    ind = len(stack)
+                print('   ' * ind, '-->', frame.f_code.co_name,
                       f"{frame.f_code.co_filename}:{frame.f_code.co_firstlineno}",
                       file=outfile, flush=flush)
         elif event == 'return':
@@ -505,7 +509,11 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
                         commsize = frame.f_locals['self'].comm.size
                     except:
                         pass
-                print('   ' * len(stack), '<--', frame.f_code.co_name,
+                if stack:
+                    ind = len(stack) + stack[-1][1]
+                else:
+                    ind = len(stack)
+                print('   ' * ind, '<--', frame.f_code.co_name,
                       f"{frame.f_code.co_filename}:{frame.f_code.co_firstlineno}",
                       file=outfile, flush=flush)
                 if pname is not None and stack and pname == stack[-1][0]:

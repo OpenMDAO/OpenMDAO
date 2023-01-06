@@ -1093,16 +1093,18 @@ class BidirectionalTestCase(unittest.TestCase):
         self.assertEqual(tot_colors, expected_colors)
 
 
-def _get_random_mat(rows, cols):
+def _get_random_mat(rows, cols, generator=None):
+    gen = generator if generator is not None else np.random.default_rng()
+
     if MPI:
         if MPI.COMM_WORLD.rank == 0:
-            mat = np.random.random(rows * cols).reshape((rows, cols)) - 0.5
+            mat = gen.random((rows, cols)) - 0.5
             MPI.COMM_WORLD.bcast(mat, root=0)
             return mat
         else:
             return MPI.COMM_WORLD.bcast(None, root=0)
     else:
-        return np.random.random(rows * cols).reshape((rows, cols)) - 0.5
+        return gen.random((rows, cols)) - 0.5
 
 
 def build_multipoint_problem(size=10, num_pts=4):
