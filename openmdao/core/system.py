@@ -2365,11 +2365,12 @@ class System(object):
 
         return responses
 
-    def _setup_driver_units(self):
+    def _setup_driver_units(self, abs2meta=None):
         """
         Compute unit conversions for driver variables.
         """
-        abs2meta = self._var_allprocs_abs2meta['output']
+        if abs2meta is None:
+            abs2meta = self._var_allprocs_abs2meta['output']
 
         dv = self._design_vars
         for name, meta in dv.items():
@@ -2451,7 +2452,7 @@ class System(object):
                 resp[name]['total_adder'] = offset + base_adder / factor
 
         for s in self._subsystems_myproc:
-            s._setup_driver_units()
+            s._setup_driver_units(abs2meta)
 
     def _setup_connections(self):
         """
