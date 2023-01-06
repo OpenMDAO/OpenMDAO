@@ -17,7 +17,6 @@ from openmdao.utils import cs_safe
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     SetupWarning
 from openmdao.utils.array_utils import get_random_arr
-from openmdao.utils.mpi import multi_proc_exception_check
 
 
 # regex to check for variable names.

@@ -136,7 +136,7 @@ elif env_truthy('OPENMDAO_PROF_MEM'):  # pragma: no cover
     start()
 
 
-if env_truthy('FLUSH_PRINT'):  # pragma: no cover
+if env_truthy('OM_FLUSH_PRINT'):  # pragma: no cover
     import builtins
     _oldprint = builtins.print
 
@@ -145,3 +145,9 @@ if env_truthy('FLUSH_PRINT'):  # pragma: no cover
         _oldprint(*args, **kwargs)
 
     builtins.print = _flushprint
+
+
+if env_truthy('OM_SAVE_TRACEBACK'):  # pragma: no cover
+    import sys
+    from openmdao.devtools.debug import save_traceback
+    sys.excepthook = save_traceback

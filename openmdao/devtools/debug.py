@@ -4,6 +4,7 @@
 import sys
 import os
 import pathlib
+import traceback
 from io import StringIO
 
 import numpy as np
@@ -574,3 +575,49 @@ def prom_info_dump(system, tgt):
                 for p in abs_in2prom_info[t]:
                     print('        ', p)
     print(flush=True)
+
+
+def fancy_traceback(ex, tb, f):
+    import linecache
+    from openmdao.core.system import System
+    from openmdao.solvers.solver import Solver
+    from openmdao.jacobians.jacobian import Jacobian
+    from openmdao.core.total_jac import _TotalJacInfo
+
+    hasmsginfo = (System, Solver, Jacobian, _TotalJacInfo)
+
+    while tb:
+        filename = tb.tb_frame.f_code.co_filename
+        name = tb.tb_frame.f_code.co_name
+        line_no = tb.tb_lineno
+        line = linecache.getline(filename, line_no).rstrip()
+        local_vars = tb.tb_frame.f_locals
+        msg = ''
+        if 'self' in local_vars:
+            self = local_vars['self']
+            if isinstance(self, hasmsginfo):
+                msg = f"  ({self.msginfo})"
+
+        print(f"File {filename} line {line_no}, in {name}{msg}", file=f)
+        print(line, file=f)
+
+        tb = tb.tb_next
+
+    print(ex, file=f)
+
+
+def save_traceback(extype, ex, tback):
+    home = os.environ.get('HOME', '.')
+    pid = os.getpid()
+    rank = MPI.COMM_WORLD.rank
+    out = os.path.join(home, f"tb.rank{rank}.pid{pid}.txt")
+    with open(out, 'w') as f:
+        traceback.print_tb(tback, file=f)
+        print(ex, file=f)
+
+        fancy_traceback(ex, tback, f)
+
+    # print out the traceback as usual too
+    traceback.print_tb(tback, file=sys.stderr)
+    print(ex, file=sys.stderr)
+    fancy_traceback(ex, tback, sys.stderr)

@@ -28,7 +28,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
 from openmdao.utils.variable_table import write_var_table
-from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len, get_random_arr
+from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len
 from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
@@ -1946,10 +1946,10 @@ class System(object):
             # randomize inputs (and outputs if implicit)
             if i > 0:
                 self._inputs.set_val(starting_inputs +
-                                     in_offsets * get_random_arr(in_offsets.size, self.comm))
+                                     in_offsets * np.random.random(in_offsets.size, self.comm))
                 if not is_explicit:
                     self._outputs.set_val(starting_outputs +
-                                          out_offsets * get_random_arr(out_offsets.size, self.comm))
+                                          out_offsets * np.random.random(out_offsets.size, self.comm))
                 if is_total:
                     self._solve_nonlinear()
                 else:

@@ -6,8 +6,8 @@ import numpy as np
 from scipy.sparse import issparse
 
 from openmdao.core.constants import INT_DTYPE
-from openmdao.utils.name_maps import key2abs_key, rel_name2abs_name
-from openmdao.utils.array_utils import sparse_subinds, get_random_arr, shape_to_len
+from openmdao.utils.name_maps import key2abs_key
+from openmdao.utils.array_utils import sparse_subinds
 from openmdao.matrices.matrix import sparse_types
 from openmdao.vectors.vector import _full_slice
 
@@ -273,8 +273,7 @@ class Jacobian(object):
         """
         if isinstance(subjac, sparse_types):  # sparse
             sparse = subjac.copy()
-            sparse.data = get_random_arr(sparse.data.size, self._system().comm,
-                                         generator=self._randgen)
+            sparse.data = self._randgen.random(sparse.data.size)
             sparse.data += 1.0
             return sparse
 
@@ -289,11 +288,11 @@ class Jacobian(object):
             assert subjac_info['rows'] is None
             rows, cols, shape = subjac_info['sparsity']
             r = np.zeros(shape)
-            val = get_random_arr(len(rows), self._system().comm, generator=self._randgen)
+            val = self._randgen.random(len(rows))
             val += 1.0
             r[rows, cols] = val
         else:
-            r = get_random_arr(subjac.shape, self._system().comm, generator=self._randgen)
+            r = self._randgen.random(subjac.shape)
             r += 1.0
         return r
 
