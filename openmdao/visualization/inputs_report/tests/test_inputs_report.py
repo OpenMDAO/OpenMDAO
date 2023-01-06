@@ -1,5 +1,6 @@
 """Test the inputs report. """
 import unittest
+import numpy as np
 
 import openmdao.api as om
 from openmdao.test_suite.components.double_sellar import DoubleSellar
@@ -100,6 +101,32 @@ class TestInputsReport(unittest.TestCase):
                                                      ' `openmdao:indep_var` as `indep_var` will'
                                                      ' be deprecated in a future release.'):
             inputs_report(prob, outfile='temp_inputs_report.md', display=True, precision=6, title=None, tablefmt='github')
+        with open('temp_inputs_report.md') as f:
+            report_content = f.read()
+        self.assertEqual(expected, report_content)
+
+    def test_zero_size_input(self):
+        class TestComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('foo', shape=0)
+                self.add_output('bar', shape=0)
+
+            def compute(self, inputs, outputs):
+                outputs['bar'] = inputs['foo']
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', TestComp())
+        p.setup()
+
+        p.set_val('comp.foo', np.array([]))
+        p.run_model()
+
+        expected = """| Absolute Name | Input Name | Source Name  | Source is IVC | Source is DV | Units | Shape | Tags | Val | Min Val | Max Val | Absolute Source |
+| :------------ | :--------- | :----------- | :-----------: | :----------: | :---- | :---- | :--- | :-- | :------ | :------ | :-------------- |
+| comp.foo      | comp.foo   | _auto_ivc.v0 |     True      |    False     |       | (0,)  | []   | []  | []      | []      | _auto_ivc.v0    |
+"""
+
+        inputs_report(p, outfile='temp_inputs_report.md', display=True, precision=6, title=None, tablefmt='github')
         with open('temp_inputs_report.md') as f:
             report_content = f.read()
         self.assertEqual(expected, report_content)
