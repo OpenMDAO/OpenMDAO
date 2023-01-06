@@ -1946,10 +1946,10 @@ class System(object):
             # randomize inputs (and outputs if implicit)
             if i > 0:
                 self._inputs.set_val(starting_inputs +
-                                     in_offsets * np.random.random(in_offsets.size, self.comm))
+                                     in_offsets * np.random.random(in_offsets.size))
                 if not is_explicit:
                     self._outputs.set_val(starting_outputs +
-                                          out_offsets * np.random.random(out_offsets.size, self.comm))
+                                          out_offsets * np.random.random(out_offsets.size))
                 if is_total:
                     self._solve_nonlinear()
                 else:
