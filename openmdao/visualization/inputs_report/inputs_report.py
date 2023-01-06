@@ -28,7 +28,7 @@ def _unit_str(meta):
 
 
 def _get_val_cells(val):
-    if isinstance(val, np.ndarray):
+    if isinstance(val, np.ndarray) and val.size > 0:
         minval = np.min(val)
         maxval = np.max(val)
         if val.size > 5:
