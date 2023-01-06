@@ -432,7 +432,10 @@ class Coloring(object):
         if isinstance(fname, str):
             color_dir = os.path.dirname(os.path.abspath(fname))
             if not os.path.exists(color_dir):
-                os.makedirs(color_dir)
+                try:
+                    os.makedirs(color_dir)
+                except FileExistsError:  # multiple systems could attempt this at the same time
+                    pass
             with open(fname, 'wb') as f:
                 pickle.dump(self, f)
         else:
