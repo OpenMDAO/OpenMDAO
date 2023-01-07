@@ -442,7 +442,8 @@ class Driver(object):
         if self.options['invalid_desvar_behavior'] != 'ignore':
             invalid_desvar_data = []
             for var, meta in self._designvars.items():
-                val = self._problem().get_val(var, units=meta['units'])
+                _val = self._problem().get_val(var, units=meta['units'])
+                val = np.array([_val]) if np.ndim(_val) == 0 else _val  # Handle discrete design vars
                 idxs = meta['indices']() if meta['indices'] else None
                 scaler = meta['scaler'] or 1.
                 adder = meta['adder'] or 0.
