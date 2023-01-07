@@ -167,7 +167,7 @@ class TestSimpleGA(unittest.TestCase):
         self.assertTrue(int(prob['xI']) in [3, -3])
 
     def test_mixed_integer_branin_discrete(self):
-        prob = om.Problem()
+        prob = om.Problem(reports=('optimizer',))
         model = prob.model
 
         indep = om.IndepVarComp()
