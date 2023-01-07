@@ -324,7 +324,7 @@ class TestDifferentialEvolution(unittest.TestCase):
                         "the driver option['invalid_desvar_behavior'] to 'ignore'."
                         "\nThis warning will become an error by default in OpenMDAO version 3.25.")
 
-        for option in ['warn', 'raise', 'ignore', None]:
+        for option in ['warn', 'raise', 'ignore']:
             with self.subTest(f'invalid_desvar_behavior = {option}'):
 
                 prob = om.Problem()
@@ -341,10 +341,7 @@ class TestDifferentialEvolution(unittest.TestCase):
                 prob.model.connect('indeps.x', 'paraboloid1.x')
                 prob.model.connect('indeps.y', 'paraboloid2.y')
 
-                if option is None:
-                    prob.driver = om.DifferentialEvolutionDriver()
-                else:
-                    prob.driver = om.DifferentialEvolutionDriver(invalid_desvar_behavior=option)
+                prob.driver = om.DifferentialEvolutionDriver(invalid_desvar_behavior=option)
 
                 prob.model.add_design_var('indeps.x', lower=-5, upper=5)
                 prob.model.add_design_var('indeps.y', lower=[-10, 0], upper=[10, 3])

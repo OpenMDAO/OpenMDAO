@@ -1916,18 +1916,15 @@ class TestPyoptSparse(unittest.TestCase):
                         "the driver option['invalid_desvar_behavior'] to 'ignore'."
                         "\nThis warning will become an error by default in OpenMDAO version 3.25.")
 
-        for option in ['warn', 'raise', 'ignore', None]:
+        for option in ['warn', 'raise', 'ignore']:
             with self.subTest(f'invalid_desvar_behavior = {option}'):
                 # build the model
                 prob = om.Problem()
 
                 prob.model.add_subsystem('paraboloid', om.ExecComp('f = (x-3)**2 + x*y + (y+4)**2 - 3'))
 
-                # setup the optimizationi
-                if option is None:
-                    prob.driver = pyOptSparseDriver(print_results=False)
-                else:
-                    prob.driver = pyOptSparseDriver(print_results=False, invalid_desvar_behavior=option)
+                # setup the optimization
+                prob.driver = pyOptSparseDriver(print_results=False, invalid_desvar_behavior=option)
                 prob.driver.options['optimizer'] = 'SLSQP'
 
                 prob.model.add_design_var('paraboloid.x', lower=-50, upper=50)

@@ -871,8 +871,6 @@ class TestColoring(unittest.TestCase):
 
         prob.setup(check=False, mode='fwd')
 
-
-
         prob.set_solver_print(level=0)
         prob.run_model()
         with assert_warning(UserWarning, "'comp' <class SparseCompExplicit>: Coloring was deactivated.  Improvement of 16.7% was less than min allowed (20.0%)."):

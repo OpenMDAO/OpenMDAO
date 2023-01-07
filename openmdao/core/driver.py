@@ -14,7 +14,7 @@ from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.hooks import _setup_hooks
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.general_utils import _src_name_iter, env_truthy
+from openmdao.utils.general_utils import _src_name_iter
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod

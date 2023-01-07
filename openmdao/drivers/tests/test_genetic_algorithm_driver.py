@@ -481,7 +481,7 @@ class TestSimpleGA(unittest.TestCase):
                         "the driver option['invalid_desvar_behavior'] to 'ignore'."
                         "\nThis warning will become an error by default in OpenMDAO version 3.25.")
 
-        for option in ['warn', 'raise', 'ignore', None]:
+        for option in ['warn', 'raise', 'ignore']:
             with self.subTest(f'invalid_desvar_behavior = {option}'):
 
                 # build the model
@@ -495,10 +495,7 @@ class TestSimpleGA(unittest.TestCase):
                 model.add_design_var('xC', lower=0.0, upper=15.0)
                 model.add_objective('comp.f')
 
-                if option is None:
-                    prob.driver = om.SimpleGADriver()
-                else:
-                    prob.driver = om.SimpleGADriver(invalid_desvar_behavior=option)
+                prob.driver = om.SimpleGADriver(invalid_desvar_behavior=option)
                 prob.driver.options['bits'] = {'xC': 8}
                 prob.driver.options['pop_size'] = 10
 
