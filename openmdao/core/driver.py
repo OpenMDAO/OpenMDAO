@@ -445,12 +445,14 @@ class Driver(object):
                 _val = self._problem().get_val(var, units=meta['units'])
                 val = np.array([_val]) if np.ndim(_val) == 0 else _val  # Handle discrete design vars
                 idxs = meta['indices']() if meta['indices'] else None
+                flat_idxs = meta['flat_indices']
                 scaler = meta['scaler'] or 1.
                 adder = meta['adder'] or 0.
                 lower = meta['lower'] / scaler - adder
                 upper = meta['upper'] / scaler - adder
+                flat_val = val.ravel()[idxs] if flat_idxs else val[idxs].ravel()
 
-                if (val[idxs] < lower).any() or (val[idxs] > upper).any():
+                if (flat_val < lower).any() or (flat_val > upper).any():
                     invalid_desvar_data.append((var, val, lower, upper))
             if invalid_desvar_data:
                 s = 'The following design variable initial conditions are out of their ' \
@@ -460,6 +462,7 @@ class Driver(object):
                          f'\n    lower: {lower}\n    upper: {upper}'
                 s += '\nSet the initial value of the design variable to a valid value or set ' \
                      'the driver option[\'invalid_desvar_behavior\'] to \'ignore\'.'
+                s += '\nThis warning will become an error by default in OpenMDAO version 3.25.'
                 if self.options['invalid_desvar_behavior'] == 'raise':
                     raise ValueError(s)
                 else:

@@ -567,7 +567,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                         "\n    lower: -50.0"
                         "\n    upper: 50.0"
                         "\nSet the initial value of the design variable to a valid value or set "
-                        "the driver option['invalid_desvar_behavior'] to 'ignore'.")
+                        "the driver option['invalid_desvar_behavior'] to 'ignore'."
+                        "\nThis warning will become an error by default in OpenMDAO version 3.25.")
 
         for option in ['warn', 'raise', 'ignore', None]:
             with self.subTest(f'invalid_desvar_behavior = {option}'):
