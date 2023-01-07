@@ -120,8 +120,8 @@ class Driver(object):
         self.options.declare('invalid_desvar_behavior', values=('warn', 'raise', 'ignore'),
                              desc='Behavior of driver if the initial value of a design '
                                   'variable exceeds its bounds. The default value may be'
-                                  'set using the `OPENMDAO_INVALID_DESVAR_BEHAVIOR` environment variable '
-                                  'to one of the valid options.',
+                                  'set using the `OPENMDAO_INVALID_DESVAR_BEHAVIOR` environment '
+                                  'variable to one of the valid options.',
                              default=default_desvar_behavior)
 
         # Case recording options
@@ -443,7 +443,7 @@ class Driver(object):
             invalid_desvar_data = []
             for var, meta in self._designvars.items():
                 _val = self._problem().get_val(var, units=meta['units'])
-                val = np.array([_val]) if np.ndim(_val) == 0 else _val  # Handle discrete design vars
+                val = np.array([_val]) if np.ndim(_val) == 0 else _val  # Handle discrete desvars
                 idxs = meta['indices']() if meta['indices'] else None
                 flat_idxs = meta['flat_indices']
                 scaler = meta['scaler'] or 1.
