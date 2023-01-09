@@ -1,7 +1,7 @@
 ***********************************
 # Release Notes for OpenMDAO 3.23.0
 
-January 13, 2023
+January 10, 2023
 
 OpenMDAO 3.23.0 fixes a few bugs and and provides functionality with numpy 1.24, which removed several previously deprecated features.
 
