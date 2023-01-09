@@ -1,9 +1,9 @@
 ***********************************
 # Release Notes for OpenMDAO 3.23.0
 
-January 13, 2022
+January 13, 2023
 
-OpenMDAO 3.23.0 fixes a few bug and provides functionality with numpy 1.24, which removed several previously deprecated features.
+OpenMDAO 3.23.0 fixes a few bugs d and provides functionality with numpy 1.24, which removed several previously deprecated features.
 
 POEM 79 is implemented. This will cause a warning to be issued if the initial value of a design variable is outside of the bounds it was given.
 Previously, this behavior was handled differently by different optimizers, with `IPOPT` clipping the values to lay within the bounds, while other optimizers just silently proceeded starting from an invalid design point.
