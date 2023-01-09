@@ -324,6 +324,7 @@ class SimpleGADriver(Driver):
         Pc = self.options['Pc']
 
         self._check_for_missing_objective()
+        self._check_for_invalid_desvar_values()
 
         if compute_pareto:
             self._ga.nobj = len(self._objs)

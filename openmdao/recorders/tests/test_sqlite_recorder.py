@@ -2919,6 +2919,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(metadata['name'], 'DOEDriver')
         self.assertEqual(metadata['type'], 'doe')
         self.assertEqual(metadata['options'], {'debug_print': [], 'generator': 'UniformGenerator',
+                                               'invalid_desvar_behavior': 'warn',
                                                'run_parallel': False, 'procs_per_model': 1})
 
         # Optimization
@@ -2938,6 +2939,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(metadata['type'], 'optimization')
         self.assertEqual(metadata['options'], {"debug_print": [], "optimizer": "SLSQP",
                                                "tol": 1e-03, "maxiter": 200, "disp": True,
+                                               "invalid_desvar_behavior": "warn",
                                                 'singular_jac_behavior': 'warn', 'singular_jac_tol': 1e-16})
         self.assertEqual(metadata['opt_settings'], {"maxiter": 1000})
 
