@@ -1116,7 +1116,7 @@ def build_multipoint_problem(size=10, num_pts=4):
     p.driver.options['optimizer'] = OPTIMIZER
     p.driver.declare_coloring()
     if OPTIMIZER == 'SNOPT':
-        p.driver.opt_settings['Major iterations limit'] = 2
+        p.driver.opt_settings['Major iterations limit'] = 100
         p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
         p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
         # p.driver.opt_settings['iSumm'] = 6

@@ -530,22 +530,6 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
     sys.setprofile(_mpi_trace_callback)
 
 
-def analyse_mpi_trace(fname='mpi_trace'):
-    stack = []
-    with open(fname, 'r') as f:
-        for line in f:
-            if line.startswith('-->'):
-                stack.append(line.partition(' ')[2])
-            elif line.startswith('<--'):
-                s = line.partition(' ')[2]
-                if s == stack[-1]:
-                    stack.pop()
-                else:
-                    print(f"******* {s} != top of stack")
-            else:
-                pass
-
-
 def prom_info_dump(system, tgt):
     """
     Dump the promotion src_indices/src_shape data for the given absolute target name.
@@ -578,6 +562,18 @@ def prom_info_dump(system, tgt):
 
 
 def fancy_traceback(ex, tb, f):
+    """
+    This generates a traceback with OpenMDAO system path added to appropriate frames.
+
+    Parameters
+    ----------
+    ex : Exception
+        Exception object being raised.
+    tb : Traceback
+        Traceback object.
+    f : file-like
+        File where traceback will be written.
+    """
     import linecache
     from openmdao.core.system import System
     from openmdao.solvers.solver import Solver
@@ -607,17 +603,39 @@ def fancy_traceback(ex, tb, f):
 
 
 def save_traceback(extype, ex, tback):
+    """
+    A traceback function to replace the default one.
+
+    Setting sys.excepthook to this function will add OpenMDAO system paths to the displayed
+    traceback where appropriate.
+
+    Parameters
+    ----------
+    extype : class
+        The exception class.
+    ex : Exception
+        The exception instance.
+    tback : traceback
+        The traceback object.
+    """
     home = os.environ.get('HOME', '.')
     pid = os.getpid()
     rank = MPI.COMM_WORLD.rank
-    out = os.path.join(home, f"tb.rank{rank}.pid{pid}.txt")
-    with open(out, 'w') as f:
-        traceback.print_tb(tback, file=f)
-        print(ex, file=f)
 
-        fancy_traceback(ex, tback, f)
+    tbdir = os.path.join(home, "om_tracebacks")
+    save = True
+    try:
+        if not os.path.isdir(tbdir):
+            os.mkdir(tbdir)
+    except Exception:
+        save = False
 
-    # print out the traceback as usual too
-    traceback.print_tb(tback, file=sys.stderr)
-    print(ex, file=sys.stderr)
+    # print out the traceback to stderr
     fancy_traceback(ex, tback, sys.stderr)
+
+    if save:
+        # save the traceback to this file in the users HOME/om_tracebacks directory.
+        # This can be helpful when MPI runs hang due to rank local exception(s).
+        out = os.path.join(tbdir, f"traceback.rank{rank}.pid{pid}.txt")
+        with open(out, 'w') as f:
+            fancy_traceback(ex, tback, f)

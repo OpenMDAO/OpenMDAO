@@ -15,8 +15,6 @@ try:
 except ImportError:
     PETScVector = None
 
-from openmdao.devtools.debug import trace_mpi
-
 
 @use_tempdirs
 @unittest.skipUnless(MPI and PETScVector and OPTIMIZER, "MPI, PETSc, and pyOptSparse are required.")
