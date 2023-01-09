@@ -109,3 +109,44 @@ def reset_notebook_cmd():
                 sys.exit(-1)
             if reset_notebook(f, args.dryrun):
                 print(updatestr, f)
+
+
+def notebook2code(fname, outstream=sys.stdout):
+    """
+    Writes all code cells in the given notebook to the given file or to stdout.
+
+    Parameters
+    ----------
+    fname : str
+        Name of the notebook file.
+    outstream : file-like
+        Write code blocks to this file.
+    """
+    with open(fname) as f:
+        dct = json.load(f)
+
+    sources = []
+    for cell in dct['cells']:
+        if cell['cell_type'] == 'code' and cell['source']:  # code cell is not empty
+            sources.extend(cell['source'])
+
+    print(''.join(sources), file=outstream)
+
+
+def notebook2code_cmd():
+    """
+    Writes all code cells in the given notebook to the given file or to stdout.
+    """
+    parser = argparse.ArgumentParser(description='Output all code cells, concatenated together.')
+    parser.add_argument('file', nargs=1, help='Jupyter notebook file.')
+    parser.add_argument("-o", "--outfile", type=str, help="Output file.")
+    args = parser.parse_args()
+
+    notebook = args.file[0]
+
+    if args.outfile:
+        with open(args.outfile, 'w') as f:
+            notebook2code(notebook, f)
+    else:
+        notebook2code(notebook, sys.stdout)
+

@@ -164,10 +164,7 @@ class MixedDistrib2(om.ExplicitComponent):  # for double diamond case
                     d_outputs['out_dist'] += np.tile(df_dIs, nId).reshape((nId, nIs)).dot(d_inputs['in_nd'])
             if 'out_nd' in d_outputs:
                 if 'in_dist' in d_inputs:
-                    deriv = np.tile(dg_dId, nIs).reshape((nIs, nId)).dot(d_inputs['in_dist'])
-                    deriv_sum = np.zeros(deriv.size)
-                    self.comm.Allreduce(deriv, deriv_sum, op=MPI.SUM)
-                    d_outputs['out_nd'] += deriv_sum
+                    d_outputs['out_nd'] += self.comm.allreduce(np.tile(dg_dId, nIs).reshape((nIs, nId)).dot(d_inputs['in_dist']))
                 if 'in_nd' in d_inputs:
                     d_outputs['out_nd'] += dg_dIs * d_inputs['in_nd']
 
@@ -176,10 +173,7 @@ class MixedDistrib2(om.ExplicitComponent):  # for double diamond case
                 if 'in_dist' in d_inputs:
                     d_inputs['in_dist'] += df_dId * d_outputs['out_dist']
                 if 'in_nd' in d_inputs:
-                    deriv = np.tile(df_dIs, nId).reshape((nId, nIs)).T.dot(d_outputs['out_dist'])
-                    full = np.zeros(deriv.size)
-                    self.comm.Allreduce(deriv, full, op=MPI.SUM)
-                    d_inputs['in_nd'] += full
+                    d_inputs['in_nd'] += self.comm.allreduce(np.tile(df_dIs, nId).reshape((nId, nIs)).T.dot(d_outputs['out_dist']))
 
             if 'out_nd' in d_outputs:
                 if 'out_nd' in d_outputs:
