@@ -1,9 +1,18 @@
 import numpy as np
 import openmdao.api as om
-from mpi4py import MPI
+try:
+    from mpi4py import MPI
+except ImportError:
+    MPI = None
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
+
 import unittest
 
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
+from openmdao.utils.assert_utils import assert_check_partials, assert_check_totals
 from openmdao.utils.array_utils import evenly_distrib_idxs
 
 
@@ -195,6 +204,7 @@ def full_totals_test(mode, arr_size):
     assert_check_totals(tdata)
 
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestDistribDerivs(unittest.TestCase):
     N_PROCS = 2
 
