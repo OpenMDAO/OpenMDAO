@@ -155,7 +155,9 @@ def create_mixed_only_problem(mode, arr_size, dist_size, dist_slice):
     return p
 
 
-def get_sizes(total_size, rank=MPI.COMM_WORLD.rank, comm_size=MPI.COMM_WORLD.size):
+def get_sizes(total_size, comm):
+    rank = comm.rank
+    comm_size = comm.size
     if total_size == 1:  # special handling if serial var is a scalar
         sizes = np.ones(comm_size, dtype=int)
         sizes[0] += 1
@@ -173,7 +175,7 @@ def get_sizes(total_size, rank=MPI.COMM_WORLD.rank, comm_size=MPI.COMM_WORLD.siz
 
 
 def mixed_partials_test(mode, arr_size):
-    dist_size, dist_slice = get_sizes(arr_size)
+    dist_size, dist_slice = get_sizes(arr_size, MPI.COMM_WORLD)
     p = create_mixed_only_problem(mode, arr_size, dist_size, dist_slice)
     p.run_model()
     pdata = p.check_partials(show_only_incorrect=True, method='cs')
@@ -181,7 +183,7 @@ def mixed_partials_test(mode, arr_size):
 
 
 def mixed_totals_test(mode, arr_size):
-    dist_size, dist_slice = get_sizes(arr_size)
+    dist_size, dist_slice = get_sizes(arr_size, MPI.COMM_WORLD)
     p = create_mixed_only_problem(mode, arr_size, dist_size, dist_slice)
     p.run_model()
     tdata = p.check_totals(of='mixed_in_sout_comp.sout', wrt=['ivc.xs', 'ivc.xd'], show_only_incorrect=True)
@@ -189,7 +191,7 @@ def mixed_totals_test(mode, arr_size):
 
 
 def full_partials_test(mode, arr_size):
-    dist_size, dist_slice = get_sizes(arr_size)
+    dist_size, dist_slice = get_sizes(arr_size, MPI.COMM_WORLD)
     p = create_problem(mode, arr_size, dist_size, dist_slice)
     p.run_model()
     pdata = p.check_partials(show_only_incorrect=True, method='cs')
@@ -197,7 +199,7 @@ def full_partials_test(mode, arr_size):
 
 
 def full_totals_test(mode, arr_size):
-    dist_size, dist_slice = get_sizes(arr_size)
+    dist_size, dist_slice = get_sizes(arr_size, MPI.COMM_WORLD)
     p = create_problem(mode, arr_size, dist_size, dist_slice)
     p.run_model()
     tdata = p.check_totals(of='mixed_in_sout_comp.sout', wrt='ivc.dv', show_only_incorrect=True)

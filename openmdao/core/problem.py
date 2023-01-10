@@ -1302,13 +1302,10 @@ class Problem(object):
         Returns
         -------
         dict of dicts of dicts
-            First key:
-                is the component name;
-            Second key:
-                is the (output, input) tuple of strings;
-            Third key:
-                is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev',
-                'rank_inconsistent'];
+            First key is the component name.
+            Second key is the (output, input) tuple of strings.
+            Third key is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev',
+            'rank_inconsistent'];
 
             For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
                 forward - fd, adjoint - fd, forward - adjoint.
