@@ -1305,14 +1305,13 @@ class Problem(object):
             First key is the component name.
             Second key is the (output, input) tuple of strings.
             Third key is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev',
-            'rank_inconsistent'];
-
-            For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
-                forward - fd, adjoint - fd, forward - adjoint.
-            For 'J_fd', 'J_fwd', 'J_rev' the value is: A numpy array representing the computed
-                Jacobian for the three different methods of computation.
-            'rank_inconsistent' is a boolean indicating if the derivative wrt a serial variable is
-            inconsistent across MPI ranks if MPI is active.
+            'rank_inconsistent'].
+            For 'rel error', 'abs error', and 'magnitude' the value is a tuple containing norms for
+            forward - fd, adjoint - fd, forward - adjoint.
+            For 'J_fd', 'J_fwd', 'J_rev' the value is a numpy array representing the computed
+            Jacobian for the three different methods of computation.
+            The boolean 'rank_inconsistent' indicates if the derivative wrt a serial variable is
+            inconsistent across MPI ranks.
         """
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             self.final_setup()
