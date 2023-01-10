@@ -8,7 +8,7 @@ OpenMDAO 3.23.0 fixes a few bugs and and provides functionality with numpy 1.24,
 POEM 79 is implemented. This will cause a warning to be issued if the initial value of a design variable is outside of the bounds it was given.
 Previously, this behavior was handled differently by different optimizers, with `IPOPT` clipping the values to lay within the bounds, while other optimizers just silently proceeded starting from an invalid design point.
 More often than not, setting design variables to invalid values is an oversight by the user and so they will receive a warning in the current release if such a condition is found.
-This warning will be changed to an exception in 3.25 in the future, but the user will continue to have the ability to choose whether OpenMDAO warns, raises, or ignores the condition.
+This warning will be changed to an exception in OpenMDAO 3.25, but the user will continue to have the ability to choose whether OpenMDAO warns, raises, or ignores the condition.
 
 We've also addressed several bugs that were found by users, so please continue to submit those issues.
 
