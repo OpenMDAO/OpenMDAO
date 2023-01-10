@@ -208,7 +208,7 @@ class ImplicitComponent(Component):
                     d_inputs.set_val(new_ins)
                     d_outputs.set_val(new_outs)
         else:
-            dochk = mode == 'rev' and self._problem_meta['checking']
+            dochk = mode == 'rev' and self._problem_meta['checking'] and self.comm.size > 1
 
             if dochk:
                 nzdresids = self._get_dist_nz_dresids()
