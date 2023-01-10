@@ -149,4 +149,3 @@ def notebook2code_cmd():
             notebook2code(notebook, f)
     else:
         notebook2code(notebook, sys.stdout)
-
