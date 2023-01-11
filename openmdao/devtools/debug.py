@@ -575,12 +575,6 @@ def fancy_traceback(ex, tb, f):
         File where traceback will be written.
     """
     import linecache
-    from openmdao.core.system import System
-    from openmdao.solvers.solver import Solver
-    from openmdao.jacobians.jacobian import Jacobian
-    from openmdao.core.total_jac import _TotalJacInfo
-
-    hasmsginfo = (System, Solver, Jacobian, _TotalJacInfo)
 
     while tb:
         filename = tb.tb_frame.f_code.co_filename
@@ -591,8 +585,10 @@ def fancy_traceback(ex, tb, f):
         msg = ''
         if 'self' in local_vars:
             self = local_vars['self']
-            if isinstance(self, hasmsginfo):
-                msg = f"  ({self.msginfo})"
+            try:
+                msg = f"  ({self.msginfo})"  # display additional info for any obj with msginfo
+            except Exception:
+                pass
 
         print(f"File {filename} line {line_no}, in {name}{msg}", file=f)
         print(line, file=f)
@@ -609,6 +605,10 @@ def save_traceback(extype, ex, tback):
     Setting sys.excepthook to this function will add OpenMDAO system paths to the displayed
     traceback where appropriate.
 
+    This also creates an om_tracebacks directory under $HOME and writes the traceback to
+    a traceback.rank<rank>.log file.  This can be helpful when an MPI run hangs and the error
+    output is lost.
+
     Parameters
     ----------
     extype : class
@@ -619,7 +619,6 @@ def save_traceback(extype, ex, tback):
         The traceback object.
     """
     home = os.environ.get('HOME', '.')
-    pid = os.getpid()
     rank = MPI.COMM_WORLD.rank
 
     tbdir = os.path.join(home, "om_tracebacks")
@@ -628,6 +627,7 @@ def save_traceback(extype, ex, tback):
         if not os.path.isdir(tbdir):
             os.mkdir(tbdir)
     except Exception:
+        print("Failed to create traceback directory", file=sys.stderr)
         save = False
 
     # print out the traceback to stderr
@@ -636,6 +636,6 @@ def save_traceback(extype, ex, tback):
     if save:
         # save the traceback to this file in the users HOME/om_tracebacks directory.
         # This can be helpful when MPI runs hang due to rank local exception(s).
-        out = os.path.join(tbdir, f"traceback.rank{rank}.pid{pid}.txt")
+        out = os.path.join(tbdir, f"traceback.rank{rank}.log")
         with open(out, 'w') as f:
             fancy_traceback(ex, tback, f)
