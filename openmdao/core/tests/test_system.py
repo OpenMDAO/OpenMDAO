@@ -386,6 +386,46 @@ class TestSystem(unittest.TestCase):
         with assert_warning(UserWarning, msg):
             prob.model.list_inputs(units=True, prom_name=True)
 
+    def test_get_io_metadata(self):
+        from openmdao.test_suite.components.sellar_feature import SellarMDA
+
+        prob = Problem()
+        prob.model = SellarMDA()
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+
+        prob.run_model()
+
+        assert_near_equal(prob.model.get_io_metadata(includes='x'), {
+                          'cycle.d1.x': {'copy_shape': None,
+                                         'desc': '',
+                                         'discrete': False,
+                                         'distributed': False,
+                                         'global_shape': (1,),
+                                         'global_size': 1,
+                                         'has_src_indices': False,
+                                         'prom_name': 'x',
+                                         'shape': (1,),
+                                         'shape_by_conn': False,
+                                         'size': 1,
+                                         'tags': set(),
+                                         'units': None},
+                          'obj_cmp.x':  {'copy_shape': None,
+                                         'desc': '',
+                                         'discrete': False,
+                                         'distributed': False,
+                                         'global_shape': (1,),
+                                         'global_size': 1,
+                                         'has_src_indices': False,
+                                         'prom_name': 'x',
+                                         'shape': (1,),
+                                         'shape_by_conn': False,
+                                         'size': 1,
+                                         'tags': set(),
+                                         'units': None}
+                            })
+
 
 if __name__ == "__main__":
     unittest.main()
