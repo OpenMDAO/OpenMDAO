@@ -376,8 +376,11 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
                 mean_val = np.mean(vals_dict[name])
                 row[col_name] = _indicate_value_is_derived_from_array(mean_val, vals_dict[name])
             elif col_name == 'min':
-                min_val = min(vals_dict[name])  # get min. Could be an array
-                min_val_as_str = _indicate_value_is_derived_from_array(min_val, vals_dict[name])
+                if isinstance(vals_dict[name], np.ndarray):
+                    min_val = min(vals_dict[name])  # get min. Could be an array
+                    min_val_as_str = _indicate_value_is_derived_from_array(min_val, vals_dict[name])
+                else:
+                    min_val_as_str = str(vals_dict[name])
                 comp = (vals_dict[name] - meta['lower']) < _bounds_tolerance
                 if np.any(comp):
                     row[col_name] = \
@@ -385,8 +388,11 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
                 else:
                     row[col_name] = min_val_as_str
             elif col_name == 'max':
-                max_val = max(vals_dict[name])
-                max_val_as_str = _indicate_value_is_derived_from_array(max_val, vals_dict[name])
+                if isinstance(vals_dict[name], np.ndarray):
+                    max_val = max(vals_dict[name])  # get max. Could be an array
+                    max_val_as_str = _indicate_value_is_derived_from_array(max_val, vals_dict[name])
+                else:
+                    max_val_as_str = str(vals_dict[name])
                 comp = (meta['upper'] - vals_dict[name]) < _bounds_tolerance
                 if np.any(comp):
                     row[col_name] = \

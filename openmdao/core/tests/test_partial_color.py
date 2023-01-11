@@ -20,7 +20,7 @@ except ImportError:
 
 from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent, ExecComp, \
     ExplicitComponent, NonlinearBlockGS, ScipyOptimizeDriver, NewtonSolver, DirectSolver, \
-        ImplicitFuncComp
+        ImplicitFuncComp, slicer
 import openmdao.func_api as omf
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.array_utils import evenly_distrib_idxs, rand_sparsity
@@ -835,6 +835,10 @@ class TestColoring(unittest.TestCase):
             model.connect(*conn)
 
         prob.setup(check=False, mode='fwd')
+
+        prob.set_val('indeps.x0', [1.03, 1.04, 1.05, 1.06])
+        prob.set_val('indeps.x1', [1.06, 1.07, 1.08])
+
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -866,6 +870,7 @@ class TestColoring(unittest.TestCase):
             model.connect(*conn)
 
         prob.setup(check=False, mode='fwd')
+
         prob.set_solver_print(level=0)
         prob.run_model()
         with assert_warning(UserWarning, "'comp' <class SparseCompExplicit>: Coloring was deactivated.  Improvement of 16.7% was less than min allowed (20.0%)."):
@@ -964,6 +969,10 @@ class TestColoring(unittest.TestCase):
         model.add_design_var('indeps.x1', lower=np.ones(2), upper=np.ones(2)+.1)
         model.approx_totals(method=method)
         prob.setup(check=False, mode='fwd')
+
+        prob.set_val('indeps.x0', [1.03, 1.04, 1.05])
+        prob.set_val('indeps.x1', [1.06, 1.07])
+
         prob.set_solver_print(level=0)
         prob.run_driver()  # need this to trigger the dynamic coloring
 
@@ -1012,6 +1021,10 @@ class TestColoring(unittest.TestCase):
         model.approx_totals(method='cs')
         model.declare_coloring(min_improve_pct=25., method='cs')
         prob.setup(check=False, mode='fwd')
+
+        prob.set_val('indeps.x0', [1.03, 1.04, 1.05])
+        prob.set_val('indeps.x1', [1.06, 1.07])
+
         prob.set_solver_print(level=0)
 
         with assert_warning(UserWarning, "<model> <class CounterGroup>: Coloring was deactivated.  Improvement of 20.0% was less than min allowed (25.0%)."):
@@ -1062,6 +1075,10 @@ class TestColoring(unittest.TestCase):
         model.approx_totals(method=method)
 
         prob.setup(check=False, mode='fwd')
+
+        prob.set_val('indeps.x0', [1.03, 1.04, 1.05])
+        prob.set_val('indeps.x1', [1.06, 1.07])
+
         prob.set_solver_print(level=0)
         prob.run_driver()  # need this to trigger the dynamic coloring
 
@@ -1079,7 +1096,7 @@ class TestColoring(unittest.TestCase):
         ), name_func=_test_func_name
     )
     @unittest.skipUnless(OPTIMIZER, 'requires pyoptsparse SLSQP.')
-    def test_totals_of_wrt_indices(self, method, sparse_partials):
+    def test_totals_of_wrt_indices(self, method='cs', sparse_partials=True):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = CounterGroup()
         prob.driver = pyOptSparseDriver(optimizer='SLSQP')
@@ -1113,6 +1130,10 @@ class TestColoring(unittest.TestCase):
         model.approx_totals(method=method)
 
         prob.setup(check=False, mode='fwd')
+
+        prob.set_val('indeps.x0', [1.03, 1.04, 1.05])
+        prob.set_val('indeps.x1', [1.06, 1.07])
+
         prob.set_solver_print(level=0)
         prob.run_driver()  # need this to trigger the dynamic coloring
 
@@ -1366,6 +1387,7 @@ class TestStaticColoring(unittest.TestCase):
         model.use_fixed_coloring()
 
         prob.setup(check=False, mode='fwd')
+
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -1578,6 +1600,9 @@ class TestStaticColoring(unittest.TestCase):
         model.use_fixed_coloring()
 
         prob.setup(check=False, mode='fwd')
+
+
+
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -1839,7 +1864,6 @@ class TestStaticColoringParallelCS(unittest.TestCase):
 
         jac = comp._jacobian._subjacs_info
         _check_partial_matrix(comp, jac, sparsity, method)
-
 
 
 if __name__ == '__main__':

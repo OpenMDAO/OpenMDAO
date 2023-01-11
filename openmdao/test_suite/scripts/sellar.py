@@ -54,7 +54,7 @@ prob.model.add_constraint('con_cmp2.con2', upper=0)
 prob.setup()
 
 prob.set_val('x', 2.0)
-prob.set_val('z', [-1., -1.])
+prob.set_val('z', [0., 0.])
 
 prob.run_driver()
 print('minimum found at')
