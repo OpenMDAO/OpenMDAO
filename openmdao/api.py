@@ -123,7 +123,7 @@ from openmdao.utils.reports_system import register_report, unregister_report, ge
 
 import os
 
-wing_dbg()  # this does nothing unless WING_DBG is set in the environment
+wing_dbg()
 
 # set up tracing or memory profiling if env vars are set.
 if env_truthy('OPENMDAO_TRACE'):  # pragma: no cover
@@ -136,7 +136,7 @@ elif env_truthy('OPENMDAO_PROF_MEM'):  # pragma: no cover
     start()
 
 
-if env_truthy('OM_FLUSH_PRINT'):  # pragma: no cover
+if env_truthy('FLUSH_PRINT'):  # pragma: no cover
     import builtins
     _oldprint = builtins.print
 
@@ -145,14 +145,3 @@ if env_truthy('OM_FLUSH_PRINT'):  # pragma: no cover
         _oldprint(*args, **kwargs)
 
     builtins.print = _flushprint
-
-
-# if running under testflo, activate traceback saving
-if env_truthy('TESTFLO_RUNNING'):
-    if os.environ.get('OM_SAVE_TRACEBACK', None) is None:
-        os.environ['OM_SAVE_TRACEBACK'] = '1'
-
-if env_truthy('OM_SAVE_TRACEBACK'):  # pragma: no cover
-    import sys
-    from openmdao.devtools.debug import save_traceback
-    sys.excepthook = save_traceback

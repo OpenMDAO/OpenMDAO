@@ -2,9 +2,7 @@
 
 
 import sys
-import os
 import pathlib
-import traceback
 from io import StringIO
 
 import numpy as np
@@ -16,9 +14,6 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.om_warnings import issue_warning, MPIWarning
 from openmdao.utils.reports_system import register_report
 from openmdao.utils.file_utils import text2html
-
-
-startdir = os.getcwd()
 
 
 class _NoColor(object):
@@ -446,15 +441,15 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
     if sys.getprofile() is not None:
         raise RuntimeError("another profile function is already active.")
 
-    my_fname = os.path.join(startdir, fname + '.' + str(MPI.COMM_WORLD.rank))
+    my_fname = fname + '.' + str(MPI.COMM_WORLD.rank)
 
     outfile = open(my_fname, 'w')
 
     stack = []
 
     _c_map = {
-        'c_call': '--> (c) ',
-        'c_return': '<-- (c) ',
+        'c_call': '(c) -->',
+        'c_return': '(c) <--',
         'c_exception': '(c_exception)',
     }
 
@@ -463,9 +458,10 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
         s = str(arg)
         if 'mpi4py' in s or 'petsc4py' in s:
             c = arg.__self__.__class__
-            print('   ' * len(stack), typestr, f"{c.__module__}.{c.__name__}.{arg.__name__}",
-                  f"{frame.f_code.co_filename}:{frame.f_code.co_firstlineno}",
-                  file=outfile, flush=True)
+            print('   ' * len(stack), typestr, "%s.%s.%s" %
+                    (c.__module__, c.__name__, arg.__name__),
+                    "%s:%d" % (frame.f_code.co_filename, frame.f_code.co_firstlineno),
+                    file=outfile, flush=True)
 
 
     def _mpi_trace_callback(frame, event, arg):
@@ -490,12 +486,8 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
                         print('   ' * len(stack), commsize, pname, file=outfile, flush=flush)
                     else:
                         stack[-1][1] += 1
-                if stack:
-                    ind = len(stack) + stack[-1][1]
-                else:
-                    ind = len(stack)
-                print('   ' * ind, '-->', frame.f_code.co_name,
-                      f"{frame.f_code.co_filename}:{frame.f_code.co_firstlineno}",
+                print('   ' * len(stack), '-->', frame.f_code.co_name, "%s:%d" %
+                      (frame.f_code.co_filename, frame.f_code.co_firstlineno),
                       file=outfile, flush=flush)
         elif event == 'return':
             if 'openmdao' in frame.f_code.co_filename:
@@ -510,12 +502,8 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
                         commsize = frame.f_locals['self'].comm.size
                     except:
                         pass
-                if stack:
-                    ind = len(stack) + stack[-1][1]
-                else:
-                    ind = len(stack)
-                print('   ' * ind, '<--', frame.f_code.co_name,
-                      f"{frame.f_code.co_filename}:{frame.f_code.co_firstlineno}",
+                print('   ' * len(stack), '<--', frame.f_code.co_name, "%s:%d" %
+                      (frame.f_code.co_filename, frame.f_code.co_firstlineno),
                       file=outfile, flush=flush)
                 if pname is not None and stack and pname == stack[-1][0]:
                     stack[-1][1] -= 1
@@ -559,83 +547,3 @@ def prom_info_dump(system, tgt):
                 for p in abs_in2prom_info[t]:
                     print('        ', p)
     print(flush=True)
-
-
-def fancy_traceback(ex, tb, f):
-    """
-    This generates a traceback with OpenMDAO system path added to appropriate frames.
-
-    Parameters
-    ----------
-    ex : Exception
-        Exception object being raised.
-    tb : Traceback
-        Traceback object.
-    f : file-like
-        File where traceback will be written.
-    """
-    import linecache
-
-    while tb:
-        filename = tb.tb_frame.f_code.co_filename
-        name = tb.tb_frame.f_code.co_name
-        line_no = tb.tb_lineno
-        line = linecache.getline(filename, line_no).rstrip()
-        local_vars = tb.tb_frame.f_locals
-        msg = ''
-        if 'self' in local_vars:
-            self = local_vars['self']
-            try:
-                msg = f"  ({self.msginfo})"  # display additional info for any obj with msginfo
-            except Exception:
-                pass
-
-        print(f"File {filename} line {line_no}, in {name}{msg}", file=f)
-        print(line, file=f)
-
-        tb = tb.tb_next
-
-    print(ex, file=f)
-
-
-def save_traceback(extype, ex, tback):
-    """
-    A traceback function to replace the default one.
-
-    Setting sys.excepthook to this function will add OpenMDAO system paths to the displayed
-    traceback where appropriate.
-
-    This also creates an om_tracebacks directory under $HOME and writes the traceback to
-    a traceback.rank<rank>.log file.  This can be helpful when an MPI run hangs and the error
-    output is lost.
-
-    Parameters
-    ----------
-    extype : class
-        The exception class.
-    ex : Exception
-        The exception instance.
-    tback : traceback
-        The traceback object.
-    """
-    home = os.environ.get('HOME', '.')
-    rank = MPI.COMM_WORLD.rank
-
-    tbdir = os.path.join(home, "om_tracebacks")
-    save = True
-    try:
-        if not os.path.isdir(tbdir):
-            os.mkdir(tbdir)
-    except Exception:
-        print("Failed to create traceback directory", file=sys.stderr)
-        save = False
-
-    # print out the traceback to stderr
-    fancy_traceback(ex, tback, sys.stderr)
-
-    if save:
-        # save the traceback to this file in the users HOME/om_tracebacks directory.
-        # This can be helpful when MPI runs hang due to rank local exception(s).
-        out = os.path.join(tbdir, f"traceback.rank{rank}.log")
-        with open(out, 'w') as f:
-            fancy_traceback(ex, tback, f)
