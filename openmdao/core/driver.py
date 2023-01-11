@@ -391,6 +391,10 @@ class Driver(object):
                         dist_dict[vname] = (_full_slice, dist_sizes,
                                             slice(offsets[rank], offsets[rank] + dist_sizes[rank]))
 
+                    # FIXME: possible fix for Rob's KeyError issue...
+                    # if vsrc != vname:
+                    #     dist_dict[vsrc] = dist_dict[vname]
+
                 else:
                     owner = owning_ranks[vsrc]
                     sz = sizes[owner, i]
