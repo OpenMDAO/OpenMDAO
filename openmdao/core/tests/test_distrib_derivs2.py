@@ -213,9 +213,6 @@ class TestDistribDerivs(unittest.TestCase):
     def test_mixed_comp_only_fwd_partials5(self):
         mixed_partials_test('fwd', 5)
 
-    def test_mixed_comp_only_fwd_partials5_no_ivc(self):
-        mixed_partials_test('fwd', 5)
-
     def test_mixed_comp_only_fwd_partials1(self):
         mixed_partials_test('fwd', 1)
 

@@ -176,9 +176,8 @@ class MixedDistrib2(om.ExplicitComponent):  # for double diamond case
                     d_inputs['in_nd'] += self.comm.allreduce(np.tile(df_dIs, nId).reshape((nId, nIs)).T.dot(d_outputs['out_dist']))
 
             if 'out_nd' in d_outputs:
-                if 'out_nd' in d_outputs:
-                    if 'in_dist' in d_inputs:
-                        d_inputs['in_dist'] += np.tile(dg_dId, nIs).reshape((nIs, nId)).T.dot(d_outputs['out_nd'])
+                if 'in_dist' in d_inputs:
+                    d_inputs['in_dist'] += np.tile(dg_dId, nIs).reshape((nIs, nId)).T.dot(d_outputs['out_nd'])
                 if 'in_nd' in d_inputs:
                     d_inputs['in_nd'] += dg_dIs * d_outputs['out_nd']
 
