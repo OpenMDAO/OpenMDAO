@@ -5,6 +5,7 @@ import sys
 import time
 import os
 import weakref
+import traceback
 
 import numpy as np
 
@@ -14,12 +15,12 @@ from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.hooks import _setup_hooks
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.general_utils import _src_name_iter
+from openmdao.utils.general_utils import _src_name_iter, _src_or_alias_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import sizes2offsets
-from openmdao.vectors.vector import _full_slice
+from openmdao.vectors.vector import _full_slice, _flat_full_indexer
 from openmdao.utils.indexer import indexer, slicer
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, DriverWarning
 import openmdao.utils.coloring as c_mod
@@ -361,6 +362,7 @@ class Driver(object):
 
                 indices = voimeta['indices']
                 vsrc = voimeta['source']
+                drv_name = _src_or_alias_name(voimeta)
 
                 meta = abs2meta_out[vsrc]
                 i = abs2idx[vsrc]
@@ -386,14 +388,11 @@ class Driver(object):
                                 distrib_indices = dist_inds
 
                         ind = indexer(local_indices, src_shape=(tot_size,), flat_src=True)
-                        dist_dict[vname] = (ind, true_sizes, distrib_indices)
+                        dist_dict[drv_name] = (ind, true_sizes, distrib_indices)
                     else:
-                        dist_dict[vname] = (_full_slice, dist_sizes,
-                                            slice(offsets[rank], offsets[rank] + dist_sizes[rank]))
-
-                    # FIXME: possible fix for Rob's KeyError issue...
-                    # if vsrc != vname:
-                    #     dist_dict[vsrc] = dist_dict[vname]
+                        dist_dict[drv_name] = (_flat_full_indexer, dist_sizes,
+                                               slice(offsets[rank],
+                                                     offsets[rank] + dist_sizes[rank]))
 
                 else:
                     owner = owning_ranks[vsrc]
@@ -592,7 +591,7 @@ class Driver(object):
         src_name = meta['source']
 
         # If there's an alias, use that for driver related stuff
-        drv_name = name if meta.get('alias') else src_name
+        drv_name = _src_or_alias_name(meta)
 
         if MPI:
             distributed = comm.size > 0 and drv_name in self._dist_driver_vars
@@ -739,6 +738,9 @@ class Driver(object):
 
         src_name = meta['source']
 
+        # If there's an alias, use that for driver related stuff
+        drv_name = _src_or_alias_name(meta)
+
         # if the value is not local, don't set the value
         if (src_name in self._remote_dvs and
                 problem.model._owning_rank[src_name] != problem.comm.rank):
@@ -762,8 +764,9 @@ class Driver(object):
 
         elif problem.model._outputs._contains_abs(src_name):
             desvar = problem.model._outputs._abs_get_val(src_name)
-            if name in self._dist_driver_vars:
-                loc_idxs, _, dist_idxs = self._dist_driver_vars[name]
+            if drv_name in self._dist_driver_vars:
+                loc_idxs, _, dist_idxs = self._dist_driver_vars[drv_name]
+                loc_idxs = loc_idxs()  # don't use indexer here
             else:
                 loc_idxs = meta['indices']
                 if loc_idxs is None:

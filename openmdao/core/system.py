@@ -3926,8 +3926,8 @@ class System(object):
                                            "is the same name as an existing variable.")
                     abs_name = prom2abs_out[name][0]
                     out[abs_name] = data
-                    out[abs_name]['source'] = abs_name
-                    out[abs_name]['distributed'] = \
+                    data['source'] = abs_name
+                    data['distributed'] = \
                         abs_name in abs2meta_out and abs2meta_out[abs_name]['distributed']
 
                 else:
@@ -3946,12 +3946,10 @@ class System(object):
                     distrib = src_path in abs2meta_out and abs2meta_out[src_path]['distributed']
                     if use_prom_ivc:
                         out[name] = data
-                        out[name]['source'] = src_path
-                        out[name]['distributed'] = distrib
                     else:
                         out[key] = data
-                        out[key]['source'] = src_path
-                        out[key]['distributed'] = distrib
+                    data['source'] = src_path
+                    data['distributed'] = distrib
 
         except KeyError as err:
             msg = "{}: Output not found for response {}."
