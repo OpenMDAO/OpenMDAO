@@ -4066,7 +4066,7 @@ class System(object):
                         includes=None, excludes=None, tags=(), get_remote=False, rank=None,
                         return_rel_names=True):
         """
-        Retrieve metdata for a filtered list of variables.
+        Retrieve metadata for a filtered list of variables.
 
         Parameters
         ----------
@@ -4229,7 +4229,7 @@ class System(object):
                         continue
 
                     ret_meta['prom_name'] = prom
-                    ret_meta['discrete'] = abs_name not in all2meta
+                    ret_meta['discrete'] = abs_name not in all2meta[iotype]
 
                     if return_rel_names:
                         result[rel_name] = ret_meta
