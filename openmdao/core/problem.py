@@ -1206,8 +1206,7 @@ class Problem(object):
         #  this part of _final_setup still needs to happen so that change takes effect
         #  in subsequent runs
         if self._metadata['setup_status'] >= _SetupStatus.POST_FINAL_SETUP:
-            if self.model._solver_print_cache:
-                self.model._setup_solver_print()
+           self.model._setup_solver_print()
 
         driver._setup_driver(self)
 
