@@ -5,7 +5,6 @@ import sys
 import time
 import os
 import weakref
-import traceback
 
 import numpy as np
 
