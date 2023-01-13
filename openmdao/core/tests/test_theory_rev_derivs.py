@@ -77,9 +77,8 @@ class TestTheoryDocExample(unittest.TestCase):
 
     N_PROCS = 2
 
+    # this mimics the "Reverse-mode Derivatives in Parallel Subsystems" example in the theory manual
     def test_theory_example(self):
-        # this mimics the "Reverse-mode Derivatives in Parallel Subsystems" example in the
-        # theory manual
         p = om.Problem()
         model = p.model
         model.add_subsystem('C1', I1O1Comp(mult=2.0))
@@ -102,7 +101,6 @@ class TestTheoryDocExample(unittest.TestCase):
         assert_check_partials(p.check_partials(out_stream=None))
 
         data = p.check_totals(of='C4.y', wrt='C1.x', out_stream=None)
-        print(data)
         assert_check_totals(data)
 
         model._dinputs.set_val(0.)
@@ -111,9 +109,10 @@ class TestTheoryDocExample(unittest.TestCase):
 
         model.linear_solver.solve('rev')
 
-        print(model._dinputs)
+        all_dinputs = model.comm.allgather(model._dinputs.asarray())
 
-
+        assert_near_equal(all_dinputs[0], np.array([16.,  8.,  2.,  3.]))
+        assert_near_equal(all_dinputs[1], np.array([36., 18.,  2.,  3.]))
 
 
 if __name__ == "__main__":
