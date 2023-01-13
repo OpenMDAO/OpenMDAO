@@ -337,6 +337,42 @@ class TestParallelGroups(unittest.TestCase):
             else:
                 self.fail("Didn't find '%s' in info messages." % msg)
 
+    def setup_ddv_model(self, con_inds):
+        p = om.Problem()
+        model = p.model
+
+        p.driver = om.pyOptSparseDriver()
+        p.driver.options['optimizer'] = 'SLSQP'
+        p.driver.declare_coloring()
+
+        sub = model.add_subsystem('sub', om.ParallelGroup())
+        sub.add_subsystem('c1', om.ExecComp(['y=-2.0*x']))
+        sub.add_subsystem('c2', om.ExecComp(['y=5.0*x']))
+
+        model.add_subsystem('c3', om.ExecComp(['y=3.0*x1+7.0*x2']))
+
+        model.connect("sub.c1.y", "c3.x1")
+        model.connect("sub.c2.y", "c3.x2")
+
+        model.add_design_var('sub.c1.x', indices=[0])
+        model.add_design_var('sub.c2.x', indices=[0])
+        model.add_objective('c3.y')
+        model.add_constraint('sub.c2.x', indices=con_inds, lower=-100.)
+
+        p.setup()
+        p.run_driver()
+
+    # both of the following test cases raise exceptions before the fix.
+
+    def test_dist_driver_vars_indices(self):
+        # rob's original test case had indices and failed in one place
+        self.setup_ddv_model(con_inds=[0])
+
+    def test_dist_driver_vars(self):
+        # and the case with no indices on the constraint failed in a different place.
+        self.setup_ddv_model(con_inds=None)
+
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestParallelListStates(unittest.TestCase):

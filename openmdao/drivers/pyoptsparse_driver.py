@@ -433,6 +433,9 @@ class pyOptSparseDriver(Driver):
                 rels = relevant[path]
                 wrt = [v for v in indep_list if dv_meta[v]['source'] in rels]
 
+            if not wrt:
+                continue
+
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
                 opt_prob.addConGroup(name, size,
@@ -466,6 +469,9 @@ class pyOptSparseDriver(Driver):
             else:
                 rels = relevant[path]
                 wrt = [v for v in indep_list if dv_meta[v]['source'] in rels]
+
+            if not wrt:
+                continue
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
@@ -846,12 +852,11 @@ class pyOptSparseDriver(Driver):
         if total_sparsity is None:
             return
 
-        model = self._problem().model
         for res, resdict in total_sparsity.items():
-            if res in self._responses and self._responses[res]['alias'] is not None:
-                res = self._responses[res]['source']
             if res in self._objs:  # skip objectives
                 continue
+            if res in self._responses and self._responses[res]['alias'] is not None:
+                res = self._responses[res]['source']
             self._res_subjacs[res] = {}
             for dv, (rows, cols, shape) in resdict.items():
                 rows = np.array(rows, dtype=INT_DTYPE)
