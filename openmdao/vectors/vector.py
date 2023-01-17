@@ -25,12 +25,7 @@ class Vector(object):
     """
     Base Vector class.
 
-    This class is instantiated for inputs, outputs, and residuals.
     It provides a dictionary interface and an arithmetic operations interface.
-    Implementations:
-
-    - <DefaultVector>
-    - <PETScVector>
 
     Parameters
     ----------
@@ -54,9 +49,7 @@ class Vector(object):
     _kind : str
         Specific kind of vector, either 'input', 'output', or 'residual'.
     _system : System
-        Pointer to the owning system.
-    _iproc : int
-        Global processor index.
+        Weak ref to the owning system.
     _length : int
         Length of flattened vector.
     _views : dict

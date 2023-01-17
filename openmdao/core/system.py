@@ -5264,6 +5264,59 @@ class System(object):
 
         return val
 
+    def set_val(self, name, val, units=None, indices=None, rank=None, vec_name='nonlinear',
+                to_src=True):
+        """
+        Get an output/input/residual variable.
+
+        Function is used if you want to specify display units.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the root system's namespace.
+        val : object
+            Value to set this variable to.
+        units : str, optional
+            Units to convert to before return.
+        indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
+            Indices or slice to return.
+        rank : int or None
+            If not None, only set the value on this rank.
+        vec_name : str
+            Name of the vector to use.   Defaults to 'nonlinear'.
+        to_src : bool
+            If True, set value of an input variable into its connected source.
+        """
+        abs_names = name2abs_names(self, name)
+        if not abs_names:
+            raise KeyError('{}: Variable "{}" not found.'.format(self.msginfo, name))
+        simp_units = simplify_unit(units)
+
+        if to_src:
+            conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
+        else:
+            conns = []
+
+        if to_src and abs_names[0] in conns:  # name is an input
+            src = conns[abs_names[0]]
+            if src in self._var_allprocs_abs2prom['output']:
+                caller = self
+            else:
+                # src is outside of this system so set the value in the model
+                caller = self._problem_meta['model_ref']()
+            return caller._get_input_from_src(name, abs_names, conns, units=simp_units,
+                                              indices=indices, get_remote=get_remote, rank=rank,
+                                              vec_name='nonlinear', flat=flat, scope_sys=self)
+        else:
+            val = self._abs_get_val(abs_names[0], get_remote, rank, vec_name, kind, flat)
+
+            if indices is not None:
+                val = val[indices]
+
+            if units is not None:
+                val = self.convert2units(abs_names[0], val, simp_units)
+
     def _get_input_from_src(self, name, abs_ins, conns, units=None, indices=None,
                             get_remote=False, rank=None, vec_name='nonlinear', flat=False,
                             scope_sys=None):
