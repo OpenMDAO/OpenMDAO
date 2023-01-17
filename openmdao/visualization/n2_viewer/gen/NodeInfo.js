@@ -246,7 +246,10 @@ class PersistentNodeInfo extends WindowResizable {
     }
 }
 
-
+/**
+ * Display all connections represented by the current off-diagonal cell.
+ * @typedef NodeConnectionInfo
+ */
 class NodeConnectionInfo extends NodeInfo {
     /**
      * Build a list of the properties we care about and set up
@@ -257,6 +260,12 @@ class NodeConnectionInfo extends NodeInfo {
         this.propList = [];
     }
 
+    /**
+     * Gather all connections between the two cells that this one represents.
+     * @param {Array} connList The connections discovered so far.
+     * @param {TreeNode} srcNode The source node to search.
+     * @param {TreeNode} tgtNode The target node to search.
+     */
     _getConnections(connList, srcNode, tgtNode) {
         if (srcNode.hasChildren()) {
             for (const child of srcNode.children) {
@@ -273,7 +282,10 @@ class NodeConnectionInfo extends NodeInfo {
         }
     }
 
-    /** Create a new persistent window by copying our contents */
+    /**
+     * Create a new persistent window by copying our contents. Set the
+     * max initial height of the window at 300px.
+     */
     pin() {
         if (this.tbody.html() == '') return; // Was already pinned so is empty
 
@@ -283,6 +295,12 @@ class NodeConnectionInfo extends NodeInfo {
         return this;
     }
 
+    /**
+     * Load the NodeInfo window with connection information for an off-diagonal cell.
+     * @param {Object} event Reference to the event that triggered the function.
+     * @param {MatrixCell} cell Reference to the cell that was hovered.
+     * @param {String} color The color of the title bar.
+     */
     update(event, cell, color) {
         if (!this.active) return;
         this.clear();
@@ -299,13 +317,13 @@ class NodeConnectionInfo extends NodeInfo {
                 .attr('scope', 'row')
                 .text(conn.src);
 
-            newRow.append('td').html(' &#x2192; ');
+            newRow.append('td').html(' &#x2501;&#x2501;&#x2501;&#x25ba; ');
 
-            newRow.append('td').text(conn.tgt);              
+            newRow.append('td').text(conn.tgt);
         }
 
-        this.sizeToContent()
-            .title('Connections')
+        this.title(`Connections from ${cell.srcObj.path} to ${cell.tgtObj.path}`)
+            .sizeToContent(0, 2, true)
             .moveNearMouse(event)
             .show();
     }
