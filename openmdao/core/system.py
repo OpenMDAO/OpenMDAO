@@ -352,9 +352,6 @@ class System(object):
     _relevant : dict
         Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
         and dependent systems.
-    _vois : dict
-        Either design vars or responses metadata, depending on the direction of
-        derivatives.
     _mode : str
         Indicates derivative direction for the model, either 'fwd' or 'rev'.
     _scope_cache : dict

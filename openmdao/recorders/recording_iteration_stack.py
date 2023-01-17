@@ -128,8 +128,6 @@ class Recording(object):
         Current counter of iterations completed.
     recording_requester : weakref to object
         The object that wants to be recorded.
-    stack : list
-        Stack containing names and iteration counts.
     abs : float
         Absolute error.
     rel : float

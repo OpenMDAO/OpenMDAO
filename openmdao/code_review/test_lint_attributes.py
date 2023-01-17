@@ -4,6 +4,9 @@ import importlib
 import inspect
 import re
 
+from openmdao.utils.code_utils import get_class_attributes
+
+
 # directories in which we do not wish to lint for attributes.
 exclude = [
     'code_review',
@@ -70,7 +73,7 @@ class LintAttributesTestCase(unittest.TestCase):
             for file_name in os.listdir(dirpath):
                 if not file_name.startswith('_') and file_name[-3:] == '.py':
                     if print_info:
-                        print('File: {}'.format(file_name))
+                        print(f'File: {file_name}')
 
                     # to construct module name, remove part of abs path that
                     # precedes 'openmdao', and then replace '/' with '.' in the remainder.
@@ -78,32 +81,28 @@ class LintAttributesTestCase(unittest.TestCase):
                     # then, get rid of the '.py' to get final part of module name.
                     mod2 = file_name[:-3]
 
-                    module_name = '{}.{}'.format(mod1, mod2)
+                    module_name = f'{mod1}.{mod2}'
 
                     if print_info:
-                        print(' Module: {}'.format(module_name))
+                        print(f' Module: {module_name}')
                     try:
                         mod = importlib.import_module(module_name)
                     except ImportError:
-                        print('Error: could not import `{}`'.format(module_name))
+                        print(f'Error: could not import `{module_name}`')
                         continue
 
-                    # Loop over classes
-                    classes = [x for x in dir(mod)
-                               if inspect.isclass(getattr(mod, x)) and
-                               getattr(mod, x).__module__ == module_name and not x.startswith('_')]
-                    for class_name in classes:
+                    fpath = os.path.join(dirpath, file_name)
+                    class_attrs = get_class_attributes(fpath)
+
+                    for class_name, full_member_vars in class_attrs.items():
+                        if class_name.startswith('_'):
+                            continue
                         new_failures = []
                         if print_info:
-                            print('  Class:{}'.format(class_name))
+                            print(f'  Class:{class_name}')
                         class_ = getattr(mod, class_name)
-                        parent_classes = [c for c in inspect.getmro(class_)
-                                          if c.__name__ != 'object'
-                                          and c.__name__ != class_name]
-                        if print_info:
-                            print('  Parent Classes:{}'.format(
-                                [c.__name__ for c in parent_classes])
-                            )
+                        if class_ is None:
+                            continue  # this can happen e.g. with PETScVector which is None if MPI isn't active
                         class_doc = inspect.getdoc(class_)
                         if class_doc is None:
                             classdoc_matches = []
@@ -112,10 +111,11 @@ class LintAttributesTestCase(unittest.TestCase):
 
                         if len(classdoc_matches) > 1:
                             new_failures.append('multiple Attributes section in docstring')
-                        classdoc_varnames_matches = classdoc_varnames_re.findall(classdoc_matches[0]) if(len(classdoc_matches) == 1) else []
+
+                        classdoc_varnames_matches = set(classdoc_varnames_re.findall(classdoc_matches[0])) if(len(classdoc_matches) == 1) else set()
 
                         # There is a valid __init__ section in the class
-                        if('__init__' in class_.__dict__ and '__init__' in dir(class_) and (inspect.ismethod(getattr(class_, '__init__')) or inspect.isfunction(getattr(class_, '__init__'))) ):
+                        if ('__init__' in class_.__dict__ and '__init__' in dir(class_) and (inspect.ismethod(getattr(class_, '__init__')) or inspect.isfunction(getattr(class_, '__init__'))) ):
                             method = getattr(class_, '__init__')
                             # don't die if inspect can't get the source.  This can happen with
                             # dataclasses
@@ -123,8 +123,7 @@ class LintAttributesTestCase(unittest.TestCase):
                                 mysrc = inspect.getsource(method)
                             except Exception:
                                 if new_failures:
-                                    key = '{0}/{1}:{2}'.format(dir_name, file_name, class_name)
-                                    failures[key] = new_failures
+                                    failures[f'{fpath}:{class_name}'] = new_failures
                                 continue
 
                             valid_lines = ''.join(valid_line_with_self_re.findall(mysrc))
@@ -136,52 +135,53 @@ class LintAttributesTestCase(unittest.TestCase):
 
                             # there are 'self.*=' statements in __init__ but there is no Attributes section
                             if(len(all_member_vars) > 0 and len(classdoc_matches) == 0):
-                                print('%s/%s : Class `%s`... Attributes section missing but found %d member vars.. will check parent classes'
-                                                % (dir_name, file_name, class_name, len(all_member_vars)))
+                                print(f'{fpath} : Class `{class_name}`... Attributes section missing but found {len(all_member_vars)} member vars.. will check parent classes')
 
-                            for v in classdoc_varnames_matches:
-                                if v not in all_member_vars:
-                                    print('%s/%s : Class `%s`, Member `%s` documented in Attributes section of docstring but not used'
-                                                % (dir_name, file_name, class_name, v))
+                            doc_but_not_exist = sorted([n for n in classdoc_varnames_matches - full_member_vars if not (n.startswith('__') and n.endswith('__'))])
+                            if doc_but_not_exist:
+                                new_failures.append(f"{fpath} : Class `{class_name}`: {doc_but_not_exist} are documented in Attributes section of docstring but don't exist.")
 
-                            for v in all_member_vars:
-                                if v not in classdoc_varnames_matches:
-                                    print('%s/%s : Class `%s`, Member `%s` not documented in Attributes section of docstring.. checking parent classes'
-                                                % (dir_name, file_name, class_name, v))
-                                    found_in_pc = False
-                                    for pc in parent_classes:
-                                        pc_class_doc = inspect.getdoc(pc)
-                                        if pc_class_doc:
-                                            pc_classdoc_matches = classdoc_re.findall(pc_class_doc)
-                                            pc_classdoc_varnames_matches = classdoc_varnames_re.findall(pc_classdoc_matches[0]) if(len(pc_classdoc_matches) == 1) else []
-                                            if v in pc_classdoc_varnames_matches:
-                                                if(print_info): print("    Documented member `%s` in base class `%s`" % (v, pc.__name__))
-                                                found_in_pc = True
-                                                break
-                                    if not found_in_pc:
-                                        new_failures.append('Member `{0}` not documented in Attributes section of own class or parent class docstrings'.format(v))
+                            ## Don't do this check for now, because we have LOTS of undocumented attributes that show up outside of __init__
+                            # exist_but_no_doc = sorted(full_member_vars - classdoc_varnames_matches)
+                            # if exist_but_no_doc:
+                            #     print(f"{fpath} : Class `{class_name}`: {exist_but_no_doc} are not documented in Attributes section of docstring.. checking parent classes")
+
+                            parent_classes = [c for c in inspect.getmro(class_) if c.__name__ != 'object' and c.__name__ != class_name]
+                            if print_info:
+                                print('  Parent Classes:{}'.format([c.__name__ for c in parent_classes]))
+
+                            missing = all_member_vars.difference(classdoc_varnames_matches)
+
+                            for v in missing:
+                                if print_info:
+                                    print(f'{fpath} : Class `{class_name}`, Member `{v}` not documented in Attributes section of docstring.. checking parent classes')
+                                for pc in parent_classes:
+                                    pc_class_doc = inspect.getdoc(pc)
+                                    if pc_class_doc:
+                                        pc_classdoc_matches = classdoc_re.findall(pc_class_doc)
+                                        pc_classdoc_varnames_matches = classdoc_varnames_re.findall(pc_classdoc_matches[0]) if(len(pc_classdoc_matches) == 1) else []
+                                        if v in pc_classdoc_varnames_matches:
+                                            if(print_info): print(f"    Documented member `{v}` in base class `{pc.__name__}`")
+                                            break
                                 else:
-                                    if print_info: print("    Documented member `%s`" % (v))
+                                    new_failures.append(f'Member `{v}` not documented in Attributes section of own class or parent class docstrings')
                         else:  # no init section
                             if len(classdoc_matches) == 0: # no Attributes section
-                                if print_info: print('    Skipping Class `%s`... missing Attributes and init' % (class_name))
+                                if print_info: print(f'    Skipping Class `{class_name}`... missing Attributes and init')
                             else:  # one Attributes section
                                 new_failures.append('Attributes section in docstring but no __init__ function')
                         if new_failures:
-                            key = '{0}/{1}:{2}'.format(dir_name, file_name, class_name)
-                            failures[key] = new_failures
-
+                            failures[f'{fpath}:{class_name}'] = new_failures
 
         if failures:
-            msg = '\n'
-            count = 0
-            for key in failures:
-                msg += '{0}\n'.format(key)
-                count += len(failures[key])
-                for failure in failures[key]:
-                    msg += '    {0}\n'.format(failure)
-            msg += 'Found {0} issues in docstrings'.format(count)
-            self.fail(msg)
+            msg = []
+            for key, fails in failures.items():
+                msg.append(key)
+                for failure in fails:
+                    msg.append(f'    {failure}')
+
+            msg.append(f'Found {len(msg) - len(failures)} issues in docstrings')
+            self.fail('\n'.join(msg))
 
 if __name__ == '__main__':
     unittest.main()
