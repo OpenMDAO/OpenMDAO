@@ -562,9 +562,6 @@ class TestBryoden(unittest.TestCase):
 
         top.setup()
 
-        # Setup again because we assigned a new linesearch
-        top.setup()
-
         top.set_solver_print(level=2)
         # Test lower bound: should go to the lower bound and stall
         top['px.x'] = 2.0

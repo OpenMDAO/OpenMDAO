@@ -391,13 +391,15 @@ class Vector(object):
             variable value.
         """
         if flat:
-            val = self._views_flat[name]
-        else:
-            val = self._views[name]
+            if self._under_complex_step:
+                return self._views_flat[name]
+            else:
+                return self._views_flat[name].real
 
         if self._under_complex_step:
-            return val
-        return val.real
+            return self._views[name]
+        else:
+            return self._views[name].real
 
     def __setitem__(self, name, value):
         """
@@ -702,3 +704,41 @@ class Vector(object):
         """
         raise NotImplementedError(f'get_hash not defined for vector type {type(self).__name__}')
         return ''  # silence lint warning about missing return value.
+
+    def _get_local_views(self, arr=None):
+        """
+        Return a dict of views into an array using local names.
+
+        If arr is not supplied, use our existing internal data array.
+        Note that if arr is not specified, the array used will depend upon the value of
+        _under_complex_step.
+
+        Parameters
+        ----------
+        arr : ndarray or None
+            If not None, create views into this array.
+
+        Returns
+        -------
+        dict
+            A dict of views into the data array keyed using local names.
+        """
+        if arr is None:
+            arr = self.asarray(copy=False)
+        elif len(self) != arr.size:
+            raise RuntimeError(f"{self._system().msginfo}: can't create local view dict because "
+                               f"given array is size {arr.size} but expected size is {len(self)}.")
+
+        dct = {}
+        path = self._system().pathname
+        pathlen = len(path) + 1 if path else 0
+
+        start = end = 0
+        for name, val in self._abs_item_iter(flat=False):
+            end += val.size
+            view = arr[start:end]
+            view.shape = val.shape
+            dct[name[pathlen:]] = view
+            start = end
+
+        return dct

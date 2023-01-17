@@ -88,13 +88,20 @@ class Report(object):
             kw['inst_id'] = None if instance is None else instance._get_inst_id()
             _register_hook(*hook_args, **kw)
 
-    def unregister_hooks(self):
+    def unregister_hooks(self, instance=None):
         """
-        Unregister all hooks associated with this report.
+        Unregister hooks associated with this report.
+
+        Parameters
+        ----------
+        instance : object or None
+            If not None, only unregister reports for this instance.
         """
         keep = {'fname', 'class_name', 'inst_id', 'pre', 'post'}
         for args, kw in self.hooks:
             kwargs = {k: v for k, v in kw.items() if k in keep}
+            if instance is not None:
+                kwargs['inst_id'] = instance
             _unregister_hook(*args, **kwargs)
 
     def __getattr__(self, name):
@@ -582,7 +589,7 @@ def clear_reports(instance=None):
         elif inst_id != active_inst_id:
             continue
         if name in _reports_registry:
-            _reports_registry[name].unregister_hooks()
+            _reports_registry[name].unregister_hooks(inst_id)
         else:
             issue_warning(f"No report with the name '{name}' is registered.")
 

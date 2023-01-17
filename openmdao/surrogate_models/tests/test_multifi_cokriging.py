@@ -45,12 +45,11 @@ class CoKrigingSurrogateTest(unittest.TestCase):
         def f_cheap(x):
             return 0.5*((x*6-2)**2)*np.sin((x*6-2)*2)+(x-0.5)*10. - 5
 
+        x = [[[0.0], [0.4], [0.6], [1.0]],
+             [[0.1], [0.2], [0.3], [0.5], [0.7], [0.8], [0.9], [0.0], [0.4], [0.6], [1.0]]]
 
-        x = np.array([[[0.0], [0.4], [0.6], [1.0]],
-                      [[0.1], [0.2], [0.3], [0.5], [0.7],
-                       [0.8], [0.9], [0.0], [0.4], [0.6], [1.0]]])
-        y = np.array([[f_expensive(v) for v in np.array(x[0]).ravel()],
-                      [f_cheap(v) for v in np.array(x[1]).ravel()]])
+        y = [[f_expensive(v) for v in np.array(x[0]).ravel()],
+             [f_cheap(v) for v in np.array(x[1]).ravel()]]
 
         cokrig = MultiFiCoKrigingSurrogate()
         cokrig.train_multifi(x, y)
@@ -68,9 +67,8 @@ class CoKrigingSurrogateTest(unittest.TestCase):
             y = (x[1]-(5.1/(4.*np.pi**2.))*x[0]**2.+5.*x[0]/np.pi-6.)**2.+10.*(1.-1./(8.*np.pi))*np.cos(x[0])+10.
             return y
 
-        x = np.array([[-2., 0.], [-0.5, 1.5], [1., 3.], [8.5, 4.5],
-                    [-3.5, 6.], [4., 7.5], [-5., 9.], [5.5, 10.5],
-                    [10., 12.], [7., 13.5], [2.5, 15.]])
+        x = [[-2., 0.], [-0.5, 1.5], [1., 3.], [8.5, 4.5], [-3.5, 6.],
+             [4., 7.5], [-5., 9.], [5.5, 10.5], [10., 12.], [7., 13.5], [2.5, 15.]]
         y = np.array([branin(case) for case in x])
         krig1 = MultiFiCoKrigingSurrogate()
         krig1.train(x, y)
@@ -137,9 +135,8 @@ class CoKrigingSurrogateTest(unittest.TestCase):
               [ 0.3914706 ,  0.09852519],
               [ 0.86565585,  0.85350002],
               [ 0.40806563,  0.91465314]]]
-        y = np.array([[branin(case) for case in x[0]],
-                      [branin_low_fidelity(case) for case in x[1]]])
-        nfi=2
+        y = [[branin(case) for case in x[0]],
+             [branin_low_fidelity(case) for case in x[1]]]
         cokrig = MultiFiCoKrigingSurrogate(normalize=False)
         cokrig.train_multifi(x, y)
 

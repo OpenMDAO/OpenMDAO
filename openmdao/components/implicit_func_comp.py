@@ -306,7 +306,7 @@ class ImplicitFuncComp(ImplicitComponent):
         d_residuals : Vector
             Unscaled, dimensional quantities read via d_residuals[key].
         mode : str
-            Derivative solutiion direction, either 'fwd' or 'rev'.
+            Derivative solution direction, either 'fwd' or 'rev'.
         """
         if mode == 'fwd':
             d_outputs.set_vals(self._solve_linear_func(*chain(d_residuals.values(),

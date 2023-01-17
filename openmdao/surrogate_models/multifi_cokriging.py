@@ -60,7 +60,7 @@ def constant_regression(x):
     array_like
         Constant regression output.
     """
-    x = np.asarray(x, dtype=np.float)
+    x = np.asarray(x, dtype=float)
     n_eval = x.shape[0]
     f = np.ones([n_eval, 1])
     return f
@@ -82,7 +82,7 @@ def linear_regression(x):
     array_like
         Linear regression output.
     """
-    x = np.asarray(x, dtype=np.float)
+    x = np.asarray(x, dtype=float)
     n_eval = x.shape[0]
     f = np.hstack([np.ones([n_eval, 1]), x])
     return f
@@ -114,8 +114,8 @@ def squared_exponential_correlation(theta, d):
         An array with shape (n_eval, ) containing the values of the
         autocorrelation model.
     """
-    theta = np.asarray(theta, dtype=np.float)
-    d = np.asarray(d, dtype=np.float)
+    theta = np.asarray(theta, dtype=float)
+    d = np.asarray(d, dtype=float)
 
     if d.ndim > 1:
         n_features = d.shape[1]

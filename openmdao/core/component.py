@@ -382,7 +382,7 @@ class Component(System):
         """
         _, allwrt = self._get_partials_varlists()
         wrt_patterns = info['wrt_patterns']
-        if '*' in wrt_patterns or wrt_patterns is None:
+        if wrt_patterns is None or '*' in wrt_patterns:
             info['wrt_matches_rel'] = None
             info['wrt_matches'] = None
             return
@@ -414,16 +414,17 @@ class Component(System):
             A nested dict of the form dct[of][wrt] = (rows, cols, shape)
         """
         # sparsity uses relative names, so we need to convert to absolute
-        pathname = self.pathname
+        prefix = self.pathname + '.' if self.pathname else None
         for of, sub in sparsity.items():
-            of_abs = '.'.join((pathname, of)) if pathname else of
+            if prefix:
+                of = prefix + of
             for wrt, tup in sub.items():
-                wrt_abs = '.'.join((pathname, wrt)) if pathname else wrt
-                abs_key = (of_abs, wrt_abs)
+                if prefix:
+                    wrt = prefix + wrt
+                abs_key = (of, wrt)
                 if abs_key in self._subjacs_info:
-                    meta = self._subjacs_info[abs_key]
                     # add sparsity info to existing partial info
-                    meta['sparsity'] = tup
+                    self._subjacs_info[abs_key]['sparsity'] = tup
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
                   units=None, desc='', tags=None, shape_by_conn=False, copy_shape=None,
@@ -1397,7 +1398,7 @@ class Component(System):
                 rows = None
                 cols = None
 
-        pattern_matches = self._find_partial_matches(of, wrt)
+        pattern_matches = self._find_partial_matches(of, '*' if wrt is None else wrt)
         abs2meta_in = self._var_abs2meta['input']
         abs2meta_out = self._var_abs2meta['output']
 
@@ -1638,6 +1639,17 @@ class Component(System):
             elif meta['add_input_src_indices']:
                 self._var_prom2inds[abs2prom[tgt]] = [meta['shape'], meta['src_indices'],
                                                       meta['src_indices']._flat_src]
+
+    def _has_fast_rel_lookup(self):
+        """
+        Return True if this System should have fast relative variable name lookup in vectors.
+
+        Returns
+        -------
+        bool
+            True if this System should have fast relative variable name lookup in vectors.
+        """
+        return True
 
 
 class _DictValues(object):

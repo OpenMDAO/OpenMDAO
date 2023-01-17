@@ -193,6 +193,17 @@ class TestOptimizationReport(unittest.TestCase):
         opt_report(self.prob)
         self.check_opt_report(expected=expect)
 
+    def test_opt_report_scipyopt_COBYLA_nobounds(self):
+        self.setup_problem_and_run_driver(om.ScipyOptimizeDriver,
+                                          # no bounds on design vars
+                                          cons_lower=0, cons_upper=10.,
+                                          optimizer='COBYLA',
+                                          )
+        expect = {'deriv_calls': None}
+        self.check_opt_result(expected=expect)
+        opt_report(self.prob)
+        self.check_opt_report(expected=expect)
+
     @require_pyoptsparse('SNOPT')
     def test_opt_report_pyoptsparse_snopt(self):
         self.setup_problem_and_run_driver(om.pyOptSparseDriver,

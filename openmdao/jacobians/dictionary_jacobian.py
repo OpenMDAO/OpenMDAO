@@ -21,8 +21,6 @@ class DictionaryJacobian(Jacobian):
     ----------
     _iter_keys : list of (vname, vname) tuples
         List of tuples of variable names that match subjacs in the this Jacobian.
-    _is_explicit : bool
-        True if corresponding system is an ExplicitComponent
     """
 
     def __init__(self, system, **kwargs):
@@ -31,11 +29,6 @@ class DictionaryJacobian(Jacobian):
         """
         super().__init__(system, **kwargs)
         self._iter_keys = None
-
-        # avoid circular import
-        from openmdao.core.explicitcomponent import ExplicitComponent
-
-        self._is_explicit = isinstance(system, ExplicitComponent)
 
     def _iter_abs_keys(self, system):
         """
@@ -96,6 +89,7 @@ class DictionaryJacobian(Jacobian):
         oflat = d_outputs._abs_get_val
         iflat = d_inputs._abs_get_val
         subjacs_info = self._subjacs_info
+        is_explicit = system.is_explicit()
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             for abs_key in self._iter_abs_keys(system):
@@ -103,7 +97,7 @@ class DictionaryJacobian(Jacobian):
                 if res_name in d_res_names:
                     if other_name in d_out_names:
                         # skip the matvec mult completely for identity subjacs
-                        if self._is_explicit and res_name is other_name:
+                        if is_explicit and res_name is other_name:
                             if fwd:
                                 val = rflat(res_name)
                                 val -= oflat(other_name)
@@ -264,7 +258,7 @@ class _CheckingJacobian(DictionaryJacobian):
         # If we are doing a directional derivative, then the sparsity will be violated.
         # Skip sparsity check if that is the case.
         options = system._get_check_partial_options()
-        loc_wrt = wrt.split('.')[-1]
+        loc_wrt = wrt.rpartition('.')[2]
         directional = (options is not None and loc_wrt in options and
                        options[loc_wrt]['directional'])
 

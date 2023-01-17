@@ -15,6 +15,7 @@ from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.reports_system import set_reports_dir, _reports_dir, register_report, \
     list_reports, clear_reports, _reset_reports_dir, activate_report, _reports_registry
 from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.utils.assert_utils import assert_no_warning
 from openmdao.utils.mpi import MPI
 from openmdao.utils.tests.test_hooks import hooks_active
 from openmdao.visualization.n2_viewer.n2_viewer import _default_n2_filename, _run_n2_report
@@ -72,10 +73,11 @@ class TestReportsSystem(unittest.TestCase):
         model.add_design_var('y', lower=0.0, upper=1.0)
         model.add_objective('f_xy')
 
-        if driver:
-            prob.driver = driver
-        else:
-            prob.driver = om.ScipyOptimizeDriver()
+        with assert_no_warning(om.OpenMDAOWarning):
+            if driver:
+                prob.driver = driver
+            else:
+                prob.driver = om.ScipyOptimizeDriver()
 
         prob.setup(check=False)
         prob.run_driver()
@@ -361,7 +363,6 @@ class TestReportsSystem(unittest.TestCase):
         self.assertTrue('User report' in _reports_registry, "'User report' not found in registry.")
         om.unregister_report('User report')
         self.assertFalse('User report' in _reports_registry, "'User report' found in registry.")
-
 
     @hooks_active
     def test_report_generation_various_locations(self):

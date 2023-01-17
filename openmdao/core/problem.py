@@ -818,6 +818,11 @@ class Problem(object):
         reset_iter_counts : bool
             If True and model has been run previously, reset all iteration counters.
         """
+        if not self.model._have_output_solver_options_been_applied():
+            raise RuntimeError(self.msginfo +
+                               ": Before calling `run_model`, the `setup` method must be called "
+                               "if set_output_solver_options has been called.")
+
         if self._mode is None:
             raise RuntimeError(self.msginfo +
                                ": The `setup` method must be called before `run_model`.")
@@ -865,6 +870,11 @@ class Problem(object):
         if self._mode is None:
             raise RuntimeError(self.msginfo +
                                ": The `setup` method must be called before `run_driver`.")
+
+        if not self.model._have_output_solver_options_been_applied():
+            raise RuntimeError(self.msginfo +
+                               ": Before calling `run_driver`, the `setup` method must be called "
+                               "if set_output_solver_options has been called.")
 
         old_prefix = self._recording_iter.prefix
 
@@ -1191,6 +1201,12 @@ class Problem(object):
 
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             self.model._final_setup(self.comm)
+
+        # If set_solver_print is called after an initial run, in a multi-run scenario,
+        #  this part of _final_setup still needs to happen so that change takes effect
+        #  in subsequent runs
+        if self._metadata['setup_status'] >= _SetupStatus.POST_FINAL_SETUP:
+            self.model._setup_solver_print()
 
         driver._setup_driver(self)
 
@@ -2000,7 +2016,8 @@ class Problem(object):
             Derivatives in form requested by 'return_format'.
         """
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-            self.final_setup()
+            with multi_proc_exception_check(self.comm):
+                self.final_setup()
 
         if wrt is None:
             wrt = list(self.driver._designvars)

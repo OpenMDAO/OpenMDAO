@@ -89,6 +89,6 @@ class CSCMatrix(COOMatrix):
                 self._coo.dtype = complex
         else:
             self._matrix.data = self._matrix.data.real
-            self._matrix.dtype = np.float
+            self._matrix.dtype = float
             self._coo.data = self._coo.data.real
-            self._coo.dtype = np.float
+            self._coo.dtype = float
