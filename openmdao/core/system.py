@@ -910,8 +910,8 @@ class System(object):
             raise TypeError('{}: The name argument should be a string, got {}'.format(self.msginfo,
                                                                                       name))
         are_new_bounds = lower is not _UNDEFINED or upper is not _UNDEFINED
-        are_new_scaling = scaler is not _UNDEFINED or adder is not _UNDEFINED or ref is not _UNDEFINED or \
-            ref0 is not _UNDEFINED
+        are_new_scaling = scaler is not _UNDEFINED or adder is not _UNDEFINED or \
+            ref is not _UNDEFINED or ref0 is not _UNDEFINED
 
         # Must set at least one argument for this function to do something
         if not are_new_scaling and not are_new_bounds:
@@ -1061,9 +1061,10 @@ class System(object):
             raise TypeError('{}: The name argument should be a string, '
                             'got {}'.format(self.msginfo, name))
 
-        are_new_bounds = equals is not _UNDEFINED or lower is not _UNDEFINED or upper is not _UNDEFINED
-        are_new_scaling = scaler is not _UNDEFINED or adder is not _UNDEFINED or ref is not _UNDEFINED or \
-            ref0 is not _UNDEFINED
+        are_new_bounds = equals is not _UNDEFINED or lower is not _UNDEFINED or \
+            upper is not _UNDEFINED
+        are_new_scaling = scaler is not _UNDEFINED or adder is not _UNDEFINED or \
+            ref is not _UNDEFINED or ref0 is not _UNDEFINED
 
         # At least one of the scaling or bounds parameters must be set or function won't do anything
         if not are_new_scaling and not are_new_bounds:
