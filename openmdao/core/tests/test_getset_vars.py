@@ -2,7 +2,7 @@
 
 import unittest
 import numpy as np
-from openmdao.api import Problem, Group, ExecComp, IndepVarComp, DirectSolver, ParallelGroup
+import openmdao.api as om
 from openmdao.utils.mpi import MPI
 
 try:
@@ -17,15 +17,15 @@ class TestGetSetVariables(unittest.TestCase):
         """
         Illustrative examples showing how to access variables and subjacs.
         """
-        c = ExecComp('y=2*x')
+        c = om.ExecComp('y=2*x')
 
-        g = Group()
+        g = om.Group()
         g.add_subsystem('c', c)
 
-        model = Group()
+        model = om.Group()
         model.add_subsystem('g', g)
 
-        p = Problem(model)
+        p = om.Problem(model)
         p.setup()
 
         # -------------------------------------------------------------------
@@ -58,19 +58,19 @@ class TestGetSetVariables(unittest.TestCase):
         """
         Illustrative examples showing how to access variables and subjacs.
         """
-        c1 = IndepVarComp('x')
-        c2 = ExecComp('y=2*x')
-        c3 = ExecComp('z=3*x')
+        c1 = om.IndepVarComp('x')
+        c2 = om.ExecComp('y=2*x')
+        c3 = om.ExecComp('z=3*x')
 
-        g = Group()
+        g = om.Group()
         g.add_subsystem('c1', c1, promotes=['*'])
         g.add_subsystem('c2', c2, promotes=['*'])
         g.add_subsystem('c3', c3, promotes=['*'])
 
-        model = Group()
+        model = om.Group()
         model.add_subsystem('g', g, promotes=['*'])
 
-        p = Problem(model)
+        p = om.Problem(model)
         p.setup()
 
         # -------------------------------------------------------------------
@@ -107,18 +107,18 @@ class TestGetSetVariables(unittest.TestCase):
         """
         Tests for error-handling for invalid variable names and keys.
         """
-        g = Group(assembled_jac_type='dense')
-        g.linear_solver = DirectSolver(assemble_jac=True)
-        g.add_subsystem('c', ExecComp('y=2*x'))
+        g = om.Group(assembled_jac_type='dense')
+        g.linear_solver = om.DirectSolver(assemble_jac=True)
+        g.add_subsystem('c', om.ExecComp('y=2*x'))
 
-        p = Problem()
+        p = om.Problem()
         model = p.model
         model.add_subsystem('g', g)
         p.setup()
 
         # -------------------------------------------------------------------
 
-        msg = '\'<model> <class Group>: Variable "{}" not found.\''
+        msg = '\'<model> <class om.Group>: Variable "{}" not found.\''
 
         # inputs
         with self.assertRaises(KeyError) as ctx:
@@ -195,20 +195,20 @@ class TestGetSetVariables(unittest.TestCase):
         """
         Tests for error-handling for invalid variable names and keys.
         """
-        c1 = IndepVarComp('x')
-        c2 = ExecComp('y=2*x')
-        c3 = ExecComp('z=3*x')
+        c1 = om.IndepVarComp('x')
+        c2 = om.ExecComp('y=2*x')
+        c3 = om.ExecComp('z=3*x')
 
-        g = Group(assembled_jac_type='dense')
+        g = om.Group(assembled_jac_type='dense')
         g.add_subsystem('c1', c1, promotes=['*'])
         g.add_subsystem('c2', c2, promotes=['*'])
         g.add_subsystem('c3', c3, promotes=['*'])
-        g.linear_solver = DirectSolver(assemble_jac=True)
+        g.linear_solver = om.DirectSolver(assemble_jac=True)
 
-        model = Group()
+        model = om.Group()
         model.add_subsystem('g', g, promotes=['*'])
 
-        p = Problem(model)
+        p = om.Problem(model)
         p.setup()
 
         # Conclude setup but don't run model.
@@ -261,10 +261,10 @@ class TestGetSetVariables(unittest.TestCase):
         self.assertEqual(str(context.exception), msg2)
 
     def test_serial_multi_src_inds(self):
-        p = Problem()
-        p.model.add_subsystem('indep', IndepVarComp('x', val=np.ones(10)))
-        p.model.add_subsystem('C1', ExecComp('y=x*2.', x=np.zeros(7), y=np.zeros(7)))
-        p.model.add_subsystem('C2', ExecComp('y=x*3.', x=np.zeros(3), y=np.zeros(3)))
+        p = om.Problem()
+        p.model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(10)))
+        p.model.add_subsystem('C1', om.ExecComp('y=x*2.', x=np.zeros(7), y=np.zeros(7)))
+        p.model.add_subsystem('C2', om.ExecComp('y=x*3.', x=np.zeros(3), y=np.zeros(3)))
         p.model.connect('indep.x', 'C1.x', src_indices=list(range(7)))
         p.model.connect('indep.x', 'C2.x', src_indices=list(range(7, 10)))
         p.setup()
@@ -282,12 +282,12 @@ class TestGetSetVariables(unittest.TestCase):
         np.testing.assert_allclose(p['C2.y'], (np.arange(7,10) + 1.) * 9.)
 
     def test_serial_multi_src_inds_promoted(self):
-        p = Problem()
-        p.model.add_subsystem('indep', IndepVarComp('x', val=np.ones(10)), promotes=['x'])
-        p.model.add_subsystem('C1', ExecComp('y=x*2.',
+        p = om.Problem()
+        p.model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(10)), promotes=['x'])
+        p.model.add_subsystem('C1', om.ExecComp('y=x*2.',
                                              x={'val': np.zeros(7)},
                                              y={'val': np.zeros(7)}))
-        p.model.add_subsystem('C2', ExecComp('y=x*3.',
+        p.model.add_subsystem('C2', om.ExecComp('y=x*3.',
                                              x={'val': np.zeros(3)},
                                              y={'val': np.zeros(3)}))
 
@@ -309,14 +309,14 @@ class TestGetSetVariables(unittest.TestCase):
         np.testing.assert_allclose(p['C2.y'], (np.arange(7,10) + 1.) * 9.)
 
     def test_serial_multi_src_inds_units_promoted(self):
-        p = Problem()
-        indep = p.model.add_subsystem('indep', IndepVarComp(), promotes=['x'])
+        p = om.Problem()
+        indep = p.model.add_subsystem('indep', om.IndepVarComp(), promotes=['x'])
         indep.add_output('x', units='inch', val=np.ones(10))
-        p.model.add_subsystem('C1', ExecComp('y=x*2.',
+        p.model.add_subsystem('C1', om.ExecComp('y=x*2.',
                                              x={'val': np.zeros(7),
                                                 'units': 'ft'},
                                              y={'val': np.zeros(7), 'units': 'ft'}))
-        p.model.add_subsystem('C2', ExecComp('y=x*3.',
+        p.model.add_subsystem('C2', om.ExecComp('y=x*3.',
                                              x={'val': np.zeros(3),
                                                 'units': 'inch'},
                                              y={'val': np.zeros(3), 'units': 'inch'}))
@@ -339,16 +339,16 @@ class TestGetSetVariables(unittest.TestCase):
         np.testing.assert_allclose(p['C2.y'], np.ones(3) * 9.)
 
     def test_serial_multi_src_inds_units_promoted_no_src(self):
-        p = Problem(name='serial_multi_src_inds_units_promoted_no_src')
-        p.model.add_subsystem('C1', ExecComp('y=x*2.',
+        p = om.Problem(name='serial_multi_src_inds_units_promoted_no_src')
+        p.model.add_subsystem('C1', om.ExecComp('y=x*2.',
                                              x={'val': np.zeros(7),
                                                 'units': 'ft'},
                                              y={'val': np.zeros(7), 'units': 'ft'}))
-        p.model.add_subsystem('C2', ExecComp('y=x*3.',
+        p.model.add_subsystem('C2', om.ExecComp('y=x*3.',
                                              x={'val': np.zeros(3),
                                                 'units': 'inch'},
                                              y={'val': np.zeros(3), 'units': 'inch'}))
-        p.model.add_subsystem('C3', ExecComp('y=x*4.',
+        p.model.add_subsystem('C3', om.ExecComp('y=x*4.',
                                              x={'val': np.zeros(10), 'units': 'mm'},
                                              y={'val': np.zeros(10), 'units': 'mm'}),
                          promotes=['x'])
@@ -366,14 +366,14 @@ class TestGetSetVariables(unittest.TestCase):
            "<group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
 
     def test_serial_multi_src_inds_units_setval_promoted(self):
-        p = Problem()
-        indep = p.model.add_subsystem('indep', IndepVarComp(), promotes=['x'])
+        p = om.Problem()
+        indep = p.model.add_subsystem('indep', om.IndepVarComp(), promotes=['x'])
         indep.add_output('x', units='inch', val=np.ones(10))
-        p.model.add_subsystem('C1', ExecComp('y=x*2.',
+        p.model.add_subsystem('C1', om.ExecComp('y=x*2.',
                                              x={'val': np.zeros(7),
                                                 'units': 'ft'},
                                              y={'val': np.zeros(7), 'units': 'ft'}))
-        p.model.add_subsystem('C2', ExecComp('y=x*3.',
+        p.model.add_subsystem('C2', om.ExecComp('y=x*3.',
                                              x={'val': np.zeros(3),
                                                 'units': 'inch'},
                                              y={'val': np.zeros(3), 'units': 'inch'}))
@@ -401,11 +401,11 @@ class ParTestCase(unittest.TestCase):
     N_PROCS = 2
 
     def test_par_multi_src_inds(self):
-        p = Problem()
-        p.model.add_subsystem('indep', IndepVarComp('x', val=np.ones(10)))
-        par = p.model.add_subsystem('par', ParallelGroup())
-        par.add_subsystem('C1', ExecComp('y=x*2.', x=np.zeros(7), y=np.zeros(7)))
-        par.add_subsystem('C2', ExecComp('y=x*3.', x=np.zeros(3), y=np.zeros(3)))
+        p = om.Problem()
+        p.model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(10)))
+        par = p.model.add_subsystem('par', om.ParallelGroup())
+        par.add_subsystem('C1', om.ExecComp('y=x*2.', x=np.zeros(7), y=np.zeros(7)))
+        par.add_subsystem('C2', om.ExecComp('y=x*3.', x=np.zeros(3), y=np.zeros(3)))
         p.model.connect('indep.x', 'par.C1.x', src_indices=list(range(7)))
         p.model.connect('indep.x', 'par.C2.x', src_indices=list(range(7, 10)))
 
@@ -424,11 +424,11 @@ class ParTestCase(unittest.TestCase):
 
     @unittest.expectedFailure
     def test_par_multi_src_inds_fail(self):
-        p = Problem()
-        p.model.add_subsystem('indep', IndepVarComp('x', val=np.ones(10)))
-        par = p.model.add_subsystem('par', ParallelGroup())
-        par.add_subsystem('C1', ExecComp('y=x*2.', x=np.zeros(7), y=np.zeros(7)))
-        par.add_subsystem('C2', ExecComp('y=x*3.', x=np.zeros(3), y=np.zeros(3)))
+        p = om.Problem()
+        p.model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(10)))
+        par = p.model.add_subsystem('par', om.ParallelGroup())
+        par.add_subsystem('C1', om.ExecComp('y=x*2.', x=np.zeros(7), y=np.zeros(7)))
+        par.add_subsystem('C2', om.ExecComp('y=x*3.', x=np.zeros(3), y=np.zeros(3)))
         p.model.connect('indep.x', 'par.C1.x', src_indices=list(range(7)))
         p.model.connect('indep.x', 'par.C2.x', src_indices=list(range(7, 10)))
 
@@ -445,6 +445,35 @@ class ParTestCase(unittest.TestCase):
         np.testing.assert_allclose(p['par.C2.x'], (np.arange(7,10) + 1.) * 3.)
         np.testing.assert_allclose(p['par.C1.y'], (np.arange(7) + 1.) * 4.)
         np.testing.assert_allclose(p['par.C2.y'], (np.arange(7,10) + 1.) * 9.)
+
+
+class SubGroup(om.Group):
+    def setup(self):
+        self.add_subsystem('C1', om.ExecComp('y=2*x'))
+        self.add_subsystem('C2', om.ExecComp('y=3*x'))
+
+
+class DynGroup(om.Group):
+    def __init__(self, cfg, **kwargs):
+        super().__init__(**kwargs)
+        self.cfg = cfg
+
+    def setup(self):
+        self.add_subsystem('sub', SubGroup())
+
+    def configure(self):
+        if self.cfg == 'config1':
+            pass
+        elif self.cfg == 'config2':
+            pass
+
+
+class SystemSetValTestCase(unittest.TestCase):
+    def test_config_sets(self):
+        p = om.Problem()
+        model = p.model
+
+
 
 
 if __name__ == '__main__':
