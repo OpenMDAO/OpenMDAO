@@ -181,6 +181,8 @@ class Group(System):
         Dynamic shape dependency graph, or None.
     _shape_knowns : set
         Set of shape dependency graph nodes with known (non-dynamic) shapes.
+    _in_configure : bool
+        If True, this Group is currently running its _configure method.
     """
 
     def __init__(self, **kwargs):
@@ -207,6 +209,7 @@ class Group(System):
         self._order_set = False
         self._shapes_graph = None
         self._shape_knowns = None
+        self._in_configure = False
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -463,22 +466,26 @@ class Group(System):
 
         Highest system's settings take precedence.
         """
-        # reset group_inputs back to what it was just after self.setup() in case _configure
-        # is called multiple times.
-        self._group_inputs = self._pre_config_group_inputs.copy()
-        for n, lst in self._group_inputs.items():
-            self._group_inputs[n] = lst.copy()
+        self._in_configure = True
 
-        for subsys in self._subsystems_myproc:
-            subsys._configure()
-            subsys._setup_var_data()
+        try:
+            # reset group_inputs back to what it was just after self.setup() in case _configure
+            # is called multiple times.
+            self._group_inputs = self._pre_config_group_inputs.copy()
+            for n, lst in self._group_inputs.items():
+                self._group_inputs[n] = lst.copy()
 
-            self._has_guess |= subsys._has_guess
-            self._has_bounds |= subsys._has_bounds
-            self.matrix_free |= subsys.matrix_free
+            for subsys in self._subsystems_myproc:
+                subsys._configure()
+                subsys._setup_var_data()
 
-        self._problem_meta['setup_status'] = _SetupStatus.POST_CONFIGURE
-        self.configure()
+                self._has_guess |= subsys._has_guess
+                self._has_bounds |= subsys._has_bounds
+                self.matrix_free |= subsys.matrix_free
+
+            self.configure()
+        finally:
+            self._in_configure = False
 
         # if our configure() has added or promoted any variables, we have to call
         # _setup_var_data again on any modified systems and their ancestors (only those that
@@ -2440,8 +2447,7 @@ class Group(System):
         new_order : list of str
             List of system names in desired new execution order.
         """
-        if self._problem_meta is not None and \
-                self._problem_meta['setup_status'] == _SetupStatus.POST_CONFIGURE:
+        if self._in_configure:
             raise RuntimeError(f"{self.msginfo}: Cannot call set_order in the configure method.")
 
         # Make sure the new_order is valid. It must contain all subsystems

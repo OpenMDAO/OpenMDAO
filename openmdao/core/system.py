@@ -38,7 +38,7 @@ from openmdao.utils.om_warnings import issue_warning, warn_deprecation, \
     DerivativesWarning, PromotionWarning, UnusedOptionWarning
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, \
-    ensure_compatible, env_truthy, make_traceback
+    ensure_compatible, env_truthy, make_traceback, _is_slicer_op
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -1462,6 +1462,7 @@ class System(object):
         """
         # save a ref to the problem level options.
         self._problem_meta = prob_meta
+        self._initial_condition_cache = {}
 
         # reset any coloring if a Coloring object was not set explicitly
         if self._coloring_info['dynamic'] or self._coloring_info['static'] is not None:
@@ -1481,6 +1482,7 @@ class System(object):
             self._configure()
         finally:
             prob_meta['config_info'] = None
+            prob_meta['setup_status'] = _SetupStatus.POST_CONFIGURE
 
         self._configure_check()
 
@@ -5264,8 +5266,58 @@ class System(object):
 
         return val
 
-    def set_val(self, name, val, units=None, indices=None, rank=None, vec_name='nonlinear',
-                to_src=True):
+    def _get_cached_val(self, name, get_remote=False):
+        # We have set and cached already
+        if name in self._initial_condition_cache:
+            return self._initial_condition_cache[name]
+
+        # Vector not setup, so we need to pull values from saved metadata request.
+        else:
+            model = self._problem_meta['model_ref']()
+
+            try:
+                conns = model._conn_abs_in2out
+            except AttributeError:
+                conns = {}
+
+            abs_names = name2abs_names(model, name)
+            if not abs_names:
+                raise KeyError(f'{model.msginfo}: Variable "{name}" not found.')
+
+            abs_name = abs_names[0]
+            vars_to_gather = self._problem_meta['vars_to_gather']
+
+            meta = model._var_abs2meta
+            io = 'output' if abs_name in meta['output'] else 'input'
+            if abs_name in meta[io]:
+                if abs_name in conns:
+                    val = meta['output'][conns[abs_name]]['val']
+                else:
+                    val = meta[io][abs_name]['val']
+            else:
+                # not found in real outputs or inputs, try discretes
+                meta = model._var_discrete
+                io = 'output' if abs_name in meta['output'] else 'input'
+                if abs_name in meta[io]:
+                    if abs_name in conns:
+                        val = meta['output'][conns[abs_name]]['val']
+                    else:
+                        val = meta[io][abs_name]['val']
+
+            if get_remote and abs_name in vars_to_gather:
+                owner = vars_to_gather[abs_name]
+                if model.comm.rank == owner:
+                    model.comm.bcast(val, root=owner)
+                else:
+                    val = model.comm.bcast(None, root=owner)
+
+            if val is not _UNDEFINED:
+                # Need to cache the "get" in case the user calls in-place numpy operations.
+                self._initial_condition_cache[name] = val
+
+            return val
+
+    def set_val(self, name, val, units=None, indices=None, rank=None, vec_name='nonlinear'):
         """
         Get an output/input/residual variable.
 
@@ -5278,44 +5330,192 @@ class System(object):
         val : object
             Value to set this variable to.
         units : str, optional
-            Units to convert to before return.
+            Units of the value being set.
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
-            Indices or slice to return.
+            Indices or slice to set.
         rank : int or None
             If not None, only set the value on this rank.
         vec_name : str
             Name of the vector to use.   Defaults to 'nonlinear'.
-        to_src : bool
-            If True, set value of an input variable into its connected source.
         """
-        abs_names = name2abs_names(self, name)
-        if not abs_names:
-            raise KeyError('{}: Variable "{}" not found.'.format(self.msginfo, name))
-        simp_units = simplify_unit(units)
+        model = self._problem_meta['model_ref']()
+        conns = model._conn_global_abs_in2out
+        post_setup = self._problem_meta['setup_status'] > _SetupStatus.POST_SETUP
+        no_vectors = self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP
+        value = val
 
-        if to_src:
-            conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
-        else:
-            conns = []
+        all_meta = model._var_allprocs_abs2meta
+        loc_meta = model._var_abs2meta
+        n_proms = 0  # if nonzero, name given was promoted input name w/o a matching prom output
 
-        if to_src and abs_names[0] in conns:  # name is an input
-            src = conns[abs_names[0]]
-            if src in self._var_allprocs_abs2prom['output']:
-                caller = self
+        try:
+            ginputs = model._group_inputs
+        except AttributeError:
+            ginputs = {}  # could happen if top level system is not a Group
+
+        abs_names = name2abs_names(model, name)
+        if abs_names:
+            n_proms = len(abs_names)  # for output this will never be > 1
+            if n_proms > 1 and name in ginputs:
+                abs_name = ginputs[name][0].get('use_tgt', abs_names[0])
             else:
-                # src is outside of this system so set the value in the model
-                caller = self._problem_meta['model_ref']()
-            return caller._get_input_from_src(name, abs_names, conns, units=simp_units,
-                                              indices=indices, get_remote=get_remote, rank=rank,
-                                              vec_name='nonlinear', flat=flat, scope_sys=self)
+                abs_name = abs_names[0]
         else:
-            val = self._abs_get_val(abs_names[0], get_remote, rank, vec_name, kind, flat)
+            raise KeyError(f'{model.msginfo}: Variable "{name}" not found.')
 
-            if indices is not None:
-                val = val[indices]
+        if abs_name in conns:
+            src = conns[abs_name]
+            if abs_name not in model._var_allprocs_discrete['input']:
+                value = np.asarray(value)
+                tmeta = all_meta['input'][abs_name]
+                tunits = tmeta['units']
+                sunits = all_meta['output'][src]['units']
+                if abs_name in loc_meta['input']:
+                    tlocmeta = loc_meta['input'][abs_name]
+                else:
+                    tlocmeta = None
 
+                gunits = ginputs[name][0].get('units') if name in ginputs else None
+                if n_proms > 1:  # promoted input name was used
+                    if gunits is None:
+                        tunit_list = [all_meta['input'][n]['units'] for n in abs_names]
+                        tu0 = tunit_list[0]
+                        for tu in tunit_list:
+                            if tu != tu0:
+                                model._show_ambiguity_msg(name, ('units',), abs_names)
+
+                if units is None:
+                    # avoids double unit conversion
+                    if post_setup:
+                        ivalue = value
+                        if sunits is not None:
+                            if gunits is not None and gunits != tunits:
+                                value = model.convert_from_units(src, value, gunits)
+                            else:
+                                value = model.convert_from_units(src, value, tunits)
+                else:
+                    if gunits is None:
+                        ivalue = model.convert_from_units(abs_name, value, units)
+                    else:
+                        ivalue = model.convert_units(name, value, units, gunits)
+                    if no_vectors:
+                        value = ivalue
+                    else:
+                        value = model.convert_from_units(src, value, units)
+        else:
+            src = abs_name
             if units is not None:
-                val = self.convert2units(abs_names[0], val, simp_units)
+                value = model.convert_from_units(abs_name, value, units)
+
+        # Caching only needed if vectors aren't allocated yet.
+        if no_vectors:
+            ic_cache = model._initial_condition_cache
+            if indices is not None:
+                self._get_cached_val(name)
+                try:
+                    if _is_slicer_op(indices):
+                        ic_cache[name] = value[indices]
+                    else:
+                        ic_cache[name][indices] = value
+                except IndexError:
+                    ic_cache[name][indices] = value
+                except Exception as err:
+                    raise RuntimeError(f"Failed to set value of '{name}': {str(err)}.")
+            else:
+                ic_cache[name] = value
+        else:
+            myrank = model.comm.rank
+
+            if indices is None:
+                indices = _full_slice
+
+            if model._outputs._contains_abs(abs_name):
+                distrib = all_meta['output'][abs_name]['distributed']
+                if (distrib and indices is _full_slice and
+                        value.size == all_meta['output'][abs_name]['global_size']):
+                    # assume user is setting using full distributed value
+                    sizes = model._var_sizes['output'][:, model._var_allprocs_abs2idx[abs_name]]
+                    start = np.sum(sizes[:myrank])
+                    end = start + sizes[myrank]
+                    model._outputs.set_var(abs_name, value[start:end], indices)
+                else:
+                    model._outputs.set_var(abs_name, value, indices)
+            elif abs_name in conns:  # input name given. Set value into output
+                src_is_auto_ivc = src.startswith('_auto_ivc.')
+                # when setting auto_ivc output, error messages should refer
+                # to the promoted name used in the set_val call
+                var_name = name if src_is_auto_ivc else src
+                if model._outputs._contains_abs(src):  # src is local
+                    if (model._outputs._abs_get_val(src).size == 0 and
+                            src_is_auto_ivc and
+                            all_meta['output'][src]['distributed']):
+                        pass  # special case, auto_ivc dist var with 0 local size
+                    elif tmeta['has_src_indices']:
+                        if tlocmeta:  # target is local
+                            flat = False
+                            if name in model._var_prom2inds:
+                                sshape, inds, flat = model._var_prom2inds[name]
+                                src_indices = inds
+                            elif (tlocmeta.get('manual_connection') or
+                                  model._inputs._contains_abs(name)):
+                                src_indices = tlocmeta['src_indices']
+                            else:
+                                src_indices = None
+
+                            if src_indices is None:
+                                model._outputs.set_var(src, value, _full_slice, flat,
+                                                       var_name=var_name)
+                            else:
+                                if tmeta['distributed']:
+                                    src_indices = src_indices.shaped_array()
+                                    ssizes = model._var_sizes['output']
+                                    sidx = model._var_allprocs_abs2idx[src]
+                                    ssize = ssizes[myrank, sidx]
+                                    start = np.sum(ssizes[:myrank, sidx])
+                                    end = start + ssize
+                                    if np.any(src_indices < start) or np.any(src_indices >= end):
+                                        raise RuntimeError(f"{model.msginfo}: Can't set {name}: "
+                                                           "src_indices refer "
+                                                           "to out-of-process array entries.")
+                                    if start > 0:
+                                        src_indices = src_indices - start
+                                    src_indices = indexer(src_indices)
+                                if indices is _full_slice:
+                                    model._outputs.set_var(src, value, src_indices, flat,
+                                                           var_name=var_name)
+                                else:
+                                    model._outputs.set_var(src, value, src_indices.apply(indices),
+                                                           True, var_name=var_name)
+                        else:
+                            raise RuntimeError(f"{model.msginfo}: Can't set {abs_name}: remote"
+                                               " connected inputs with src_indices currently not"
+                                               " supported.")
+                    else:
+                        value = np.asarray(value)
+                        if indices is not _full_slice:
+                            indices = indexer(indices)
+                        model._outputs.set_var(src, value, indices, var_name=var_name)
+                elif src in model._discrete_outputs:
+                    model._discrete_outputs[src] = value
+                # also set the input
+                # TODO: maybe remove this if inputs are removed from case recording
+                if n_proms < 2:
+                    if model._inputs._contains_abs(abs_name):
+                        model._inputs.set_var(abs_name, ivalue, indices)
+                    elif abs_name in model._discrete_inputs:
+                        model._discrete_inputs[abs_name] = value
+                    else:
+                        # must be a remote var. so, just do nothing on this proc. We can't get here
+                        # unless abs_name is found in connections, so the variable must exist.
+                        if abs_name in model._var_allprocs_abs2meta:
+                            print(f"Variable '{name}' is remote on rank {self.comm.rank}.  "
+                                  "Local assignment ignored.")
+            elif abs_name in model._discrete_outputs:
+                model._discrete_outputs[abs_name] = value
+            elif model._inputs._contains_abs(abs_name):   # could happen if model is a component
+                model._inputs.set_var(abs_name, value, indices)
+            elif abs_name in model._discrete_inputs:   # could happen if model is a component
+                model._discrete_inputs[abs_name] = value
 
     def _get_input_from_src(self, name, abs_ins, conns, units=None, indices=None,
                             get_remote=False, rank=None, vec_name='nonlinear', flat=False,
