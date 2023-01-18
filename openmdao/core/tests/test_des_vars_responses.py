@@ -1065,5 +1065,37 @@ class TestObjectiveOnModel(unittest.TestCase):
         assert_near_equal(0.0, derivs['indeps.y', 'indeps.x']['abs error'][0])
 
 
+class DesvarVecTestCase(unittest.TestCase):
+    def test_vector_options(self):
+        # test raised an exception before the fix for array lower/upper
+        prob = om.Problem(model=SellarDerivatives())
+        model = prob.model
+        model.nonlinear_solver = om.NonlinearBlockGS()
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]), indices=[0,1])
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+        prob.run_driver()
+        # print(f"con1 = {prob.get_val('con1')}")
+        # print(f"z = {prob.get_val('z')}")
+
+        model.set_design_var_options("z", lower=np.array([0.0, 0.0])) #broken
+        model.set_constraint_options(name='con1', upper=-1.0)
+        prob.setup()
+        prob.run_driver()
+        # print(f"con1 = {prob.get_val('con1')}")
+        # print(f"z = {prob.get_val('z')}")
+
+
+
 if __name__ == '__main__':
     unittest.main()

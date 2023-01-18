@@ -909,9 +909,9 @@ class System(object):
         if not isinstance(name, str):
             raise TypeError('{}: The name argument should be a string, got {}'.format(self.msginfo,
                                                                                       name))
-        are_new_bounds = lower != _UNDEFINED or upper != _UNDEFINED
-        are_new_scaling = scaler != _UNDEFINED or adder != _UNDEFINED or ref != _UNDEFINED or \
-            ref0 != _UNDEFINED
+        are_new_bounds = lower is not _UNDEFINED or upper is not _UNDEFINED
+        are_new_scaling = scaler is not _UNDEFINED or adder is not _UNDEFINED or ref is not _UNDEFINED or \
+            ref0 is not _UNDEFINED
 
         # Must set at least one argument for this function to do something
         if not are_new_scaling and not are_new_bounds:
@@ -940,9 +940,9 @@ class System(object):
         #   method and what were the existing bounds
         if are_new_bounds:
             # wipe out all the bounds and only use what is set by the arguments to this call
-            if lower == _UNDEFINED:
+            if lower is _UNDEFINED:
                 lower = None
-            if upper == _UNDEFINED:
+            if upper is _UNDEFINED:
                 upper = None
         else:
             lower = existing_dv_meta['lower']
@@ -1061,9 +1061,9 @@ class System(object):
             raise TypeError('{}: The name argument should be a string, '
                             'got {}'.format(self.msginfo, name))
 
-        are_new_bounds = equals != _UNDEFINED or lower != _UNDEFINED or upper != _UNDEFINED
-        are_new_scaling = scaler != _UNDEFINED or adder != _UNDEFINED or ref != _UNDEFINED or \
-            ref0 != _UNDEFINED
+        are_new_bounds = equals is not _UNDEFINED or lower is not _UNDEFINED or upper is not _UNDEFINED
+        are_new_scaling = scaler is not _UNDEFINED or adder is not _UNDEFINED or ref is not _UNDEFINED or \
+            ref0 is not _UNDEFINED
 
         # At least one of the scaling or bounds parameters must be set or function won't do anything
         if not are_new_scaling and not are_new_bounds:
@@ -1109,11 +1109,11 @@ class System(object):
         #   method and what were the existing bounds
         if are_new_bounds:
             # wipe the slate clean and only use what is set by the arguments to this call
-            if equals == _UNDEFINED:
+            if equals is _UNDEFINED:
                 equals = None
-            if lower == _UNDEFINED:
+            if lower is _UNDEFINED:
                 lower = None
-            if upper == _UNDEFINED:
+            if upper is _UNDEFINED:
                 upper = None
         else:
             equals = existing_cons_meta['equals']
@@ -1247,7 +1247,7 @@ class System(object):
             raise TypeError('{}: The name argument should be a string, got {}'.format(self.msginfo,
                                                                                       name))
         # At least one of the scaling parameters must be set or function does nothing
-        if scaler == _UNDEFINED and adder == _UNDEFINED and ref == _UNDEFINED and ref0 == \
+        if scaler is _UNDEFINED and adder is _UNDEFINED and ref is _UNDEFINED and ref0 is \
                 _UNDEFINED:
             raise RuntimeError(
                 'Must set a value for at least one argument in call to set_objective_options.')
@@ -1275,13 +1275,13 @@ class System(object):
 
         # Since one or more of these are being set by the incoming arguments, the
         #   ones that are not being set should be set to None since they will be re-computed below
-        if scaler == _UNDEFINED:
+        if scaler is _UNDEFINED:
             scaler = None
-        if adder == _UNDEFINED:
+        if adder is _UNDEFINED:
             adder = None
-        if ref == _UNDEFINED:
+        if ref is _UNDEFINED:
             ref = None
-        if ref0 == _UNDEFINED:
+        if ref0 is _UNDEFINED:
             ref0 = None
 
         new_obj_metadata = {}
