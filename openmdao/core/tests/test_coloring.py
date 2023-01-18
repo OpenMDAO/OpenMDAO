@@ -20,7 +20,7 @@ from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.array_utils import array_viz
 from openmdao.utils.coloring import _compute_coloring, compute_total_coloring, Coloring
-from openmdao.utils.mpi import MPI
+from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.testing_utils import use_tempdirs, set_env_vars
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder
 from openmdao.utils.general_utils import run_driver
@@ -163,7 +163,7 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
     if 'method' in options:
         p.model.approx_totals(method=options['method'])
         del options['method']
-        
+
     min_improve_pct = options.get('min_improve_pct', 5.)
     if 'min_improve_pct' in options:
         del options['min_improve_pct']
@@ -694,7 +694,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         # coloring saves 16 solves per driver iter  (5 vs 21)
         self.assertEqual(p.model._solve_count, 21)
         self.assertEqual(p_color.model._solve_count, 5)
-        
+
     def test_min_improve_pct(self):
         # first, run w/o coloring
         p = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False)
@@ -1105,54 +1105,58 @@ def _get_random_mat(rows, cols):
         return np.random.random(rows * cols).reshape((rows, cols)) - 0.5
 
 
+def build_multipoint_problem(size=10, num_pts=4):
+
+    np.random.seed(11)
+
+    p = om.Problem()
+    p.driver = pyOptSparseDriver()
+    p.driver.options['optimizer'] = OPTIMIZER
+    p.driver.declare_coloring()
+    if OPTIMIZER == 'SNOPT':
+        p.driver.opt_settings['Major iterations limit'] = 100
+        p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
+        p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
+        # p.driver.opt_settings['iSumm'] = 6
+
+    model = p.model
+    for i in range(num_pts):
+        model.add_subsystem('indep%d' % i, om.IndepVarComp('x', val=np.ones(size)))
+        model.add_design_var('indep%d.x' % i)
+
+    par1 = model.add_subsystem('par1', om.ParallelGroup())
+    for i in range(num_pts):
+        mat = _get_random_mat(5, size)
+        par1.add_subsystem('comp%d' % i, om.ExecComp('y=A.dot(x)', A=mat, x=np.ones(size), y=np.ones(5)))
+        model.connect('indep%d.x' % i, 'par1.comp%d.x' % i)
+
+    par2 = model.add_subsystem('par2', om.ParallelGroup())
+    for i in range(num_pts):
+        mat = _get_random_mat(size, 5)
+        par2.add_subsystem('comp%d' % i, om.ExecComp('y=A.dot(x)', A=mat, x=np.ones(5), y=np.ones(size)))
+        model.connect('par1.comp%d.y' % i, 'par2.comp%d.x' % i)
+        par2.add_constraint('comp%d.y' % i, lower=-1.)
+
+        model.add_subsystem('normcomp%d' % i, om.ExecComp("y=sum(x*x)", x=np.ones(size)))
+        model.connect('par2.comp%d.y' % i, 'normcomp%d.x' % i)
+
+    model.add_subsystem('obj', om.ExecComp("y=" + '+'.join(['x%d' % i for i in range(num_pts)])))
+
+    for i in range(num_pts):
+        model.connect('normcomp%d.y' % i, 'obj.x%d' % i)
+
+    model.add_objective('obj.y')
+
+    return p
+
+
 @use_tempdirs
 @unittest.skipUnless(OPTIMIZER is not None, "pyOptSparse required.")
 class MatMultMultipointTestCase(unittest.TestCase):
 
     def test_multipoint_with_coloring(self):
-        size = 10
         num_pts = 4
-
-        np.random.seed(11)
-
-        p = om.Problem()
-        p.driver = pyOptSparseDriver()
-        p.driver.options['optimizer'] = OPTIMIZER
-        p.driver.declare_coloring()
-        if OPTIMIZER == 'SNOPT':
-            p.driver.opt_settings['Major iterations limit'] = 100
-            p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
-            p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
-            # p.driver.opt_settings['iSumm'] = 6
-
-        model = p.model
-        for i in range(num_pts):
-            model.add_subsystem('indep%d' % i, om.IndepVarComp('x', val=np.ones(size)))
-            model.add_design_var('indep%d.x' % i)
-
-        par1 = model.add_subsystem('par1', om.ParallelGroup())
-        for i in range(num_pts):
-            mat = _get_random_mat(5, size)
-            par1.add_subsystem('comp%d' % i, om.ExecComp('y=A.dot(x)', A=mat, x=np.ones(size), y=np.ones(5)))
-            model.connect('indep%d.x' % i, 'par1.comp%d.x' % i)
-
-        par2 = model.add_subsystem('par2', om.ParallelGroup())
-        for i in range(num_pts):
-            mat = _get_random_mat(size, 5)
-            par2.add_subsystem('comp%d' % i, om.ExecComp('y=A.dot(x)', A=mat, x=np.ones(5), y=np.ones(size)))
-            model.connect('par1.comp%d.y' % i, 'par2.comp%d.x' % i)
-            par2.add_constraint('comp%d.y' % i, lower=-1.)
-
-            model.add_subsystem('normcomp%d' % i, om.ExecComp("y=sum(x*x)", x=np.ones(size)))
-            model.connect('par2.comp%d.y' % i, 'normcomp%d.x' % i)
-
-        model.add_subsystem('obj', om.ExecComp("y=" + '+'.join(['x%d' % i for i in range(num_pts)])))
-
-        for i in range(num_pts):
-            model.connect('normcomp%d.y' % i, 'obj.x%d' % i)
-
-        model.add_objective('obj.y')
-
+        p = build_multipoint_problem(size=10, num_pts=num_pts)
         p.setup()
 
         p.run_driver()
@@ -1160,26 +1164,15 @@ class MatMultMultipointTestCase(unittest.TestCase):
         J = p.compute_totals()
 
         for i in range(num_pts):
-            cname = 'par2.comp%d' % i
-            vname = cname + '.A'
-            A1 = p.get_val('par1.comp%d.A'%i, get_remote=True)
-            A2 = p.get_val('par2.comp%d.A'%i, get_remote=True)
+            with multi_proc_exception_check(p.comm):
+                A1 = p.get_val('par1.comp%d.A'%i, get_remote=True)
+            with multi_proc_exception_check(p.comm):
+                A2 = p.get_val('par2.comp%d.A'%i, get_remote=True)
             norm = np.linalg.norm(J['par2.comp%d.y'%i,'indep%d.x'%i] - A2.dot(A1))
-            self.assertLess(norm, 1.e-7)
+            with multi_proc_exception_check(p.comm):
+                self.assertLess(norm, 1.e-7)
 
         print("final obj:", p['obj.y'])
-
-
-# use_tempdirs is inherited
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class MatMultMultipointMPI2TestCase(MatMultMultipointTestCase):
-    N_PROCS = 2
-
-
-# use_tempdirs is inherited
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class MatMultMultipointMPI4TestCase(MatMultMultipointTestCase):
-    N_PROCS = 4
 
 
 @use_tempdirs

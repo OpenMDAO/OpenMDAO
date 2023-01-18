@@ -12,7 +12,7 @@ from openmdao.utils.general_utils import format_as_float_or_array
 from openmdao.utils.units import simplify_unit
 
 
-_inst_functs = ['apply_linear']
+_inst_functs = ['apply_linear', 'solve_nonlinear']
 _full_slice = slice(None)
 
 
@@ -76,6 +76,10 @@ class ImplicitComponent(Component):
         """
         self._has_guess = overrides_method('guess_nonlinear', self, ImplicitComponent)
 
+        solve_nl = getattr(self, 'solve_nonlinear')
+        self._has_solve_nl = (overrides_method('solve_nonlinear', self, ImplicitComponent) or
+                              solve_nl != self._inst_functs['solve_nonlinear'])
+
         new_apply_linear = getattr(self, 'apply_linear', None)
 
         self.matrix_free = (overrides_method('apply_linear', self, ImplicitComponent) or
@@ -88,13 +92,15 @@ class ImplicitComponent(Component):
         """
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
             with self._call_user_function('apply_nonlinear', protect_outputs=True):
-                args = [self._inputs, self._outputs, self._residuals_wrapper]
-                if self._discrete_inputs or self._discrete_outputs:
-                    args += [self._discrete_inputs, self._discrete_outputs]
-
                 if self._run_root_only():
                     if self.comm.rank == 0:
-                        self.apply_nonlinear(*args)
+                        if self._discrete_inputs or self._discrete_outputs:
+                            self.apply_nonlinear(self._inputs, self._outputs,
+                                                 self._residuals_wrapper,
+                                                 self._discrete_inputs, self._discrete_outputs)
+                        else:
+                            self.apply_nonlinear(self._inputs, self._outputs,
+                                                 self._residuals_wrapper)
                         self.comm.bcast([self._residuals.asarray(), self._discrete_outputs], root=0)
                     else:
                         new_res, new_disc_outs = self.comm.bcast(None, root=0)
@@ -103,7 +109,11 @@ class ImplicitComponent(Component):
                             for name, val in new_disc_outs.items():
                                 self._discrete_outputs[name] = val
                 else:
-                    self.apply_nonlinear(*args)
+                    if self._discrete_inputs or self._discrete_outputs:
+                        self.apply_nonlinear(self._inputs, self._outputs, self._residuals_wrapper,
+                                             self._discrete_inputs, self._discrete_outputs)
+                    else:
+                        self.apply_nonlinear(self._inputs, self._outputs, self._residuals_wrapper)
 
         self.iter_count_apply += 1
 
@@ -114,16 +124,18 @@ class ImplicitComponent(Component):
         if self._nonlinear_solver is not None:
             with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
                 self._nonlinear_solver._solve_with_cache_check()
-        else:
+        elif self._has_solve_nl:
             with self._unscaled_context(outputs=[self._outputs]):
                 with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
                     with self._call_user_function('solve_nonlinear'):
-                        args = [self._inputs, self._outputs]
-                        if self._discrete_inputs or self._discrete_outputs:
-                            args += [self._discrete_inputs, self._discrete_outputs]
                         if self._run_root_only():
                             if self.comm.rank == 0:
-                                self.solve_nonlinear(*args)
+                                if self._discrete_inputs or self._discrete_outputs:
+                                    self.solve_nonlinear(self._inputs, self._outputs,
+                                                         self._discrete_inputs,
+                                                         self._discrete_outputs)
+                                else:
+                                    self.solve_nonlinear(self._inputs, self._outputs)
                                 self.comm.bcast([self._outputs.asarray(), self._discrete_outputs],
                                                 root=0)
                             else:
@@ -133,7 +145,11 @@ class ImplicitComponent(Component):
                                     for name, val in new_disc_outs.items():
                                         self._discrete_outputs[name] = val
                         else:
-                            self.solve_nonlinear(*args)
+                            if self._discrete_inputs or self._discrete_outputs:
+                                self.solve_nonlinear(self._inputs, self._outputs,
+                                                     self._discrete_inputs, self._discrete_outputs)
+                            else:
+                                self.solve_nonlinear(self._inputs, self._outputs)
 
         # Iteration counter is incremented in the Recording context manager at exit.
 
@@ -293,19 +309,23 @@ class ImplicitComponent(Component):
         Call linearize based on the value of the "run_root_only" option.
         """
         with self._call_user_function('linearize', protect_outputs=True):
-            args = [self._inputs, self._outputs, self._jac_wrapper]
-            if self._discrete_inputs or self._discrete_outputs:
-                args += [self._discrete_inputs, self._discrete_outputs]
-
             if self._run_root_only():
                 if self.comm.rank == 0:
-                    self.linearize(*args)
+                    if self._discrete_inputs or self._discrete_outputs:
+                        self.linearize(self._inputs, self._outputs, self._jac_wrapper,
+                                       self._discrete_inputs, self._discrete_outputs)
+                    else:
+                        self.linearize(self._inputs, self._outputs, self._jac_wrapper)
                     self.comm.bcast(list(self._jacobian.items()), root=0)
                 else:
                     for key, val in self.comm.bcast(None, root=0):
                         self._jac_wrapper[key] = val
             else:
-                self.linearize(*args)
+                if self._discrete_inputs or self._discrete_outputs:
+                    self.linearize(self._inputs, self._outputs, self._jac_wrapper,
+                                   self._discrete_inputs, self._discrete_outputs)
+                else:
+                    self.linearize(self._inputs, self._outputs, self._jac_wrapper)
 
     def _linearize(self, jac=None, sub_do_ln=True):
         """

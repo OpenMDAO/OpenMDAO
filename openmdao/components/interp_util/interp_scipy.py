@@ -185,7 +185,7 @@ class InterpScipy(InterpAlgorithm):
         # for spline based methods
 
         # requires floating point input
-        xi = xi.astype(np.float)
+        xi = xi.astype(float)
 
         # ensure xi is 2D list of points to evaluate
         if xi.ndim == 1:

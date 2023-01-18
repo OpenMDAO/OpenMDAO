@@ -1411,15 +1411,13 @@ class Group(System):
         pathname = self.pathname
 
         abs_in2out = {}
+        new_conns = {}
 
-        if pathname == '':
-            path_len = 0
-            nparts = 0
-        else:
+        if pathname:
             path_len = len(pathname) + 1
             nparts = len(pathname.split('.'))
-
-        new_conns = {}
+        else:
+            path_len = nparts = 0
 
         if conns is not None:
             for abs_in, abs_out in conns.items():
@@ -1565,7 +1563,7 @@ class Group(System):
             conn_list.extend(subgroup._conn_global_abs_in2out.items())
 
         if len(conn_list) > len(global_abs_in2out):
-            dupes = [n for n, val in Counter(tgt for tgt, src in conn_list).items() if val > 1]
+            dupes = [n for n, val in Counter(tgt for tgt, _ in conn_list).items() if val > 1]
             dup_info = defaultdict(set)
             for tgt, src in conn_list:
                 for dup in dupes:

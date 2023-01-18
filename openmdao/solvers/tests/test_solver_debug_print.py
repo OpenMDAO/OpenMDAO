@@ -183,6 +183,34 @@ class TestNonlinearSolvers(unittest.TestCase):
         with open(self.filename, 'r') as f:
             self.assertEqual(f.read(), self.expected_data)
 
+    def test_solver_debug_print_multi_run_scenario(self):
+
+        p = om.Problem()
+        model = p.model
+
+        model.add_subsystem('circuit', Circuit())
+
+        p.setup()
+
+        nl = model.circuit.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+
+        nl.options['iprint'] = 2
+        nl.options['debug_print'] = True
+        nl.options['err_on_non_converge'] = False
+
+        # set some poor initial guesses so that we don't converge
+        p.set_val('circuit.I_in', 0.1, units='A')
+        p.set_val('circuit.Vg', 0.0, units='V')
+        p.set_val('circuit.n1.V', 10.)
+        p.set_val('circuit.n2.V', 1e-3)
+
+        p.run_model()
+        p.set_solver_print(level=-1)
+        output = run_model(p)
+
+        # Should be empty since solver debugging printing was turned off
+        self.assertEqual(output, '')
+
 
 class TestNonlinearSolversIsolated(unittest.TestCase):
     """

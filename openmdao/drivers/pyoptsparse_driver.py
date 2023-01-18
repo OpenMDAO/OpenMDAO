@@ -346,6 +346,7 @@ class pyOptSparseDriver(Driver):
         self._fill_NANs = not respects_fail_flag[self.options['optimizer']]
 
         self._check_for_missing_objective()
+        self._check_for_invalid_desvar_values()
         self._check_jac = self.options['singular_jac_behavior'] in ['error', 'warn']
 
         # Only need initial run if we have linear constraints or if we are using an optimizer that

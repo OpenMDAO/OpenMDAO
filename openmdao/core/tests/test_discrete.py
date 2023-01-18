@@ -721,6 +721,62 @@ class DiscreteTestCase(unittest.TestCase):
 
         self.assertEqual(prob['x'], 10)
 
+    def test_get_io_metadata_discrete(self):
+        prob = om.Problem()
+        model = prob.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_discrete_output('x', 11)
+        model.add_subsystem('comp', ModCompEx(3))
+
+        model.connect('indep.x', 'comp.x')
+
+        prob.setup()
+        prob.run_model()
+
+        assert_near_equal(prob.model.get_io_metadata(includes='comp.*'), {
+                          'comp.a': {'copy_shape': None,
+                                     'desc': '',
+                                     'discrete': False,
+                                     'distributed': False,
+                                     'global_shape': (1,),
+                                     'global_size': 1,
+                                     'has_src_indices': False,
+                                     'prom_name': 'comp.a',
+                                     'shape': (1,),
+                                     'shape_by_conn': False,
+                                     'size': 1,
+                                     'tags': set(),
+                                     'units': None},
+                          'comp.b': {'copy_shape': None,
+                                     'desc': '',
+                                     'discrete': False,
+                                     'distributed': False,
+                                     'global_shape': (1,),
+                                     'global_size': 1,
+                                     'lower': None,
+                                     'prom_name': 'comp.b',
+                                     'ref': 1.0,
+                                     'ref0': 0.0,
+                                     'res_ref': 1.0,
+                                     'shape': (1,),
+                                     'shape_by_conn': False,
+                                     'size': 1,
+                                     'tags': set(),
+                                     'units': None,
+                                     'upper': None},
+                          'comp.x': {'desc': '',
+                                     'discrete': True,
+                                     'prom_name': 'comp.x',
+                                     'tags': {'tagx'},
+                                     'type': int},
+                          'comp.y': {'desc': '',
+                                     'discrete': True,
+                                     'prom_name': 'comp.y',
+                                     'tags': {'tagy'},
+                                     'type': int}
+                          })
+
 
 class SolverDiscreteTestCase(unittest.TestCase):
     def _setup_model(self, solver_class):

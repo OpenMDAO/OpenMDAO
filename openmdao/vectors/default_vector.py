@@ -24,9 +24,65 @@ class DefaultVector(Vector):
         Pointer to the vector owned by the root system.
     alloc_complex : bool
         Whether to allocate any imaginary storage to perform complex step. Default is False.
+
+    Attributes
+    ----------
+    _views_rel : dict or None
+        If owning system is a component, this will contain a mapping of relative names to views.
     """
 
     TRANSFER = DefaultTransfer
+
+    def __init__(self, name, kind, system, root_vector=None, alloc_complex=False):
+        """
+        Initialize all attributes.
+        """
+        self._views_rel = None
+        super().__init__(name, kind, system, root_vector=root_vector, alloc_complex=alloc_complex)
+
+    def __getitem__(self, name):
+        """
+        Get the variable value.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the owning system's namespace.
+
+        Returns
+        -------
+        float or ndarray
+            variable value.
+        """
+        if self._views_rel is not None:
+            try:
+                if self._under_complex_step:
+                    return self._views_rel[name]
+                return self._views_rel[name].real
+            except KeyError:
+                pass  # try normal lookup after rel lookup failed
+
+        return super().__getitem__(name)
+
+    def __setitem__(self, name, value):
+        """
+        Set the variable value.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the owning system's namespace.
+        value : float or list or tuple or ndarray
+            variable value to set
+        """
+        if self._views_rel is not None and not self.read_only:
+            try:
+                self._views_rel[name][:] = value
+                return
+            except Exception:
+                pass  # fall through to normal set if fast one failed in any way
+
+        self.set_var(name, value)
 
     def _get_data(self):
         """
@@ -41,9 +97,7 @@ class DefaultVector(Vector):
         ndarray
             The data array or its real part.
         """
-        if self._under_complex_step:
-            return self._data
-        return self._data.real
+        return self._data if self._under_complex_step else self._data.real
 
     def _create_data(self):
         """
@@ -134,15 +188,12 @@ class DefaultVector(Vector):
     def _initialize_views(self):
         """
         Internally assemble views onto the vectors.
-
-        Sets the following attributes:
-        _views
-        _views_flat
         """
         system = self._system()
         io = self._typ
         kind = self._kind
         islinear = self._name == 'linear'
+        rel_lookup = system._has_fast_rel_lookup()
 
         do_scaling = self._do_scaling
         if do_scaling:
@@ -151,6 +202,11 @@ class DefaultVector(Vector):
 
         self._views = views = {}
         self._views_flat = views_flat = {}
+        if rel_lookup:
+            self._views_rel = views_rel = {}
+            relstart = len(system.pathname) + 1 if system.pathname else 0
+        else:
+            self._views_rel = None
 
         start = end = 0
         for abs_name, meta in system._var_abs2meta[io].items():
@@ -161,6 +217,9 @@ class DefaultVector(Vector):
                 v = v.view()
                 v.shape = shape
             views[abs_name] = v
+
+            if rel_lookup:
+                views_rel[abs_name[relstart:]] = v
 
             if do_scaling:
                 factor_tuple = factors[abs_name][kind]
@@ -382,7 +441,7 @@ class DefaultVector(Vector):
         """
         Return an array representation of this vector.
 
-        If copy is True, return a copy.  Otherwise, try to avoid it.
+        If copy is True, return a copy.
 
         Parameters
         ----------
