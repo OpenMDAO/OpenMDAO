@@ -261,6 +261,15 @@ class NodeConnectionInfo extends NodeInfo {
     }
 
     /**
+     * Find the best label for a connected node.
+     * @param {TreeNode} node The node to determine a name for.
+     * @returns The promoted name if it has one, otherwise the absolute path.
+     */
+    nodeName(node) {
+        return node.promotedName? node.promotedName : node.path;
+    }
+
+    /**
      * Gather all connections between the two cells that this one represents.
      * @param {Array} connList The connections discovered so far.
      * @param {TreeNode} srcNode The source node to search.
@@ -273,10 +282,14 @@ class NodeConnectionInfo extends NodeInfo {
             }
         }
         else {
+            if (srcNode.parent === tgtNode.parent) {
+                const newConn = { 'src': this.nodeName(srcNode), 'tgt': this.nodeName(tgtNode) };
+                connList.push(newConn);
+            }
             for (const tgt of srcNode.targetParentSet) {
                 if (tgt.isLeaf() && tgt.hasParent(tgtNode, null, true)) {
-                    const newConn = { 'src': srcNode.path, 'tgt': tgt.path};
-                    connList.push(newConn)
+                    const newConn = { 'src': this.nodeName(srcNode), 'tgt': this.nodeName(tgt) };
+                    connList.push(newConn);
                 }
             }
         }
@@ -318,11 +331,15 @@ class NodeConnectionInfo extends NodeInfo {
                 .text(conn.src);
 
             newRow.append('td').html(' &#x2501;&#x2501;&#x2501;&#x25ba; ');
-
             newRow.append('td').text(conn.tgt);
         }
 
-        this.title(`Connections from ${cell.srcObj.path} to ${cell.tgtObj.path}`)
+        let title = 'Connections';
+        if ( ! (cell.srcObj.isLeaf() || cell.tgtObj.isLeaf()) ) {
+            title += ` from ${this.nodeName(cell.srcObj)} to ${this.nodeName(cell.tgtObj)}`;
+        }
+
+        this.title(title)
             .sizeToContent(0, 2, true)
             .moveNearMouse(event)
             .show();
