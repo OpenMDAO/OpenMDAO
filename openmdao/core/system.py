@@ -59,13 +59,13 @@ _supported_methods = {
 
 _DEFAULT_COLORING_META = {
     'wrt_patterns': ('*',),  # patterns used to match wrt variables
-    'method': 'fd',          # finite differencing method  ('fd' or 'cs')
-    'wrt_matches': None,     # where matched wrt names are stored
-    'per_instance': True,    # assume each instance can have a different coloring
-    'coloring': None,        # this will contain the actual Coloring object
-    'dynamic': False,        # True if dynamic coloring is being used
-    'static': None,          # either _STD_COLORING_FNAME, a filename, or a Coloring object
-                             # if use_fixed_coloring was called
+    'method': 'fd',  # finite differencing method  ('fd' or 'cs')
+    'wrt_matches': None,  # where matched wrt names are stored
+    'per_instance': True,  # assume each instance can have a different coloring
+    'coloring': None,  # this will contain the actual Coloring object
+    'dynamic': False,  # True if dynamic coloring is being used
+    'static': None,  # either _STD_COLORING_FNAME, a filename, or a Coloring object
+    # if use_fixed_coloring was called
 }
 
 _DEFAULT_COLORING_META.update(_DEF_COMP_SPARSITY_ARGS)
@@ -436,7 +436,7 @@ class System(object):
                                        Uses fnmatch wildcards')
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
-                                       '(processed post-includes). Uses fnmatch wildcards')
+                                            '(processed post-includes). Uses fnmatch wildcards')
         self.recording_options.declare('options_excludes', types=list, default=[],
                                        desc='User-defined metadata to exclude in recording')
 
@@ -544,7 +544,7 @@ class System(object):
         self._filtered_vars_to_record = {}
         self._owning_rank = None
         self._coloring_info = _DEFAULT_COLORING_META.copy()
-        self._first_call_to_linearize = True   # will check in first call to _linearize
+        self._first_call_to_linearize = True  # will check in first call to _linearize
         self._tot_jac = None
         self._saved_errors = None if env_truthy('OPENMDAO_FAIL_FAST') else []
 
@@ -909,9 +909,9 @@ class System(object):
         if not isinstance(name, str):
             raise TypeError('{}: The name argument should be a string, got {}'.format(self.msginfo,
                                                                                       name))
-        are_new_bounds = lower != _UNDEFINED or upper != _UNDEFINED
-        are_new_scaling = scaler != _UNDEFINED or adder != _UNDEFINED or ref != _UNDEFINED or \
-            ref0 != _UNDEFINED
+        are_new_bounds = lower is not _UNDEFINED or upper is not _UNDEFINED
+        are_new_scaling = scaler is not _UNDEFINED or adder is not _UNDEFINED or ref is not \
+            _UNDEFINED or ref0 is not _UNDEFINED
 
         # Must set at least one argument for this function to do something
         if not are_new_scaling and not are_new_bounds:
@@ -940,9 +940,9 @@ class System(object):
         #   method and what were the existing bounds
         if are_new_bounds:
             # wipe out all the bounds and only use what is set by the arguments to this call
-            if lower == _UNDEFINED:
+            if lower is _UNDEFINED:
                 lower = None
-            if upper == _UNDEFINED:
+            if upper is _UNDEFINED:
                 upper = None
         else:
             lower = existing_dv_meta['lower']
@@ -1061,9 +1061,10 @@ class System(object):
             raise TypeError('{}: The name argument should be a string, '
                             'got {}'.format(self.msginfo, name))
 
-        are_new_bounds = equals != _UNDEFINED or lower != _UNDEFINED or upper != _UNDEFINED
-        are_new_scaling = scaler != _UNDEFINED or adder != _UNDEFINED or ref != _UNDEFINED or \
-            ref0 != _UNDEFINED
+        are_new_bounds = equals is not _UNDEFINED or lower is not _UNDEFINED or upper is not \
+            _UNDEFINED
+        are_new_scaling = scaler is not _UNDEFINED or adder is not _UNDEFINED or \
+            ref is not _UNDEFINED or ref0 is not _UNDEFINED
 
         # At least one of the scaling or bounds parameters must be set or function won't do anything
         if not are_new_scaling and not are_new_bounds:
@@ -1109,11 +1110,11 @@ class System(object):
         #   method and what were the existing bounds
         if are_new_bounds:
             # wipe the slate clean and only use what is set by the arguments to this call
-            if equals == _UNDEFINED:
+            if equals is _UNDEFINED:
                 equals = None
-            if lower == _UNDEFINED:
+            if lower is _UNDEFINED:
                 lower = None
-            if upper == _UNDEFINED:
+            if upper is _UNDEFINED:
                 upper = None
         else:
             equals = existing_cons_meta['equals']
@@ -1180,6 +1181,7 @@ class System(object):
             raise TypeError("Argument 'upper' can not be a string ('{}' given). You can not "
                             "specify a variable as upper bound. You can only provide constant "
                             "float values".format(upper))
+
         # Convert equals to ndarray/float as necessary
         if equals is not None:
             try:
@@ -1247,7 +1249,7 @@ class System(object):
             raise TypeError('{}: The name argument should be a string, got {}'.format(self.msginfo,
                                                                                       name))
         # At least one of the scaling parameters must be set or function does nothing
-        if scaler == _UNDEFINED and adder == _UNDEFINED and ref == _UNDEFINED and ref0 == \
+        if scaler is _UNDEFINED and adder is _UNDEFINED and ref is _UNDEFINED and ref0 == \
                 _UNDEFINED:
             raise RuntimeError(
                 'Must set a value for at least one argument in call to set_objective_options.')
@@ -1275,13 +1277,13 @@ class System(object):
 
         # Since one or more of these are being set by the incoming arguments, the
         #   ones that are not being set should be set to None since they will be re-computed below
-        if scaler == _UNDEFINED:
+        if scaler is _UNDEFINED:
             scaler = None
-        if adder == _UNDEFINED:
+        if adder is _UNDEFINED:
             adder = None
-        if ref == _UNDEFINED:
+        if ref is _UNDEFINED:
             ref = None
-        if ref0 == _UNDEFINED:
+        if ref0 is _UNDEFINED:
             ref0 = None
 
         new_obj_metadata = {}
@@ -1400,7 +1402,7 @@ class System(object):
         if method not in _supported_methods:
             msg = '{}: Method "{}" is not supported, method must be one of {}'
             raise ValueError(msg.format(self.msginfo, method,
-                             [m for m in _supported_methods if m != 'exact']))
+                                        [m for m in _supported_methods if m != 'exact']))
         if method not in self._approx_schemes:
             self._approx_schemes[method] = _supported_methods[method]()
         return self._approx_schemes[method]
@@ -2707,7 +2709,7 @@ class System(object):
 
                 if old_key != '*':
                     msg = f"{io} variable '{name}', promoted using {new_using}, " \
-                        f"was already promoted using {old_using}."
+                          f"was already promoted using {old_using}."
                     issue_warning(msg, prefix=self.msginfo, category=PromotionWarning)
             except Exception:
                 type_exc, exc, tb = sys.exc_info()
@@ -4839,7 +4841,7 @@ class System(object):
         """
         if MPI:
             raise RuntimeError(self.msginfo + ": Recording of Systems when running parallel "
-                               "code is not supported yet")
+                                              "code is not supported yet")
 
         self._rec_mgr.append(recorder)
 
@@ -5141,7 +5143,7 @@ class System(object):
         if get_remote and (distrib or abs_name in vars_to_gather) and self.comm.size > 1:
             owner = self._owning_rank[abs_name]
             myrank = self.comm.rank
-            if rank is None:   # bcast
+            if rank is None:  # bcast
                 if distrib:
                     idx = self._var_allprocs_abs2idx[abs_name]
                     sizes = self._var_sizes[typ][:, idx]
@@ -5162,7 +5164,7 @@ class System(object):
                     # TODO: use Bcast if not discrete for speed
                     new_val = self.comm.bcast(val, root=owner)
                     val = new_val
-            else:   # retrieve to rank
+            else:  # retrieve to rank
                 if distrib:
                     idx = self._var_allprocs_abs2idx[abs_name]
                     sizes = self._var_sizes[typ][:, idx]
@@ -5480,7 +5482,7 @@ class System(object):
             else:
                 val = self.convert2units(abs_name, val, units)
         elif (vmeta['units'] is not None and smeta['units'] is not None and
-                vmeta['units'] != smeta['units']):
+              vmeta['units'] != smeta['units']):
             val = self.convert2units(src, val, vmeta['units'])
 
         return val

@@ -7,11 +7,13 @@ import numpy as np
 from openmdao.api import Problem, ExecComp, ExplicitComponent
 from openmdao.components.linear_system_comp import LinearSystemComp
 from openmdao.core.implicitcomponent import ImplicitComponent
+from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.drivers.scipy_optimizer import ScipyOptimizeDriver
 from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
 from openmdao.solvers.nonlinear.broyden import BroydenSolver
 from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
+from openmdao.test_suite.components.expl_comp_array import TestExplCompArraySparse
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarProblem
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -271,6 +273,20 @@ class TestSystemSetSolverOutputOptions(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, msg) as cm:
             prob.run_driver()
 
+    def test_set_output_solver_options_vector_values(self):
+        class SimpleImpComp(ImplicitComponent):
+            def setup(self):
+                self.add_output('y', np.array([3, 1]), upper = np.array([10,10]))
+                self.declare_partials(of='*', wrt='*')
+        prob = Problem()
+        prob.model.add_subsystem('px', SimpleImpComp())
+        prob.setup()
+
+        new_upper_solver_option = np.array([1,1])
+        prob.model.set_output_solver_options(name='px.y', upper = new_upper_solver_option)
+        prob.setup()
+        output_meta = prob.model._var_allprocs_abs2meta['output']
+        assert_near_equal(output_meta['px.y']['upper'], new_upper_solver_option)
 
 class TestSystemSetDesignVarOptions(unittest.TestCase):
     def test_set_design_var_options_scaler_adder_ref_ref0(self):
@@ -398,6 +414,28 @@ class TestSystemSetDesignVarOptions(unittest.TestCase):
         prob.run_driver()
         assert_near_equal(prob['x'], x_when_setting_using_add_design_var, 1e-6)
         assert_near_equal(prob['y'], y_when_setting_using_add_design_var, 1e-6)
+
+    def test_set_design_var_options_vector_values(self):
+        prob = Problem(model=SellarDerivatives())
+        model = prob.model
+        model.nonlinear_solver = NonlinearBlockGS()
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', lower=-100, upper=100)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.setup()
+        new_z_lower_bound = np.array([0.0, 0.0])
+        model.set_design_var_options("z", lower=np.array(new_z_lower_bound))
+        des_vars_using_set_design_var_options = prob.model.get_design_vars()
+        assert_near_equal(des_vars_using_set_design_var_options['z']['lower'], new_z_lower_bound)
+
 
 class TestSystemSetConstraintsOptions(unittest.TestCase):
 
@@ -586,6 +624,32 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
               "that has multiple aliases: ['y0', 'yf']. Call set_objective_options with the " \
               "'alias' argument set to one of those aliases."
         self.assertEqual(str(cm.exception), msg)
+
+    def test_set_constraint_options_vector_values(self):
+        prob = Problem()
+        model = prob.model
+        model.add_subsystem('p1', IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
+        model.add_subsystem('comp', TestExplCompArraySparse(), promotes=['*'])
+        model.add_subsystem('obj',
+                            ExecComp('o = areas[0, 0] + areas[1, 1]', areas=np.zeros((2, 2))),
+                            promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
+
+        model.add_design_var('widths', lower=-50.0, upper=50.0)
+        model.add_objective('o')
+        model.add_constraint('areas', equals=np.array([24.0, 21.0, 3.5, 17.5]))
+
+        prob.setup()
+
+        new_areas_equals_bound = np.array([4.0, 1.0, 0.5, 7.5])
+        prob.model.set_constraint_options(name='areas', equals=new_areas_equals_bound)
+        constraints_using_set_objective_options = prob.model.get_constraints()
+        assert_near_equal(constraints_using_set_objective_options['comp.areas']['equals'],
+                          new_areas_equals_bound)
+
 
 class TestSystemSetObjectiveOptions(unittest.TestCase):
     def test_set_objective_options_scaler_adder_ref_ref0(self):
