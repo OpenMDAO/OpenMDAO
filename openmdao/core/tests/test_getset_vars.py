@@ -4,6 +4,7 @@ import unittest
 import numpy as np
 import openmdao.api as om
 from openmdao.utils.mpi import MPI
+from openmdao.utils.assert_utils import assert_near_equal
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -118,7 +119,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         # -------------------------------------------------------------------
 
-        msg = '\'<model> <class om.Group>: Variable "{}" not found.\''
+        msg = '\'<model> <class Group>: Variable "{}" not found.\''
 
         # inputs
         with self.assertRaises(KeyError) as ctx:
@@ -447,31 +448,49 @@ class ParTestCase(unittest.TestCase):
         np.testing.assert_allclose(p['par.C2.y'], (np.arange(7,10) + 1.) * 9.)
 
 
-class SubGroup(om.Group):
-    def setup(self):
-        self.add_subsystem('C1', om.ExecComp('y=2*x'))
-        self.add_subsystem('C2', om.ExecComp('y=3*x'))
-
-
-class DynGroup(om.Group):
-    def __init__(self, cfg, **kwargs):
+class AdderGroup(om.Group):
+    # creates either a sub-group or a sub-component depending on depth, and at configure time
+    # it modifies the input 'x' of the bottom level component.
+    def __init__(self, depth, mydepth, relnames, **kwargs):
         super().__init__(**kwargs)
-        self.cfg = cfg
+        self.depth = mydepth
+        self.total_depth = depth
+        self.relnames = relnames
 
     def setup(self):
-        self.add_subsystem('sub', SubGroup())
+        if self.depth == self.total_depth:
+            self.add_subsystem('C1', om.ExecComp('y=2*x', x=1.0, y=1.0))
+        else:
+            self.add_subsystem('sub', AdderGroup(self.total_depth, self.depth + 1, self.relnames))
 
     def configure(self):
-        if self.cfg == 'config1':
-            pass
-        elif self.cfg == 'config2':
-            pass
+        if self.relnames:
+            vname = 'sub.' * (self.total_depth - self.depth) + 'C1.x'
+        else:
+            vname = 'sub.' * (self.total_depth + 1) + 'C1.x'
+        self.set_val(vname, float(self.total_depth - self.depth))
 
 
 class SystemSetValTestCase(unittest.TestCase):
     def test_config_sets(self):
+        depth = 3
         p = om.Problem()
         model = p.model
+        model.add_subsystem('sub', AdderGroup(depth, 0, relnames=False))
+        p.setup()
+        p.run_model()
+        vname = 'sub.' * (depth + 1) + 'C1.x'
+        assert_near_equal(p[vname], float(depth))
+
+    def test_config_sets_relative(self):
+        depth = 3
+        p = om.Problem()
+        model = p.model
+        model.add_subsystem('sub', AdderGroup(depth, 0, relnames=True))
+        p.setup()
+        p.run_model()
+        vname = 'sub.' * (depth + 1) + 'C1.x'
+        assert_near_equal(p[vname], float(depth))
 
 
 

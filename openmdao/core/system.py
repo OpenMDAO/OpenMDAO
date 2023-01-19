@@ -5353,7 +5353,20 @@ class System(object):
         except AttributeError:
             ginputs = {}  # could happen if top level system is not a Group
 
-        abs_names = name2abs_names(model, name)
+        relname = False
+        if post_setup:
+            abs_names = name2abs_names(model, name)
+        else:
+            if self.pathname:
+                if name.startswith(self.pathname + '.'):
+                    # absolute name
+                    abs_names = [name]
+                else:  # relative
+                    abs_names = [self.pathname + '.' + name]
+                    relname = True
+            else:
+                abs_names = [name]
+
         if abs_names:
             n_proms = len(abs_names)  # for output this will never be > 1
             if n_proms > 1 and name in ginputs:
