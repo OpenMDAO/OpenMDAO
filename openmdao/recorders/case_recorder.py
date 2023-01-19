@@ -33,8 +33,6 @@ class CaseRecorder(object):
         System inputs values, post-filtering, to be used by a derived recorder.
     _outputs : dict
         System or Solver output values, post-filtering, to be used by a derived recorder.
-    _resids : dict
-        System or Solver residual values, post-filtering, to be used by a derived recorder.
     _abs_error : float
         Solver abs_error value, to be used by a derived recorder.
     _rel_error : float

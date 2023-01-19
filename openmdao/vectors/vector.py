@@ -55,10 +55,6 @@ class Vector(object):
         Specific kind of vector, either 'input', 'output', or 'residual'.
     _system : System
         Pointer to the owning system.
-    _iproc : int
-        Global processor index.
-    _length : int
-        Length of flattened vector.
     _views : dict
         Dictionary mapping absolute variable names to the ndarray views.
     _views_flat : dict

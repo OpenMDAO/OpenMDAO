@@ -249,7 +249,107 @@ def _calltree_exec(options, user_args):
     get_nested_calls(klass, func_name, stream)
 
 
-if __name__ == '__main__':
-    import openmdao.api as om
+def _target_iter(targets):
+    for target in targets:
+        if isinstance(target, ast.Tuple):
+            for t in target.elts:
+                yield t
+        else:
+            yield target
 
-    get_nested_calls(om.LinearBlockGS, 'solve')
+
+class _AttrCollector(ast.NodeVisitor):
+    """
+    An ast.NodeVisitor that records class attribute names.
+    """
+
+    def __init__(self, class_dict):
+        super().__init__()
+        self.class_dict = class_dict
+        self.class_stack = []
+        self.func_stack = []
+        self.names = None
+        self.decnames = None
+
+    def get_attributes(self):
+        return self.class_dict
+
+    def visit_ClassDef(self, node):
+        full_name = '.'.join(self.class_stack[:] + [node.name])
+        self.class_stack.append(full_name)
+        self.class_dict[full_name] = set()
+        for stmt in node.body:
+            self.visit(stmt)
+        self.class_stack.pop()
+
+        if self.func_stack:  # ignore classes nested in functs
+            del self.class_dict[full_name]
+
+    def visit_FunctionDef(self, node):
+        self.func_stack.append(node.name)
+        for stmt in node.body:
+            self.visit(stmt)
+        self.func_stack.pop()
+
+        if self.class_stack:
+            # see if this is a property, and if so, treat as an attribute
+            for dec in node.decorator_list:
+                self.decnames = []
+                self.visit(dec)
+                if len(self.decnames) == 1 and self.decnames[0] == 'property':
+                    self.class_dict[self.class_stack[-1]].add(node.name)
+
+        self.decnames = None
+
+    def visit_Assign(self, node):
+        if self.class_stack:
+            for t in _target_iter(node.targets):
+                self.names = []
+                self.visit(t)
+                if len(self.names) > 1 and self.names[0] == 'self':
+                    self.class_dict[self.class_stack[-1]].add(self.names[1])
+
+            self.names = None
+
+    def visit_Attribute(self, node):
+        if self.names is not None:
+            self.visit(node.value)
+            self.names.append(node.attr)
+
+    def visit_Name(self, node):
+        if self.names is not None:
+            self.names.append(node.id)
+        elif self.decnames is not None:
+            self.decnames.append(node.id)
+
+
+def get_class_attributes(fname, class_dict=None):
+    """
+    Find all referenced attributes in all classes defined in the given file.
+
+    Parameters
+    ----------
+    fname : str
+        File name.
+    class_dict : dict or None
+        Dict mapping class names to attribute names.
+
+    Returns
+    -------
+    dict
+        The dict maps class name to a set of attribute names.
+    """
+    if class_dict is None:
+        class_dict = {}
+
+    with open(fname, 'r') as f:
+        source = f.read()
+        node = ast.parse(source, mode='exec')
+        visitor = _AttrCollector(class_dict)
+        visitor.visit(node)
+        return visitor.get_attributes()
+
+
+if __name__ == '__main__':
+    import pprint
+    pprint.pprint(get_class_attributes(__file__))

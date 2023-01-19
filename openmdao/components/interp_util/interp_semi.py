@@ -60,9 +60,6 @@ class InterpNDSemi(object):
         Cache of computed gradients with respect to table values.
     _interp : class
         Class specified as interpolation algorithm, used to regenerate if needed.
-    _interp_config : dict
-        Configuration object that stores the number of points required for each interpolation
-        method.
     _interp_options : dict
         Dictionary of cached interpolator-specific options.
     _xi : ndarray
