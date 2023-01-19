@@ -266,7 +266,9 @@ class NodeConnectionInfo extends NodeInfo {
      * @returns The promoted name if it has one, otherwise the absolute path.
      */
     nodeName(node) {
-        return node.promotedName? node.promotedName : node.path;
+        let name = node.path;
+        if (node.path != node.promotedName) name += `<br><i>(${node.promotedName}</i>)`;
+        return name;
     }
 
     /**
@@ -328,15 +330,15 @@ class NodeConnectionInfo extends NodeInfo {
 
             newRow.append('td')
                 .attr('scope', 'row')
-                .text(conn.src);
+                .html(conn.src);
 
             newRow.append('td').html(' &#x2501;&#x2501;&#x2501;&#x25ba; ');
-            newRow.append('td').text(conn.tgt);
+            newRow.append('td').html(conn.tgt);
         }
 
         let title = 'Connections';
         if ( ! (cell.srcObj.isLeaf() || cell.tgtObj.isLeaf()) ) {
-            title += ` from ${this.nodeName(cell.srcObj)} to ${this.nodeName(cell.tgtObj)}`;
+            title += ` from ${cell.srcObj.path} to ${cell.tgtObj.path}`;
         }
 
         this.title(title)
