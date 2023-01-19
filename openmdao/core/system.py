@@ -1175,7 +1175,7 @@ class System(object):
                 upper = INF_BOUND
             else:
                 upper = format_as_float_or_array('upper', upper, flatten=True)
-                if upper is not INF_BOUND:
+                if upper != INF_BOUND:
                     upper = (upper + adder) * scaler
         except (TypeError, ValueError):
             raise TypeError("Argument 'upper' can not be a string ('{}' given). You can not "
