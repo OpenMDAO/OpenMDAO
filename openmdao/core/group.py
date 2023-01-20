@@ -2510,17 +2510,17 @@ class Group(System):
         System or None
             System if found else None.
         """
-        if name == '':
-            return self
-
         system = self
         for subname in name.split('.'):
-            if subname in system._subsystems_allprocs:
+            try:
                 system = system._subsystems_allprocs[subname].system
-            elif subname in system._static_subsystems_allprocs:
-                system = system._static_subsystems_allprocs[subname].system
-            else:
-                return None
+            except KeyError:
+                try:
+                    system = system._static_subsystems_allprocs[subname].system
+                except KeyError:
+                    if name == '':
+                        return self
+                    return None
         return system
 
     def _apply_nonlinear(self):

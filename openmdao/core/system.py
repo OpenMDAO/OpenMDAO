@@ -5267,9 +5267,11 @@ class System(object):
         return val
 
     def _get_cached_val(self, name, get_remote=False):
+        # this should only be called on the top level System
+        key = (name, self.pathname)
         # We have set and cached already
-        if name in self._initial_condition_cache:
-            return self._initial_condition_cache[name]
+        if key in self._initial_condition_cache:
+            return self._initial_condition_cache[key][0]
 
         # Vector not setup, so we need to pull values from saved metadata request.
         else:
@@ -5282,18 +5284,26 @@ class System(object):
 
             abs_names = name2abs_names(model, name)
             if not abs_names:
-                raise KeyError(f'{model.msginfo}: Variable "{name}" not found.')
+                if self.pathname:
+                    abs_names = name2abs_names(model, self.pathname + '.' + name)
+                if not abs_names:
+                    raise KeyError(f'{model.msginfo}: Variable "{name}" not found.')
 
             abs_name = abs_names[0]
             vars_to_gather = self._problem_meta['vars_to_gather']
+            units = None
 
             meta = model._var_abs2meta
             io = 'output' if abs_name in meta['output'] else 'input'
             if abs_name in meta[io]:
                 if abs_name in conns:
-                    val = meta['output'][conns[abs_name]]['val']
+                    smeta = meta['output'][conns[abs_name]]
+                    val = smeta['val']  # input
+                    units = smeta['units']
                 else:
-                    val = meta[io][abs_name]['val']
+                    vmeta = meta[io][abs_name]
+                    val = vmeta['val']
+                    units = vmeta['units']
             else:
                 # not found in real outputs or inputs, try discretes
                 meta = model._var_discrete
@@ -5313,11 +5323,11 @@ class System(object):
 
             if val is not _UNDEFINED:
                 # Need to cache the "get" in case the user calls in-place numpy operations.
-                self._initial_condition_cache[name] = val
+                self._initial_condition_cache[key] = (val, units)
 
             return val
 
-    def set_val(self, name, val, units=None, indices=None, rank=None, vec_name='nonlinear'):
+    def set_val(self, name, val, units=None, indices=None):
         """
         Get an output/input/residual variable.
 
@@ -5333,15 +5343,11 @@ class System(object):
             Units of the value being set.
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to set.
-        rank : int or None
-            If not None, only set the value on this rank.
-        vec_name : str
-            Name of the vector to use.   Defaults to 'nonlinear'.
         """
         model = self._problem_meta['model_ref']()
         conns = model._conn_global_abs_in2out
-        post_setup = self._problem_meta['setup_status'] > _SetupStatus.POST_SETUP
-        no_vectors = self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP
+        post_setup = self._problem_meta['setup_status'] >= _SetupStatus.POST_SETUP
+        has_vectors = self._problem_meta['setup_status'] >= _SetupStatus.POST_FINAL_SETUP
         value = val
 
         all_meta = model._var_allprocs_abs2meta
@@ -5353,19 +5359,11 @@ class System(object):
         except AttributeError:
             ginputs = {}  # could happen if top level system is not a Group
 
-        relname = False
         if post_setup:
-            abs_names = name2abs_names(model, name)
+            abs_names = name2abs_names(self, name)
         else:
-            if self.pathname:
-                if name.startswith(self.pathname + '.'):
-                    # absolute name
-                    abs_names = [name]
-                else:  # relative
-                    abs_names = [self.pathname + '.' + name]
-                    relname = True
-            else:
-                abs_names = [name]
+            raise RuntimeError(f"{self.msginfo}: Called set_val({name}, ...) before setup "
+                               "completes.")
 
         if abs_names:
             n_proms = len(abs_names)  # for output this will never be > 1
@@ -5376,9 +5374,11 @@ class System(object):
         else:
             raise KeyError(f'{model.msginfo}: Variable "{name}" not found.')
 
-        if abs_name in conns:
+        set_units = None
+
+        if abs_name in conns:  # we're setting an input
             src = conns[abs_name]
-            if abs_name not in model._var_allprocs_discrete['input']:
+            if abs_name not in model._var_allprocs_discrete['input']:  # input is continuous
                 value = np.asarray(value)
                 tmeta = all_meta['input'][abs_name]
                 tunits = tmeta['units']
@@ -5399,43 +5399,49 @@ class System(object):
 
                 if units is None:
                     # avoids double unit conversion
-                    if post_setup:
-                        ivalue = value
-                        if sunits is not None:
-                            if gunits is not None and gunits != tunits:
-                                value = model.convert_from_units(src, value, gunits)
-                            else:
-                                value = model.convert_from_units(src, value, tunits)
+                    ivalue = value
+                    if sunits is not None:
+                        if gunits is not None and gunits != tunits:
+                            value = model.convert_from_units(src, value, gunits)
+                        else:
+                            value = model.convert_from_units(src, value, tunits)
                 else:
                     if gunits is None:
                         ivalue = model.convert_from_units(abs_name, value, units)
                     else:
                         ivalue = model.convert_units(name, value, units, gunits)
-                    if no_vectors:
-                        value = ivalue
-                    else:
-                        value = model.convert_from_units(src, value, units)
+                    value = model.convert_from_units(src, value, units)
+                set_units = sunits
         else:
             src = abs_name
             if units is not None:
                 value = model.convert_from_units(abs_name, value, units)
+                try:
+                    set_units = all_meta['output'][abs_name]['units']
+                except KeyError:  # this can happen if a component is the top level System
+                    set_units = all_meta['input'][abs_name]['units']
 
         # Caching only needed if vectors aren't allocated yet.
-        if no_vectors:
+        if not has_vectors:
             ic_cache = model._initial_condition_cache
+            key = (name, self.pathname)
             if indices is not None:
                 self._get_cached_val(name)
                 try:
+                    cval = ic_cache[key][0]
                     if _is_slicer_op(indices):
-                        ic_cache[name] = value[indices]
+                        try:
+                            ic_cache[key] = (value[indices], set_units)
+                        except IndexError:
+                            cval[indices] = value
+                            ic_cache[key] = (cval, set_units)
                     else:
-                        ic_cache[name][indices] = value
-                except IndexError:
-                    ic_cache[name][indices] = value
+                        cval[indices] = value
+                        ic_cache[key] = (cval, set_units)
                 except Exception as err:
                     raise RuntimeError(f"Failed to set value of '{name}': {str(err)}.")
             else:
-                ic_cache[name] = value
+                ic_cache[key] = (value, set_units)
         else:
             myrank = model.comm.rank
 

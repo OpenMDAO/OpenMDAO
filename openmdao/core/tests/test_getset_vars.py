@@ -448,51 +448,21 @@ class ParTestCase(unittest.TestCase):
         np.testing.assert_allclose(p['par.C2.y'], (np.arange(7,10) + 1.) * 9.)
 
 
-class AdderGroup(om.Group):
-    # creates either a sub-group or a sub-component depending on depth, and at configure time
-    # it modifies the input 'x' of the bottom level component.
-    def __init__(self, depth, mydepth, relnames, **kwargs):
-        super().__init__(**kwargs)
-        self.depth = mydepth
-        self.total_depth = depth
-        self.relnames = relnames
-
-    def setup(self):
-        if self.depth == self.total_depth:
-            self.add_subsystem('C1', om.ExecComp('y=2*x', x=1.0, y=1.0))
-        else:
-            self.add_subsystem('sub', AdderGroup(self.total_depth, self.depth + 1, self.relnames))
-
-    def configure(self):
-        if self.relnames:
-            vname = 'sub.' * (self.total_depth - self.depth) + 'C1.x'
-        else:
-            vname = 'sub.' * (self.total_depth + 1) + 'C1.x'
-        self.set_val(vname, float(self.total_depth - self.depth))
-
-
 class SystemSetValTestCase(unittest.TestCase):
-    def test_config_sets(self):
-        depth = 3
+    def test_set_val(self):
         p = om.Problem()
         model = p.model
-        model.add_subsystem('sub', AdderGroup(depth, 0, relnames=False))
+        G1 = model.add_subsystem('G1', om.Group())
+        G2 = G1.add_subsystem('G2', om.Group())
+        C1 = G2.add_subsystem('C1', om.ExecComp('y=2*x'))
+
         p.setup()
-        p.run_model()
-        vname = 'sub.' * (depth + 1) + 'C1.x'
-        assert_near_equal(p[vname], float(depth))
 
-    def test_config_sets_relative(self):
-        depth = 3
-        p = om.Problem()
-        model = p.model
-        model.add_subsystem('sub', AdderGroup(depth, 0, relnames=True))
-        p.setup()
-        p.run_model()
-        vname = 'sub.' * (depth + 1) + 'C1.x'
-        assert_near_equal(p[vname], float(depth))
+        G2.set_val('C1.x', 99.)
 
+        p.final_setup()
 
+        assert_near_equal(p['G1.G2.C1.x'], 99.)
 
 
 if __name__ == '__main__':
