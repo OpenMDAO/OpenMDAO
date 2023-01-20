@@ -987,6 +987,12 @@ class Problem(object):
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             self.model._final_setup(self.comm)
 
+        # If set_solver_print is called after an initial run, in a multi-run scenario,
+        #  this part of _final_setup still needs to happen so that change takes effect
+        #  in subsequent runs
+        if self._metadata['setup_status'] >= _SetupStatus.POST_FINAL_SETUP:
+            self.model._setup_solver_print()
+
         driver._setup_driver(self)
 
         info = driver._coloring_info

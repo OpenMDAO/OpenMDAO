@@ -42,8 +42,6 @@ else:
         ----------
         _scatter : method
             Method that performs a PETSc scatter.
-        _transfer : method
-            Method that performs either a normal transfer or a multi-transfer.
         """
 
         def __init__(self, in_vec, out_vec, in_inds, out_inds, comm):

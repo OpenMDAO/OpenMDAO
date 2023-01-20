@@ -50,8 +50,6 @@ class Vector(object):
         Specific kind of vector, either 'input', 'output', or 'residual'.
     _system : System
         Weak ref to the owning system.
-    _length : int
-        Length of flattened vector.
     _views : dict
         Dictionary mapping absolute variable names to the ndarray views.
     _views_flat : dict
