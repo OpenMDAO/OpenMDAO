@@ -449,7 +449,7 @@ class ParTestCase(unittest.TestCase):
 
 
 class SystemSetValTestCase(unittest.TestCase):
-    def test_set_val(self):
+    def setup_model(self):
         p = om.Problem()
         model = p.model
         G1 = model.add_subsystem('G1', om.Group())
@@ -457,12 +457,29 @@ class SystemSetValTestCase(unittest.TestCase):
         C1 = G2.add_subsystem('C1', om.ExecComp('y=2*x'))
 
         p.setup()
+        return p, G1, G2, C1
 
+    def test_set_val(self):
+        p, G1, G2, C1 = self.setup_model()
+        C1.set_val('x', 42.)
         G2.set_val('C1.x', 99.)
+
+        assert_near_equal(p['G1.G2.C1.x'], 99.)
 
         p.final_setup()
 
         assert_near_equal(p['G1.G2.C1.x'], 99.)
+
+    def test_set_val2(self):
+        p, G1, G2, C1 = self.setup_model()
+        G2.set_val('C1.x', 99.)
+        C1.set_val('x', 42.)
+
+        assert_near_equal(p['G1.G2.C1.x'], 42.)
+
+        p.final_setup()
+
+        assert_near_equal(p['G1.G2.C1.x'], 42.)
 
 
 if __name__ == '__main__':

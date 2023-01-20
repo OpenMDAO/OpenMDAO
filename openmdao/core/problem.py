@@ -555,9 +555,11 @@ class Problem(object):
                     cache[pathname].set_val(name, units=set_units)
                 else:
                     system = self.model._get_subsystem(pathname)
-                    if system is not None:
+                    if system is None:
+                        self.model.set_val(pathname + '.' + name, value, units=set_units)
+                    else:
                         cache[pathname] = system
-                    system.set_val(name, value, units=set_units)
+                        system.set_val(name, value, units=set_units)
             else:
                 self.model.set_val(name, value, units=set_units)
 
