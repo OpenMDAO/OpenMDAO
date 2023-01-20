@@ -8,6 +8,9 @@ Moving forward from 3.25.0 onward, users developing components involving distrib
 [POEM 075](https://github.com/OpenMDAO/POEMs/blob/master/POEM_075.md), as OpenMDAO is changing to this convention
 and the switch will not be backwards compatible.
 
+For the N2 diagram, we've added information about connections between systems when a connection node is highlighted in
+NodeInfo mode.
+
 ## New Deprecations
 
 - **POEM 75** implementation: Problems involving systems with distributed inputs will raise a deprecation regarding upcoming changes to their behavior. [#TBD](https://github.com/OpenMDAO/OpenMDAO/pull/TBD)
@@ -22,7 +25,7 @@ and the switch will not be backwards compatible.
 
 ## New Features
 
-- None
+- N2: Connections displayed during mouseover of a connection node when in NodeInfo mode [#2778](https://github.com/OpenMDAO/OpenMDAO/pull/2778)
 
 ## Bug Fixes
 
@@ -30,6 +33,7 @@ and the switch will not be backwards compatible.
 - Fixed bug in System.get_io_metadata() that caused the `discrete` property to always be shown as `True`. [#2771](https://github.com/OpenMDAO/OpenMDAO/pull/2771)
 - Fixed a bug that prevented `Problem.set_solver_print` from impacting output in multi-run scenarios [#2773](https://github.com/OpenMDAO/OpenMDAO/pull/2773)
 - Fixed a bug in `set_output_solver_options`, `set_design_var_options`, and `set_constraint_options` that prevented them from working when given vector values. [#2782](https://github.com/OpenMDAO/OpenMDAO/pull/2782)
+- Fixed KeyError when total coloring done on model with an unconnected input constraint in a ParallelGroup [#2774](https://github.com/OpenMDAO/OpenMDAO/pull/2774)
 
 ## Miscellaneous
 
