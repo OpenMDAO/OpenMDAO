@@ -23,7 +23,7 @@ from openmdao.utils.general_utils import format_as_float_or_array, ensure_compat
 from openmdao.utils.indexer import Indexer, indexer
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
-    DerivativesWarning, SetupWarning, warn_deprecation
+    DerivativesWarning, warn_deprecation
 
 _forbidden_chars = {'.', '*', '?', '!', '[', ']'}
 _whitespace = {' ', '\t', '\r', '\n'}
@@ -115,6 +115,32 @@ class Component(System):
                              desc='If True, call compute, compute_partials, linearize, '
                                   'apply_linear, apply_nonlinear, and compute_jacvec_product '
                                   'only on rank 0 and broadcast the results to the other ranks.')
+
+    def _check_matfree_deprecation(self):
+        # check for mixed distributed variables
+        has_dist_ins = has_nd_ins = has_dist_outs = has_nd_outs = False
+        for name in self._var_rel_names['input']:
+            meta = self._var_rel2meta[name]
+            if meta['distributed']:
+                has_dist_ins = True
+            else:
+                has_nd_ins = True
+
+        for name in self._var_rel_names['output']:
+            meta = self._var_rel2meta[name]
+            if meta['distributed']:
+                has_dist_outs = True
+            else:
+                has_nd_outs = True
+
+        if (has_nd_ins and has_dist_outs) or (has_dist_ins and has_nd_outs):
+            warn_deprecation(f"{self.msginfo}: It appears this component mixes "
+                             "distributed/non-distributed inputs and outputs, so it may break "
+                             "starting with the next OpenMDAO release, where the convention "
+                             "used when passing data between distributed and non-distributed "
+                             "inputs and outputs within a matrix free component will change. "
+                             "See https://github.com/OpenMDAO/POEMs/blob/master/POEM_075.md for "
+                             "details.")
 
     def setup(self):
         """
