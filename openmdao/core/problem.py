@@ -480,7 +480,7 @@ class Problem(object):
         if self._metadata['setup_status'] == _SetupStatus.POST_SETUP:
             abs_names = name2abs_names(self.model, name)
             if abs_names:
-                val = self.model._get_cached_val(abs_names[0], get_remote=get_remote)
+                val = self.model._get_cached_val(name, abs_names, get_remote=get_remote)
                 if val is not _UNDEFINED:
                     if indices is not None:
                         val = val[indices]
@@ -552,19 +552,19 @@ class Problem(object):
         """
         cache = {}
         for abs_name, tup in self.model._initial_condition_cache.items():
-            value, set_units = tup
-            # if pathname:
-            #     if pathname in cache:
-            #         cache[pathname].set_val(name, units=set_units)
-            #     else:
-            #         system = self.model._get_subsystem(pathname)
-            #         if system is None:
-            #             self.model.set_val(pathname + '.' + name, value, units=set_units)
-            #         else:
-            #             cache[pathname] = system
-            #             system.set_val(name, value, units=set_units)
-            # else:
-            self.model.set_val(abs_name, value, units=set_units)
+            value, set_units, pathname, name = tup
+            if pathname:
+                if pathname in cache:
+                    cache[pathname].set_val(name, units=set_units)
+                else:
+                    system = self.model._get_subsystem(pathname)
+                    if system is None:
+                        self.model.set_val(pathname + '.' + name, value, units=set_units)
+                    else:
+                        cache[pathname] = system
+                        system.set_val(name, value, units=set_units)
+            else:
+                self.model.set_val(name, value, units=set_units)
 
         # Clean up cache
         self.model._initial_condition_cache = {}

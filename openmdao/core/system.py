@@ -5265,66 +5265,64 @@ class System(object):
 
         return val
 
-    def _get_cached_val(self, abs_name, get_remote=False):
-        # this should only be called on the top level System
-        # key = (name, self.pathname)
+    def _get_cached_val(self, name, abs_names, get_remote=False):
         # We have set and cached already
-        if abs_name in self._initial_condition_cache:
-            return self._initial_condition_cache[abs_name][0]
+        for abs_name in abs_names:
+            if abs_name in self._initial_condition_cache:
+                return self._initial_condition_cache[abs_name][0]
 
         # Vector not setup, so we need to pull values from saved metadata request.
+        model = self._problem_meta['model_ref']()
+
+        try:
+            conns = model._conn_abs_in2out
+        except AttributeError:
+            conns = {}
+
+        # abs_names = name2abs_names(model, name)
+        # if not abs_names:
+        #     if self.pathname:
+        #         abs_names = name2abs_names(model, self.pathname + '.' + name)
+        #     if not abs_names:
+        #         raise KeyError(f'{model.msginfo}: Variable "{name}" not found.')
+
+        abs_name = abs_names[0]
+        vars_to_gather = self._problem_meta['vars_to_gather']
+        units = None
+
+        meta = model._var_abs2meta
+        io = 'output' if abs_name in meta['output'] else 'input'
+        if abs_name in meta[io]:
+            if abs_name in conns:
+                smeta = meta['output'][conns[abs_name]]
+                val = smeta['val']  # output
+                units = smeta['units']
+            else:
+                vmeta = meta[io][abs_name]
+                val = vmeta['val']
+                units = vmeta['units']
         else:
-            model = self._problem_meta['model_ref']()
-
-            try:
-                conns = model._conn_abs_in2out
-            except AttributeError:
-                conns = {}
-
-            # abs_names = name2abs_names(model, name)
-            # if not abs_names:
-            #     if self.pathname:
-            #         abs_names = name2abs_names(model, self.pathname + '.' + name)
-            #     if not abs_names:
-            #         raise KeyError(f'{model.msginfo}: Variable "{name}" not found.')
-
-            # abs_name = abs_names[0]
-            vars_to_gather = self._problem_meta['vars_to_gather']
-            units = None
-
-            meta = model._var_abs2meta
+            # not found in real outputs or inputs, try discretes
+            meta = model._var_discrete
             io = 'output' if abs_name in meta['output'] else 'input'
             if abs_name in meta[io]:
                 if abs_name in conns:
-                    smeta = meta['output'][conns[abs_name]]
-                    val = smeta['val']  # input
-                    units = smeta['units']
+                    val = meta['output'][conns[abs_name]]['val']
                 else:
-                    vmeta = meta[io][abs_name]
-                    val = vmeta['val']
-                    units = vmeta['units']
+                    val = meta[io][abs_name]['val']
+
+        if get_remote and abs_name in vars_to_gather:
+            owner = vars_to_gather[abs_name]
+            if model.comm.rank == owner:
+                model.comm.bcast(val, root=owner)
             else:
-                # not found in real outputs or inputs, try discretes
-                meta = model._var_discrete
-                io = 'output' if abs_name in meta['output'] else 'input'
-                if abs_name in meta[io]:
-                    if abs_name in conns:
-                        val = meta['output'][conns[abs_name]]['val']
-                    else:
-                        val = meta[io][abs_name]['val']
+                val = model.comm.bcast(None, root=owner)
 
-            if get_remote and abs_name in vars_to_gather:
-                owner = vars_to_gather[abs_name]
-                if model.comm.rank == owner:
-                    model.comm.bcast(val, root=owner)
-                else:
-                    val = model.comm.bcast(None, root=owner)
+        if val is not _UNDEFINED:
+            # Need to cache the "get" in case the user calls in-place numpy operations.
+            self._initial_condition_cache[abs_name] = (val, units, self.pathname, name)
 
-            if val is not _UNDEFINED:
-                # Need to cache the "get" in case the user calls in-place numpy operations.
-                self._initial_condition_cache[abs_name] = (val, units)
-
-            return val
+        return val
 
     def set_val(self, name, val, units=None, indices=None):
         """
@@ -5423,24 +5421,23 @@ class System(object):
         # Caching only needed if vectors aren't allocated yet.
         if not has_vectors:
             ic_cache = model._initial_condition_cache
-            # key = (name, self.pathname)
             if indices is not None:
-                self._get_cached_val(abs_name)
+                self._get_cached_val(name, abs_names)
                 try:
                     cval = ic_cache[abs_name][0]
                     if _is_slicer_op(indices):
                         try:
-                            ic_cache[abs_name] = (value[indices], set_units)
+                            ic_cache[abs_name] = (value[indices], set_units, self.pathname, name)
                         except IndexError:
                             cval[indices] = value
-                            ic_cache[abs_name] = (cval, set_units)
+                            ic_cache[abs_name] = (cval, set_units, self.pathname, name)
                     else:
                         cval[indices] = value
-                        ic_cache[abs_name] = (cval, set_units)
+                        ic_cache[abs_name] = (cval, set_units, self.pathname, name)
                 except Exception as err:
                     raise RuntimeError(f"Failed to set value of '{name}': {str(err)}.")
             else:
-                ic_cache[abs_name] = (value, set_units)
+                ic_cache[abs_name] = (value, set_units, self.pathname, name)
         else:
             myrank = model.comm.rank
 
@@ -5501,16 +5498,8 @@ class System(object):
                                         src_indices = src_indices - start
                                     src_indices = indexer(src_indices)
                                 if indices is _full_slice:
-                                    #sval = model._outputs._abs_get_val(src, flat=src_indices._flat_src)
-                                    #sval[src_indices()] = value
-                                    #if src_indices._flat_src:
-                                        #ivalue = ivalue.flat[src_indices()]
-                                    #else:
-                                        #ivalue = ivalue[src_indices()]
                                     model._outputs.set_var(src, value, src_indices, flat,
                                                            var_name=var_name)
-                                    #  model._outputs.set_var(src, sval, flat=flat,
-                                    #                         var_name=var_name)
                                 else:
                                     model._outputs.set_var(src, value, src_indices.apply(indices),
                                                            True, var_name=var_name)
