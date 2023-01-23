@@ -25,7 +25,12 @@ class Vector(object):
     """
     Base Vector class.
 
+    This class is instantiated for inputs, outputs, and residuals.
     It provides a dictionary interface and an arithmetic operations interface.
+    Implementations:
+
+    - <DefaultVector>
+    - <PETScVector>
 
     Parameters
     ----------
@@ -481,7 +486,7 @@ class Vector(object):
             This vector times val is added to self.
         """
         raise NotImplementedError('add_scale_vec not defined for vector type '
-                                  f'{ype(self).__name__}')
+                                  f'{type(self).__name__}')
 
     def asarray(self, copy=False):
         """

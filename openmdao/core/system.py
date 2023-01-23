@@ -5279,13 +5279,6 @@ class System(object):
         except AttributeError:
             conns = {}
 
-        # abs_names = name2abs_names(model, name)
-        # if not abs_names:
-        #     if self.pathname:
-        #         abs_names = name2abs_names(model, self.pathname + '.' + name)
-        #     if not abs_names:
-        #         raise KeyError(f'{model.msginfo}: Variable "{name}" not found.')
-
         abs_name = abs_names[0]
         vars_to_gather = self._problem_meta['vars_to_gather']
         units = None
@@ -5326,9 +5319,7 @@ class System(object):
 
     def set_val(self, name, val, units=None, indices=None):
         """
-        Get an output/input/residual variable.
-
-        Function is used if you want to specify display units.
+        Set an input or output variable.
 
         Parameters
         ----------
