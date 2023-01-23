@@ -5265,12 +5265,12 @@ class System(object):
 
         return val
 
-    def _get_cached_val(self, name, get_remote=False):
+    def _get_cached_val(self, abs_name, get_remote=False):
         # this should only be called on the top level System
-        key = (name, self.pathname)
+        # key = (name, self.pathname)
         # We have set and cached already
-        if key in self._initial_condition_cache:
-            return self._initial_condition_cache[key][0]
+        if abs_name in self._initial_condition_cache:
+            return self._initial_condition_cache[abs_name][0]
 
         # Vector not setup, so we need to pull values from saved metadata request.
         else:
@@ -5281,14 +5281,14 @@ class System(object):
             except AttributeError:
                 conns = {}
 
-            abs_names = name2abs_names(model, name)
-            if not abs_names:
-                if self.pathname:
-                    abs_names = name2abs_names(model, self.pathname + '.' + name)
-                if not abs_names:
-                    raise KeyError(f'{model.msginfo}: Variable "{name}" not found.')
+            # abs_names = name2abs_names(model, name)
+            # if not abs_names:
+            #     if self.pathname:
+            #         abs_names = name2abs_names(model, self.pathname + '.' + name)
+            #     if not abs_names:
+            #         raise KeyError(f'{model.msginfo}: Variable "{name}" not found.')
 
-            abs_name = abs_names[0]
+            # abs_name = abs_names[0]
             vars_to_gather = self._problem_meta['vars_to_gather']
             units = None
 
@@ -5322,7 +5322,7 @@ class System(object):
 
             if val is not _UNDEFINED:
                 # Need to cache the "get" in case the user calls in-place numpy operations.
-                self._initial_condition_cache[key] = (val, units)
+                self._initial_condition_cache[abs_name] = (val, units)
 
             return val
 
@@ -5423,24 +5423,24 @@ class System(object):
         # Caching only needed if vectors aren't allocated yet.
         if not has_vectors:
             ic_cache = model._initial_condition_cache
-            key = (name, self.pathname)
+            # key = (name, self.pathname)
             if indices is not None:
-                self._get_cached_val(name)
+                self._get_cached_val(abs_name)
                 try:
-                    cval = ic_cache[key][0]
+                    cval = ic_cache[abs_name][0]
                     if _is_slicer_op(indices):
                         try:
-                            ic_cache[key] = (value[indices], set_units)
+                            ic_cache[abs_name] = (value[indices], set_units)
                         except IndexError:
                             cval[indices] = value
-                            ic_cache[key] = (cval, set_units)
+                            ic_cache[abs_name] = (cval, set_units)
                     else:
                         cval[indices] = value
-                        ic_cache[key] = (cval, set_units)
+                        ic_cache[abs_name] = (cval, set_units)
                 except Exception as err:
                     raise RuntimeError(f"Failed to set value of '{name}': {str(err)}.")
             else:
-                ic_cache[key] = (value, set_units)
+                ic_cache[abs_name] = (value, set_units)
         else:
             myrank = model.comm.rank
 
@@ -5484,6 +5484,8 @@ class System(object):
                                 model._outputs.set_var(src, value, _full_slice, flat,
                                                        var_name=var_name)
                             else:
+                                flat = src_indices._flat_src
+
                                 if tmeta['distributed']:
                                     src_indices = src_indices.shaped_array()
                                     ssizes = model._var_sizes['output']
@@ -5499,8 +5501,16 @@ class System(object):
                                         src_indices = src_indices - start
                                     src_indices = indexer(src_indices)
                                 if indices is _full_slice:
+                                    #sval = model._outputs._abs_get_val(src, flat=src_indices._flat_src)
+                                    #sval[src_indices()] = value
+                                    #if src_indices._flat_src:
+                                        #ivalue = ivalue.flat[src_indices()]
+                                    #else:
+                                        #ivalue = ivalue[src_indices()]
                                     model._outputs.set_var(src, value, src_indices, flat,
                                                            var_name=var_name)
+                                    #  model._outputs.set_var(src, sval, flat=flat,
+                                    #                         var_name=var_name)
                                 else:
                                     model._outputs.set_var(src, value, src_indices.apply(indices),
                                                            True, var_name=var_name)

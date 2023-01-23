@@ -478,12 +478,16 @@ class Problem(object):
             The value of the requested output/input variable.
         """
         if self._metadata['setup_status'] == _SetupStatus.POST_SETUP:
-            val = self.model._get_cached_val(name, get_remote=get_remote)
-            if val is not _UNDEFINED:
-                if indices is not None:
-                    val = val[indices]
-                if units is not None:
-                    val = self.model.convert2units(name, val, simplify_unit(units))
+            abs_names = name2abs_names(self.model, name)
+            if abs_names:
+                val = self.model._get_cached_val(abs_names[0], get_remote=get_remote)
+                if val is not _UNDEFINED:
+                    if indices is not None:
+                        val = val[indices]
+                    if units is not None:
+                        val = self.model.convert2units(name, val, simplify_unit(units))
+            else:
+                raise KeyError(f'{self.model.msginfo}: Variable "{name}" not found.')
         else:
             val = self.model.get_val(name, units=units, indices=indices, get_remote=get_remote,
                                      from_src=True)
@@ -547,21 +551,20 @@ class Problem(object):
         Set all initial conditions that have been saved in cache after setup.
         """
         cache = {}
-        for key, tup in self.model._initial_condition_cache.items():
-            name, pathname = key
+        for abs_name, tup in self.model._initial_condition_cache.items():
             value, set_units = tup
-            if pathname:
-                if pathname in cache:
-                    cache[pathname].set_val(name, units=set_units)
-                else:
-                    system = self.model._get_subsystem(pathname)
-                    if system is None:
-                        self.model.set_val(pathname + '.' + name, value, units=set_units)
-                    else:
-                        cache[pathname] = system
-                        system.set_val(name, value, units=set_units)
-            else:
-                self.model.set_val(name, value, units=set_units)
+            # if pathname:
+            #     if pathname in cache:
+            #         cache[pathname].set_val(name, units=set_units)
+            #     else:
+            #         system = self.model._get_subsystem(pathname)
+            #         if system is None:
+            #             self.model.set_val(pathname + '.' + name, value, units=set_units)
+            #         else:
+            #             cache[pathname] = system
+            #             system.set_val(name, value, units=set_units)
+            # else:
+            self.model.set_val(abs_name, value, units=set_units)
 
         # Clean up cache
         self.model._initial_condition_cache = {}

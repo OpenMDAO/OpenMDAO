@@ -119,27 +119,27 @@ class TestGetSetVariables(unittest.TestCase):
 
         # -------------------------------------------------------------------
 
-        msg = '\'<model> <class Group>: Variable "{}" not found.\''
+        msg = '<model> <class Group>: Variable "{}" not found.'
 
         # inputs
         with self.assertRaises(KeyError) as ctx:
             p['x'] = 5.0
-        self.assertEqual(str(ctx.exception), msg.format('x'))
+        self.assertEqual(ctx.exception.args[0], msg.format('x'))
         p._initial_condition_cache = {}
 
         with self.assertRaises(KeyError) as ctx:
             p['x']
-        self.assertEqual(str(ctx.exception), msg.format('x'))
+        self.assertEqual(ctx.exception.args[0], msg.format('x'))
 
         # outputs
         with self.assertRaises(KeyError) as ctx:
             p['y'] = 5.0
-        self.assertEqual(str(ctx.exception), msg.format('y'))
+        self.assertEqual(ctx.exception.args[0], msg.format('y'))
         p._initial_condition_cache = {}
 
         with self.assertRaises(KeyError) as ctx:
             p['y']
-        self.assertEqual(str(ctx.exception), msg.format('y'))
+        self.assertEqual(ctx.exception.args[0], msg.format('y'))
 
         p.final_setup()
 
