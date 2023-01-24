@@ -81,16 +81,15 @@ class MatrixCell {
      * Select the mouseover callback depending on whether we're on the diagonal.
      * TODO: Remove these globals
      */
-    mouseover() {
-        return (this.onDiagonal() ? n2MouseFuncs.overOnDiag :
-            n2MouseFuncs.overOffDiag);
+    getMouseoverFunc() {
+        return (this.onDiagonal() ? n2MouseFuncs.overOnDiag : n2MouseFuncs.overOffDiag);
     }
 
     /**
     * Select the mousemove callback depending on whether we're on the diagonal.
     * TODO: Remove these globals
     */
-    mousemove() {
+    getMousemoveFunc() {
         return (this.onDiagonal() ? n2MouseFuncs.moveOnDiag : null);
     }
 

@@ -397,11 +397,11 @@ class Matrix {
 
                 return `translate(${transX},${transY})`;
             })
-            .each(function (d) {
+            .each(function(d) {
                 // "this" refers to the element here, so leave it alone:
                 d.renderer.renderCurrent(this)
-                    .on('mouseover', d.mouseover())
-                    .on('mousemove', d.mousemove())
+                    .on('mouseover', d.getMouseoverFunc())
+                    .on('mousemove', d.getMousemoveFunc())
                     .on('mouseleave', n2MouseFuncs.out)
                     .on('click', (e,d) => n2MouseFuncs.click(d))
             });
@@ -624,7 +624,7 @@ class Matrix {
                             'tgtId': cell.tgtObj.id
                         },
                         'matrixSize': this.diagNodes.length,
-                        'label': offscreenNode.absPathName,
+                        'label': offscreenNode.path,
                         'offscreenId': offscreenNode.id
                     });
                 }

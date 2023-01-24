@@ -288,7 +288,8 @@
     min-width: 200px;
     border-collapse: separate;
     border-spacing: 0;
-    width: fit-content;
+    /* width: fit-content; */
+    width: 100%;
     height: fit-content;
 }
 
@@ -1104,3 +1105,8 @@ p.help-text > span {
 
 
 /* ^^^^^^^^^^ End Child Select Window theme ^^^^^^^^^^ */
+
+.scrollable {
+    overflow-y: scroll;
+    overflow-x: hidden;
+}
