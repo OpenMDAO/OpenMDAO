@@ -13,7 +13,7 @@ NodeInfo mode.
 
 ## New Deprecations
 
-- **POEM 75** implementation: Problems involving systems with distributed inputs will raise a deprecation regarding upcoming changes to their behavior. [#TBD](https://github.com/OpenMDAO/OpenMDAO/pull/TBD)
+- **POEM 75** implementation: Problems involving systems with distributed inputs will raise a deprecation regarding upcoming changes to their behavior. [#2784](https://github.com/OpenMDAO/OpenMDAO/pull/2784)
 
 ## Backwards Incompatible API Changes
 
@@ -26,6 +26,7 @@ NodeInfo mode.
 ## New Features
 
 - N2: Connections displayed during mouseover of a connection node when in NodeInfo mode [#2778](https://github.com/OpenMDAO/OpenMDAO/pull/2778)
+- Added set_val as a method of System. [#2785](https://github.com/OpenMDAO/OpenMDAO/pull/2785)
 
 ## Bug Fixes
 
