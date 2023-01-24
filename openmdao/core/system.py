@@ -5324,11 +5324,11 @@ class System(object):
         Parameters
         ----------
         name : str
-            Promoted or relative variable name in the root system's namespace.
+            Promoted or relative variable name in the system's namespace.
         val : object
-            Value to set this variable to.
+            Value to assign to this variable.
         units : str, optional
-            Units of the value being set.
+            Units of the value.
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to set.
         """
