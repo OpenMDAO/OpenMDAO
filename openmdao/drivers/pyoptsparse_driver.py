@@ -426,7 +426,7 @@ class pyOptSparseDriver(Driver):
                 continue
             size = meta['global_size'] if meta['distributed'] else meta['size']
             lower = upper = meta['equals']
-            path = meta['source'] if meta['alias'] is not None else name
+            path = meta['source']
             if fwd:
                 wrt = [v for v in indep_list if path in relevant[dv_meta[v]['source']]]
             else:
@@ -462,7 +462,7 @@ class pyOptSparseDriver(Driver):
             lower = meta['lower']
             upper = meta['upper']
 
-            path = meta['source'] if meta['alias'] is not None else name
+            path = meta['source']
 
             if fwd:
                 wrt = [v for v in indep_list if path in relevant[dv_meta[v]['source']]]

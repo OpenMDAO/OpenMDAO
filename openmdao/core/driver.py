@@ -890,6 +890,7 @@ class Driver(object):
 
         model._setup_driver_units()
 
+        # driver _responses are keyed by either the alias or the promoted name
         self._responses = resps = model.get_responses(recurse=True, use_prom_ivc=True)
         for name, data in resps.items():
             if data['type'] == 'con':
