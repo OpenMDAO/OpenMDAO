@@ -134,8 +134,8 @@ class NodeInfo extends Window {
  * Make a persistent copy of the NodeInfo panel and handle its drag/close events
  * @typedef PersistentNodeInfo
  */
-class PersistentNodeInfo extends WindowDraggable {
-    constructor(nodeInfo) {
+class PersistentNodeInfo extends WindowResizable {
+    constructor(nodeInfo, startHeight = 0) {
         super('persistentNodeInfo-' + uuidv4(), '#' + nodeInfo.window.attr('id'));
 
         // Avoid just copying the reference because nodeInfo.values will be wiped:
@@ -152,6 +152,21 @@ class PersistentNodeInfo extends WindowDraggable {
             .on("mouseover", this.mouseOver.bind(this))
             .on("mouseleave", this.mouseLeave.bind(this))
             .on("mousemove", this.mouseMove.bind(this));
+
+        if (startHeight > 0) {
+            const pos = this._getPos();
+            if (pos.height > startHeight) {
+                pos.height = startHeight;
+                this._setPos(pos)
+                this.body.classed('scrollable', true);
+                const tableHeight = parseInt(this.body.select('table.node-info-table').style('height'));
+                const extraHeight = pos.height - parseInt(this.body.style('height'));
+                this.maxHeight = tableHeight + extraHeight;
+            }
+            else {
+                this.maxHeight = pos.height;
+            }
+        }
     }
 
     /** When the mouse enters the element, show the tool tip */
@@ -228,5 +243,107 @@ class PersistentNodeInfo extends WindowDraggable {
                 .on("mousemove", null);
             super.close(e);
         }
+    }
+}
+
+/**
+ * Display all connections represented by the current off-diagonal cell.
+ * @typedef NodeConnectionInfo
+ */
+class NodeConnectionInfo extends NodeInfo {
+    /**
+     * Build a list of the properties we care about and set up
+     * references to the HTML elements.
+     */
+    constructor(ui) {
+        super(ui, false);
+        this.propList = [];
+    }
+
+    /**
+     * Find the best label for a connected node.
+     * @param {TreeNode} node The node to determine a name for.
+     * @returns The promoted name if it has one, otherwise the absolute path.
+     */
+    nodeName(node) {
+        let name = node.path;
+        if (node.path != node.promotedName) name += `<br><i>(${node.promotedName}</i>)`;
+        return name;
+    }
+
+    /**
+     * Gather all connections between the two cells that this one represents.
+     * @param {Array} connList The connections discovered so far.
+     * @param {TreeNode} srcNode The source node to search.
+     * @param {TreeNode} tgtNode The target node to search.
+     */
+    _getConnections(connList, srcNode, tgtNode) {
+        if (srcNode.hasChildren()) {
+            for (const child of srcNode.children) {
+                this._getConnections(connList, child, tgtNode)
+            }
+        }
+        else {
+            if (srcNode.parent === tgtNode.parent) {
+                const newConn = { 'src': this.nodeName(srcNode), 'tgt': this.nodeName(tgtNode) };
+                connList.push(newConn);
+            }
+            for (const tgt of srcNode.targetParentSet) {
+                if (tgt.isLeaf() && tgt.hasParent(tgtNode, null, true)) {
+                    const newConn = { 'src': this.nodeName(srcNode), 'tgt': this.nodeName(tgt) };
+                    connList.push(newConn);
+                }
+            }
+        }
+    }
+
+    /**
+     * Create a new persistent window by copying our contents. Set the
+     * max initial height of the window at 300px.
+     */
+    pin() {
+        if (this.tbody.html() == '') return; // Was already pinned so is empty
+
+        new PersistentNodeInfo(this, 300);
+        this.hidden = true;
+        this.clear();
+        return this;
+    }
+
+    /**
+     * Load the NodeInfo window with connection information for an off-diagonal cell.
+     * @param {Object} event Reference to the event that triggered the function.
+     * @param {MatrixCell} cell Reference to the cell that was hovered.
+     * @param {String} color The color of the title bar.
+     */
+    update(event, cell, color) {
+        if (!this.active) return;
+        this.clear();
+
+        this.name = cell.id;
+        this.ribbonColor(color);
+
+        const connList = [];
+        this._getConnections(connList, cell.srcObj, cell.tgtObj);
+        for (const conn of connList) {
+            const newRow = this.tbody.append('tr');
+
+            newRow.append('td')
+                .attr('scope', 'row')
+                .html(conn.src);
+
+            newRow.append('td').html(' &#x2501;&#x2501;&#x2501;&#x25ba; ');
+            newRow.append('td').html(conn.tgt);
+        }
+
+        let title = 'Connections';
+        if ( ! (cell.srcObj.isLeaf() || cell.tgtObj.isLeaf()) ) {
+            title += ` from ${cell.srcObj.path} to ${cell.tgtObj.path}`;
+        }
+
+        this.title(title)
+            .sizeToContent(0, 2, true)
+            .moveNearMouse(event)
+            .show();
     }
 }
