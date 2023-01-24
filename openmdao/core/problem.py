@@ -1521,7 +1521,11 @@ class Problem(object):
                                     flat_view[idx] = perturb
 
                                 # Matrix Vector Product
-                                comp._apply_linear(None, _contains_all, mode)
+                                self._metadata['checking'] = True
+                                try:
+                                    comp._apply_linear(None, _contains_all, mode)
+                                finally:
+                                    self._metadata['checking'] = False
 
                                 for out in out_list:
                                     out_abs = rel_name2abs_name(comp, out)
@@ -2524,8 +2528,6 @@ def _iter_derivs(system, derivatives, sys_name, show_only_incorrect, global_opti
 
     for key in sorted_keys:
         of, wrt = key
-        if incon_keys:
-            abs_key = rel_key2abs_key(system, key)
 
         inconsistent = False
         derivative_info = derivatives[key]
@@ -2917,19 +2919,25 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             print('-' * len(header), file=out_stream)
             print(worst_subjac_line, file=out_stream)
 
-    if incon_keys and totals:
+    if incon_keys:
         # stick incon_keys into the first key's dict in order to avoid breaking existing code
-        for key, dct in derivative_data[''].items():
+        for key, dct in derivative_data['' if totals else sys_name].items():
             dct['inconsistent_keys'] = incon_keys
             break
         if not suppress_output:
+            if totals:
+                msgstart = "During computation of totals, the "
+            else:
+                msgstart = "The "
             ders = [f"{sof} wrt {swrt}" for sof, swrt in sorted(incon_keys)]
-            print("\nDuring computation of totals, the following partial derivatives resulted in\n"
+            print(f"\n{msgstart}following partial derivatives resulted in\n"
                   "inconsistent values across processes for certain serial inputs:\n"
                   f"{ders}.\nThis can happen if a component 'compute_jacvec_product' "
                   "or 'apply_linear'\nmethod does not properly reduce the value of a distributed "
                   "output when computing the\nderivative of that output with respect to a serial "
-                  "input.")
+                  "input.  Try reverting back to OpenMDAO 3.24 \nwhich used a different convention "
+                  "when transferring data between distributed and non-distributed \nvariables "
+                  "within a matrix free component. See POEM 75 for details.")
 
 
 def _format_if_not_matrix_free(matrix_free, val):

@@ -1673,7 +1673,7 @@ class Component(System):
         nz_dist_outputs : set or list
             Set of distributed outputs with nonzero values for the most recent _apply_linear call.
         """
-        if not self._has_distrib_outputs or not self.checking or self.comm.size < 2:
+        if not self.checking or not self._has_distrib_outputs or self.comm.size < 2:
             return
 
         if self._serial_idxs is None:

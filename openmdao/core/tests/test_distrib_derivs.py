@@ -1913,8 +1913,9 @@ class TestDistribBugs(unittest.TestCase):
 
     def test_check_totals_rev_old(self):
         prob = self.get_problem(Distrib_Derivs_Matfree_Old, mode='rev')
-        data = prob.check_totals(method='cs', out_stream=None, of=['D1.out_nd', 'D1.out_dist'],
-                                                   wrt=['indep.x_serial', 'indep.x_dist'])
+        data = prob.check_totals(method='cs',
+                                 of=['D1.out_nd', 'D1.out_dist'], wrt=['indep.x_serial', 'indep.x_dist'],
+                                 show_only_incorrect=True)
         with self.assertRaises(ValueError) as cm:
             assert_check_totals(data)
 

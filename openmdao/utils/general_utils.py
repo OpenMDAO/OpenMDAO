@@ -1330,8 +1330,7 @@ def inconsistent_across_procs(comm, arr, tol=1e-15, return_array=True):
 
     if comm.rank == 0:
         result = np.zeros(arr.size, dtype=bool) if return_array else False
-        vals = comm.gather(arr, root=0)
-        for rank, val in enumerate(vals):
+        for rank, val in enumerate(comm.gather(arr, root=0)):
             if rank == 0:
                 baseval = val
             elif return_array:
