@@ -1,11 +1,11 @@
 ***********************************
 # Release Notes for OpenMDAO 3.24.0
 
-January 23, 2023
+January 25, 2023
 
 OpenMDAO 3.24.0 serves as a transitional release that marks a change in the way distributed I/O is handled.
-Moving forward from 3.25.0 onward, users developing components involving distributed inputs should consult 
-[POEM 075](https://github.com/OpenMDAO/POEMs/blob/master/POEM_075.md), as OpenMDAO is changing to this convention
+Moving forward from 3.25.0 onward, users developing components involving distributed inputs should consult
+[POEM 075](https://github.com/OpenMDAO/POEMs/blob/master/POEM_075.md), as OpenMDAO is changing this convention
 and the switch will not be backwards compatible.
 
 For the N2 diagram, we've added information about connections between systems when a connection node is highlighted in
@@ -30,8 +30,8 @@ NodeInfo mode.
 
 ## Bug Fixes
 
-- Fixed a bug in the handling of design variable bounds conditions by COBYLA. [#2770](https://github.com/OpenMDAO/OpenMDAO/pull/2770)
-- Fixed bug in System.get_io_metadata() that caused the `discrete` property to always be shown as `True`. [#2771](https://github.com/OpenMDAO/OpenMDAO/pull/2771)
+- Fixed a bug in the handling of design variable bounds conditions when using COBYLA. [#2770](https://github.com/OpenMDAO/OpenMDAO/pull/2770)
+- Fixed a bug in System.get_io_metadata() that caused the `discrete` property to always be shown as `True`. [#2771](https://github.com/OpenMDAO/OpenMDAO/pull/2771)
 - Fixed a bug that prevented `Problem.set_solver_print` from impacting output in multi-run scenarios [#2773](https://github.com/OpenMDAO/OpenMDAO/pull/2773)
 - Fixed a bug in `set_output_solver_options`, `set_design_var_options`, and `set_constraint_options` that prevented them from working when given vector values. [#2782](https://github.com/OpenMDAO/OpenMDAO/pull/2782)
 
