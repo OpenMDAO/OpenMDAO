@@ -3928,8 +3928,8 @@ class System(object):
                     abs_name = prom2abs_out[name][0]
                     # for outputs, the dict key is always the absolute name of the output
                     out[abs_name] = data
-                    out[abs_name]['source'] = abs_name
-                    out[abs_name]['distributed'] = \
+                    data['source'] = abs_name
+                    data['distributed'] = \
                         abs_name in abs2meta_out and abs2meta_out[abs_name]['distributed']
 
                 else:

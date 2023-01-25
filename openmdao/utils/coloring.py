@@ -1979,7 +1979,7 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
 
     coloring = compute_total_coloring(problem, num_full_jacs=num_full_jacs, tol=tol, orders=orders,
                                       setup=False, run_model=run_model, fname=fname,
-                                      use_abs_names=True)
+                                      use_abs_names=False)
 
     if coloring is not None:
         if driver._coloring_info['show_sparsity']:

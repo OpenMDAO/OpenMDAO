@@ -752,7 +752,7 @@ class pyOptSparseDriver(Driver):
                 res_subjacs = self._res_subjacs
                 for okey in func_dict:
                     new_sens[okey] = newdv = {}
-                    osrc_or_alias = _src_or_alias_name(self._responses[okey])
+                    osrc_or_alias = okey  # _src_or_alias_name(self._responses[okey])
                     for ikey in dv_dict:
                         ikey_src = self._designvars[ikey]['source']
                         if osrc_or_alias in res_subjacs and ikey_src in res_subjacs[osrc_or_alias]:
@@ -853,12 +853,13 @@ class pyOptSparseDriver(Driver):
             return
 
         for res, resdict in total_sparsity.items():
+            orig = res
             if res in self._objs:  # skip objectives
                 continue
             if res in self._responses and self._responses[res]['alias'] is not None:
                 res = self._responses[res]['source']
             self._res_subjacs[res] = {}
-            for dv, (rows, cols, shape) in resdict.items():
+            for dv, (rows, cols, shape) in resdict.items():  # dvs are src names
                 rows = np.array(rows, dtype=INT_DTYPE)
                 cols = np.array(cols, dtype=INT_DTYPE)
 
