@@ -136,7 +136,7 @@ class Component(System):
         if (has_nd_ins and has_dist_outs) or (has_dist_ins and has_nd_outs):
             warn_deprecation(f"{self.msginfo}: It appears this component mixes "
                              "distributed/non-distributed inputs and outputs, so it may break "
-                             "starting with the next OpenMDAO release, where the convention "
+                             "starting with OpenMDAO 3.25, where the convention "
                              "used when passing data between distributed and non-distributed "
                              "inputs and outputs within a matrix free component will change. "
                              "See https://github.com/OpenMDAO/POEMs/blob/master/POEM_075.md for "

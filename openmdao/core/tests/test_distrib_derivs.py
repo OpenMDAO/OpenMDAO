@@ -841,8 +841,8 @@ class MPITests2(unittest.TestCase):
         model.add_constraint('D4.out_nd', lower=0.0)
 
         msg = "'D4' <class MixedDistrib2>: It appears this component mixes " \
-              "distributed/non-distributed inputs and outputs, so it may break starting with the " \
-              "next OpenMDAO release, where the convention used when passing data between " \
+              "distributed/non-distributed inputs and outputs, so it may break starting with " \
+              "OpenMDAO 3.25, where the convention used when passing data between " \
               "distributed and non-distributed inputs and outputs within a matrix free component " \
               "will change. See https://github.com/OpenMDAO/POEMs/blob/master/POEM_075.md for " \
               "details."
