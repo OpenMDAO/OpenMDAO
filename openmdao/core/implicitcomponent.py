@@ -86,6 +86,9 @@ class ImplicitComponent(Component):
                             (new_apply_linear is not None and
                              self._inst_functs['apply_linear'] != new_apply_linear))
 
+        if self.matrix_free:
+            self._check_matfree_deprecation()
+
     def _apply_nonlinear(self):
         """
         Compute residuals. The model is assumed to be in a scaled state.

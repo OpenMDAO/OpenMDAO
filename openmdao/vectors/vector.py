@@ -54,11 +54,7 @@ class Vector(object):
     _kind : str
         Specific kind of vector, either 'input', 'output', or 'residual'.
     _system : System
-        Pointer to the owning system.
-    _iproc : int
-        Global processor index.
-    _length : int
-        Length of flattened vector.
+        Weak ref to the owning system.
     _views : dict
         Dictionary mapping absolute variable names to the ndarray views.
     _views_flat : dict
@@ -490,7 +486,7 @@ class Vector(object):
             This vector times val is added to self.
         """
         raise NotImplementedError('add_scale_vec not defined for vector type '
-                                  f'{ype(self).__name__}')
+                                  f'{type(self).__name__}')
 
     def asarray(self, copy=False):
         """

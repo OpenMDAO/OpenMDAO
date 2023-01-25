@@ -390,7 +390,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA', tol=1e-9, disp=False)
 
-        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('x')  # note: no bounds
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
 

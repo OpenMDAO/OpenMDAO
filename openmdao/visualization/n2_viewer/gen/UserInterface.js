@@ -69,20 +69,45 @@ class UserInterface {
     }
 
     /**
+     * Create a new node connection info window.
+     * @param {Selection} svgNodeGroup Placeholder for subclasses.
+     */
+    _newConnInfoBox(svgNodeGroup) { 
+        this.nodeInfoBox = new NodeConnectionInfo(this);
+    }
+
+    /**
      * If node info mode is active, create a new node info window, populate, and display it.
      * @param {Event} event The Event object created by the trigger.
      * @param {TreeNode} node The node associated with the HTML object.
      * @param {String} [color = null] The color of the titlebard. Autoselected if null.
+     * @param {Boolean} [isConnection = false] If true, make a connection info window.
      */
-    showInfoBox(event, node, color = null) {
+    showInfoBox(event, node, color = null, isConnection = false) {
         if (this.click.isNodeInfo) {
             const svgNodeGroup = d3.select(event.currentTarget);
             if (!color) color = svgNodeGroup.select('rect').style('fill');
 
-            this._newInfoBox(svgNodeGroup);
+            if (isConnection) {
+                this._newConnInfoBox(svgNodeGroup)
+            }
+            else this._newInfoBox(svgNodeGroup);
+
             this.nodeInfoBox.activate();
             this.click.update(this.nodeInfoBox);
             this.nodeInfoBox.update(event, node, color);
+        }
+    }
+
+    showCellInfoBox(event, cell, color = null) {
+        if (this.click.isNodeInfo) {
+            const svgNodeGroup = d3.select(event.currentTarget);
+            if (!color) color = svgNodeGroup.select('rect').style('fill');
+
+            this._newConnInfoBox(svgNodeGroup);
+            this.nodeInfoBox.activate();
+            this.click.update(this.nodeInfoBox);
+            this.nodeInfoBox.update(event, cell, color);
         }
     }
 

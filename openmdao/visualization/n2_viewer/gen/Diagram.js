@@ -506,7 +506,7 @@ class Diagram {
     mouseOverOnDiagonal(e, cell) {
         if (this.matrix.cellExists(cell)) {
             this.matrix.mouseOverOnDiagonal(cell);
-            this.ui.showInfoBox(e, cell.obj, cell.color());
+            this.ui.showInfoBox(e, cell.obj, cell.color(), false);
         }
     }
 
@@ -527,6 +527,7 @@ class Diagram {
     mouseOverOffDiagonal(e, cell) {
         if (this.matrix.cellExists(cell)) {
             this.matrix.mouseOverOffDiagonal(cell);
+            this.ui.showCellInfoBox(e, cell, cell.color(), true);
         }
     }
 

@@ -62,8 +62,6 @@ class OptionsDictionary(object):
         If True, no options can be set after declaration.
     _all_recordable : bool
         Flag to determine if all options in UserOptions are recordable.
-    _widget : OptionsWidget
-        If running in a Jupyter notebook, a widget for viewing/setting options.
     """
 
     def __init__(self, parent_name=None, read_only=False):
