@@ -9,6 +9,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.mpi import MPI
+from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 try:
     from parameterized import parameterized
@@ -337,11 +338,24 @@ class TestParallelGroups(unittest.TestCase):
             else:
                 self.fail("Didn't find '%s' in info messages." % msg)
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestDistDriverVars(unittest.TestCase):
+
+    N_PROCS = 2
+
     def setup_ddv_model(self, con_inds):
+        # check that pyoptsparse is installed. if it is, try to use SLSQP.
+        _, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
+
+        if OPTIMIZER:
+            from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
+        else:
+            raise unittest.SkipTest("pyOptSparseDriver is required.")
+
         p = om.Problem()
         model = p.model
 
-        p.driver = om.pyOptSparseDriver()
+        p.driver = pyOptSparseDriver()
         p.driver.options['optimizer'] = 'SLSQP'
         p.driver.declare_coloring()
 
