@@ -34,7 +34,6 @@ NodeInfo mode.
 - Fixed bug in System.get_io_metadata() that caused the `discrete` property to always be shown as `True`. [#2771](https://github.com/OpenMDAO/OpenMDAO/pull/2771)
 - Fixed a bug that prevented `Problem.set_solver_print` from impacting output in multi-run scenarios [#2773](https://github.com/OpenMDAO/OpenMDAO/pull/2773)
 - Fixed a bug in `set_output_solver_options`, `set_design_var_options`, and `set_constraint_options` that prevented them from working when given vector values. [#2782](https://github.com/OpenMDAO/OpenMDAO/pull/2782)
-- Fixed KeyError when total coloring done on model with an unconnected input constraint in a ParallelGroup [#2774](https://github.com/OpenMDAO/OpenMDAO/pull/2774)
 
 ## Miscellaneous
 
