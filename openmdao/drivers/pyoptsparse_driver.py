@@ -474,7 +474,7 @@ class pyOptSparseDriver(Driver):
 
             if not wrt:
                 issue_warning(f"Inequality constraint '{name}' does not depend on any design "
-                              "variables.")
+                              "variables and was not added to the optimization.")
                 continue
 
             if meta['linear']:
