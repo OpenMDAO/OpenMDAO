@@ -164,13 +164,18 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
         len_wrt_width = len(wrt_header)
         len_norm_width = len(norm_value_header)
         bad_derivs = []
+        inconsistent_derivs = set()
 
         # Find all derivatives whose errors exceed tolerance.
         # Also, size the output to precompute column extents.
-        for (var, wrt) in data[comp]:
-            pair_data = data[comp][var, wrt]
+        for key, pair_data in data[comp].items():
+            var, wrt = key
             for error_type, tolerance in [('abs error', atol), ('rel error', rtol), ]:
                 actual = pair_data[error_type]
+                incon = pair_data.get('rank_inconsistent')
+                if incon:
+                    inconsistent_derivs.add(key)
+
                 for error_val, mode in zip(actual, norm_types):
                     in_error = False
 
@@ -196,21 +201,28 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
                         in_error = True
 
                     if in_error:
-                        wrt_string = '{0} wrt {1}'.format(var, wrt)
-                        norm_string = '{}'.format(error_val)
+                        wrt_string = f'{var} wrt {wrt}'
+                        norm_string = str(error_val)
                         bad_derivs.append((wrt_string, norm_string, error_type, mode))
                         len_wrt_width = max(len_wrt_width, len(wrt_string))
                         len_norm_width = max(len_norm_width, len(norm_string))
 
-        if bad_derivs:
+        if bad_derivs or inconsistent_derivs:
             comp_error_string = ''
-            for wrt_string, norm_string, error_type, mode in bad_derivs:
-                err_msg = '{0} | {1} | {2} | {3}'.format(
-                    pad_name(wrt_string, len_wrt_width),
-                    pad_name(error_type.split()[0], len_absrel_width),
-                    pad_name(mode, len_norm_type_width),
-                    pad_name(norm_string, len_norm_width)) + '\n'
-                comp_error_string += err_msg
+            if bad_derivs:
+                for wrt_string, norm_string, error_type, mode in bad_derivs:
+                    err_msg = '{0} | {1} | {2} | {3}'.format(
+                        pad_name(wrt_string, len_wrt_width),
+                        pad_name(error_type.split()[0], len_absrel_width),
+                        pad_name(mode, len_norm_type_width),
+                        pad_name(norm_string, len_norm_width)) + '\n'
+                    comp_error_string += err_msg
+
+            if inconsistent_derivs:
+                comp_error_string += (
+                    "\nInconsistent derivs across processes for keys: "
+                    f"{sorted(inconsistent_derivs)}.\nCheck that distributed outputs are properly "
+                    "reduced when computing\nderivatives of serial inputs.")
 
             name_header = 'Component: {}\n'.format(comp)
             len_name_header = len(name_header)
@@ -235,7 +247,7 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
     # if error string then raise error with that string
     if error_string:
         header_line1 = 'Assert Check Partials failed for the following Components'
-        header_line2 = 'with absolute tolerance = {} and relative tolerance = {}'.format(atol, rtol)
+        header_line2 = f'with absolute tolerance = {atol} and relative tolerance = {rtol}'
         header_width = max(len(header_line1), len(header_line2))
         header = '\n' + header_width * '=' + '\n'
         header += header_line1 + '\n'
@@ -265,15 +277,19 @@ def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6):
         Relative error. Default is 1e-6.
     """
     fails = []
-    for key, val in totals_data.items():
+    incon_keys = set()
+    for key, dct in totals_data.items():
+        if 'inconsistent_keys' in dct:
+            incon_keys = dct['inconsistent_keys']
+
         try:
-            val['J_fwd']
-            val['J_fd']
+            dct['J_fwd']
+            dct['J_fd']
         except Exception as err:
             raise err.__class__(f"For key {key}: {err}")
         try:
             for i in range(3):
-                erel, eabs = val['rel error'][i], val['abs error'][i]
+                erel, eabs = dct['rel error'][i], dct['abs error'][i]
                 if erel is not None and not np.isnan(erel):
                     if erel > rtol:
                         raise ValueError(f"rel tolerance of {erel} > allowed rel tolerance "
@@ -283,11 +299,23 @@ def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6):
                         raise ValueError(f"abs tolerance of {eabs} > allowed abs tolerance "
                                          f"of {atol}.")
         except ValueError as err:
-            fails.append((key, val, err))
+            fails.append((key, dct, err))
+
+    fail_list = []
+
     if fails:
-        raise ValueError('\n\n'.join(
-            [f"Totals differ for {key}:\nAnalytic:\n{val['J_fwd']}\nFD:\n{val['J_fd']}\n{err}"
-             for key, val, err in fails]))
+        fail_list.extend(
+            [f"Totals differ for {key}:\nAnalytic:\n{dct['J_fwd']}\nFD:\n{dct['J_fd']}\n{err}"
+             for key, dct, err in fails])
+
+    if incon_keys:
+        ders = [f"{sof} wrt {swrt}" for sof, swrt in sorted(incon_keys)]
+        fail_list.append(f"During total derivative computation, the following partial derivatives "
+                         "resulted in serial inputs that were inconsistent across processes: "
+                         f"{ders}.")
+
+    if fails or incon_keys:
+        raise ValueError('\n\n'.join(fail_list))
 
 
 def assert_no_approx_partials(system, include_self=True, recurse=True, method='any', excludes=None):

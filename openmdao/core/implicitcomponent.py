@@ -211,7 +211,15 @@ class ImplicitComponent(Component):
                     d_inputs.set_val(new_ins)
                     d_outputs.set_val(new_outs)
         else:
+            dochk = mode == 'rev' and self._problem_meta['checking'] and self.comm.size > 1
+
+            if dochk:
+                nzdresids = self._get_dist_nz_dresids()
+
             self.apply_linear(inputs, outputs, d_inputs, d_outputs, d_residuals, mode)
+
+            if dochk:
+                self._check_consistent_serial_dinputs(nzdresids)
 
     def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
         """
@@ -792,17 +800,6 @@ class ImplicitComponent(Component):
             List of all states.
         """
         return self._list_states()
-
-    def has_declared_resids(self):
-        """
-        Return True if this System has declared residuals.
-
-        Returns
-        -------
-        bool
-            True if this System has declared residuals.
-        """
-        return len(self._declared_residuals) > 0
 
 
 def meta2range_iter(meta_dict, names=None, shp_name='shape'):

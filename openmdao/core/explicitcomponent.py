@@ -356,10 +356,18 @@ class ExplicitComponent(Component):
                 else:  # rev
                     d_inputs.set_val(new_vals)
         else:
+            dochk = mode == 'rev' and self._problem_meta['checking'] and self.comm.size > 1
+
+            if dochk:
+                nzdresids = self._get_dist_nz_dresids()
+
             if discrete_inputs:
                 self.compute_jacvec_product(inputs, d_inputs, d_resids, mode, discrete_inputs)
             else:
                 self.compute_jacvec_product(inputs, d_inputs, d_resids, mode)
+
+            if dochk:
+                self._check_consistent_serial_dinputs(nzdresids)
 
     def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
         """

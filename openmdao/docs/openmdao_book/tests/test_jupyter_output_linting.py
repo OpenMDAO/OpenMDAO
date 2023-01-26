@@ -150,7 +150,12 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
 
                     for line in block['source']:
                         if 'assert' in line:
-                            self.fail(f"Assert found in a code block in {file}. ")
+                            sblock = ''.join(block['source'])
+                            stags = tags if tags else ''
+                            delim = '-' * 50
+                            self.fail(f"Assert found in a code block in {file}:\n"
+                                      f"Tags: {stags}\n"
+                                      f"Block source:\n{delim}\n{sblock}\n{delim}")
 
     def test_eval_rst(self):
         """

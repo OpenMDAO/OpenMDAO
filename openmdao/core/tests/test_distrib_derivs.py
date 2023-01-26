@@ -14,7 +14,8 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.om_warnings import OMDeprecationWarning
 from openmdao.utils.name_maps import rel_name2abs_name
 from openmdao.utils.array_utils import evenly_distrib_idxs
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, \
+    assert_check_totals, assert_warning
 
 try:
     from pyoptsparse import Optimization as pyoptsparse_opt
@@ -117,6 +118,70 @@ class DistribCoordComp(om.ExplicitComponent):
             outputs['outvec'] = inputs['invec'] * 2.0
         else:
             outputs['outvec'] = inputs['invec'] * 3.0
+
+
+class MixedDistrib2(om.ExplicitComponent):  # for double diamond case
+
+    def setup(self):
+        self.add_input('in_dist', shape_by_conn=True, distributed=True)
+        self.add_input('in_nd', shape_by_conn=True)
+        self.add_output('out_dist', copy_shape='in_dist', distributed=True)
+        self.add_output('out_nd', copy_shape='in_nd')
+
+    def compute(self, inputs, outputs):
+        Id = inputs['in_dist']
+        Is = inputs['in_nd']
+
+        f_Id = Id**2 - 2.0*Id + 4.0
+        f_Is = Is ** 0.5
+        g_Is = Is**2 + 3.0*Is - 5.0
+        g_Id = Id ** 0.5
+
+        # Distributed output
+        outputs['out_dist'] = f_Id + np.sum(f_Is)
+
+        # We need to gather the summed values to compute the total sum over all procs.
+        local_sum = np.array(np.sum(g_Id))
+        total_sum = local_sum.copy()
+        self.comm.Allreduce(local_sum, total_sum, op=MPI.SUM)
+        outputs['out_nd'] = g_Is + total_sum
+
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        Id = inputs['in_dist']
+        Is = inputs['in_nd']
+
+        df_dId = 2.0 * Id - 2.0
+        df_dIs = 0.5 / Is ** 0.5
+        dg_dId = 0.5 / Id ** 0.5
+        dg_dIs = 2.0 * Is + 3.0
+
+        nId = len(Id)
+        nIs = len(Is)
+
+        if mode == 'fwd':
+            if 'out_dist' in d_outputs:
+                if 'in_dist' in d_inputs:
+                    d_outputs['out_dist'] += df_dId * d_inputs['in_dist']
+                if 'in_nd' in d_inputs:
+                    d_outputs['out_dist'] += np.tile(df_dIs, nId).reshape((nId, nIs)).dot(d_inputs['in_nd'])
+            if 'out_nd' in d_outputs:
+                if 'in_dist' in d_inputs:
+                    d_outputs['out_nd'] += self.comm.allreduce(np.tile(dg_dId, nIs).reshape((nIs, nId)).dot(d_inputs['in_dist']))
+                if 'in_nd' in d_inputs:
+                    d_outputs['out_nd'] += dg_dIs * d_inputs['in_nd']
+
+        else:
+            if 'out_dist' in d_outputs:
+                if 'in_dist' in d_inputs:
+                    d_inputs['in_dist'] += df_dId * d_outputs['out_dist']
+                if 'in_nd' in d_inputs:
+                    d_inputs['in_nd'] += self.comm.allreduce(np.tile(df_dIs, nId).reshape((nId, nIs)).T.dot(d_outputs['out_dist']))
+
+            if 'out_nd' in d_outputs:
+                if 'in_dist' in d_inputs:
+                    d_inputs['in_dist'] += np.tile(dg_dId, nIs).reshape((nIs, nId)).T.dot(d_outputs['out_nd'])
+                if 'in_nd' in d_inputs:
+                    d_inputs['in_nd'] += dg_dIs * d_outputs['out_nd']
 
 
 def _test_func_name(func, num, param):
@@ -347,13 +412,13 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        J = prob.check_totals(method='fd')
+        J = prob.check_totals(method='fd', out_stream=None)
         assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-5)
         assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-5)
         assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-5)
         assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][0], 0.0, 1e-5)
 
-        J = prob.check_totals(method='cs')
+        J = prob.check_totals(method='cs', out_stream=None)
         assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-14)
         assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-14)
         assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-14)
@@ -373,13 +438,13 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        J = prob.check_totals(method='fd')
+        J = prob.check_totals(method='fd', show_only_incorrect=True)
         assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-5)
         assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-5)
         assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-5)
         assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][0], 0.0, 1e-5)
 
-        J = prob.check_totals(method='cs')
+        J = prob.check_totals(method='cs', show_only_incorrect=True)
         assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-14)
         assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-14)
         assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-14)
@@ -422,13 +487,13 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        J = prob.check_totals(method='fd')
+        J = prob.check_totals(method='fd', show_only_incorrect=True)
         assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-5)
         assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-5)
         assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-5)
         assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][0], 0.0, 1e-5)
 
-        J = prob.check_totals(method='cs')
+        J = prob.check_totals(method='cs', show_only_incorrect=True)
         assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-14)
         assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-14)
         assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-14)
@@ -448,13 +513,13 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        J = prob.check_totals(method='fd')
+        J = prob.check_totals(method='fd', show_only_incorrect=True)
         assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-5)
         assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-5)
         assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-5)
         assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][0], 0.0, 1e-5)
 
-        J = prob.check_totals(method='cs')
+        J = prob.check_totals(method='cs', show_only_incorrect=True)
         assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-14)
         assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-14)
         assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-14)
@@ -517,7 +582,7 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        J = prob.check_totals(method='cs')
+        J = prob.check_totals(method='cs', show_only_incorrect=True)
         assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-5)
         assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-5)
         assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-5)
@@ -577,7 +642,7 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        J = prob.check_totals(method='fd')
+        J = prob.check_totals(method='fd', show_only_incorrect=True)
         assert_near_equal(J['sub.parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-5)
         assert_near_equal(J['sub.parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-5)
         assert_near_equal(J['sub.sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-5)
@@ -597,7 +662,7 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        J = prob.check_totals(method='fd')
+        J = prob.check_totals(method='fd', show_only_incorrect=True)
         assert_near_equal(J['sub.parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-5)
         assert_near_equal(J['sub.parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-5)
         assert_near_equal(J['sub.sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-5)
@@ -712,7 +777,7 @@ class MPITests2(unittest.TestCase):
 
             prob.run_model()
 
-            J = prob.check_totals(method='fd')
+            J = prob.check_totals(method='fd', show_only_incorrect=True)
             assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-5)
             assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-5)
             assert_near_equal(J['ndp.g', 'p.x']['abs error'][0], 0.0, 2e-5)
@@ -724,7 +789,7 @@ class MPITests2(unittest.TestCase):
             assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-5)
             assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][0], 0.0, 1e-5)
 
-            J = prob.check_totals(method='cs')
+            J = prob.check_totals(method='cs', show_only_incorrect=True)
             assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-14)
             assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-14)
             assert_near_equal(J['ndp.g', 'p.x']['abs error'][0], 0.0, 1e-13)
@@ -736,78 +801,73 @@ class MPITests2(unittest.TestCase):
             assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-14)
             assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][0], 0.0, 1e-14)
 
-    def test_distrib_cascade(self):
+    def run_mixed_distrib2_prob(self, mode):
+        size = 5
+        comm = MPI.COMM_WORLD
+        rank = comm.rank
+        sizes, offsets = evenly_distrib_idxs(comm.size, size)
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x_dist', np.zeros(sizes[rank]), distributed=True)
+        ivc.add_output('x_nd', np.zeros(size))
+
+        model.add_subsystem("indep", ivc)
+        model.add_subsystem("D1", MixedDistrib2())
+
+        model.connect('indep.x_dist', 'D1.in_dist')
+        model.connect('indep.x_nd', 'D1.in_nd')
+
+        model.add_design_var('indep.x_nd')
+        model.add_design_var('indep.x_dist')
+        model.add_constraint('D1.out_dist', lower=0.0)
+        model.add_constraint('D1.out_nd', lower=0.0)
+
+        prob.setup(force_alloc_complex=True, mode=mode)
+
+        # Set initial values of distributed variable.
+        x_dist_init = 3.0 + np.arange(size)[offsets[rank]:offsets[rank] + sizes[rank]]
+        x_dist_init /= np.max(x_dist_init)
+        prob.set_val('indep.x_dist', x_dist_init)
+
+        # Set initial values of non-distributed variable.
+        x_nd_init = 1.0 + 2.0*np.arange(size)
+        x_nd_init /= np.max(x_nd_init)
+        prob.set_val('indep.x_nd', x_nd_init)
+
+        prob.run_model()
+
+        return prob
+
+    def test_distrib_mixeddistrib2_totals_rev(self):
+        prob = self.run_mixed_distrib2_prob('rev')
+
+        totals = prob.check_totals(show_only_incorrect=True, method='cs')
+        assert_check_totals(totals)
+
+    def test_distrib_mixeddistrib2_partials_rev(self):
+        prob = self.run_mixed_distrib2_prob('rev')
+
+        partials = prob.check_partials(show_only_incorrect=True, method='cs')
+        assert_check_partials(partials)
+
+    def test_distrib_mixeddistrib2_totals_fwd(self):
+        prob = self.run_mixed_distrib2_prob('fwd')
+
+        totals = prob.check_totals(show_only_incorrect=True, method='cs')
+        assert_check_totals(totals)
+
+    def test_distrib_mixeddistrib2_partials_fwd(self):
+        prob = self.run_mixed_distrib2_prob('fwd')
+
+        partials = prob.check_partials(show_only_incorrect=True, method='cs')
+        assert_check_partials(partials)
+
+    def test_distrib_cascade_rev(self):
         # Tests the derivatives on a complicated model that is the distributed equivalent
         # of a double diamond.
-        class MixedDistrib2(om.ExplicitComponent):
-
-            def setup(self):
-                self.add_input('in_dist', shape_by_conn=True, distributed=True)
-                self.add_input('in_nd', shape_by_conn=True)
-                self.add_output('out_dist', copy_shape='in_dist', distributed=True)
-                self.add_output('out_nd', copy_shape='in_nd')
-
-            def compute(self, inputs, outputs):
-                x = inputs['in_dist']
-                y = inputs['in_nd']
-
-                f_x = x**2 - 2.0*x + 4.0
-                f_y = y ** 0.5
-                g_y = y**2 + 3.0*y - 5.0
-                g_x = x ** 0.5
-
-                # Distributed output
-                outputs['out_dist'] = f_x + np.sum(f_y)
-
-                # We need to gather the summed values to compute the total sum over all procs.
-                local_sum = np.array(np.sum(g_x))
-                total_sum = local_sum.copy()
-                self.comm.Allreduce(local_sum, total_sum, op=MPI.SUM)
-                outputs['out_nd'] = g_y + total_sum
-
-            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-                x = inputs['in_dist']
-                y = inputs['in_nd']
-
-                df_dx = 2.0 * x - 2.0
-                df_dy = 0.5 / y ** 0.5
-                dg_dx = 0.5 / x ** 0.5
-                dg_dy = 2.0 * y + 3.0
-
-                nx = len(x)
-                ny = len(y)
-
-                if mode == 'fwd':
-                    if 'out_dist' in d_outputs:
-                        if 'in_dist' in d_inputs:
-                            d_outputs['out_dist'] += df_dx * d_inputs['in_dist']
-                        if 'in_nd' in d_inputs:
-                            d_outputs['out_dist'] += np.tile(df_dy, nx).reshape((nx, ny)).dot(d_inputs['in_nd'])
-                    if 'out_nd' in d_outputs:
-                        if 'in_dist' in d_inputs:
-                            deriv = np.tile(dg_dx, ny).reshape((ny, nx)).dot(d_inputs['in_dist'])
-                            deriv_sum = np.zeros(deriv.size)
-                            self.comm.Allreduce(deriv, deriv_sum, op=MPI.SUM)
-                            d_outputs['out_nd'] += deriv_sum
-                        if 'in_nd' in d_inputs:
-                            d_outputs['out_nd'] += dg_dy * d_inputs['in_nd']
-
-                else:
-                    if 'out_dist' in d_outputs:
-                        if 'in_dist' in d_inputs:
-                            d_inputs['in_dist'] += df_dx * d_outputs['out_dist']
-                        if 'in_nd' in d_inputs:
-                            d_inputs['in_nd'] += np.tile(df_dy, nx).reshape((nx, ny)).T.dot(d_outputs['out_dist'])
-
-                    if 'out_nd' in d_outputs:
-                        if 'out_nd' in d_outputs:
-                            if 'in_dist' in d_inputs:
-                                full = np.zeros(d_outputs['out_nd'].size)
-                                self.comm.Allreduce(d_outputs['out_nd'], full, op=MPI.SUM)
-                                d_inputs['in_dist'] += np.tile(dg_dx, ny).reshape((ny, nx)).T.dot(full)
-                        if 'in_nd' in d_inputs:
-                            d_inputs['in_nd'] += dg_dy * d_outputs['out_nd']
-
         size = 5
         comm = MPI.COMM_WORLD
         rank = comm.rank
@@ -851,17 +911,18 @@ class MPITests2(unittest.TestCase):
 
         # Set initial values of distributed variable.
         x_dist_init = 3.0 + np.arange(size)[offsets[rank]:offsets[rank] + sizes[rank]]
+        x_dist_init /= np.max(x_dist_init)
         prob.set_val('indep.x_dist', x_dist_init)
 
         # Set initial values of non-distributed variable.
         x_nd_init = 1.0 + 2.0*np.arange(size)
+        x_nd_init /= np.max(x_nd_init)
         prob.set_val('indep.x_nd', x_nd_init)
 
         prob.run_model()
 
-        totals = prob.check_totals(method='cs', out_stream=None)
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-12)
+        totals = prob.check_totals(show_only_incorrect=True, method='cs')
+        assert_check_totals(totals, rtol=1e-12)
 
 
 class DistribStateImplicit(om.ImplicitComponent):
@@ -877,11 +938,9 @@ class DistribStateImplicit(om.ImplicitComponent):
 
         rank = self.comm.rank
 
-        GLOBAL_SIZE = 5
-        sizes, offsets = evenly_distrib_idxs(self.comm.size, GLOBAL_SIZE)
+        sizes, _ = evenly_distrib_idxs(self.comm.size, 5)
 
         self.add_output('states', shape=int(sizes[rank]), distributed=True)
-
         self.add_output('out_var', shape=1, distributed=True)
 
         self.local_size = sizes[rank]
@@ -939,7 +998,7 @@ class DistribStateImplicit(om.ImplicitComponent):
                 d_o['out_var'] += d_r['out_var']
 
             if 'a' in d_i:
-                    d_i['a'] -= np.sum(d_r['states'])
+                d_i['a'] -= np.sum(d_r['states'])
 
 
 class DistParab2(om.ExplicitComponent):
@@ -1043,9 +1102,8 @@ class MPITests3(unittest.TestCase):
                           np.array([12.48]),
                           1e-6)
 
-        totals = prob.check_totals(method='cs')
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+        totals = prob.check_totals(method='cs', show_only_incorrect=True)
+        assert_check_totals(totals, rtol=1e-6)
 
         of = ['parab.f_xy']
         J = prob.driver._compute_totals(of=of, wrt=['p.x', 'p.y'], return_format='dict')
@@ -1058,9 +1116,8 @@ class MPITests3(unittest.TestCase):
 
         prob.run_model()
 
-        totals = prob.check_totals(method='cs')
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+        totals = prob.check_totals(method='cs', show_only_incorrect=True)
+        assert_check_totals(totals, rtol=1e-6)
 
         of = ['parab.f_xy']
         J = prob.driver._compute_totals(of=of, wrt=['p.x', 'p.y'], return_format='dict')
@@ -1098,16 +1155,14 @@ class MPITests3(unittest.TestCase):
 
         prob.run_model()
 
-        totals = prob.check_totals(method='cs')
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+        totals = prob.check_totals(method='cs', show_only_incorrect=True)
+        assert_check_totals(totals, rtol=1e-6)
 
         prob.setup(force_alloc_complex=True, mode='rev')
         prob.run_model()
 
-        totals = prob.check_totals(method='cs')
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+        totals = prob.check_totals(method='cs', show_only_incorrect=True)
+        assert_check_totals(totals, rtol=1e-6)
 
     def test_distrib_con_indices_negative(self):
         size = 7
@@ -1144,9 +1199,8 @@ class MPITests3(unittest.TestCase):
                           np.array([ 8.88, 31.92]),
                           1e-6)
 
-        totals = prob.check_totals(method='cs')
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+        totals = prob.check_totals(method='cs', show_only_incorrect=True)
+        assert_check_totals(totals, rtol=1e-6)
 
         of = ['parab.f_xy']
         J = prob.driver._compute_totals(of=of, wrt=['p.x', 'p.y'], return_format='dict')
@@ -1161,9 +1215,8 @@ class MPITests3(unittest.TestCase):
 
         prob.run_model()
 
-        totals = prob.check_totals(method='cs')
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+        totals = prob.check_totals(method='cs', show_only_incorrect=True)
+        assert_check_totals(totals, rtol=1e-6)
 
         of = ['parab.f_xy']
         J = prob.driver._compute_totals(of=of, wrt=['p.x', 'p.y'], return_format='dict')
@@ -1304,10 +1357,8 @@ class MPITestsBug(unittest.TestCase):
 
         of ='rhs_disc.x0dot'
         wrt = 'states:x1'
-        totals = p.check_totals(of=of, wrt=wrt, compact_print=False)
-
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+        totals = p.check_totals(of=of, wrt=wrt, compact_print=False, show_only_incorrect=True)
+        assert_check_totals(totals, atol=1e-5, rtol=1e-6)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -1342,7 +1393,7 @@ class MPIFeatureTests(unittest.TestCase):
                           2*np.ones(8) if model.comm.rank == 0 else -3*np.ones(7))
         assert_near_equal(prob.get_val('C3.sum'), -5.)
 
-        assert_check_partials(prob.check_partials())
+        assert_check_partials(prob.check_partials(show_only_incorrect=True))
 
         J = prob.compute_totals(of=['C2.outvec'], wrt=['indep.x'])
         assert_near_equal(J[('C2.outvec', 'indep.x')],
@@ -1459,7 +1510,7 @@ class ZeroLengthInputsOutputs(unittest.TestCase):
                           np.eye(3)*np.append(2*np.ones(1), -3*np.ones(2)))
 
         # Make sure that the code for handling element stepsize also works on a distributed model.
-        assert(prob.check_partials(step_calc='rel_element'))
+        assert(prob.check_partials(step_calc='rel_element', show_only_incorrect=True))
 
 
 class DistribCompDenseJac(om.ExplicitComponent):
@@ -1547,7 +1598,7 @@ class TestBugs(unittest.TestCase):
 
         prob.setup()
         prob.run_model()
-        totals = prob.check_totals(wrt='dvs.state')
+        totals = prob.check_totals(wrt='dvs.state', show_only_incorrect=True)
         assert_near_equal(totals['solver.func', 'dvs.state']['abs error'][0], 0.0, tolerance=1e-7)
 
 
@@ -1620,14 +1671,56 @@ class Distrib_Derivs_Matfree(Distrib_Derivs):
                 if 'in_dist' in d_inputs:
                     d_inputs['in_dist'] += (2.0 * Id - 2.0) * d_outputs['out_dist']
                 if 'in_nd' in d_inputs:
-                    d_inputs['in_nd'] += np.tile(df_dIs, local_size).reshape((local_size, size)).T.dot(d_outputs['out_dist'])
+                    deriv = np.tile(df_dIs, local_size).reshape((local_size, size)).T.dot(d_outputs['out_dist'])
+                    deriv_sum = np.zeros(deriv.size)
+                    self.comm.Allreduce(deriv, deriv_sum, op=MPI.SUM)
+                    d_inputs['in_nd'] += deriv_sum
+
+            if 'out_nd' in d_outputs:
+                if 'in_dist' in d_inputs:
+                    d_inputs['in_dist'] += np.tile(dg_dId, size).reshape((size, local_size)).T.dot(d_outputs['out_nd'])
+                if 'in_nd' in d_inputs:
+                    d_inputs['in_nd'] += (2.0 * Is + 3.0) * d_outputs['out_nd']
+
+
+class Distrib_Derivs_Matfree_Old(Distrib_Derivs):
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        Id = inputs['in_dist']
+        Is = inputs['in_nd']
+
+        size = len(Is)
+        local_size = len(Id)
+
+        df_dIs = 3. * Is
+        dg_dId = 3. * Id
+
+        if mode == 'fwd':
+            if 'out_dist' in d_outputs:
+                if 'in_dist' in d_inputs:
+                    d_outputs['out_dist'] += (2.0 * Id - 2.0) * d_inputs['in_dist']
+                if 'in_nd' in d_inputs:
+                    d_outputs['out_dist'] += np.tile(df_dIs, local_size).reshape((local_size, size)).dot(d_inputs['in_nd'])
+            if 'out_nd' in d_outputs:
+                if 'in_dist' in d_inputs:
+                    deriv = np.tile(dg_dId, size).reshape((size, local_size)).dot(d_inputs['in_dist'])
+                    deriv_sum = np.zeros(deriv.size)
+                    self.comm.Allreduce(deriv, deriv_sum, op=MPI.SUM)
+                    d_outputs['out_nd'] += deriv_sum
+                if 'in_nd' in d_inputs:
+                    d_outputs['out_nd'] += (2.0 * Is + 3.0) * d_inputs['in_nd']
+        else:  # rev
+            if 'out_dist' in d_outputs:
+                if 'in_dist' in d_inputs:
+                    d_inputs['in_dist'] += (2.0 * Id - 2.0) * d_outputs['out_dist']
+                if 'in_nd' in d_inputs:
+                    d_inputs['in_nd'] += 2. * np.tile(df_dIs, local_size).reshape((local_size, size)).T.dot(d_outputs['out_dist'])
             if 'out_nd' in d_outputs:
                 if 'in_dist' in d_inputs:
                     full = np.zeros(d_outputs['out_nd'].size)
                     # add up contributions from the non-distributed variable that is duplicated over
                     # all of the procs.
                     self.comm.Allreduce(d_outputs['out_nd'], full, op=MPI.SUM)
-                    d_inputs['in_dist'] += np.tile(dg_dId, size).reshape((size, local_size)).T.dot(full)
+                    d_inputs['in_dist'] += .5 * np.tile(dg_dId, size).reshape((size, local_size)).T.dot(full)
                 if 'in_nd' in d_inputs:
                     d_inputs['in_nd'] += (2.0 * Is + 3.0) * d_outputs['out_nd']
 
@@ -1718,12 +1811,13 @@ class Distrib_Derivs_Prod_Matfree(Distrib_Derivs_Prod):
                 if 'in_dist' in d_inputs:
                     d_inputs['in_dist'] += (2.0 * Id - 2.0) * d_outputs['out_dist']
                 if 'in_nd' in d_inputs:
-                    d_inputs['in_nd'] += d_dIs.T.dot(d_outputs['out_dist'])
+                    deriv = d_dIs.T.dot(d_outputs['out_dist'])
+                    deriv_sum = np.zeros(deriv.size)
+                    self.comm.Allreduce(deriv, deriv_sum, op=MPI.SUM)
+                    d_inputs['in_nd'] += deriv_sum
             if 'out_nd' in d_outputs:
                 if 'in_dist' in d_inputs:
-                    full = np.zeros(d_outputs['out_nd'].size)
-                    self.comm.Allreduce(d_outputs['out_nd'], full, op=MPI.SUM)
-                    d_inputs['in_dist'] += d_dId.T.dot(full)
+                    d_inputs['in_dist'] += d_dId.T.dot(d_outputs['out_nd'])
                 if 'in_nd' in d_inputs:
                     d_inputs['in_nd'] += (2.0 * Is + 3.0) * d_outputs['out_nd']
 
@@ -1736,13 +1830,9 @@ class TestDistribBugs(unittest.TestCase):
     def get_problem(self, comp_class, mode='auto', stacked=False):
         size = 5
 
-        if MPI:
-            comm = MPI.COMM_WORLD
-            rank = comm.rank
-            sizes, offsets = evenly_distrib_idxs(comm.size, size)
-        else:
-            rank = 0
-            sizes, offsets = [size], [0]
+        comm = MPI.COMM_WORLD
+        rank = comm.rank
+        sizes, offsets = evenly_distrib_idxs(comm.size, size)
 
         model = om.Group()
 
@@ -1829,6 +1919,26 @@ class TestDistribBugs(unittest.TestCase):
         totals = prob.check_totals(method='cs', out_stream=None, of=['D1.out_nd', 'D1.out_dist'],
                                                    wrt=['indep.x_serial', 'indep.x_dist'])
         self._compare_totals(totals)
+
+    def test_check_totals_rev_old(self):
+        prob = self.get_problem(Distrib_Derivs_Matfree_Old, mode='rev')
+        data = prob.check_totals(method='cs',
+                                 of=['D1.out_nd', 'D1.out_dist'], wrt=['indep.x_serial', 'indep.x_dist'],
+                                 show_only_incorrect=True)
+        with self.assertRaises(ValueError) as cm:
+            assert_check_totals(data)
+
+        msg = "During total derivative computation, the following partial derivatives resulted in serial inputs that were inconsistent across processes: ['D1.out_dist wrt D1.in_nd']."
+        self.assertEquals(str(cm.exception), msg)
+
+    def test_check_partials_cs_old(self):
+        prob = self.get_problem(Distrib_Derivs_Matfree_Old)
+        data = prob.check_partials(method='cs', show_only_incorrect=True)
+        with self.assertRaises(ValueError) as cm:
+            assert_check_partials(data)
+
+        msg = "Inconsistent derivs across processes for keys: [('out_dist', 'in_nd')].\nCheck that distributed outputs are properly reduced when computing\nderivatives of serial inputs."
+        self.assertTrue(str(cm.exception).endswith(msg))
 
     def test_check_totals_prod_rev(self):
         prob = self.get_problem(Distrib_Derivs_Prod_Matfree, mode='rev')

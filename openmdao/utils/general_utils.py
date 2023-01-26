@@ -782,7 +782,7 @@ def make_set(str_data, name=None):
 
 def match_includes_excludes(name, includes=None, excludes=None):
     """
-    Check to see if the variable names pass through the includes and excludes filter.
+    Check to see if the variable name passes through the includes and excludes filter.
 
     Parameters
     ----------
@@ -814,6 +814,30 @@ def match_includes_excludes(name, includes=None, excludes=None):
                 return True
 
     return False
+
+
+def filtered_name_iter(name_iter, includes=None, excludes=None):
+    """
+    Yield names that pass through the includes and excludes filters.
+
+    Parameters
+    ----------
+    name_iter : iter of str
+        Iterator over names to be checked for match.
+    includes : iter of str or None
+        Glob patterns for name to include in the filtering.  None, the default, means
+        include all.
+    excludes : iter of str or None
+        Glob patterns for name to exclude in the filtering.
+
+    Yields
+    ------
+    str
+        Each name that passes through the filters.
+    """
+    for name in name_iter:
+        if match_includes_excludes(name, includes, excludes):
+            yield name
 
 
 def match_prom_or_abs(name, prom_name, includes=None, excludes=None):
@@ -1248,3 +1272,77 @@ def make_traceback():
     """
     finfo = getouterframes(currentframe())[2]
     return types.TracebackType(None, finfo.frame, finfo.frame.f_lasti, finfo.frame.f_lineno)
+
+
+if env_truthy('OM_DBG'):
+    def dprint(*args, **kwargs):
+        """
+        Print only if OM_DBG is truthy in the environment.
+
+        Parameters
+        ----------
+        args : list
+            Positional args.
+        kwargs : dict
+            Named args.
+        """
+        print(*args, **kwargs)
+else:
+    def dprint(*args, **kwargs):
+        """
+        Print only if OM_DBG is truthy in the environment.
+
+        Parameters
+        ----------
+        args : list
+            Positional args.
+        kwargs : dict
+            Named args.
+        """
+        pass
+
+
+def inconsistent_across_procs(comm, arr, tol=1e-15, return_array=True):
+    """
+    Check serial deriv values across ranks.
+
+    This should only be run after _apply_linear.
+
+    Parameters
+    ----------
+    comm : MPI communicator
+        Communicator belonging to the component that owns the derivs array.
+    arr : ndarray
+        The array being checked for consistency across processes.
+    tol : float
+        Tolerance to determine if diff is 0.
+    return_array : bool
+        If True, return a boolean array on rank 0 indicating which indices are inconsistent.
+
+    Returns
+    -------
+    ndarray on rank 0, boolean elsewhere, or bool everywhere if return_array is False
+        On rank 0, boolean array with True in entries that are not consistent across all processes
+        in the communicator.  On other ranks, True if there are inconsistent entries.
+    """
+    if comm.size < 2:
+        return np.zeros(0, dtype=bool) if return_array and comm.rank == 0 else False
+
+    if comm.rank == 0:
+        result = np.zeros(arr.size, dtype=bool) if return_array else False
+        for rank, val in enumerate(comm.gather(arr, root=0)):
+            if rank == 0:
+                baseval = val
+            elif return_array:
+                result |= (np.abs(baseval - val) > tol).flat
+            else:
+                result |= np.any(np.abs(baseval - val) > tol)
+
+        if return_array:
+            comm.bcast(np.any(result), root=0)
+        else:
+            comm.bcast(result, root=0)
+        return result
+
+    comm.gather(arr, root=0)
+    return comm.bcast(None, root=0)

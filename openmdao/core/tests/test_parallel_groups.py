@@ -509,6 +509,75 @@ class TestParallelOrdering(unittest.TestCase):
             self.assertEqual(locnames, ['_auto_ivc', 'G1.G2.C1', 'G1.G2.C2', 'G3.C3', 'G3.C4', 'par.G5.C7', 'par.G5.C8', 'C9'])
 
 
+class I1O1Comp(om.ExplicitComponent):
+    def __init__(self, idist=False, odist=False, mult=1.0, **kwargs):
+        self.idist = idist
+        self.odist = odist
+        self.mult = 1.0
+        super().__init__(**kwargs)
+
+    def setup(self):
+        self.add_input("x", distributed=self.idist)
+        self.add_output("y", distributed=self.odist)
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = self.mult * inputs['x']
+
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        if mode == 'fwd':
+            if 'y' in d_outputs:
+                if 'x' in d_inputs:
+                    d_outputs['y'] += self.mult * d_inputs['x']
+        else:  # rev
+            if 'y' in d_outputs:
+                if 'x' in d_inputs:
+                    d_inputs['x'] += self.mult * d_outputs['y']
+
+
+class I2O1Comp(om.ExplicitComponent):
+    def __init__(self, idist1=False, idist2=False, odist=False, mult1=1.0, mult2=1.0, **kwargs):
+        self.idist1 = idist1
+        self.idist2 = idist2
+        self.odist = odist
+        self.mult1 = 1.0
+        self.mult2 = 1.0
+        super().__init__(**kwargs)
+
+    def setup(self):
+        self.add_input("x1", distributed=self.idist1)
+        self.add_input("x2", distributed=self.idist2)
+        self.add_output("y", distributed=self.odist)
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = self.mult1 * inputs['x1'] + self.mult2 * inputs['x2']
+
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        if mode == 'fwd':
+            if 'y' in d_outputs:
+                if 'x1' in d_inputs:
+                    d_outputs['y'] += self.mult1 * d_inputs['x1']
+                if 'x2' in d_inputs:
+                    d_outputs['y'] += self.mult2 * d_inputs['x2']
+        else:  # rev
+            if 'y' in d_outputs:
+                if 'x1' in d_inputs:
+                    d_inputs['x1'] += self.mult1 * d_outputs['y']
+                if 'x2' in d_inputs:
+                    d_inputs['x2'] += self.mult2 * d_outputs['y']
+
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestTheoryDocExample(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def setup_model(self):
+        p = om.Problem()
+        model = p.model
+        model.add_subsystem('C1', I1O1Comp())
+
+
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests
     mpirun_tests()

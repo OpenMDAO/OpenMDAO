@@ -640,3 +640,36 @@ def array_hash(arr, alg=hashlib.sha1):
         The computed hash.
     """
     return alg(arr.view(np.uint8)).hexdigest()
+
+
+_randgen = np.random.default_rng()
+
+
+def get_random_arr(shape, comm=None, generator=None):
+    """
+    Request a random array, ensuring that its value will be consistent across MPI processes.
+
+    Parameters
+    ----------
+    shape : int
+        Shape of the random array.
+    comm : MPI communicator or None
+        All members of this communicator will receive the random array.
+    generator : random number generator or None
+        If not None, use this as the random number generator if on rank 0.
+
+    Returns
+    -------
+    ndarray
+        The random array.
+    """
+    gen = generator if generator is not None else _randgen
+    if comm is None or comm.size == 1:
+        return gen.random(shape)
+
+    if comm.rank == 0:
+        arr = gen.random(shape)
+    else:
+        arr = np.empty(shape)
+    comm.Bcast(arr, root=0)
+    return arr

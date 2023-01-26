@@ -28,7 +28,8 @@ class MatMultMultipointMPI2TestCase(unittest.TestCase):
 
         p.run_driver()
 
-        J = p.compute_totals()
+        with multi_proc_exception_check(p.comm):
+            J = p.compute_totals()
 
         for i in range(num_pts):
             with multi_proc_exception_check(p.comm):
@@ -39,7 +40,8 @@ class MatMultMultipointMPI2TestCase(unittest.TestCase):
             with multi_proc_exception_check(p.comm):
                 self.assertLess(norm, 1.e-7)
 
-        print("final obj:", p['obj.y'])
+        with multi_proc_exception_check(p.comm):
+            print("final obj:", p['obj.y'])
 
 
 if __name__ == '__main__':
