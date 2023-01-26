@@ -219,8 +219,8 @@ class ScipyOptimizeDriver(Driver):
             for name, meta in self._designvars.items():
                 lower = meta['lower']
                 upper = meta['upper']
-                if isinstance(lower, np.ndarray) or lower >= -INF_BOUND \
-                        or isinstance(upper, np.ndarray) or upper <= INF_BOUND:
+                if isinstance(lower, np.ndarray) or lower > -INF_BOUND \
+                        or isinstance(upper, np.ndarray) or upper < INF_BOUND:
                     self._cons[name] = meta.copy()
                     self._cons[name]['equals'] = None
                     self._cons[name]['linear'] = True

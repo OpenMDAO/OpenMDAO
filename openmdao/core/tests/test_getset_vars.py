@@ -4,6 +4,7 @@ import unittest
 import numpy as np
 from openmdao.api import Problem, Group, ExecComp, IndepVarComp, DirectSolver, ParallelGroup
 from openmdao.utils.mpi import MPI
+from openmdao.utils.assert_utils import assert_near_equal
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -445,6 +446,40 @@ class ParTestCase(unittest.TestCase):
         np.testing.assert_allclose(p['par.C2.x'], (np.arange(7,10) + 1.) * 3.)
         np.testing.assert_allclose(p['par.C1.y'], (np.arange(7) + 1.) * 4.)
         np.testing.assert_allclose(p['par.C2.y'], (np.arange(7,10) + 1.) * 9.)
+
+
+class SystemSetValTestCase(unittest.TestCase):
+    def setup_model(self):
+        p = Problem()
+        model = p.model
+        G1 = model.add_subsystem('G1', Group())
+        G2 = G1.add_subsystem('G2', Group())
+        C1 = G2.add_subsystem('C1', ExecComp('y=2*x'))
+
+        p.setup()
+        return p, G1, G2, C1
+
+    def test_set_val(self):
+        p, G1, G2, C1 = self.setup_model()
+        C1.set_val('x', 42.)
+        G2.set_val('C1.x', 99.)
+
+        assert_near_equal(p['G1.G2.C1.x'], 99.)
+
+        p.final_setup()
+
+        assert_near_equal(p['G1.G2.C1.x'], 99.)
+
+    def test_set_val2(self):
+        p, G1, G2, C1 = self.setup_model()
+        G2.set_val('C1.x', 99.)
+        C1.set_val('x', 42.)
+
+        assert_near_equal(p['G1.G2.C1.x'], 42.)
+
+        p.final_setup()
+
+        assert_near_equal(p['G1.G2.C1.x'], 42.)
 
 
 if __name__ == '__main__':

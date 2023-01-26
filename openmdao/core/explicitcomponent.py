@@ -78,6 +78,9 @@ class ExplicitComponent(Component):
             (new_jacvec_prod is not None and
              new_jacvec_prod != self._inst_functs['compute_jacvec_product']))
 
+        if self.matrix_free:
+            self._check_matfree_deprecation()
+
     def _get_partials_varlists(self, use_resname=False):
         """
         Get lists of 'of' and 'wrt' variables that form the partial jacobian.

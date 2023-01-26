@@ -45,15 +45,10 @@ class InterpScipy(InterpAlgorithm):
     ----------
     _d_dx : ndarray
         Cache of computed gradients with respect to evaluation point.
-    _interp_config : dict
-        Configuration object that stores the number of points required for each interpolation
-        method.
     _ki : list
         Interpolation order to be used in each dimension.
     _supports_d_dvalues : bool
         If True, this algorithm can compute the derivatives with respect to table values.
-    _xi : ndarray
-        Cache of current evaluation point.
     """
 
     def __init__(self, grid, values, interp=None, **kwargs):

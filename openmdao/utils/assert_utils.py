@@ -525,8 +525,14 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
     if type(actual) != type(desired):
         raise ValueError('actual %s, desired %s have different types' % (actual, desired))
 
+    if isinstance(actual, type) and isinstance(desired, type):
+        if actual != desired:
+            raise ValueError(
+                'actual type %s, and desired type %s are different' % (actual, desired))
+        return 0
+
     # The code below can only handle these data types
-    _supported_types = [dict, str, bool, np.ndarray, type(None)]
+    _supported_types = [dict, set, str, bool, np.ndarray, type(None)]
     if type(actual) not in _supported_types:
         warnings.warn(
             f"The function, assert_near_equal, does not support the actual value type: '"
@@ -561,6 +567,16 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
             except KeyError as exception:
                 msg = '{}: '.format(key) + str(exception)
                 raise KeyError(msg) from None
+
+    elif isinstance(actual, set) and isinstance(desired, set):
+        if actual.symmetric_difference(desired):
+            actual_extra = actual.difference(desired)
+            desired = desired.difference(actual)
+            raise KeyError("Actual and desired sets differ. "
+                           f"Actual extra values: {actual_extra}, "
+                           f"Desired extra values: {desired_extra}")
+
+        error = 0.
 
     elif isinstance(actual, str) and isinstance(desired, str):
         if actual != desired:
