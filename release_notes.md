@@ -3,7 +3,7 @@
 
 January 27, 2023
 
-OpenMDAO 3.25.0 includea only one change, which is the convention OpenMDAO uses when transferring data between distributed and non-distributed variables. The underlying principle is that serial variables and their derivatives must have consistent values across all ranks where those variables exist.
+OpenMDAO 3.25.0 includes only one change, which is the convention OpenMDAO uses when transferring data between distributed and non-distributed variables. The underlying principle is that serial variables and their derivatives must have consistent values across all ranks where those variables exist.
 
 This is a backwards incompatible change that could break some matrix-free components with a mix of distributed and non-distributed variables.  Users developing components involving distributed inputs should consult [POEM 075](https://github.com/OpenMDAO/POEMs/blob/master/POEM_075.md).
 
