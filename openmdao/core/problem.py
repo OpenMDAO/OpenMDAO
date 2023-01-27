@@ -547,19 +547,13 @@ class Problem(object):
         """
         Set all initial conditions that have been saved in cache after setup.
         """
-        cache = {}
-        for abs_name, tup in self.model._initial_condition_cache.items():
-            value, set_units, pathname, name = tup
+        for value, set_units, pathname, name in self.model._initial_condition_cache.values():
             if pathname:
-                if pathname in cache:
-                    cache[pathname].set_val(name, units=set_units)
+                system = self.model._get_subsystem(pathname)
+                if system is None:
+                    self.model.set_val(pathname + '.' + name, value, units=set_units)
                 else:
-                    system = self.model._get_subsystem(pathname)
-                    if system is None:
-                        self.model.set_val(pathname + '.' + name, value, units=set_units)
-                    else:
-                        cache[pathname] = system
-                        system.set_val(name, value, units=set_units)
+                    system.set_val(name, value, units=set_units)
             else:
                 self.model.set_val(name, value, units=set_units)
 
