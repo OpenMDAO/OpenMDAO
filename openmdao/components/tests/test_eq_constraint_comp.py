@@ -161,6 +161,7 @@ class TestEQConstraintComp(unittest.TestCase):
 
         prob.run_driver()
 
+        # verify that options are added
         self.assertEqual(prob.driver._cons['eq_constraint']['linear'], True)
         self.assertEqual(prob.driver._cons['eq_constraint']['cache_linear_solution'], True)
         self.assertEqual(prob.driver._cons['eq_constraint']['alias'], 'eq_constraint')
