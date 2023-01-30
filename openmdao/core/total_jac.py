@@ -11,7 +11,7 @@ import time
 import numpy as np
 
 from openmdao.core.constants import INT_DTYPE
-from openmdao.utils.general_utils import ContainsAll, _src_or_alias_dict
+from openmdao.utils.general_utils import ContainsAll, _src_or_alias_dict, _src_or_alias_name
 
 from openmdao.utils.mpi import MPI, check_mpi_env
 from openmdao.utils.coloring import _initialize_model_approx, Coloring
@@ -854,12 +854,22 @@ class _TotalJacInfo(object):
 
         for name in names:
 
+            drv_name = None
             if name in self.responses:
                 path = self.responses[name]['source']
+                drv_name = _src_or_alias_name(self.responses[name])
             else:
                 path = name
 
-            indices = vois[name]['indices'] if name in vois else None
+            if name in vois:
+                indices = vois[name]['indices']
+                drv_name = _src_or_alias_name(vois[name])
+            else:
+                indices = None
+
+            if drv_name is None:
+                drv_name = name
+
             meta = allprocs_abs2meta_out[path]
 
             if indices is not None:
@@ -876,7 +886,7 @@ class _TotalJacInfo(object):
 
                 if MPI and meta['distributed'] and self.get_remote:
                     if indices is not None:
-                        local_idx, sizes_idx, _ = self._dist_driver_vars[name]
+                        local_idx, sizes_idx, _ = self._dist_driver_vars[drv_name]
 
                         dist_offset = np.sum(sizes_idx[:myproc])
                         full_inds = np.arange(slc.start, slc.stop, dtype=INT_DTYPE)

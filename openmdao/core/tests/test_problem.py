@@ -1380,8 +1380,9 @@ class TestProblem(unittest.TestCase):
 
         p.setup(check=False, mode='rev')
 
-        relevant = model.get_relevant_vars({'indep1.x': {}, 'indep2.x': {}},
-                                           {'C8.y': {}, 'Unconnected.y': {}}, mode='rev')
+        dumb_meta = {'parallel_deriv_color': None}
+        relevant = model.get_relevant_vars({'indep1.x': dumb_meta, 'indep2.x': dumb_meta},
+                                           {'C8.y': dumb_meta, 'Unconnected.y': dumb_meta}, mode='rev')
 
         indep1_ins = set(['C3.b', 'C3.c', 'C8.b', 'G1.C1.a', 'G2.C5.a', 'G2.C5.b'])
         indep1_outs = set(['C3.y', 'C8.y', 'G1.C1.z', 'G2.C5.x', 'indep1.x'])

@@ -659,6 +659,56 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         self.assertEqual(p.model._solve_count, 22)
         self.assertEqual(p_color.model._solve_count, 11)
 
+    @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
+    def test_dynamic_total_coloring_auto_con_alias_pyoptsparse(self):
+        # This test makes sure that coloring works with aliased constraints.
+
+        p = run_opt(pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False, con_alias=True)
+        p_color = run_opt(pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False,
+                          dynamic_total_coloring=True, con_alias=True)
+
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
+
+        p.model._solve_count = 0
+        p_color.model._solve_count = 0
+
+        J = p.driver._compute_totals()
+        J_color = p_color.driver._compute_totals()
+
+        # coloring saves 16 solves per driver iter  (5 vs 21)
+        self.assertEqual(p.model._solve_count, 21)
+        self.assertEqual(p_color.model._solve_count, 5)
+
+    def test_dynamic_total_coloring_auto_con_alias_pyoptsparse_slsqp(self):
+        # This test makes sure that coloring works with aliased constraints.
+        try:
+            from pyoptsparse import OPT
+        except ImportError:
+            raise unittest.SkipTest("This test requires pyoptsparse.")
+
+        try:
+            OPT('SLSQP')
+        except:
+            raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
+
+        p = run_opt(pyOptSparseDriver, 'auto', optimizer='SLSQP', print_results=False, con_alias=True)
+        p_color = run_opt(pyOptSparseDriver, 'auto', optimizer='SLSQP', print_results=False,
+                          dynamic_total_coloring=True, con_alias=True)
+
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
+
+        p.model._solve_count = 0
+        p_color.model._solve_count = 0
+
+        J = p.driver._compute_totals()
+        J_color = p_color.driver._compute_totals()
+
+        # coloring saves 16 solves per driver iter  (5 vs 21)
+        self.assertEqual(p.model._solve_count, 21)
+        self.assertEqual(p_color.model._solve_count, 5)
+
 
 @use_tempdirs
 class SimulColoringScipyTestCase(unittest.TestCase):
