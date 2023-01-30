@@ -255,7 +255,7 @@ class TestProblem(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,
                 "<model> <class Group>: Failed to set value of '.*': could not broadcast input array from shape (.*) into shape (.*)."):
             prob.final_setup()
-        prob._initial_condition_cache = {}
+        prob.model._initial_condition_cache = {}
 
         # check assign scalar to array
         arr_val = new_val*np.ones((10, 1))

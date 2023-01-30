@@ -125,7 +125,6 @@ class TestGetSetVariables(unittest.TestCase):
         with self.assertRaises(KeyError) as ctx:
             p['x'] = 5.0
         self.assertEqual(str(ctx.exception), msg.format('x'))
-        p._initial_condition_cache = {}
 
         with self.assertRaises(KeyError) as ctx:
             p['x']
@@ -135,7 +134,6 @@ class TestGetSetVariables(unittest.TestCase):
         with self.assertRaises(KeyError) as ctx:
             p['y'] = 5.0
         self.assertEqual(str(ctx.exception), msg.format('y'))
-        p._initial_condition_cache = {}
 
         with self.assertRaises(KeyError) as ctx:
             p['y']
