@@ -27,9 +27,9 @@ from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
 import openmdao.utils.coloring as c_mod
 from openmdao.utils.class_util import WeakMethodWrapper
-from openmdao.utils.mpi import FakeComm
+from openmdao.utils.mpi import FakeComm, MPI
 from openmdao.utils.general_utils import _src_or_alias_name
-from openmdao.utils.mpi import MPI
+from openmdao.utils.om_warnings import issue_warning
 
 # what version of pyoptspare are we working with
 if pyoptsparse and hasattr(pyoptsparse, '__version__'):
@@ -426,12 +426,17 @@ class pyOptSparseDriver(Driver):
                 continue
             size = meta['global_size'] if meta['distributed'] else meta['size']
             lower = upper = meta['equals']
-            path = meta['source'] if meta['alias'] is not None else name
+            path = meta['source']
             if fwd:
                 wrt = [v for v in indep_list if path in relevant[dv_meta[v]['source']]]
             else:
                 rels = relevant[path]
                 wrt = [v for v in indep_list if dv_meta[v]['source'] in rels]
+
+            if not wrt:
+                issue_warning(f"Equality constraint '{name}' does not depend on any design "
+                              "variables and was not added to the optimization.")
+                continue
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
@@ -459,13 +464,18 @@ class pyOptSparseDriver(Driver):
             lower = meta['lower']
             upper = meta['upper']
 
-            path = meta['source'] if meta['alias'] is not None else name
+            path = meta['source']
 
             if fwd:
                 wrt = [v for v in indep_list if path in relevant[dv_meta[v]['source']]]
             else:
                 rels = relevant[path]
                 wrt = [v for v in indep_list if dv_meta[v]['source'] in rels]
+
+            if not wrt:
+                issue_warning(f"Inequality constraint '{name}' does not depend on any design "
+                              "variables and was not added to the optimization.")
+                continue
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
@@ -746,13 +756,12 @@ class pyOptSparseDriver(Driver):
                 res_subjacs = self._res_subjacs
                 for okey in func_dict:
                     new_sens[okey] = newdv = {}
-                    osrc_or_alias = _src_or_alias_name(self._responses[okey])
                     for ikey in dv_dict:
                         ikey_src = self._designvars[ikey]['source']
-                        if osrc_or_alias in res_subjacs and ikey_src in res_subjacs[osrc_or_alias]:
+                        if okey in res_subjacs and ikey_src in res_subjacs[okey]:
                             arr = sens_dict[okey][ikey]
-                            coo = res_subjacs[osrc_or_alias][ikey_src]
-                            row, col, data = coo['coo']
+                            coo = res_subjacs[okey][ikey_src]
+                            row, col, _ = coo['coo']
                             coo['coo'][2] = arr[row, col].flatten()
                             newdv[ikey] = coo
                         elif okey in sens_dict:
@@ -846,14 +855,13 @@ class pyOptSparseDriver(Driver):
         if total_sparsity is None:
             return
 
-        model = self._problem().model
-        for res, resdict in total_sparsity.items():
-            if res in self._responses and self._responses[res]['alias'] is not None:
-                res = self._responses[res]['source']
+        for res, dvdict in total_sparsity.items():  # res are 'driver' names (prom name or alias)
             if res in self._objs:  # skip objectives
                 continue
+            # if res in self._responses and self._responses[res]['alias'] is not None:
+            #     res = self._responses[res]['source']
             self._res_subjacs[res] = {}
-            for dv, (rows, cols, shape) in resdict.items():
+            for dv, (rows, cols, shape) in dvdict.items():  # dvs are src names
                 rows = np.array(rows, dtype=INT_DTYPE)
                 cols = np.array(cols, dtype=INT_DTYPE)
 

@@ -1701,11 +1701,13 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
 
 
 def _get_desvar_info(driver, names=None, use_abs_names=True):
-    desvars = _src_or_alias_dict(driver._designvars)
-
     if names is None:
-        vnames = list(desvars)
-        return vnames, [desvars[n]['size'] for n in vnames]
+        vnames = []
+        sizes = []
+        for meta in driver._designvars.values():
+            vnames.append(meta['source'])
+            sizes.append(meta['size'])
+        return vnames, sizes
 
     model = driver._problem().model
     abs2meta_out = model._var_allprocs_abs2meta['output']
@@ -1715,6 +1717,8 @@ def _get_desvar_info(driver, names=None, use_abs_names=True):
     else:
         prom2abs = model._var_allprocs_prom2abs_list['output']
         vnames = [prom2abs[n][0] for n in names]
+
+    desvars = _src_or_alias_dict(driver._designvars)
 
     # if a variable happens to be a design var, use that size
     sizes = []
@@ -1738,7 +1742,7 @@ def _get_response_info(driver, names=None, use_abs_names=True):
     model = driver._problem().model
     abs2meta_out = model._var_allprocs_abs2meta['output']
 
-    if use_abs_names:
+    if use_abs_names:  # assume given names are absolute
         vnames = names
     else:
         prom2abs = model._var_allprocs_prom2abs_list['output']
@@ -1881,8 +1885,11 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
     """
     driver = problem.driver
 
+    # if of and wrt are None, which is True in the case of dynamic coloring, ofs will be the
+    # 'driver' names of the responses (promoted or alias), and wrts will be the abs names of
+    # the wrt sources.  In this case, use_abs_names is not used.
     ofs, of_sizes = _get_response_info(driver, of, use_abs_names)
-    abs_wrts, wrt_sizes = _get_desvar_info(driver, wrt, use_abs_names)
+    wrts, wrt_sizes = _get_desvar_info(driver, wrt, use_abs_names)
 
     model = problem.model
 
@@ -1900,7 +1907,7 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
             raise NotImplementedError("Currently there is no support for approx coloring when "
                                       "linear constraint derivatives are computed separately "
                                       "from nonlinear ones.")
-        _initialize_model_approx(model, driver, ofs, abs_wrts)
+        _initialize_model_approx(model, driver, ofs, wrts)
         if model._coloring_info['coloring'] is None:
             kwargs = {n: v for n, v in model._coloring_info.items()
                       if n in _DEF_COMP_SPARSITY_ARGS and v is not None}
@@ -1913,13 +1920,13 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
     else:
         J, sparsity_info = _get_bool_total_jac(problem, num_full_jacs=num_full_jacs, tol=tol,
                                                orders=orders, setup=setup,
-                                               run_model=run_model, of=ofs, wrt=abs_wrts,
+                                               run_model=run_model, of=ofs, wrt=wrts,
                                                use_abs_names=True)
         coloring = _compute_coloring(J, mode)
         if coloring is not None:
             coloring._row_vars = ofs
             coloring._row_var_sizes = of_sizes
-            coloring._col_vars = abs_wrts
+            coloring._col_vars = wrts
             coloring._col_var_sizes = wrt_sizes
 
             # save metadata we used to create the coloring
@@ -1979,7 +1986,7 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
 
     coloring = compute_total_coloring(problem, num_full_jacs=num_full_jacs, tol=tol, orders=orders,
                                       setup=False, run_model=run_model, fname=fname,
-                                      use_abs_names=True)
+                                      use_abs_names=False)
 
     if coloring is not None:
         if driver._coloring_info['show_sparsity']:
