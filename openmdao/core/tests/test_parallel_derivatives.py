@@ -10,8 +10,8 @@ from packaging.version import Version
 import numpy as np
 
 import openmdao.api as om
-from openmdao.test_suite.groups.parallel_groups import FanOutGrouped, FanInGrouped
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.test_suite.groups.parallel_groups import FanOutGrouped, FanInGrouped, FanInGrouped2
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
 from openmdao.utils.mpi import MPI
 
 
@@ -39,14 +39,25 @@ class ParDerivTestCase(unittest.TestCase):
         prob.model.add_objective('c3.y')
 
         prob.setup(check=False, mode='rev')
-        prob.run_driver()
+        prob.run_model()
 
-        indep_list = ['x1', 'x2']
-        unknown_list = ['c3.y']
+        data = prob.check_totals(of=['c3.y'], wrt=['x1', 'x2'])
+        assert_check_totals(data)
 
-        J = prob.compute_totals(unknown_list, indep_list, return_format='dict')
-        assert_near_equal(J['c3.y']['x1'][0][0], -6.0, 1e-6)
-        assert_near_equal(J['c3.y']['x2'][0][0], 35.0, 1e-6)
+    def test_fan_in_serial_sets_rev_ivc(self):
+
+        prob = om.Problem()
+        prob.model = FanInGrouped2()
+
+        prob.model.add_design_var('p1.x')
+        prob.model.add_design_var('p2.x')
+        prob.model.add_objective('c3.y')
+
+        prob.setup(check=False, mode='rev')
+        prob.run_model()
+
+        data = prob.check_totals(of=['c3.y'], wrt=['p1.x', 'p2.x'])
+        assert_check_totals(data)
 
     def test_fan_in_serial_sets_fwd(self):
 

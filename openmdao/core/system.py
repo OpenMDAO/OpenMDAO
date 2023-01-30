@@ -677,7 +677,6 @@ class System(object):
         """
         toidx = self._var_allprocs_abs2idx
         sizes_in = self._var_sizes['input']
-        sizes_out = self._var_sizes['output']
 
         tometa_in = self._var_allprocs_abs2meta['input']
 
@@ -3913,6 +3912,7 @@ class System(object):
         # Human readable error message during Driver setup.
         try:
             out = {}
+            # keys of self._responses are the alias or the promoted name
             for name, data in self._responses.items():
                 if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
                     self._problem_meta['using_par_deriv_color'] = True
@@ -3926,9 +3926,10 @@ class System(object):
                         raise RuntimeError(f"Constraint alias '{alias}' on '{path}' "
                                            "is the same name as an existing variable.")
                     abs_name = prom2abs_out[name][0]
+                    # for outputs, the dict key is always the absolute name of the output
                     out[abs_name] = data
-                    out[abs_name]['source'] = abs_name
-                    out[abs_name]['distributed'] = \
+                    data['source'] = abs_name
+                    data['distributed'] = \
                         abs_name in abs2meta_out and abs2meta_out[abs_name]['distributed']
 
                 else:
@@ -3937,22 +3938,22 @@ class System(object):
                         key = in_abs = prom2abs_in[name][0]
                         src_path = conns[in_abs]
                     else:  # name is an alias
+                        key = alias
                         if prom in prom2abs_out:
                             src_path = prom2abs_out[prom][0]
                         else:
                             src_path = conns[prom2abs_in[prom][0]]
 
-                        key = alias
-
                     distrib = src_path in abs2meta_out and abs2meta_out[src_path]['distributed']
+                    data['source'] = src_path
+                    data['distributed'] = distrib
+
                     if use_prom_ivc:
+                        # dict key is either an alias or the promoted name
                         out[name] = data
-                        out[name]['source'] = src_path
-                        out[name]['distributed'] = distrib
                     else:
+                        # dict key is either an alias or the absolute name of the input
                         out[key] = data
-                        out[key]['source'] = src_path
-                        out[key]['distributed'] = distrib
 
         except KeyError as err:
             msg = "{}: Output not found for response {}."
@@ -6079,23 +6080,12 @@ class System(object):
         for dv in desvars:
             if dv not in graph:
                 graph.add_node(dv, type_='out')
-                parts = dv.rsplit('.', 1)
-                if len(parts) == 1:
-                    system = ''  # this happens when a component is the model
-                    graph.add_edge(dv, system)
-                else:
-                    system = parts[0]
-                    graph.add_edge(system, dv)
+                graph.add_edge(dv.rpartition('.')[0], dv)
 
         for res in responses:
             if res not in graph:
                 graph.add_node(res, type_='out')
-                parts = res.rsplit('.', 1)
-                if len(parts) == 1:
-                    system = ''  # this happens when a component is the model
-                else:
-                    system = parts[0]
-                graph.add_edge(system, res)
+                graph.add_edge(res.rpartition('.')[0], res)
 
         nodes = graph.nodes
         grev = graph.reverse(copy=False)
@@ -6108,7 +6098,7 @@ class System(object):
 
         for desvar, dvmeta in desvars.items():
             dvset = set(self.all_connected_nodes(graph, desvar))
-            parallel_deriv_color = dvmeta.get('parallel_deriv_color')
+            parallel_deriv_color = dvmeta['parallel_deriv_color']
             if parallel_deriv_color:
                 pd_dv_locs[desvar] = set(self.all_connected_nodes(graph, desvar, local=True))
                 pd_err_chk[parallel_deriv_color][desvar] = pd_dv_locs[desvar]
@@ -6116,7 +6106,7 @@ class System(object):
             for response, resmeta in responses.items():
                 if response not in rescache:
                     rescache[response] = set(self.all_connected_nodes(grev, response))
-                    parallel_deriv_color = resmeta.get('parallel_deriv_color')
+                    parallel_deriv_color = resmeta['parallel_deriv_color']
                     if parallel_deriv_color:
                         pd_res_locs[response] = set(self.all_connected_nodes(grev, response,
                                                                              local=True))
@@ -6138,11 +6128,7 @@ class System(object):
                     for node in common:
                         if 'type_' in nodes[node]:
                             typ = nodes[node]['type_']
-                            parts = node.rsplit('.', 1)
-                            if len(parts) == 1:
-                                system = ''
-                            else:
-                                system = parts[0]
+                            system = node.rpartition('.')[0]
                             if typ == 'in':  # input var
                                 input_deps.add(node)
                                 if system not in sys_deps:
@@ -6533,16 +6519,21 @@ class System(object):
             prob_meta['saved_errors'].extend(self._saved_errors)
         self._saved_errors = None if env_truthy('OPENMDAO_FAIL_FAST') else []
 
-    def has_declared_resids(self):
-        """
-        Return True if this System has declared residuals.
+    def _get_inconsistent_keys(self):
+        keys = set()
+        if self.comm.size > 1:
+            from openmdao.core.component import Component
+            if isinstance(self, Component):
+                keys.update(self._inconsistent_keys)
+            else:
+                for comp in self.system_iter(recurse=True, include_self=True, typ=Component):
+                    keys.update(comp._inconsistent_keys)
+            myrank = self.comm.rank
 
-        Returns
-        -------
-        bool
-            True if this System has declared residuals.
-        """
-        return False
+            for rank, proc_keys in enumerate(self.comm.allgather(keys)):
+                if rank != myrank:
+                    keys.update(proc_keys)
+        return keys
 
     def is_explicit(self):
         """

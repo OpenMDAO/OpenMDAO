@@ -133,7 +133,8 @@ class TestEQConstraintComp(unittest.TestCase):
         model.add_subsystem('f', om.ExecComp('y=3*x-3', x=0.))
         model.add_subsystem('g', om.ExecComp('y=2.3*x+4', x=0.))
         model.add_subsystem('equal', om.EQConstraintComp('y', add_constraint=True, normalize=False,
-                                                         ref0=0, ref=100.0))
+                                                         ref0=0, ref=100.0, linear=True, cache_linear_solution=True,
+                                                         alias='eq_constraint'))
 
         model.connect('indep.x', 'f.x')
         model.connect('indep.x', 'g.x')
@@ -147,7 +148,7 @@ class TestEQConstraintComp(unittest.TestCase):
         prob.setup(mode='fwd')
 
         # verify that the constraint has been added as requested
-        self.assertTrue('equal.y' in model.get_constraints())
+        self.assertTrue('eq_constraint' in model.get_constraints())
 
         # verify that the output is not being normalized
         prob.run_model()
@@ -159,6 +160,11 @@ class TestEQConstraintComp(unittest.TestCase):
         prob.driver = om.ScipyOptimizeDriver(disp=False)
 
         prob.run_driver()
+
+        # verify that options are added
+        self.assertEqual(prob.driver._cons['eq_constraint']['linear'], True)
+        self.assertEqual(prob.driver._cons['eq_constraint']['cache_linear_solution'], True)
+        self.assertEqual(prob.driver._cons['eq_constraint']['alias'], 'eq_constraint')
 
         assert_almost_equal(prob['equal.y'], 0.)
         assert_almost_equal(prob['indep.x'], 10.)
@@ -613,6 +619,31 @@ class TestEQConstraintComp(unittest.TestCase):
         prob.set_val('eq_comp.k2', np.random.rand(n) * 10)
 
         prob.run_model()
+    
+    def test_indices(self):
+        prob = om.Problem()
+        model = prob.model
+
+        n = 20
+
+        model.add_subsystem('indep', om.IndepVarComp('x', np.ones(n)))
+        model.add_subsystem('f', om.ExecComp('y=x**2', x=np.ones(n), y=np.ones(n)))
+        model.add_subsystem('eq_comp', om.EQConstraintComp('y', val=np.ones(n), 
+                            indices=[n-2,n-1],
+                            flat_indices=True, add_constraint=True))
+
+        model.connect('indep.x', 'f.x')
+        model.add_design_var('indep.x')
+        model.add_objective('f.y', index=0)
+
+        prob.setup()
+
+        prob.run_driver()
+
+        assert_near_equal(prob.driver._cons['eq_comp.y']['indices']._arr, np.asarray([n-2,n-1], dtype=int))
+        self.assertEqual(prob.driver._cons['eq_comp.y']['flat_indices'], True)
+
+
 
 
 if __name__ == '__main__':  # pragma: no cover

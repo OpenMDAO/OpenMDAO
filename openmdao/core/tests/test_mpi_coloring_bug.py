@@ -277,7 +277,6 @@ class StateIndependentsComp(om.ImplicitComponent):
         # Setup partials
         for state_name, options in state_options.items():
             shape = options['shape']
-            size = np.prod(shape)
             state_var_name = 'states:{0}'.format(state_name)
 
             row_col = np.arange(num_state_input_nodes*np.prod(shape))
@@ -510,4 +509,4 @@ class TestMPIColoringBug(unittest.TestCase):
         J = p.driver._compute_totals(of=of, wrt=wrt, return_format='dict')
         dd = J['phases.burn1.collocation_constraint.defects:deltav']['phases.burn1.indep_states.states:deltav']
 
-        assert_near_equal(np.array([[-0.75, 0.75]]), dd, 1e-6)
+        assert_near_equal(dd, np.array([[-0.75, 0.75]]), 1e-6)

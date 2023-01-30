@@ -178,7 +178,7 @@ class SimpleCompWithPrintPartials(ExplicitComponent):
                 self.partials_name_pairs.append(k)
 
             for k, v in partials.items():
-                self.partials_values.append((k,v))
+                self.partials_values.append((k, v))
 
         self.count += 1
 

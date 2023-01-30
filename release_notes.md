@@ -1,4 +1,80 @@
 ***********************************
+# Release Notes for OpenMDAO 3.25.0
+
+January 27, 2023
+
+OpenMDAO 3.25.0 includes only one change, which is the convention OpenMDAO uses when transferring data between distributed and non-distributed variables. The underlying principle is that serial variables and their derivatives must have consistent values across all ranks where those variables exist.
+
+This is a backwards incompatible change that could break some matrix-free components with a mix of distributed and non-distributed variables.  Users developing components involving distributed inputs should consult [POEM 075](https://github.com/OpenMDAO/POEMs/blob/master/POEM_075.md).
+
+## New Deprecations
+
+- None
+
+## Backwards Incompatible API Changes
+
+- **POEM 75** implementation: changes the convention OpenMDAO uses when transferring data between distributed and non-distributed variables. [#2751](https://github.com/OpenMDAO/OpenMDAO/pull/2751)
+
+## Backwards Incompatible Non-API Changes
+
+- None
+
+## New Features
+
+- None
+
+## Bug Fixes
+
+- None
+
+## Miscellaneous
+
+- None
+
+
+***********************************
+# Release Notes for OpenMDAO 3.24.0
+
+January 25, 2023
+
+OpenMDAO 3.24.0 serves as a transitional release that marks a change in the way distributed I/O is handled.
+Moving forward from 3.25.0 onward, users developing components involving distributed inputs should consult
+[POEM 075](https://github.com/OpenMDAO/POEMs/blob/master/POEM_075.md), as OpenMDAO is changing this convention
+and the switch will not be backwards compatible.
+
+For the N2 diagram, we've added information about connections between systems when a connection node is highlighted in
+NodeInfo mode.
+
+## New Deprecations
+
+- **POEM 75** implementation: Problems involving systems with distributed inputs will raise a deprecation regarding upcoming changes to their behavior. [#2784](https://github.com/OpenMDAO/OpenMDAO/pull/2784)
+
+## Backwards Incompatible API Changes
+
+- None
+
+## Backwards Incompatible Non-API Changes
+
+- None
+
+## New Features
+
+- N2: Connections displayed during mouseover of a connection node when in NodeInfo mode [#2778](https://github.com/OpenMDAO/OpenMDAO/pull/2778)
+- Added set_val as a method of System. [#2785](https://github.com/OpenMDAO/OpenMDAO/pull/2785)
+
+## Bug Fixes
+
+- Fixed a bug in the handling of design variable bounds conditions when using COBYLA. [#2770](https://github.com/OpenMDAO/OpenMDAO/pull/2770)
+- Fixed a bug in System.get_io_metadata() that caused the `discrete` property to always be shown as `True`. [#2771](https://github.com/OpenMDAO/OpenMDAO/pull/2771)
+- Fixed a bug that prevented `Problem.set_solver_print` from impacting output in multi-run scenarios [#2773](https://github.com/OpenMDAO/OpenMDAO/pull/2773)
+- Fixed a bug in `set_output_solver_options`, `set_design_var_options`, and `set_constraint_options` that prevented them from working when given vector values. [#2782](https://github.com/OpenMDAO/OpenMDAO/pull/2782)
+
+## Miscellaneous
+
+- Fixed a bug in our docstring linting so that now we can detect class attributes that aren't created in __init__. [#2780](https://github.com/OpenMDAO/OpenMDAO/pull/2780)
+
+
+***********************************
 # Release Notes for OpenMDAO 3.23.0
 
 January 10, 2023

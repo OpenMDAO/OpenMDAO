@@ -78,6 +78,9 @@ class ExplicitComponent(Component):
             (new_jacvec_prod is not None and
              new_jacvec_prod != self._inst_functs['compute_jacvec_product']))
 
+        if self.matrix_free:
+            self._check_matfree_deprecation()
+
     def _get_partials_varlists(self, use_resname=False):
         """
         Get lists of 'of' and 'wrt' variables that form the partial jacobian.
@@ -353,10 +356,18 @@ class ExplicitComponent(Component):
                 else:  # rev
                     d_inputs.set_val(new_vals)
         else:
+            dochk = mode == 'rev' and self._problem_meta['checking'] and self.comm.size > 1
+
+            if dochk:
+                nzdresids = self._get_dist_nz_dresids()
+
             if discrete_inputs:
                 self.compute_jacvec_product(inputs, d_inputs, d_resids, mode, discrete_inputs)
             else:
                 self.compute_jacvec_product(inputs, d_inputs, d_resids, mode)
+
+            if dochk:
+                self._check_consistent_serial_dinputs(nzdresids)
 
     def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
         """

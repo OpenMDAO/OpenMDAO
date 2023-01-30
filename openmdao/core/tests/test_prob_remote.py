@@ -342,12 +342,24 @@ class ProbRemote4TestCase(unittest.TestCase):
 
         all_failed = comm.allgather(failed)
         if any(all_failed):
-            all_msgs = comm.allgather(str(prob.driver.pyopt_solution.optInform))
+            msg = 'No solution found' if prob.driver.pyopt_solution is None \
+                else str(prob.driver.pyopt_solution.optInform)
+            all_msgs = comm.allgather(msg)
             for i, tup in enumerate(zip(all_failed, all_msgs)):
                 failed, msg = tup
                 if failed:
-                    self.fail("Optimization failed on rank %d: %s" % (i, msg))
+                    self.fail(f"Optimization failed on rank {i}: {msg}")
 
-        objs = comm.allgather(prob['obj.o'])
-        for i, obj in enumerate(objs):
+        try:
+            obj = prob['obj.o']
+            failed = False
+        except Exception as err:
+            obj = str(err)
+            failed = True
+
+        all_status = comm.allgather((obj, failed))
+        for i, tup in enumerate(all_status):
+            obj, failed = tup
+            if failed:
+                self.fail(f"Failed to retrieve objective on rank {i}: {obj}")
             assert_near_equal(obj, 2.0, 1e-6)
