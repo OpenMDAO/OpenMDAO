@@ -193,7 +193,9 @@ class EQConstraintComp(ExplicitComponent):
 
     def add_eq_output(self, name, eq_units=None, lhs_name=None, rhs_name=None, rhs_val=0.0,
                       use_mult=False, mult_name=None, mult_val=1.0, normalize=True,
-                      add_constraint=False, ref=None, ref0=None, adder=None, scaler=None, **kwargs):
+                      add_constraint=False, ref=None, ref0=None, adder=None, scaler=None,
+                      linear=False, indices=None, cache_linear_solution=False,
+                      flat_indices=False, alias=None, **kwargs):
         """
         Add a new output variable computed via the difference equation.
 
@@ -244,6 +246,21 @@ class EQConstraintComp(ExplicitComponent):
         scaler : float or ndarray, optional
             Value to multiply the model value to get the scaled value for the driver. scaler
             is second in precedence. This option is only meaningful when add_constraint=True.
+        linear : bool
+            Set to True if constraint is linear. Default is False.
+        indices : sequence of int, optional
+            If variable is an array, these indicate which entries are of
+            interest for this particular response.  These may be positive or
+            negative integers.
+        cache_linear_solution : bool
+            If True, store the linear solution vectors for this variable so they can
+            be used to start the next linear solution with an initial guess equal to the
+            solution from the previous linear solve.
+        flat_indices : bool
+            If True, interpret specified indices as being indices into a flat source array.
+        alias : str
+            Alias for this response. Necessary when adding multiple constraints on different
+            indices or slices of a single variable.
         **kwargs : dict
             Additional arguments to be passed for the creation of the output variable.
             (see `add_output` method).
@@ -268,8 +285,8 @@ class EQConstraintComp(ExplicitComponent):
         shape = meta['shape']
 
         for s in ('lhs', 'rhs', 'mult'):
-            if options['{0}_name'.format(s)] is None:
-                options['{0}_name'.format(s)] = '{0}:{1}'.format(s, name)
+            if options[f'{s}_name'] is None:
+                options[f'{s}_name'] = f'{s}:{name}'
 
         self.add_input(options['lhs_name'],
                        val=np.ones(shape),
@@ -293,4 +310,6 @@ class EQConstraintComp(ExplicitComponent):
 
         if options['add_constraint']:
             self.add_constraint(name, equals=0., ref0=options['ref0'], ref=options['ref'],
-                                adder=options['adder'], scaler=options['scaler'])
+                                adder=options['adder'], scaler=options['scaler'],
+                                linear=linear, indices=indices, flat_indices=flat_indices,
+                                cache_linear_solution=cache_linear_solution, alias=alias)
