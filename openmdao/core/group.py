@@ -1165,6 +1165,9 @@ class Group(System):
         self._auto_ivc_warnings = []
 
         for prom, metalist in self._group_inputs.items():
+            if prom not in prom2abs_in:
+                # this error was already collected in setup_var_data, so just continue here
+                continue
             try:
                 paths = [(i, m['path']) for i, m in enumerate(metalist) if not m['auto']]
                 top_origin = paths[0][1]

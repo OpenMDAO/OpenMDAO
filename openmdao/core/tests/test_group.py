@@ -1435,6 +1435,24 @@ class TestGroup(unittest.TestCase):
            "for the connection '_auto_ivc.v0' to 'G.foo.test_param'. The source shape is (1,) but "
            "the target shape is (5,).")
 
+    def test_set_input_defaults_keyerror(self):
+        class Sub(om.Group):
+            def setup(self):
+                comp = om.ExecComp("z = x + y")
+                self.add_subsystem('comp', comp, promotes_inputs=['*'])
+
+        prob = om.Problem(name='set_input_def_key_error')
+        model = prob.model
+
+        model.add_subsystem('sub', Sub(), promotes=['*'])
+
+        model.set_input_defaults('bad_name', 3.0)
+        with self.assertRaises(Exception) as cm:
+            prob.setup()
+
+        msg = ("\nCollected errors for problem 'set_input_def_key_error':\n"
+               "   <model> <class Group>: The following group inputs, passed to set_input_defaults(), could not be found: ['bad_name'].")
+        self.assertEqual(cm.exception.args[0], msg)
 
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestGroupMPISlice(unittest.TestCase):
