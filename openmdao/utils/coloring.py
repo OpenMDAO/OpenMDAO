@@ -702,13 +702,19 @@ class Coloring(object):
             Path to the location where the plot file should be saved.
         """
         try:
-            from matplotlib import pyplot, cm
+            import matplotlib as mpl
+            from matplotlib import pyplot
+            mplLessThan360 = True if float(mpl.__version__.replace('.', '')) < 360 else False
+
         except ImportError:
             print("matplotlib is not installed so the coloring viewer is not available. The ascii "
                   "based coloring viewer can be accessed by calling display_txt() on the Coloring "
                   "object or by using 'openmdao view_coloring --textview <your_coloring_file>' "
                   "from the command line.")
             return
+
+        if mplLessThan360:
+            from matplotlib import cm
 
         nrows, ncols = self._shape
         aspect_ratio = ncols / nrows
@@ -744,7 +750,10 @@ class Coloring(object):
             entry_ycolors = np.zeros(nrows, dtype=INT_DTYPE)
 
             # pick two colors for our checkerboard pattern
-            sjcolors = [cm.get_cmap('Greys')(0.3), cm.get_cmap('Greys')(0.4)]
+            if mplLessThan360:
+                sjcolors = [cm.get_cmap('Greys')(0.3), cm.get_cmap('Greys')(0.4)]
+            else:
+                sjcolors = [mpl.colormaps['Greys'](0.3), mpl.colormaps['Greys'](0.4)]
 
             colstart = colend = 0
             for i, cvsize in enumerate(self._col_var_sizes):
@@ -811,7 +820,10 @@ class Coloring(object):
 
         if self._fwd:
             # winter is a blue/green color map
-            cmap = cm.get_cmap('winter')
+            if mplLessThan360:
+                cmap = cm.get_cmap('winter')
+            else:
+                cmap = mpl.colormaps['winter']
 
             icol = 1
             full_rows = np.arange(nrows, dtype=INT_DTYPE)
@@ -829,7 +841,10 @@ class Coloring(object):
 
         if self._rev:
             # autumn_r is a red/yellow color map
-            cmap = cm.get_cmap('autumn_r')
+            if mplLessThan360:
+                cmap = cm.get_cmap('autumn_r')
+            else:
+                cmap = mpl.colormaps['autumn_r']
 
             icol = 1
             full_cols = np.arange(ncols, dtype=INT_DTYPE)
