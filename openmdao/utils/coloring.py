@@ -10,6 +10,8 @@ from itertools import combinations
 from contextlib import contextmanager
 from pprint import pprint
 from itertools import groupby
+from packaging.version import Version
+
 
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
@@ -704,7 +706,8 @@ class Coloring(object):
         try:
             import matplotlib as mpl
             from matplotlib import pyplot
-            mplLessThan360 = True if float(mpl.__version__.replace('.', '')) < 360 else False
+            if Version(mpl.__version__) < Version("3.6"):
+                from matplotlib import cm
 
         except ImportError:
             print("matplotlib is not installed so the coloring viewer is not available. The ascii "
@@ -712,9 +715,6 @@ class Coloring(object):
                   "object or by using 'openmdao view_coloring --textview <your_coloring_file>' "
                   "from the command line.")
             return
-
-        if mplLessThan360:
-            from matplotlib import cm
 
         nrows, ncols = self._shape
         aspect_ratio = ncols / nrows
@@ -750,7 +750,7 @@ class Coloring(object):
             entry_ycolors = np.zeros(nrows, dtype=INT_DTYPE)
 
             # pick two colors for our checkerboard pattern
-            if mplLessThan360:
+            if Version(mpl.__version__) < Version("3.6"):
                 sjcolors = [cm.get_cmap('Greys')(0.3), cm.get_cmap('Greys')(0.4)]
             else:
                 sjcolors = [mpl.colormaps['Greys'](0.3), mpl.colormaps['Greys'](0.4)]
@@ -820,7 +820,7 @@ class Coloring(object):
 
         if self._fwd:
             # winter is a blue/green color map
-            if mplLessThan360:
+            if Version(mpl.__version__) < Version("3.6"):
                 cmap = cm.get_cmap('winter')
             else:
                 cmap = mpl.colormaps['winter']
@@ -841,7 +841,7 @@ class Coloring(object):
 
         if self._rev:
             # autumn_r is a red/yellow color map
-            if mplLessThan360:
+            if Version(mpl.__version__) < Version("3.6"):
                 cmap = cm.get_cmap('autumn_r')
             else:
                 cmap = mpl.colormaps['autumn_r']
