@@ -492,7 +492,7 @@ class System(object):
         self._approx_schemes = {}
         self._subjacs_info = {}
         self._approx_subjac_keys = None
-        self.matrix_free = False
+        self.matrix_free = _UNDEFINED
 
         self._owns_approx_jac = False
         self._owns_approx_jac_meta = {}
