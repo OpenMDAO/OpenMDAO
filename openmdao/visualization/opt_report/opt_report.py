@@ -164,14 +164,11 @@ def opt_report(prob, outfile=None):
                 driver.get_design_var_values(driver_scaling=driver_scaling)[abs_name]
 
         for abs_name, meta in prob.driver._cons.items():
-            prom_name = get_prom_name(abs_name)
+            if meta.get('alias') is not None:
+                prom_name = abs_name
+            else:
+                prom_name = get_prom_name(abs_name)
             cons_meta[prom_name] = meta
-            if 'alias' in meta and meta['alias'] is not None:
-                # check to see if the abs_name is the alias
-                if abs_name == meta['alias']:
-                    prom_name = meta['name']
-                else:
-                    raise ValueError("Absolute name of var was expected to be the alias")  # TODO ??
             cons_vals[prom_name] = \
                 driver.get_constraint_values(driver_scaling=driver_scaling)[abs_name]
 
@@ -355,8 +352,6 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
             meta['ref0'] = 0.0
 
         alias = meta.get('alias', '')
-        if alias:
-            name = meta['name']
 
         # the scipy optimizer, when using COBYLA, creates constraints under the hood.
         #  But the values are not given by the driver, so use this as a sign that this

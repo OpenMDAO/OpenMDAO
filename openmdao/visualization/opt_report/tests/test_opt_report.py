@@ -524,6 +524,43 @@ class TestOptimizationReport(unittest.TestCase):
         prob.run_driver()
         opt_report(prob)
 
+    @require_pyoptsparse('SLSQP')
+    def test_opt_report_multiple_con_alias(self):
+        prob = self.prob = om.Problem(reports='optimizer')
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('widths', np.zeros((2, 2))),
+                            promotes=['*'])
+        model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
+        model.add_subsystem('obj', om.ExecComp('o = areas[0, 0] + areas[1, 1]',
+                                               areas=np.zeros((2, 2))),
+                            promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        model.add_design_var('widths', lower=-50.0, upper=50.0)
+        model.add_objective('o')
+
+        model.add_constraint('areas', equals=24.0, indices=[0], flat_indices=True)
+        model.add_constraint('areas', equals=21.0, indices=[1], flat_indices=True, alias='a2')
+        model.add_constraint('areas', equals=3.5, indices=[2], flat_indices=True, alias='a3')
+        model.add_constraint('areas', equals=17.5, indices=[3], flat_indices=True, alias='a4')
+
+        prob.driver = om.pyOptSparseDriver(optimizer='SLSQP')
+        prob.driver.options['print_results'] = False
+
+        prob.setup(mode='fwd')
+
+        prob.run_driver()
+
+        opt_report(self.prob)
+        report_file_path = str(pathlib.Path(prob.get_reports_dir()).joinpath(_default_optimizer_report_filename))
+
+        with open(report_file_path, 'r') as f:
+            for line in f.readlines():
+                if 'areas' in line:
+                    self.assertTrue("equality-constraint-violated" not in line)
+
     @hooks_active
     def test_opt_report_hook(self):
         testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
@@ -571,3 +608,6 @@ class TestMPIScatter(unittest.TestCase):
         prob.setup()
         prob.run_driver()
         opt_report(prob)
+
+if __name__ == '__main__':
+    unittest.main()
