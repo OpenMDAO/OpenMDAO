@@ -105,6 +105,7 @@ class ExplicitCycleComp(ExplicitComponent):
 
         if self.options['jacobian_type'] == 'matvec':
             self.compute_jacvec_product = self.jacvec_product
+            self.matrix_free = True
 
         if self.options['connection_type'] == 'implicit':
             idx = self.options['index']

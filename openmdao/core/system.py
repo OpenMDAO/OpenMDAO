@@ -348,7 +348,10 @@ class System(object):
         Driver responses added outside of setup.
     matrix_free : bool
         This is set to True if the component overrides the appropriate function with a user-defined
-        matrix vector product with the Jacobian or any of its subsystems do.
+        matrix vector product with the Jacobian or any of its subsystems do. Note that the framework
+        will not set the matrix_free flag correctly for Component instances having a matrix vector
+        product function that is added dynamically (not declared as part of the class) and in that
+        case the matrix_free flag must be set manually to True.
     _relevant : dict
         Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
         and dependent systems.
@@ -492,7 +495,7 @@ class System(object):
         self._approx_schemes = {}
         self._subjacs_info = {}
         self._approx_subjac_keys = None
-        self.matrix_free = False
+        self.matrix_free = _UNDEFINED
 
         self._owns_approx_jac = False
         self._owns_approx_jac_meta = {}
