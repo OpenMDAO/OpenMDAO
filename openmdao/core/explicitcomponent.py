@@ -9,8 +9,6 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE, _UNDEFINED
 
-_inst_functs = ['compute_jacvec_product']
-
 
 class ExplicitComponent(Component):
     """
@@ -23,8 +21,6 @@ class ExplicitComponent(Component):
 
     Attributes
     ----------
-    _inst_functs : dict
-        Dictionary of names mapped to bound methods.
     _has_compute_partials : bool
         If True, the instance overrides compute_partials.
     """
@@ -35,7 +31,6 @@ class ExplicitComponent(Component):
         """
         super().__init__(**kwargs)
 
-        self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
         self._has_compute_partials = overrides_method('compute_partials', self, ExplicitComponent)
         self.options.undeclare('assembled_jac_type')
 
@@ -73,10 +68,8 @@ class ExplicitComponent(Component):
         """
         new_jacvec_prod = getattr(self, 'compute_jacvec_product', None)
 
-        self.matrix_free = (
-            overrides_method('compute_jacvec_product', self, ExplicitComponent) or
-            (new_jacvec_prod is not None and
-             new_jacvec_prod != self._inst_functs['compute_jacvec_product']))
+        if self.matrix_free is _UNDEFINED:
+            self.matrix_free = overrides_method('compute_jacvec_product', self, ExplicitComponent)
 
         if self.matrix_free:
             self._check_matfree_deprecation()

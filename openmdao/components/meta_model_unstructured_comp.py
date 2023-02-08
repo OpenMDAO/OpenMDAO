@@ -541,7 +541,6 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                             j2 = j1 + out_size * sz
                             partials[out_name, in_name][j1:j2] = derivs[:, idx:idx + sz].flat
                             idx += sz
-
             else:
                 if overrides_method('linearize', surrogate, SurrogateModel):
                     sjac = surrogate.linearize(flat_inputs)
