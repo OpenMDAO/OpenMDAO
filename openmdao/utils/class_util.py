@@ -7,6 +7,10 @@ def overrides_method(method_name, obj, base):
     """
     Return True if the named base class method is overridden by obj.
 
+    Note that this only works if the overriding method is declared as part of the class, i.e.,
+    if the overriding method is added to the object instance dynamically, it will not be detected
+    and this function will return False.
+
     Parameters
     ----------
     method_name : str
@@ -20,8 +24,8 @@ def overrides_method(method_name, obj, base):
     Returns
     -------
     bool
-        True if the named base clas is overridden by the given obj, otherwise
-        False.
+        True if the named base class method is overridden by obj's class or some class in its
+        class' mro, otherwise False.
     """
     for klass in obj.__class__.__mro__:
         if method_name in klass.__dict__:

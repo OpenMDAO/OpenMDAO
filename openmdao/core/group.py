@@ -469,6 +469,7 @@ class Group(System):
         for n, lst in self._group_inputs.items():
             self._group_inputs[n] = lst.copy()
 
+        self.matrix_free = False
         for subsys in self._subsystems_myproc:
             subsys._configure()
             subsys._setup_var_data()

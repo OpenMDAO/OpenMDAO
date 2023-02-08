@@ -82,6 +82,7 @@ class ImplicitFuncComp(ImplicitComponent):
 
         if solve_nonlinear:
             self.solve_nonlinear = self._user_solve_nonlinear
+            self._has_solve_nl = True
         if linearize:
             self.linearize = self._user_linearize
         if solve_linear:
