@@ -4,6 +4,7 @@ import functools
 import builtins
 import os
 from contextlib import contextmanager
+from openmdao.utils.general_utils import env_truthy, env_none
 
 try:
     from parameterized import parameterized
@@ -77,7 +78,7 @@ def use_tempdirs(cls):
     TestCase
         The decorated TestCase class.
     """
-    if os.environ.get('USE_TEMPDIRS') in ['true', 'True', None]:
+    if env_truthy('USE_TEMPDIRS') or env_none('USE_TEMPDIRS'):
         if getattr(cls, 'setUp', None):
             setattr(cls, 'original_setUp', getattr(cls, 'setUp'))
         setattr(cls, 'setUp', _new_setup)
