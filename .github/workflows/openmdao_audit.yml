@@ -3,9 +3,9 @@ name: OpenMDAO Audit
 
 on:
 
-  # Run the workflow daily a 0200 UTC
+  # Run the workflow daily a 0400 UTC
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '0 3 * * *'
 
   # Allow running the workflow manually from the Actions tab
   workflow_dispatch:
