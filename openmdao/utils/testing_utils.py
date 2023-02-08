@@ -77,13 +77,14 @@ def use_tempdirs(cls):
     TestCase
         The decorated TestCase class.
     """
-    if getattr(cls, 'setUp', None):
-        setattr(cls, 'original_setUp', getattr(cls, 'setUp'))
-    setattr(cls, 'setUp', _new_setup)
+    if os.environ.get('USE_TEMPDIRS') in ['true', 'True', None]:
+        if getattr(cls, 'setUp', None):
+            setattr(cls, 'original_setUp', getattr(cls, 'setUp'))
+        setattr(cls, 'setUp', _new_setup)
 
-    if getattr(cls, 'tearDown', None):
-        setattr(cls, 'original_tearDown', getattr(cls, 'tearDown'))
-    setattr(cls, 'tearDown', _new_teardown)
+        if getattr(cls, 'tearDown', None):
+            setattr(cls, 'original_tearDown', getattr(cls, 'tearDown'))
+        setattr(cls, 'tearDown', _new_teardown)
 
     return cls
 
