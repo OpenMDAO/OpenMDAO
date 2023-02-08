@@ -2590,8 +2590,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     forward = derivative_info['J_fwd']
 
                     fd_desc = f"{fd_opts['method']}:{fd_opts['form']}"
-                    # print(type(fd_opts['method']))
-                    # sys.exit()
 
                     # Magnitudes
                     if directional:
