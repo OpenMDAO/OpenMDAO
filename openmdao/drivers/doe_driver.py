@@ -236,7 +236,8 @@ class DOEDriver(Driver):
         if opts['record_derivatives']:
             self._compute_totals(of=self._quantities,
                                  wrt=self._indep_list,
-                                 return_format=self._total_jac_format)
+                                 return_format=self._total_jac_format,
+                                 driver_scaling=False)
 
     def _parallel_generator(self, design_vars, model=None):
         """
