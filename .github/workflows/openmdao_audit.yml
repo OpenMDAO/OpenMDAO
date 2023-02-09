@@ -3,7 +3,7 @@ name: OpenMDAO Audit
 
 on:
 
-  # Run the workflow daily a 0400 UTC
+  # Run the workflow daily a 0300 UTC
   schedule:
     - cron: '0 3 * * *'
 
