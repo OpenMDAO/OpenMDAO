@@ -89,6 +89,38 @@ class _ReprClass(object):
     def __hash__(self):
         return hash(self._repr_string)
 
+    def __copy__(self):
+        """
+        Return self instead of a copy.
+
+        This ensures that 'is' and 'is not' comparisons to copies of this object don't break.
+
+        Returns
+        -------
+        _ReprClass instance
+            Return self instead of a copy.
+        """
+        return self
+
+    def __deepcopy__(self, memo):
+        """
+        Return self instead of a copy.
+
+        This ensures that 'is' and 'is not' comparisons to deep copies of this object don't break.
+
+        Parameters
+        ----------
+        memo : dict
+            Keeps track of already copied objects.
+
+        Returns
+        -------
+        _ReprClass instance
+            Return self instead of a copy.
+        """
+        memo[id(self)] = self
+        return self
+
 
 # unique object to check if default is given (when None is an allowed value)
 _UNDEFINED = _ReprClass("UNDEFINED")
