@@ -3,7 +3,7 @@ name: OpenMDAO Latest
 
 on:
 
-  # Run the workflow daily a 0400 UTC
+  # Run the workflow daily at 0400 UTC
   schedule:
     - cron: '0 4 * * *'
 
