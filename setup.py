@@ -18,11 +18,7 @@ optional_dependencies = {
     'docs': [
         'matplotlib',
         'numpydoc>=1.1',
-        'jupyter-core>=4.11.2',
-        'jupyter-book>=0.8.0,<0.13',
-        'jupyter-client>=7.4.0',
-        'jupyter',
-        'jupyter-sphinx',
+        'jupyter-book',
         'sphinx-sitemap',
         'ipyparallel',
         'nbconvert>=6.3'
@@ -32,10 +28,7 @@ optional_dependencies = {
     ],
     'notebooks': [
         'notebook',
-        'ipython',
-        'ipywidgets>=7.6.5',
-        'ipympl',
-        'myst_nb'
+        'ipympl'
     ],
     'visualization': [
         'bokeh>=1.3.4',
