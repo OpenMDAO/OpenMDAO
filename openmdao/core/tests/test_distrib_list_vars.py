@@ -575,6 +575,8 @@ class MPIFeatureTests(unittest.TestCase):
         model.connect('indep.x', 'C2.invec')
         model.connect('C2.outvec', 'C3.invec', src_indices=om.slicer[:])
 
+        model.add_design_var('indep.x')
+
         prob = om.Problem(model)
         prob.setup()
 
@@ -599,16 +601,32 @@ class MPIFeatureTests(unittest.TestCase):
         inputs = model.list_inputs(all_procs=True)
         self.assertEqual(['C2.invec', 'C3.invec'], [name for name, _ in inputs])
 
-        # list model outputs that are an indep_var
+        # list all model outputs
+        outputs = model.list_outputs(all_procs=True)
+        self.assertEqual(['indep.x', 'C2.outvec', 'C3.sum'], [name for name, _ in outputs])
+
+        # list all model outputs that are an indep_var
         outputs = model.list_outputs(is_indep_var=True, all_procs=True)
         self.assertEqual(['indep.x'], [name for name, _ in outputs])
 
-        # list inputs that are connected to an indep_var
+        # list all model inputs that are connected to an indep_var
         inputs = model.list_inputs(is_indep_var=True, all_procs=True)
         self.assertEqual(['C2.invec'], [name for name, _ in inputs])
 
-        # list inputs that are not connected to an indep_var
+        # list all model inputs that are not connected to an indep_var
         inputs = model.list_inputs(is_indep_var=False, all_procs=True)
+        self.assertEqual(['C3.invec'], [name for name, _ in inputs])
+
+        # list all model outputs that are design vars
+        outputs = model.list_outputs(is_design_var=True, all_procs=True)
+        self.assertEqual(['indep.x'], [name for name, _ in outputs])
+
+        # list all model inputs that are connected to a design var
+        inputs = model.list_inputs(is_design_var=True, all_procs=True)
+        self.assertEqual(['C2.invec'], [name for name, _ in inputs])
+
+        # list all model inputs that are not connected to a design var
+        inputs = model.list_inputs(is_design_var=False, all_procs=True)
         self.assertEqual(['C3.invec'], [name for name, _ in inputs])
 
         assert_near_equal(prob['C3.sum'], -5.)

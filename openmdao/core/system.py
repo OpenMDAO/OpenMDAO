@@ -4242,20 +4242,33 @@ class System(object):
                     if tags and not tagset & ret_meta['tags']:
                         continue
 
+                    # handle is_indep_var
                     if is_indep_var is not None:
                         if iotype == 'output':
-                            src_meta = meta
+                            out_meta = meta
                         else:
                             src_name = self.get_source(abs_name)
                             try:
-                                src_meta = metadict['output'][src_name]
+                                out_meta = metadict['output'][src_name]
                             except KeyError:
-                                src_meta = disc_metadict['output'][src_name]  # TODO: test discrete
+                                out_meta = disc_metadict['output'][src_name]  # TODO: test discrete
 
-                        src_tags = src_meta['tags'] if 'tags' in src_meta else {}
+                        src_tags = out_meta['tags'] if 'tags' in out_meta else {}
                         if is_indep_var is True and 'openmdao:indep_var' not in src_tags:
                             continue
                         elif is_indep_var is False and 'openmdao:indep_var' in src_tags:
+                            continue
+
+                    # handle is_design_var
+                    if is_design_var is not None:
+                        if iotype == 'output':
+                            out_name = abs_name
+                        else:
+                            out_name = self.get_source(abs_name)
+
+                        if is_design_var is True and out_name not in self._design_vars:
+                            continue
+                        elif is_design_var is False and out_name in self._design_vars:
                             continue
 
                     ret_meta['prom_name'] = prom
