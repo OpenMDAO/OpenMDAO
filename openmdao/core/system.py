@@ -4068,7 +4068,8 @@ class System(object):
             self._apply_nonlinear()
 
     def get_io_metadata(self, iotypes=('input', 'output'), metadata_keys=None,
-                        includes=None, excludes=None, tags=(), get_remote=False, rank=None,
+                        includes=None, excludes=None, is_indep_var=None, is_design_var=None,
+                        tags=(), get_remote=False, rank=None,
                         return_rel_names=True):
         """
         Retrieve metadata for a filtered list of variables.
@@ -4091,6 +4092,14 @@ class System(object):
             User defined tags that can be used to filter what gets listed. Only inputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
+        is_indep_var : bool or None
+            If None (the default), do no additional filtering of the inputs.
+            If True, list only inputs connected to an output tagged `openmdao:indep_var`.
+            If False, list only inputs _not_ connected to outputs tagged `openmdao:indep_var`.
+        is_design_var : bool or None
+            If None (the default), do no additional filtering of the inputs.
+            If True, list only inputs connected to outputs that are driver design variables.
+            If False, list only inputs _not_ connected to outputs that are driver design variables.
         get_remote : bool
             If True, retrieve variables from other MPI processes as well.
         rank : int or None
@@ -4233,6 +4242,21 @@ class System(object):
                     if tags and not tagset & ret_meta['tags']:
                         continue
 
+                    if is_indep_var is not None:
+                        if iotype == 'output':
+                            src_meta = ret_meta
+                        else:
+                            src_name = self.get_source(abs_name)
+                            try:
+                                src_meta = metadict['output'][src_name]  # TODO: test continuous
+                            except KeyError:
+                                src_meta = disc_metadict['output'][src_name]  # TODO: test discrete
+
+                        if is_indep_var is True and 'openmdao:indep_var' not in src_meta['tags']:
+                            continue
+                        elif is_indep_var is False and 'openmdao:indep_var' in src_meta['tags']:
+                            continue
+
                     ret_meta['prom_name'] = prom
                     ret_meta['discrete'] = abs_name not in all2meta[iotype]
 
@@ -4255,6 +4279,8 @@ class System(object):
                     tags=None,
                     includes=None,
                     excludes=None,
+                    is_indep_var=None,
+                    is_design_var=None,
                     all_procs=False,
                     out_stream=_DEFAULT_OUT_STREAM,
                     values=None,
@@ -4295,6 +4321,14 @@ class System(object):
             which includes all input variables.
         excludes : None, str, or iter of str
             Collection of glob patterns for pathnames of variables to exclude. Default is None.
+        is_indep_var : bool or None
+            If None (the default), do no additional filtering of the inputs.
+            If True, list only inputs connected to an output tagged `openmdao:indep_var`.
+            If False, list only inputs _not_ connected to outputs tagged `openmdao:indep_var`.
+        is_design_var : bool or None
+            If None (the default), do no additional filtering of the inputs.
+            If True, list only inputs connected to outputs that are driver design variables.
+            If False, list only inputs _not_ connected to outputs that are driver design variables.
         all_procs : bool, optional
             When True, display output on all ranks. Default is False, which will display
             output only from rank 0.
@@ -4332,7 +4366,8 @@ class System(object):
         keyvals = [metavalues, units, shape, global_shape, desc, tags is not None]
         keys = [n for i, n in enumerate(keynames) if keyvals[i]]
 
-        inputs = self.get_io_metadata(('input',), keys, includes, excludes, tags,
+        inputs = self.get_io_metadata(('input',), keys, includes, excludes,
+                                      is_indep_var, is_design_var, tags,
                                       get_remote=True,
                                       rank=None if all_procs or val else 0,
                                       return_rel_names=False)
