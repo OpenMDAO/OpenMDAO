@@ -599,6 +599,10 @@ class MPIFeatureTests(unittest.TestCase):
         inputs = model.list_inputs(all_procs=True)
         self.assertEqual(['C2.invec', 'C3.invec'], [name for name, _ in inputs])
 
+        # list model outputs that are an indep_var
+        outputs = model.list_outputs(is_indep_var=True, all_procs=True)
+        self.assertEqual(['indep.x'], [name for name, _ in outputs])
+
         # list inputs that are connected to an indep_var
         inputs = model.list_inputs(is_indep_var=True, all_procs=True)
         self.assertEqual(['C2.invec'], [name for name, _ in inputs])

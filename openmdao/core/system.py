@@ -4244,17 +4244,18 @@ class System(object):
 
                     if is_indep_var is not None:
                         if iotype == 'output':
-                            src_meta = ret_meta
+                            src_meta = meta
                         else:
                             src_name = self.get_source(abs_name)
                             try:
-                                src_meta = metadict['output'][src_name]  # TODO: test continuous
+                                src_meta = metadict['output'][src_name]
                             except KeyError:
                                 src_meta = disc_metadict['output'][src_name]  # TODO: test discrete
 
-                        if is_indep_var is True and 'openmdao:indep_var' not in src_meta['tags']:
+                        src_tags = src_meta['tags'] if 'tags' in src_meta else {}
+                        if is_indep_var is True and 'openmdao:indep_var' not in src_tags:
                             continue
-                        elif is_indep_var is False and 'openmdao:indep_var' in src_meta['tags']:
+                        elif is_indep_var is False and 'openmdao:indep_var' in src_tags:
                             continue
 
                     ret_meta['prom_name'] = prom
@@ -4430,6 +4431,8 @@ class System(object):
                      tags=None,
                      includes=None,
                      excludes=None,
+                     is_indep_var=None,
+                     is_design_var=None,
                      all_procs=False,
                      list_autoivcs=False,
                      out_stream=_DEFAULT_OUT_STREAM,
@@ -4485,6 +4488,14 @@ class System(object):
             which includes all output variables.
         excludes : None, str, or iter of str
             Collection of glob patterns for pathnames of variables to exclude. Default is None.
+        is_indep_var : bool or None
+            If None (the default), do no additional filtering of the inputs.
+            If True, list only outputs tagged `openmdao:indep_var`.
+            If False, list only outputs that are _not_ tagged `openmdao:indep_var`.
+        is_design_var : bool or None
+            If None (the default), do no additional filtering of the inputs.
+            If True, list only inputs connected to outputs that are driver design variables.
+            If False, list only inputs _not_ connected to outputs that are driver design variables.
         all_procs : bool, optional
             When True, display output on all processors. Default is False.
         list_autoivcs : bool
@@ -4522,7 +4533,8 @@ class System(object):
         if scaling:
             keys.extend(('ref', 'ref0', 'res_ref'))
 
-        outputs = self.get_io_metadata(('output',), keys, includes, excludes, tags,
+        outputs = self.get_io_metadata(('output',), keys, includes, excludes,
+                                       is_indep_var, is_design_var, tags,
                                        get_remote=True,
                                        rank=None if all_procs or val or residuals else 0,
                                        return_rel_names=False)
