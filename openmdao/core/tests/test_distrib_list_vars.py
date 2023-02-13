@@ -595,6 +595,18 @@ class MPIFeatureTests(unittest.TestCase):
         # is different on each processor, use the all_procs argument to display on all processors
         model.C3.list_inputs(hierarchical=False, shape=True, global_shape=True, print_arrays=True, all_procs=True)
 
+        # list all model inputs
+        inputs = model.list_inputs(all_procs=True)
+        self.assertEqual(['C2.invec', 'C3.invec'], [name for name, _ in inputs])
+
+        # list inputs that are connected to an indep_var
+        inputs = model.list_inputs(is_indep_var=True, all_procs=True)
+        self.assertEqual(['C2.invec'], [name for name, _ in inputs])
+
+        # list inputs that are not connected to an indep_var
+        inputs = model.list_inputs(is_indep_var=False, all_procs=True)
+        self.assertEqual(['C3.invec'], [name for name, _ in inputs])
+
         assert_near_equal(prob['C3.sum'], -5.)
 
 
