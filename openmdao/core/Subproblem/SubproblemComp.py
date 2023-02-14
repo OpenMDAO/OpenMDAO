@@ -140,7 +140,7 @@ class SubproblemComp(om.ExplicitComponent):
 
     def setup(self):
         model = self.prob_args['model']
-        driver = self.prob_args['driver']
+        driver = self.prob_args['driver'] # leaving out for now
         comm = self.prob_args['comm']
         name = self.prob_args['name']
         reports= self.prob_args['reports']
@@ -148,10 +148,10 @@ class SubproblemComp(om.ExplicitComponent):
         inputs = self.options['inputs']
         outputs = self.options['outputs']
         
-        p = self._subprob = om.Problem(model=model, driver=driver, comm=comm,
-                                       name=name, reports=reports, **prob_kwargs)
+        p = self._subprob = om.Problem(comm=comm, name=name, reports=reports, 
+                                       **prob_kwargs)
         
-        # p.model.add_subsystem('subsys', self.model, promotes=['*'])
+        p.model.add_subsystem('subsys', model, promotes=['*'])
         
         p.setup(force_alloc_complex=False)
         p.final_setup()
@@ -217,12 +217,11 @@ class SubproblemComp(om.ExplicitComponent):
         for inp in self._input_names:
             p.set_val(self.options['inputs'][inp]['prom_name'], inputs[inp])
 
-        # tots = p.compute_totals(of=self._output_names, wrt=self._input_names,
-        #                         use_abs_names=False)
-        # tots = p.compute_totals()
+        tots = p.compute_totals(of=self._output_names, wrt=self._input_names,
+                                use_abs_names=False)
 
-        # for of in self._output_names:
-        #     for wrt in self._input_names:
-        #         partials[of, wrt] = tots[of, wrt]
+        for of in self._output_names:
+            for wrt in self._input_names:
+                partials[of, wrt] = tots[of, wrt]
     
         
