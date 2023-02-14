@@ -3,6 +3,8 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 import unittest
 from sys import exit
 
+from numpy import pi
+
 from SubproblemComp import SubproblemComp
 
 prob = om.Problem()
@@ -12,8 +14,6 @@ sub_model1 = om.ExecComp('x = r*cos(theta)') #promotes_inputs=['r', 'theta'],
                         #  promotes_outputs=['x'])
 sub_model2 = om.ExecComp('y = r*sin(theta)') #promotes_inputs=['r','theta'],
                         #  promotes_outputs=['y'])
-# print(sub_model1.list_inputs(out_stream=None, prom_name=True, units=True, shape=True, desc=True))
-# exit()
 
 subprob1 = SubproblemComp(model=sub_model1, driver=None, comm=None,
                             name=None, reports=False, prob_kwargs=None,
@@ -31,17 +31,12 @@ prob.model.add_subsystem('sub1', subprob1, promotes_inputs=['r','theta'],
 prob.model.add_subsystem('sub2', subprob2, promotes_inputs=['r','theta'],
                             promotes_outputs=['y'])
 
-# prob.model.connect('supModel.x', 'sub1.x')
-# prob.model.connect('supModel.y', 'sub2.y')
-# prob.model.connect('sub1.r', 'sub2.r')
-# prob.model.connect('sub1.theta', 'sub2.theta')
-
 prob.setup(force_alloc_complex=True)
 
 prob.set_val('r', 1)
-prob.set_val('theta', 0.5)
+prob.set_val('theta', pi)
 
 cpd = prob.check_partials(method='fd')     
-# print(cpd)
+print(prob.get_val('z'))
 
 om.n2(prob)
