@@ -1,6 +1,5 @@
 import openmdao.api as om
 from openmdao.core.constants import _UNDEFINED
-# from openmdao.utils.om_warnings import issue_warning
 
 
 class SubproblemComp(om.ExplicitComponent):
@@ -27,9 +26,6 @@ class SubproblemComp(om.ExplicitComponent):
         p = om.Problem(model=model)
         p.setup()
         p.final_setup()
-        
-        # model.setup()
-        # model.final_setup()
         
         model_inputs = p.model.list_inputs(out_stream=None, prom_name=True,
                                          units=True, shape=True, desc=True)
@@ -129,7 +125,6 @@ class SubproblemComp(om.ExplicitComponent):
                 
                 self.options['outputs'].update(out_dict)
             
-            # wrong type
             else:
                 raise Exception('Wrong dataype used for output.')
                 
@@ -155,17 +150,6 @@ class SubproblemComp(om.ExplicitComponent):
         
         p.setup(force_alloc_complex=False)
         p.final_setup()
-        
-        # Lets interrogate the subsystem to figure out what its inputs and outputs are
-        # inputs = p.model.list_inputs(out_stream=None, prom_name=True,
-        #                              units=True, shape=True, desc=True)
-
-        # outputs = p.model.list_outputs(out_stream=None, prom_name=True,
-        #                                units=True, shape=True, desc=True)
-
-        # Store the inputs and outputs with promoted path instead of absolute
-        # inputs = {meta['prom_name']: meta for _, meta in inputs}
-        # outputs = {meta['prom_name']: meta for _, meta in outputs}
 
         self._input_names = []
         self._output_names = []
@@ -207,10 +191,8 @@ class SubproblemComp(om.ExplicitComponent):
 
         p.run_model()
 
-        # do we need prom_name for get_val too?
         for op in self._output_names:
             outputs[op] = p.get_val(self.options['outputs'][op]['prom_name'])
-            # outputs[op] = p.get_val(op)
 
     def compute_partials(self, inputs, partials):
         p = self._subprob
