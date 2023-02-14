@@ -6549,7 +6549,71 @@ class System(object):
         """
         return False
 
+    def _abs_lists2proms(self, abs_outs, abs_ins):
+        prom_out = None
+        if abs_outs:
+            for abs_out in abs_outs:
+                prom_out = self._var_allprocs_abs2prom['output'][abs_out]
+                break
+
+        prom_in = None
+        if abs_ins:
+            for abs_in in abs_ins:
+                prom_in = self._var_allprocs_abs2prom['input'][abs_in]
+                break
+
+        return prom_out, prom_in
+
+    def _get_sys_tree(self, tree=None, abs_outs=None, abs_ins=None):
+        if tree is None:
+            tree = nx.DiGraph()
+
+        prefix = self.pathname + '.' if self.pathname else ''
+        if abs_outs is not None:
+            abs_outs = [n for n in abs_outs if n.startswith(prefix)]
+        if abs_ins is not None:
+            abs_ins = [n for n in abs_ins if n.startswith(prefix)]
+
+        prom_out, prom_in = self._abs_lists2proms(abs_outs, abs_ins)
+        tree.add_node(self.pathname, prom_out=prom_out, prom_in=prom_in)
+
+        parent = self.pathname.rpartition('.')[0]
+        if parent in tree:
+            parent_node = tree.nodes[parent]
+            parent_prom_in = parent_node['prom_in']
+            parent_prom_out = parent_node['prom_out']
+            maps = self._get_promotion_maps()
+            out_promotions = []
+            in_promotions = []
+            if parent_prom_out in maps['output']:
+                out_promotions.append((parent_prom_out, maps['output'][parent_prom_out][0]))
+            if parent_prom_in in maps['input']:
+                in_promotions.append((parent_prom_in, maps['input'][parent_prom_in][0]))
+            # for n, tup in maps['output'].items():
+            #     if tup[0] == n:
+            #         out_promotions.append(n)
+            #     else:
+            #         out_promotions.append((tup[0], n))
+            # for n, tup in maps['input'].items():
+            #     if tup[0] == n:
+            #         in_promotions.append(n)
+            #     else:
+            #         in_promotions.append((tup[0], n))
+
+            tree.add_edge(parent, self.pathname,
+                          out_promotions=out_promotions, in_promotions=in_promotions)
+
+        for subsys in self._subsystems_myproc:
+            subsys._get_sys_tree(tree=tree, abs_outs=abs_outs, abs_ins=abs_ins)
+
+        return tree
+
     def get_promotes_tree(self, prom):
+        tree = self._get_sys_tree()
+        import pprint
+        pprint.pprint(tree.nodes(data=True))
+        pprint.pprint(tree.edges(data=True))
+
         if prom in self._var_allprocs_prom2abs_list['output']:
             abs_outs = self._var_allprocs_prom2abs_list['output'][prom]
         else:
@@ -6560,31 +6624,19 @@ class System(object):
         else:
             abs_ins = []
 
-        tree = nx.DiGraph()
+        # import pprint
+        # print('Input PROMS:', sorted(n for n in self._var_allprocs_prom2abs_list['input'] if n.count('.') < 2))
+        # print('Output PROMS:', sorted(n for n in self._var_allprocs_prom2abs_list['output'] if n.count('.') < 2))
+        # for sname, system in children.items():
+        #     print("System:", sname)
+        #     maps = system._get_promotion_maps()
+        #     if maps['output']:
+        #         print("    Outputs:")
+        #         for n, tup in maps['output'].items():
+        #             print('       ', tup[0], '⇡', n)
+        #     if maps['input']:
+        #         print("    Inputs:")
+        #         for n, tup in maps['input'].items():
+        #             print('       ', tup[0], '⇡', n)
 
-        prefix = self.pathname + '.' if self.pathname else ''
-        prefix_len = len(prefix)
-        sys_rel_paths = set()
-        for name in abs_outs:
-            sys_rel_paths.update(n[prefix_len:] for n in list(all_ancestors(name))[1:])
-        for name in abs_ins:
-            sys_rel_paths.update(n[prefix_len:] for n in list(all_ancestors(name))[1:])
-
-        abs2prom = self._var_allprocs_abs2prom['output']
-
-        import pprint
-        print('Input PROMS:', sorted(n for n in self._var_allprocs_prom2abs_list['input'] if n.count('.') < 2))
-        print('Output PROMS:', sorted(n for n in self._var_allprocs_prom2abs_list['output'] if n.count('.') < 2))
-        for sname in sorted(sys_rel_paths):
-            system = self._get_subsystem(sname)
-            print("System:", sname)
-            maps = system._get_promotion_maps()
-            if maps['output']:
-                print("    Outputs:")
-                for n, tup in maps['output'].items():
-                    print('       ', tup[0], '⇡', n)
-            if maps['input']:
-                print("    Inputs:")
-                for n, tup in maps['input'].items():
-                    print('       ', tup[0], '⇡', n)
-
+        return tree
