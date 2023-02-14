@@ -38,11 +38,10 @@ prob.model.add_subsystem('sub2', subprob2, promotes_inputs=['r','theta'],
 
 prob.setup(force_alloc_complex=True)
 
-prob.set_val('sub1.r', 1)
-prob.set_val('sub1.theta', 0.5)
+prob.set_val('r', 1)
+prob.set_val('theta', 0.5)
 
-prob.run_model()
 cpd = prob.check_partials(method='fd')     
-print(cpd)
+# print(cpd)
 
-om.n2(prob.model.sub1._subprob)
+om.n2(prob)
