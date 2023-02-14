@@ -6548,3 +6548,43 @@ class System(object):
             True if this is an explicit component.
         """
         return False
+
+    def get_promotes_tree(self, prom):
+        if prom in self._var_allprocs_prom2abs_list['output']:
+            abs_outs = self._var_allprocs_prom2abs_list['output'][prom]
+        else:
+            abs_outs = []
+
+        if prom in self._var_allprocs_prom2abs_list['input']:
+            abs_ins = self._var_allprocs_prom2abs_list['input'][prom]
+        else:
+            abs_ins = []
+
+        tree = nx.DiGraph()
+
+        prefix = self.pathname + '.' if self.pathname else ''
+        prefix_len = len(prefix)
+        sys_rel_paths = set()
+        for name in abs_outs:
+            sys_rel_paths.update(n[prefix_len:] for n in list(all_ancestors(name))[1:])
+        for name in abs_ins:
+            sys_rel_paths.update(n[prefix_len:] for n in list(all_ancestors(name))[1:])
+
+        abs2prom = self._var_allprocs_abs2prom['output']
+
+        import pprint
+        print('Input PROMS:', sorted(n for n in self._var_allprocs_prom2abs_list['input'] if n.count('.') < 2))
+        print('Output PROMS:', sorted(n for n in self._var_allprocs_prom2abs_list['output'] if n.count('.') < 2))
+        for sname in sorted(sys_rel_paths):
+            system = self._get_subsystem(sname)
+            print("System:", sname)
+            maps = system._get_promotion_maps()
+            if maps['output']:
+                print("    Outputs:")
+                for n, tup in maps['output'].items():
+                    print('       ', tup[0], '⇡', n)
+            if maps['input']:
+                print("    Inputs:")
+                for n, tup in maps['input'].items():
+                    print('       ', tup[0], '⇡', n)
+
