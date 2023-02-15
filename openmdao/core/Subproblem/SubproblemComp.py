@@ -53,6 +53,9 @@ class SubproblemComp(om.ExplicitComponent):
         # make sure prob_kwargs can be passed appropriately
         prob_kwargs = {} if prob_kwargs is None else prob_kwargs
 
+        # call base class to set kwargs
+        super().__init__(**kwargs)
+
         # store inputs and outputs in options
         self.options.declare('inputs', {}, types=dict,
                              desc='Subproblem Component inputs')
@@ -63,9 +66,6 @@ class SubproblemComp(om.ExplicitComponent):
         self._prev_complex_step = False
         self.prob_args = {'model' : model, 'driver' : driver, 'comm' : comm,
                           'name' : name, 'reports' : reports,'kwargs' : prob_kwargs}
-
-        # call base class to set kwargs
-        super().__init__(**kwargs)
 
         # instantiate problem to get model inputs and outputs
         p = om.Problem(model=model)
