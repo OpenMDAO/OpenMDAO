@@ -1,6 +1,7 @@
 import openmdao.api as om
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.om_warnings import issue_warning
+from openmdao.core.driver import Driver
 
 
 class SubproblemComp(om.ExplicitComponent):
@@ -9,24 +10,10 @@ class SubproblemComp(om.ExplicitComponent):
     
     Parameters
     ----------
+    problem : Problem
+        Problem instance that becomes the subproblem.
     model : <System> or None
-        The top-level <System>. If not specified, an empty <Group> will be created.
-    driver : <Driver> or None
-        The driver for the problem. If not specified, a simple "Run Once" driver will be used.
-    comm : MPI.Comm or <FakeComm> or None
-        The global communicator.
-    name : str
-        Problem name. Can be used to specify a Problem instance when multiple Problems
-        exist.
-    reports : str, bool, None, _UNDEFINED
-        If _UNDEFINED, the OPENMDAO_REPORTS variable is used. Defaults to _UNDEFINED.
-        If given, reports overrides OPENMDAO_REPORTS. If boolean, enable/disable all reports.
-        Since none is acceptable in the environment variable, a value of reports=None
-        is equivalent to reports=False. Otherwise, reports may be a sequence of
-        strings giving the names of the reports to run.
-    prob_kwargs : dict
-        All remaining args typically used in a problem. Must be stored in a dict since
-        **kwargs is used for om.ExplicitComponent instead.
+        The system-level <System>. Required for subproblem.
     inputs : list of str or tuple
         List of desired inputs to subproblem. If an element is a str, then it should be
         the var name in its promoted name. If it is a tuple, then the first element 
@@ -40,18 +27,16 @@ class SubproblemComp(om.ExplicitComponent):
     **kwargs : named args
         All remaining named args that become options for `SubproblemComp`.
     """
-    def __init__(self, model=None, driver=None, comm=None, name=None,
-                 reports=_UNDEFINED, prob_kwargs=None, inputs=None,
+    def __init__(self, problem=None, model=None, inputs=None,
                  outputs=None, **kwargs):
 
-        if driver is not None:
+        # check the type because two `Driver` instances are not equal
+        # om.ScipyOptimizeDriver and om.pyOptSparseDriver
+        if type(problem.driver) != type(Driver()):
             issue_warning('Driver results may not be accurate if'
                           ' derivatives are needed. Set driver to'
                           ' None if your subproblem isn\'t reliant on'
                           ' a driver.')
-
-        # make sure prob_kwargs can be passed appropriately
-        prob_kwargs = {} if prob_kwargs is None else prob_kwargs
 
         # call base class to set kwargs
         super().__init__(**kwargs)
@@ -64,20 +49,17 @@ class SubproblemComp(om.ExplicitComponent):
 
         # set other variables necessary for subproblem
         self._prev_complex_step = False
-        self.prob_args = {'model' : model, 'driver' : driver, 'comm' : comm,
-                          'name' : name, 'reports' : reports,'kwargs' : prob_kwargs}
+        
+        p = self._subprob = problem
+        p.model.add_subsystem('subsys', model, promotes=['*'])
 
-        # instantiate problem to get model inputs and outputs
-        p = om.Problem(model=model)
-        p.setup()
+        p.setup(force_alloc_complex=False)
         p.final_setup()
 
         model_inputs = p.model.list_inputs(out_stream=None, prom_name=True,
                                            units=True, shape=True, desc=True)
         model_outputs = p.model.list_outputs(out_stream=None, prom_name=True,
                                              units=True, shape=True, desc=True)
-
-        del p # delete problem and free memory
 
         # store model inputs/outputs as dictionary with keys as the promoted name
         model_inputs = {meta['prom_name']: meta for _, meta in model_inputs}
@@ -187,24 +169,8 @@ class SubproblemComp(om.ExplicitComponent):
                                 ' string or tuple.')
 
     def setup(self):
-        # instantiate problem args
-        model = self.prob_args['model']
-        driver = self.prob_args['driver']
-        comm = self.prob_args['comm']
-        name = self.prob_args['name']
-        reports= self.prob_args['reports']
-        prob_kwargs = self.prob_args['kwargs']
         inputs = self.options['inputs']
         outputs = self.options['outputs']
-
-        # instantiate subproblem
-        p = self._subprob = om.Problem(driver=driver, comm=comm, name=name,
-                                       reports=reports, **prob_kwargs)
-        p.model.add_subsystem('subsys', model, promotes=['*'])
-
-        # set up subproblem
-        p.setup(force_alloc_complex=False)
-        p.final_setup()
 
         # instantiate input/output name list for use in compute and 
         # compute partials
@@ -250,7 +216,7 @@ class SubproblemComp(om.ExplicitComponent):
             p.set_val(self.options['inputs'][inp]['prom_name'], inputs[inp])
 
         # use driver if it is provided
-        if p.driver is not None:
+        if type(p.driver) != type(Driver()):
             p.run_driver()
         else:
             p.run_model()
