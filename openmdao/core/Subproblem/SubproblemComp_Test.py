@@ -1,19 +1,12 @@
-import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
-import unittest
-from sys import exit
-
 from numpy import pi
-
+import openmdao.api as om
 from SubproblemComp import SubproblemComp
 
 prob = om.Problem()
 
 model = om.ExecComp('z = x**2 + y')
-sub_model1 = om.ExecComp('x = r*cos(theta)') #promotes_inputs=['r', 'theta'],
-                        #  promotes_outputs=['x'])
-sub_model2 = om.ExecComp('y = r*sin(theta)') #promotes_inputs=['r','theta'],
-                        #  promotes_outputs=['y'])
+sub_model1 = om.ExecComp('x = r*cos(theta)')
+sub_model2 = om.ExecComp('y = r*sin(theta)')
 
 subprob1 = SubproblemComp(model=sub_model1, driver=None, comm=None,
                             name=None, reports=False, prob_kwargs=None,
@@ -37,7 +30,7 @@ prob.set_val('r', 1)
 prob.set_val('theta', pi)
 
 prob.run_model()
-cpd = prob.check_partials(method='fd')     
+cpd = prob.check_partials(method='cs')     
 print(prob.get_val('z'))
 
-om.n2(prob)
+# om.n2(prob)
