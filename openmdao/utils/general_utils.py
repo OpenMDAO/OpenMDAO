@@ -917,6 +917,23 @@ def env_truthy(env_var):
     return is_truthy(os.environ.get(env_var, ''))
 
 
+def env_none(env_var):
+    """
+    Return True if the given environment variable is None.
+
+    Parameters
+    ----------
+    env_var : str
+        The name of the environment variable.
+
+    Returns
+    -------
+    bool
+        True if the specified environment variable is None.
+    """
+    return os.environ.get(env_var) is None
+
+
 def common_subpath(pathnames):
     """
     Return the common dotted subpath found in all of the given dotted pathnames.
