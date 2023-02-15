@@ -36,6 +36,7 @@ prob.setup(force_alloc_complex=True)
 prob.set_val('r', 1)
 prob.set_val('theta', pi)
 
+prob.run_model()
 cpd = prob.check_partials(method='fd')     
 print(prob.get_val('z'))
 
