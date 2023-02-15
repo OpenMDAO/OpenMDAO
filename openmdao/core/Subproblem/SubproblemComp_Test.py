@@ -2,20 +2,17 @@ from numpy import pi
 import openmdao.api as om
 from SubproblemComp import SubproblemComp
 
+
 prob = om.Problem()
 
 model = om.ExecComp('z = x**2 + y')
 sub_model1 = om.ExecComp('x = r*cos(theta)')
 sub_model2 = om.ExecComp('y = r*sin(theta)')
 
-subprob1 = SubproblemComp(model=sub_model1, driver=None, comm=None,
-                            name=None, reports=False, prob_kwargs=None,
-                            inputs=['r', 'theta'],
-                            outputs=['x'])
-subprob2 = SubproblemComp(model=sub_model2, driver=None, comm=None,
-                            name=None, reports=False, prob_kwargs=None,
-                            inputs=['r', 'theta'],
-                            outputs=['y'])
+subprob1 = SubproblemComp(problem=om.Problem(), model=sub_model1,
+                          inputs=['r', 'theta'], outputs=['x'])
+subprob2 = SubproblemComp(problem=om.Problem(), model=sub_model2,
+                          inputs=['r', 'theta'], outputs=['y'])
 
 prob.model.add_subsystem('supModel', model, promotes_inputs=['x','y'],
                             promotes_outputs=['z'])
