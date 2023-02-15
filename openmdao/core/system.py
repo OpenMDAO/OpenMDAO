@@ -4088,10 +4088,6 @@ class System(object):
             which includes all variables.
         excludes : str, iter of str or None
             Collection of glob patterns for pathnames of variables to exclude. Default is None.
-        tags : str or iter of strs
-            User defined tags that can be used to filter what gets listed. Only inputs with the
-            given tags will be listed.
-            Default is None, which means there will be no filtering based on tags.
         is_indep_var : bool or None
             If None (the default), do no additional filtering of the inputs.
             If True, list only inputs connected to an output tagged `openmdao:indep_var`.
@@ -4100,6 +4096,10 @@ class System(object):
             If None (the default), do no additional filtering of the inputs.
             If True, list only inputs connected to outputs that are driver design variables.
             If False, list only inputs _not_ connected to outputs that are driver design variables.
+        tags : str or iter of strs
+            User defined tags that can be used to filter what gets listed. Only inputs with the
+            given tags will be listed.
+            Default is None, which means there will be no filtering based on tags.
         get_remote : bool
             If True, retrieve variables from other MPI processes as well.
         rank : int or None
