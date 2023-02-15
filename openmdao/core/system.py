@@ -6575,33 +6575,26 @@ class System(object):
             abs_ins = [n for n in abs_ins if n.startswith(prefix)]
 
         prom_out, prom_in = self._abs_lists2proms(abs_outs, abs_ins)
-        tree.add_node(self.pathname, prom_out=prom_out, prom_in=prom_in)
+        if (abs_ins or abs_outs) or (abs_ins is None and abs_outs is None):
+            tree.add_node(self.pathname, prom_out=prom_out, prom_in=prom_in)
 
-        parent = self.pathname.rpartition('.')[0]
-        if parent in tree:
-            parent_node = tree.nodes[parent]
-            parent_prom_in = parent_node['prom_in']
-            parent_prom_out = parent_node['prom_out']
-            maps = self._get_promotion_maps()
-            out_promotions = []
-            in_promotions = []
-            if parent_prom_out in maps['output']:
-                out_promotions.append((parent_prom_out, maps['output'][parent_prom_out][0]))
-            if parent_prom_in in maps['input']:
-                in_promotions.append((parent_prom_in, maps['input'][parent_prom_in][0]))
-            # for n, tup in maps['output'].items():
-            #     if tup[0] == n:
-            #         out_promotions.append(n)
-            #     else:
-            #         out_promotions.append((tup[0], n))
-            # for n, tup in maps['input'].items():
-            #     if tup[0] == n:
-            #         in_promotions.append(n)
-            #     else:
-            #         in_promotions.append((tup[0], n))
+            parent = self.pathname.rpartition('.')[0] if self.pathname else None
+            if parent in tree:
+                parent_node = tree.nodes[parent]
+                parent_prom_in = parent_node['prom_in']
+                parent_prom_out = parent_node['prom_out']
+                maps = self._get_promotion_maps()
+                out_promotions = []
+                in_promotions = []
+                if parent_prom_out in maps['output']:
+                    out_promotions.append((parent_prom_out, maps['output'][parent_prom_out][0]))
+                if parent_prom_in in maps['input']:
+                    in_promotions.append((parent_prom_in, maps['input'][parent_prom_in][0]))
+                for parent_prom_in, tup in maps['input'].items():
+                    pass
 
-            tree.add_edge(parent, self.pathname,
-                          out_promotions=out_promotions, in_promotions=in_promotions)
+                tree.add_edge(parent, self.pathname,
+                              out_promotions=out_promotions, in_promotions=in_promotions)
 
         for subsys in self._subsystems_myproc:
             subsys._get_sys_tree(tree=tree, abs_outs=abs_outs, abs_ins=abs_ins)
@@ -6609,10 +6602,6 @@ class System(object):
         return tree
 
     def get_promotes_tree(self, prom):
-        tree = self._get_sys_tree()
-        import pprint
-        pprint.pprint(tree.nodes(data=True))
-        pprint.pprint(tree.edges(data=True))
 
         if prom in self._var_allprocs_prom2abs_list['output']:
             abs_outs = self._var_allprocs_prom2abs_list['output'][prom]
@@ -6624,6 +6613,19 @@ class System(object):
         else:
             abs_ins = []
 
+        tree = self._get_sys_tree(abs_outs=abs_outs, abs_ins=abs_ins)
+        import pprint
+        pprint.pprint(dict(tree.nodes(data=True)))
+        pprint.pprint({(u,v): data for u, v, data in tree.edges(data=True)})
+
+        from openmdao.visualization.tables.table_builder import generate_table
+        rows = []
+        for node, data in tree.nodes(data=True):
+            pre = data['prom_in'] if data['prom_in'] else ''
+            post = data['prom_out'] if data['prom_out'] else ''
+            rows.append((pre, node, post))
+
+        generate_table(rows, tablefmt='heavy_grid', headers=['Input', 'System', 'Output']).display()
         # import pprint
         # print('Input PROMS:', sorted(n for n in self._var_allprocs_prom2abs_list['input'] if n.count('.') < 2))
         # print('Output PROMS:', sorted(n for n in self._var_allprocs_prom2abs_list['output'] if n.count('.') < 2))
