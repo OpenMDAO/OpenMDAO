@@ -4239,9 +4239,6 @@ class System(object):
                             ret_meta = None
 
                 if ret_meta is not None:
-                    if tags and not tagset & ret_meta['tags']:
-                        continue
-
                     # handle is_indep_var
                     if is_indep_var is not None:
                         if iotype == 'output':
@@ -4261,15 +4258,19 @@ class System(object):
 
                     # handle is_design_var
                     if is_design_var is not None:
+                        des_vars = self.get_design_vars(use_prom_ivc=False)
                         if iotype == 'output':
                             out_name = abs_name
                         else:
                             out_name = self.get_source(abs_name)
+                        if is_design_var is True and out_name not in des_vars:
+                            continue
+                        elif is_design_var is False and out_name in des_vars:
+                            continue
 
-                        if is_design_var is True and out_name not in self._design_vars:
-                            continue
-                        elif is_design_var is False and out_name in self._design_vars:
-                            continue
+                    # handle tags
+                    if tags and not tagset & ret_meta['tags']:
+                        continue
 
                     ret_meta['prom_name'] = prom
                     ret_meta['discrete'] = abs_name not in all2meta[iotype]
