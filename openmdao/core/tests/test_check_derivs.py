@@ -3552,7 +3552,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
         prob.run_model()
 
-        totals = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs', out_stream=None)
+        totals = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs')
 
         for key, val in totals.items():
             assert_near_equal(val['rel error'][0], 0.0, 3e-8)
