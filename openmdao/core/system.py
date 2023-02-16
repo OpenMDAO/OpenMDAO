@@ -552,6 +552,7 @@ class System(object):
         self._saved_errors = None if env_truthy('OPENMDAO_FAIL_FAST') else []
 
         self._output_solver_options = {}
+        self._promotion_tree = None
 
     @property
     def under_approx(self):
@@ -6564,44 +6565,52 @@ class System(object):
 
         return prom_out, prom_in
 
-    def _get_sys_tree(self, tree=None, abs_outs=None, abs_ins=None):
+    def _get_sys_tree(self, tree=None):
         if tree is None:
             tree = nx.DiGraph()
 
-        prefix = self.pathname + '.' if self.pathname else ''
-        if abs_outs is not None:
-            abs_outs = [n for n in abs_outs if n.startswith(prefix)]
-        if abs_ins is not None:
-            abs_ins = [n for n in abs_ins if n.startswith(prefix)]
+        assert self.pathname not in tree
+        tree.add_node(self.pathname, proms_out=defaultdict(set), proms_in=defaultdict(set))
 
-        prom_out, prom_in = self._abs_lists2proms(abs_outs, abs_ins)
-        if (abs_ins or abs_outs) or (abs_ins is None and abs_outs is None):
-            tree.add_node(self.pathname, prom_out=prom_out, prom_in=prom_in)
+        parent = self.pathname.rpartition('.')[0] if self.pathname else None
+        if parent in tree:
+            parent_node = tree.nodes[parent]
+            out_promotions = parent_node['proms_out']
+            in_promotions = parent_node['proms_in']
+            maps = self._get_promotion_maps()
+            for prom_out, tup in maps['output'].items():
+                out_promotions[tup[0]].add(f"{self.name}.{prom_out}")
+            for prom_in, tup in maps['input'].items():
+                in_promotions[tup[0]].add(f"{self.name}.{prom_in}")
 
-            parent = self.pathname.rpartition('.')[0] if self.pathname else None
-            if parent in tree:
-                parent_node = tree.nodes[parent]
-                parent_prom_in = parent_node['prom_in']
-                parent_prom_out = parent_node['prom_out']
-                maps = self._get_promotion_maps()
-                out_promotions = []
-                in_promotions = []
-                if parent_prom_out in maps['output']:
-                    out_promotions.append((parent_prom_out, maps['output'][parent_prom_out][0]))
-                if parent_prom_in in maps['input']:
-                    in_promotions.append((parent_prom_in, maps['input'][parent_prom_in][0]))
-                for parent_prom_in, tup in maps['input'].items():
-                    pass
-
-                tree.add_edge(parent, self.pathname,
-                              out_promotions=out_promotions, in_promotions=in_promotions)
+            tree.add_edge(parent, self.pathname)
 
         for subsys in self._subsystems_myproc:
-            subsys._get_sys_tree(tree=tree, abs_outs=abs_outs, abs_ins=abs_ins)
+            subsys._get_sys_tree(tree=tree)
 
         return tree
 
-    def get_promotes_tree(self, prom):
+    def get_promotions(self, prom):
+        """
+        Return all promotions for the given promoted variable.
+
+        In other words, how and where did promotions occur to convert absolute variable names into
+        the given promoted name at the current System level.
+
+        Parameters
+        ----------
+        prom : str
+            The promoted variable name.  This can correspond to an output and/or multiple inputs.
+
+        Returns
+        -------
+        dict
+            Dictionary keyed on system pathname containing input and output promotion lists for
+            each System where promotions occurred to produce the given promoted variable.
+        """
+        if self._promotion_tree is None:
+            self._promotion_tree = self._get_sys_tree()
+        tree = self._promotion_tree
 
         if prom in self._var_allprocs_prom2abs_list['output']:
             abs_outs = self._var_allprocs_prom2abs_list['output'][prom]
@@ -6613,32 +6622,92 @@ class System(object):
         else:
             abs_ins = []
 
-        tree = self._get_sys_tree(abs_outs=abs_outs, abs_ins=abs_ins)
-        import pprint
-        pprint.pprint(dict(tree.nodes(data=True)))
-        pprint.pprint({(u,v): data for u, v, data in tree.edges(data=True)})
+        if not abs_ins and not abs_outs:
+            raise RuntimeError(f"{self.msginfo}: Promoted variable '{prom}' was not found.")
 
-        from openmdao.visualization.tables.table_builder import generate_table
+        plist_outs = []
+        if abs_outs:
+            for abs_out in abs_outs:
+                # starting vname is just the local
+                vname = abs_out.rpartition('.')[2]
+                # systems from the bottom up
+                slist = list(all_ancestors(abs_out))[1:]
+                if not self.pathname:
+                    slist += ['']
+                for s in slist:
+                    sname = s.rpartition('.')[2]
+                    node = tree.nodes[s]
+                    proms_out = node['proms_out']
+                    for pname, subs in proms_out.items():
+                        if vname in subs:
+                            plist_outs.append((s, vname, pname))
+                            vname = sname + '.' + pname
+                            break
+                    else:
+                        vname = sname + '.' + vname
+
+        plist_ins = []
+        if abs_ins:
+            for abs_in in abs_ins:
+                # starting vname is just the local var name in its component
+                vname = abs_in.rpartition('.')[2]
+                # systems from the bottom up
+                slist = list(all_ancestors(abs_in))[1:]
+                if not self.pathname:
+                    slist += ['']
+                for s in slist:
+                    sname = s.rpartition('.')[2]
+                    node = tree.nodes[s]
+                    proms_in = node['proms_in']
+                    for pname, subs in proms_in.items():
+                        if vname in subs:
+                            plist_ins.append((s, vname, pname))
+                            vname = sname + '.' + pname
+                            break
+                    else:
+                        vname = sname + '.' + vname
+
+        sysmap = defaultdict(lambda: [None, set(), set()])
+        for spath, sub, theprom in plist_outs:
+            sysmap[spath][2].add(sub)
+            sysmap[spath][0] = theprom
+        for spath, sub, theprom in plist_ins:
+            sysmap[spath][1].add(sub)
+            sysmap[spath][0] = theprom
+
         rows = []
-        for node, data in tree.nodes(data=True):
-            pre = data['prom_in'] if data['prom_in'] else ''
-            post = data['prom_out'] if data['prom_out'] else ''
-            rows.append((pre, node, post))
+        if sysmap:
+            level = f" in system '{self.pathname}'" if self.pathname else ''
+            print(f"\nPromotion table for '{prom}'{level}:")
+            for spath, lst in sorted(sysmap.items(), key=lambda x: x[0]):
+                # indent = '  ' * (len(spath.split('.')) if spath else 0)
+                # print(f"System '{spath}' : ", end='')
+                theprom, ins, outs = lst
+                pre = post = ''
+                if ins:
+                    pre = ', '.join(sorted(ins))
+                    if len(ins) > 1:
+                        inp = f"[{pre}]"
+                    else:
+                        inp = f"'{pre}'"
+                    # if outs:
+                    #     print(f"{inp} --> '{theprom}'", end='')
+                    # else:
+                    #     print(f"{inp} --> '{theprom}'")
+                if outs:
+                    post = ', '.join(sorted(outs))
+                    if len(outs) > 1:
+                        out = f"[{post}]"
+                    else:
+                        out = f"'{post}'"
+                    # if ins:
+                    #     print(f" <-- {out}")
+                    # else:
+                    #     print(f"'{theprom}' <-- {out}")
 
-        generate_table(rows, tablefmt='heavy_grid', headers=['Input', 'System', 'Output']).display()
-        # import pprint
-        # print('Input PROMS:', sorted(n for n in self._var_allprocs_prom2abs_list['input'] if n.count('.') < 2))
-        # print('Output PROMS:', sorted(n for n in self._var_allprocs_prom2abs_list['output'] if n.count('.') < 2))
-        # for sname, system in children.items():
-        #     print("System:", sname)
-        #     maps = system._get_promotion_maps()
-        #     if maps['output']:
-        #         print("    Outputs:")
-        #         for n, tup in maps['output'].items():
-        #             print('       ', tup[0], '⇡', n)
-        #     if maps['input']:
-        #         print("    Inputs:")
-        #         for n, tup in maps['input'].items():
-        #             print('       ', tup[0], '⇡', n)
+                rows.append((spath, pre, theprom, post))
 
-        return tree
+        if rows:
+            from openmdao.visualization.tables.table_builder import generate_table
+            generate_table(rows, tablefmt='box_grid', headers=['System', 'Sub Input(s)', 'Promoted To', 'Sub Outputs']).display()
+        return rows

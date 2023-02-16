@@ -43,8 +43,8 @@ class ParallelGroup(Group):
                 for n, data in sub.nodes(data=True):
                     if n not in tree:
                         tree.add_node(n, **data)
-                for u, v, data in sub.edges(data=True):
-                    if (u, v) not in edges:
-                        tree.add_edge(u, v, **data)
+                for tup in sub.edges():
+                    if tup not in edges:
+                        tree.add_edge(*tup)
 
         return tree
