@@ -444,6 +444,14 @@ class Case(object):
         excludes : str, iter of str, or None
             Glob patterns for pathnames to exclude from the check. Default is None, which
             excludes nothing.
+        is_indep_var : bool or None
+            If None (the default), do no additional filtering of the inputs.
+            If True, list only inputs connected to an output tagged `openmdao:indep_var`.
+            If False, list only inputs _not_ connected to outputs tagged `openmdao:indep_var`.
+        is_design_var : bool or None
+            If None (the default), do no additional filtering of the inputs.
+            If True, list only inputs connected to outputs that are driver design variables.
+            If False, list only inputs _not_ connected to outputs that are driver design variables.
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -627,6 +635,14 @@ class Case(object):
         excludes : str, iter of str, or None
             Glob patterns for pathnames to exclude from the check. Default is None, which
             excludes nothing.
+        is_indep_var : bool or None
+            If None (the default), do no additional filtering of the inputs.
+            If True, list only inputs connected to an output tagged `openmdao:indep_var`.
+            If False, list only inputs _not_ connected to outputs tagged `openmdao:indep_var`.
+        is_design_var : bool or None
+            If None (the default), do no additional filtering of the inputs.
+            If True, list only inputs connected to outputs that are driver design variables.
+            If False, list only inputs _not_ connected to outputs that are driver design variables.
         list_autoivcs : bool
             If True, include auto_ivc outputs in the listing.  Defaults to False.
         out_stream : file-like
