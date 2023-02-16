@@ -27,16 +27,18 @@ class SubproblemComp(om.ExplicitComponent):
         strings giving the names of the reports to run.
     prob_options : dict or None
         Remaining named args for problem that are converted to options.
-    inputs : list of str or tuple
+    inputs : list of str or tuple or None
         List of desired inputs to subproblem. If an element is a str, then it should be
         the var name in its promoted name. If it is a tuple, then the first element 
         should be the promoted name, and the second element should be the var name
         you wish to refer to it by within the subproblem [e.g. (prom_name, var_name)].
-    outputs : list of str or tuple
+        If None, then it will automatically use all inputs in the model.
+    outputs : list of str or tuple or None
         List of desired outputs from subproblem. If an element is a str, then it should be
         the var name in its promoted name. If it is a tuple, then the first element 
         should be the promoted name, and the second element should be the var name
         you wish to refer to it by within the subproblem [e.g. (prom_name, var_name)].
+        If None, then it will automatically use all outputs in the model.
     **kwargs : named args
         All remaining named args that become options for `SubproblemComp`.
     """
@@ -88,108 +90,118 @@ class SubproblemComp(om.ExplicitComponent):
         model_inputs = {meta['prom_name']: meta for _, meta in model_inputs}
         model_outputs = {meta['prom_name']: meta for _, meta in model_outputs}
 
-        # loop through inputs and make sure they're valid for use
-        for inp in inputs:
-            if type(inp) is tuple:
-                # check if variable already exists in self.options['inputs']
-                # i.e. no repeated input variable names
-                inp_vars = list(self.options['inputs'].keys())
-                if inp[1] in inp_vars:
-                    raise Exception(f'Variable {inp[1]} already exists. Rename variable'
-                                    ' or delete copy of variable.')
+        # use all inputs in model if none are provided
+        if inputs is None:
+            self.options['inputs'].update(model_inputs)
 
-                # make dict with given var name as key and meta data from model_inputs
-                inp_dict = {inp[1]: meta for _,meta in model_inputs.items()
-                            if meta['prom_name'] == inp[0]}
+        else:
+            # loop through inputs and make sure they're valid for use
+            for inp in inputs:
+                if type(inp) is tuple:
+                    # check if variable already exists in self.options['inputs']
+                    # i.e. no repeated input variable names
+                    inp_vars = list(self.options['inputs'].keys())
+                    if inp[1] in inp_vars:
+                        raise Exception(f'Variable {inp[1]} already exists. Rename variable'
+                                        ' or delete copy of variable.')
 
-                # check if dict is empty (no inputs added)
-                if len(inp_dict) == 0:
-                    raise Exception(f'Promoted name {inp[0]} does not'
-                                    ' exist in model.')
+                    # make dict with given var name as key and meta data from model_inputs
+                    inp_dict = {inp[1]: meta for _,meta in model_inputs.items()
+                                if meta['prom_name'] == inp[0]}
 
-                # update options inputs dict with new input dict
-                self.options['inputs'].update(inp_dict)
+                    # check if dict is empty (no inputs added)
+                    if len(inp_dict) == 0:
+                        raise Exception(f'Promoted name {inp[0]} does not'
+                                        ' exist in model.')
 
-            elif type(inp) is str:
-                # check if variable already exists in self.options['inputs']
-                # i.e. no repeated input variable names
-                inp_vars = list(self.options['inputs'].keys())
-                if inp in inp_vars:
-                    raise Exception(f'Variable {inp} already exists. Rename variable'
-                                    ' or delete copy of variable.')
+                    # update options inputs dict with new input dict
+                    self.options['inputs'].update(inp_dict)
 
-                # make dict with given var name as key and meta data from model_inputs
-                inp_dict = {inp: meta for _,meta in model_inputs.items()
-                            if meta['prom_name'].endswith(inp)}
+                elif type(inp) is str:
+                    # check if variable already exists in self.options['inputs']
+                    # i.e. no repeated input variable names
+                    inp_vars = list(self.options['inputs'].keys())
+                    if inp in inp_vars:
+                        raise Exception(f'Variable {inp} already exists. Rename variable'
+                                        ' or delete copy of variable.')
 
-                # check if provided variable appears more than once in model
-                if len(inp_dict) > 1:
-                    raise Exception(f'Ambiguous variable {inp} in inputs. To'
-                                    ' specify which one is desired, use a tuple'
-                                    ' with the promoted name and variable name'
-                                    ' instead [e.g. (prom_name, var_name)].')
+                    # make dict with given var name as key and meta data from model_inputs
+                    inp_dict = {inp: meta for _,meta in model_inputs.items()
+                                if meta['prom_name'].endswith(inp)}
 
-                # checks if provided variable doesn't exist in model
-                elif len(inp_dict) == 0:
-                    raise Exception(f'Variable {inp} does not exist in model.')
+                    # check if provided variable appears more than once in model
+                    if len(inp_dict) > 1:
+                        raise Exception(f'Ambiguous variable {inp} in inputs. To'
+                                        ' specify which one is desired, use a tuple'
+                                        ' with the promoted name and variable name'
+                                        ' instead [e.g. (prom_name, var_name)].')
 
-                # update options inputs dict with new input dict
-                self.options['inputs'].update(inp_dict)
+                    # checks if provided variable doesn't exist in model
+                    elif len(inp_dict) == 0:
+                        raise Exception(f'Variable {inp} does not exist in model.')
 
-            else:
-                raise Exception(f'Type {type(inp)} is invalid for input. Must be'
-                                ' string or tuple.')
+                    # update options inputs dict with new input dict
+                    self.options['inputs'].update(inp_dict)
 
-        # loop through outputs and make sure they're valid for use
-        for out in outputs:
-            if type(out) is tuple:
-                # check if variable already exists in self.options['outputs']
-                # i.e. no repeated output variable names
-                out_vars = list(self.options['outputs'].keys())
-                if out[1] in out_vars:
-                    raise Exception(f'Variable {out[1]} already exists. Rename variable'
-                                    ' or delete copy of variable.')
+                else:
+                    raise Exception(f'Type {type(inp)} is invalid for input. Must be'
+                                    ' string or tuple.')
 
-                # make dict with given var name as key and meta data from model_outputs
-                out_dict = {out[1]: meta for _,meta in model_outputs.items()
-                            if meta['prom_name'] == out[0]}
+        # use all outputs in model if none are provided
+        if outputs is None:
+            self.options['outputs'].update(model_outputs)
 
-                # checks if provided variable doesn't exist in model
-                if len(out_dict) == 0:
-                    raise Exception(f'Variable {out[0]} does not exist in model.')
+        else:
+            # loop through outputs and make sure they're valid for use
+            for out in outputs:
+                if type(out) is tuple:
+                    # check if variable already exists in self.options['outputs']
+                    # i.e. no repeated output variable names
+                    out_vars = list(self.options['outputs'].keys())
+                    if out[1] in out_vars:
+                        raise Exception(f'Variable {out[1]} already exists. Rename variable'
+                                        ' or delete copy of variable.')
 
-                # update options outputs dict with new output dict
-                self.options['outputs'].update(out_dict)
+                    # make dict with given var name as key and meta data from model_outputs
+                    out_dict = {out[1]: meta for _,meta in model_outputs.items()
+                                if meta['prom_name'] == out[0]}
 
-            elif type(out) is str:
-                # check if variable already exists in self.options['outputs']
-                # i.e. no repeated output variable names
-                out_vars = list(self.options['outputs'].keys())
-                if out in out_vars:
-                    raise Exception(f'Variable {out} already exists. Rename variable'
-                                    ' or delete copy of variable.')
+                    # checks if provided variable doesn't exist in model
+                    if len(out_dict) == 0:
+                        raise Exception(f'Variable {out[0]} does not exist in model.')
 
-                # make dict with given var name as key and meta data from model_outputs
-                out_dict = {out: meta for _,meta in model_outputs.items()
-                            if meta['prom_name'].endswith(out)}
+                    # update options outputs dict with new output dict
+                    self.options['outputs'].update(out_dict)
 
-                # check if provided variable appears more than once in model
-                if len(out_dict) > 1:
-                    raise Exception(f'Ambiguous variable {out} in outputs. To'
-                                    ' specify which one is desired, use a tuple'
-                                    ' with the promoted name and variable name'
-                                    ' instead [e.g. (prom_name, var_name)].')
+                elif type(out) is str:
+                    # check if variable already exists in self.options['outputs']
+                    # i.e. no repeated output variable names
+                    out_vars = list(self.options['outputs'].keys())
+                    if out in out_vars:
+                        raise Exception(f'Variable {out} already exists. Rename variable'
+                                        ' or delete copy of variable.')
 
-                 # checks if provided variable doesn't exist in model
-                elif len(out_dict) == 0:
-                    raise Exception(f'Variable {out} does not exist in model.')
+                    # make dict with given var name as key and meta data from model_outputs
+                    out_dict = {out: meta for _,meta in model_outputs.items()
+                                if meta['prom_name'].endswith(out)}
 
-                # update options outputs dict with new output dict
-                self.options['outputs'].update(out_dict)
+                    # check if provided variable appears more than once in model
+                    if len(out_dict) > 1:
+                        raise Exception(f'Ambiguous variable {out} in outputs. To'
+                                        ' specify which one is desired, use a tuple'
+                                        ' with the promoted name and variable name'
+                                        ' instead [e.g. (prom_name, var_name)].')
 
-            else:
-                raise Exception(f'Type {type(out)} is invalid for output. Must be'
-                                ' string or tuple.')
+                    # checks if provided variable doesn't exist in model
+                    elif len(out_dict) == 0:
+                        raise Exception(f'Variable {out} does not exist in model.')
+
+                    # update options outputs dict with new output dict
+                    self.options['outputs'].update(out_dict)
+
+                else:
+                    raise Exception(f'Type {type(out)} is invalid for output. Must be'
+                                    ' string or tuple.')
 
     def setup(self):
         inputs = self.options['inputs']
