@@ -91,7 +91,7 @@ class SubproblemComp(om.ExplicitComponent):
         model_outputs = {meta['prom_name']: meta for _, meta in model_outputs}
 
         # use all inputs in model if none are provided
-        if inputs is None:
+        if inputs is None or inputs == ['*']:
             self.options['inputs'].update(model_inputs)
 
         else:
@@ -148,7 +148,7 @@ class SubproblemComp(om.ExplicitComponent):
                                     ' string or tuple.')
 
         # use all outputs in model if none are provided
-        if outputs is None:
+        if outputs is None or outputs == ['*']:
             self.options['outputs'].update(model_outputs)
 
         else:
