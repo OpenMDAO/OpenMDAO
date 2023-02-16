@@ -90,7 +90,7 @@ class SubproblemComp(om.ExplicitComponent):
         model_inputs = {meta['prom_name']: meta for _, meta in model_inputs}
         model_outputs = {meta['prom_name']: meta for _, meta in model_outputs}
 
-        # use all inputs in model if none are provided
+        # use all inputs in model if none are provided or if it's requested
         if inputs is None or inputs == ['*']:
             self.options['inputs'].update(model_inputs)
 
@@ -147,7 +147,7 @@ class SubproblemComp(om.ExplicitComponent):
                     raise Exception(f'Type {type(inp)} is invalid for input. Must be'
                                     ' string or tuple.')
 
-        # use all outputs in model if none are provided
+        # use all outputs in model if none are provided or if it's requested
         if outputs is None or outputs == ['*']:
             self.options['outputs'].update(model_outputs)
 
