@@ -5,7 +5,7 @@ Author: Rob Falck
 Date: 2022-04-08
 
 ## What is this roadmap for?
-This document represents the perspective of the OpenMDAO development team on what we feel will be the most important areas to focus on for framework development in 2021.
+This document represents the perspective of the OpenMDAO development team on what we feel will be the most important areas to focus on for framework development in 2022.
 It is intended to communicate this perspective to the OpenMDAO user community, and to provide a basis for feedback.
 It is not intended to be all-encompassing or a binding  development plan, but should be regarded as an indication of the current direction of the core development team.
 Also, it should be clearly understood that there is very probably more listed here than can actually be accomplished in a single year!
@@ -26,10 +26,10 @@ The current case plotting tool runs on Jupyter notebooks.  More work is needed t
 ### Building an OpenMDAO training course
 
 While no substitution for a training course, the documentation update achieved by the team in 2021 using JupyterBook
-is a signficant advance in interactivity.
+is a significant advance in interactivity.
 The ability for users to test out code in the documentation online via Binder or Google Colab without installing anything locally significantly lowered the barrier to entry for OpenMDAO.
-However, this means that building a signficant training course is still on the todo list for 2022.
-The focus on various Jupyter notebook based tools should help this effort signifcantly, however.
+However, this means that building a significant training course is still on the todo list for 2022.
+The focus on various Jupyter notebook based tools should help this effort significantly, however.
 
 ### General performance improvements
 
@@ -56,7 +56,7 @@ With our advancements in Jupyter notebook-based tools and documentation, the nex
 ### Goal
 
 Provide a series of Jupyter notebooks, separate from the documentation, which entail a training course on optimization.
-Starting from basics of single disicipline optimization, work up in complexity to systems involving implicit behavior, multi-point optimization, and cover how to identify degenerate cases.
+Starting from basics of single discipline optimization, work up in complexity to systems involving implicit behavior, multi-point optimization, and cover how to identify degenerate cases.
 
 The training course should be paralleled by videos providing further depth than the example notebooks.
 Teach users to get a feel for how to debug models when things aren't working.
@@ -70,13 +70,13 @@ We've experimented with the use of subproblems, and we've noticed significant pe
 We will document the use of subproblems.  If it becomes a common pattern, then some sort of official API for them might be warranted, but it's too early to make that call.
 
 We will develop training and documentation of automatic differentiation in the form of Google's `jax` as well as `sympy` and its lambdify feature.
-The ability to effectively use automatic differentiation is a prerequesite to computing second derivative information for those optimizers which can utilize it.
+The ability to effectively use automatic differentiation is a prerequisite to computing second derivative information for those optimizers which can utilize it.
 
 ## Large multi-point parallelism
 
 We've continued to push the parallel capability of OpenMDAO and are actively developing larger and larger applications.
 In 2021 we accomplished a major overhaul of some of our distributed memory API.
-As we start to push costlier applications, we're stressing the parallization capabilities that have long-existed in OpenMDAO: distributed components and parallel groups.
+As we start to push costlier applications, we're stressing the parallelization capabilities that have long-existed in OpenMDAO: distributed components and parallel groups.
 
 ### Goal:
 Leverage the reports system to provide better user feedback on processor utilization when running in parallel.
@@ -88,4 +88,4 @@ Continue to improve parallel performance, potentially developing an API for easi
 
 Expand on the MAUD implementation to provide second derivatives.
 This information can be used by modern optimizers to significantly improve performance, but would all but require AD on reasonably complex models.
-As a goal for this year we should try to get a optimization model working where analytic partial second derivatives are developed for a simle system and have OpenMDAO compute the total second derivatives.
+As a goal for this year we should try to get a optimization model working where analytic partial second derivatives are developed for a simple system and have OpenMDAO compute the total second derivatives.
