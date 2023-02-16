@@ -4248,7 +4248,7 @@ class System(object):
                             try:
                                 out_meta = metadict['output'][src_name]
                             except KeyError:
-                                out_meta = disc_metadict['output'][src_name]  # TODO: test discrete
+                                out_meta = disc_metadict['output'][src_name]
 
                         src_tags = out_meta['tags'] if 'tags' in out_meta else {}
                         if is_indep_var is True and 'openmdao:indep_var' not in src_tags:
