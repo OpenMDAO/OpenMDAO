@@ -10,10 +10,23 @@ class SubproblemComp(om.ExplicitComponent):
     
     Parameters
     ----------
-    problem : Problem
-        Problem instance that becomes the subproblem.
     model : <System> or None
         The system-level <System>. Required for subproblem.
+    driver : <Driver> or None
+        The driver for the problem. If not specified, a simple "Run Once" driver will be used.
+    comm : MPI.Comm or <FakeComm> or None
+        The global communicator.
+    name : str or None
+        Problem name. Can be used to specify a Problem instance when multiple Problems
+        exist.
+    reports : str, bool, None, _UNDEFINED
+        If _UNDEFINED, the OPENMDAO_REPORTS variable is used. Defaults to _UNDEFINED.
+        If given, reports overrides OPENMDAO_REPORTS. If boolean, enable/disable all reports.
+        Since none is acceptable in the environment variable, a value of reports=None
+        is equivalent to reports=False. Otherwise, reports may be a sequence of
+        strings giving the names of the reports to run.
+    prob_options : dict or None
+        Remaining named args for problem that are converted to options.
     inputs : list of str or tuple
         List of desired inputs to subproblem. If an element is a str, then it should be
         the var name in its promoted name. If it is a tuple, then the first element 
@@ -27,16 +40,25 @@ class SubproblemComp(om.ExplicitComponent):
     **kwargs : named args
         All remaining named args that become options for `SubproblemComp`.
     """
-    def __init__(self, problem=None, model=None, inputs=None,
+    def __init__(self, model=None, driver=None, comm=None, name=None,
+                 reports=_UNDEFINED, prob_options=None, inputs=None,
                  outputs=None, **kwargs):
 
-        # check the type because two `Driver` instances are not equal
-        # om.ScipyOptimizeDriver and om.pyOptSparseDriver
-        if type(problem.driver) != type(Driver()):
+        if model is None:
+            raise Exception('`model` arg is required for SubproblemComp.')
+
+        # check for driver and issue warning about its current use
+        # in subproblem
+        if driver is not None:
             issue_warning('Driver results may not be accurate if'
                           ' derivatives are needed. Set driver to'
                           ' None if your subproblem isn\'t reliant on'
                           ' a driver.')
+
+        # make `prob_options` empty dict to be passed as **options to problem 
+        # instantiation
+        if prob_options is None:
+            prob_options = {}
 
         # call base class to set kwargs
         super().__init__(**kwargs)
@@ -49,8 +71,9 @@ class SubproblemComp(om.ExplicitComponent):
 
         # set other variables necessary for subproblem
         self._prev_complex_step = False
-        
-        p = self._subprob = problem
+
+        p = self._subprob = om.Problem(driver=driver, comm=comm, name=name,
+                                       reports=reports, **prob_options)
         p.model.add_subsystem('subsys', model, promotes=['*'])
 
         p.setup(force_alloc_complex=False)
@@ -214,16 +237,21 @@ class SubproblemComp(om.ExplicitComponent):
         # setup input values
         for inp in self._input_names:
             p.set_val(self.options['inputs'][inp]['prom_name'], inputs[inp])
+            # p.set_val(inp, inputs[inp])
 
         # use driver if it is provided
-        if type(p.driver) != type(Driver()):
+        # if driver is None when problem is instantiated, then problem.driver is
+        # an instance of Driver(). Two Driver instances are not equal, so it's
+        # necessary to check the type
+        if type(p.driver) is not type(Driver()):
             p.run_driver()
         else:
             p.run_model()
 
         # store output vars
         for op in self._output_names:
-            outputs[op] = p.get_val(self.options['outputs'][op]['prom_name'])
+            # outputs[op] = p.get_val(self.options['outputs'][op]['prom_name'])
+            outputs[op] = p.get_val(op)
 
     def compute_partials(self, inputs, partials):
         p = self._subprob
