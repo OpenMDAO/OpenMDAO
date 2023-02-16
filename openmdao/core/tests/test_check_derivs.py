@@ -1246,7 +1246,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count('rev'), 0)
 
         stream = StringIO()
-        prob.check_partials(out_stream=stream, compact_print=False)
+        partials_data = prob.check_partials(out_stream=stream, compact_print=False)
         # So for this case, they do all provide them, so rev should not be shown
         self.assertEqual(stream.getvalue().count('Analytic Magnitude'), 2)
         self.assertEqual(stream.getvalue().count('Forward Magnitude'), 0)
@@ -1257,7 +1257,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 0)
         self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'), 0)
         self.assertEqual(stream.getvalue().count('Raw FD Derivative'), 2)
-
+        self.assertEqual(stream.getvalue().count(f"(Jfd)\n{partials_data[''][('z', 'x1')]['J_fd']}"), 1)
+        self.assertEqual(stream.getvalue().count(f"(Jfd)\n{partials_data[''][('z', 'x2')]['J_fd']}"), 1)
         # 3: Explicit comp that does not define Jacobian. It defines compute_jacvec_product
         #      For both compact and non-compact display
         prob = om.Problem()
@@ -1301,7 +1302,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count('wrt'), 8)
 
         stream = StringIO()
-        prob.check_partials(out_stream=stream, compact_print=False)
+        partials_data = prob.check_partials(out_stream=stream, compact_print=False)
         self.assertEqual(stream.getvalue().count('Analytic Magnitude'), 2)
         self.assertEqual(stream.getvalue().count('Forward Magnitude'), 2)
         self.assertEqual(stream.getvalue().count('Reverse Magnitude'), 2)
@@ -1311,6 +1312,10 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 2)
         self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'), 2)
         self.assertEqual(stream.getvalue().count('Raw FD Derivative'), 4)
+        self.assertEqual(stream.getvalue().count(f"(Jfd)\n{partials_data['c0'][('z', 'x1')]['J_fd']}"), 1)
+        self.assertEqual(stream.getvalue().count(f"(Jfd)\n{partials_data['c0'][('z', 'x2')]['J_fd']}"), 1)
+        self.assertEqual(stream.getvalue().count(f"(Jfd)\n{partials_data['comp'][('f_xy', 'x')]['J_fd']}"), 1)
+        self.assertEqual(stream.getvalue().count(f"(Jfd)\n{partials_data['comp'][('f_xy', 'y')]['J_fd']}"), 1)
 
     def test_check_partials_worst_subjac(self):
         # The first is printing the worst subjac at the bottom of the output. Worst is defined by
