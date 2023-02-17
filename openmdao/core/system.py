@@ -6579,9 +6579,9 @@ class System(object):
             in_promotions = parent_node['proms_in']
             maps = self._get_promotion_maps()
             for prom_out, tup in maps['output'].items():
-                out_promotions[tup[0]].add(f"{self.name}.{prom_out}")
+                out_promotions[tup[0]].add(self.name + '.' + prom_out)
             for prom_in, tup in maps['input'].items():
-                in_promotions[tup[0]].add(f"{self.name}.{prom_in}")
+                in_promotions[tup[0]].add(self.name + '.' + prom_in)
 
             tree.add_edge(parent, self.pathname)
 
@@ -6589,6 +6589,31 @@ class System(object):
             subsys._get_sys_tree(tree=tree)
 
         return tree
+
+    def _get_promote_lists(self, tree, abs_vnames, io):
+        promotion_list = []
+        if abs_vnames:
+            node_proms = f'proms_{io}'
+            for abs_vname in abs_vnames:
+                # starting vname is just the local
+                vname = abs_vname.rpartition('.')[2]
+                # systems from the bottom up
+                slist = list(all_ancestors(abs_vname))[1:]
+                if not self.pathname:
+                    slist += ['']
+                for spath in slist:
+                    sname = spath.rpartition('.')[2]
+                    node = tree.nodes[spath]
+                    proms = node[node_proms]
+                    for pname, subs in proms.items():
+                        if vname in subs:
+                            promotion_list.append((spath, vname, pname))
+                            vname = sname + '.' + pname
+                            break
+                    else:
+                        vname = sname + '.' + vname
+
+        return promotion_list
 
     def get_promotions(self, prom):
         """
@@ -6612,60 +6637,21 @@ class System(object):
             self._promotion_tree = self._get_sys_tree()
         tree = self._promotion_tree
 
-        if prom in self._var_allprocs_prom2abs_list['output']:
+        try:
             abs_outs = self._var_allprocs_prom2abs_list['output'][prom]
-        else:
+        except KeyError:
             abs_outs = []
 
-        if prom in self._var_allprocs_prom2abs_list['input']:
+        try:
             abs_ins = self._var_allprocs_prom2abs_list['input'][prom]
-        else:
+        except KeyError:
             abs_ins = []
 
         if not abs_ins and not abs_outs:
             raise RuntimeError(f"{self.msginfo}: Promoted variable '{prom}' was not found.")
 
-        plist_outs = []
-        if abs_outs:
-            for abs_out in abs_outs:
-                # starting vname is just the local
-                vname = abs_out.rpartition('.')[2]
-                # systems from the bottom up
-                slist = list(all_ancestors(abs_out))[1:]
-                if not self.pathname:
-                    slist += ['']
-                for s in slist:
-                    sname = s.rpartition('.')[2]
-                    node = tree.nodes[s]
-                    proms_out = node['proms_out']
-                    for pname, subs in proms_out.items():
-                        if vname in subs:
-                            plist_outs.append((s, vname, pname))
-                            vname = sname + '.' + pname
-                            break
-                    else:
-                        vname = sname + '.' + vname
-
-        plist_ins = []
-        if abs_ins:
-            for abs_in in abs_ins:
-                # starting vname is just the local var name in its component
-                vname = abs_in.rpartition('.')[2]
-                # systems from the bottom up
-                slist = list(all_ancestors(abs_in))[1:]
-                if not self.pathname:
-                    slist += ['']
-                for s in slist:
-                    sname = s.rpartition('.')[2]
-                    node = tree.nodes[s]
-                    proms_in = node['proms_in']
-                    for pname, subs in proms_in.items():
-                        if vname in subs:
-                            plist_ins.append((s, vname, pname))
-                            vname = sname + '.' + pname
-                            break
-                    else:
-                        vname = sname + '.' + vname
+        plist_outs = self._get_promote_lists(tree, abs_outs, 'out')
+        plist_ins = self._get_promote_lists(tree, abs_ins, 'in')
 
         sysmap = defaultdict(lambda: [None, set(), set()])
         for spath, sub, theprom in plist_outs:
@@ -6680,34 +6666,13 @@ class System(object):
             level = f" in system '{self.pathname}'" if self.pathname else ''
             print(f"\nPromotion table for '{prom}'{level}:")
             for spath, lst in sorted(sysmap.items(), key=lambda x: x[0]):
-                # indent = '  ' * (len(spath.split('.')) if spath else 0)
-                # print(f"System '{spath}' : ", end='')
                 theprom, ins, outs = lst
-                pre = post = ''
-                if ins:
-                    pre = ', '.join(sorted(ins))
-                    if len(ins) > 1:
-                        inp = f"[{pre}]"
-                    else:
-                        inp = f"'{pre}'"
-                    # if outs:
-                    #     print(f"{inp} --> '{theprom}'", end='')
-                    # else:
-                    #     print(f"{inp} --> '{theprom}'")
-                if outs:
-                    post = ', '.join(sorted(outs))
-                    if len(outs) > 1:
-                        out = f"[{post}]"
-                    else:
-                        out = f"'{post}'"
-                    # if ins:
-                    #     print(f" <-- {out}")
-                    # else:
-                    #     print(f"'{theprom}' <-- {out}")
-
+                pre = ', '.join(sorted(ins)) if ins else ''
+                post = ', '.join(sorted(outs)) if outs else ''
                 rows.append((spath, pre, theprom, post))
 
         if rows:
             from openmdao.visualization.tables.table_builder import generate_table
-            generate_table(rows, tablefmt='box_grid', headers=['System', 'Sub Input(s)', 'Promoted To', 'Sub Outputs']).display()
+            generate_table(rows, tablefmt='box_grid',
+                           headers=['System', 'Sub Input(s)', 'Promoted To', 'Sub Outputs']).display()
         return rows
