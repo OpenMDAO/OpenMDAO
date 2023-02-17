@@ -290,7 +290,7 @@ class SchurSolver(NonlinearSolver):
         # TODO better way to get the dtype?
         schur_jac = np.zeros((n_vars, n_vars), dtype=system._vectors["residual"]["linear"].asarray(copy=True).dtype)
 
-        if self._modeNS == "rev":
+        if self._modeNS == "fwd":
             print("FWD")
             # backup the vectors we are working with
             rvec = system._vectors["residual"]["linear"]
@@ -412,9 +412,11 @@ class SchurSolver(NonlinearSolver):
                 #     subsys1._vectors["output"]["linear"],
                 #     subsys1._vectors["input"]["linear"],
                 # )
+                system._transfer("linear", "rev")
                 scope_out, scope_in = system._get_matvec_scope()
                 # print(scope_out, scope_in)
                 system._apply_linear(None, ["linear"], "rev", scope_out, scope_in)
+
                 # print("jac:", subsys2._jacobian["jac"])
                 if system.comm.rank == 0:
                     print(f"\nComputing Jacobian columns for {var}")
