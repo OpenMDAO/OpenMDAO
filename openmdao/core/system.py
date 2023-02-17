@@ -4170,6 +4170,9 @@ class System(object):
 
         it = self._var_allprocs_abs2prom if get_remote else self._var_abs2prom
 
+        if is_design_var is not None:
+            des_vars = self.get_design_vars(get_sizes=False, use_prom_ivc=False)
+
         for iotype in iotypes:
             cont2meta = metadict[iotype]
             disc2meta = disc_metadict[iotype]
@@ -4258,7 +4261,6 @@ class System(object):
 
                     # handle is_design_var
                     if is_design_var is not None:
-                        des_vars = self.get_design_vars(use_prom_ivc=False)
                         if iotype == 'output':
                             out_name = abs_name
                         else:
