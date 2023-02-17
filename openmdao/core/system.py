@@ -6658,17 +6658,20 @@ class System(object):
             sys_prom_map[spath][1].add(sub)
             sys_prom_map[spath][0] = theprom
 
-        rows = []
-        if sys_prom_map:
-            level = f" in system '{self.pathname}'" if self.pathname else ''
-            print(f"\nPromotion table for '{prom}'{level}:")
-            for spath, (theprom, in_proms, out_proms) in sorted(sys_prom_map.items(), key=lambda x: x[0]):
-                inpromstr = ', '.join(sorted(in_proms)) if in_proms else ''
-                outpromstr = ', '.join(sorted(out_proms)) if out_proms else ''
-                rows.append((spath, inpromstr, theprom, outpromstr))
+        return sys_prom_map, prom
 
-        if rows:
-            from openmdao.visualization.tables.table_builder import generate_table
-            generate_table(rows, tablefmt='box_grid',
-                           headers=['System', 'Sub Input(s)', 'Promoted To', 'Sub Outputs']).display()
-        return rows
+def sys_prom_map2table(sys_prom_map, prom):
+    from openmdao.visualization.tables.table_builder import generate_table
+    rows = []
+    if sys_prom_map:
+        print(f"\nPromotion table for '{prom}':")
+        for spath, (theprom, in_proms, out_proms) in sorted(sys_prom_map.items(),
+                                                            key=lambda x: x[0]):
+            inpromstr = ', '.join(sorted(in_proms)) if in_proms else ''
+            outpromstr = ', '.join(sorted(out_proms)) if out_proms else ''
+            rows.append((spath, inpromstr, theprom, outpromstr))
+
+    if rows:
+        generate_table(rows, tablefmt='box_grid',
+                        headers=['System', 'Sub Input(s)', 'Promoted To', 'Sub Outputs']).display()
+    return rows

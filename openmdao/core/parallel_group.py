@@ -1,7 +1,5 @@
 """Define the ParallelGroup class."""
 
-import networkx as nx
-
 from openmdao.core.group import Group
 
 
@@ -37,14 +35,10 @@ class ParallelGroup(Group):
 
         if self.comm.size > 1:
             prefix = self.pathname + '.' if self.pathname else ''
-            subtree = nx.subgraph(tree, [n for n in tree if n.startswith(prefix)])
-            edges = tree.edges()
+            subtree = {n: data for n, data in tree.items() if n.startswith(prefix)}
             for sub in self.comm.allgather(subtree):  # TODO: make this more efficient
-                for n, data in sub.nodes(data=True):
+                for n, data in sub.items():
                     if n not in tree:
-                        tree.add_node(n, **data)
-                for tup in sub.edges():
-                    if tup not in edges:
-                        tree.add_edge(*tup)
+                        tree[n] = data
 
         return tree
