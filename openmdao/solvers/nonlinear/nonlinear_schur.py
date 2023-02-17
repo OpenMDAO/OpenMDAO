@@ -412,7 +412,7 @@ class SchurSolver(NonlinearSolver):
                 #     subsys1._vectors["output"]["linear"],
                 #     subsys1._vectors["input"]["linear"],
                 # )
-                system._transfer("linear", "rev")
+                # system._transfer("linear", "rev")
                 scope_out, scope_in = system._get_matvec_scope()
                 # print(scope_out, scope_in)
                 system._apply_linear(None, ["linear"], "rev", scope_out, scope_in)
