@@ -40,12 +40,8 @@ class SubproblemComp(om.ExplicitComponent):
     **kwargs : named args
         All remaining named args that become options for `SubproblemComp`.
     """
-    def __init__(self, model=None, driver=None, comm=None, name=None,
-                 reports=_UNDEFINED, prob_options=None, inputs=None,
-                 outputs=None, **kwargs):
-
-        if model is None:
-            raise Exception('`model` arg is required for SubproblemComp.')
+    def __init__(self, model, inputs, outputs, driver=None, comm=None,
+                 name=None, reports=_UNDEFINED, prob_options=None, **kwargs):
 
         # check for driver and issue warning about its current use
         # in subproblem
@@ -59,11 +55,6 @@ class SubproblemComp(om.ExplicitComponent):
         # instantiation
         if prob_options is None:
             prob_options = {}
-
-        if inputs is None:
-            raise Exception('`inputs` arg is required for SubproblemComp.')
-        if outputs is None:
-            raise Exception('`outputs` arg is required for SubproblemComp.')
 
         # call base class to set kwargs
         super().__init__(**kwargs)
@@ -95,11 +86,10 @@ class SubproblemComp(om.ExplicitComponent):
 
         # loop through inputs and make sure they're valid for use
         for inp in inputs:
-            if type(inp) is tuple:
+            if isinstance(inp, tuple):
                 # check if variable already exists in self.options['inputs']
                 # i.e. no repeated input variable names
-                inp_vars = list(self.options['inputs'].keys())
-                if inp[1] in inp_vars:
+                if inp[1] in self.options['inputs']:
                     raise Exception(f'Variable {inp[1]} already exists. Rename variable'
                                     ' or delete copy of variable.')
 
@@ -115,11 +105,10 @@ class SubproblemComp(om.ExplicitComponent):
                 # update options inputs dict with new input dict
                 self.options['inputs'].update(inp_dict)
 
-            elif type(inp) is str:
+            elif isinstance(inp, str):
                 # check if variable already exists in self.options['inputs']
                 # i.e. no repeated input variable names
-                inp_vars = list(self.options['inputs'].keys())
-                if inp in inp_vars:
+                if inp in self.options['inputs']:
                     raise Exception(f'Variable {inp} already exists. Rename variable'
                                     ' or delete copy of variable.')
 
@@ -147,11 +136,10 @@ class SubproblemComp(om.ExplicitComponent):
 
         # loop through outputs and make sure they're valid for use
         for out in outputs:
-            if type(out) is tuple:
+            if isinstance(out, tuple):
                 # check if variable already exists in self.options['outputs']
                 # i.e. no repeated output variable names
-                out_vars = list(self.options['outputs'].keys())
-                if out[1] in out_vars:
+                if out[1] in self.options['outputs']:
                     raise Exception(f'Variable {out[1]} already exists. Rename variable'
                                     ' or delete copy of variable.')
 
@@ -166,11 +154,10 @@ class SubproblemComp(om.ExplicitComponent):
                 # update options outputs dict with new output dict
                 self.options['outputs'].update(out_dict)
 
-            elif type(out) is str:
+            elif isinstance(out, str):
                 # check if variable already exists in self.options['outputs']
                 # i.e. no repeated output variable names
-                out_vars = list(self.options['outputs'].keys())
-                if out in out_vars:
+                if out in self.options['outputs']:
                     raise Exception(f'Variable {out} already exists. Rename variable'
                                     ' or delete copy of variable.')
 
