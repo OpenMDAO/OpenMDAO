@@ -6567,14 +6567,13 @@ class System(object):
 
     def _get_sys_tree(self, tree=None):
         if tree is None:
-            tree = nx.DiGraph()
+            tree = {}
 
-        assert self.pathname not in tree
-        tree.add_node(self.pathname, proms_out=defaultdict(set), proms_in=defaultdict(set))
+        tree[self.pathname] = {'proms_out': defaultdict(set), 'proms_in': defaultdict(set)}
 
         parent = self.pathname.rpartition('.')[0] if self.pathname else None
         if parent in tree:
-            parent_node = tree.nodes[parent]
+            parent_node = tree[parent]
             out_promotions = parent_node['proms_out']
             in_promotions = parent_node['proms_in']
             maps = self._get_promotion_maps()
@@ -6582,8 +6581,6 @@ class System(object):
                 out_promotions[tup[0]].add(self.name + '.' + prom_out)
             for prom_in, tup in maps['input'].items():
                 in_promotions[tup[0]].add(self.name + '.' + prom_in)
-
-            tree.add_edge(parent, self.pathname)
 
         for subsys in self._subsystems_myproc:
             subsys._get_sys_tree(tree=tree)
@@ -6603,7 +6600,7 @@ class System(object):
                     slist += ['']
                 for spath in slist:
                     sname = spath.rpartition('.')[2]
-                    node = tree.nodes[spath]
+                    node = tree[spath]
                     proms = node[node_proms]
                     for pname, subs in proms.items():
                         if vname in subs:
@@ -6653,23 +6650,22 @@ class System(object):
         plist_outs = self._get_promote_lists(tree, abs_outs, 'out')
         plist_ins = self._get_promote_lists(tree, abs_ins, 'in')
 
-        sysmap = defaultdict(lambda: [None, set(), set()])
+        sys_prom_map = defaultdict(lambda: [None, set(), set()])
         for spath, sub, theprom in plist_outs:
-            sysmap[spath][2].add(sub)
-            sysmap[spath][0] = theprom
+            sys_prom_map[spath][2].add(sub)
+            sys_prom_map[spath][0] = theprom
         for spath, sub, theprom in plist_ins:
-            sysmap[spath][1].add(sub)
-            sysmap[spath][0] = theprom
+            sys_prom_map[spath][1].add(sub)
+            sys_prom_map[spath][0] = theprom
 
         rows = []
-        if sysmap:
+        if sys_prom_map:
             level = f" in system '{self.pathname}'" if self.pathname else ''
             print(f"\nPromotion table for '{prom}'{level}:")
-            for spath, lst in sorted(sysmap.items(), key=lambda x: x[0]):
-                theprom, ins, outs = lst
-                pre = ', '.join(sorted(ins)) if ins else ''
-                post = ', '.join(sorted(outs)) if outs else ''
-                rows.append((spath, pre, theprom, post))
+            for spath, (theprom, in_proms, out_proms) in sorted(sys_prom_map.items(), key=lambda x: x[0]):
+                inpromstr = ', '.join(sorted(in_proms)) if in_proms else ''
+                outpromstr = ', '.join(sorted(out_proms)) if out_proms else ''
+                rows.append((spath, inpromstr, theprom, outpromstr))
 
         if rows:
             from openmdao.visualization.tables.table_builder import generate_table
