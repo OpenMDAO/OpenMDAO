@@ -1,131 +1,100 @@
+"""Define the SubproblemComp class for evaluating OpenMDAO systems within problems."""
+
 import openmdao.api as om
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.core.driver import Driver
 
 
-def get_model_io(inputs, outputs, model_inputs, model_outputs):
-    options = {'inputs': {},
-               'outputs': {}}
-    
-    # loop through inputs and make sure they're valid for use
-    for inp in inputs:
-        if isinstance(inp, tuple):
-            # check if variable already exists in options['inputs']
-            # i.e. no repeated input variable names
-            if inp[1] in options['inputs']:
-                raise Exception(f'Variable {inp[1]} already exists. Rename variable'
+def get_model_vars(varType, vars, model_vars):
+    """
+    Get the requested IO variable data from model's list of IO.
+
+    Parameters
+    ----------
+    varType : str
+        Specifies whether inputs or outputs are being extracted.
+    vars : list of str or tuple
+        List of provided variable names in str or tuple form. If an element is a str,
+        then it should be the var name in its promoted name. If it is a tuple, then the
+        first element should be the promoted name, and the second element should be the
+        var name you wish to refer to it by within the subproblem [e.g. (prom_name, var_name)].
+    model_vars : dict
+        Dict of model's IO vars and meta data.
+
+    Returns
+    -------
+    var_dict : dict
+        Dict to update `self.options` with desired IO data in `SubproblemComp`.
+    """
+    var_dict = {varType: {}}
+
+    for var in vars:
+        if isinstance(var, tuple):
+            # check if variable already exists in var_dict[varType]
+            # i.e. no repeated variable names
+            if var[1] in var_dict[varType]:
+                raise Exception(f'Variable {var[1]} already exists. Rename variable'
                                 ' or delete copy of variable.')
 
-            # make dict with given var name as key and meta data from model_inputs
-            inp_dict = {inp[1]: meta for _,meta in model_inputs.items()
-                        if meta['prom_name'] == inp[0]}
+            # make dict with given var name as key and meta data from model_vars
+            tmp_dict = {var[1]: meta for _, meta in model_vars.items()
+                        if meta['prom_name'] == var[0]}
 
-            # check if dict is empty (no inputs added)
-            if len(inp_dict) == 0:
-                raise Exception(f'Promoted name {inp[0]} does not'
+            # check if dict is empty (no vars added)
+            if len(tmp_dict) == 0:
+                raise Exception(f'Promoted name {var[0]} does not'
                                 ' exist in model.')
 
-            # update options inputs dict with new input dict
-            options['inputs'].update(inp_dict)
+            var_dict[varType].update(tmp_dict)
 
-        elif isinstance(inp, str):
-            # check if variable already exists in options['inputs']
-            # i.e. no repeated input variable names
-            if inp in options['inputs']:
-                raise Exception(f'Variable {inp} already exists. Rename variable'
+        elif isinstance(var, str):
+            # check if variable already exists in var_dict[varType]
+            # i.e. no repeated variable names
+            if var in var_dict[varType]:
+                raise Exception(f'Variable {var} already exists. Rename variable'
                                 ' or delete copy of variable.')
 
-            # make dict with given var name as key and meta data from model_inputs
-            inp_dict = {inp: meta for _,meta in model_inputs.items()
-                        if meta['prom_name'].endswith(inp)}
+            # make dict with given var name as key and meta data from model_vars
+            tmp_dict = {var: meta for _, meta in model_vars.items()
+                        if meta['prom_name'].endswith(var)}
 
             # check if provided variable appears more than once in model
-            if len(inp_dict) > 1:
-                raise Exception(f'Ambiguous variable {inp} in inputs. To'
+            if len(tmp_dict) > 1:
+                raise Exception(f'Ambiguous variable {var}. To'
                                 ' specify which one is desired, use a tuple'
                                 ' with the promoted name and variable name'
                                 ' instead [e.g. (prom_name, var_name)].')
 
             # checks if provided variable doesn't exist in model
-            elif len(inp_dict) == 0:
-                raise Exception(f'Variable {inp} does not exist in model.')
+            elif len(tmp_dict) == 0:
+                raise Exception(f'Variable {var} does not exist in model.')
 
-            # update options inputs dict with new input dict
-            options['inputs'].update(inp_dict)
-
-        else:
-            raise Exception(f'Type {type(inp)} is invalid for input. Must be'
-                            ' string or tuple.')
-
-    # loop through outputs and make sure they're valid for use
-    for out in outputs:
-        if isinstance(out, tuple):
-            # check if variable already exists in options['outputs']
-            # i.e. no repeated output variable names
-            if out[1] in options['outputs']:
-                raise Exception(f'Variable {out[1]} already exists. Rename variable'
-                                ' or delete copy of variable.')
-
-            # make dict with given var name as key and meta data from model_outputs
-            out_dict = {out[1]: meta for _,meta in model_outputs.items()
-                        if meta['prom_name'] == out[0]}
-
-            # checks if provided variable doesn't exist in model
-            if len(out_dict) == 0:
-                raise Exception(f'Variable {out[0]} does not exist in model.')
-
-            # update options outputs dict with new output dict
-            options['outputs'].update(out_dict)
-
-        elif isinstance(out, str):
-            # check if variable already exists in options['outputs']
-            # i.e. no repeated output variable names
-            if out in options['outputs']:
-                raise Exception(f'Variable {out} already exists. Rename variable'
-                                ' or delete copy of variable.')
-
-            # make dict with given var name as key and meta data from model_outputs
-            out_dict = {out: meta for _,meta in model_outputs.items()
-                        if meta['prom_name'].endswith(out)}
-
-            # check if provided variable appears more than once in model
-            if len(out_dict) > 1:
-                raise Exception(f'Ambiguous variable {out} in outputs. To'
-                                ' specify which one is desired, use a tuple'
-                                ' with the promoted name and variable name'
-                                ' instead [e.g. (prom_name, var_name)].')
-
-                # checks if provided variable doesn't exist in model
-            elif len(out_dict) == 0:
-                raise Exception(f'Variable {out} does not exist in model.')
-
-            # update options outputs dict with new output dict
-            options['outputs'].update(out_dict)
+            var_dict[varType].update(tmp_dict)
 
         else:
-            raise Exception(f'Type {type(out)} is invalid for output. Must be'
+            raise Exception(f'Type {type(var)} is invalid. Must be'
                             ' string or tuple.')
-    
-    return options
+
+    return var_dict
 
 
 class SubproblemComp(om.ExplicitComponent):
     """
     System level container for systems and drivers.
-    
+
     Parameters
     ----------
     model : <System>
         The system-level <System>.
     inputs : list of str or tuple
         List of desired inputs to subproblem. If an element is a str, then it should be
-        the var name in its promoted name. If it is a tuple, then the first element 
+        the var name in its promoted name. If it is a tuple, then the first element
         should be the promoted name, and the second element should be the var name
         you wish to refer to it by within the subproblem [e.g. (prom_name, var_name)].
     outputs : list of str or tuple
         List of desired outputs from subproblem. If an element is a str, then it should be
-        the var name in its promoted name. If it is a tuple, then the first element 
+        the var name in its promoted name. If it is a tuple, then the first element
         should be the promoted name, and the second element should be the var name
         you wish to refer to it by within the subproblem [e.g. (prom_name, var_name)].
     driver : <Driver> or None
@@ -145,10 +114,29 @@ class SubproblemComp(om.ExplicitComponent):
         Remaining named args for problem that are converted to options.
     **kwargs : named args
         All remaining named args that become options for `SubproblemComp`.
+
+    Attributes
+    ----------
+    _prev_complex_step : bool
+        Flag to determine if the system will need to switch to use complex IO
+        or to switch away from using complex IO.
+    prob_args : dict
+        Extra arguments to be passed to the problem instantiation.
+    model : <System>
+        The system being analyzed in subproblem.
+    list_inputs : list of str or tuple
+        List of inputs requested by user to be used as inputs in the
+        subproblem's system.
+    list_outputs : list of str or tuple
+        List of outputs requested by user to be used as inputs in the
+        subproblem's system.
     """
+
     def __init__(self, model, inputs, outputs, driver=None, comm=None,
                  name=None, reports=_UNDEFINED, prob_options=None, **kwargs):
-
+        """
+        Initialize all attributes.
+        """
         # check for driver and issue warning about its current use
         # in subproblem
         if driver is not None:
@@ -157,7 +145,7 @@ class SubproblemComp(om.ExplicitComponent):
                           ' None if your subproblem isn\'t reliant on'
                           ' a driver.')
 
-        # make `prob_options` empty dict to be passed as **options to problem 
+        # make `prob_options` empty dict to be passed as **options to problem
         # instantiation
         if prob_options is None:
             prob_options = {}
@@ -172,44 +160,45 @@ class SubproblemComp(om.ExplicitComponent):
                              desc='Subproblem Component outputs')
 
         # set other variables necessary for subproblem
-        self.first_setup = True
         self._prev_complex_step = False
+
         self.prob_args = {'driver': driver,
                           'comm': comm,
                           'name': name,
                           'reports': reports}
+
         self.prob_args.update(prob_options)
+
         self.model = model
         self.list_inputs = inputs
         self.list_outputs = outputs
 
-    def setup(self):        
+    def setup(self):
+        """
+        Perform some final setup and checks.
+        """
         p = self._subprob = om.Problem(**self.prob_args)
         p.model.add_subsystem('subsys', self.model, promotes=['*'])
-        
+
         p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'])
         p.final_setup()
 
-        if self.first_setup:
-            inputs = self.list_inputs
-            outputs = self.list_outputs
+        model_inputs = p.model.list_inputs(out_stream=None, prom_name=True,
+                                           units=True, shape=True, desc=True)
+        model_outputs = p.model.list_outputs(out_stream=None, prom_name=True,
+                                             units=True, shape=True, desc=True)
 
-            model_inputs = p.model.list_inputs(out_stream=None, prom_name=True,
-                                            units=True, shape=True, desc=True)
-            model_outputs = p.model.list_outputs(out_stream=None, prom_name=True,
-                                                units=True, shape=True, desc=True)
+        # store model inputs/outputs as dictionary with keys as the promoted name
+        model_inputs = {meta['prom_name']: meta for _, meta in model_inputs}
+        model_outputs = {meta['prom_name']: meta for _, meta in model_outputs}
 
-            # store model inputs/outputs as dictionary with keys as the promoted name
-            model_inputs = {meta['prom_name']: meta for _, meta in model_inputs}
-            model_outputs = {meta['prom_name']: meta for _, meta in model_outputs}
-
-            self.options.update(get_model_io(inputs, outputs, model_inputs, model_outputs))
-            self.first_setup = False
+        self.options.update(get_model_vars('inputs', self.list_inputs, model_inputs))
+        self.options.update(get_model_vars('outputs', self.list_outputs, model_outputs))
 
         inputs = self.options['inputs']
         outputs = self.options['outputs']
 
-        # instantiate input/output name list for use in compute and 
+        # instantiate input/output name list for use in compute and
         # compute partials
         self._input_names = []
         self._output_names = []
@@ -232,6 +221,16 @@ class SubproblemComp(om.ExplicitComponent):
                 self.declare_partials(of=var, wrt=ip)
 
     def compute(self, inputs, outputs):
+        """
+        Perform the subproblem system computation at run time.
+
+        Parameters
+        ----------
+        inputs : Vector
+            Unscaled, dimensional input variables read via inputs[key].
+        outputs : Vector
+            Unscaled, dimensional output variables read via outputs[key].
+        """
         p = self._subprob
 
         # switch subproblem to use complex IO if in complex step mode
@@ -256,11 +255,25 @@ class SubproblemComp(om.ExplicitComponent):
             outputs[op] = p.get_val(op)
 
     def compute_partials(self, inputs, partials):
+        """
+        Collect computed partial derivatives and return them.
+
+        Checks if the needed derivatives are cached already based on the
+        inputs vector. Refreshes the cache by re-computing the current point
+        if necessary.
+
+        Parameters
+        ----------
+        inputs : Vector
+            Unscaled, dimensional input variables read via inputs[key].
+        partials : Jacobian
+            Sub-jac components written to partials[output_name, input_name].
+        """
         p = self._subprob
         for inp in self._input_names:
             p.set_val(self.options['inputs'][inp]['prom_name'], inputs[inp])
 
-        # compute total derivatives for now... assuming every output is sensitive 
+        # compute total derivatives for now... assuming every output is sensitive
         # to every input. Will be changed in a future version
         tots = p.compute_totals(of=self._output_names, wrt=self._input_names,
                                 use_abs_names=False)

@@ -35,7 +35,3 @@ class TestSubproblemComp(unittest.TestCase):
         cpd = prob.check_partials(method='cs', out_stream=None)
         
         assert_near_equal(prob.get_val('z'), 1.0) 
-        
-    
-    def test_skip_driver(self):
-        pass
