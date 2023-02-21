@@ -404,6 +404,8 @@ class Case(object):
                     tags=None,
                     includes=None,
                     excludes=None,
+                    is_indep_var=None,
+                    is_design_var=None,
                     out_stream=_DEFAULT_OUT_STREAM,
                     values=None,
                     print_min=False,
@@ -442,6 +444,14 @@ class Case(object):
         excludes : str, iter of str, or None
             Glob patterns for pathnames to exclude from the check. Default is None, which
             excludes nothing.
+        is_indep_var : bool or None
+            If None (the default), do no additional filtering of the inputs.
+            If True, list only inputs connected to an output tagged `openmdao:indep_var`.
+            If False, list only inputs _not_ connected to outputs tagged `openmdao:indep_var`.
+        is_design_var : bool or None
+            If None (the default), do no additional filtering of the inputs.
+            If True, list only inputs connected to outputs that are driver design variables.
+            If False, list only inputs _not_ connected to outputs that are driver design variables.
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -481,6 +491,9 @@ class Case(object):
             print_options = np.get_printoptions()
             np_precision = print_options['precision']
 
+            if is_design_var is not None:
+                des_vars = self._get_variables_of_type('desvar')
+
             for var_name in self.inputs.absolute_names():
                 meta = abs2meta[var_name]
 
@@ -492,6 +505,27 @@ class Case(object):
 
                 if not match_prom_or_abs(var_name, var_name_prom, includes, excludes):
                     continue
+
+                # handle is_indep_var
+                if is_indep_var is not None:
+                    src_name = self._conns[var_name]
+                    src_name_prom = self._abs2prom['output'][src_name]
+                    src_meta = abs2meta[src_name]
+                    if is_indep_var is True and 'openmdao:indep_var' not in src_meta['tags']:
+                        continue
+                    elif is_indep_var is False and 'openmdao:indep_var' in src_meta['tags']:
+                        continue
+
+                # handle is_design_var
+                if is_design_var is not None:
+                    src_name = self._conns[var_name]
+                    src_name_prom = self._abs2prom['output'][src_name]
+                    if src_name_prom.startswith('_auto_ivc.'):
+                        src_name_prom = self._auto_ivc_map[src_name_prom]
+                    if is_design_var is True and src_name_prom not in des_vars:
+                        continue
+                    elif is_design_var is False and src_name_prom in des_vars:
+                        continue
 
                 val = self.inputs[var_name]
 
@@ -546,6 +580,8 @@ class Case(object):
                      tags=None,
                      includes=None,
                      excludes=None,
+                     is_indep_var=None,
+                     is_design_var=None,
                      list_autoivcs=False,
                      out_stream=_DEFAULT_OUT_STREAM,
                      values=None,
@@ -599,6 +635,14 @@ class Case(object):
         excludes : str, iter of str, or None
             Glob patterns for pathnames to exclude from the check. Default is None, which
             excludes nothing.
+        is_indep_var : bool or None
+            If None (the default), do no additional filtering of the inputs.
+            If True, list only inputs connected to an output tagged `openmdao:indep_var`.
+            If False, list only inputs _not_ connected to outputs tagged `openmdao:indep_var`.
+        is_design_var : bool or None
+            If None (the default), do no additional filtering of the inputs.
+            If True, list only inputs connected to outputs that are driver design variables.
+            If False, list only inputs _not_ connected to outputs that are driver design variables.
         list_autoivcs : bool
             If True, include auto_ivc outputs in the listing.  Defaults to False.
         out_stream : file-like
@@ -640,6 +684,9 @@ class Case(object):
         print_options = np.get_printoptions()
         np_precision = print_options['precision']
 
+        if is_design_var is not None:
+            des_vars = self._get_variables_of_type('desvar')
+
         for var_name in self.outputs.absolute_names():
             if not list_autoivcs and var_name.startswith('_auto_ivc.'):
                 continue
@@ -654,6 +701,23 @@ class Case(object):
 
             if not match_prom_or_abs(var_name, var_name_prom, includes, excludes):
                 continue
+
+            # handle is_indep_var
+            if is_indep_var is not None:
+                if is_indep_var is True and 'openmdao:indep_var' not in meta['tags']:
+                    continue
+                elif is_indep_var is False and 'openmdao:indep_var' in meta['tags']:
+                    continue
+
+            # handle is_design_var
+            if is_design_var is not None:
+                var_name_prom = self._abs2prom['output'][var_name]
+                if var_name_prom.startswith('_auto_ivc.'):
+                    var_name_prom = self._auto_ivc_map[var_name_prom]
+                if is_design_var is True and var_name_prom not in des_vars:
+                    continue
+                elif is_design_var is False and var_name_prom in des_vars:
+                    continue
 
             # check if residuals were recorded, skip if within specifed tolerance
             if residuals and self.residuals and var_name in self.residuals.absolute_names():

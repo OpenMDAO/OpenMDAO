@@ -3,8 +3,7 @@ import os
 import sys
 import re
 
-import numpy.distutils
-from numpy.distutils.exec_command import find_executable
+from shutil import which
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.explicitcomponent import ExplicitComponent
@@ -82,13 +81,13 @@ class ExternalCodeDelegate(object):
         else:
             program_to_execute = comp.options['command'][0]
             if sys.platform == 'win32':
-                if not find_executable(program_to_execute):
+                if not which(program_to_execute):
                     missing = self._check_for_files([program_to_execute])
                     if missing:
                         logger.error("The command to be executed, '%s', "
                                      "cannot be found" % program_to_execute)
             else:
-                if not find_executable(program_to_execute):
+                if not which(program_to_execute):
                     logger.error("The command to be executed, '%s', "
                                  "cannot be found" % program_to_execute)
 
@@ -200,11 +199,8 @@ class ExternalCodeDelegate(object):
         else:
             program_to_execute = command[0]
 
-        # Suppress message from find_executable function, we'll handle it
-        numpy.distutils.log.set_verbosity(-1)
-
         if sys.platform == 'win32':
-            if not find_executable(program_to_execute):
+            if not which(program_to_execute):
                 missing = self._check_for_files([program_to_execute])
                 if missing:
                     raise ValueError("The command to be executed, '%s', "
@@ -215,7 +211,7 @@ class ExternalCodeDelegate(object):
                 command_for_shell_proc = 'cmd.exe /c ' + str(command)
 
         else:
-            if not find_executable(program_to_execute):
+            if not which(program_to_execute):
                 raise ValueError("The command to be executed, '%s', "
                                  "cannot be found" % program_to_execute)
             command_for_shell_proc = command

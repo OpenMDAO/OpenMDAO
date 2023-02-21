@@ -6,6 +6,13 @@ from contextlib import redirect_stderr
 
 class TestOMWarnings(unittest.TestCase):
 
+    def setUp(self):
+        """
+        Ensure that OpenMDAO warnings are using their default filter action.
+        """
+        import openmdao.api as om
+        om.reset_warnings()
+
     def test_warnings_filters(self):
         # OMDeprecationWarning should only generate one warning
         # because it has the 'once' filter
