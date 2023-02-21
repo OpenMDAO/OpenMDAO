@@ -1500,6 +1500,43 @@ class TestDOEDriver(unittest.TestCase):
             for dv in ('x', 'y'):
                 self.assertEqual(derivs['f_xy', dv], expected_deriv['f_xy', dv])
 
+    @unittest.skipUnless(pyDOE2, "requires 'pyDOE2', install openmdao[doe]")
+    def test_derivative_scaled_recording(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+        model.set_input_defaults('x', 0.0)
+        model.set_input_defaults('y', 0.0)
+        model.add_design_var('x', lower=0.0, upper=1.0, ref=5.0)
+        model.add_design_var('y', lower=0.0, upper=1.0, ref=10.0)
+        model.add_objective('f_xy', ref=2.0)
+
+        prob.driver = om.DOEDriver(generator=om.FullFactorialGenerator(levels=3))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+        prob.driver.recording_options['record_derivatives'] = True
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        expected_vals = self.expected_fullfact3
+        expected_derivs = self.expected_fullfact3_derivs
+
+        cr = om.CaseReader("cases.sql")
+        cases = cr.list_cases('driver', out_stream=None)
+
+        self.assertEqual(len(cases), 9)
+
+        for case, expected_val, expected_deriv in zip(cases, expected_vals, expected_derivs):
+            outputs = cr.get_case(case).outputs
+            for name in ('x', 'y', 'f_xy'):
+                self.assertEqual(outputs[name], expected_val[name])
+
+            derivs = cr.get_case(case).derivatives
+            for dv in ('x', 'y'):
+                self.assertEqual(derivs['f_xy', dv], expected_deriv['f_xy', dv])
+
     def test_derivative_no_recording(self):
         prob = om.Problem()
         model = prob.model
