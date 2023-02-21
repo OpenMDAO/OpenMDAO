@@ -6,7 +6,7 @@ from openmdao.utils.om_warnings import issue_warning
 from openmdao.core.driver import Driver
 
 
-def get_model_vars(varType, vars, model_vars):
+def _get_model_vars(varType, vars, model_vars):
     """
     Get the requested IO variable data from model's list of IO.
 
@@ -24,7 +24,7 @@ def get_model_vars(varType, vars, model_vars):
 
     Returns
     -------
-    var_dict : dict
+    dict
         Dict to update `self.options` with desired IO data in `SubproblemComp`.
     """
     var_dict = {varType: {}}
@@ -192,8 +192,8 @@ class SubproblemComp(om.ExplicitComponent):
         model_inputs = {meta['prom_name']: meta for _, meta in model_inputs}
         model_outputs = {meta['prom_name']: meta for _, meta in model_outputs}
 
-        self.options.update(get_model_vars('inputs', self.list_inputs, model_inputs))
-        self.options.update(get_model_vars('outputs', self.list_outputs, model_outputs))
+        self.options.update(_get_model_vars('inputs', self.list_inputs, model_inputs))
+        self.options.update(_get_model_vars('outputs', self.list_outputs, model_outputs))
 
         inputs = self.options['inputs']
         outputs = self.options['outputs']
