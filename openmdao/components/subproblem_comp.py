@@ -19,8 +19,8 @@ def _get_model_vars(varType, vars, model_vars):
         then it should be the var name in its promoted name. If it is a tuple, then the
         first element should be the promoted name, and the second element should be the
         var name you wish to refer to it by within the subproblem [e.g. (prom_name, var_name)].
-    model_vars : dict
-        Dict of model's IO vars and meta data.
+    model_vars : list of tuples
+        List of model's variable names and meta data.
 
     Returns
     -------
@@ -38,7 +38,7 @@ def _get_model_vars(varType, vars, model_vars):
                                 ' or delete copy of variable.')
 
             # make dict with given var name as key and meta data from model_vars
-            tmp_dict = {var[1]: meta for _, meta in model_vars.items()
+            tmp_dict = {var[1]: meta for _, meta in model_vars
                         if meta['prom_name'] == var[0]}
 
             # check if dict is empty (no vars added)
@@ -56,8 +56,8 @@ def _get_model_vars(varType, vars, model_vars):
                                 ' or delete copy of variable.')
 
             # make dict with given var name as key and meta data from model_vars
-            tmp_dict = {var: meta for _, meta in model_vars.items()
-                        if meta['prom_name'].endswith(var)}
+            tmp_dict = {var: meta for name, meta in model_vars
+                        if name.endswith('.' + var)}
 
             # check if provided variable appears more than once in model
             if len(tmp_dict) > 1:
@@ -188,10 +188,6 @@ class SubproblemComp(om.ExplicitComponent):
         model_outputs = p.model.list_outputs(out_stream=None, prom_name=True,
                                              units=True, shape=True, desc=True)
 
-        # store model inputs/outputs as dictionary with keys as the promoted name
-        model_inputs = {meta['prom_name']: meta for _, meta in model_inputs}
-        model_outputs = {meta['prom_name']: meta for _, meta in model_outputs}
-
         self.options.update(_get_model_vars('inputs', self.list_inputs, model_inputs))
         self.options.update(_get_model_vars('outputs', self.list_outputs, model_outputs))
 
@@ -220,6 +216,10 @@ class SubproblemComp(om.ExplicitComponent):
             for ip in self._input_names:
                 self.declare_partials(of=var, wrt=ip)
 
+    def _set_complex_step_mode(self, active):
+        super()._set_complex_step_mode(active)
+        self._subprob.set_complex_step_mode(active)
+
     def compute(self, inputs, outputs):
         """
         Perform the subproblem system computation at run time.
@@ -235,10 +235,7 @@ class SubproblemComp(om.ExplicitComponent):
 
         # switch subproblem to use complex IO if in complex step mode
         if self.under_complex_step != self._prev_complex_step:
-            if self.under_complex_step:
-                p.set_complex_step_mode(True)
-            else:
-                p.set_complex_step_mode(False)
+            self._set_complex_step_mode(self.under_complex_step)
             self._prev_complex_step = self.under_complex_step
 
         # setup input values
