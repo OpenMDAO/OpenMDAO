@@ -117,30 +117,11 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
             vals[t] = val
 
-    NOCONN = '[NO CONNECTION]'
-    vals[NOCONN] = ''
-
-    src_systems = set()
-    tgt_systems = set()
-    for s, _ in all_vars['output']:
-        parts = s.split('.')
-        for i in range(len(parts)):
-            src_systems.add('.'.join(parts[:i]))
-
-    for t, _ in all_vars['input']:
-        parts = t.split('.')
-        for i in range(len(parts)):
-            tgt_systems.add('.'.join(parts[:i]))
-
-    src_systems = [{'name': n} for n in sorted(src_systems)]
-    src_systems.insert(1, {'name': NOCONN})
-    tgt_systems = [{'name': n} for n in sorted(tgt_systems)]
-    tgt_systems.insert(1, {'name': NOCONN})
-
     tprom = system._var_allprocs_abs2prom['input']
     sprom = system._var_allprocs_abs2prom['output']
 
     table = []
+    prom_trees = {}
     idx = 1  # unique ID for use by Tabulator
     for tgt, src in connections.items():
         usrc = units[src]
@@ -152,23 +133,66 @@ def view_connections(root, outfile='connections.html', show_browser=True,
             if utgt:
                 utgt = '!' + units[tgt]
 
-        row = {'id': idx, 'src': src, 'sprom': sprom[src], 'sunits': usrc,
+        tgtprom = tprom[tgt]
+        srcprom = sprom[src]
+
+        if (tgtprom, srcprom) in prom_trees:
+            sys_prom_map = prom_trees[(tgtprom, srcprom)]
+        else:
+            sys_prom_map = system.get_promotions(tgtprom, srcprom)
+            prom_trees[(tgtprom, srcprom)] = sys_prom_map
+
+        row = {'id': idx, 'src': src, 'sprom': srcprom,
+               'outpromto': '',
+               'sunits': usrc,
                'val': _val2str(vals[tgt]), 'tunits': utgt,
-               'tprom': tprom[tgt], 'tgt': tgt}
+               'system': '', 'inpromto': '',
+               'tprom': tgtprom, 'tgt': tgt}
+
+        children = []
+        keep = {'sprom', 'tprom', 'src', 'tgt'}
+        for spath, (inpromto, subins, outpromto, subout) in sys_prom_map.items():
+            r = {n: v if n in keep else '' for n, v in row.items()}
+
+            implicitconn = (inpromto and outpromto and
+                            inpromto.rpartition(' ')[2] == outpromto.rpartition(' ')[2])
+
+            if inpromto:
+                subins = list(subins)
+                if len(subins) > 1:
+                    subins = '(' + ', '.join(subins) + ')'
+                elif len(subins) == 1:
+                    subins = subins[0]
+                else:
+                    subins = ''
+                inpromto = f"{subins} ↑ {inpromto}"
+            else:
+                inpromto = ''
+
+            if outpromto:
+                if len(subout) == 1:
+                    subout = list(subout)[0]
+                else:
+                    subout = ''
+                outpromto = f"{subout} ↑ {outpromto}"
+            else:
+                outpromto = ''
+
+            if implicitconn:
+                spath = '!' + spath
+                inpromto = '!' + inpromto
+                outpromto = '!' + outpromto
+
+            r['system'] = spath
+            r['inpromto'] = inpromto
+            r['outpromto'] = outpromto
+            children.append(r)
+
+        if children:
+            row['_children'] = children
+
         table.append(row)
         idx += 1
-
-    # add rows for unconnected sources
-    for src, _ in all_vars['output']:
-        if src not in src2tgts:
-            if show_values:
-                v = _val2str(system._abs_get_val(src))
-            else:
-                v = ''
-            row = {'id': idx, 'src': src, 'sprom': sprom[src], 'sunits': units[src],
-                   'val': v, 'tunits': '', 'tprom': NOCONN, 'tgt': NOCONN}
-            table.append(row)
-            idx += 1
 
     if title is None:
         title = ''
@@ -188,10 +212,10 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     with open(os.path.join(code_dir, viewer), "r", encoding='utf-8') as f:
         template = f.read()
 
-    with open(os.path.join(libs_dir, 'tabulator.min.js'), "r", encoding='utf-8') as f:
+    with open(os.path.join(libs_dir, 'tabulator.5.4.4.min.js'), "r", encoding='utf-8') as f:
         tabulator_src = f.read()
 
-    with open(os.path.join(style_dir, 'tabulator.min.css'), "r", encoding='utf-8') as f:
+    with open(os.path.join(style_dir, 'tabulator.5.4.4.min.css'), "r", encoding='utf-8') as f:
         tabulator_style = f.read()
 
     jsontxt = json.dumps(data)

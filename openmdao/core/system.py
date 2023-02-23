@@ -407,7 +407,11 @@ class System(object):
     _saved_errors : list
         Temporary storage for any saved errors that occur before this System is assigned
         a parent Problem.
-    _output_solver_options : dict
+    _output_solver_options : dict or None
+        Solver output options if set_output_solver_options has been called.
+    _promotion_tree : dict
+        Mapping of system path to promotion info indicating all subsystems where variables
+        were promoted.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -6612,66 +6616,109 @@ class System(object):
 
         return promotion_list
 
-    def get_promotions(self, prom):
+    def get_promotions(self, inprom=None, outprom=None):
         """
         Return all promotions for the given promoted variable.
 
         In other words, how and where did promotions occur to convert absolute variable names into
-        the given promoted name at the current System level.
+        the given promoted name(s) at the current System level.
 
         Parameters
         ----------
-        prom : str
-            The promoted variable name.  This can correspond to an output and/or multiple inputs.
+        inprom : str or None
+            The promoted input variable name.
+        outprom : str or None
+            The promoted output variable name.
 
         Returns
         -------
         dict
-            Dictionary keyed on system pathname containing input and output promotion lists for
-            each System where promotions occurred to produce the given promoted variable.
+            Dictionary keyed on system pathname containing input and/or output promotion lists for
+            each System where promotions occurred to produce the given promoted variable(s).
         """
+        if inprom is None and outprom is None:
+            raise RuntimeError(f"{self.msginfo}: At least one of (inprom, outprom) must be set "
+                               "when calling get_promotions.")
+
         if self._promotion_tree is None:
             self._promotion_tree = self._get_sys_tree()
         tree = self._promotion_tree
 
-        try:
-            abs_outs = self._var_allprocs_prom2abs_list['output'][prom]
-        except KeyError:
-            abs_outs = []
+        plist_ins = plist_outs = None
+        if outprom is None and inprom in self._var_allprocs_prom2abs_list['output']:
+            outprom = inprom
 
-        try:
-            abs_ins = self._var_allprocs_prom2abs_list['input'][prom]
-        except KeyError:
-            abs_ins = []
+        if outprom is not None:
+            try:
+                abs_outs = self._var_allprocs_prom2abs_list['output'][outprom]
+            except KeyError:
+                raise KeyError(f"{self.msginfo}: Promoted output variable '{outprom}' was not "
+                               "found.")
 
-        if not abs_ins and not abs_outs:
-            raise RuntimeError(f"{self.msginfo}: Promoted variable '{prom}' was not found.")
+            plist_outs = self._get_promote_lists(tree, abs_outs, 'out')
 
-        plist_outs = self._get_promote_lists(tree, abs_outs, 'out')
-        plist_ins = self._get_promote_lists(tree, abs_ins, 'in')
+        if inprom is not None:
+            try:
+                abs_ins = self._var_allprocs_prom2abs_list['input'][inprom]
+            except KeyError:
+                raise KeyError(f"{self.msginfo}: Promoted input variable '{inprom}' was not "
+                               "found.")
 
-        sys_prom_map = defaultdict(lambda: [None, set(), set()])
-        for spath, sub, theprom in plist_outs:
-            sys_prom_map[spath][2].add(sub)
-            sys_prom_map[spath][0] = theprom
-        for spath, sub, theprom in plist_ins:
-            sys_prom_map[spath][1].add(sub)
-            sys_prom_map[spath][0] = theprom
+            plist_ins = self._get_promote_lists(tree, abs_ins, 'in')
 
-        return sys_prom_map, prom
+        # create a dict that interleaves all of the input and output promotions, keeping the
+        # number of rows consistent when adding a promotion tree info to a table.
+        sys_prom_map = defaultdict(lambda: [None, set(), None, set()])
+        if plist_outs:
+            for spath, sub, theprom in plist_outs:
+                sys_prom_map[spath][2] = theprom
+                sys_prom_map[spath][3].add(sub)
 
-def sys_prom_map2table(sys_prom_map, prom):
+        if plist_ins:
+            for spath, sub, theprom in plist_ins:
+                sys_prom_map[spath][0] = theprom
+                sys_prom_map[spath][1].add(sub)
+
+        # return regular dict sorted by system pathname
+        return {spath: data for spath, data in sorted(sys_prom_map.items(), key=lambda x: x[0])}
+
+
+def _sys_prom_map2table(sys_prom_map, inprom, outprom, display=True):
     from openmdao.visualization.tables.table_builder import generate_table
     rows = []
     if sys_prom_map:
-        print(f"\nPromotion table for '{prom}':")
-        for spath, (theprom, in_proms, out_proms) in sorted(sys_prom_map.items(),
-                                                            key=lambda x: x[0]):
-            inpromstr = ', '.join(sorted(in_proms)) if in_proms else ''
+        for spath, (iprom, in_proms, oprom, out_proms) in sys_prom_map.items():
             outpromstr = ', '.join(sorted(out_proms)) if out_proms else ''
-            rows.append((spath, inpromstr, theprom, outpromstr))
+            if inprom is not None:
+                inpromstr = ', '.join(sorted(in_proms)) if in_proms else ''
+                if outprom is not None:
+                    rows.append((spath, inpromstr, iprom, outpromstr, oprom))
+                else:
+                    rows.append((spath, inpromstr, iprom))
+            elif outprom is not None:
+                rows.append((spath, outpromstr, oprom))
 
-    if rows:
-        generate_table(rows, tablefmt='box_grid',
-                        headers=['System', 'Sub Input(s)', 'Promoted To', 'Sub Outputs']).display()
+        if rows:
+            headers = ['System']
+            if inprom is not None:
+                headers.append('Sub Input(s)')
+                headers.append('Promoted To')
+            if outprom is not None:
+                headers.append('Sub Output(s)')
+                headers.append('Promoted To')
+
+            if display:
+                if inprom == outprom:
+                    pstr = inprom
+                else:
+                    plst = []
+                    if inprom is not None:
+                        plst.append(f"input '{inprom}'")
+                    if outprom is not None:
+                        plst.append(f"output '{outprom}'")
+                    pstr = ' and '.join(plst)
+
+                print(f"\nPromotion table for {pstr}:")
+                generate_table(rows, tablefmt='box_grid', headers=headers).display()
+
     return rows

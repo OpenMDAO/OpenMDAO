@@ -14,6 +14,11 @@
         font-weight: bold;
     }
 
+    .implicitconnect {
+        color: darkred;
+        font-weight: bold;
+    }
+
     .promoted {
         color: blue;
     }
@@ -34,12 +39,66 @@
         margin: 3px 5px 3px 5px;
     }
 
+    #help-text {
+        display: none;
+    }
 
     <tabulator_style>
 </style>
 <title>Connection Viewer</title>
 </head>
 <body>
+    <button id="help-button" onclick="toggleHelp(event)">Help</button>
+    <div id="help-text">
+        <p>Each row in the table corresponds to a connection between a single input and a single output,
+            so when multiple inputs are promoted to the same name, there will be multiple rows where the
+            same output is repeated.
+        </p>
+        <p>
+            The table can be sorted by most columns by clicking on the column header, and a column
+            can be filtered by typing text into the ‘filter column’ field found at the top of the column.
+        </p>
+        <p>
+            Differing input and output units are highlighted in red.
+        </p>
+        <p>
+            Columns can be shown or hidden using the toggle buttons below the table.
+        </p>
+        <p>
+            In the promoted input and output columns, variables that are promoted at some level in
+            the model are shown in blue, while variables that are never promoted are shown in black.
+        </p>
+        <p>
+            By default for inputs and outputs, the promoted name column is shown and the absolute
+            name column is hidden.
+        </p>
+        <p>
+            When showing promoted output and promoted input columns, if the promoted output name equals
+            the promoted input name, that means the connection is an implicit connection. Otherwise
+            the connection is explicit, meaning somewhere in the model there is an explicit call to
+            connect that produced the connection.
+        </p>
+        <p>
+            Multiple inputs are sometimes promoted to the same name, and by sorting the promoted inputs
+            column, all such inputs will be grouped together. This can make it easier to spot either
+            missing or unwanted implicit connections.
+        </p>
+        <p>
+            Clicking on the '+' next to the name in the promoted outputs column will show additional
+            columns ('System', 'Output Promotion', and 'Input Promotion') and rows
+            (one row per promotion) in the table to
+            indicate where the input and/or output was promoted throughout the model.
+            The 'System' column shows each system where a variable was promoted up from one or more
+            of its subsystems.  The 'Output Promotion' and 'Input Promotion' columns show the
+            promoted name from each promoting subsystem, relative to the system found in the 'System'
+            column, followed by the '↑' symbol, followed by the new promoted name in the system found
+            in the 'System' column.  The contents of the 'System', 'Output Promotion' and 'Input Promotion'
+            columns will be colored dark red if there is an implicit connection (promoted input name
+            and output name match) at that system level.
+            If neither the input nor the output have been promoted anywhere in the model, then
+            the '+' won't exist.
+        </p>
+    </div>
     <h2 id="conn_title"></h2>
     <div id="connection-table"></div>
 <script type="text/javascript">
@@ -63,6 +122,7 @@ var table =
         // improves render speed dramatically (can be any valid css height value)
         height: 650,
         data:tabledata, //assign data to table
+        dataTree:true,
         layout:"fitColumns", //"fitDataFill",
         footerElement:"<p class='middle'>" +
                             "<span class='toggle'><input type='checkbox' onclick='src_abs_toggle(this)'>Absolute Outputs</input></span>" +
@@ -75,35 +135,57 @@ var table =
         columns:[ //Define Table Columns
                 {title: "Output (absolute)", field:"src", hozAlign:"left", headerFilter:true,
                     visible:false, minWidth:300,
-                tooltip:function(cell){
-                    return cell.getData().sprom;
-                }},
-                {title: "Output (promoted)", field:"sprom", hozAlign:"left", headerFilter:true, minWidth:300,
-                    formatter:function(cell, formmaterParams, onRendered) {
-                    var promname = cell.getData().sprom;
-                    if (promname == cell.getData().src) {
-                        return promname;
-                    }
-                    else {
-                        return "<span class='promoted'>" + promname + "</span>";
+                    tooltip:function(e, cell, onRendered){
+                        return cell.getData().sprom;
                     }
                 },
-                tooltip:function(cell){
-                    return cell.getData().src;
-                }},
+                {title: "Output (promoted)", field:"sprom", hozAlign:"left", headerFilter:true, minWidth:300,
+                    formatter:function(cell, formmaterParams, onRendered) {
+                        var promname = cell.getData().sprom;
+                        if (promname == cell.getData().src) {
+                            return promname;
+                        }
+                        else {
+                            return "<span class='promoted'>" + promname + "</span>";
+                        }
+                    },
+                    tooltip:function(e, cell, onRendered){
+                        return cell.getData().src;
+                    }
+                },
+                {title: "System", visible:false, field:"system", hozAlign:"left", headerFilter:false, headerSort:false,
+                    formatter:function(cell, formatterParams){
+                            let value = cell.getValue();
+                            if(value.startsWith("!")){
+                                return "<span class='implicitconnect'>" + value.substring(1) + "</span>";
+                            }else{
+                                return value;
+                            }
+                            }
+                },
+                {title: "Output Promotion", visible:false, field:"outpromto", hozAlign:"left", headerFilter:false, headerSort:false,
+                    formatter:function(cell, formatterParams){
+                        let value = cell.getValue();
+                        if(value.startsWith("!")){
+                            return "<span class='implicitconnect'>" + value.substring(1) + "</span>";
+                        }else{
+                            return value;
+                        }
+                    }
+                },
+                {title: "Input Promotion", visible:false, field:"inpromto", hozAlign:"left", headerFilter:false, headerSort:false,
+                    formatter:function(cell, formatterParams){
+                        let value = cell.getValue();
+                        if(value.startsWith("!")){
+                            return "<span class='implicitconnect'>" + value.substring(1) + "</span>";
+                        }else{
+                            return value;
+                        }
+                    }
+                },
                 {title: "Units", field:"sunits", hozAlign:"center", headerFilter:true,
                     formatter:function(cell, formatterParams){
-                    var value = cell.getValue();
-                    if(value.startsWith("!")){
-                        return "<span class='unitnomatch'>" + value.substring(1) + "</span>";
-                    }else{
-                        return value;
-                    }
-                    }},
-                {title: "Value", visible:data.show_values, field:"val", hozAlign:"center", headerFilter:true},
-                {title: "Units", field:"tunits", hozAlign:"center", headerFilter:true,
-                    formatter:function(cell, formatterParams){
-                        var value = cell.getValue();
+                        let value = cell.getValue();
                         if(value.startsWith("!")){
                             return "<span class='unitnomatch'>" + value.substring(1) + "</span>";
                         }else{
@@ -111,26 +193,63 @@ var table =
                         }
                     }
                 },
-                {title: "Input (absolute)", field:"tgt", hozAlign:"left", headerFilter:true,
-                    visible:false, minWidth:300,
-                    tooltip:function(cell){
-                    return cell.getData().tprom;
-                    }},
+                {title: "Value", visible:data.show_values, field:"val", hozAlign:"center", headerFilter:true},
+                {title: "Units", field:"tunits", hozAlign:"center", headerFilter:true,
+                    formatter:function(cell, formatterParams){
+                        let value = cell.getValue();
+                        if(value.startsWith("!")){
+                            return "<span class='unitnomatch'>" + value.substring(1) + "</span>";
+                        }else{
+                            return value;
+                        }
+                    }
+                },
                 {title: "Input (promoted)", field:"tprom", hozAlign:"left", headerFilter:true,
                     minWidth:300,
                     formatter:function(cell, formmaterParams, onRendered) {
-                    var promname = cell.getData().tprom;
-                    if (promname == cell.getData().tgt) {
-                        return promname;
+                        var promname = cell.getData().tprom;
+                        if (promname == cell.getData().tgt) {
+                            return promname;
+                        }
+                        else {
+                            return "<span class='promoted'>" + promname + "</span>";
+                        }
+                        },
+                        tooltip:function(e, cell, onRendered){
+                            return cell.getData().tgt;
+                        }
+                },
+                {title: "Input (absolute)", field:"tgt", hozAlign:"left", headerFilter:true,
+                    visible:false, minWidth:300,
+                    tooltip:function(e, cell, onRendered){
+                        return cell.getData().tprom;
                     }
-                    else {
-                        return "<span class='promoted'>" + promname + "</span>";
-                    }
-                    },
-                    tooltip:function(cell){
-                    return cell.getData().tgt;
-                }},
+                },
         ],
+});
+
+var num_promotes_showing = 0;
+
+
+table.on("dataTreeRowExpanded", function(row, level){
+    if (num_promotes_showing == 0) {
+        table.showColumn("system");
+        table.showColumn("outpromto");
+        table.showColumn("inpromto");
+        table.redraw();
+    }
+    num_promotes_showing = num_promotes_showing + 1;
+});
+
+
+table.on("dataTreeRowCollapsed", function(row, level){
+    num_promotes_showing = num_promotes_showing - 1;
+    if (num_promotes_showing == 0) {
+        table.toggleColumn("system");
+        table.toggleColumn("outpromto");
+        table.toggleColumn("inpromto");
+        table.redraw();
+    }
 });
 
 
@@ -167,6 +286,16 @@ function sunits_toggle(tbutton) {
 function tunits_toggle(tbutton) {
     table.toggleColumn("tunits");
     table.redraw();
+}
+
+function toggleHelp(event) {
+    let txt = document.getElementById("help-text");
+    if (txt.style.display === "block") {
+        txt.style.display = "none";
+    }
+    else {
+        txt.style.display = "block";
+    }
 }
 
 </script>
