@@ -134,7 +134,9 @@ setup(
         'openmdao.devtools': ['*.wpr', ],
         'openmdao.visualization': [
             'common/libs/*.js',
-            'common/style/*.css'
+            'common/libs/*.js.map',
+            'common/style/*.css',
+            'common/style/*.css.map'
         ],
         'openmdao.visualization.n2_viewer': [
             'assets/*png*',
