@@ -210,6 +210,7 @@ setup(
             "newtonsolver=openmdao.solvers.nonlinear.newton:NewtonSolver",
             "nonlinearblockgs=openmdao.solvers.nonlinear.nonlinear_block_gs:NonlinearBlockGS",
             "nonlinearblockjac=openmdao.solvers.nonlinear.nonlinear_block_jac:NonlinearBlockJac",
+            "nonlinearschur=openmdao.solvers.nonlinear.nonlinear_schur:SchurSolver",
             "nonlinearrunonce=openmdao.solvers.nonlinear.nonlinear_runonce:NonlinearRunOnce",
             "armijogoldsteinls=openmdao.solvers.linesearch.backtracking:ArmijoGoldsteinLS",
             "boundsenforcels=openmdao.solvers.linesearch.backtracking:BoundsEnforceLS",

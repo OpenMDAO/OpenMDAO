@@ -127,7 +127,11 @@ class LinearBlockGS(BlockLinearSolver):
                     b_vec.set_val(self._rhs_vec[off : off + len(b_vec)])
 
                 subsys._solve_linear(mode, self._rel_systems, scope_out, scope_in)
-
+                print("subsys2", subsys._vectors["residual"]["linear"].asarray())
+                print("subsys2", subsys._vectors["output"]["linear"].asarray())
+                print("subsys2", subsys._vectors["input"]["linear"].asarray())
+                print(subsys._dresiduals, subsys._doutputs)
+            quit()
         else:  # rev
             if sys.version_info >= (3, 8):
                 subsystems = reversed(system._subsystems_allprocs.values())

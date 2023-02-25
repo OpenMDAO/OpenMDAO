@@ -198,7 +198,6 @@ class SchurSolver(NonlinearSolver):
 
         with Recording("Newton_subsolve", 0, self):
             if self.options["solve_subsystems"] and (self._iter_count <= self.options["max_sub_solves"]):
-
                 self._solver_info.append_solver()
 
                 # should call the subsystems solve before computing the first residual
@@ -336,14 +335,15 @@ class SchurSolver(NonlinearSolver):
                 # finally, set the seed of the variable to 1 as well to get the diagonal contribution
                 # system._vectors["output"]["linear"][f"{subsys2.name}.{var}"]
                 # this should already be at one since we perturbed it above!
-
+                # print(system._inputs)
                 # transfer the outputs to inputs
                 system._transfer("linear", "fwd")
+                # print(system._inputs)
 
                 # run the apply linear. we do it on the complete system here
                 scope_out, scope_in = system._get_matvec_scope()
-                system._apply_linear(None, ["linear"], "fwd", scope_out, scope_in)
-
+                system._apply_linear(None, None, "fwd", scope_out, scope_in)
+                # print(system._inputs)
                 # the result is the final jacobian for this using the schur complement method
                 if system.comm.rank == 0:
                     print(
@@ -361,7 +361,6 @@ class SchurSolver(NonlinearSolver):
                 ovec[f"{subsys2.name}.{var}"] = 0.0
 
         else:  # rev mode
-
             # backup the vectors we are working with
             rvec = system._vectors["residual"]["linear"]
             ovec = system._vectors["output"]["linear"]
@@ -454,7 +453,7 @@ class SchurSolver(NonlinearSolver):
         rvec.set_val(r_data)
         ovec.set_val(o_data)
 
-        # quit()
+        quit()
         # ivec.set_val(i_data)
 
         # we now have the schur complement of the jacobian for the second component.
