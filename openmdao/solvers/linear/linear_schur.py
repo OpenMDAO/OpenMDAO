@@ -290,52 +290,62 @@ class LinearSchur(BlockLinearSolver):
             # rvec.set_val(r_data)
             # ovec.set_val(o_data)
             # ivec.set_val(i_data)
+            off1 = b_vec._root_offset - parent_offset
+            b_vec.set_val(self._rhs_vec[off1 : off1 + len(b_vec)])
             b_vec2.set_val(self._rhs_vec[off : off + len(b_vec2)])
-            b_vec.set_val(self._rhs_vec[off : off + len(b_vec)])
-            subsys1._dresiduals = b_vec_cache_1
-            subsys2._dresiduals = b_vec2
-            print("dres", b_vec_cache_1)
+
+            # b_vec.set_val(self._rhs_vec[off : off + len(b_vec)])
+            # subsys1._dresiduals = b_vec_cache_1
+            # subsys2._dresiduals = b_vec2
+            print("dres", b_vec2, self._rhs_vec, b_vec)
             ########################
             #### schur_jacobian ####
             ########################
             # if subsys2._iter_call_apply_linear():
             # scope_out, scope_in = system._get_matvec_scope(subsys1)
-            print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
-            print("subsys1", subsys1._vectors["output"]["linear"].asarray())
-            print("subsys1", subsys1._vectors["input"]["linear"].asarray())
+            # print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
+            # print("subsys1", subsys1._vectors["output"]["linear"].asarray())
+            # print("subsys1", subsys1._vectors["input"]["linear"].asarray())
 
-            print("subsys2", subsys2._vectors["residual"]["linear"].asarray())
-            print("subsys2", subsys2._vectors["output"]["linear"].asarray())
-            print("subsys2", subsys2._vectors["input"]["linear"].asarray())
+            # print("subsys2", subsys2._vectors["residual"]["linear"].asarray())
+            # print("subsys2", subsys2._vectors["output"]["linear"].asarray())
+            # print("subsys2", subsys2._vectors["input"]["linear"].asarray())
             subsys1._solve_linear("fwd", "linear", ContainsAll())
-            print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
-            print("subsys1", subsys1._vectors["output"]["linear"].asarray())
-            print("subsys1", subsys1._vectors["input"]["linear"].asarray())
+            # print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
+            # print("subsys1", subsys1._vectors["output"]["linear"].asarray())
+            # print("subsys1", subsys1._vectors["input"]["linear"].asarray())
 
-            print("subsys2", subsys2._vectors["residual"]["linear"].asarray())
-            print("subsys2", subsys2._vectors["output"]["linear"].asarray())
-            print("subsys2", subsys2._vectors["input"]["linear"].asarray())
-            # first negate the vector from the linear solve
+            # print("subsys2", subsys2._vectors["residual"]["linear"].asarray())
+            # print("subsys2", subsys2._vectors["output"]["linear"].asarray())
+            # print("subsys2", subsys2._vectors["input"]["linear"].asarray())
+            # # first negate the vector from the linear solve
             subsys1._vectors["output"]["linear"] *= -1.0
-            # transfer the outputs to inputs
-            system._transfer("linear", "fwd")
+            # # transfer the outputs to inputs
+            # system._transfer("linear", "fwd")
 
             scope_out, scope_in = system._get_matvec_scope()
             scope_out = self._vars_union(self._scope_out, scope_out)
             scope_in = self._vars_union(self._scope_in, scope_in)
             system._apply_linear(None, self._rel_systems, "fwd", scope_out, scope_in)
-
+            # print("subsys2", subsys2._vectors["residual"]["linear"].asarray())
+            # print("subsys2", subsys2._vectors["output"]["linear"].asarray())
+            # print("subsys2", subsys2._vectors["input"]["linear"].asarray())
             # b_vec2 = scipy.linalg.solve(schur_jac, subsys2._vectors["residual"]["linear"].asarray())
-
+            # print("dres", b_vec2, self._rhs_vec)
+            b_vec2 += self._rhs_vec[off : off + len(b_vec2)]
+            # print("dres", b_vec2, self._rhs_vec)
+            # print("subsys2", subsys2._vectors["residual"]["linear"].asarray())
+            # print("subsys2", subsys2._vectors["output"]["linear"].asarray())
+            # print("subsys2", subsys2._vectors["input"]["linear"].asarray())
             # # subsys2._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
             # b_vec2 *= -1.0
             # b_vec2 = subsys2._dresiduals
-            print("b2", subsys2._dresiduals.asarray())
+            # print("b2", subsys2._vectors["residual"]["linear"].asarray())
             # else:
             # b_vec2.set_val(self._rhs_vec[off : off + len(b_vec2)])
             # quit()
             # subsys2._solve_linear(mode, self._rel_systems, scope_out, scope_in)
-            d_subsys2 = scipy.linalg.solve(schur_jac, subsys2._dresiduals.asarray())
+            d_subsys2 = scipy.linalg.solve(schur_jac, subsys2._vectors["residual"]["linear"].asarray())
             # loop over the variables just to be safe with the ordering
             for ii, var in enumerate(vars_to_solve):
                 system._doutputs[f"{subsys2.name}.{var}"] += d_subsys2[ii]

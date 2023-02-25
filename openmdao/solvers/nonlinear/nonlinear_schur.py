@@ -453,7 +453,7 @@ class SchurSolver(NonlinearSolver):
         rvec.set_val(r_data)
         ovec.set_val(o_data)
 
-        quit()
+        # quit()
         # ivec.set_val(i_data)
 
         # we now have the schur complement of the jacobian for the second component.
