@@ -255,6 +255,7 @@ class _TotalJacInfo(object):
         self.has_output_dist = {}
 
         self.total_relevant_systems = set()
+        self.simul_coloring = None
 
         if approx:
             _initialize_model_approx(model, driver, self.of, self.wrt)
@@ -333,13 +334,25 @@ class _TotalJacInfo(object):
 
         if self.comm.size > 1 and self.get_remote:
             # need 2 scratch vectors of the same size here
-            scratch = np.zeros(max(J.shape), dtype=J.dtype)
-            scratch2 = scratch.copy()
+            mxsize = 0
+            if 'fwd' in modes:
+                mxsize = J.shape[0]
+            if 'rev' in modes:
+                if J.shape[1] > mxsize:
+                    mxsize = J.shape[1]
+            scratch = [np.zeros(mxsize, dtype=J.dtype)]
+            if self.simul_coloring is not None:
+                scratch.append(scratch[0].copy())
+
             self.jac_scratch = {}
             if 'fwd' in modes:
-                self.jac_scratch['fwd'] = (scratch[:J.shape[0]], scratch2[:J.shape[0]])
+                self.jac_scratch['fwd'] = [scratch[0][:J.shape[0]]]
+                if self.simul_coloring is not None:  # when simul coloring, need two scratch arrays
+                    self.jac_scratch['fwd'].append(scratch[1][:J.shape[0]])
             if 'rev' in modes:
-                self.jac_scratch['rev'] = (scratch[:J.shape[1]], scratch2[:J.shape[1]])
+                self.jac_scratch['rev'] = [scratch[0][:J.shape[1]]]
+                if self.simul_coloring is not None:  # when simul coloring, need two scratch arrays
+                    self.jac_scratch['rev'].append(scratch[1][:J.shape[1]])
                 if self.has_output_dist['rev']:
                     sizes = model._var_sizes['output']
                     abs2idx = model._var_allprocs_abs2idx
@@ -1233,11 +1246,9 @@ class _TotalJacInfo(object):
         elif mode == 'rev':
             # for rows corresponding to serial 'of' vars, we need to correct for
             # duplication of their seed values by dividing by the number of duplications.
-            ndups, _, _, oname = self.in_idx_map[mode][i]
+            ndups, _, _, _ = self.in_idx_map[mode][i]
             if self.get_remote:
-                # don't use scratch[0] here because it may be in use by simul_coloring_jac_setter
-                # which calls this method.
-                scratch = self.jac_scratch['rev'][1]
+                scratch = self.jac_scratch['rev'][0]
                 scratch[:] = self.J[i]
 
                 self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
@@ -1352,7 +1363,9 @@ class _TotalJacInfo(object):
         if self.jac_scratch is None:
             reduced_derivs = deriv_val[deriv_idxs]
         else:
-            reduced_derivs = self.jac_scratch[mode][0]
+            # if simul_coloring is in effect when comm.size > 1, there will be two scratch arrays,
+            # so just always use the last one to avoid overwriting any data.
+            reduced_derivs = self.jac_scratch[mode][-1]
             reduced_derivs[:] = 0.0
             reduced_derivs[jac_idxs] = deriv_val[deriv_idxs]
 
