@@ -170,8 +170,8 @@ class SubproblemComp(om.ExplicitComponent):
         self.prob_args.update(prob_options)
 
         self.model = model
-        self.list_inputs = inputs
-        self.list_outputs = outputs
+        self.model_input_names = inputs
+        self.model_output_names = outputs
 
     def setup(self):
         """
@@ -188,8 +188,8 @@ class SubproblemComp(om.ExplicitComponent):
         model_outputs = p.model.list_outputs(out_stream=None, prom_name=True,
                                              units=True, shape=True, desc=True)
 
-        self.options.update(_get_model_vars('inputs', self.list_inputs, model_inputs))
-        self.options.update(_get_model_vars('outputs', self.list_outputs, model_outputs))
+        self.options.update(_get_model_vars('inputs', self.model_input_names, model_inputs))
+        self.options.update(_get_model_vars('outputs', self.model_output_names, model_outputs))
 
         inputs = self.options['inputs']
         outputs = self.options['outputs']
