@@ -124,10 +124,10 @@ class SubproblemComp(om.ExplicitComponent):
         Extra arguments to be passed to the problem instantiation.
     model : <System>
         The system being analyzed in subproblem.
-    list_inputs : list of str or tuple
+    model_input_names : list of str or tuple
         List of inputs requested by user to be used as inputs in the
         subproblem's system.
-    list_outputs : list of str or tuple
+    model_output_names : list of str or tuple
         List of outputs requested by user to be used as inputs in the
         subproblem's system.
     """
