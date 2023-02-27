@@ -194,6 +194,9 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         table.append(row)
         idx += 1
 
+    # clean up promotion tree memory
+    system._promotion_tree = None
+
     if title is None:
         title = ''
 

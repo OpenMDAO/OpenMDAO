@@ -6554,22 +6554,7 @@ class System(object):
         """
         return False
 
-    def _abs_lists2proms(self, abs_outs, abs_ins):
-        prom_out = None
-        if abs_outs:
-            for abs_out in abs_outs:
-                prom_out = self._var_allprocs_abs2prom['output'][abs_out]
-                break
-
-        prom_in = None
-        if abs_ins:
-            for abs_in in abs_ins:
-                prom_in = self._var_allprocs_abs2prom['input'][abs_in]
-                break
-
-        return prom_out, prom_in
-
-    def _get_sys_tree(self, tree=None):
+    def _get_sys_promotion_tree(self, tree=None):
         if tree is None:
             tree = {}
 
@@ -6587,7 +6572,7 @@ class System(object):
                 in_promotions[tup[0]].add(self.name + '.' + prom_in)
 
         for subsys in self._subsystems_myproc:
-            subsys._get_sys_tree(tree=tree)
+            subsys._get_sys_promotion_tree(tree=tree)
 
         return tree
 
@@ -6641,7 +6626,7 @@ class System(object):
                                "when calling get_promotions.")
 
         if self._promotion_tree is None:
-            self._promotion_tree = self._get_sys_tree()
+            self._promotion_tree = self._get_sys_promotion_tree()
         tree = self._promotion_tree
 
         plist_ins = plist_outs = None

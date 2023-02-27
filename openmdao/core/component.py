@@ -7,7 +7,6 @@ from itertools import product
 
 from numbers import Integral
 import numpy as np
-import networkx as nx
 from numpy import ndarray, isscalar, ndim, atleast_1d, atleast_2d, promote_types
 from scipy.sparse import issparse, coo_matrix
 

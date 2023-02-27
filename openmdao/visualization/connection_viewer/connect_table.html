@@ -59,14 +59,14 @@
             can be filtered by typing text into the ‘filter column’ field found at the top of the column.
         </p>
         <p>
-            Differing input and output units are highlighted in red.
+            Differing input and output units are highlighted in <span style="color:red;">red</span>.
         </p>
         <p>
             Columns can be shown or hidden using the toggle buttons below the table.
         </p>
         <p>
             In the promoted input and output columns, variables that are promoted at some level in
-            the model are shown in blue, while variables that are never promoted are shown in black.
+            the model are shown in <span style="color:blue;">blue</span>.
         </p>
         <p>
             By default for inputs and outputs, the promoted name column is shown and the absolute
@@ -76,7 +76,7 @@
             When showing promoted output and promoted input columns, if the promoted output name equals
             the promoted input name, that means the connection is an implicit connection. Otherwise
             the connection is explicit, meaning somewhere in the model there is an explicit call to
-            connect that produced the connection.
+            <strong>connect</strong> that produced the connection.
         </p>
         <p>
             Multiple inputs are sometimes promoted to the same name, and by sorting the promoted inputs
@@ -84,19 +84,20 @@
             missing or unwanted implicit connections.
         </p>
         <p>
-            Clicking on the '+' next to the name in the promoted outputs column will show additional
-            columns ('System', 'Output Promotion', and 'Input Promotion') and rows
+            Clicking on the <strong>+</strong> symbol next to the name in the promoted outputs column will show
+            additional columns <strong>(System, Output Promotion, and Input Promotion)</strong> and rows
             (one row per promotion) in the table to
             indicate where the input and/or output was promoted throughout the model.
-            The 'System' column shows each system where a variable was promoted up from one or more
-            of its subsystems.  The 'Output Promotion' and 'Input Promotion' columns show the
-            promoted name from each promoting subsystem, relative to the system found in the 'System'
-            column, followed by the '↑' symbol, followed by the new promoted name in the system found
-            in the 'System' column.  The contents of the 'System', 'Output Promotion' and 'Input Promotion'
-            columns will be colored dark red if there is an implicit connection (promoted input name
-            and output name match) at that system level.
+            The <strong>System</strong> column shows each system where a variable was promoted up from one or more
+            of its subsystems.  The <strong>Output Promotion</strong> and <strong>Input Promotion</strong> columns show the
+            promoted name from each promoting subsystem, relative to the system found in the <strong>System</strong>
+            column, followed by the <strong>↑</strong> symbol, followed by the new promoted name in the system found
+            in the <strong>System</strong> column.  The contents of the <strong>System</strong>,
+            <strong>Output Promotion</strong> and <strong>Input Promotion</strong>
+            columns will be colored <span style="color:darkred;">dark red</span> if there is an implicit
+            connection (promoted input name and output name match) at that system level.
             If neither the input nor the output have been promoted anywhere in the model, then
-            the '+' won't exist.
+            the <strong>+</strong> symbol won't exist.
         </p>
     </div>
     <h2 id="conn_title"></h2>
@@ -141,7 +142,7 @@ var table =
                 },
                 {title: "Output (promoted)", field:"sprom", hozAlign:"left", headerFilter:true, minWidth:300,
                     formatter:function(cell, formmaterParams, onRendered) {
-                        var promname = cell.getData().sprom;
+                        let promname = cell.getData().sprom;
                         if (promname == cell.getData().src) {
                             return promname;
                         }
@@ -207,7 +208,7 @@ var table =
                 {title: "Input (promoted)", field:"tprom", hozAlign:"left", headerFilter:true,
                     minWidth:300,
                     formatter:function(cell, formmaterParams, onRendered) {
-                        var promname = cell.getData().tprom;
+                        let promname = cell.getData().tprom;
                         if (promname == cell.getData().tgt) {
                             return promname;
                         }

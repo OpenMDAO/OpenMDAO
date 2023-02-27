@@ -30,8 +30,8 @@ class ParallelGroup(Group):
         if self.comm.size > 1:
             self._has_guess = any(self.comm.allgather(self._has_guess))
 
-    def _get_sys_tree(self, tree):
-        tree = super()._get_sys_tree(tree)
+    def _get_sys_promotion_tree(self, tree):
+        tree = super()._get_sys_promotion_tree(tree)
 
         if self.comm.size > 1:
             prefix = self.pathname + '.' if self.pathname else ''
