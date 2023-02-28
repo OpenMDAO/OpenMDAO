@@ -6603,7 +6603,7 @@ class System(object):
 
     def get_promotions(self, inprom=None, outprom=None):
         """
-        Return all promotions for the given promoted variable.
+        Return all promotions for the given promoted variable(s).
 
         In other words, how and where did promotions occur to convert absolute variable names into
         the given promoted name(s) at the current System level.
