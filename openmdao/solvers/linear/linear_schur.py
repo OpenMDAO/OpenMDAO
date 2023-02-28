@@ -30,7 +30,7 @@ class LinearSchur(BlockLinearSolver):
 
     SOLVER = "LN: Schur"
 
-    def __init__(self, **kwargs):
+    def __init__(self, mode_linear="rev", groupNames=["group1", "group2"], **kwargs):
         """
         Initialize all attributes.
         """
@@ -38,6 +38,8 @@ class LinearSchur(BlockLinearSolver):
 
         self._theta_n_1 = None
         self._delta_d_n_1 = None
+        self._mode_linear = mode_linear
+        self._groupNames = groupNames
 
     def _declare_options(self):
         """
@@ -62,7 +64,7 @@ class LinearSchur(BlockLinearSolver):
             error at the first iteration.
         """
         if self.options["use_aitken"]:
-            if self._mode == "fwd":
+            if self._mode_linear == "fwd":
                 self._delta_d_n_1 = self._system()._doutputs.asarray(copy=True)
             else:
                 self._delta_d_n_1 = self._system()._dresiduals.asarray(copy=True)
@@ -75,7 +77,7 @@ class LinearSchur(BlockLinearSolver):
         Perform the operations in the iteration loop.
         """
         system = self._system()
-        mode = self._mode
+        mode = self._mode_linear
         use_aitken = self.options["use_aitken"]
 
         if use_aitken:
@@ -87,7 +89,7 @@ class LinearSchur(BlockLinearSolver):
             theta_n_1 = self._theta_n_1
 
             # store a copy of the outputs, used to compute the change in outputs later
-            if self._mode == "fwd":
+            if self._mode_linear == "fwd":
                 d_out_vec = system._doutputs
             else:
                 d_out_vec = system._dresiduals
@@ -95,8 +97,8 @@ class LinearSchur(BlockLinearSolver):
             d_n = d_out_vec.asarray(copy=True)
             delta_d_n = d_out_vec.asarray(copy=True)
 
-        subsys1, _ = system._subsystems_allprocs["group1"]
-        subsys2, _ = system._subsystems_allprocs["group2"]
+        subsys1, _ = system._subsystems_allprocs[self._groupNames[0]]
+        subsys2, _ = system._subsystems_allprocs[self._groupNames[1]]
         # print(system._doutputs.keys())
 
         # TODO this may not be the most general case. think about just solving for a subset
@@ -221,14 +223,14 @@ class LinearSchur(BlockLinearSolver):
                 ovec[f"{subsys2.name}.{var}"] = 1.0
 
                 # transfer this seed to the first subsystem
-                system._transfer("linear", "fwd", subsys1.name)
+                system._transfer("linear", mode, subsys1.name)
 
                 # run the jac-vec computation in the first subsystem
                 scope_out, scope_in = system._get_matvec_scope(subsys1)
                 print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
                 print("subsys1", subsys1._vectors["output"]["linear"].asarray())
                 print("subsys1", subsys1._vectors["input"]["linear"].asarray())
-                subsys1._apply_linear(None, self._rel_systems, "fwd", scope_out, scope_in)
+                subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
 
                 if system.comm.rank == 0:
                     print(f"\nComputing Jacobian columns for {var}")
@@ -243,7 +245,7 @@ class LinearSchur(BlockLinearSolver):
                 print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
                 print("subsys1", subsys1._vectors["output"]["linear"].asarray())
                 print("subsys1", subsys1._vectors["input"]["linear"].asarray())
-                subsys1._solve_linear("fwd", self._rel_systems, ContainsAll())
+                subsys1._solve_linear(mode, self._rel_systems, ContainsAll())
                 if system.comm.rank == 0:
                     print(f"A^-1 B[:,{ii}]               =", subsys1._vectors["output"]["linear"].asarray())
                     print(
@@ -265,11 +267,11 @@ class LinearSchur(BlockLinearSolver):
                 # this should already be at one since we perturbed it above!
 
                 # transfer the outputs to inputs
-                system._transfer("linear", "fwd")
+                system._transfer("linear", mode)
 
                 # run the apply linear. we do it on the complete system here
                 scope_out, scope_in = system._get_matvec_scope()
-                system._apply_linear(None, self._rel_systems, "fwd", scope_out, scope_in)
+                system._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
 
                 # the result is the final jacobian for this using the schur complement method
                 if system.comm.rank == 0:
@@ -310,7 +312,7 @@ class LinearSchur(BlockLinearSolver):
             # print("subsys2", subsys2._vectors["residual"]["linear"].asarray())
             # print("subsys2", subsys2._vectors["output"]["linear"].asarray())
             # print("subsys2", subsys2._vectors["input"]["linear"].asarray())
-            subsys1._solve_linear("fwd", "linear", ContainsAll())
+            subsys1._solve_linear(mode, "linear", ContainsAll())
             # print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
             # print("subsys1", subsys1._vectors["output"]["linear"].asarray())
             # print("subsys1", subsys1._vectors["input"]["linear"].asarray())
@@ -326,7 +328,7 @@ class LinearSchur(BlockLinearSolver):
             scope_out, scope_in = system._get_matvec_scope()
             scope_out = self._vars_union(self._scope_out, scope_out)
             scope_in = self._vars_union(self._scope_in, scope_in)
-            system._apply_linear(None, self._rel_systems, "fwd", scope_out, scope_in)
+            system._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
             # print("subsys2", subsys2._vectors["residual"]["linear"].asarray())
             # print("subsys2", subsys2._vectors["output"]["linear"].asarray())
             # print("subsys2", subsys2._vectors["input"]["linear"].asarray())
@@ -389,7 +391,7 @@ class LinearSchur(BlockLinearSolver):
                     system._transfer("linear", mode, subsys.name)
 
         if use_aitken:
-            if self._mode == "fwd":
+            if self._mode_linear == "fwd":
                 d_resid_vec = system._dresiduals
                 d_out_vec = system._doutputs
             else:

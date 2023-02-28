@@ -131,7 +131,7 @@ class LinearBlockGS(BlockLinearSolver):
                 print("subsys2", subsys._vectors["output"]["linear"].asarray())
                 print("subsys2", subsys._vectors["input"]["linear"].asarray())
                 print(subsys._dresiduals, subsys._doutputs)
-            quit()
+            # quit()
         else:  # rev
             if sys.version_info >= (3, 8):
                 subsystems = reversed(system._subsystems_allprocs.values())

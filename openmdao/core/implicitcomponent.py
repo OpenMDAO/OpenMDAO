@@ -73,13 +73,13 @@ class ImplicitComponent(Component):
 
         Also tag component if it provides a guess_nonlinear.
         """
-        self._has_guess = overrides_method('guess_nonlinear', self, ImplicitComponent)
+        self._has_guess = overrides_method("guess_nonlinear", self, ImplicitComponent)
 
         if self._has_solve_nl is _UNDEFINED:
-            self._has_solve_nl = overrides_method('solve_nonlinear', self, ImplicitComponent)
+            self._has_solve_nl = overrides_method("solve_nonlinear", self, ImplicitComponent)
 
         if self.matrix_free is _UNDEFINED:
-            self.matrix_free = overrides_method('apply_linear', self, ImplicitComponent)
+            self.matrix_free = overrides_method("apply_linear", self, ImplicitComponent)
 
         if self.matrix_free:
             self._check_matfree_deprecation()
@@ -89,16 +89,19 @@ class ImplicitComponent(Component):
         Compute residuals. The model is assumed to be in a scaled state.
         """
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
-            with self._call_user_function('apply_nonlinear', protect_outputs=True):
+            with self._call_user_function("apply_nonlinear", protect_outputs=True):
                 if self._run_root_only():
                     if self.comm.rank == 0:
                         if self._discrete_inputs or self._discrete_outputs:
-                            self.apply_nonlinear(self._inputs, self._outputs,
-                                                 self._residuals_wrapper,
-                                                 self._discrete_inputs, self._discrete_outputs)
+                            self.apply_nonlinear(
+                                self._inputs,
+                                self._outputs,
+                                self._residuals_wrapper,
+                                self._discrete_inputs,
+                                self._discrete_outputs,
+                            )
                         else:
-                            self.apply_nonlinear(self._inputs, self._outputs,
-                                                 self._residuals_wrapper)
+                            self.apply_nonlinear(self._inputs, self._outputs, self._residuals_wrapper)
                         self.comm.bcast([self._residuals.asarray(), self._discrete_outputs], root=0)
                     else:
                         new_res, new_disc_outs = self.comm.bcast(None, root=0)
@@ -108,8 +111,13 @@ class ImplicitComponent(Component):
                                 self._discrete_outputs[name] = val
                 else:
                     if self._discrete_inputs or self._discrete_outputs:
-                        self.apply_nonlinear(self._inputs, self._outputs, self._residuals_wrapper,
-                                             self._discrete_inputs, self._discrete_outputs)
+                        self.apply_nonlinear(
+                            self._inputs,
+                            self._outputs,
+                            self._residuals_wrapper,
+                            self._discrete_inputs,
+                            self._discrete_outputs,
+                        )
                     else:
                         self.apply_nonlinear(self._inputs, self._outputs, self._residuals_wrapper)
 
@@ -120,22 +128,21 @@ class ImplicitComponent(Component):
         Compute outputs. The model is assumed to be in a scaled state.
         """
         if self._nonlinear_solver is not None:
-            with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
+            with Recording(self.pathname + "._solve_nonlinear", self.iter_count, self):
                 self._nonlinear_solver._solve_with_cache_check()
         elif self._has_solve_nl:
             with self._unscaled_context(outputs=[self._outputs]):
-                with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
-                    with self._call_user_function('solve_nonlinear'):
+                with Recording(self.pathname + "._solve_nonlinear", self.iter_count, self):
+                    with self._call_user_function("solve_nonlinear"):
                         if self._run_root_only():
                             if self.comm.rank == 0:
                                 if self._discrete_inputs or self._discrete_outputs:
-                                    self.solve_nonlinear(self._inputs, self._outputs,
-                                                         self._discrete_inputs,
-                                                         self._discrete_outputs)
+                                    self.solve_nonlinear(
+                                        self._inputs, self._outputs, self._discrete_inputs, self._discrete_outputs
+                                    )
                                 else:
                                     self.solve_nonlinear(self._inputs, self._outputs)
-                                self.comm.bcast([self._outputs.asarray(), self._discrete_outputs],
-                                                root=0)
+                                self.comm.bcast([self._outputs.asarray(), self._discrete_outputs], root=0)
                             else:
                                 new_res, new_disc_outs = self.comm.bcast(None, root=0)
                                 self._outputs.set_val(new_res)
@@ -144,8 +151,9 @@ class ImplicitComponent(Component):
                                         self._discrete_outputs[name] = val
                         else:
                             if self._discrete_inputs or self._discrete_outputs:
-                                self.solve_nonlinear(self._inputs, self._outputs,
-                                                     self._discrete_inputs, self._discrete_outputs)
+                                self.solve_nonlinear(
+                                    self._inputs, self._outputs, self._discrete_inputs, self._discrete_outputs
+                                )
                             else:
                                 self.solve_nonlinear(self._inputs, self._outputs)
 
@@ -166,14 +174,17 @@ class ImplicitComponent(Component):
                         self._outputs.set_complex_step_mode(False)
                         self._residuals.set_complex_step_mode(False)
 
-                    with self._call_user_function('guess_nonlinear', protect_residuals=True):
+                    with self._call_user_function("guess_nonlinear", protect_residuals=True):
                         if self._discrete_inputs or self._discrete_outputs:
-                            self.guess_nonlinear(self._inputs, self._outputs,
-                                                 self._residuals_wrapper,
-                                                 self._discrete_inputs, self._discrete_outputs)
+                            self.guess_nonlinear(
+                                self._inputs,
+                                self._outputs,
+                                self._residuals_wrapper,
+                                self._discrete_inputs,
+                                self._discrete_outputs,
+                            )
                         else:
-                            self.guess_nonlinear(self._inputs, self._outputs,
-                                                 self._residuals_wrapper)
+                            self.guess_nonlinear(self._inputs, self._outputs, self._residuals_wrapper)
             finally:
                 if complex_step:
                     self._inputs.set_complex_step_mode(True)
@@ -190,15 +201,16 @@ class ImplicitComponent(Component):
             List of positional arguments.
         """
         inputs, outputs, d_inputs, d_outputs, d_residuals, mode = args
+
         if self._run_root_only():
             if self.comm.rank == 0:
                 self.apply_linear(inputs, outputs, d_inputs, d_outputs, d_residuals, mode)
-                if mode == 'fwd':
+                if mode == "fwd":
                     self.comm.bcast(d_residuals.asarray(), root=0)
                 else:  # rev
                     self.comm.bcast((d_inputs.asarray(), d_outputs.asarray()), root=0)
             else:
-                if mode == 'fwd':
+                if mode == "fwd":
                     new_res = self.comm.bcast(None, root=0)
                     d_residuals.set_val(new_res)
                 else:  # rev
@@ -206,8 +218,8 @@ class ImplicitComponent(Component):
                     d_inputs.set_val(new_ins)
                     d_outputs.set_val(new_outs)
         else:
-            dochk = mode == 'rev' and self._problem_meta['checking'] and self.comm.size > 1
-
+            dochk = mode == "rev" and self._problem_meta["checking"] and self.comm.size > 1
+            # print("_doutputs b", np.linalg.norm(d_outputs))
             if dochk:
                 nzdresids = self._get_dist_nz_dresids()
 
@@ -237,11 +249,15 @@ class ImplicitComponent(Component):
         """
         if jac is None:
             jac = self._assembled_jac if self._assembled_jac is not None else self._jacobian
-
+        # system = self._system()
+        if self.comm.rank == 0:
+            print("self._doutputs", self._doutputs)
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
             d_inputs, d_outputs, d_residuals = vecs
+            if self.comm.rank == 0:
+                print("d_outputs", d_outputs)
             d_residuals = self._dresiduals_wrapper
-
+            # print("_doutputs a", d_outputs)
             # Jacobian and vectors are all scaled, unitless
             jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
 
@@ -251,19 +267,16 @@ class ImplicitComponent(Component):
                 return
 
             # Jacobian and vectors are all unscaled, dimensional
-            with self._unscaled_context(
-                    outputs=[self._outputs, d_outputs], residuals=[d_residuals]):
-
+            with self._unscaled_context(outputs=[self._outputs, d_outputs], residuals=[d_residuals]):
                 # set appropriate vectors to read_only to help prevent user error
-                if mode == 'fwd':
+                if mode == "fwd":
                     d_inputs.read_only = d_outputs.read_only = True
-                elif mode == 'rev':
+                elif mode == "rev":
                     d_residuals.read_only = True
 
                 try:
-                    with self._call_user_function('apply_linear', protect_outputs=True):
-                        self._apply_linear_wrapper(self._inputs, self._outputs,
-                                                   d_inputs, d_outputs, d_residuals, mode)
+                    with self._call_user_function("apply_linear", protect_outputs=True):
+                        self._apply_linear_wrapper(self._inputs, self._outputs, d_inputs, d_outputs, d_residuals, mode)
                 finally:
                     d_inputs.read_only = d_outputs.read_only = d_residuals.read_only = False
 
@@ -282,31 +295,34 @@ class ImplicitComponent(Component):
         scope_in : set, None, or _UNDEFINED
             Inputs relevant to possible lower level calls to _apply_linear on Components.
         """
+        print("mode linear solve", mode)
         if self._linear_solver is not None:
             self._linear_solver._set_matvec_scope(scope_out, scope_in)
             self._linear_solver.solve(mode, rel_systems)
+            print("mode linear", mode)
 
         else:
             d_outputs = self._doutputs
             d_residuals = self._dresiduals_wrapper
-
+            print("mode linear 1", mode)
             with self._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
                 # set appropriate vectors to read_only to help prevent user error
-                if mode == 'fwd':
+                if mode == "fwd":
                     d_residuals.read_only = True
-                elif mode == 'rev':
+                elif mode == "rev":
                     d_outputs.read_only = True
 
                 try:
-                    with self._call_user_function('solve_linear'):
+                    with self._call_user_function("solve_linear"):
+                        print("mode linear solve_linear", mode)
                         self.solve_linear(d_outputs, d_residuals, mode)
                 finally:
                     d_outputs.read_only = d_residuals.read_only = False
 
     def _approx_subjac_keys_iter(self):
         for abs_key, meta in self._subjacs_info.items():
-            if 'method' in meta:
-                method = meta['method']
+            if "method" in meta:
+                method = meta["method"]
                 if method is not None and method in self._approx_schemes:
                     yield abs_key
 
@@ -314,12 +330,17 @@ class ImplicitComponent(Component):
         """
         Call linearize based on the value of the "run_root_only" option.
         """
-        with self._call_user_function('linearize', protect_outputs=True):
+        with self._call_user_function("linearize", protect_outputs=True):
             if self._run_root_only():
                 if self.comm.rank == 0:
                     if self._discrete_inputs or self._discrete_outputs:
-                        self.linearize(self._inputs, self._outputs, self._jac_wrapper,
-                                       self._discrete_inputs, self._discrete_outputs)
+                        self.linearize(
+                            self._inputs,
+                            self._outputs,
+                            self._jac_wrapper,
+                            self._discrete_inputs,
+                            self._discrete_outputs,
+                        )
                     else:
                         self.linearize(self._inputs, self._outputs, self._jac_wrapper)
                     self.comm.bcast(list(self._jacobian.items()), root=0)
@@ -328,8 +349,9 @@ class ImplicitComponent(Component):
                         self._jac_wrapper[key] = val
             else:
                 if self._discrete_inputs or self._discrete_outputs:
-                    self.linearize(self._inputs, self._outputs, self._jac_wrapper,
-                                   self._discrete_inputs, self._discrete_outputs)
+                    self.linearize(
+                        self._inputs, self._outputs, self._jac_wrapper, self._discrete_inputs, self._discrete_outputs
+                    )
                 else:
                     self.linearize(self._inputs, self._outputs, self._jac_wrapper)
 
@@ -378,11 +400,11 @@ class ImplicitComponent(Component):
         """
         metadata = super().add_output(name, val, **kwargs)
 
-        metadata['tags'].add('openmdao:allow_desvar')
+        metadata["tags"].add("openmdao:allow_desvar")
 
         return metadata
 
-    def add_residual(self, name, shape=(), units=None, desc='', ref=None):
+    def add_residual(self, name, shape=(), units=None, desc="", ref=None):
         """
         Add an residual variable to the component.
 
@@ -410,8 +432,7 @@ class ImplicitComponent(Component):
             Metadata for the added residual.
         """
         if self._problem_meta is None:
-            raise RuntimeError(f"{self.msginfo}: "
-                               "A residual may only be added during component setup.")
+            raise RuntimeError(f"{self.msginfo}: " "A residual may only be added during component setup.")
 
         metadict = self._declared_residuals
 
@@ -420,7 +441,7 @@ class ImplicitComponent(Component):
             raise ValueError(f"{self.msginfo}: Residual name '{name}' already exists.")
 
         if self._problem_meta is not None:
-            if self._problem_meta['setup_status'] >= _SetupStatus.POST_SETUP:
+            if self._problem_meta["setup_status"] >= _SetupStatus.POST_SETUP:
                 raise RuntimeError(f"{self.msginfo}: Can't add residual '{name}' after setup.")
 
         # check ref shape
@@ -431,15 +452,18 @@ class ImplicitComponent(Component):
                 self._has_resid_scaling |= np.any(ref != 1.0)
 
                 if not isinstance(ref, _allowed_types):
-                    raise TypeError(f'{self.msginfo}: The ref argument should be a '
-                                    'float, list, tuple, ndarray or Iterable')
+                    raise TypeError(
+                        f"{self.msginfo}: The ref argument should be a " "float, list, tuple, ndarray or Iterable"
+                    )
 
                 it = np.atleast_1d(ref)
                 if shape is None:
                     shape = it.shape
                 elif it.shape != shape:
-                    raise ValueError(f"{self.msginfo}: When adding residual '{name}', expected "
-                                     f"shape {shape} but got shape {it.shape} for argument 'ref'.")
+                    raise ValueError(
+                        f"{self.msginfo}: When adding residual '{name}', expected "
+                        f"shape {shape} but got shape {it.shape} for argument 'ref'."
+                    )
 
         if units is not None:
             if not isinstance(units, str):
@@ -447,10 +471,10 @@ class ImplicitComponent(Component):
             units = simplify_unit(units, msginfo=self.msginfo)
 
         metadict[name] = meta = {
-            'shape': shape,
-            'units': units,
-            'desc': desc,
-            'ref': format_as_float_or_array('ref', ref, flatten=True, val_if_none=None),
+            "shape": shape,
+            "units": units,
+            "desc": desc,
+            "ref": format_as_float_or_array("ref", ref, flatten=True, val_if_none=None),
         }
 
         return meta
@@ -466,11 +490,11 @@ class ImplicitComponent(Component):
         """
         if self._has_resid_scaling:
             scale_factors = super()._compute_root_scale_factors()
-            prefix = self.pathname + '.' if self.pathname else ''
+            prefix = self.pathname + "." if self.pathname else ""
             for resid, meta in self._declared_residuals.items():
-                ref = meta['ref']
+                ref = meta["ref"]
                 if ref is not None:
-                    scale_factors[prefix + resid]['residual'] = (0.0, ref)
+                    scale_factors[prefix + resid]["residual"] = (0.0, ref)
             return scale_factors
         else:
             return super()._compute_root_scale_factors()
@@ -499,7 +523,7 @@ class ImplicitComponent(Component):
 
     def _resid_name_shape_iter(self):
         for name, meta in self._declared_residuals.items():
-            yield name, meta['shape']
+            yield name, meta["shape"]
 
     def _setup_vectors(self, root_vectors):
         """
@@ -552,8 +576,7 @@ class ImplicitComponent(Component):
             for _, resids in resbundle:
                 if not resids:
                     continue
-                for tup in _overlap_range_iter(self._declared_residuals,
-                                               self._var_abs2meta['output'], names1=resids):
+                for tup in _overlap_range_iter(self._declared_residuals, self._var_abs2meta["output"], names1=resids):
                     resid, rstart, rend, oname, ostart, oend = tup
 
                     if resid not in rmap:
@@ -582,31 +605,33 @@ class ImplicitComponent(Component):
             Local name of the output.
         """
         resmeta = self._declared_residuals[resid]
-        outmeta = self._var_abs2meta['output'][output]
-        loc_out = output[len(self.pathname) + 1:] if self.pathname else output
+        outmeta = self._var_abs2meta["output"][output]
+        loc_out = output[len(self.pathname) + 1 :] if self.pathname else output
 
-        ref = resmeta['ref']
-        res_ref = outmeta['res_ref']
+        ref = resmeta["ref"]
+        res_ref = outmeta["res_ref"]
 
         if ref is not None and res_ref is not None:
             ref_arr = isinstance(ref, np.ndarray)
             res_ref_arr = isinstance(res_ref, np.ndarray)
-            if (ref_arr != res_ref_arr or (ref_arr and not np.all(ref == res_ref) or
-                                           (not ref_arr and ref != res_ref))):
-                raise ValueError(f"{self.msginfo}: ({ref} != {res_ref}), 'ref' for residual "
-                                 f"'{resid}' != 'res_ref' for output '{loc_out}'.")
+            if ref_arr != res_ref_arr or (ref_arr and not np.all(ref == res_ref) or (not ref_arr and ref != res_ref)):
+                raise ValueError(
+                    f"{self.msginfo}: ({ref} != {res_ref}), 'ref' for residual "
+                    f"'{resid}' != 'res_ref' for output '{loc_out}'."
+                )
 
-        units = resmeta['units']
-        res_units = outmeta['res_units']
+        units = resmeta["units"]
+        res_units = outmeta["res_units"]
 
         # assume units and res_units are already simplified
         if units is not None and res_units is not None and units != res_units:
-            raise ValueError(f"{self.msginfo}: residual units '{units}' for residual '{resid}' != "
-                             f"output res_units '{res_units}' for output '{loc_out}'.")
+            raise ValueError(
+                f"{self.msginfo}: residual units '{units}' for residual '{resid}' != "
+                f"output res_units '{res_units}' for output '{loc_out}'."
+            )
 
     def _check_res_out_overlaps(self):
-        for resid, _, _, output, _, _ in _overlap_range_iter(self._declared_residuals,
-                                                             self._var_abs2meta['output']):
+        for resid, _, _, output, _, _ in _overlap_range_iter(self._declared_residuals, self._var_abs2meta["output"]):
             self._check_res_vs_out_meta(resid, output)
 
     def _get_partials_varlists(self, use_resname=False):
@@ -623,8 +648,8 @@ class ImplicitComponent(Component):
         tuple(list, list)
             'of' and 'wrt' variable lists.
         """
-        of = list(self._var_allprocs_prom2abs_list['output'])
-        wrt = list(self._var_allprocs_prom2abs_list['input'])
+        of = list(self._var_allprocs_prom2abs_list["output"])
+        wrt = list(self._var_allprocs_prom2abs_list["input"])
 
         # filter out any discrete inputs or outputs
         if self._discrete_outputs:
@@ -637,8 +662,7 @@ class ImplicitComponent(Component):
 
         return of, of + wrt
 
-    def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs=None,
-                        discrete_outputs=None):
+    def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs=None, discrete_outputs=None):
         """
         Compute residuals given inputs and outputs.
 
@@ -657,8 +681,7 @@ class ImplicitComponent(Component):
         discrete_outputs : dict or None
             If not None, dict containing discrete output values.
         """
-        raise NotImplementedError('ImplicitComponent.apply_nonlinear() must be overridden '
-                                  'by the child class.')
+        raise NotImplementedError("ImplicitComponent.apply_nonlinear() must be overridden " "by the child class.")
 
     def solve_nonlinear(self, inputs, outputs):
         """
@@ -673,8 +696,7 @@ class ImplicitComponent(Component):
         """
         pass
 
-    def guess_nonlinear(self, inputs, outputs, residuals,
-                        discrete_inputs=None, discrete_outputs=None):
+    def guess_nonlinear(self, inputs, outputs, residuals, discrete_inputs=None, discrete_outputs=None):
         """
         Provide initial guess for states.
 
@@ -744,7 +766,7 @@ class ImplicitComponent(Component):
         mode : str
             Either 'fwd' or 'rev'.
         """
-        if mode == 'fwd':
+        if mode == "fwd":
             d_outputs.set_vec(d_residuals)
         else:  # rev
             d_residuals.set_vec(d_outputs)
@@ -781,9 +803,8 @@ class ImplicitComponent(Component):
         list
             List of all states.
         """
-        prefix = self.pathname + '.' if self.pathname else ''
-        return sorted(list(self._var_abs2meta['output']) +
-                      [prefix + n for n in self._var_discrete['output']])
+        prefix = self.pathname + "." if self.pathname else ""
+        return sorted(list(self._var_abs2meta["output"]) + [prefix + n for n in self._var_discrete["output"]])
 
     def _list_states_allprocs(self):
         """
@@ -797,7 +818,7 @@ class ImplicitComponent(Component):
         return self._list_states()
 
 
-def meta2range_iter(meta_dict, names=None, shp_name='shape'):
+def meta2range_iter(meta_dict, names=None, shp_name="shape"):
     """
     Iterate over variables and their ranges, based on shape metadata for each variable.
 
@@ -884,17 +905,19 @@ def _overlap_range_iter(meta_dict1, meta_dict2, names1=None, names2=None):
 
 class _ResidsWrapper(object):
     def __init__(self, vec, name2slice_shape):
-        self.__dict__['_vec'] = vec
-        self.__dict__['_dct'] = name2slice_shape
+        self.__dict__["_vec"] = vec
+        self.__dict__["_dct"] = name2slice_shape
         # check that vec size matches mapped resids size
         for slc, _ in name2slice_shape.values():
             pass
         if slc.stop != len(vec):
             system = vec._system()
-            raise RuntimeError(f"{system.msginfo}: The number of residuals ({slc.stop}) doesn't "
-                               f"match number of outputs ({len(vec)}).  If any residuals are "
-                               "added using 'add_residuals', their total size must match the "
-                               "total size of the outputs.")
+            raise RuntimeError(
+                f"{system.msginfo}: The number of residuals ({slc.stop}) doesn't "
+                f"match number of outputs ({len(vec)}).  If any residuals are "
+                "added using 'add_residuals', their total size must match the "
+                "total size of the outputs."
+            )
 
     def __getitem__(self, name):
         arr = self._vec.asarray(copy=False)
@@ -924,8 +947,8 @@ class _ResidsWrapper(object):
 
 class _JacobianWrapper(object):
     def __init__(self, jac, res2outmap):
-        self.__dict__['_jac'] = jac
-        self.__dict__['_dct'] = res2outmap
+        self.__dict__["_jac"] = jac
+        self.__dict__["_dct"] = res2outmap
 
     def __getitem__(self, key):
         res, wrt = key
