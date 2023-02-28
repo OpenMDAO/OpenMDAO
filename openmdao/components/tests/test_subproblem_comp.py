@@ -4,7 +4,7 @@ import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
 import unittest
 
-from openmdao.components.subproblem_comp import SubproblemComp
+# from openmdao.components.subproblem_comp import SubproblemComp
 
 class TestSubproblemComp(unittest.TestCase):
     def test_subproblem_comp(self):
@@ -33,9 +33,9 @@ class TestSubproblemComp(unittest.TestCase):
                                 promotes_inputs=['r', 'theta'],
                                 promotes_outputs=['y'])
 
-        subprob1 = SubproblemComp(model=submodel1, inputs=['r', 'theta'],
+        subprob1 = om.SubproblemComp(model=submodel1, inputs=['r', 'theta'],
                                   outputs=['x'])
-        subprob2 = SubproblemComp(model=submodel2, inputs=['r', 'theta'],
+        subprob2 = om.SubproblemComp(model=submodel2, inputs=['r', 'theta'],
                                   outputs=['y'])
 
         prob.model.add_subsystem('sub1', subprob1, promotes_inputs=['r','theta'],
@@ -54,3 +54,29 @@ class TestSubproblemComp(unittest.TestCase):
         cpd = prob.check_partials(method='cs', out_stream=None)
         
         assert_near_equal(prob.get_val('z'), 1.0) 
+
+    def test_variable_alias(self):
+        p = om.Problem()
+        model = om.Group()
+
+        model.add_subsystem('subsys', om.ExecComp('z = x**2 + y**2'))
+        subprob = om.SubproblemComp(model=model, inputs=[('subsys.x', 'a'), ('subsys.y', 'b')],
+                                    outputs=[('subsys.z', 'c')])
+
+        p.model.add_subsystem('prob', subprob, promotes_inputs=['a', 'b'], promotes_outputs=['c'])
+        p.setup()
+
+        p.set_val('a', 1)
+        p.set_val('b', 2)
+
+        p.run_model()
+
+        inputs = p.model.prob.list_inputs()
+        outputs = p.model.prob.list_outputs()
+
+        inputs = {inputs[i][0]: inputs[i][1] for i in range(len(inputs))}
+        outputs = {outputs[i][0]: outputs[i][1] for i in range(len(outputs))}
+
+        assert(inputs['a']['val'] == 1)
+        assert(inputs['b']['val'] == 2)
+        assert(outputs['c']['val'] == 5)

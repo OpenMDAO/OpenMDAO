@@ -1,6 +1,7 @@
 """Define the SubproblemComp class for evaluating OpenMDAO systems within problems."""
 
-import openmdao.api as om
+from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.core.problem import Problem
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.core.driver import Driver
@@ -38,8 +39,10 @@ def _get_model_vars(varType, vars, model_vars):
                                 ' or delete copy of variable.')
 
             # make dict with given var name as key and meta data from model_vars
-            tmp_dict = {var[1]: meta for _, meta in model_vars
-                        if meta['prom_name'] == var[0]}
+            # check if name == var[0] -> var[0] is abs name and var[1] is alias
+            # check if meta['prom_name'] == var[0] -> var[0] is prom name and var[1] is alias
+            tmp_dict = {var[1]: meta for name, meta in model_vars
+                        if name == var[0] or meta['prom_name'] == var[0]}
 
             # check if dict is empty (no vars added)
             if len(tmp_dict) == 0:
@@ -56,8 +59,11 @@ def _get_model_vars(varType, vars, model_vars):
                                 ' or delete copy of variable.')
 
             # make dict with given var name as key and meta data from model_vars
+            # check if name == var -> given var is abs name
+            # check if meta['prom_name'] == var -> given var is prom_name
+            # check if name.endswith('.' + var) -> given var is last part of abs name
             tmp_dict = {var: meta for name, meta in model_vars
-                        if name.endswith('.' + var)}
+                        if name == var or meta['prom_name'] == var or name.endswith('.' + var)}
 
             # check if provided variable appears more than once in model
             if len(tmp_dict) > 1:
@@ -79,7 +85,7 @@ def _get_model_vars(varType, vars, model_vars):
     return var_dict
 
 
-class SubproblemComp(om.ExplicitComponent):
+class SubproblemComp(ExplicitComponent):
     """
     System level container for systems and drivers.
 
@@ -177,7 +183,7 @@ class SubproblemComp(om.ExplicitComponent):
         """
         Perform some final setup and checks.
         """
-        p = self._subprob = om.Problem(**self.prob_args)
+        p = self._subprob = Problem(**self.prob_args)
         p.model.add_subsystem('subsys', self.model, promotes=['*'])
 
         p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'])
@@ -234,9 +240,7 @@ class SubproblemComp(om.ExplicitComponent):
         p = self._subprob
 
         # switch subproblem to use complex IO if in complex step mode
-        if self.under_complex_step != self._prev_complex_step:
-            self._set_complex_step_mode(self.under_complex_step)
-            self._prev_complex_step = self.under_complex_step
+        self._set_complex_step_mode(self.under_complex_step)
 
         # setup input values
         for inp in self._input_names:
@@ -249,7 +253,7 @@ class SubproblemComp(om.ExplicitComponent):
 
         # store output vars
         for op in self._output_names:
-            outputs[op] = p.get_val(op)
+            outputs[op] = p.get_val(self.options['outputs'][op]['prom_name'])
 
     def compute_partials(self, inputs, partials):
         """
