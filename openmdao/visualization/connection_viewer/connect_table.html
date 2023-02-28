@@ -246,9 +246,9 @@ table.on("dataTreeRowExpanded", function(row, level){
 table.on("dataTreeRowCollapsed", function(row, level){
     num_promotes_showing = num_promotes_showing - 1;
     if (num_promotes_showing == 0) {
-        table.toggleColumn("system");
-        table.toggleColumn("outpromto");
-        table.toggleColumn("inpromto");
+        table.hideColumn("system");
+        table.hideColumn("outpromto");
+        table.hideColumn("inpromto");
         table.redraw();
     }
 });
