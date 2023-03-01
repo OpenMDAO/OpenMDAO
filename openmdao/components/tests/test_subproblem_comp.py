@@ -95,11 +95,11 @@ class TestSubproblemComp(unittest.TestCase):
         subprob = om.SubproblemComp(model=model, inputs=[('x1Comp.x', 'x'), ('x2Comp.x', 'y')],
                                     outputs=[('model.z', 'z')])
 
-        p.model.add_subsystem('subprob', subprob, promotes=['*'])
+        p.model.add_subsystem('subprob', subprob)
         p.setup()
 
-        p.set_val('x1Compx', 1)
-        p.set_val('x2Compx', 2)
+        p.set_val('subprob.x', 1)
+        p.set_val('subprob.y', 2)
 
         p.run_model()
 
