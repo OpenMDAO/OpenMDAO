@@ -8,7 +8,7 @@ import unittest
 
 class TestSubproblemComp(unittest.TestCase):
     def test_subproblem_comp(self):
-        prob = om.Problem()
+        p = om.Problem()
 
         model = om.Group()
         model.add_subsystem('supComp', om.ExecComp('z = x**2 + y'),
@@ -38,22 +38,22 @@ class TestSubproblemComp(unittest.TestCase):
         subprob2 = om.SubproblemComp(model=submodel2, inputs=['r', 'theta'],
                                   outputs=['y'])
 
-        prob.model.add_subsystem('sub1', subprob1, promotes_inputs=['r','theta'],
+        p.model.add_subsystem('sub1', subprob1, promotes_inputs=['r','theta'],
                                     promotes_outputs=['x'])
-        prob.model.add_subsystem('sub2', subprob2, promotes_inputs=['r','theta'],
+        p.model.add_subsystem('sub2', subprob2, promotes_inputs=['r','theta'],
                                     promotes_outputs=['y'])
-        prob.model.add_subsystem('supModel', model, promotes_inputs=['x','y'],
+        p.model.add_subsystem('supModel', model, promotes_inputs=['x','y'],
                                     promotes_outputs=['z'])
 
-        prob.setup(force_alloc_complex=True)
+        p.setup(force_alloc_complex=True)
 
-        prob.set_val('r', 1)
-        prob.set_val('theta', pi)
+        p.set_val('r', 1)
+        p.set_val('theta', pi)
 
-        prob.run_model()
-        cpd = prob.check_partials(method='cs', out_stream=None)
+        p.run_model()
+        cpd = p.check_partials(method='cs', out_stream=None)
         
-        assert_near_equal(prob.get_val('z'), 1.0) 
+        assert_near_equal(p.get_val('z'), 1.0) 
 
     def test_variable_alias(self):
         p = om.Problem()
@@ -63,7 +63,7 @@ class TestSubproblemComp(unittest.TestCase):
         subprob = om.SubproblemComp(model=model, inputs=[('subsys.x', 'a'), ('subsys.y', 'b')],
                                     outputs=[('subsys.z', 'c')])
 
-        p.model.add_subsystem('prob', subprob, promotes_inputs=['a', 'b'], promotes_outputs=['c'])
+        p.model.add_subsystem('subprob', subprob, promotes_inputs=['a', 'b'], promotes_outputs=['c'])
         p.setup()
 
         p.set_val('a', 1)
@@ -71,8 +71,8 @@ class TestSubproblemComp(unittest.TestCase):
 
         p.run_model()
 
-        inputs = p.model.prob.list_inputs()
-        outputs = p.model.prob.list_outputs()
+        inputs = p.model.subprob.list_inputs()
+        outputs = p.model.subprob.list_outputs()
 
         inputs = {inputs[i][0]: inputs[i][1]['val'] for i in range(len(inputs))}
         outputs = {outputs[i][0]: outputs[i][1]['val'] for i in range(len(outputs))}
