@@ -227,8 +227,8 @@ class SchurSolver(NonlinearSolver):
         approx_status = system._owns_approx_jac
         system._owns_approx_jac = False
 
-        system._vectors["residual"]["linear"].set_vec(system._dresiduals)
-        # system._vectors["output"]["linear"].set_vec(system._outputs)
+        system._vectors["residual"]["linear"].set_vec(system._residuals)
+        system._vectors["output"]["linear"].set_vec(system._outputs)
         # system._vectors["input"]["linear"].set_vec(system._inputs)
         system._vectors["residual"]["linear"] *= -1.0
         my_asm_jac = self.linear_solver._assembled_jac
@@ -421,7 +421,7 @@ class SchurSolver(NonlinearSolver):
                     print("subsys2", subsys2._vectors["output"]["linear"].asarray())
                     print("subsys2", subsys2._vectors["input"]["linear"].asarray())
                 # print(scope_out, scope_in)
-                system._apply_linear(None, None, mode, scope_out, scope_in)
+                system._apply_linear(None, ContainsAll(), mode, scope_out, scope_in)
                 if system.comm.rank == 0:
                     print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
                     print("subsys1", subsys1._vectors["output"]["linear"].asarray())
@@ -448,7 +448,7 @@ class SchurSolver(NonlinearSolver):
                     print("subsys2", subsys2._vectors["residual"]["linear"].asarray())
                     print("subsys2", subsys2._vectors["output"]["linear"].asarray())
                     print("subsys2", subsys2._vectors["input"]["linear"].asarray())
-                subsys1._solve_linear(mode, ["linear"], ContainsAll())
+                subsys1._solve_linear(mode, ContainsAll())
                 if system.comm.rank == 0:
                     print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
                     print("subsys1", subsys1._vectors["output"]["linear"].asarray())
@@ -525,7 +525,7 @@ class SchurSolver(NonlinearSolver):
         rvec.set_val(r_data)
         ovec.set_val(o_data)
 
-        # quit()
+        quit()
         # ivec.set_val(i_data)
 
         # we now have the schur complement of the jacobian for the second component.
