@@ -16,12 +16,13 @@ def _get_model_vars(varType, vars, model_vars):
     varType : str
         Specifies whether inputs or outputs are being extracted.
     vars : list of str or tuple
-        List of provided variable names in str or tuple form. If an element is a str,
-        then it should be the var name in its promoted name. If it is a tuple, then the
-        first element should be the promoted name, and the second element should be the
-        var name you wish to refer to it by within the subproblem [e.g. (prom_name, var_name)].
+        List of provided var names in str or tuple form. If an element is a str,
+        then it should be the absolute name or the promoted name in its group. If it is a tuple,
+        then the first element should be the absolute name or group's promoted name, and the
+        second element should be the var name you wish to refer to it within the subproblem
+        [e.g. (path.to.var, desired_name)].
     model_vars : list of tuples
-        List of model's variable names and meta data.
+        List of model variable absolute names and meta data.
 
     Returns
     -------
@@ -63,7 +64,7 @@ def _get_model_vars(varType, vars, model_vars):
             # check if meta['prom_name'] == var -> given var is prom_name
             # check if name.endswith('.' + var) -> given var is last part of abs name
             tmp_dict = {var: meta for name, meta in model_vars
-                        if name == var or meta['prom_name'] == var or name.endswith('.' + var)}
+                        if name == var or meta['prom_name'] == var}
 
             # check if provided variable appears more than once in model
             if len(tmp_dict) > 1:
@@ -94,15 +95,17 @@ class SubproblemComp(ExplicitComponent):
     model : <System>
         The system-level <System>.
     inputs : list of str or tuple
-        List of desired inputs to subproblem. If an element is a str, then it should be
-        the var name in its promoted name. If it is a tuple, then the first element
-        should be the promoted name, and the second element should be the var name
-        you wish to refer to it by within the subproblem [e.g. (prom_name, var_name)].
+        List of provided input names in str or tuple form. If an element is a str,
+        then it should be the absolute name or the promoted name in its group. If it is a tuple,
+        then the first element should be the absolute name or group's promoted name, and the
+        second element should be the var name you wish to refer to it within the subproblem
+        [e.g. (path.to.var, desired_name)].
     outputs : list of str or tuple
-        List of desired outputs from subproblem. If an element is a str, then it should be
-        the var name in its promoted name. If it is a tuple, then the first element
-        should be the promoted name, and the second element should be the var name
-        you wish to refer to it by within the subproblem [e.g. (prom_name, var_name)].
+        List of provided output names in str or tuple form. If an element is a str,
+        then it should be the absolute name or the promoted name in its group. If it is a tuple,
+        then the first element should be the absolute name or group's promoted name, and the
+        second element should be the var name you wish to refer to it within the subproblem
+        [e.g. (path.to.var, desired_name)].
     driver : <Driver> or None
         The driver for the problem. If not specified, a simple "Run Once" driver will be used.
     comm : MPI.Comm or <FakeComm> or None
@@ -123,9 +126,6 @@ class SubproblemComp(ExplicitComponent):
 
     Attributes
     ----------
-    _prev_complex_step : bool
-        Flag to determine if the system will need to switch to use complex IO
-        or to switch away from using complex IO.
     prob_args : dict
         Extra arguments to be passed to the problem instantiation.
     model : <System>
@@ -134,7 +134,7 @@ class SubproblemComp(ExplicitComponent):
         List of inputs requested by user to be used as inputs in the
         subproblem's system.
     model_output_names : list of str or tuple
-        List of outputs requested by user to be used as inputs in the
+        List of outputs requested by user to be used as outputs in the
         subproblem's system.
     """
 
@@ -166,7 +166,6 @@ class SubproblemComp(ExplicitComponent):
                              desc='Subproblem Component outputs')
 
         # set other variables necessary for subproblem
-        self._prev_complex_step = False
 
         self.prob_args = {'driver': driver,
                           'comm': comm,
