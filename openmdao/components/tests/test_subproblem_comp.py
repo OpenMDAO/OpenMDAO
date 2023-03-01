@@ -74,9 +74,41 @@ class TestSubproblemComp(unittest.TestCase):
         inputs = p.model.prob.list_inputs()
         outputs = p.model.prob.list_outputs()
 
-        inputs = {inputs[i][0]: inputs[i][1] for i in range(len(inputs))}
-        outputs = {outputs[i][0]: outputs[i][1] for i in range(len(outputs))}
+        inputs = {inputs[i][0]: inputs[i][1]['val'] for i in range(len(inputs))}
+        outputs = {outputs[i][0]: outputs[i][1]['val'] for i in range(len(outputs))}
 
-        assert(inputs['a']['val'] == 1)
-        assert(inputs['b']['val'] == 2)
-        assert(outputs['c']['val'] == 5)
+        assert(inputs['a'] == 1)
+        assert(inputs['b'] == 2)
+        assert(outputs['c'] == 5)
+
+    def test_unconnected_same_var(self):
+        p = om.Problem()
+
+        model = om.Group()
+
+        model.add_subsystem('x1Comp', om.ExecComp('x1 = x*3'))
+        model.add_subsystem('x2Comp', om.ExecComp('x2 = x**3'))
+        model.connect('x1Comp.x1', 'model.x1')
+        model.connect('x2Comp.x2', 'model.x2')
+        model.add_subsystem('model', om.ExecComp('z = x1**2 + x2**2'))
+
+        subprob = om.SubproblemComp(model=model, inputs=[('x1Comp.x', 'x'), ('x2Comp.x', 'y')],
+                                    outputs=[('model.z', 'z')])
+
+        p.model.add_subsystem('subprob', subprob, promotes=['*'])
+        p.setup()
+
+        p.set_val('x1Compx', 1)
+        p.set_val('x2Compx', 2)
+
+        p.run_model()
+
+        inputs = p.model.subprob.list_inputs()
+        outputs = p.model.subprob.list_outputs()
+
+        inputs = {inputs[i][0]: inputs[i][1]['val'] for i in range(len(inputs))}
+        outputs = {outputs[i][0]: outputs[i][1]['val'] for i in range(len(outputs))}
+
+        assert(inputs['x'] == 1)
+        assert(inputs['y'] == 2)
+        assert(outputs['z'] == 73)
