@@ -33,9 +33,10 @@ def _get_model_vars(varType, vars, model_vars):
     var_dict = {varType: {}}
 
     # check for wildcards and append them to vars list
-    wildcards = [i for i in vars if isinstance(i, str) and '*' in i]
-    for i in wildcards:
-        vars.extend(find_matches(i, [meta['prom_name'] for _, meta in model_vars]))
+    patterns = [i for i in vars if isinstance(i, str)]
+    var_list = [meta['prom_name'] for _, meta in model_vars]
+    for i in patterns:
+        vars.extend(find_matches(i, var_list))
         vars.remove(i)
 
     for var in vars:
