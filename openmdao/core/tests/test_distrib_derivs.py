@@ -1360,6 +1360,136 @@ class MPITestsBug(unittest.TestCase):
         totals = p.check_totals(of=of, wrt=wrt, compact_print=False, show_only_incorrect=True)
         assert_check_totals(totals, atol=1e-5, rtol=1e-6)
 
+    def test_zero_entry_distrib(self):
+        # this test errored out before the fix
+        dist_shape = 1 if MPI.COMM_WORLD.rank > 0 else 2
+
+        current_om_convention = True
+
+        class SerialComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input("dv")
+                self.add_output("aoa_serial")
+
+            def compute(self, inputs, outputs):
+                outputs["aoa_serial"] = 2.0 * inputs["dv"]
+
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                if mode == "fwd":
+                    if "aoa_serial" in d_outputs:
+                        if "dv" in d_inputs:
+                            d_outputs["aoa_serial"] += 2.0 * d_inputs["dv"]
+                if mode == "rev":
+                    if "aoa_serial" in d_outputs:
+                        if "dv" in d_inputs:
+                            d_inputs["dv"] += 2.0 * d_outputs["aoa_serial"]
+
+
+        class MixedSerialInComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input("aoa_serial")
+                self.add_output("flow_state_dist", shape=dist_shape, distributed=True)
+
+            def compute(self, inputs, outputs):
+                outputs["flow_state_dist"][:] = 0.5 * inputs["aoa_serial"]
+
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                if mode == "fwd":
+                    if "flow_state_dist" in d_outputs:
+                        if "aoa_serial" in d_inputs:
+                            d_outputs["flow_state_dist"] += 0.5 * d_inputs["aoa_serial"]
+                if mode == "rev":
+                    if "flow_state_dist" in d_outputs:
+                        if "aoa_serial" in d_inputs:
+                            if current_om_convention:
+                                d_inputs["aoa_serial"] += 0.5 * np.sum(d_outputs["flow_state_dist"])
+                            else:
+                                d_inputs["aoa_serial"] += 0.5 * self.comm.allreduce(np.sum(d_outputs["flow_state_dist"]))
+
+
+        class MixedSerialOutComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input("aoa_serial")
+                self.add_input("force_dist", shape=dist_shape, distributed=True)
+                self.add_output("lift_serial")
+                self.add_output("cons_dist", shape=dist_shape, distributed=True)
+
+            def compute(self, inputs, outputs):
+                outputs["lift_serial"] = 2.0 * inputs["aoa_serial"] + self.comm.allreduce(3.0 * np.sum(inputs["force_dist"]))
+                if self.comm.rank == 0:
+                    outputs["cons_dist"] = inputs["force_dist"]
+                else:
+                    outputs["cons_dist"] = 0.0
+
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                if mode == "fwd":
+                    if "lift_serial" in d_outputs:
+                        if "aoa_serial" in d_inputs:
+                            d_outputs["lift_serial"] += 2.0 * d_inputs["aoa_serial"]
+                        if "force_dist" in d_inputs:
+                            d_outputs["lift_serial"] += 3.0 * self.comm.allreduce(np.sum(d_inputs["force_dist"]))
+                else:  # rev
+                    if "lift_serial" in d_outputs:
+                        if "aoa_serial" in d_inputs:
+                            d_inputs["aoa_serial"] += 2.0 * d_outputs["lift_serial"]
+                        if "force_dist" in d_inputs:
+                            if current_om_convention:
+                                d_inputs["force_dist"] += 3.0 * self.comm.allreduce(d_outputs["lift_serial"])
+                            else:
+                                d_inputs["force_dist"] += 3.0 * d_outputs["lift_serial"]
+
+                    if "cons_dist" in d_outputs:
+                        if "aoa_serial" in d_inputs:
+                            d_inputs["aoa_serial"] += 0.0
+                        if "force_dist" in d_inputs:
+                            if self.comm.rank == 0:
+                                # when any entry in a derivative is 0, we hit errors
+                                d_inputs["force_dist"] = d_outputs["cons_dist"]
+                                # set one entry to 0 - comment out and error goes away
+                                d_inputs["force_dist"][-1] = 0
+                            else:
+                                d_inputs["force_dist"] = 0.0
+
+
+        class DistComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input("flow_state_dist", shape=dist_shape, distributed=True)
+                self.add_output("force_dist", shape=dist_shape, distributed=True)
+
+            def compute(self, inputs, outputs):
+                outputs["force_dist"] = 3.0 * inputs["flow_state_dist"]
+
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                if mode == "fwd":
+                    if "force_dist" in d_outputs and "flow_state_dist" in d_inputs:
+                        d_outputs["force_dist"] += 3.0 * d_inputs["flow_state_dist"]
+                if mode == "rev":
+                    if "force_dist" in d_outputs and "flow_state_dist" in d_inputs:
+                        d_inputs["flow_state_dist"] += 3.0 * d_outputs["force_dist"]
+
+        prob = om.Problem()
+        model = prob.model
+        ivc = model.add_subsystem("ivc", om.IndepVarComp())
+        ivc.add_output("dv", val=1.0)
+
+        model.add_subsystem("serial_comp", SerialComp())
+        model.add_subsystem("mixed_in_comp", MixedSerialInComp())
+        model.add_subsystem("dist_comp", DistComp())
+        model.add_subsystem("mixed_out_comp", MixedSerialOutComp())
+        model.add_design_var("ivc.dv")
+        model.connect("ivc.dv", "serial_comp.dv")
+        model.connect("serial_comp.aoa_serial", "mixed_in_comp.aoa_serial")
+        model.connect("mixed_in_comp.flow_state_dist", "dist_comp.flow_state_dist")
+        model.connect("dist_comp.force_dist", "mixed_out_comp.force_dist")
+        model.connect("serial_comp.aoa_serial", "mixed_out_comp.aoa_serial")
+        model.add_objective("mixed_out_comp.lift_serial")
+        model.add_constraint("mixed_out_comp.cons_dist")
+
+        prob.setup(mode="rev")
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options["optimizer"] = "SLSQP"
+        prob.run_driver()
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPIFeatureTests(unittest.TestCase):
