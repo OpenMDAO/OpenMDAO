@@ -212,12 +212,11 @@ class SubproblemComp(ExplicitComponent):
         if self.model_input_names is None:
             self.model_input_names = [meta['prom_name'] for _, meta in
                                       p.model.list_inputs(out_stream=None, prom_name=True,
-                                                          is_design_var=False)]
+                                                          is_indep_var=True)]
 
         if self.model_output_names is None:
             self.model_output_names = [meta['prom_name'] for _, meta in
                                        p.model.list_outputs(out_stream=None, prom_name=True,
-                                                            is_design_var=False,
                                                             is_indep_var=False)]
 
         self.options.update(_get_model_vars('inputs', self.model_input_names, model_inputs))
