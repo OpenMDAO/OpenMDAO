@@ -4,7 +4,6 @@ import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
 import unittest
 
-# from openmdao.components.subproblem_comp import SubproblemComp
 
 class TestSubproblemComp(unittest.TestCase):
     def test_subproblem_comp(self):
