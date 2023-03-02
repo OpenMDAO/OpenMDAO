@@ -2827,7 +2827,6 @@ class Group(System):
             # ExplicitComponent and pass on the values in the derivatives vectors.
             d_outputs = self._doutputs
             d_residuals = self._dresiduals
-            print("group linear a")
 
             if mode == "fwd":
                 if self._has_resid_scaling:
@@ -2850,8 +2849,6 @@ class Group(System):
                 d_residuals *= -1.0
 
         else:
-            print("group linear a")
-
             self._linear_solver._set_matvec_scope(scope_out, scope_in)
             self._linear_solver.solve(mode, rel_systems)
 

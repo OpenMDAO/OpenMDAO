@@ -249,13 +249,10 @@ class ImplicitComponent(Component):
         """
         if jac is None:
             jac = self._assembled_jac if self._assembled_jac is not None else self._jacobian
-        # system = self._system()
-        if self.comm.rank == 0:
-            print("self._doutputs", self._doutputs)
+
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
             d_inputs, d_outputs, d_residuals = vecs
-            if self.comm.rank == 0:
-                print("d_outputs", d_outputs)
+
             d_residuals = self._dresiduals_wrapper
             # print("_doutputs a", d_outputs)
             # Jacobian and vectors are all scaled, unitless
@@ -295,16 +292,14 @@ class ImplicitComponent(Component):
         scope_in : set, None, or _UNDEFINED
             Inputs relevant to possible lower level calls to _apply_linear on Components.
         """
-        print("mode linear solve", mode)
         if self._linear_solver is not None:
             self._linear_solver._set_matvec_scope(scope_out, scope_in)
             self._linear_solver.solve(mode, rel_systems)
-            print("mode linear", mode)
 
         else:
             d_outputs = self._doutputs
             d_residuals = self._dresiduals_wrapper
-            print("mode linear 1", mode)
+
             with self._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
                 # set appropriate vectors to read_only to help prevent user error
                 if mode == "fwd":
@@ -314,7 +309,6 @@ class ImplicitComponent(Component):
 
                 try:
                     with self._call_user_function("solve_linear"):
-                        print("mode linear solve_linear", mode)
                         self.solve_linear(d_outputs, d_residuals, mode)
                 finally:
                     d_outputs.read_only = d_residuals.read_only = False

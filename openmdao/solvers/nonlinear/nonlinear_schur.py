@@ -414,21 +414,21 @@ class SchurSolver(NonlinearSolver):
 
                 scope_out, scope_in = system._get_matvec_scope()
                 if system.comm.rank == 0:
-                    print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
-                    print("subsys1", subsys1._vectors["output"]["linear"].asarray())
-                    print("subsys1", subsys1._vectors["input"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["residual"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["output"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["input"]["linear"].asarray())
+                    print("subsys1 a", subsys1._vectors["residual"]["linear"].asarray())
+                    print("subsys1 a", subsys1._vectors["output"]["linear"].asarray())
+                    print("subsys1 a", subsys1._vectors["input"]["linear"].asarray())
+                    print("subsys2 a", subsys2._vectors["residual"]["linear"].asarray())
+                    print("subsys2 a", subsys2._vectors["output"]["linear"].asarray())
+                    print("subsys2 a", subsys2._vectors["input"]["linear"].asarray())
                 # print(scope_out, scope_in)
-                system._apply_linear(None, ContainsAll(), mode, scope_out, scope_in)
+                system._apply_linear(None, None, mode, scope_out, scope_in)
                 if system.comm.rank == 0:
-                    print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
-                    print("subsys1", subsys1._vectors["output"]["linear"].asarray())
-                    print("subsys1", subsys1._vectors["input"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["residual"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["output"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["input"]["linear"].asarray())
+                    print("subsys1 b", subsys1._vectors["residual"]["linear"].asarray())
+                    print("subsys1 b", subsys1._vectors["output"]["linear"].asarray())
+                    print("subsys1 b", subsys1._vectors["input"]["linear"].asarray())
+                    print("subsys2 b", subsys2._vectors["residual"]["linear"].asarray())
+                    print("subsys2 b", subsys2._vectors["output"]["linear"].asarray())
+                    print("subsys2 b", subsys2._vectors["input"]["linear"].asarray())
                 # print("jac:", subsys2._jacobian["jac"])
                 if system.comm.rank == 0:
                     print(f"\nComputing Jacobian columns for {var}")
@@ -439,23 +439,24 @@ class SchurSolver(NonlinearSolver):
                         flush=True,
                     )
 
-                system._transfer("linear", mode, subsys1.name)
+                # system._transfer("linear", mode, subsys1.name)
                 # # run the jac-vec computation in the first subsystem
                 if system.comm.rank == 0:
-                    print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
-                    print("subsys1", subsys1._vectors["output"]["linear"].asarray())
-                    print("subsys1", subsys1._vectors["input"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["residual"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["output"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["input"]["linear"].asarray())
+                    print("subsys1 c", subsys1._vectors["residual"]["linear"].asarray())
+                    print("subsys1 c", subsys1._vectors["output"]["linear"].asarray())
+                    print("subsys1 c", subsys1._vectors["input"]["linear"].asarray())
+                    print("subsys2 c", subsys2._vectors["residual"]["linear"].asarray())
+                    print("subsys2 c", subsys2._vectors["output"]["linear"].asarray())
+                    print("subsys2 c", subsys2._vectors["input"]["linear"].asarray())
+                scope_out, scope_in = system._get_matvec_scope(subsys1)
                 subsys1._solve_linear(mode, ContainsAll())
                 if system.comm.rank == 0:
-                    print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
-                    print("subsys1", subsys1._vectors["output"]["linear"].asarray())
-                    print("subsys1", subsys1._vectors["input"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["residual"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["output"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["input"]["linear"].asarray())
+                    print("subsys1 d", subsys1._vectors["residual"]["linear"].asarray())
+                    print("subsys1 d", subsys1._vectors["output"]["linear"].asarray())
+                    print("subsys1 d", subsys1._vectors["input"]["linear"].asarray())
+                    print("subsys2 d", subsys2._vectors["residual"]["linear"].asarray())
+                    print("subsys2 d", subsys2._vectors["output"]["linear"].asarray())
+                    print("subsys2 d", subsys2._vectors["input"]["linear"].asarray())
 
                 # print(subsys2._vectors["residual"]["linear"])
                 if system.comm.rank == 0:
@@ -473,20 +474,20 @@ class SchurSolver(NonlinearSolver):
                 scope_out, scope_in = system._get_matvec_scope(subsys1)
                 # print(subsys1._vectors["input"]["linear"])
                 if system.comm.rank == 0:
-                    print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
-                    print("subsys1", subsys1._vectors["output"]["linear"].asarray())
-                    print("subsys1", subsys1._vectors["input"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["residual"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["output"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["input"]["linear"].asarray())
-                subsys1._apply_linear(None, None, mode, scope_out, scope_in)
+                    print("subsys1 e", subsys1._vectors["residual"]["linear"].asarray())
+                    print("subsys1 e", subsys1._vectors["output"]["linear"].asarray())
+                    print("subsys1 e", subsys1._vectors["input"]["linear"].asarray())
+                    print("subsys2 e", subsys2._vectors["residual"]["linear"].asarray())
+                    print("subsys2 e", subsys2._vectors["output"]["linear"].asarray())
+                    print("subsys2 e", subsys2._vectors["input"]["linear"].asarray())
+                subsys1._apply_linear(None, ContainsAll(), mode, scope_out, scope_in)
                 if system.comm.rank == 0:
-                    print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
-                    print("subsys1", subsys1._vectors["output"]["linear"].asarray())
-                    print("subsys1", subsys1._vectors["input"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["residual"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["output"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["input"]["linear"].asarray())
+                    print("subsys1 f", subsys1._vectors["residual"]["linear"].asarray())
+                    print("subsys1 f", subsys1._vectors["output"]["linear"].asarray())
+                    print("subsys1 f", subsys1._vectors["input"]["linear"].asarray())
+                    print("subsys2 f", subsys2._vectors["residual"]["linear"].asarray())
+                    print("subsys2 f", subsys2._vectors["output"]["linear"].asarray())
+                    print("subsys2 f", subsys2._vectors["input"]["linear"].asarray())
 
                 # print(subsys1._vectors["input"]["linear"])
                 if system.comm.rank == 0:
@@ -496,11 +497,26 @@ class SchurSolver(NonlinearSolver):
                         np.linalg.norm(subsys1._vectors["input"]["linear"].asarray()),
                         flush=True,
                     )
-                subsys1._solve_linear(mode, ContainsAll())
+                if system.comm.rank == 0:
+                    print("subsys1 g", subsys1._vectors["residual"]["linear"].asarray())
+                    print("subsys1 g", subsys1._vectors["output"]["linear"].asarray())
+                    print("subsys1 g", subsys1._vectors["input"]["linear"].asarray())
+                    print("subsys2 g", subsys2._vectors["residual"]["linear"].asarray())
+                    print("subsys2 g", subsys2._vectors["output"]["linear"].asarray())
+                    print("subsys2 g", subsys2._vectors["input"]["linear"].asarray())
+                # subsys1._solve_linear(mode, ContainsAll())
                 # do another mat-mult with the solution of this linear system, we want to get the final
                 # jacobian using the schur method here, so we will need to do a bit more math
                 # transfer the outputs to inputs
-                system._transfer("linear", mode)
+                system._transfer("linear", mode, subsys2.name)
+
+                if system.comm.rank == 0:
+                    print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
+                    print("subsys1", subsys1._vectors["output"]["linear"].asarray())
+                    print("subsys1", subsys1._vectors["input"]["linear"].asarray())
+                    print("subsys2", subsys2._vectors["residual"]["linear"].asarray())
+                    print("subsys2", subsys2._vectors["output"]["linear"].asarray())
+                    print("subsys2", subsys2._vectors["input"]["linear"].asarray())
 
                 if system.comm.rank == 0:
                     print("seed for C | D            =", system._vectors["residual"]["linear"].asarray(), flush=True)
@@ -525,7 +541,7 @@ class SchurSolver(NonlinearSolver):
         rvec.set_val(r_data)
         ovec.set_val(o_data)
 
-        quit()
+        # quit()
         # ivec.set_val(i_data)
 
         # we now have the schur complement of the jacobian for the second component.
@@ -538,7 +554,7 @@ class SchurSolver(NonlinearSolver):
             print("\nSchur Jacobian: ", schur_jac, flush=True)
             # print("My    Jacobian:\n", custom_jac, flush=True)
         # system.comm.barrier()
-        # quit()
+        quit()
         d_subsys2 = scipy.linalg.solve(schur_jac, subsys2._vectors["residual"]["linear"].asarray())
 
         if system.comm.rank == 0:
