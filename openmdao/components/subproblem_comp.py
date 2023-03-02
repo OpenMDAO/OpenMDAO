@@ -3,6 +3,7 @@
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.problem import Problem
 from openmdao.core.constants import _UNDEFINED
+from openmdao.utils.general_utils import find_matches
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.core.driver import Driver
 
@@ -31,8 +32,18 @@ def _get_model_vars(varType, vars, model_vars):
     """
     var_dict = {varType: {}}
 
+    # check for wildcards and append them to vars list
+    wildcards = [i for i in vars if isinstance(i, str) and '*' in i]
+    for i in wildcards:
+        vars.extend(find_matches(i, [meta['prom_name'] for _, meta in model_vars]))
+        vars.remove(i)
+
     for var in vars:
         if isinstance(var, tuple):
+            # check if user tries to use wildcard in tuple
+            if '*' in var[0] or '*' in var[1]:
+                raise Exception('Cannot use \'*\' in tuple variable.')
+
             # check if variable already exists in var_dict[varType]
             # i.e. no repeated variable names
             if var[1] in var_dict[varType]:

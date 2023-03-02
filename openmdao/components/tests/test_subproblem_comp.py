@@ -112,3 +112,30 @@ class TestSubproblemComp(unittest.TestCase):
         assert(inputs['x'] == 1)
         assert(inputs['y'] == 2)
         assert(outputs['z'] == 73)
+
+    def test_wildcard(self):
+        p = om.Problem()
+        model = om.Group()
+
+        model.add_subsystem('subsys', om.ExecComp('z = x1**2 + x2**2 + x3**2'), promotes=['*'])
+        subprob = om.SubproblemComp(model=model, inputs=['x*'], outputs=['*'])
+
+        p.model.add_subsystem('prob', subprob, promotes_inputs=['*'], promotes_outputs=['*'])
+        p.setup()
+
+        p.set_val('x1', 1)
+        p.set_val('x2', 2)
+        p.set_val('x3', 3)
+
+        p.run_model()
+
+        inputs = p.model.prob.list_inputs()
+        outputs = p.model.prob.list_outputs()
+
+        inputs = {inputs[i][0]: inputs[i][1]['val'] for i in range(len(inputs))}
+        outputs = {outputs[i][0]: outputs[i][1]['val'] for i in range(len(outputs))}
+
+        assert(inputs['x1'] == 1)
+        assert(inputs['x2'] == 2)
+        assert(inputs['x3'] == 3)
+        assert(outputs['z'] == 14)
