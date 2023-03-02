@@ -105,18 +105,22 @@ class SubproblemComp(ExplicitComponent):
     ----------
     model : <System>
         The system-level <System>.
-    inputs : list of str or tuple
+    inputs : list of str or tuple or None
         List of provided input names in str or tuple form. If an element is a str,
         then it should be the absolute name or the promoted name in its group. If it is a tuple,
         then the first element should be the absolute name or group's promoted name, and the
         second element should be the var name you wish to refer to it within the subproblem
         [e.g. (path.to.var, desired_name)].
-    outputs : list of str or tuple
+        If inputs is None, then inputs not connected to outputs from driver design variables are
+        used.
+    outputs : list of str or tuple or None
         List of provided output names in str or tuple form. If an element is a str,
         then it should be the absolute name or the promoted name in its group. If it is a tuple,
         then the first element should be the absolute name or group's promoted name, and the
         second element should be the var name you wish to refer to it within the subproblem
         [e.g. (path.to.var, desired_name)].
+        If outputs is None, then outputs not connected to outputs that are driver design variables
+        and are not tagged as `openmdao:indep_var` are used.
     driver : <Driver> or None
         The driver for the problem. If not specified, a simple "Run Once" driver will be used.
     comm : MPI.Comm or <FakeComm> or None
@@ -149,7 +153,7 @@ class SubproblemComp(ExplicitComponent):
         subproblem's system.
     """
 
-    def __init__(self, model, inputs, outputs, driver=None, comm=None,
+    def __init__(self, model, inputs=None, outputs=None, driver=None, comm=None,
                  name=None, reports=_UNDEFINED, prob_options=None, **kwargs):
         """
         Initialize all attributes.
@@ -203,6 +207,17 @@ class SubproblemComp(ExplicitComponent):
                                            units=True, shape=True, desc=True)
         model_outputs = p.model.list_outputs(out_stream=None, prom_name=True,
                                              units=True, shape=True, desc=True)
+
+        if self.model_input_names is None:
+            self.model_input_names = [meta['prom_name'] for _, meta in
+                                      p.model.list_inputs(out_stream=None, prom_name=True,
+                                                          is_design_var=False)]
+
+        if self.model_output_names is None:
+            self.model_output_names = [meta['prom_name'] for _, meta in
+                                       p.model.list_outputs(out_stream=None, prom_name=True,
+                                                            is_design_var=False,
+                                                            is_indep_var=False)]
 
         self.options.update(_get_model_vars('inputs', self.model_input_names, model_inputs))
         self.options.update(_get_model_vars('outputs', self.model_output_names, model_outputs))
