@@ -93,10 +93,12 @@ class _TotalJacInfo(object):
         (ndups, relevant_systems, cache_linear_solutions_flag)
     total_relevant_systems : set
         The set of names of all systems relevant to the computation of the total derivatives.
-    """
+    directional : bool
+        If True, perform a single directional derivative.
+   """
 
     def __init__(self, problem, of, wrt, use_abs_names, return_format, approx=False,
-                 debug_print=False, driver_scaling=True, get_remote=True):
+                 debug_print=False, driver_scaling=True, get_remote=True, directional=False):
         """
         Initialize object.
 
@@ -122,6 +124,8 @@ class _TotalJacInfo(object):
             and responses were added. If False, leave them unscaled.
         get_remote : bool
             Whether to get remote variables if using MPI.
+        directional : bool
+            If True, perform a single directional derivative.
         """
         driver = problem.driver
         prom2abs = problem.model._var_allprocs_prom2abs_list['output']
@@ -138,6 +142,7 @@ class _TotalJacInfo(object):
         self.debug_print = debug_print
         self.par_deriv_printnames = {}
         self.get_remote = get_remote
+        self.directional = directional
 
         if isinstance(wrt, str):
             wrt = [wrt]
@@ -769,9 +774,9 @@ class _TotalJacInfo(object):
                     imeta['idx_list'] = [(start, end)]
                     idx_iter_dict[parallel_deriv_color] = (imeta, it)
                 else:
-                    imeta, _ = idx_iter_dict[parallel_deriv_color]
+                    imeta = idx_iter_dict[parallel_deriv_color][0]
                     imeta['idx_list'].append((start, end))
-            elif not simul_coloring:  # plain old single index iteration
+            elif not simul_coloring and not self.directional:  # plain old single index iteration
                 imeta = defaultdict(bool)
                 imeta['idx_list'] = range(start, end)
                 idx_iter_dict[name] = (imeta, self.single_index_iter)
@@ -794,7 +799,39 @@ class _TotalJacInfo(object):
         loc_idxs = np.hstack(loc_idxs)
         seed = np.hstack(seed)
 
-        if simul_coloring and simul_color_modes[mode] is not None:
+        # if self.directional:
+        #     rng = np.random.default_rng()
+        #     seed[:] = rng.random(seed.size)
+        #     seed *= 2.0
+        #     seed -= 1.0
+
+        if self.directional:
+            imeta = defaultdict(bool)
+            all_rel_systems = set()
+            imeta['itermeta'] = itermeta = []
+            locs = None
+            if mode == 'fwd':
+                ilist = range(self.J.shape[1])
+            else:
+                ilist = range(self.J.shape[0])
+
+            for i in ilist:
+                _update_rel_systems(all_rel_systems, idx_map[i][1])
+
+            iterdict = defaultdict(bool)
+
+            if len(ilist) > 1:
+                locs = loc_idxs[ilist]
+                active = locs != -1
+                iterdict['local_in_idxs'] = locs[active]
+                iterdict['seeds'] = seed[ilist][active]
+
+            iterdict['relevant'] = all_rel_systems
+            iterdict['cache_lin_solve'] = False
+            itermeta.append(iterdict)
+
+            idx_iter_dict['@directional'] = (imeta, self.directional_iter)
+        elif simul_coloring and simul_color_modes[mode] is not None:
             imeta = defaultdict(bool)
             imeta['coloring'] = simul_coloring
             all_rel_systems = set()
@@ -1019,6 +1056,8 @@ class _TotalJacInfo(object):
             Input setter method.
         method
             Jac setter method.
+        dict or None
+            Iteration metadata.
         """
         for i in imeta['idx_list']:
             yield i, self.single_input_setter, self.single_jac_setter, None
@@ -1042,6 +1081,8 @@ class _TotalJacInfo(object):
             Input setter method.
         method
             Jac setter method.
+        dict or None
+            Iteration metadata.
         """
         coloring = imeta['coloring']
         input_setter = self.simul_coloring_input_setter
@@ -1077,6 +1118,33 @@ class _TotalJacInfo(object):
         idxs = imeta['idx_list']
         for tup in zip(*idxs):
             yield tup, self.par_deriv_input_setter, self.par_deriv_jac_setter, imeta
+
+    def directional_iter(self, imeta, mode):
+        """
+        Iterate (once) over a directional index list
+
+        Parameters
+        ----------
+        imeta : dict
+            Dictionary of iteration metadata.
+        mode : str
+            Direction of derivative solution.
+
+        Yields
+        ------
+        list of int
+            Current indices.
+        method
+            Input setter method.
+        method
+            Jac setter method.
+        """
+        if mode == 'fwd':
+            ilist = range(self.J.shape[1])
+        else:  # 'rev'
+            ilist = range(self.J.shape[0])
+
+        yield ilist, self.directional_input_setter, self.directional_jac_setter, imeta
 
     def _zero_vecs(self, mode):
         # clean out vectors from last solve
@@ -1195,6 +1263,37 @@ class _TotalJacInfo(object):
             return all_rel_systems, sorted(vec_names), (inds[0], mode)
         else:
             return all_rel_systems, None, None
+
+    def directional_input_setter(self, inds, itermeta, mode):
+        """
+        Set -1's into the input vector in the directional case.
+
+        Parameters
+        ----------
+        inds : list of int
+            Total jacobian row or column indices.
+        itermeta : dict
+            Dictionary of iteration metadata.
+        mode : str
+            Direction of derivative solution.
+
+        Returns
+        -------
+        set
+            Set of relevant system names.
+        None
+            Not used.
+        None
+            Not used.
+        """
+        if itermeta is None:
+            return self.single_input_setter(inds[0], None, mode)
+
+        self._zero_vecs(mode)
+
+        self.input_vec[mode].set_val(itermeta['seeds'], itermeta['local_in_idxs'])
+
+        return itermeta['relevant'], None, None
 
     #
     # Jacobian setter functions
@@ -1380,6 +1479,46 @@ class _TotalJacInfo(object):
                 if dist:
                     self._jac_setter_dist(i, mode)
 
+    def directional_jac_setter(self, inds, mode, meta):
+        """
+        Set the appropriate part of the total jacobian for directional input indices.
+
+        Parameters
+        ----------
+        inds : list of int
+            Total jacobian row or column indices.
+        mode : str
+            Direction of derivative solution.
+        meta : dict
+            Metadata dict.
+        """
+        fwd = mode == 'fwd'
+        dist = self.comm.size > 1
+
+        J = self.J
+        deriv_idxs, jac_idxs, _ = self.sol2jac_map[mode]
+
+        deriv_val = self.output_vec[mode].asarray()
+        if self.jac_scratch is None:
+            reduced_derivs = deriv_val[deriv_idxs]
+        else:
+            # if 'directional' is in effect when comm.size > 1, there will be two scratch arrays,
+            # so just always use the last one to avoid overwriting any data.
+            reduced_derivs = self.jac_scratch[mode][-1]
+            reduced_derivs[:] = 0.0
+            reduced_derivs[jac_idxs] = deriv_val[deriv_idxs]
+
+        if fwd:
+            for i in inds:
+                J[:, i] = reduced_derivs
+                if dist:
+                    self._jac_setter_dist(i, mode)
+        else:  # rev
+            for i in inds:
+                J[i, :] = reduced_derivs
+                if dist:
+                    self._jac_setter_dist(i, mode)
+
     def compute_totals(self):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
@@ -1440,6 +1579,9 @@ class _TotalJacInfo(object):
                                 for local_ind in imeta['coloring']._local_indices(inds=inds,
                                                                                   mode=self.mode):
                                     print(f"   {local_ind}", flush=True)
+                            elif key == '@directional':
+                                print(f'In mode: {mode}, Solving variable(s) using directional '
+                                      'derivative:')
                             else:
                                 print(f"In mode: {mode}.\n('{self.ivc_print_names.get(key, key)}'"
                                       f", [{inds}])", flush=True)

@@ -1533,7 +1533,7 @@ class Problem(object):
     def check_totals(self, of=None, wrt=None, out_stream=_DEFAULT_OUT_STREAM, compact_print=False,
                      driver_scaling=False, abs_err_tol=1e-6, rel_err_tol=1e-6, method='fd',
                      step=None, form=None, step_calc='abs', show_progress=False,
-                     show_only_incorrect=False):
+                     show_only_incorrect=False, directional=False):
         """
         Check total derivatives for the model vs. finite difference.
 
@@ -1581,6 +1581,8 @@ class Problem(object):
             True to show progress of check_totals.
         show_only_incorrect : bool, optional
             Set to True if output should print only the subjacs found to be incorrect.
+        directional : bool
+            If True, compute a single directional derivative for all supplied of's and wrt's.
 
         Returns
         -------
@@ -1673,12 +1675,13 @@ class Problem(object):
         if model._owns_approx_jac:
             # Support this, even though it is a bit silly (though you could compare fd with cs.)
             total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
-                                       approx=True, driver_scaling=driver_scaling)
+                                       approx=True, driver_scaling=driver_scaling,
+                                       directional=directional)
             Jcalc = total_info.compute_totals_approx(initialize=True)
 
         else:
             total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
-                                       driver_scaling=driver_scaling)
+                                       driver_scaling=driver_scaling, directional=directional)
             self._metadata['checking'] = True
             try:
                 Jcalc = total_info.compute_totals()
@@ -1697,6 +1700,7 @@ class Problem(object):
             'form': form,
             'step_calc': step_calc,
             'method': method,
+            'directional': directional,
         }
         approx = model._owns_approx_jac
         approx_of = model._owns_approx_of
@@ -1707,7 +1711,7 @@ class Problem(object):
         model.approx_totals(method=method, step=step, form=form,
                             step_calc=step_calc if method == 'fd' else None)
         fd_tot_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True,
-                                    driver_scaling=driver_scaling)
+                                    driver_scaling=driver_scaling, directional=directional)
         if show_progress:
             Jfd = fd_tot_info.compute_totals_approx(initialize=True, progress_out_stream=out_stream)
         else:
@@ -2263,7 +2267,7 @@ def _errors_above_tol(deriv_info, abs_error_tol, rel_error_tol):
     return above_abs, above_rel
 
 
-def _iter_derivs(system, derivatives, sys_name, show_only_incorrect, global_options, totals,
+def _iter_derivs(derivatives, sys_name, show_only_incorrect, global_options, totals,
                  matrix_free, abs_error_tol=1e-6, rel_error_tol=1e-6, incon_keys=()):
     """
     Iterate over all of the derivatives.
@@ -2274,8 +2278,6 @@ def _iter_derivs(system, derivatives, sys_name, show_only_incorrect, global_opti
 
     Parameters
     ----------
-    system : System
-        Active system.
     derivatives : dict
         Dict of metadata for derivative groups, keyed on (of, wrt) pairs.
     sys_name : str
@@ -2489,7 +2491,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 out_buffer.write('-' * len(header) + '\n\n')
 
         for key, fd_norm, fd_opts, directional, above_abs, above_rel, inconsistent in \
-                _iter_derivs(system, derivatives, sys_name, show_only_incorrect,
+                _iter_derivs(derivatives, sys_name, show_only_incorrect,
                              global_options, totals, matrix_free,
                              abs_error_tol, rel_error_tol, incon_keys):
 
