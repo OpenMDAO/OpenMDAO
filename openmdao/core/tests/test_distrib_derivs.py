@@ -1360,6 +1360,7 @@ class MPITestsBug(unittest.TestCase):
         totals = p.check_totals(of=of, wrt=wrt, compact_print=False, show_only_incorrect=True)
         assert_check_totals(totals, atol=1e-5, rtol=1e-6)
 
+    @unittest.skipUnless(pyoptsparse_opt, "pyOptsparse is required.")
     def test_zero_entry_distrib(self):
         # this test errored out before the fix
         dist_shape = 1 if MPI.COMM_WORLD.rank > 0 else 2
