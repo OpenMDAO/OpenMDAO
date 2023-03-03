@@ -111,10 +111,9 @@ jobs:
           echo "============================================================="
           python -m pip install --pre matplotlib
           python -m pip install --pre numpydoc
-          python -m pip install git+https://github.com/executablebooks/jupyter-book
+          python -m pip install --pre jupyter-book
           python -m pip install --pre sphinx-sitemap
           python -m pip install --pre ipyparallel
-          python -m pip install --pre nbconvert
 
           echo "============================================================="
           echo "Install latest versions of 'doe' dependencies"
