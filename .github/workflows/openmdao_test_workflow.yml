@@ -148,13 +148,6 @@ jobs:
 
           python -m pip install --upgrade pip
 
-          if [[ "${{ matrix.OPTIONAL }}" == "[all]" ]]; then
-            echo "============================================================="
-            echo "Pre-install jupyter dependencies"
-            echo "============================================================="
-            python -m pip install jupyter-book
-          fi
-
           echo "============================================================="
           echo "Install OpenMDAO"
           echo "============================================================="

@@ -118,9 +118,8 @@ jobs:
           echo "======================================================================="
           echo "Scan environment for pypi packages with known vulnerabilities"
           echo "found in the Python Packaging Advisory Database"
-          echo "(Temporarily ignoring PYSEC-2022-237 in mistune, required by nbconvert)"
           echo "======================================================================="
-          python -m pip_audit -s pypi --ignore-vuln PYSEC-2022-237 --ignore-vuln GHSA-hcpj-qp55-gfph
+          python -m pip_audit -s pypi --ignore-vuln GHSA-hcpj-qp55-gfph
 
           echo "======================================================================="
           echo "Scan environment for packages with known vulnerabilities"

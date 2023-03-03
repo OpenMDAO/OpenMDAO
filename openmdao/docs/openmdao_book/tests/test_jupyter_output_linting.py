@@ -62,8 +62,7 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
                     json_data = json.load(f)
                     for i in json_data['cells']:
                         if 'execution_count' in i and i['execution_count'] is not None:
-                            msg = "Clear output with 'jupyter nbconvert  --clear-output " \
-                                  f"--inplace path_to_notebook.ipynb'"
+                            msg = "Clear output with 'reset_notebook path_to_notebook.ipynb'"
                             self.fail(f"Output found in {file}.\n{msg}")
 
     def test_header(self):

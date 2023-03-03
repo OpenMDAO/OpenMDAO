@@ -28,9 +28,6 @@ class TestMissingImports(unittest.TestCase):
         with MissingImports('matplotlib'):
             import openmdao.api as om
 
-        with MissingImports('nbconvert'):
-            import openmdao.api as om
-
         with MissingImports('numpydoc'):
             import openmdao.api as om
 
