@@ -637,7 +637,9 @@ class NonlinearSolver(Solver):
         if stall_limit > 0:
             stall_norm = norm0
 
-        while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol and not stalled:
+        while ((self._iter_count < maxiter and norm > atol and norm / norm0 > rtol and
+               not stalled) or
+               (self._system().under_complex_step and self._iter_count == 0)):
             with Recording(type(self).__name__, self._iter_count, self) as rec:
 
                 if stall_count == 3 and not self.linesearch.options['print_bound_enforce']:
@@ -804,6 +806,7 @@ class NonlinearSolver(Solver):
         if the 'restart_from_successful' option is True.
         """
         system = self._system()
+
         if (self.options['restart_from_successful'] and self.options['maxiter'] > 1 and
                 not system.under_approx):
             try:
