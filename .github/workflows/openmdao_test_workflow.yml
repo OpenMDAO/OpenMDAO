@@ -152,7 +152,7 @@ jobs:
             echo "============================================================="
             echo "Pre-install jupyter dependencies"
             echo "============================================================="
-            python -m pip install git+https://github.com/executablebooks/jupyter-book
+            python -m pip install jupyter-book
           fi
 
           echo "============================================================="
@@ -348,7 +348,7 @@ jobs:
           echo "Build the docs"
           echo "============================================================="
           python build_source_docs.py
-          jupyter-book build -W --keep-going openmdao_book
+          jupyter-book build openmdao_book
           python copy_build_artifacts.py
 
       - name: Display doc build reports
