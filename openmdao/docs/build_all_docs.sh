@@ -5,5 +5,5 @@ export OLD_OPENMDAO_REPORTS=${OPENMDAO_REPORTS}
 export OPENMDAO_REPORTS=0
 
 python build_source_docs.py;
-jupyter-book build --keep-going openmdao_book || export OPENMDAO_REPORTS=${OLD_OPENMDAO_REPORTS}
+jupyter-book build openmdao_book || export OPENMDAO_REPORTS=${OLD_OPENMDAO_REPORTS}
 python copy_build_artifacts.py;
