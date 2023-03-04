@@ -18,10 +18,9 @@ optional_dependencies = {
     'docs': [
         'matplotlib',
         'numpydoc>=1.1',
-        'jupyter-book',
+        'jupyter-book==0.14',
         'sphinx-sitemap',
-        'ipyparallel',
-        'nbconvert>=6.3'
+        'ipyparallel'
     ],
     'doe': [
         'pyDOE2'
