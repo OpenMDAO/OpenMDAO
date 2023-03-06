@@ -2684,9 +2684,11 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         fd = 0.
 
                     if directional:
-                        out_buffer.write(f'    Directional FD Derivative (Jfd)\n{fd}\n')
+                        out_buffer.write(f"    Directional {fd_opts['method'].upper()}"
+                                         f" Derivative (J{fd_opts['method']})\n{fd}\n")
                     else:
-                        out_buffer.write(f'    Raw FD Derivative (Jfd)\n{fd}\n')
+                        out_buffer.write(f"    Raw {fd_opts['method'].upper()}"
+                                         f" Derivative (J{fd_opts['method']})\n{fd}\n")
 
                     out_buffer.write(' -' * 30 + '\n')
 

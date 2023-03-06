@@ -3,9 +3,9 @@ name: OpenMDAO Audit
 
 on:
 
-  # Run the workflow daily a 0200 UTC
+  # Run the workflow daily at 0300 UTC
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '0 3 * * *'
 
   # Allow running the workflow manually from the Actions tab
   workflow_dispatch:
@@ -118,9 +118,8 @@ jobs:
           echo "======================================================================="
           echo "Scan environment for pypi packages with known vulnerabilities"
           echo "found in the Python Packaging Advisory Database"
-          echo "(Temporarily ignoring PYSEC-2022-237 in mistune, required by nbconvert)"
           echo "======================================================================="
-          python -m pip_audit -s pypi --ignore-vuln PYSEC-2022-237 --ignore-vuln GHSA-hcpj-qp55-gfph
+          python -m pip_audit -s pypi --ignore-vuln GHSA-hcpj-qp55-gfph
 
           echo "======================================================================="
           echo "Scan environment for packages with known vulnerabilities"

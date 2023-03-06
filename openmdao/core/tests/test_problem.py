@@ -18,6 +18,7 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 import openmdao.utils.hooks as hooks
 from openmdao.utils.units import convert_units
 from openmdao.utils.om_warnings import DerivativesWarning
+from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.tests.test_hooks import hooks_active
 
 try:
@@ -2109,6 +2110,7 @@ class TestProblem(unittest.TestCase):
             self.fail("'setup raised RuntimeError unexpectedly")
 
 
+@use_tempdirs
 class RelevanceTestCase(unittest.TestCase):
     def _setup_relevance_problem(self):
         p = om.Problem()

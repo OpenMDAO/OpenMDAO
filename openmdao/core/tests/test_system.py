@@ -300,6 +300,58 @@ class TestSystem(unittest.TestCase):
         with assert_warning(OMDeprecationWarning, msg):
             self.assertEqual(meta['comp.a']['value'], 1)
 
+    def test_list_inputs_outputs_is_indep_is_des_var(self):
+        from openmdao.test_suite.components.sellar_feature import SellarMDA
+
+        model = SellarMDA()
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        # model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob = Problem(model)
+
+        prob.setup()
+        prob.final_setup()
+
+        indeps = model.list_inputs(is_indep_var=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in indeps]),
+                         ['cycle.d1.x', 'cycle.d1.z', 'cycle.d2.z',
+                          'obj_cmp.x', 'obj_cmp.z'])
+
+        desvars = model.list_inputs(is_design_var=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in desvars]),
+                         ['cycle.d1.z', 'cycle.d2.z', 'obj_cmp.z'])
+
+        non_desvars = model.list_inputs(is_design_var=False, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in non_desvars]),
+                         ['con_cmp1.y1', 'con_cmp2.y2',
+                          'cycle.d1.x', 'cycle.d1.y2', 'cycle.d2.y1',
+                          'obj_cmp.x', 'obj_cmp.y1', 'obj_cmp.y2'])
+
+        nonDV_indeps = model.list_inputs(is_indep_var=True, is_design_var=False, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in nonDV_indeps]),
+                         ['cycle.d1.x', 'obj_cmp.x'])
+
+        indeps = model.list_outputs(is_indep_var=True, list_autoivcs=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in indeps]),
+                         ['_auto_ivc.v0', '_auto_ivc.v1'])
+
+        desvars = model.list_outputs(is_design_var=True, list_autoivcs=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in desvars]),
+                         ['_auto_ivc.v0'])
+
+        non_desvars = model.list_outputs(is_design_var=False, list_autoivcs=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in non_desvars]),
+                         ['_auto_ivc.v1', 'con_cmp1.con1', 'con_cmp2.con2',
+                          'cycle.d1.y1', 'cycle.d2.y2', 'obj_cmp.obj'])
+
+        nonDV_indeps = model.list_outputs(is_indep_var=True, is_design_var=False, list_autoivcs=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in nonDV_indeps]),
+                         ['_auto_ivc.v1'])
+
     def test_setup_check_group(self):
 
         class CustomGroup(Group):

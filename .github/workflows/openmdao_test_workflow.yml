@@ -24,15 +24,15 @@ jobs:
           # test baseline versions on Ubuntu
           - NAME: Ubuntu Baseline
             OS: ubuntu-latest
-            PY: '3.10'
-            NUMPY: 1.22
-            SCIPY: 1.7
-            PETSc: 3.16
-            PYOPTSPARSE: 'v2.8.3'
+            PY: '3.11'
+            NUMPY: '1.24'
+            SCIPY: '1.10'
+            PETSc: '3.18'
+            PYOPTSPARSE: 'v2.9.2'
             PAROPT: true
-            SNOPT: 7.7
+            SNOPT: '7.7'
             OPTIONAL: '[all]'
-            JAX: '0.3.24'
+            JAX: '0.4.2'
             BANDIT: true
             TESTS: true
             # set DEBUG to create an interactive debugging session just before testflo is run.
@@ -50,66 +50,51 @@ jobs:
           # test baseline versions on MacOS
           - NAME: MacOS Baseline
             OS: macos-latest
-            PY: '3.10'
-            NUMPY: 1.22
-            SCIPY: 1.7
-            PETSc: 3.16
-            # PYOPTSPARSE: 'v2.8.3'
+            PY: '3.11'
+            NUMPY: '1.24'
+            SCIPY: '1.10'
+            PETSc: '3.18'
+            # PYOPTSPARSE: 'v2.9.2'
             # PAROPT: true
-            # SNOPT: 7.7
+            # SNOPT: '7.7'
             OPTIONAL: '[all]'
-            JAX: '0.3.24'
-            TESTS: true
-
-          # test latest versions
-          - NAME: Ubuntu Latest
-            OS: ubuntu-latest
-            PY: 3
-            NUMPY: 1
-            SCIPY: 1
-            PETSc: 3
-            PYOPTSPARSE: 'latest'
-            # PAROPT: true
-            SNOPT: 7.7
-            OPTIONAL: '[all]'
-            JAX: '0.3.24'
+            JAX: '0.4.2'
             TESTS: true
 
           # test minimal install
           - NAME: Ubuntu Minimal
             OS: ubuntu-latest
-            PY: 3
-            NUMPY: 1
-            SCIPY: 1
-            # PYOPTSPARSE: 'latest'
+            PY: '3'
+            NUMPY: '1.24'
+            SCIPY: '1.10'
             OPTIONAL: '[test]'
             TESTS: true
 
           # test oldest supported versions
           - NAME: Ubuntu Oldest
             OS: ubuntu-latest
-            PY: 3.7
-            NUMPY: 1.21
-            SCIPY: 1.7
+            PY: '3.7'
+            NUMPY: '1.21'
+            SCIPY: '1.7'
             OPENMPI: '4.0'
             MPI4PY: '3.0'
-            PETSc: 3.13
+            PETSc: '3.13'
             PYOPTSPARSE: 'v1.2'
-            SNOPT: 7.2
+            SNOPT: '7.2'
             OPTIONAL: '[all]'
             TESTS: true
 
           # build docs (baseline versions)
           - NAME: Build Docs
             OS: ubuntu-latest
-            PY: '3.10'
-            NUMPY: 1.22
-            SCIPY: 1.7
-            PETSc: 3.16
-            PYOPTSPARSE: 'v2.8.3'
-            SNOPT: 7.7
+            PY: '3.11'
+            NUMPY: '1.24'
+            SCIPY: '1.10'
+            PETSc: '3.18'
+            PYOPTSPARSE: 'v2.9.2'
+            SNOPT: '7.7'
             OPTIONAL: '[all]'
-            JAX: '0.3.24'
+            JAX: '0.4.2'
             BUILD_DOCS: true
 
     runs-on: ${{ matrix.OS }}
@@ -162,13 +147,6 @@ jobs:
           conda install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
 
           python -m pip install --upgrade pip
-
-          if [[ "${{ matrix.OPTIONAL }}" == "[all]" ]]; then
-            echo "============================================================="
-            echo "Pre-install jupyter dependencies"
-            echo "============================================================="
-            python -m pip install git+https://github.com/executablebooks/jupyter-book
-          fi
 
           echo "============================================================="
           echo "Install OpenMDAO"
@@ -247,9 +225,13 @@ jobs:
             python -m pip install git+https://github.com/OpenMDAO/build_pyoptsparse
 
             if [[ "${{ matrix.PYOPTSPARSE }}" == "latest" ]]; then
-              LATEST_URL=`curl -fsSLI -o /dev/null -w %{url_effective} https://github.com/mdolab/pyoptsparse/releases/latest`
-              LATEST_VER=`echo $LATEST_URL | awk '{split($0,a,"/tag/"); print a[2]}'`
-              BRANCH="-b $LATEST_VER"
+              function latest_version() {
+                local REPO_URL=$1/releases/latest
+                local LATEST_URL=`curl -fsSLI -o /dev/null -w %{url_effective} $REPO_URL`
+                local LATEST_VER=`echo $LATEST_URL | awk '{split($0,a,"/tag/"); print a[2]}'`
+                echo $LATEST_VER
+              }
+              BRANCH="-b $(latest_version https://github.com/mdolab/pyoptsparse)"
             else
               BRANCH="-b ${{ matrix.PYOPTSPARSE }}"
             fi
@@ -281,7 +263,7 @@ jobs:
           echo "============================================================="
           echo "Install additional packages for testing/coverage"
           echo "============================================================="
-          python -m pip install pyparsing psutil objgraph git+https://github.com/mdolab/pyxdsm
+          python -m pip install pyparsing psutil objgraph pyxdsm
 
       - name: Display environment info
         run: |
@@ -291,8 +273,8 @@ jobs:
           echo "============================================================="
           echo "Check installed versions of Python, Numpy and Scipy"
           echo "============================================================="
-          python -c "import sys; assert str(sys.version).startswith(str(${{ matrix.PY }})), \
-                    f'Python version {sys.version} is not the requested version (${{ matrix.PY }})'"
+          python -c "import platform; assert  platform.python_version().startswith(str(${{ matrix.PY }})), \
+                    f'Python version {platform.python_version()} is not the requested version (${{ matrix.PY }})'"
 
           python -c "import numpy; assert str(numpy.__version__).startswith(str(${{ matrix.NUMPY }})), \
                     f'Numpy version {numpy.__version__} is not the requested version (${{ matrix.NUMPY }})'"
@@ -337,6 +319,7 @@ jobs:
         id: build_docs
         run: |
           export OPENMDAO_REPORTS=0
+          export PYDEVD_DISABLE_FILE_VALIDATION=1
 
           cd openmdao/docs
           if [[ "${{ secrets.SNOPT_LOCATION_72 }}" || "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
@@ -358,7 +341,7 @@ jobs:
           echo "Build the docs"
           echo "============================================================="
           python build_source_docs.py
-          jupyter-book build -W --keep-going openmdao_book
+          jupyter-book build openmdao_book
           python copy_build_artifacts.py
 
       - name: Display doc build reports
@@ -530,10 +513,9 @@ jobs:
           coveralls --basedir $SITE_DIR
 
       - name: Notify slack
-        uses: act10ns/slack@v1.6.0
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        uses: act10ns/slack@v2.0.0
         with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
           status: ${{ job.status }}
         if: always()
 
