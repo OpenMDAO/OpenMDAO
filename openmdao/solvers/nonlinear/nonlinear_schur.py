@@ -400,7 +400,7 @@ class SchurSolver(NonlinearSolver):
 
             r_data = rvec.asarray(copy=True)
             o_data = ovec.asarray(copy=True)
-   
+
             rvec.set_val(np.zeros(len(rvec)))
 
             for ii, var in enumerate(resd_to_solve):
@@ -408,11 +408,11 @@ class SchurSolver(NonlinearSolver):
 
                 rvec[f"{subsys2.name}.{var}"] = 1.0
 
-                scope_out, scope_in = system._get_matvec_scope(subsys2)
-                
+                scope_out, scope_in = system._get_matvec_scope()
+
                 # print(scope_out, scope_in)
-                subsys2._apply_linear(None, ContainsAll(), mode, scope_out, scope_in)
-                system._transfer("linear", mode, subsys1.name)
+                system._apply_linear(None, None, mode, scope_out, scope_in)
+                # system._transfer("linear", mode, subsys1.name)
 
                 # print("jac:", subsys2._jacobian["jac"])
                 if system.comm.rank == 0:
@@ -426,10 +426,9 @@ class SchurSolver(NonlinearSolver):
 
                 # system._transfer("linear", mode, subsys1.name)
                 # # run the jac-vec computation in the first subsystem
-                
+
                 scope_out, scope_in = system._get_matvec_scope(subsys1)
                 subsys1._solve_linear(mode, ContainsAll())
-                
 
                 # print(subsys2._vectors["residual"]["linear"])
                 if system.comm.rank == 0:
@@ -445,12 +444,12 @@ class SchurSolver(NonlinearSolver):
                 if system.comm.rank == 0:
                     print("seed for C | D            =", system._vectors["residual"]["linear"].asarray(), flush=True)
                 # print(subsys1._vectors["residual"]["linear"])
-                scope_out, scope_in = system._get_matvec_scope()
+                scope_out, scope_in = system._get_matvec_scope(subsys1)
                 # print(subsys1._vectors["input"]["linear"])
-               
-                system._apply_linear(None, ContainsAll(), mode, scope_out, scope_in)
-                
-                
+
+                subsys1._apply_linear(None, None, mode, scope_out, scope_in)
+
+                system._transfer("linear", mode, subsys2.name)
                 if system.comm.rank == 0:
                     print(
                         f"D[{ii},:] - C[{ii},:] A^-1 B    =",
