@@ -308,30 +308,29 @@ class _TotalJacInfo(object):
         # return format is 'dict' or 'flat_dict'.
         self.J = J = np.zeros((self.of_size, self.wrt_size))
 
-        if self.get_remote:
-            # if we have distributed 'wrt' variables in fwd mode we have to broadcast the jac
-            # columns from the owner of a given range of dist indices to everyone else.
-            if has_wrt_dist and self.comm.size > 1:
-                abs2idx = model._var_allprocs_abs2idx
-                sizes = model._var_sizes['output']
-                meta = self.wrt_meta
-                # map which indices belong to dist vars and to which rank
-                self.dist_input_range_map['fwd'] = dist_map = []
-                start = end = 0
-                for name in self.input_list['fwd']:
-                    slc, _, is_dist = meta[name]
-                    end += (slc.stop - slc.start)
-                    if is_dist:
-                        # get owning rank for each part of the distrib var
-                        varidx = abs2idx[name]
-                        distsz = sizes[:, varidx]
-                        dstart = dend = start
-                        for rank, sz in enumerate(distsz):
-                            dend += sz
-                            if sz > 0:
-                                dist_map.append((dstart, dend, rank))
-                            dstart = dend
-                    start = end
+        # if we have distributed 'wrt' variables in fwd mode we have to broadcast the jac
+        # columns from the owner of a given range of dist indices to everyone else.
+        if self.get_remote and has_wrt_dist and self.comm.size > 1:
+            abs2idx = model._var_allprocs_abs2idx
+            sizes = model._var_sizes['output']
+            meta = self.wrt_meta
+            # map which indices belong to dist vars and to which rank
+            self.dist_input_range_map['fwd'] = dist_map = []
+            start = end = 0
+            for name in self.input_list['fwd']:
+                slc, _, is_dist = meta[name]
+                end += (slc.stop - slc.start)
+                if is_dist:
+                    # get owning rank for each part of the distrib var
+                    varidx = abs2idx[name]
+                    distsz = sizes[:, varidx]
+                    dstart = dend = start
+                    for rank, sz in enumerate(distsz):
+                        dend += sz
+                        if sz > 0:
+                            dist_map.append((dstart, dend, rank))
+                        dstart = dend
+                start = end
 
         # create scratch array for jac scatters
         self.jac_scratch = None
@@ -654,6 +653,9 @@ class _TotalJacInfo(object):
         else:
             non_rel_outs = False
 
+        if self.directional:
+            rng = np.random.default_rng()
+
         for name in input_list:
             if name in self.responses and self.responses[name]['alias'] is not None:
                 path = self.responses[name]['source']
@@ -799,32 +801,38 @@ class _TotalJacInfo(object):
         loc_idxs = np.hstack(loc_idxs)
         seed = np.hstack(seed)
 
-        # if self.directional:
-        #     rng = np.random.default_rng()
-        #     seed[:] = rng.random(seed.size)
-        #     seed *= 2.0
-        #     seed -= 1.0
-
         if self.directional:
+            seed[:] = rng.random(seed.size)
+            seed *= 2.0
+            seed -= 1.0
+
             imeta = defaultdict(bool)
             all_rel_systems = set()
             imeta['itermeta'] = itermeta = []
             locs = None
-            if mode == 'fwd':
-                ilist = range(self.J.shape[1])
-            else:
-                ilist = range(self.J.shape[0])
 
-            for i in ilist:
-                _update_rel_systems(all_rel_systems, idx_map[i][1])
+            for name in input_list:
+                if name in relevant and not non_rel_outs:
+                    relsystems = relevant[name]['@all'][1]
+                    _update_rel_systems(all_rel_systems, relsystems)
+                else:
+                    all_rel_systems = _contains_all
+                    break
+
+            if mode == 'fwd':
+                veclen = self.J.shape[1]
+            else:
+                veclen = self.J.shape[0]
 
             iterdict = defaultdict(bool)
 
-            if len(ilist) > 1:
-                locs = loc_idxs[ilist]
-                active = locs != -1
-                iterdict['local_in_idxs'] = locs[active]
-                iterdict['seeds'] = seed[ilist][active]
+            if veclen > 1:
+                if -1 in loc_idxs:
+                    active = loc_idxs != -1
+                else:
+                    active = slice(None)
+                iterdict['local_in_idxs'] = loc_idxs[active]
+                iterdict['seeds'] = seed[active]
 
             iterdict['relevant'] = all_rel_systems
             iterdict['cache_lin_solve'] = False
@@ -925,10 +933,7 @@ class _TotalJacInfo(object):
             if indices is not None:
                 sz = indices.indexed_src_size
             else:
-                if self.get_remote:
-                    sz = meta['global_size']
-                else:
-                    sz = meta['size']
+                sz = meta['global_size'] if self.get_remote else meta['size']
 
             if (path in abs2idx and path in slices and path not in self.remote_vois):
                 var_idx = abs2idx[path]
@@ -1266,7 +1271,7 @@ class _TotalJacInfo(object):
 
     def directional_input_setter(self, inds, itermeta, mode):
         """
-        Set -1's into the input vector in the directional case.
+        Set random numbers into the input vector in the directional case.
 
         Parameters
         ----------
@@ -1289,11 +1294,12 @@ class _TotalJacInfo(object):
         if itermeta is None:
             return self.single_input_setter(inds[0], None, mode)
 
+        _, rel_systems, cache_lin_sol, _ = self.in_idx_map[mode][0]
         self._zero_vecs(mode)
 
         self.input_vec[mode].set_val(itermeta['seeds'], itermeta['local_in_idxs'])
 
-        return itermeta['relevant'], None, None
+        return rel_systems, None, None
 
     #
     # Jacobian setter functions
@@ -1513,11 +1519,13 @@ class _TotalJacInfo(object):
                 J[:, i] = reduced_derivs
                 if dist:
                     self._jac_setter_dist(i, mode)
+                break  # only need a single col of Jac for directional
         else:  # rev
             for i in inds:
                 J[i, :] = reduced_derivs
                 if dist:
                     self._jac_setter_dist(i, mode)
+                break  # only need a single row of jac for directional
 
     def compute_totals(self):
         """

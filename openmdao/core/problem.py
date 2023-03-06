@@ -1354,9 +1354,8 @@ class Problem(object):
                                             meta = abs2meta_in[out_abs] if out_abs in abs2meta_in \
                                                 else abs2meta_out[out_abs]
                                             if not meta['distributed']:  # serial input or state
-                                                inc = inconsistent_across_procs(comp.comm, derivs,
-                                                                                return_array=False)
-                                                if inc:
+                                                if inconsistent_across_procs(comp.comm, derivs,
+                                                                             return_array=False):
                                                     deriv['rank_inconsistent'] = True
 
                                         # Allocate first time
@@ -1728,6 +1727,33 @@ class Problem(object):
         # Assemble and Return all metrics.
         data = {'': {}}
         resp = self.driver._responses
+
+        if directional:
+            if self._mode == 'fwd':
+                # check directional fwd against fd (must have same seed)
+                for abs_key, partial in Jfd.items():
+                    # convert analytic to directional.
+                    Jcalc = np.atleast_2d(np.sum(Jcalc, axis=1)).T
+
+                    # Dot product test for adjoint validity.
+                    #m = mfree_directions[rel_key[0]].flatten()
+                    #d = mfree_directions[wrt].flatten()
+                    #mhat = partial.flatten()
+                    #dhat = deriv['J_rev'].flatten()
+
+                    #deriv['directional_fd_rev'] = dhat.dot(d) - mhat.dot(m)
+            elif self._mode == 'rev':
+                    # check directional rev against fd (different seeds)
+                    Jcalc = np.atleast_2d(np.sum(Jcalc, axis=1)).T
+    
+                    # Dot product test for adjoint validity.
+                    #m = mfree_directions[rel_key[0]].flatten()
+                    #d = mfree_directions[wrt].flatten()
+                    #mhat = Jfd[].flatten()
+                    #dhat = deriv['J_rev'].flatten()
+    
+                    #deriv['directional_fd_rev'] = dhat.dot(d) - mhat.dot(m)
+
         # TODO key should not be fwd when exact computed in rev mode or auto
         for key, val in Jcalc.items():
             data[''][key] = {'J_fwd': val, 'J_fd': Jfd[key]}

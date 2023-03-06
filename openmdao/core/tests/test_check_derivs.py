@@ -124,6 +124,64 @@ class MyComp(om.ExplicitComponent):
         J['y', 'x1'] = np.array([4.0])
         J['y', 'x2'] = np.array([40])
 
+class DirectionalVectorizedComp(om.ExplicitComponent):
+    def initialize(self):
+        self.options.declare('n',default=1, desc='vector size')
+
+        self.n_compute = 0
+        self.n_fwd = 0
+        self.n_rev = 0
+
+    def setup(self):
+        self.add_input('in',shape=self.options['n'])
+        self.add_output('out',shape=self.options['n'])
+
+        self.declare_partials('out', 'in')
+        self.set_check_partial_options(wrt='*', directional=True, method='cs')
+
+    def compute(self,inputs,outputs):
+        self.n_compute += 1
+        fac = 2.0 + np.arange(self.options['n'])
+        outputs['out'] = fac * inputs['in']
+
+    def compute_partials(self, inputs, partials):
+        partials['out', 'in'] = np.diag(2.0 + np.arange(self.options['n']))
+
+
+class DirectionalVectorizedMatFreeComp(om.ExplicitComponent):
+    def initialize(self):
+        self.options.declare('n', default=1, desc='vector size')
+
+        self.n_compute = 0
+        self.n_fwd = 0
+        self.n_rev = 0
+
+    def setup(self):
+        self.add_input('in',shape=self.options['n'])
+        self.add_output('out',shape=self.options['n'])
+
+        self.set_check_partial_options(wrt='*', directional=True, method='cs')
+
+    def compute(self,inputs,outputs):
+        self.n_compute += 1
+        fac = 2.0 + np.arange(self.options['n'])
+        outputs['out'] = fac * inputs['in']
+
+    def compute_jacvec_product(self,inputs,d_inputs,d_outputs, mode):
+        fac = 2.0 + np.arange(self.options['n'])
+        if mode == 'fwd':
+            if 'out' in d_outputs:
+                if 'in' in d_inputs:
+                    d_outputs['out'] = fac * d_inputs['in']
+                    self.n_fwd += 1
+
+        if mode == 'rev':
+            if 'out' in d_outputs:
+                if 'in' in d_inputs:
+                    d_inputs['in'] = fac * d_outputs['out']
+                    self.n_rev += 1
+
+
 class TestProblemCheckPartials(unittest.TestCase):
 
     def test_incorrect_jacobian(self):
@@ -1474,45 +1532,12 @@ class TestProblemCheckPartials(unittest.TestCase):
 
     def test_directional_vectorized_matrix_free(self):
 
-        class TestDirectional(om.ExplicitComponent):
-            def initialize(self):
-                self.options.declare('n',default=1, desc='vector size')
-
-                self.n_compute = 0
-                self.n_fwd = 0
-                self.n_rev = 0
-
-            def setup(self):
-                self.add_input('in',shape=self.options['n'])
-                self.add_output('out',shape=self.options['n'])
-
-                self.set_check_partial_options(wrt='*', directional=True, method='cs')
-
-            def compute(self,inputs,outputs):
-                self.n_compute += 1
-                fac = 2.0 + np.arange(self.options['n'])
-                outputs['out'] = fac * inputs['in']
-
-            def compute_jacvec_product(self,inputs,d_inputs,d_outputs, mode):
-                fac = 2.0 + np.arange(self.options['n'])
-                if mode == 'fwd':
-                    if 'out' in d_outputs:
-                        if 'in' in d_inputs:
-                            d_outputs['out'] = fac * d_inputs['in']
-                            self.n_fwd += 1
-
-                if mode == 'rev':
-                    if 'out' in d_outputs:
-                        if 'in' in d_inputs:
-                            d_inputs['in'] = fac * d_outputs['out']
-                            self.n_rev += 1
-
         prob = om.Problem()
         model = prob.model
 
         np.random.seed(1)
 
-        comp = TestDirectional(n=5)
+        comp = DirectionalVectorizedMatFreeComp(n=5)
         model.add_subsystem('comp', comp)
 
         prob.setup(force_alloc_complex=True)
@@ -1656,36 +1681,12 @@ class TestProblemCheckPartials(unittest.TestCase):
         assert_check_partials(J)
 
     def test_directional_vectorized(self):
-
-        class TestDirectional(om.ExplicitComponent):
-            def initialize(self):
-                self.options.declare('n',default=1, desc='vector size')
-
-                self.n_compute = 0
-                self.n_fwd = 0
-                self.n_rev = 0
-
-            def setup(self):
-                self.add_input('in',shape=self.options['n'])
-                self.add_output('out',shape=self.options['n'])
-
-                self.declare_partials('out', 'in')
-                self.set_check_partial_options(wrt='*', directional=True, method='cs')
-
-            def compute(self,inputs,outputs):
-                self.n_compute += 1
-                fac = 2.0 + np.arange(self.options['n'])
-                outputs['out'] = fac * inputs['in']
-
-            def compute_partials(self, inputs, partials):
-                partials['out', 'in'] = np.diag(2.0 + np.arange(self.options['n']))
-
         prob = om.Problem()
         model = prob.model
 
         np.random.seed(1)
 
-        comp = TestDirectional(n=5)
+        comp = DirectionalVectorizedComp(n=5)
         model.add_subsystem('comp', comp)
 
         prob.setup(force_alloc_complex=True)
@@ -1694,7 +1695,6 @@ class TestProblemCheckPartials(unittest.TestCase):
         assert_check_partials(J)
 
     def test_directional_mixed_error_message(self):
-
         class ArrayCompMatrixFree(om.ExplicitComponent):
 
             def setup(self):
@@ -3846,6 +3846,19 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertEqual(stream.getvalue().count('>ABS_TOL'), 2)
         self.assertEqual(stream.getvalue().count('>REL_TOL'), 2)
 
+    def test_directional_vectorized_matrix_free(self):
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', DirectionalVectorizedMatFreeComp(n=5))
+        prob.model.add_design_var('comp.in')
+        prob.model.add_objective('comp.out', index=0)
+
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+
+        J = prob.check_totals(method='cs', out_stream=None, directional=True)
+        print(J)
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestProblemCheckTotalsMPI(unittest.TestCase):
@@ -3902,7 +3915,7 @@ class TestCheckPartialsDistrib(unittest.TestCase):
 
         prob.setup(force_alloc_complex=True)
 
-        partials = prob.check_partials(compact_print=True, method='cs')
+        prob.check_partials(compact_print=True, method='cs')
 
 
 if __name__ == "__main__":
