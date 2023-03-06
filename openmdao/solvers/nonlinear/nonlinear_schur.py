@@ -73,7 +73,6 @@ class SchurSolver(NonlinearSolver):
 
         self.supports["gradients"] = True
         self.supports["implicit_components"] = True
-        print(self._mode_nonlinear)
 
     def _setup_solvers(self, system, depth):
         """
@@ -285,7 +284,6 @@ class SchurSolver(NonlinearSolver):
 
         mode = self._mode_nonlinear
         if mode == "fwd":
-            print("FWD")
             # backup the vectors we are working with
             # rvec = system._dresiduals
             # ovec = system._doutputs
@@ -304,13 +302,6 @@ class SchurSolver(NonlinearSolver):
             for ii, var in enumerate(vars_to_solve):
                 # set the linear seed of the variable we want to solve for in subsys 2
                 ovec[f"{subsys2.name}.{var}"] = 1.0
-                if system.comm.rank == 0:
-                    print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
-                    print("subsys1", subsys1._vectors["output"]["linear"].asarray())
-                    print("subsys1", subsys1._vectors["input"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["residual"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["output"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["input"]["linear"].asarray())
 
                 # transfer this seed to the first subsystem
                 system._transfer("linear", mode, subsys1.name)
@@ -318,24 +309,8 @@ class SchurSolver(NonlinearSolver):
                 # run the jac-vec computation in the first subsystem
                 scope_out, scope_in = system._get_matvec_scope(subsys1)
 
-                if system.comm.rank == 0:
-                    print("_doutputs 1", system._doutputs, subsys1._doutputs)
-                    print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
-                    print("subsys1", subsys1._vectors["output"]["linear"].asarray())
-                    print("subsys1", subsys1._vectors["input"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["residual"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["output"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["input"]["linear"].asarray())
-
                 subsys1._apply_linear(None, None, mode, scope_out, scope_in)
 
-                if system.comm.rank == 0:
-                    print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
-                    print("subsys1", subsys1._vectors["output"]["linear"].asarray())
-                    print("subsys1", subsys1._vectors["input"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["residual"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["output"]["linear"].asarray())
-                    print("subsys2", subsys2._vectors["input"]["linear"].asarray())
                 if system.comm.rank == 0:
                     print(f"\nComputing Jacobian columns for {var}")
                     print(f"B[:,{ii}]                    =", subsys1._vectors["output"]["linear"].asarray())
@@ -393,7 +368,6 @@ class SchurSolver(NonlinearSolver):
                 ovec[f"{subsys2.name}.{var}"] = 0.0
 
         else:  # rev mode
-            print(mode)
             # backup the vectors we are working with
             rvec = system._vectors["residual"]["linear"]
             ovec = system._vectors["output"]["linear"]
@@ -417,10 +391,10 @@ class SchurSolver(NonlinearSolver):
                 # print("jac:", subsys2._jacobian["jac"])
                 if system.comm.rank == 0:
                     print(f"\nComputing Jacobian columns for {var}")
-                    print(f"C[{ii},:]                    =", subsys2._vectors["input"]["linear"].asarray())
+                    print(f"C[{ii},:]                    =", subsys1._vectors["output"]["linear"].asarray())
                     print(
                         f"|C[{ii},:]|                  =",
-                        np.linalg.norm(subsys2._vectors["input"]["linear"].asarray()),
+                        np.linalg.norm(subsys1._vectors["output"]["linear"].asarray()),
                         flush=True,
                     )
 
