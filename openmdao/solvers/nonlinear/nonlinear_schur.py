@@ -371,9 +371,11 @@ class SchurSolver(NonlinearSolver):
             # backup the vectors we are working with
             rvec = system._vectors["residual"]["linear"]
             ovec = system._vectors["output"]["linear"]
+            ivec = system._vectors["input"]["linear"]
 
             r_data = rvec.asarray(copy=True)
             o_data = ovec.asarray(copy=True)
+            i_data = ivec.asarray(copy=True)
 
             rvec.set_val(np.zeros(len(rvec)))
 
@@ -445,7 +447,7 @@ class SchurSolver(NonlinearSolver):
         ovec.set_val(o_data)
 
         # quit()
-        # ivec.set_val(i_data)
+        ivec.set_val(i_data)
 
         # we now have the schur complement of the jacobian for the second component.
         # do a newton update with it!
