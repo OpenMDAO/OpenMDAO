@@ -271,10 +271,7 @@ class SubproblemComp(ExplicitComponent):
         for inp in self._input_names:
             p.set_val(self.options['inputs'][inp]['prom_name'], inputs[inp])
 
-        if not isinstance(p.driver, Driver):
-            p.run_driver()
-        else:
-            p.run_model()
+        p.run_driver()
 
         # store output vars
         for op in self._output_names:
