@@ -1911,12 +1911,10 @@ class Problem(object):
                                        print_arrays=print_arrays,
                                        col_spacing=2)
 
-        # tuples are immutable, so need to use lists to get desired metadata
         cons_vars = [[i, j] for i, j in cons.items()]
         for c in cons_vars:
             c[1]['val'] = vals[c[0]]
             c[1] = {i: j for i, j in c[1].items() if i in col_names}
-        # convert back to tuple
         cons_vars = [tuple(c) for c in cons_vars]
 
         objs = self.driver._objs
@@ -1935,7 +1933,6 @@ class Problem(object):
         for o in obj_vars:
             o[1]['val'] = vals[o[0]]
             o[1] = {i: j for i, j in o[1].items() if i in col_names}
-        # convert back to tuple
         obj_vars = [tuple(o) for o in obj_vars]
 
         prob_vars = {'design_vars': des_vars,
