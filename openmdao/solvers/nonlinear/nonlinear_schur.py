@@ -227,24 +227,12 @@ class SchurSolver(NonlinearSolver):
         system._owns_approx_jac = False
 
         system._vectors["residual"]["linear"].set_vec(system._residuals)
-        # system._vectors["output"]["linear"].set_vec(system._outputs)
-        # system._vectors["input"]["linear"].set_vec(system._inputs)
         system._vectors["residual"]["linear"] *= -1.0
         my_asm_jac = self.linear_solver._assembled_jac
 
         system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
         if my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac:
             my_asm_jac._update(system)
-
-        # print("\nFull Jacobian:")
-        # print(my_asm_jac._int_mtx._matrix.todense())
-        # print(my_asm_jac["group1.comp1.x1", "group1.comp1.x1"], my_asm_jac["group1.comp1.x1", "group1.comp1.x2"])
-        # print(my_asm_jac["group2.comp2.x2", "group2.comp2.x1"], my_asm_jac["group2.comp2.x2", "group2.comp2.x2"])
-
-        # J11 = my_asm_jac["group1.comp1.x1", "group1.comp1.x1"][0]
-        # J12 = my_asm_jac["group1.comp1.x1", "group1.comp1.x2"][0]
-        # J21 = my_asm_jac["group2.comp2.x2", "group2.comp2.x1"][0]
-        # J22 = my_asm_jac["group2.comp2.x2", "group2.comp2.x2"][0]
 
         # extract the first and second subsystems
         subsys1, _ = system._subsystems_allprocs[self._groupNames[0]]
@@ -282,20 +270,19 @@ class SchurSolver(NonlinearSolver):
         # TODO better way to get the dtype?
         schur_jac = np.zeros((n_vars, n_vars), dtype=system._vectors["residual"]["linear"].asarray(copy=True).dtype)
 
-        mode = self._mode_nonlinear
-        if mode == "fwd":
-            # backup the vectors we are working with
-            # rvec = system._dresiduals
-            # ovec = system._doutputs
-            rvec = system._vectors["residual"]["linear"]
-            ovec = system._vectors["output"]["linear"]
-            # ivec = system._vectors["input"]["linear"]
+        # backup the vectors we are working with
+        rvec = system._vectors["residual"]["linear"]
+        ovec = system._vectors["output"]["linear"]
+        ivec = system._vectors["input"]["linear"]
 
-            r_data = rvec.asarray(copy=True)
-            o_data = ovec.asarray(copy=True)
-            # i_data = ivec.asarray(copy=True)
-            # print(rvec, ovec)
-            # print("_doutputs", system._doutputs, system._inputs)
+        r_data = rvec.asarray(copy=True)
+        o_data = ovec.asarray(copy=True)
+        i_data = ivec.asarray(copy=True)
+
+        # mode
+        mode = self._mode_nonlinear
+
+        if mode == "fwd":
             # set the ovec to zeros
             ovec.set_val(np.zeros(len(ovec)))
 
@@ -368,15 +355,6 @@ class SchurSolver(NonlinearSolver):
                 ovec[f"{subsys2.name}.{var}"] = 0.0
 
         else:  # rev mode
-            # backup the vectors we are working with
-            rvec = system._vectors["residual"]["linear"]
-            ovec = system._vectors["output"]["linear"]
-            ivec = system._vectors["input"]["linear"]
-
-            r_data = rvec.asarray(copy=True)
-            o_data = ovec.asarray(copy=True)
-            i_data = ivec.asarray(copy=True)
-
             rvec.set_val(np.zeros(len(rvec)))
 
             for ii, var in enumerate(resd_to_solve):
@@ -445,8 +423,6 @@ class SchurSolver(NonlinearSolver):
         # put back the vectors
         rvec.set_val(r_data)
         ovec.set_val(o_data)
-
-        # quit()
         ivec.set_val(i_data)
 
         # we now have the schur complement of the jacobian for the second component.
