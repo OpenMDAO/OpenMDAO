@@ -634,8 +634,6 @@ class Case(object):
         out_stream : file-like
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
-        values : bool, optional
-            This argument has been deprecated and will be removed in 4.0.
         print_min : bool, optional
             When true, if the output value is an array, print its smallest value.
         print_max : bool, optional
