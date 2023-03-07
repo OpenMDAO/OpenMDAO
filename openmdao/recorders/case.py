@@ -16,7 +16,6 @@ from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.general_utils import make_set, match_prom_or_abs
 from openmdao.utils.units import unit_conversion, simplify_unit
 from openmdao.recorders.sqlite_recorder import format_version as current_version
-from openmdao.utils.om_warnings import issue_warning
 
 _AMBIGOUS_PROM_NAME = object()
 
@@ -407,7 +406,6 @@ class Case(object):
                     is_indep_var=None,
                     is_design_var=None,
                     out_stream=_DEFAULT_OUT_STREAM,
-                    values=None,
                     print_min=False,
                     print_max=False):
         """
@@ -455,8 +453,6 @@ class Case(object):
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
-        values : bool, optional
-            This argument has been deprecated and will be removed in 4.0.
         print_min : bool, optional
             When true, if the input value is an array, print its smallest value.
         print_max : bool, optional
@@ -472,14 +468,6 @@ class Case(object):
 
         # string to display when an attribute is not available (e.g. for a discrete)
         NA = 'Unavailable'
-
-        if values is not None:
-            issue_warning("'value' is deprecated and will be removed in 4.0. "
-                          "Please index in using 'val'")
-        elif not val and values:
-            values = True
-        else:
-            values = val
 
         if isinstance(includes, str):
             includes = [includes, ]
@@ -527,18 +515,17 @@ class Case(object):
                     elif is_design_var is False and src_name_prom in des_vars:
                         continue
 
-                val = self.inputs[var_name]
+                var_val = self.inputs[var_name]
 
                 var_meta = {}
-                if values:
-                    var_meta['val'] = val
-                    var_meta['value'] = val
-                    if isinstance(val, np.ndarray):
+                if val:
+                    var_meta['val'] = var_val
+                    if isinstance(var_val, np.ndarray):
                         if print_min:
-                            var_meta['min'] = np.round(np.min(val), np_precision)
+                            var_meta['min'] = np.round(np.min(var_val), np_precision)
 
                         if print_max:
-                            var_meta['max'] = np.round(np.max(val), np_precision)
+                            var_meta['max'] = np.round(np.max(var_val), np_precision)
 
                 if prom_name:
                     var_meta['prom_name'] = var_name_prom
@@ -546,7 +533,7 @@ class Case(object):
                     var_meta['units'] = meta.get('units', NA)
                 if shape:
                     try:
-                        var_meta['shape'] = val.shape
+                        var_meta['shape'] = var_val.shape
                     except AttributeError:
                         var_meta['shape'] = NA
                 if desc:
@@ -584,7 +571,6 @@ class Case(object):
                      is_design_var=None,
                      list_autoivcs=False,
                      out_stream=_DEFAULT_OUT_STREAM,
-                     values=None,
                      print_min=False,
                      print_max=False):
         """
@@ -667,14 +653,6 @@ class Case(object):
         # string to display when an attribute is not available (e.g. for a discrete)
         NA = 'Unavailable'
 
-        if values is not None:
-            issue_warning("'value' is deprecated and will be removed in 4.0. "
-                          "Please index in using 'val'")
-        elif not val and values:
-            values = True
-        else:
-            values = val
-
         if isinstance(includes, str):
             includes = [includes, ]
 
@@ -727,18 +705,17 @@ class Case(object):
             else:
                 resids = 'Not Recorded'
 
-            val = self.outputs[var_name]
+            var_val = self.outputs[var_name]
 
             var_meta = {}
-            if values:
-                var_meta['val'] = val
-                var_meta['value'] = val
-                if isinstance(val, np.ndarray):
+            if val:
+                var_meta['val'] = var_val
+                if isinstance(var_val, np.ndarray):
                     if print_min:
-                        var_meta['min'] = np.round(np.min(val), np_precision)
+                        var_meta['min'] = np.round(np.min(var_val), np_precision)
 
                     if print_max:
-                        var_meta['max'] = np.round(np.max(val), np_precision)
+                        var_meta['max'] = np.round(np.max(var_val), np_precision)
             if prom_name:
                 var_meta['prom_name'] = var_name_prom
             if residuals:
@@ -747,7 +724,7 @@ class Case(object):
                 var_meta['units'] = meta.get('units', NA)
             if shape:
                 try:
-                    var_meta['shape'] = val.shape
+                    var_meta['shape'] = var_val.shape
                 except AttributeError:
                     var_meta['shape'] = NA
             if bounds:
