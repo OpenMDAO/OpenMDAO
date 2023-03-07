@@ -1864,6 +1864,12 @@ class Problem(object):
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
+
+        Returns
+        -------
+        dict
+            Name, size, val, and other requested parameters of design variables, constraints,
+            and objectives.
         """
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             raise RuntimeError(f"{self.msginfo}: Problem.list_problem_vars() cannot be called "
