@@ -120,26 +120,21 @@ class LinearSchur(BlockLinearSolver):
         # TODO better way to get the dtype?
         schur_jac = np.zeros((n_vars, n_vars), dtype=system._vectors["residual"]["linear"].asarray(copy=True).dtype)
 
-        subsystem_list = [subsys1, subsys2]
-        print("Linear FWD", system._dresiduals, system._doutputs, system._dinputs)
         if mode == "fwd":
-            print("Linear FWD", system._dresiduals._root_offset)
             parent_offset = system._dresiduals._root_offset
 
             # for subsys in subsystem_list:
-            if self._rel_systems is not None and subsys1.pathname not in self._rel_systems:
-                return
+            # if self._rel_systems is not None and subsys1.pathname not in self._rel_systems:
+            #     return
             # must always do the transfer on all procs even if subsys not local
 
             # subsys1._vectors["input"]["linear"] = subsys2._vectors["output"]["linear"]
             system._transfer("linear", mode, subsys1.name)
 
-            if not subsys1._is_local:
-                return
+            # if not subsys1._is_local:
+            #     return
 
             b_vec = subsys1._dresiduals
-            b_vec_cache_1 = subsys1._dresiduals
-            print(b_vec, "bvec")
             scope_out, scope_in = system._get_matvec_scope(subsys1)
             # we use _vars_union to combine relevant variables from the current solve
             # with those of the subsystem solve, because for recursive block linear solves
@@ -151,26 +146,26 @@ class LinearSchur(BlockLinearSolver):
             scope_out = self._vars_union(self._scope_out, scope_out)
             scope_in = self._vars_union(self._scope_in, scope_in)
             off = b_vec._root_offset - parent_offset
+
             if subsys1._iter_call_apply_linear():
                 subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
-
                 b_vec *= -1.0
                 b_vec += self._rhs_vec[off : off + len(b_vec)]
             else:
                 b_vec.set_val(self._rhs_vec[off : off + len(b_vec)])
 
-            print("subsys1 solve", subsys1._vectors["residual"]["linear"].asarray())
-            print("subsys1 solve", subsys1._vectors["output"]["linear"].asarray())
-            print("subsys1 solve", subsys1._vectors["input"]["linear"].asarray())
+            # print("subsys1 solve", subsys1._vectors["residual"]["linear"].asarray())
+            # print("subsys1 solve", subsys1._vectors["output"]["linear"].asarray())
+            # print("subsys1 solve", subsys1._vectors["input"]["linear"].asarray())
 
-            subsys1._solve_linear(mode, self._rel_systems, scope_out, scope_in)
+            subsys1._solve_linear(mode, ContainsAll(), scope_out, scope_in)
 
             # print("subsys1 solve", subsys1._vectors["residual"]["linear"].asarray())
             # print("subsys1 solve", subsys1._vectors["output"]["linear"].asarray())
             # print("subsys1 solve", subsys1._vectors["input"]["linear"].asarray())
-            print("subsys1 F", subsys1._vectors["residual"]["linear"].asarray())
-            print("subsys1", subsys1._vectors["output"]["linear"].asarray())
-            print("subsys1", subsys1._vectors["input"]["linear"].asarray())
+            # print("subsys1 F", subsys1._vectors["residual"]["linear"].asarray())
+            # print("subsys1", subsys1._vectors["output"]["linear"].asarray())
+            # print("subsys1", subsys1._vectors["input"]["linear"].asarray())
             ##### Subsys2 #####
 
             # for subsys2 in subsystem_list:
@@ -227,9 +222,9 @@ class LinearSchur(BlockLinearSolver):
 
                 # run the jac-vec computation in the first subsystem
                 scope_out, scope_in = system._get_matvec_scope(subsys1)
-                print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
-                print("subsys1", subsys1._vectors["output"]["linear"].asarray())
-                print("subsys1", subsys1._vectors["input"]["linear"].asarray())
+                # print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
+                # print("subsys1", subsys1._vectors["output"]["linear"].asarray())
+                # print("subsys1", subsys1._vectors["input"]["linear"].asarray())
                 subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
 
                 if system.comm.rank == 0:
@@ -242,10 +237,10 @@ class LinearSchur(BlockLinearSolver):
                     )
 
                 # using the result from this jac-vec product, solve the RHS for this subsystem
-                print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
-                print("subsys1", subsys1._vectors["output"]["linear"].asarray())
-                print("subsys1", subsys1._vectors["input"]["linear"].asarray())
-                subsys1._solve_linear(mode, self._rel_systems, ContainsAll())
+                # print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
+                # print("subsys1", subsys1._vectors["output"]["linear"].asarray())
+                # print("subsys1", subsys1._vectors["input"]["linear"].asarray())
+                subsys1._solve_linear(mode, ContainsAll())
                 if system.comm.rank == 0:
                     print(f"A^-1 B[:,{ii}]               =", subsys1._vectors["output"]["linear"].asarray())
                     print(
@@ -299,7 +294,7 @@ class LinearSchur(BlockLinearSolver):
             # b_vec.set_val(self._rhs_vec[off : off + len(b_vec)])
             # subsys1._dresiduals = b_vec_cache_1
             # subsys2._dresiduals = b_vec2
-            print("dres", b_vec2, self._rhs_vec, b_vec)
+            # print("dres", b_vec2, self._rhs_vec, b_vec)
             ########################
             #### schur_jacobian ####
             ########################
