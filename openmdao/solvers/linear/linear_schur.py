@@ -121,6 +121,8 @@ class LinearSchur(BlockLinearSolver):
         schur_jac = np.zeros((n_vars, n_vars), dtype=system._vectors["residual"]["linear"].asarray(copy=True).dtype)
 
         if mode == "fwd":
+            if system.comm.rank == 0:
+                print("FWD LS:")
             parent_offset = system._dresiduals._root_offset
 
             # for subsys in subsystem_list:
@@ -157,7 +159,8 @@ class LinearSchur(BlockLinearSolver):
             # print("subsys1 solve", subsys1._vectors["residual"]["linear"].asarray())
             # print("subsys1 solve", subsys1._vectors["output"]["linear"].asarray())
             # print("subsys1 solve", subsys1._vectors["input"]["linear"].asarray())
-
+            if system.comm.rank == 0:
+                print("FWD _solve_linear:")
             subsys1._solve_linear(mode, ContainsAll(), scope_out, scope_in)
 
             # print("subsys1 solve", subsys1._vectors["residual"]["linear"].asarray())
