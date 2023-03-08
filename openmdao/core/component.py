@@ -1706,10 +1706,9 @@ class Component(System):
             for name, offset, end, vec, slc, dist_sizes in self._jac_wrt_iter():
                 if name.split(".")[-1] in self._var_rel_names["output"]:
                     globaloffset += (end - offset)
-                elif dist_sizes is None:  # not distributed
+                if dist_sizes is None:  # not distributed
                     if offset != end:
                         ranges[vec].append(range(offset - globaloffset, end - globaloffset))
-
 
             self._serial_idxs = []
             for vec, rlist in ranges.items():
