@@ -3413,7 +3413,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
     def test_cs_around_newton_new_method(self):
         # The old method of nudging the Newton and forcing it to reconverge could not achieve the
-        # same accuracy on this model.
+        # same accuracy on this model. (1e8 vs 1e12)
 
         class SellarDerivatives(om.Group):
 
