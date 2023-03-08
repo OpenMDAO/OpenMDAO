@@ -963,13 +963,7 @@ class LinearSolver(Solver):
 
         self._mpi_print(self._iter_count, norm, norm / norm0)
 
-        force_one_iteration = system.under_complex_step
-
-        while ((self._iter_count < maxiter and norm > atol and norm / norm0 > rtol) or
-               force_one_iteration):
-
-            if system.under_complex_step:
-                force_one_iteration = False
+        while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol:
 
             with Recording(type(self).__name__, self._iter_count, self) as rec:
                 self._single_iteration()
