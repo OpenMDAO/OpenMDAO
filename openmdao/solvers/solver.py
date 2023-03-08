@@ -632,14 +632,21 @@ class NonlinearSolver(Solver):
 
         self._mpi_print(self._iter_count, norm, norm / norm0)
 
+        system = self._system()
+
         stalled = False
         stall_count = 0
         if stall_limit > 0:
             stall_norm = norm0
 
+        force_one_iteration = system.under_complex_step
+
         while ((self._iter_count < maxiter and norm > atol and norm / norm0 > rtol and
-               not stalled) or
-               (self._system().under_complex_step and self._iter_count == 0)):
+               not stalled) or force_one_iteration):
+
+            if system.under_complex_step:
+                force_one_iteration = False
+
             with Recording(type(self).__name__, self._iter_count, self) as rec:
 
                 if stall_count == 3 and not self.linesearch.options['print_bound_enforce']:
@@ -686,8 +693,6 @@ class NonlinearSolver(Solver):
                         stall_norm = rel_norm
 
             self._mpi_print(self._iter_count, norm, norm / norm0)
-
-        system = self._system()
 
         # flag for the print statements. we only print on root if USE_PROC_FILES is not set to True
         print_flag = system.comm.rank == 0 or os.environ.get('USE_PROC_FILES')
@@ -954,9 +959,18 @@ class LinearSolver(Solver):
 
         self._norm0 = norm0
 
+        system = self._system()
+
         self._mpi_print(self._iter_count, norm, norm / norm0)
 
-        while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol:
+        force_one_iteration = system.under_complex_step
+
+        while ((self._iter_count < maxiter and norm > atol and norm / norm0 > rtol) or
+               force_one_iteration):
+
+            if system.under_complex_step:
+                force_one_iteration = False
+
             with Recording(type(self).__name__, self._iter_count, self) as rec:
                 self._single_iteration()
                 self._iter_count += 1
@@ -970,8 +984,6 @@ class LinearSolver(Solver):
                 rec.rel = norm / norm0
 
             self._mpi_print(self._iter_count, norm, norm / norm0)
-
-        system = self._system()
 
         # flag for the print statements. we only print on root if USE_PROC_FILES is not set to True
         print_flag = system.comm.rank == 0 or os.environ.get('USE_PROC_FILES')
