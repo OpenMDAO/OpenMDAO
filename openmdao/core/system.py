@@ -5723,12 +5723,12 @@ class System(object):
                     if rank is None:
                         parts = self.comm.allgather(val)
                         parts = [p for p in parts if p.size > 0]
-                        val = np.hstack(parts)
+                        val = np.concatenate(parts, axis=0)
                     else:
                         parts = self.comm.gather(val, root=rank)
                         if rank == self.comm.rank:
                             parts = [p for p in parts if p.size > 0]
-                            val = np.hstack(parts)
+                            val = np.concatenate(parts, axis=0)
                         else:
                             val = None
                 else:  # non-distrib input
