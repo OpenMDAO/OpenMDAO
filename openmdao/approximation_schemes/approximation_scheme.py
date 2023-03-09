@@ -1,5 +1,6 @@
 """Base class used to define the interface for derivative approximation schemes."""
 import time
+from collections import defaultdict
 import numpy as np
 
 from openmdao.core.constants import INT_DTYPE
@@ -55,6 +56,7 @@ class ApproximationScheme(object):
         self._progress_out = None
         self._during_sparsity_comp = False
         self._jac_scatter = None
+        self._totals_directions = None
 
     def __repr__(self):
         """
@@ -228,6 +230,12 @@ class ApproximationScheme(object):
         else:
             wrt_matches = None
 
+        if self._totals_directions is not None:
+            wrts_directional = []
+            in_inds_directional = []
+            vec_inds_directional = defaultdict(list)
+            rng_directional = np.random.default_rng()
+
         for wrt, start, end, vec, _, _ in system._jac_wrt_iter(wrt_matches):
             if wrt in self._wrt_meta:
                 meta = self._wrt_meta[wrt]
@@ -239,7 +247,7 @@ class ApproximationScheme(object):
                     slices = out_slices
 
                 data = self._get_approx_data(system, wrt, meta)
-                directional = meta['directional']
+                directional = meta['directional'] or self._totals_directions is not None
 
                 in_idx = range(start, end)
 
@@ -251,7 +259,7 @@ class ApproximationScheme(object):
                         vec_idx = approx_wrt_idx[wrt].shaped_array(copy=True)
                         # convert into index into input or output vector
                         vec_idx += slices[wrt].start
-                        # Directional derivatives for quick partial checking.
+                        # Directional derivatives for quick deriv checking.
                         # Place the indices in a list so that they are all stepped at the same time.
                         if directional:
                             in_idx = [list(in_idx)]
@@ -267,7 +275,7 @@ class ApproximationScheme(object):
                         if directional:
                             vec_idx = [v for v in vec_idx if v is not None]
 
-                    # Directional derivatives for quick partial checking.
+                    # Directional derivatives for quick deriv checking.
                     # Place the indices in a list so that they are all stepped at the same time.
                     if directional:
                         in_idx = [list(in_idx)]
@@ -278,10 +286,29 @@ class ApproximationScheme(object):
                 else:
                     self._nruns_uncolored += end - start
 
-                self._approx_groups.append((wrt, data, in_idx, vec, vec_idx, directional,
-                                            meta['vector']))
+                if self._totals_directions is None:
+                    self._approx_groups.append((wrt, data, in_idx, [(vec, vec_idx)], directional,
+                                                meta['vector']))
+                else:
+                    wrts_directional.append(wrt)
+                    data_directional = data
+                    in_inds_directional.extend(in_idx[0])
+                    vec_inds_directional[vec].extend(vec_idx[0])
 
         if total:
+            if self._totals_directions is not None:
+                self._nruns_uncolored = 1
+                if 'fwd' in self._totals_directions:
+                    vector = self._totals_directions['fwd']
+                else:
+                    vector = rng_directional.random(len(in_inds_directional))
+                    vector *= 2.0
+                    vector -= 1.0
+
+                self._approx_groups = [(tuple(wrts_directional), data_directional,
+                                        [in_inds_directional], list(vec_inds_directional.items()),
+                                        True, vector)]
+
             # compute scatter from the results vector into a column of the total jacobian
             sinds, tinds, colsize, has_dist_data = system._get_jac_col_scatter()
             if has_dist_data:
@@ -392,6 +419,18 @@ class ApproximationScheme(object):
                     scratch[nzrows[i]] = res[nzrows[i]]
                     yield col, scratch
 
+    def _vec_ind_iter(self, vec_ind_list):
+        if self._totals_directions is not None:
+            yield vec_ind_list, None
+        else:
+            entry = [[None, None]]
+            ent0 = entry[0]
+            for vec, vec_idxs in vec_ind_list:
+                for vinds in vec_idxs:
+                    ent0[0] = vec
+                    ent0[1] = vinds
+                    yield entry, vinds
+
     def _uncolored_column_iter(self, system, approx_groups):
         """
         Perform approximations and yields (column_index, column) for each jac column.
@@ -439,7 +478,7 @@ class ApproximationScheme(object):
 
         # now do uncolored solves
         for group_i, tup in enumerate(approx_groups):
-            wrt, data, jcol_idxs, vec, vec_idxs, directional, direction = tup
+            wrt, data, jcol_idxs, vec_ind_list, directional, direction = tup
             if self._progress_out:
                 start_time = time.perf_counter()
 
@@ -451,11 +490,11 @@ class ApproximationScheme(object):
             mult = self._get_multiplier(data)
 
             jidx_iter = iter(range(len(jcol_idxs)))
-            for vecidxs in vec_idxs:
+            for vec_ind_info, vecidxs in self._vec_ind_iter(vec_ind_list):
 
                 if fd_count % num_par_fd == system._par_fd_id:
                     # run the finite difference
-                    result = self._run_point(system, [(vec, vecidxs)],
+                    result = self._run_point(system, vec_ind_info,
                                              app_data, results_array, total_or_semi,
                                              jcol_idxs)
 
@@ -501,7 +540,7 @@ class ApproximationScheme(object):
                     gi, icount, res = tup
                     if icount is None:
                         continue  # skip yield for non-local partial jac column
-                    # approx_groups[gi] -> (wrt, data, jcol_idxs, vec, vec_idxs, direction)
+                    # approx_groups[gi] -> (wrt, data, jcol_idxs, vec_ind_list, direction)
                     # [2] -> jcol_idxs, and [icount] -> actual indices used for the fd run.
                     jinds = approx_groups[gi][2][icount]
                     if directional:

@@ -819,20 +819,15 @@ class _TotalJacInfo(object):
                     all_rel_systems = _contains_all
                     break
 
-            if mode == 'fwd':
-                veclen = self.J.shape[1]
-            else:
-                veclen = self.J.shape[0]
-
             iterdict = defaultdict(bool)
 
-            if veclen > 1:
-                if -1 in loc_idxs:
-                    active = loc_idxs != -1
-                else:
-                    active = slice(None)
-                iterdict['local_in_idxs'] = loc_idxs[active]
-                iterdict['seeds'] = seed[active]
+            if -1 in loc_idxs:
+                active = loc_idxs != -1
+            else:
+                active = slice(None)
+
+            iterdict['local_in_idxs'] = loc_idxs[active]
+            iterdict['seeds'] = seed[active]
 
             iterdict['relevant'] = all_rel_systems
             iterdict['cache_lin_solve'] = False
@@ -1291,13 +1286,10 @@ class _TotalJacInfo(object):
         None
             Not used.
         """
-        if itermeta is None:
-            return self.single_input_setter(inds[0], None, mode)
-
-        _, rel_systems, cache_lin_sol, _ = self.in_idx_map[mode][0]
+        _, rel_systems, _, _ = self.in_idx_map[mode][0]
         self._zero_vecs(mode)
-
-        self.input_vec[mode].set_val(itermeta['seeds'], itermeta['local_in_idxs'])
+        imeta = itermeta['itermeta'][0]
+        self.input_vec[mode].set_val(imeta['seeds'], imeta['local_in_idxs'])
 
         return rel_systems, None, None
 
@@ -1687,6 +1679,14 @@ class _TotalJacInfo(object):
                 model._setup_approx_partials()
                 if model._coloring_info['coloring'] is not None:
                     model._update_wrt_matches(model._coloring_info)
+
+            if self.directional and self.mode == 'fwd':
+                for scheme in model._approx_schemes.values():
+                    seeds = {k: -s for k, s in self.seeds.items()}
+                    scheme._totals_directions = seeds
+            else:
+                for scheme in model._approx_schemes.values():
+                    scheme._totals_directions = {}
 
             # Linearize Model
             if len(model._subsystems_allprocs) > 0:

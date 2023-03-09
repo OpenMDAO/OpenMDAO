@@ -3846,14 +3846,27 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertEqual(stream.getvalue().count('>ABS_TOL'), 2)
         self.assertEqual(stream.getvalue().count('>REL_TOL'), 2)
 
-    def test_directional_vectorized_matrix_free(self):
+    def test_directional_vectorized_matrix_free_fwd(self):
 
         prob = om.Problem()
         prob.model.add_subsystem('comp', DirectionalVectorizedMatFreeComp(n=5))
         prob.model.add_design_var('comp.in')
         prob.model.add_objective('comp.out', index=0)
 
-        prob.setup(force_alloc_complex=True)
+        prob.setup(force_alloc_complex=True, mode='fwd')
+        prob.run_model()
+
+        J = prob.check_totals(method='cs', out_stream=None, directional=True)
+        print(J)
+
+    def test_directional_vectorized_matrix_free_rev(self):
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', DirectionalVectorizedMatFreeComp(n=5))
+        prob.model.add_design_var('comp.in')
+        prob.model.add_objective('comp.out', index=0)
+
+        prob.setup(force_alloc_complex=True, mode='rev')
         prob.run_model()
 
         J = prob.check_totals(method='cs', out_stream=None, directional=True)

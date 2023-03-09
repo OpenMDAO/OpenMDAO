@@ -1711,6 +1711,10 @@ class Problem(object):
                             step_calc=step_calc if method == 'fd' else None)
         fd_tot_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True,
                                     driver_scaling=driver_scaling, directional=directional)
+        if directional and self._mode == 'fwd':
+            # for fd, use the same seeds as the analytical derives used
+            fd_tot_info.seeds = total_info.seeds
+
         if show_progress:
             Jfd = fd_tot_info.compute_totals_approx(initialize=True, progress_out_stream=out_stream)
         else:
@@ -1731,32 +1735,28 @@ class Problem(object):
         if directional:
             if self._mode == 'fwd':
                 # check directional fwd against fd (must have same seed)
-                for abs_key, partial in Jfd.items():
-                    # convert analytic to directional.
-                    Jcalc = np.atleast_2d(np.sum(Jcalc, axis=1)).T
-
-                    # Dot product test for adjoint validity.
-                    #m = mfree_directions[rel_key[0]].flatten()
-                    #d = mfree_directions[wrt].flatten()
-                    #mhat = partial.flatten()
-                    #dhat = deriv['J_rev'].flatten()
-
-                    #deriv['directional_fd_rev'] = dhat.dot(d) - mhat.dot(m)
+                directional_fd_fwd = total_info.J - fd_tot_info.J
             elif self._mode == 'rev':
-                    # check directional rev against fd (different seeds)
-                    Jcalc = np.atleast_2d(np.sum(Jcalc, axis=1)).T
-    
-                    # Dot product test for adjoint validity.
-                    #m = mfree_directions[rel_key[0]].flatten()
-                    #d = mfree_directions[wrt].flatten()
-                    #mhat = Jfd[].flatten()
-                    #dhat = deriv['J_rev'].flatten()
-    
-                    #deriv['directional_fd_rev'] = dhat.dot(d) - mhat.dot(m)
+                # check directional rev against fd (different seeds)
+
+                # Dot product test for adjoint validity.
+                for scheme in fd_tot_info.model._approx_schemes.values():
+                    m = scheme._approx_groups[0][5]  # direction from approx_group
+                    break
+                mhat = fd_tot_info.J.flatten()
+                d = total_info.seeds[self._mode]  # analytic
+                dhat = total_info.J.T
+
+                directional_fd_rev = dhat.dot(d) - mhat.dot(m)
 
         # TODO key should not be fwd when exact computed in rev mode or auto
         for key, val in Jcalc.items():
             data[''][key] = {'J_fwd': val, 'J_fd': Jfd[key]}
+            if directional:
+                if self._mode == 'fwd':
+                    data[''][key]['directional_fd_fwd'] = directional_fd_fwd
+                else:
+                    data[''][key]['directional_fd_rev'] = directional_fd_rev
 
             # Display whether indices were declared when response was added.
             of = key[0]
