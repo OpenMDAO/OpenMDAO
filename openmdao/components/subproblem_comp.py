@@ -194,18 +194,6 @@ class SubproblemComp(ExplicitComponent):
         self.model_input_names = inputs
         self.model_output_names = outputs
 
-    # def add_input(self, inp):
-    #     """
-    #     Add input to subproblem
-    #     """
-    #     pass
-
-    # def add_output(self, out):
-    #     """
-    #     Add output to subproblem
-    #     """
-    #     pass
-
     def setup(self):
         """
         Perform some final setup and checks.
@@ -219,10 +207,10 @@ class SubproblemComp(ExplicitComponent):
 
         # boundary inputs are any inputs that externally come into `SubproblemComp`
         boundary_inputs = p.model.list_inputs(out_stream=None, prom_name=True,
-                                           units=True, shape=True, desc=True, is_indep_var=True)
+                                              units=True, shape=True, desc=True, is_indep_var=True)
         # want all outputs from the `SubproblemComp`
         all_outputs = p.model.list_outputs(out_stream=None, prom_name=True,
-                                             units=True, shape=True, desc=True)
+                                           units=True, shape=True, desc=True)
 
         # declaring all inputs as design vars and all outputs as constraints allows for coloring
         # to be computed
@@ -240,8 +228,9 @@ class SubproblemComp(ExplicitComponent):
 
         # get coloring and change row and column names to be prom names for use later
         self.coloring = p.driver._get_coloring(run_model=True)
-        self.coloring._row_vars = [meta['prom_name'] for name,meta in all_outputs if name in self.coloring._row_vars]
-        self.coloring._col_vars = [meta['prom_name'] for _,meta in boundary_inputs]
+        self.coloring._row_vars = [meta['prom_name'] for name, meta in all_outputs
+                                   if name in self.coloring._row_vars]
+        self.coloring._col_vars = [meta['prom_name'] for _, meta in boundary_inputs]
 
         # self.sparsity = self.coloring.get_subjac_sparsity()
 
@@ -286,11 +275,6 @@ class SubproblemComp(ExplicitComponent):
             if of not in self._output_names or wrt not in self._input_names:
                 continue
             self.declare_partials(of=of, wrt=wrt, rows=nzrows, cols=nzcols)
-            # for ip in self._input_names:
-                # self.declare_partials(of=var, wrt=ip, rows=coloring[ip], cols=coloring[ip])
-                # if self.sparsity[var][ip][0].size == 0 or self.sparsity[var][ip][1].size == 0:
-                #     continue
-                # self.declare_partials(of=var, wrt=ip, rows=self.sparsity[var][ip][0], cols=self.sparsity[var][ip][1])
 
     def _set_complex_step_mode(self, active):
         super()._set_complex_step_mode(active)
@@ -343,10 +327,6 @@ class SubproblemComp(ExplicitComponent):
 
         tots = p.compute_totals(of=self._output_names, wrt=self._input_names,
                                 use_abs_names=False)
-        # import numpy as np
-        # for pair, jac in tots.items():
-        #     print(pair, np.linalg.norm(jac))
-        # exit(0)
 
         for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():
             partials[of, wrt] = tots[of, wrt][nzrows, nzcols].ravel()
