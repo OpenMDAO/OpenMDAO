@@ -343,6 +343,10 @@ class SubproblemComp(ExplicitComponent):
 
         tots = p.compute_totals(of=self._output_names, wrt=self._input_names,
                                 use_abs_names=False)
+        # import numpy as np
+        # for pair, jac in tots.items():
+        #     print(pair, np.linalg.norm(jac))
+        # exit(0)
 
         for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():
-            partials[of, wrt] = tots[of, wrt][nzrows, nzcols].flatten()
+            partials[of, wrt] = tots[of, wrt][nzrows, nzcols].ravel()
