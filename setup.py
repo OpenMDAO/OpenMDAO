@@ -204,7 +204,6 @@ setup(
             'addsubtractcomp=openmdao.components.add_subtract_comp:AddSubtractComp',
             'balancecomp=openmdao.components.balance_comp:BalanceComp',
             'crossproductcomp=openmdao.components.cross_product_comp:CrossProductComp',
-            'demuxcomp=openmdao.components.demux_comp:DemuxComp',
             'dotproductcomp=openmdao.components.dot_product_comp:DotProductComp',
             'eqconstraintcomp=openmdao.components.eq_constraint_comp:EQConstraintComp',
             'execcomp=openmdao.components.exec_comp:ExecComp',
