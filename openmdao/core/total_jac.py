@@ -264,15 +264,24 @@ class _TotalJacInfo(object):
                 self.simul_coloring = driver._coloring_info['coloring']
 
                 # if we don't get wrt and of from driver, turn off coloring
-                if self.simul_coloring is not None and \
-                   (prom_wrt != driver_wrt or prom_of != driver_of):
-                    msg = ("compute_totals called using a different list of design vars and/or "
-                           "responses than those used to define coloring, so coloring will "
-                           "be turned off.\ncoloring design vars: %s, current design vars: "
-                           "%s\ncoloring responses: %s, current responses: %s." %
-                           (driver_wrt, wrt, driver_of, of))
-                    issue_warning(msg, category=DerivativesWarning)
-                    self.simul_coloring = None
+                if self.simul_coloring is not None:
+                    ok = True
+                    if prom_wrt != driver_wrt:
+                        ok = False
+                    # TODO: there's some weirdness here where sometimes the
+                    # of vars are absolute and sometimes they're not...
+                    for pof, aof, dof in zip(prom_of, of, driver_of):
+                        if pof != dof and aof != dof:
+                            ok = False
+                            break
+                    if not ok:
+                        msg = ("compute_totals called using a different list of design vars and/or "
+                               "responses than those used to define coloring, so coloring will "
+                               "be turned off.\ncoloring design vars: %s, current design vars: "
+                               "%s\ncoloring responses: %s, current responses: %s." %
+                               (driver_wrt, wrt, driver_of, of))
+                        issue_warning(msg, category=DerivativesWarning)
+                        self.simul_coloring = None
 
             if not isinstance(self.simul_coloring, Coloring):
                 self.simul_coloring = None

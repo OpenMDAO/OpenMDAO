@@ -300,7 +300,9 @@ class SubproblemComp(ExplicitComponent):
         for inp in self._input_names:
             p.set_val(self.options['inputs'][inp]['prom_name'], inputs[inp])
 
-        p.run_driver()
+        # problem.run_driver() calls setup_driver each time, so call run
+        # directly on the driver instead
+        p.driver.run()
 
         # store output vars
         for op in self._output_names:
@@ -325,8 +327,10 @@ class SubproblemComp(ExplicitComponent):
         for inp in self._input_names:
             p.set_val(self.options['inputs'][inp]['prom_name'], inputs[inp])
 
-        tots = p.compute_totals(of=self._output_names, wrt=self._input_names,
-                                use_abs_names=False)
+        # need to use driver._compute_totals here else we re-initialize the whole
+        # _TotalJacInfo object every time
+        tots = p.driver._compute_totals(of=self._output_names, wrt=self._input_names,
+                                        use_abs_names=False)
 
         for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():
             partials[of, wrt] = tots[of, wrt][nzrows, nzcols].ravel()
