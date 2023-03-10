@@ -228,9 +228,10 @@ class SubproblemComp(ExplicitComponent):
 
         # get coloring and change row and column names to be prom names for use later
         self.coloring = p.driver._get_coloring(run_model=True)
-        self.coloring._row_vars = [meta['prom_name'] for name, meta in all_outputs
-                                   if name in self.coloring._row_vars]
-        self.coloring._col_vars = [meta['prom_name'] for _, meta in boundary_inputs]
+        if self.coloring is not None:
+            self.coloring._row_vars = [meta['prom_name'] for name, meta in all_outputs
+                                       if name in self.coloring._row_vars]
+            self.coloring._col_vars = [meta['prom_name'] for _, meta in boundary_inputs]
 
         # self.sparsity = self.coloring.get_subjac_sparsity()
 
@@ -271,10 +272,13 @@ class SubproblemComp(ExplicitComponent):
             meta['prom_name'] = prom_name
             self._output_names.append(var)
 
-        for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():
-            if of not in self._output_names or wrt not in self._input_names:
-                continue
-            self.declare_partials(of=of, wrt=wrt, rows=nzrows, cols=nzcols)
+        if self.coloring is None:
+            self.declare_partials(of='*', wrt='*')
+        else:
+            for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():
+                if of not in self._output_names or wrt not in self._input_names:
+                    continue
+                self.declare_partials(of=of, wrt=wrt, rows=nzrows, cols=nzcols)
 
     def _set_complex_step_mode(self, active):
         super()._set_complex_step_mode(active)
@@ -300,7 +304,9 @@ class SubproblemComp(ExplicitComponent):
         for inp in self._input_names:
             p.set_val(self.options['inputs'][inp]['prom_name'], inputs[inp])
 
-        p.run_driver()
+        # problem.run_driver() calls setup_driver each time, so call run
+        # directly on the driver instead
+        p.driver.run()
 
         # store output vars
         for op in self._output_names:
@@ -325,8 +331,14 @@ class SubproblemComp(ExplicitComponent):
         for inp in self._input_names:
             p.set_val(self.options['inputs'][inp]['prom_name'], inputs[inp])
 
-        tots = p.compute_totals(of=self._output_names, wrt=self._input_names,
-                                use_abs_names=False)
+        # need to use driver._compute_totals here else we re-initialize the whole
+        # _TotalJacInfo object every time
+        tots = p.driver._compute_totals(of=self._output_names, wrt=self._input_names,
+                                        use_abs_names=False)
 
-        for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():
-            partials[of, wrt] = tots[of, wrt][nzrows, nzcols].ravel()
+        if self.coloring is None:
+            for key, tot in tots.items():
+                partials[key] = tot
+        else:
+            for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():
+                partials[of, wrt] = tots[of, wrt][nzrows, nzcols].ravel()
