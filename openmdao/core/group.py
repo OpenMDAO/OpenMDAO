@@ -1524,15 +1524,7 @@ class Group(System):
                                 continue
 
                         meta = abs2meta[abs_in]
-                        if meta['src_indices'] is not None:
-                            self._collect_error(
-                                f"{self.msginfo}: src_indices has been defined in both "
-                                f"connect('{prom_out}', '{prom_in}') and "
-                                f"add_input('{prom_in}', ...).")
-
                         meta['manual_connection'] = True
-                        meta['src_indices'] = src_indices
-                        meta['flat_src_indices'] = flat
 
                     src_ind_inputs.add(abs_in)
 
