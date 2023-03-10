@@ -978,49 +978,49 @@ class TestExecComp(unittest.TestCase):
         prob.run_model()
 
         # Inputs no tags
-        inputs = prob.model.list_inputs(values=False, out_stream=None)
+        inputs = prob.model.list_inputs(val=False, out_stream=None)
         self.assertEqual(sorted(inputs), [
             ('C1.x', {}),
             ('C1.z', {}),
         ])
 
         # Inputs with tags
-        inputs = prob.model.list_inputs(values=False, out_stream=None, tags="tagx")
+        inputs = prob.model.list_inputs(val=False, out_stream=None, tags="tagx")
         self.assertEqual(sorted(inputs), [
             ('C1.x', {}),
         ])
 
         # Inputs with multiple tags
-        inputs = prob.model.list_inputs(values=False, out_stream=None, tags=["tagx", "tagz"])
+        inputs = prob.model.list_inputs(val=False, out_stream=None, tags=["tagx", "tagz"])
         self.assertEqual(sorted(inputs), [
             ('C1.x', {}),
             ('C1.z', {}),
         ])
 
         # Inputs with tag that does not match
-        inputs = prob.model.list_inputs(values=False, out_stream=None, tags="tag_wrong")
+        inputs = prob.model.list_inputs(val=False, out_stream=None, tags="tag_wrong")
         self.assertEqual(sorted(inputs), [])
 
         # Outputs no tags
-        outputs = prob.model.list_outputs(values=False, out_stream=None)
+        outputs = prob.model.list_outputs(val=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
             ('C1.y', {}),
         ])
 
         # Outputs with tags
-        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tagy")
+        outputs = prob.model.list_outputs(val=False, out_stream=None, tags="tagy")
         self.assertEqual(sorted(outputs), [
             ('C1.y', {}),
         ])
 
         # Outputs with multiple tags
-        outputs = prob.model.list_outputs(values=False, out_stream=None, tags=["tagy", "tagx"])
+        outputs = prob.model.list_outputs(val=False, out_stream=None, tags=["tagy", "tagx"])
         self.assertEqual(sorted(outputs), [
             ('C1.y', {}),
         ])
 
         # Outputs with tag that does not match
-        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag_wrong")
+        outputs = prob.model.list_outputs(val=False, out_stream=None, tags="tag_wrong")
         self.assertEqual(sorted(outputs), [])
 
     def test_feature_has_diag_partials(self):
@@ -1169,9 +1169,9 @@ class TestExecComp(unittest.TestCase):
             "quad_1",
             om.ExecComp(
                 "y = a * x ** 2 + b * x + c",
-                a={"value": 2.0},
-                b={"value": 5.0},
-                c={"value": 3.0},
+                a={"val": 2.0},
+                b={"val": 5.0},
+                c={"val": 3.0},
                 x={"shape": (2,)},
                 y={"shape": (2,)},
             ),
@@ -1365,31 +1365,6 @@ class TestExecComp(unittest.TestCase):
 
         self.assertEquals(cm.exception.args[0],
                           "'zzz' <class ExecComp>: The output 'y' has already been defined by an expression.")
-
-    def test_value_deprecation(self):
-        p = om.Problem()
-
-        msg = ("'zzz' <class ExecComp>: 'value' will be deprecated in 4.0. Please use 'val' in the future.")
-
-        excomp = om.ExecComp('y=x**2', x={'value': np.ones(10)}, y={'val': np.ones(10)})
-
-        p.model.add_subsystem('zzz', excomp)
-        with assert_warning(OMDeprecationWarning, msg):
-            p.setup()
-
-    def test_val_value_error(self):
-        p = om.Problem()
-
-        msg = ("Cannot use 'val' and 'value' at the same time, use 'val'.")
-
-        excomp = om.ExecComp('y=x**2', x={'value': np.ones(10), 'val': np.ones(10)},
-                                       y={'val': np.ones(10)})
-
-        p.model.add_subsystem('zzz', excomp)
-
-        with self.assertRaises(RuntimeError) as cm:
-            p.setup()
-            self.assertEquals(cm.exception.args[0], msg)
 
     def test_feature_add_expr(self):
 

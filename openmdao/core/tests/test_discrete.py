@@ -282,7 +282,7 @@ class DiscreteTestCase(unittest.TestCase):
         # list inputs, not hierarchical
         #
         stream = StringIO()
-        prob.model.list_inputs(values=True, hierarchical=False, out_stream=stream)
+        prob.model.list_inputs(val=True, hierarchical=False, out_stream=stream)
         text = stream.getvalue()
 
         self.assertEqual(1, text.count("3 Input(s) in 'model'"))
@@ -294,7 +294,7 @@ class DiscreteTestCase(unittest.TestCase):
         # list inputs, hierarchical
         #
         stream = StringIO()
-        prob.model.list_inputs(values=True, hierarchical=True, out_stream=stream)
+        prob.model.list_inputs(val=True, hierarchical=True, out_stream=stream)
         text = stream.getvalue()
 
         self.assertEqual(1, text.count("3 Input(s) in 'model'"))
@@ -307,7 +307,7 @@ class DiscreteTestCase(unittest.TestCase):
         # list outputs, not hierarchical
         #
         stream = StringIO()
-        prob.model.list_outputs(values=True, residuals=True, hierarchical=False, out_stream=stream)
+        prob.model.list_outputs(val=True, residuals=True, hierarchical=False, out_stream=stream)
         text = stream.getvalue()
 
         self.assertEqual(text.count('3 Explicit Output'), 1)
@@ -321,7 +321,7 @@ class DiscreteTestCase(unittest.TestCase):
         # list outputs, hierarchical
         #
         stream = StringIO()
-        prob.model.list_outputs(values=True, residuals=True, hierarchical=True, out_stream=stream)
+        prob.model.list_outputs(val=True, residuals=True, hierarchical=True, out_stream=stream)
         text = stream.getvalue()
 
         self.assertEqual(text.count('\nindep'), 1)
@@ -417,7 +417,7 @@ class DiscreteTestCase(unittest.TestCase):
         prob.run_model()
 
         # list inputs, no tags
-        inputs = prob.model.list_inputs(values=False, out_stream=None)
+        inputs = prob.model.list_inputs(val=False, out_stream=None)
         self.assertEqual(sorted(inputs), [
             ('expl.a', {}),
             ('expl.x', {}),
@@ -425,14 +425,14 @@ class DiscreteTestCase(unittest.TestCase):
         ])
 
         # list inputs, with tags
-        inputs = prob.model.list_inputs(values=False, out_stream=None, tags='tagx')
+        inputs = prob.model.list_inputs(val=False, out_stream=None, tags='tagx')
         self.assertEqual(sorted(inputs), [
             ('expl.x', {}),
             ('impl.x', {}),
         ])
 
         # list outputs, no tags
-        outputs = prob.model.list_outputs(values=False, out_stream=None)
+        outputs = prob.model.list_outputs(val=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
             ('expl.b', {}),
             ('expl.y', {}),
@@ -441,7 +441,7 @@ class DiscreteTestCase(unittest.TestCase):
         ])
 
         # list outputs, with tags
-        outputs = prob.model.list_outputs(values=False, out_stream=None, tags='tagy')
+        outputs = prob.model.list_outputs(val=False, out_stream=None, tags='tagy')
         self.assertEqual(sorted(outputs), [
             ('expl.y', {}),
             ('impl.y', {}),
