@@ -389,7 +389,8 @@ def find_plugins(types=None):
         query = 'topic:{}'.format(_github_topics[type_])
 
         response = requests.get('https://api.github.com/search/repositories?q={}'.format(query),
-                                headers={'Accept': 'application/vnd.github.mercy-preview+json'})
+                                headers={'Accept': 'application/vnd.github.mercy-preview+json'},
+                                timeout=60)
 
         if response.status_code != 200:
             print("Query failed for topic '{}' with response code {}.".format(_github_topics[type_],
