@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.sparse
 
 from numpy import arccos, arcsin, arccosh, arcsinh, arctan, cos, cosh, exp, \
     log, log10, sin, sinh, sqrt, sum, tan, tanh
@@ -308,7 +309,7 @@ def sum(x, axis=None):
     return np.sum(x, axis=axis)
 
 
-def d_sum(x, axis=None):
+def d_sum(x, axis=None, sparse=False):
     """
     The derivative of the sum of the elements in x along the given axis.
 
@@ -318,12 +319,24 @@ def d_sum(x, axis=None):
         Array value argument.
     axis : int or None.
         The axis along which the sum is computed, or None if the sum is computed over all elements.
+    sparse : str or None
+        If None, return a dense array. Otherwise, sparse provides the scipy sparse format for the returned jacobian.
 
     Returns
     -------
     ndarray
         Derivative of sum wrt x along the specified axis.
     """
+    if sparse is None:
+        kron = np.kron
+        eye = np.eye
+    else:
+        def kron(a, b):
+            return scipy.sparse.kron(a, b, format=sparse)
+
+        def eye(size):
+            return scipy.sparse.eye(size, format=sparse)
+
     if axis is None or len(x.shape) == 1:
         n = np.size(x)
         return np.ones((1, n))
@@ -340,17 +353,17 @@ def d_sum(x, axis=None):
             if i == axis:
                 kron_args.append(np.atleast_2d(np.ones(x.shape[i])))
             else:
-                kron_args.append(np.eye(x.shape[i]))
+                kron_args.append(eye(x.shape[i]))
 
         # Start with the kronecker product of the last two arguments
         arg2 = kron_args.pop()
         arg1 = kron_args.pop()
-        J = np.kron(arg1, arg2)
+        J = kron(arg1, arg2)
 
         # Now proceed through the remaining ones, fromr right to left
         while kron_args:
             arg1 = kron_args.pop()
-            J = np.kron(arg1, J)
+            J = kron(arg1, J)
         return J
 
 
