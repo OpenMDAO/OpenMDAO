@@ -28,7 +28,7 @@ def act_tanh(x, mu=1., z=0., a=-1., b=1.):
     return 0.5 * dy * (1 + tanh_term) + a
 
 
-def d_act_tanh(x, mu=1.0, z=0.0, a=-1.0, b=1.0, d_x=None, d_mu=None, d_z=None, d_a=None, d_b=None):
+def d_act_tanh(x, mu=1.0, z=0.0, a=-1.0, b=1.0, dx=True, dmu=True, dz=True, da=True, db=True):
     """
     A function which provides a differentiable activation function based on the hyperbolic tangent.
 
@@ -45,21 +45,21 @@ def d_act_tanh(x, mu=1.0, z=0.0, a=-1.0, b=1.0, d_x=None, d_mu=None, d_z=None, d
         The initial value that the input asymptotically approaches negative infinity.
     b : float
         The final value that the input asymptotically approaches positive infinity.
-    dx : np.array or None
-        If provided, an array with the same length as x which will be populated with the _diagonal_ of the partial
-        derivative jacobian matrix for tanh_act with respect to x.
-    dmu : np.array or None
-        If provided, an array with the same length as x which will be populated with the column vector of the partial
-        derivative jacobian matrix for tanh_act with respect to mu.
-    dz : np.array or None
-        If provided, an array with the same length as z which will be populated with the column vector of the partial
-        derivative jacobian matrix for tanh_act with respect to z.
-    da : np.array or None
-        If provided, an array with the same length as z which will be populated with the column vector of the partial
-        derivative jacobian matrix for tanh_act with respect to a.
-    db : np.array or None
-        If provided, an array with the same length as z which will be populated with the column vector of the partial
-        derivative jacobian matrix for tanh_act with respect to b.
+    dx : bool
+        True if the derivative of act_tanh wrt x should be calculated. Setting this to False can save time when the
+        derivative is not needed.
+    dmu : bool
+        True if the derivative of act_tanh wrt mu should be calculated. Setting this to False can save time when
+        the derivative is not needed.
+    dz : bool
+        True if the derivative of act_tanh wrt z should be calculated. Setting this to False can save time when
+        the derivative is not needed.
+    da : bool
+        True if the derivative of act_tanh wrt a should be calculated. Setting this to False can save time when
+        the derivative is not needed.
+    db : bool
+        True if the derivative of act_tanh wrt b should be calculated. Setting this to False can save time when
+        the derivative is not needed.
     Returns
     -------
     dict
@@ -67,17 +67,14 @@ def d_act_tanh(x, mu=1.0, z=0.0, a=-1.0, b=1.0, d_x=None, d_mu=None, d_z=None, d
         keys 'x', 'mu', 'z', 'a', 'b'.
     """
     dy = b - a
+    dy_d_2 = 0.5 * dy
     xmz = x - z
     tanh_term = np.tanh(xmz / mu)
     cosh2 = np.cosh(xmz / mu) ** 2
+    mu_cosh2 = mu * cosh2
 
-    if d_x is not None:
-        d_x[...] = (0.5 * dy) / (mu * cosh2)
-    if d_mu is not None:
-        d_mu[...] = -(0.5 * dy * xmz) / (mu ** 2 * cosh2)
-    if d_z is not None:
-        d_z[...] = (-0.5 * dy) / (mu * cosh2)
-    if d_a is not None:
-        d_a[...] = 0.5 * (1 - tanh_term)
-    if d_b is not None:
-        d_b[...] = 0.5 * (1 + tanh_term)
+    return (dy_d_2 / mu_cosh2 if dx else None,  # d_dx
+            -(dy_d_2 * xmz) / (mu * mu_cosh2) if dmu else None,  # d_dmu
+            (-dy_d_2) / mu_cosh2 if dz else None,  # d_dz
+            0.5 * (1 - tanh_term) if da else None,  # d_da
+            0.5 * (1 + tanh_term) if db else None)  # d_db

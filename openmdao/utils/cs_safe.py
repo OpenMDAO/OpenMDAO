@@ -1,8 +1,8 @@
 """
 collection of complex-step safe functions to replace standard numpy operations.
 """
-
-import numpy as np
+from .om_warnings import warn_deprecation
+from ..func import abs as cs_abs, norm as cs_norm, arctan2 as cs_arctan2
 
 
 def abs(x):
@@ -19,11 +19,8 @@ def abs(x):
     ndarray
         Absolute value.
     """
-    if isinstance(x, np.ndarray):
-        return x * np.sign(x)
-    elif x.real < 0.0:
-        return -x
-    return x
+    warn_deprecation('openmdao.utils.cs_safe.abs is deprecated. Use openmdao.func.abs instead.')
+    return cs_abs(x)
 
 
 def norm(x, axis=None):
@@ -42,7 +39,8 @@ def norm(x, axis=None):
     ndarray
         Matrix or vector norm.
     """
-    return np.sqrt(np.sum(x**2, axis=axis))
+    warn_deprecation('openmdao.utils.cs_safe.norm is deprecated. Use openmdao.func.norm instead.')
+    return cs_norm(x, axis=axis)
 
 
 def arctan2(y, x):
@@ -61,11 +59,5 @@ def arctan2(y, x):
     ndarray
         The angle whose opposite side has length y and whose adjacent side has length x.
     """
-    if np.iscomplexobj(x) or np.iscomplexobj(y):
-        a = np.real(y)
-        b = np.imag(y)
-        c = np.real(x)
-        d = np.imag(x)
-        return np.arctan2(a, c) + 1j * (c * b - a * d) / (a**2 + c**2)
-    else:
-        return np.arctan2(y, x)
+    warn_deprecation('openmdao.utils.cs_safe.arctan2 is deprecated. Use openmdao.func.arctan2 instead.')
+    return cs_arctan2(y, x)
