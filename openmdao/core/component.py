@@ -1702,13 +1702,18 @@ class Component(System):
 
         if self._serial_idxs is None:
             ranges = defaultdict(list)
-            globaloffset = 0
+            output_len = 0
             for name, offset, end, vec, slc, dist_sizes in self._jac_wrt_iter():
-                if name.split(".")[-1] in self._var_rel_names["output"]:
-                    globaloffset += (end - offset)
+                if vec is self._outputs:
+                    output_len = len(self._outputs)
+                    break
+            for name, offset, end, vec, slc, dist_sizes in self._jac_wrt_iter():
                 if dist_sizes is None:  # not distributed
                     if offset != end:
-                        ranges[vec].append(range(offset - globaloffset, end - globaloffset))
+                        if vec is self._outputs:
+                            ranges[vec].append(range(offset, end))
+                        else:
+                            ranges[vec].append(range(offset - output_len, end - output_len))
 
             self._serial_idxs = []
             for vec, rlist in ranges.items():
