@@ -164,10 +164,5 @@ def d_norm(x, axis=None):
     ndarray
         Derivative of norm wrt x.
     """
-    _x = x
     x_sq = (x ** 2)
-
-    if axis is None or len(x.shape) == 1:
-        return d_sum(x_sq, axis=axis).diagonal() * (x / np.sqrt(sum(x_sq, axis=axis)))
-    else:
-        return d_sum(x_sq, axis=axis) * (x / np.sqrt(sum(x_sq, axis=axis)))
+    return d_sum(x_sq, axis=axis) * (x / np.sqrt(sum(x_sq, axis=axis)))

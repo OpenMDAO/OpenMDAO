@@ -72,7 +72,6 @@ class TestFuncsFromNumpy(unittest.TestCase):
 class TestSum(unittest.TestCase):
 
     def test_sum_tensor(self):
-
         for X_SHAPE in [(12,), (4, 5), (3, 2, 6), (2, 3, 2, 3), (4, 3, 2, 1, 5)]:
             for AXIS in list(range(len(X_SHAPE))) + [None]:
                 with self.subTest(f'sum of shape {X_SHAPE} along axis {AXIS}'):

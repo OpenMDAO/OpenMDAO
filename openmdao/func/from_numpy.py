@@ -360,8 +360,7 @@ def d_sum(x, axis=None):
     eye = np.eye
 
     if axis is None or len(x.shape) == 1:
-        n = np.size(x)
-        return np.ones((1, n))
+        return np.ones((1,) + x.shape)
     else:
         # Build up a list of arguments for the kronecker products.
         #
