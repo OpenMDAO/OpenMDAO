@@ -2,8 +2,10 @@ import unittest
 
 import numpy as np
 
+import openmdao.api as om
 import openmdao.func.cs_safe as cs_safe
-from openmdao.utils.assert_utils import assert_near_equal
+import openmdao.func_api as omf
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 
 funcs_single_arg = ['abs', 'arctanh']
 funcs_vector_arg = ['norm']
@@ -26,7 +28,49 @@ class TestNorm(unittest.TestCase):
             cs_deriv_f[0, i] = cs_safe.norm(a).imag / 1.0E-40
             a[i] = a[i].real
 
+
+        with np.printoptions(linewidth=1024):
+            print(cs_deriv_f)
+            print()
+            print(deriv_f)
+
         assert_near_equal(deriv_f, cs_deriv_f, tolerance=1.0E-12)
+
+    def test_tensor(self):
+
+        for X_SHAPE in [(12,), (4, 5), (3, 2, 6), (2, 3, 2, 3), (4, 3, 2, 1, 5)]:
+            for AXIS in list(range(len(X_SHAPE))) + [None]:
+                with self.subTest(f'sum of shape {X_SHAPE} along axis {AXIS}'):
+                    if AXIS is None or len(X_SHAPE) == 1:
+                        SUM_SHAPE = (1,)
+                    else:
+                        temp = list(X_SHAPE)
+                        temp.pop(AXIS)
+                        SUM_SHAPE = tuple(temp)
+
+                    def norm_wrap(x):
+                        return cs_safe.norm(x, axis=AXIS)
+
+                    def dnorm_wrap(x, J):
+                        J['norm', 'x'] = cs_safe.d_norm(x, axis=AXIS)
+
+                    f = (omf.wrap(norm_wrap).add_input('x', shape=X_SHAPE, val=1.0)
+                         .add_output('norm', shape=SUM_SHAPE, val=1.0)
+                         .declare_partials(of='norm', wrt=('x',)))
+
+                    p = om.Problem()
+                    p.model.add_subsystem('norm_comp', om.ExplicitFuncComp(f, compute_partials=dnorm_wrap))
+
+                    p.setup(force_alloc_complex=True)
+                    p.set_val('norm_comp.x', np.random.random(X_SHAPE))
+
+                    p.run_model()
+
+                    assert_near_equal(p.get_val('norm_comp.norm'), np.asarray(np.linalg.norm(p.get_val('norm_comp.x'), axis=AXIS)))
+
+                    with np.printoptions(linewidth=1024):
+                        cpd = p.check_partials(method='cs', out_stream=None)
+                    assert_check_partials(cpd)
 
     def test_vec(self):
         N = 10
@@ -45,6 +89,7 @@ class TestNorm(unittest.TestCase):
 
         with np.printoptions(linewidth=1024):
             print(cs_deriv_f)
+            print()
             print(deriv_f)
 
         assert_near_equal(deriv_f, cs_deriv_f, tolerance=1.0E-12)

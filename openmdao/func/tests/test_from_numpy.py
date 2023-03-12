@@ -75,37 +75,35 @@ class TestSum(unittest.TestCase):
 
         for X_SHAPE in [(12,), (4, 5), (3, 2, 6), (2, 3, 2, 3), (4, 3, 2, 1, 5)]:
             for AXIS in list(range(len(X_SHAPE))) + [None]:
-                for SPARSE in [None, 'csr', 'csc']:
-                    with self.subTest(f'sum of shape {X_SHAPE} along axis {AXIS} - sparse={SPARSE}'):
-                        if AXIS is None or len(X_SHAPE) == 1:
-                            SUM_SHAPE = (1,)
-                        else:
-                            temp = list(X_SHAPE)
-                            temp.pop(AXIS)
-                            SUM_SHAPE = tuple(temp)
+                with self.subTest(f'sum of shape {X_SHAPE} along axis {AXIS}'):
+                    if AXIS is None or len(X_SHAPE) == 1:
+                        SUM_SHAPE = (1,)
+                    else:
+                        temp = list(X_SHAPE)
+                        temp.pop(AXIS)
+                        SUM_SHAPE = tuple(temp)
 
-                        p = om.Problem()
+                    p = om.Problem()
 
-                        def sum_wrap(x):
-                            return omfunc.sum(x, axis=AXIS)
+                    def sum_wrap(x):
+                        return omfunc.sum(x, axis=AXIS)
 
-                        def dsum_wrap(x, J):
-                            print(type(omfunc.d_sum(x, axis=AXIS, sparse=SPARSE)))
-                            J['sum', 'x'] = omfunc.d_sum(x, axis=AXIS, sparse=SPARSE)
+                    def dsum_wrap(x, J):
+                        J['sum', 'x'] = omfunc.d_sum(x, axis=AXIS)
 
-                        f = (omf.wrap(sum_wrap).add_input('x', shape=X_SHAPE, val=1.0)
-                             .add_output('sum', shape=SUM_SHAPE, val=1.0)
-                             .declare_partials(of='sum', wrt=('x',)))
+                    f = (omf.wrap(sum_wrap).add_input('x', shape=X_SHAPE, val=1.0)
+                         .add_output('sum', shape=SUM_SHAPE, val=1.0)
+                         .declare_partials(of='sum', wrt=('x',)))
 
-                        p.model.add_subsystem('sum_comp', om.ExplicitFuncComp(f, compute_partials=dsum_wrap))
+                    p.model.add_subsystem('sum_comp', om.ExplicitFuncComp(f, compute_partials=dsum_wrap))
 
-                        p.setup(force_alloc_complex=True)
-                        p.set_val('sum_comp.x', np.random.random(X_SHAPE))
+                    p.setup(force_alloc_complex=True)
+                    p.set_val('sum_comp.x', np.random.random(X_SHAPE))
 
-                        p.run_model()
+                    p.run_model()
 
-                        assert_near_equal(p.get_val('sum_comp.sum'), np.asarray(np.sum(p.get_val('sum_comp.x'), axis=AXIS)))
+                    assert_near_equal(p.get_val('sum_comp.sum'), np.asarray(np.sum(p.get_val('sum_comp.x'), axis=AXIS)))
 
-                        with np.printoptions(linewidth=1024):
-                            cpd = p.check_partials(method='cs', out_stream=None)
-                        assert_check_partials(cpd)
+                    with np.printoptions(linewidth=1024):
+                        cpd = p.check_partials(method='cs', out_stream=None)
+                    assert_check_partials(cpd)

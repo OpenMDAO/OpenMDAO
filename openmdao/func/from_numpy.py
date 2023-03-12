@@ -1,8 +1,7 @@
 import numpy as np
-import scipy.sparse
 
 from numpy import arccos, arcsin, arccosh, arcsinh, arctan, cos, cosh, exp, \
-    log, log10, sin, sinh, sqrt, sum, tan, tanh
+    log, log10, sin, sinh, sum, tan, tanh
 
 from scipy.special import erf, erfc
 
@@ -288,6 +287,23 @@ def d_sinh(x):
     return np.cosh(x)
 
 
+def sqrt(x):
+    """
+    The square root function
+
+    Parameters
+    ----------
+    x : ndarray
+        Array valued argument.
+
+    Returns
+    -------
+    ndarray
+        The square root of each element in x.
+    """
+    return np.sqrt(x)
+
+
 def d_sqrt(x):
     """
     The derivative of the square root function.
@@ -302,14 +318,29 @@ def d_sqrt(x):
     ndarray
         Derivative of sqrt wrt x.
     """
-    return 0.5 / np.sqrt(x)
+    return 0.5 / sqrt(x)
 
 
 def sum(x, axis=None):
-    return np.sum(x, axis=axis)
+    """
+    The sum of the elements over the given axis of x.
+
+    Parameters
+    ----------
+    x : ndarray
+        Array valued argument.
+    axis : int
+        If None, return the sum of all elements in x.
+
+    Returns
+    -------
+    ndarray
+        The sum of the elements in x over the given axis.
+    """
+    return np.sum(x, axis=axis, keepdims=True)
 
 
-def d_sum(x, axis=None, sparse=False):
+def d_sum(x, axis=None):
     """
     The derivative of the sum of the elements in x along the given axis.
 
@@ -319,23 +350,14 @@ def d_sum(x, axis=None, sparse=False):
         Array value argument.
     axis : int or None.
         The axis along which the sum is computed, or None if the sum is computed over all elements.
-    sparse : str or None
-        If None, return a dense array. Otherwise, sparse provides the scipy sparse format for the returned jacobian.
 
     Returns
     -------
     ndarray
         Derivative of sum wrt x along the specified axis.
     """
-    if sparse is None:
-        kron = np.kron
-        eye = np.eye
-    else:
-        def kron(a, b):
-            return scipy.sparse.kron(a, b, format=sparse)
-
-        def eye(size):
-            return scipy.sparse.eye(size, format=sparse)
+    kron = np.kron
+    eye = np.eye
 
     if axis is None or len(x.shape) == 1:
         n = np.size(x)
@@ -364,6 +386,12 @@ def d_sum(x, axis=None, sparse=False):
         while kron_args:
             arg1 = kron_args.pop()
             J = kron(arg1, J)
+
+        temp = list(x.shape)
+        temp.pop(axis)
+        ax0 = np.prod(temp)
+
+        J = np.reshape(J, (ax0,) + (x.shape))
         return J
 
 
