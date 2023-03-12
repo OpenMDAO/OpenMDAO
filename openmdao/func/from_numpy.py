@@ -337,7 +337,7 @@ def sum(x, axis=None):
     ndarray
         The sum of the elements in x over the given axis.
     """
-    return np.sum(x, axis=axis, keepdims=True)
+    return np.sum(x, axis=axis, keepdims=axis is not None)
 
 
 def d_sum(x, axis=None):
@@ -354,7 +354,9 @@ def d_sum(x, axis=None):
     Returns
     -------
     ndarray
-        Derivative of sum wrt x along the specified axis.
+        Derivative of sum wrt x along the specified axis. The shape of the jacobian is the
+        shape of output of sum (which keeps dimensions when axis is specified) concatenated
+        with the shape of the input.
     """
     kron = np.kron
     eye = np.eye
@@ -362,6 +364,9 @@ def d_sum(x, axis=None):
     if axis is None or len(x.shape) == 1:
         return np.ones((1,) + x.shape)
     else:
+        # This builds up J to the shape of (total_output_size, total_input_size) and then reshapes it to
+        # the appropriate dimensions. There may be a more efficient way to do this.
+        #
         # Build up a list of arguments for the kronecker products.
         #
         # If the axis of x is the summation axis, it appears in the kronecker products
@@ -386,11 +391,9 @@ def d_sum(x, axis=None):
             arg1 = kron_args.pop()
             J = kron(arg1, J)
 
-        temp = list(x.shape)
-        temp.pop(axis)
-        ax0 = np.prod(temp)
+        ax0 = np.prod([ax_size for i, ax_size in enumerate(x.shape) if i != axis])
 
-        J = np.reshape(J, (ax0,) + (x.shape))
+        J = np.reshape(J, (ax0,) + x.shape)
         return J
 
 

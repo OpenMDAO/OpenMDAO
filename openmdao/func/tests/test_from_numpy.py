@@ -72,15 +72,15 @@ class TestFuncsFromNumpy(unittest.TestCase):
 class TestSum(unittest.TestCase):
 
     def test_sum_tensor(self):
+        """ Test sum and its partials for a variety of input shapes and axis options. """
         for X_SHAPE in [(12,), (4, 5), (3, 2, 6), (2, 3, 2, 3), (4, 3, 2, 1, 5)]:
             for AXIS in list(range(len(X_SHAPE))) + [None]:
                 with self.subTest(f'sum of shape {X_SHAPE} along axis {AXIS}'):
                     if AXIS is None or len(X_SHAPE) == 1:
                         SUM_SHAPE = (1,)
                     else:
-                        temp = list(X_SHAPE)
-                        temp.pop(AXIS)
-                        SUM_SHAPE = tuple(temp)
+                        SUM_SHAPE = list(X_SHAPE)
+                        SUM_SHAPE[AXIS] = 1
 
                     p = om.Problem()
 
@@ -101,7 +101,8 @@ class TestSum(unittest.TestCase):
 
                     p.run_model()
 
-                    assert_near_equal(p.get_val('sum_comp.sum'), np.asarray(np.sum(p.get_val('sum_comp.x'), axis=AXIS)))
+                    assert_near_equal(p.get_val('sum_comp.sum'),
+                                      np.asarray(np.sum(p.get_val('sum_comp.x'), axis=AXIS, keepdims=AXIS is not None)))
 
                     with np.printoptions(linewidth=1024):
                         cpd = p.check_partials(method='cs', out_stream=None)
