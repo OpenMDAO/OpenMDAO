@@ -1734,7 +1734,7 @@ class Problem(object):
 
         if directional:
             if self._mode == 'fwd':
-                # check directional fwd against fd (must have same seed)
+                # check directional fwd against fd (one must have negative seed of the other)
                 directional_fd_fwd = total_info.J - fd_tot_info.J
             elif self._mode == 'rev':
                 # check directional rev against fd (different seeds)
