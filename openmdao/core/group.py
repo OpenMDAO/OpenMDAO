@@ -176,7 +176,7 @@ class Group(System):
     _order_set : bool
         Flag to check if set_order has been called.
     _auto_ivc_warnings : list
-        List of Auto IVC warnings to be raised later with simple_warnings.
+        List of Auto IVC warnings to be raised later.
     _shapes_graph : nx.Graph
         Dynamic shape dependency graph, or None.
     _shape_knowns : set

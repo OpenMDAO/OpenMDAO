@@ -407,17 +407,6 @@ class ExecComp(ExplicitComponent):
                                        "recognized for variable '%s': %s" %
                                        (self.msginfo, arg, sorted(diff)))
 
-                if 'val' in val and 'value' in val:
-                    raise RuntimeError(f"{self.msginfo}: 'val' and 'value' at the same time, use "
-                                       "'val'.")
-                elif 'value' in val and not warned:
-                    warn_deprecation(f"{self.msginfo}: 'value' will be deprecated in 4.0. Please "
-                                     "use 'val' in the future.")
-
-                if 'value' in val:
-                    val['val'] = val.pop('value')
-                    warned = True
-
                 kwargs2[arg] = val.copy()
 
                 if units is not None:

@@ -1072,7 +1072,7 @@ class CaseTable(object):
             with sqlite3.connect(self._filename) as con:
                 cur = con.cursor()
                 cur.execute(f"SELECT {self._index_name} FROM {self._table_name}"
-                            " ORDER BY id ASC")
+                            " ORDER BY id ASC")  # nosec trusted input
                 rows = cur.fetchall()
 
             con.close()
