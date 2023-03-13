@@ -107,3 +107,39 @@ class TestSum(unittest.TestCase):
                     with np.printoptions(linewidth=1024):
                         cpd = p.check_partials(method='cs', out_stream=None)
                     assert_check_partials(cpd)
+
+    def test_cumsum_tensor(self):
+        """ Test sum and its partials for a variety of input shapes and axis options. """
+        for X_SHAPE in [(12,), (4, 5), (3, 2, 5), (2, 3, 4, 5), (4, 3, 2, 1, 5)]:
+            for AXIS in list(range(len(X_SHAPE))) + [None]:
+                with self.subTest(f'sum of shape {X_SHAPE} along axis {AXIS}'):
+                    if AXIS is None or len(X_SHAPE) == 1:
+                        F_SHAPE = np.prod(X_SHAPE)
+                    else:
+                        F_SHAPE = X_SHAPE
+
+                    p = om.Problem()
+
+                    def wrap(x):
+                        return omfunc.cumsum(x, axis=AXIS)
+
+                    def d_wrap(x, J):
+                        J['f', 'x'] = omfunc.d_cumsum(x, axis=AXIS)
+
+                    f = (omf.wrap(wrap).add_input('x', shape=X_SHAPE, val=1.0)
+                         .add_output('f', shape=F_SHAPE, val=1.0)
+                         .declare_partials(of='f', wrt=('x',)))
+
+                    p.model.add_subsystem('f_comp', om.ExplicitFuncComp(f, compute_partials=d_wrap))
+
+                    p.setup(force_alloc_complex=True)
+                    p.set_val('f_comp.x', np.random.random(X_SHAPE))
+
+                    p.run_model()
+
+                    assert_near_equal(p.get_val('f_comp.f'),
+                                      np.asarray(np.cumsum(p.get_val('f_comp.x'), axis=AXIS)))
+
+                    with np.printoptions(linewidth=1024, edgeitems=1000):
+                        cpd = p.check_partials(method='cs', out_stream=None)
+                    assert_check_partials(cpd)

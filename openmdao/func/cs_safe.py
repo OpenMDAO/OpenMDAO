@@ -4,7 +4,7 @@ collection of complex-step safe functions to replace standard numpy operations.
 
 import numpy as np
 
-from .from_numpy import sum, d_sum
+from .from_numpy import sum as omfunc_sum, d_sum
 
 
 def abs(x):
@@ -145,7 +145,7 @@ def norm(x, axis=None):
     ndarray
         Matrix or vector norm.
     """
-    return np.sqrt(sum(x**2, axis=axis))
+    return np.sqrt(omfunc_sum(x**2, axis=axis))
 
 
 def d_norm(x, axis=None):
@@ -165,4 +165,4 @@ def d_norm(x, axis=None):
         Derivative of norm wrt x.
     """
     x_sq = (x ** 2)
-    return d_sum(x_sq, axis=axis) * (x / np.sqrt(sum(x_sq, axis=axis)))
+    return d_sum(x_sq, axis=axis) * (x / np.sqrt(omfunc_sum(x_sq, axis=axis)))

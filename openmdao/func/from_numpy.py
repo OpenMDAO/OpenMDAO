@@ -1,12 +1,33 @@
 import numpy as np
 
-from numpy import arccos, arcsin, arccosh, arcsinh, arctan, cos, cosh, exp, \
-    log, log10, sin, sinh, sum, tan, tanh
+from numpy import arccos, arcsin, arccosh, arcsinh, arctan, cos, cosh, cumsum, exp, \
+    log, log10, sin, sinh, tan, tanh
 
 from scipy.special import erf, erfc
 
-
 _2_div_sqrt_pi = 2. / np.sqrt(np.pi)
+
+
+def d_cumsum(x, axis=None):
+    n = np.prod(x.shape, dtype=int)
+    if axis is None or len(x.shape) == 1:
+        return np.tri(n)
+    else:
+        J = np.zeros(x.shape + x.shape)
+        J_view = np.reshape(J, (n, n))
+
+        k = len(x.shape)
+        kron = np.kron
+        eye = np.eye
+
+        len_axes_before_axis = 1 if axis == 0 else np.prod([size for i, size in enumerate(x.shape) if i < axis],
+                                                           dtype=int)
+        len_axes_after_axis = 1 if axis == k else np.prod([size for i, size in enumerate(x.shape) if i > axis],
+                                                          dtype=int)
+        pattern = kron(np.tri(x.shape[axis]), eye(len_axes_after_axis))
+        J_view[...] = kron(eye(len_axes_before_axis), pattern)
+
+        return J
 
 
 def d_arccos(x):
@@ -427,3 +448,4 @@ def d_tanh(x):
         Derivative of tanh wrt x.
     """
     return 1 / (np.cosh(x) ** 2)
+
