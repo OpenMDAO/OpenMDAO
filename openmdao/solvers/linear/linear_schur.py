@@ -470,16 +470,18 @@ class LinearSchur(BlockLinearSolver):
 
             # # first negate the vector from the linear solve
             subsys1._vectors["residual"]["linear"] *= -1.0
+            # b_vec.set_val(0.0)
+            subsys2._dresiduals.set_val(0.0)
             # # transfer the outputs to inputs
-            b_vec2.set_val(0.0)
-            b_vec2.set_val(subsys1._vectors["residual"]["linear"].asarray())
-            scope_out, scope_in = system._get_matvec_scope(subsys2)
+            # b_vec2.set_val(0.0)
+            # b_vec2.set_val(subsys1._vectors["residual"]["linear"].asarray())
+            scope_out, scope_in = system._get_matvec_scope()
             scope_out = self._vars_union(self._scope_out, scope_out)
             scope_in = self._vars_union(self._scope_in, scope_in)
-            subsys2._apply_linear(None, None, mode, scope_out, scope_in)
+            system._apply_linear(None, None, mode, scope_out, scope_in)
 
-            subsys2_rhs += subsys2._vectors["input"]["linear"].asarray()
-            # system._transfer("linear", "fwd", subsys2.name)
+            system._transfer("linear", mode)
+            b_vec2 += subsys2_rhs
 
             # subsys2._solve_linear(mode, self._rel_systems, scope_out, scope_in)
             if system.comm.rank == 0:
