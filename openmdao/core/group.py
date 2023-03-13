@@ -2801,7 +2801,7 @@ class Group(System):
             absolute, 'rel_avg' for a size relative to the absolute value of the vector input, or
             'rel_element' for a size relative to each value in the vector input. In addition, it
             can be 'rel_legacy' for a size relative to the norm of the vector.  For backwards
-            compatibilty, it can be 'rel', which is equivalent to 'rel_avg'. Defaults to None,
+            compatibilty, it can be 'rel', which is now equivalent to 'rel_avg'. Defaults to None,
             in which case the approximation method provides its default value.
         """
         self._has_approx = True
