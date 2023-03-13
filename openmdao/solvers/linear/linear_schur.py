@@ -311,27 +311,13 @@ class LinearSchur(BlockLinearSolver):
             ########################
             #### schur_jacobian ####
             ########################
-            # if subsys2._iter_call_apply_linear():
-            # scope_out, scope_in = system._get_matvec_scope(subsys1)
-            # if system.comm.rank == 0:
-            #     print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
-            #     print("subsys1", subsys1._vectors["output"]["linear"].asarray())
-            #     print("subsys1", subsys1._vectors["input"]["linear"].asarray())
 
-            # print("subsys2", subsys2._vectors["residual"]["linear"].asarray())
-            # print("subsys2", subsys2._vectors["output"]["linear"].asarray())
-            # print("subsys2", subsys2._vectors["input"]["linear"].asarray())
             subsys1._solve_linear(mode, ContainsAll())
-            # print("subsys1", subsys1._vectors["residual"]["linear"].asarray())
-            # print("subsys1", subsys1._vectors["output"]["linear"].asarray())
-            # print("subsys1", subsys1._vectors["input"]["linear"].asarray())
 
-            # print("subsys2", subsys2._vectors["residual"]["linear"].asarray())
-            # print("subsys2", subsys2._vectors["output"]["linear"].asarray())
-            # print("subsys2", subsys2._vectors["input"]["linear"].asarray())
             # # first negate the vector from the linear solve
             subsys1._vectors["output"]["linear"] *= -1.0
             # # transfer the outputs to inputs
+            subsys2._dinputs.set_val(0.0)
             system._transfer("linear", "fwd", subsys2.name)
 
             scope_out, scope_in = system._get_matvec_scope(subsys2)
@@ -369,42 +355,185 @@ class LinearSchur(BlockLinearSolver):
                 system._doutputs[f"{subsys2.name}.{var}"] = d_subsys2[ii]
 
         else:  # rev
-            if sys.version_info >= (3, 8):
-                subsystems = reversed(system._subsystems_allprocs.values())
-            else:
-                subsystems = list(system._subsystems_allprocs.values())
-                subsystems.reverse()
             parent_offset = system._doutputs._root_offset
 
-            subsys1, _ = subsystems["coupling_2"]
-            subsys2, _ = subsystems["balance"]
+            b_vec = subsys1._doutputs
+            off = b_vec._root_offset - parent_offset
+            b_vec2 = subsys2._doutputs
+            off2 = b_vec2._root_offset - parent_offset
+            subsys1_rhs = self._rhs_vec[off : off + len(b_vec)].copy()
+            subsys2_rhs = self._rhs_vec[off2 : off2 + len(b_vec2)].copy()
 
-            # for subsys, _ in subsystems:
-            if self._rel_systems is not None and subsys1.pathname not in self._rel_systems:
-                return
+            rvec = system._vectors["residual"]["linear"]
+            ovec = system._vectors["output"]["linear"]
+            ivec = system._vectors["input"]["linear"]
 
-            if subsys1._is_local:
-                b_vec = subsys1._doutputs
-                b_vec.set_val(0.0)
+            r_data = rvec.asarray(copy=True)
+            o_data = ovec.asarray(copy=True)
+            i_data = ivec.asarray(copy=True)
 
-                system._transfer("linear", mode, subsys1.name)
+            ########################
+            #### schur_jacobian ####
+            ########################
 
-                b_vec *= -1.0
-                off = b_vec._root_offset - parent_offset
-                b_vec += self._rhs_vec[off : off + len(b_vec)]
+            rvec.set_val(np.zeros(len(rvec)))
 
+            for ii, var in enumerate(resd_to_solve):
+                # set the linear seed of the variable we want to solve for in subsys 2
+
+                rvec[f"{subsys2.name}.{var}"] = 1.0
+
+                scope_out, scope_in = system._get_matvec_scope()
+                # scope_out, scope_in = system._get_matvec_scope(subsys2)
+                scope_out = self._vars_union(self._scope_out, scope_out)
+                scope_in = self._vars_union(self._scope_in, scope_in)
+                # print(scope_out, scope_in)
+                system._apply_linear(None, None, mode, scope_out, scope_in)
+                # system._transfer("linear", mode, subsys1.name)
+
+                # print("jac:", subsys2._jacobian["jac"])
+                if system.comm.rank == 0:
+                    print(f"\nComputing Jacobian columns for {var}")
+                    print(f"C[{ii},:]                    =", subsys1._vectors["output"]["linear"].asarray())
+                    print(
+                        f"|C[{ii},:]|                  =",
+                        np.linalg.norm(subsys1._vectors["output"]["linear"].asarray()),
+                        flush=True,
+                    )
+
+                # system._transfer("linear", mode, subsys1.name)
+                # # run the jac-vec computation in the first subsystem
+
+                # scope_out, scope_in = system._get_matvec_scope(subsys1)
+                subsys1._solve_linear(mode, ContainsAll())
+
+                # print(subsys2._vectors["residual"]["linear"])
+                if system.comm.rank == 0:
+                    # print(f"\nComputing Jacobian columns for {var}")
+                    print(f"C[{ii},:] A^-1                    =", subsys1._vectors["residual"]["linear"].asarray())
+                    print(
+                        f"|C[{ii},:] A^-1|                  =",
+                        np.linalg.norm(subsys1._vectors["residual"]["linear"].asarray()),
+                        flush=True,
+                    )
+
+                # cache C A^-1
+                # CA_cache = subsys1._vectors["residual"]["linear"].asarray(copy=True)
+                # print(subsys1._vectors["residual"]["linear"])
+                subsys1._vectors["residual"]["linear"] *= -1.0
+                if system.comm.rank == 0:
+                    print("seed for C | D            =", system._vectors["residual"]["linear"].asarray(), flush=True)
+                # print(subsys1._vectors["residual"]["linear"])
                 scope_out, scope_in = system._get_matvec_scope(subsys1)
+                # print(subsys1._vectors["input"]["linear"])
+                # scope_out, scope_in = system._get_matvec_scope(subsys2)
                 scope_out = self._vars_union(self._scope_out, scope_out)
                 scope_in = self._vars_union(self._scope_in, scope_in)
 
-                subsys1._solve_linear(mode, self._rel_systems, scope_out, scope_in)
+                subsys1._apply_linear(None, None, mode, scope_out, scope_in)
 
-                if subsys1._iter_call_apply_linear():
-                    subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
-                else:
-                    b_vec.set_val(0.0)
-            else:  # subsys not local
-                system._transfer("linear", mode, subsys1.name)
+                system._transfer("linear", mode, subsys2.name)
+                if system.comm.rank == 0:
+                    print(
+                        f"D[{ii},:] - C[{ii},:] A^-1 B    =",
+                        subsys2._vectors["output"]["linear"].asarray(),
+                        flush=True,
+                    )
+
+                # quit()
+
+                # put this value into the jacobian.
+                schur_jac[ii, :] = subsys2._vectors["output"]["linear"].asarray()
+
+                # set back the seed to zero for the next vector
+                rvec[f"{subsys2.name}.{var}"] = 0.0
+
+            ########################
+            #### schur_jacobian ####
+            ########################
+
+            # put back the vectors
+            rvec.set_val(r_data)
+            ovec.set_val(o_data)
+            ivec.set_val(i_data)
+
+            # subsys1._vectors["input"]["linear"] = subsys2._vectors["output"]["linear"]
+            system._transfer("linear", mode, subsys2.name)
+
+            ############################
+            #### solve for subsys 2 ####
+            ############################
+
+            b_vec.set_val(subsys1_rhs)
+
+            subsys1._solve_linear(mode, ContainsAll())
+
+            # # first negate the vector from the linear solve
+            subsys1._vectors["residual"]["linear"] *= -1.0
+            # # transfer the outputs to inputs
+            b_vec2.set_val(0.0)
+            b_vec2.set_val(subsys1._vectors["residual"]["linear"].asarray())
+            scope_out, scope_in = system._get_matvec_scope(subsys2)
+            scope_out = self._vars_union(self._scope_out, scope_out)
+            scope_in = self._vars_union(self._scope_in, scope_in)
+            subsys2._apply_linear(None, None, mode, scope_out, scope_in)
+
+            subsys2_rhs += subsys2._vectors["input"]["linear"].asarray()
+            # system._transfer("linear", "fwd", subsys2.name)
+
+            # subsys2._solve_linear(mode, self._rel_systems, scope_out, scope_in)
+            if system.comm.rank == 0:
+                print("\nSchur Jacobian: ", schur_jac, flush=True)
+            d_subsys2 = scipy.linalg.solve(schur_jac, subsys2_rhs)
+
+            if system.comm.rank == 0:
+                print("\nupdate vector: ", d_subsys2, flush=True)
+                print("\n==================================================")
+            # loop over the variables just to be safe with the ordering
+
+            for ii, var in enumerate(vars_to_solve):
+                system._doutputs[f"{subsys2.name}.{var}"] = d_subsys2[ii]
+
+            ############################
+            #### solve for subsys 2 ####
+            ############################
+
+            ############################
+            #### solve for subsys 1 ####
+            ############################
+            # b_vec.set_val(0.0)
+            # system._transfer("linear", "fwd", subsys1.name)
+
+            # scope_out, scope_in = system._get_matvec_scope(subsys1)
+            # scope_out = self._vars_union(self._scope_out, scope_out)
+            # scope_in = self._vars_union(self._scope_in, scope_in)
+            # subsys1._apply_linear(None, None, mode, scope_out, scope_in)
+
+            # subsys1._doutputs.set_val(subsys1_output)
+
+            # b_vec = subsys1._doutputs
+            b_vec.set_val(0.0)
+
+            system._transfer("linear", mode, subsys1.name)
+
+            b_vec *= -1.0
+            # b_vec += subsys1_rhs
+
+            scope_out, scope_in = system._get_matvec_scope(subsys1)
+            scope_out = self._vars_union(self._scope_out, scope_out)
+            scope_in = self._vars_union(self._scope_in, scope_in)
+
+            if subsys1._iter_call_apply_linear():
+                subsys1._dresiduals.set_val(b_vec.asarray())
+                subsys1._apply_linear(None, None, mode, scope_out, scope_in)
+            else:
+                b_vec.set_val(0.0)
+
+            b_vec += subsys1_rhs
+            subsys1._solve_linear(mode, ContainsAll())
+        # quit()
+        # if not subsys1._is_local:
+        #     return
 
         if use_aitken:
             if self._mode_linear == "fwd":
