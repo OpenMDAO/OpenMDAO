@@ -306,7 +306,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.prob.run_model()
 
         # No tags
-        inputs = self.prob.model.list_inputs(values=False, hierarchical=False, out_stream=None)
+        inputs = self.prob.model.list_inputs(val=False, hierarchical=False, out_stream=None)
         self.assertEqual(sorted(inputs), [
             ('comp1.a', {}),
             ('comp1.b', {}),
@@ -317,14 +317,14 @@ class ImplicitCompTestCase(unittest.TestCase):
         ])
 
         # With tag
-        inputs = self.prob.model.list_inputs(values=False, hierarchical=False, out_stream=None, tags='tag_a')
+        inputs = self.prob.model.list_inputs(val=False, hierarchical=False, out_stream=None, tags='tag_a')
         self.assertEqual(sorted(inputs), [
             ('comp1.a', {}),
             ('comp2.a', {}),
         ])
 
         # Wrong tag
-        inputs = self.prob.model.list_inputs(values=False, hierarchical=False, out_stream=None, tags='tag_wrong')
+        inputs = self.prob.model.list_inputs(val=False, hierarchical=False, out_stream=None, tags='tag_wrong')
         self.assertEqual(sorted(inputs), [])
 
     def test_list_inputs_prom_name(self):
@@ -408,7 +408,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.prob.run_model()
 
         stream = StringIO()
-        resids = self.prob.model.list_outputs(values=False, residuals=True, hierarchical=False,
+        resids = self.prob.model.list_outputs(val=False, residuals=True, hierarchical=False,
                                               out_stream=stream)
         self.assertEqual(sorted(resids), [
             ('comp1.x', {'resids': [0.]}),
@@ -968,7 +968,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
             def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs=None,
                 discrete_outputs=None):
                 pass
-            
+
         group = om.Group()
 
         group.add_subsystem('px', om.IndepVarComp('x', 77.0))
@@ -1404,23 +1404,23 @@ class ListFeatureTestCase(unittest.TestCase):
 
     def test_for_docs_list_no_values(self):
         # list inputs
-        inputs = prob.model.list_inputs(values=False)
+        inputs = prob.model.list_inputs(val=False)
 
         # list only explicit outputs
-        outputs = prob.model.list_outputs(implicit=False, values=False)
+        outputs = prob.model.list_outputs(implicit=False, val=False)
 
     def test_for_docs_list_includes_excludes(self):
         # list inputs
-        inputs = prob.model.list_inputs(values=False, includes=['*comp2*',])
-        inputs = prob.model.list_inputs(values=False, excludes=['*comp2*',])
+        inputs = prob.model.list_inputs(val=False, includes=['*comp2*',])
+        inputs = prob.model.list_inputs(val=False, excludes=['*comp2*',])
 
         # list only explicit outputs
-        outputs = prob.model.list_outputs(implicit=False, values=False, includes=['*b',])
-        outputs = prob.model.list_outputs(implicit=False, values=False, excludes=['*b',])
+        outputs = prob.model.list_outputs(implicit=False, val=False, includes=['*b',])
+        outputs = prob.model.list_outputs(implicit=False, val=False, excludes=['*b',])
 
     def test_list_no_values(self):
         # list inputs
-        inputs = prob.model.list_inputs(values=False)
+        inputs = prob.model.list_inputs(val=False)
         self.assertEqual([n[0] for n in sorted(inputs)], [
             'sub.comp1.a',
             'sub.comp1.b',
@@ -1461,7 +1461,7 @@ class ListFeatureTestCase(unittest.TestCase):
 
         # list_inputs test
         stream = StringIO()
-        inputs = prob.model.list_inputs(values=False, out_stream=stream)
+        inputs = prob.model.list_inputs(val=False, out_stream=stream)
         text = stream.getvalue()
         self.assertEqual(sorted(inputs), [
             ('sub.comp2.a', {}),

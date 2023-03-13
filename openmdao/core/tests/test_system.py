@@ -251,55 +251,6 @@ class TestSystem(unittest.TestCase):
         outputs = model.list_outputs(excludes=['circuit*'], implicit=False, out_stream=None)
         self.assertEqual(len(outputs), 2)
 
-    def test_list_inputs_outputs_val_deprecation(self):
-        p = Problem()
-        p.model.add_subsystem('comp', ExecComp('b=2*a'), promotes=['a', 'b'])
-        p.setup()
-        p.run_model()
-
-        msg = "<model> <class Group>: The 'values' argument to 'list_inputs()' " \
-              "is deprecated and will be removed in 4.0. Please use 'val' instead."
-
-        with assert_warning(OMDeprecationWarning, msg):
-            inputs = p.model.list_inputs(values=False, out_stream=None)
-        self.assertEqual(inputs, [('comp.a', {})])
-
-        with assert_warning(OMDeprecationWarning, msg):
-            inputs = p.model.list_inputs(values=True, out_stream=None)
-        self.assertEqual(inputs, [('comp.a', {'val': 1})])
-
-        msg = "The metadata key 'value' will be deprecated in 4.0. Please use 'val'."
-        with assert_warning(OMDeprecationWarning, msg):
-            self.assertEqual(inputs[0][1]['value'], 1)
-
-        msg = "<model> <class Group>: The 'values' argument to 'list_outputs()' " \
-              "is deprecated and will be removed in 4.0. Please use 'val' instead."
-
-        with assert_warning(OMDeprecationWarning, msg):
-            outputs = p.model.list_outputs(values=False, out_stream=None)
-        self.assertEqual(outputs, [('comp.b', {})])
-
-        with assert_warning(OMDeprecationWarning, msg):
-            outputs = p.model.list_outputs(values=True, out_stream=None)
-        self.assertEqual(outputs, [('comp.b', {'val': 2})])
-
-        msg = "The metadata key 'value' will be deprecated in 4.0. Please use 'val'."
-        with assert_warning(OMDeprecationWarning, msg):
-            self.assertEqual(outputs[0][1]['value'], 2)
-
-        meta = p.model.get_io_metadata(metadata_keys=('val',))
-        with assert_warning(OMDeprecationWarning, msg):
-            self.assertEqual(meta['comp.a']['value'], 1)
-
-        with assert_warning(OMDeprecationWarning, msg):
-            meta = p.model.get_io_metadata(metadata_keys=('value',))
-        self.assertEqual(meta['comp.a']['val'], 1)
-
-        with assert_warning(OMDeprecationWarning, msg):
-            meta = p.model.get_io_metadata(metadata_keys=('value',))
-        with assert_warning(OMDeprecationWarning, msg):
-            self.assertEqual(meta['comp.a']['value'], 1)
-
     def test_list_inputs_outputs_is_indep_is_des_var(self):
         from openmdao.test_suite.components.sellar_feature import SellarMDA
 
