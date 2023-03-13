@@ -3869,7 +3869,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.setup(force_alloc_complex=True, mode='rev')
         prob.run_model()
 
-        J = prob.check_totals(method='cs', out_stream=None, directional=True)
+        J = prob.check_totals(method='cs', directional=True)
         print(J)
 
 

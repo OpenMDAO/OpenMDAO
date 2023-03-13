@@ -1680,10 +1680,14 @@ class _TotalJacInfo(object):
                 if model._coloring_info['coloring'] is not None:
                     model._update_wrt_matches(model._coloring_info)
 
-            if self.directional and self.mode == 'fwd':
-                for scheme in model._approx_schemes.values():
-                    seeds = {k: -s for k, s in self.seeds.items()}
-                    scheme._totals_directions = seeds
+            if self.directional:
+                if self.mode == 'fwd':
+                    for scheme in model._approx_schemes.values():
+                        seeds = {k: -s for k, s in self.seeds.items()}
+                        scheme._totals_directions = seeds
+                else:
+                    for scheme in model._approx_schemes.values():
+                        scheme._totals_directions = {'rev': None}
             else:
                 for scheme in model._approx_schemes.values():
                     scheme._totals_directions = {}

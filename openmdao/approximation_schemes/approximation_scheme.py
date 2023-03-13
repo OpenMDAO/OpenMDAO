@@ -56,7 +56,7 @@ class ApproximationScheme(object):
         self._progress_out = None
         self._during_sparsity_comp = False
         self._jac_scatter = None
-        self._totals_directions = None
+        self._totals_directions = {}
 
     def __repr__(self):
         """
@@ -230,7 +230,7 @@ class ApproximationScheme(object):
         else:
             wrt_matches = None
 
-        if self._totals_directions is not None:
+        if self._totals_directions:
             wrts_directional = []
             in_inds_directional = []
             vec_inds_directional = defaultdict(list)
@@ -247,7 +247,7 @@ class ApproximationScheme(object):
                     slices = out_slices
 
                 data = self._get_approx_data(system, wrt, meta)
-                directional = meta['directional'] or self._totals_directions is not None
+                directional = meta['directional'] or self._totals_directions
 
                 in_idx = range(start, end)
 
@@ -286,7 +286,7 @@ class ApproximationScheme(object):
                 else:
                     self._nruns_uncolored += end - start
 
-                if self._totals_directions is None:
+                if not self._totals_directions:
                     self._approx_groups.append((wrt, data, in_idx, [(vec, vec_idx)], directional,
                                                 meta['vector']))
                 else:
@@ -296,7 +296,7 @@ class ApproximationScheme(object):
                     vec_inds_directional[vec].extend(vec_idx[0])
 
         if total:
-            if self._totals_directions is not None:
+            if self._totals_directions:
                 self._nruns_uncolored = 1
                 if 'fwd' in self._totals_directions:
                     vector = self._totals_directions['fwd']
@@ -420,7 +420,7 @@ class ApproximationScheme(object):
                     yield col, scratch
 
     def _vec_ind_iter(self, vec_ind_list):
-        if self._totals_directions is not None:
+        if self._totals_directions:
             yield vec_ind_list, None
         else:
             entry = [[None, None]]
@@ -429,7 +429,6 @@ class ApproximationScheme(object):
                 for vinds in vec_idxs:
                     ent0[0] = vec
                     ent0[1] = vinds
-                    print("entry:", entry, "vinds:", vinds)
                     yield entry, vinds
 
     def _uncolored_column_iter(self, system, approx_groups):
@@ -492,8 +491,6 @@ class ApproximationScheme(object):
 
             jidx_iter = iter(range(len(jcol_idxs)))
             for vec_ind_info, vecidxs in self._vec_ind_iter(vec_ind_list):
-                print("vec_ind_info:", vec_ind_info)
-                print("vecidxs:", vecidxs)
 
                 if fd_count % num_par_fd == system._par_fd_id:
                     # run the finite difference
@@ -506,6 +503,7 @@ class ApproximationScheme(object):
                     if direction is not None or mult != 1.0:
                         result *= mult
 
+                    print("RESULT:", result)
                     if total:
                         result = self._get_total_result(result, tot_result)
 
