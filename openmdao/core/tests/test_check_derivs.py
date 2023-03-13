@@ -3416,6 +3416,52 @@ class TestProblemCheckTotals(unittest.TestCase):
         for key, val in totals.items():
             assert_near_equal(val['rel error'][0], 0.0, 1e-10)
 
+    def test_cs_around_newton_new_method(self):
+        # The old method of nudging the Newton and forcing it to reconverge could not achieve the
+        # same accuracy on this model. (1e8 vs 1e12)
+
+        class SellarDerivatives(om.Group):
+
+            def setup(self):
+                self.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+                self.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+                self.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+                self.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+                sub = self.add_subsystem('sub', om.Group(), promotes=['*'])
+
+                sub.linear_solver = om.DirectSolver(assemble_jac=True)
+                sub.options['assembled_jac_type'] = 'csc'
+
+                obj = sub.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)', obj=0.0,
+                                                         x=0.0, z=np.array([0.0, 0.0]), y1=0.0, y2=0.0),
+                                  promotes=['obj', 'x', 'z', 'y1', 'y2'])
+                obj.declare_partials(of='*', wrt='*', method='cs')
+
+                con1 = sub.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1', con1=0.0, y1=0.0),
+                                  promotes=['con1', 'y1'])
+                con2 = sub.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0),
+                                  promotes=['con2', 'y2'])
+                con1.declare_partials(of='*', wrt='*', method='cs')
+                con2.declare_partials(of='*', wrt='*', method='cs')
+
+                self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+                self.linear_solver = om.DirectSolver(assemble_jac=False)
+
+
+        prob = om.Problem()
+        prob.model = SellarDerivatives()
+        prob.set_solver_print(level=0)
+        prob.setup(force_alloc_complex=True)
+
+        prob.run_model()
+
+        wrt = ['z', 'x']
+        of = ['obj', 'con1', 'con2']
+
+        totals = prob.check_totals(of=of, wrt=wrt, method='cs', compact_print=False)
+        assert_check_totals(totals, atol=1e-12, rtol=1e-12)
+
     def test_cs_around_newton_in_comp(self):
         # CS around Newton in an ImplicitComponent.
         class MyComp(om.ImplicitComponent):
