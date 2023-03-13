@@ -1702,7 +1702,7 @@ class Component(System):
 
         if self._serial_idxs is None:
             ranges = defaultdict(list)
-            output_len = 0 if self.is_explicit() else len(self._outputs) 
+            output_len = 0 if self.is_explicit() else len(self._outputs)
             for name, offset, end, vec, slc, dist_sizes in self._jac_wrt_iter():
                 if dist_sizes is None:  # not distributed
                     if offset != end:
