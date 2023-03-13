@@ -2534,23 +2534,6 @@ class TestFDRelative(unittest.TestCase):
         # This derivative requires rel_element to be accurate.
         self.assertTrue(np.abs(totals['comp.y', 'comp.x_element']['J_fd'][2, 2]) < 1e-9)
 
-    def test_deprecation(self):
-        prob = om.Problem()
-        model = prob.model
-        comp = model.add_subsystem('comp', Paraboloid())
-
-        prob.setup()
-        prob.run_model()
-
-        msg = "When using 'rel' as the step_calc, the fd stepsize is currently " + \
-            "scaled by the norm of the vector variable. This is not ideal for" + \
-            " larger vectors, and this behavior is being changed in " + \
-            "OpenMDAO 3.12.0. To preserve the older way of doing this " + \
-            "calculation, set step_calc to 'rel_legacy'."
-
-        with assert_warning(OMDeprecationWarning, msg):
-            prob.check_partials(out_stream=None, method='fd', step_calc='rel')
-
 
 class ParallelFDParametricTestCase(unittest.TestCase):
 

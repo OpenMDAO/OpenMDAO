@@ -131,13 +131,6 @@ class FiniteDifference(ApproximationScheme):
                 raise ValueError(f"{system.msginfo}: Option 'directional' is not supported when "
                                  "'step_calc' is set to 'rel_element.'")
 
-            elif step_calc == 'rel':
-                warn_deprecation("When using 'rel' as the step_calc, the fd stepsize is currently "
-                                 "scaled by the norm of the vector variable. This is not ideal for"
-                                 " larger vectors, and this behavior is being changed in "
-                                 "OpenMDAO 3.12.0. To preserve the older way of doing this "
-                                 "calculation, set step_calc to 'rel_legacy'.")
-
         options['vector'] = vector
         wrt = abs_key[1]
         if wrt in self._wrt_meta:
@@ -190,14 +183,13 @@ class FiniteDifference(ApproximationScheme):
                 var_local = False
 
             if var_local:
-                # TODO - behavior or 'rel' will switch to 'rel_avg' in an upcoming release.
-                if step_calc == 'rel_legacy' or step_calc == 'rel':
+                if step_calc == 'rel_legacy':
                     step *= np.linalg.norm(wrt_val)
 
                     if step < minimum_step:
                         step = minimum_step
 
-                elif step_calc == 'rel_avg':
+                elif step_calc == 'rel_avg' or step_calc == 'rel':
                     step *= np.sum(np.abs(wrt_val)) / len(wrt_val)
 
                     if step < minimum_step:
