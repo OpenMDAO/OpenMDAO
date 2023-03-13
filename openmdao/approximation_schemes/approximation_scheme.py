@@ -491,6 +491,8 @@ class ApproximationScheme(object):
 
             jidx_iter = iter(range(len(jcol_idxs)))
             for vec_ind_info, vecidxs in self._vec_ind_iter(vec_ind_list):
+                print("vec_ind_info:", vec_ind_info)
+                print("vecidxs:", vecidxs)
 
                 if fd_count % num_par_fd == system._par_fd_id:
                     # run the finite difference
