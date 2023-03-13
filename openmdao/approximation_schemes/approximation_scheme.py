@@ -429,6 +429,7 @@ class ApproximationScheme(object):
                 for vinds in vec_idxs:
                     ent0[0] = vec
                     ent0[1] = vinds
+                    print("entry:", entry, "vinds:", vinds)
                     yield entry, vinds
 
     def _uncolored_column_iter(self, system, approx_groups):
