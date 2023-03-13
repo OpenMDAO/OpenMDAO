@@ -379,32 +379,32 @@ class LinearSchur(BlockLinearSolver):
             subsys1, _ = subsystems["coupling_2"]
             subsys2, _ = subsystems["balance"]
 
-            for subsys, _ in subsystems:
-                if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
-                    continue
+            # for subsys, _ in subsystems:
+            if self._rel_systems is not None and subsys1.pathname not in self._rel_systems:
+                return
 
-                if subsys._is_local:
-                    b_vec = subsys._doutputs
+            if subsys1._is_local:
+                b_vec = subsys1._doutputs
+                b_vec.set_val(0.0)
+
+                system._transfer("linear", mode, subsys1.name)
+
+                b_vec *= -1.0
+                off = b_vec._root_offset - parent_offset
+                b_vec += self._rhs_vec[off : off + len(b_vec)]
+
+                scope_out, scope_in = system._get_matvec_scope(subsys1)
+                scope_out = self._vars_union(self._scope_out, scope_out)
+                scope_in = self._vars_union(self._scope_in, scope_in)
+
+                subsys1._solve_linear(mode, self._rel_systems, scope_out, scope_in)
+
+                if subsys1._iter_call_apply_linear():
+                    subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+                else:
                     b_vec.set_val(0.0)
-
-                    system._transfer("linear", mode, subsys.name)
-
-                    b_vec *= -1.0
-                    off = b_vec._root_offset - parent_offset
-                    b_vec += self._rhs_vec[off : off + len(b_vec)]
-
-                    scope_out, scope_in = system._get_matvec_scope(subsys)
-                    scope_out = self._vars_union(self._scope_out, scope_out)
-                    scope_in = self._vars_union(self._scope_in, scope_in)
-
-                    subsys._solve_linear(mode, self._rel_systems, scope_out, scope_in)
-
-                    if subsys._iter_call_apply_linear():
-                        subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
-                    else:
-                        b_vec.set_val(0.0)
-                else:  # subsys not local
-                    system._transfer("linear", mode, subsys.name)
+            else:  # subsys not local
+                system._transfer("linear", mode, subsys1.name)
 
         if use_aitken:
             if self._mode_linear == "fwd":
