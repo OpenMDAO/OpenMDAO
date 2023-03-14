@@ -37,6 +37,14 @@ class TestSubproblemComp(unittest.TestCase):
         subprob2 = om.SubproblemComp(model=submodel2, inputs=['r', 'theta'],
                                   outputs=['y'])
 
+        subprob1.add_design_var('r')
+        subprob1.add_design_var('theta')
+        subprob1.add_constraint('x')
+
+        subprob2.add_design_var('r')
+        subprob2.add_design_var('theta')
+        subprob2.add_constraint('y')
+
         p.model.add_subsystem('sub1', subprob1, promotes_inputs=['r','theta'],
                                     promotes_outputs=['x'])
         p.model.add_subsystem('sub2', subprob2, promotes_inputs=['r','theta'],
@@ -83,14 +91,22 @@ class TestSubproblemComp(unittest.TestCase):
         subprob1 = om.SubproblemComp(model=submodel1)
         subprob2 = om.SubproblemComp(model=submodel2)
 
+        subprob1.add_design_var('r')
+        subprob1.add_design_var('theta')
+        subprob1.add_constraint('x')
+
+        subprob2.add_design_var('r')
+        subprob2.add_design_var('theta')
+        subprob2.add_constraint('y')
+
         p.model.add_subsystem('sub1', subprob1)
         p.model.add_subsystem('sub2', subprob2)
         p.model.add_subsystem('supModel', model, promotes_inputs=['x','y'],
                                     promotes_outputs=['z'])
 
-        p.setup(force_alloc_complex=True)
-
         with self.assertRaises(Exception) as ctx:
+            p.setup(force_alloc_complex=True)
+
             p.set_val('r', 1)
             p.set_val('theta', pi)
 
@@ -103,6 +119,10 @@ class TestSubproblemComp(unittest.TestCase):
         model.add_subsystem('subsys', om.ExecComp('z = x**2 + y**2'))
         subprob = om.SubproblemComp(model=model, inputs=[('subsys.x', 'a'), ('subsys.y', 'b')],
                                     outputs=[('subsys.z', 'c')])
+
+        subprob.add_design_var('a')
+        subprob.add_design_var('b')
+        subprob.add_constraint('c')
 
         p.model.add_subsystem('subprob', subprob, promotes_inputs=['a', 'b'], promotes_outputs=['c'])
         p.setup()
@@ -136,6 +156,10 @@ class TestSubproblemComp(unittest.TestCase):
         subprob = om.SubproblemComp(model=model, inputs=[('x1Comp.x', 'x'), ('x2Comp.x', 'y')],
                                     outputs=[('model.z', 'z')])
 
+        subprob.add_design_var('x')
+        subprob.add_design_var('y')
+        subprob.add_constraint('z')
+
         p.model.add_subsystem('subprob', subprob)
         p.setup()
 
@@ -160,6 +184,11 @@ class TestSubproblemComp(unittest.TestCase):
 
         model.add_subsystem('subsys', om.ExecComp('z = x1**2 + x2**2 + x3**2'), promotes=['*'])
         subprob = om.SubproblemComp(model=model, inputs=['x*'], outputs=['*'])
+
+        subprob.add_design_var('x1')
+        subprob.add_design_var('x2')
+        subprob.add_design_var('x3')
+        subprob.add_constraint('z')
 
         p.model.add_subsystem('prob', subprob, promotes_inputs=['*'], promotes_outputs=['*'])
         p.setup()
@@ -217,6 +246,14 @@ class TestSubproblemComp(unittest.TestCase):
         
         subprob1.add_output('x')
         subprob2.add_output('y')
+        
+        subprob1.add_design_var('r')
+        subprob1.add_design_var('theta')
+        subprob2.add_design_var('r')
+        subprob2.add_design_var('theta')
+        
+        subprob1.add_constraint('x')
+        subprob2.add_constraint('y')
 
         p.model.add_subsystem('sub1', subprob1, promotes_inputs=['r','theta'],
                                     promotes_outputs=['x'])
@@ -253,9 +290,12 @@ class TestSubproblemComp(unittest.TestCase):
                 self.promotes('subprob1', ['theta'])
                 self.promotes('subprob1', ['x'])
 
+                self._get_subsystem('subprob1').add_design_var('r')
+                self._get_subsystem('subprob1').add_design_var('theta')
+                self._get_subsystem('subprob1').add_constraint('x')
+
         class Subsys2(om.Group):
             def setup(self):
-                # adds subsystems -> subprobs
                 model = om.Group()
                 comp = om.ExecComp('y = r*sin(theta)')
                 model.add_subsystem('comp', comp, promotes_inputs=['r', 'theta'],
@@ -270,6 +310,10 @@ class TestSubproblemComp(unittest.TestCase):
                 self.promotes('subprob2', ['r'])
                 self.promotes('subprob2', ['theta'])
                 self.promotes('subprob2', ['y'])
+
+                self._get_subsystem('subprob2').add_design_var('r')
+                self._get_subsystem('subprob2').add_design_var('theta')
+                self._get_subsystem('subprob2').add_constraint('y')
 
         p = om.Problem()
 
@@ -348,6 +392,9 @@ class TestSubproblemComp(unittest.TestCase):
         subprob = om.SubproblemComp(model=submodel)
         subprob.add_input('z')
         subprob.add_output('x')
+
+        subprob.add_design_var('z')
+        subprob.add_constraint('x')
 
         p.model.add_subsystem('subprob', subprob, promotes_inputs=['z'],
                               promotes_outputs=['x'])

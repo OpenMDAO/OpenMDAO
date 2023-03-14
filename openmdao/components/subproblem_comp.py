@@ -162,6 +162,12 @@ class SubproblemComp(ExplicitComponent):
         List of inputs added to model.
     _output_names : list of str
         List of outputs added to model.
+    subprob_design_vars : dict
+        Dict of design vars and their meta data.
+    subprob_constraints : dict
+        Dict of constraints and their meta data.
+    subprob_objectives : dict
+        Dict of objectives and their meta data.
     """
 
     def __init__(self, model, inputs=None, outputs=None, driver=None,
@@ -203,6 +209,9 @@ class SubproblemComp(ExplicitComponent):
         self.model_input_names = inputs if inputs is not None else []
         self.model_output_names = outputs if outputs is not None else []
         self.is_set_up = False
+        self.subprob_design_vars = {}
+        self.subprob_constraints = {}
+        self.subprob_objectives = {}
 
     def add_input(self, name):
         """
@@ -254,6 +263,66 @@ class SubproblemComp(ExplicitComponent):
         meta['prom_name'] = prom_name
         self._output_names.append(name)
 
+    def add_design_var(self, name, **kwargs):
+        """
+        Add design variable before or after setup.
+
+        Parameters
+        ----------
+        name : str
+            Name of design variable to be added.
+        **kwargs : named args
+            Meta data associated with design variables.
+        """
+        if not self.is_set_up:
+            self.subprob_design_vars.update({name: kwargs})
+            return
+
+        if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
+            raise Exception('Cannot call add_output after configure.')
+
+        self._subprob.model.add_design_var(self.options['inputs'][name]['prom_name'], **kwargs)
+
+    def add_constraint(self, name, **kwargs):
+        """
+        Add constraint before or after setup.
+
+        Parameters
+        ----------
+        name : str
+            Name of constraint to be added.
+        **kwargs : named args
+            Meta data associated with constraint.
+        """
+        if not self.is_set_up:
+            self.subprob_constraints.update({name: kwargs})
+            return
+
+        if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
+            raise Exception('Cannot call add_output after configure.')
+
+        self._subprob.model.add_constraint(self.options['outputs'][name]['prom_name'], **kwargs)
+
+    def add_objective(self, name, **kwargs):
+        """
+        Add objective before or after setup.
+
+        Parameters
+        ----------
+        name : str
+            Name of objectiveto be added.
+        **kwargs : named args
+            Meta data associated with objective.
+        """
+        if not self.is_set_up:
+            self.subprob_objectives.update({name: kwargs})
+            return
+
+        if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
+            raise Exception('Cannot call add_output after configure.')
+
+        self._subprob.model.add_objective(self.options['outputs'][name]['prom_name'], **kwargs)
+
     def setup(self):
         """
         Perform some final setup and checks.
@@ -281,30 +350,6 @@ class SubproblemComp(ExplicitComponent):
         self.all_outputs = p.model.list_outputs(out_stream=None, prom_name=True,
                                                 units=True, shape=True, desc=True)
 
-        # declaring all inputs as design vars and all outputs as constraints allows for coloring
-        # to be computed
-        for _, meta in self.boundary_inputs:
-            p.model.add_design_var(meta['prom_name'])
-
-        for _, meta in self.all_outputs:
-            p.model.add_constraint(meta['prom_name'])
-
-        p.driver.declare_coloring()
-
-        # setup again to compute coloring
-        if self._problem_meta is None:
-            p.setup(force_alloc_complex=False)
-        else:
-            p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'])
-        p.final_setup()
-
-        # get coloring and change row and column names to be prom names for use later
-        self.coloring = p.driver._get_coloring(run_model=True)
-        if self.coloring is not None:
-            self.coloring._row_vars = [meta['prom_name'] for name, meta in self.all_outputs
-                                       if name in self.coloring._row_vars]
-            self.coloring._col_vars = [meta['prom_name'] for _, meta in self.boundary_inputs]
-
         self.options['inputs'].update(_get_model_vars(self.model_input_names, self.boundary_inputs))
         self.options['outputs'].update(_get_model_vars(self.model_output_names, self.all_outputs))
 
@@ -325,6 +370,38 @@ class SubproblemComp(ExplicitComponent):
             super().add_output(var, **meta)
             meta['prom_name'] = prom_name
             self._output_names.append(var)
+
+    def _setup_var_data(self):
+        super()._setup_var_data()
+
+        p = self._subprob
+        inputs = self.options['inputs']
+        outputs = self.options['outputs']
+
+        for name, meta in self.subprob_design_vars.items():
+            p.model.add_design_var(inputs[name]['prom_name'], **meta)
+
+        for name, meta in self.subprob_constraints.items():
+            p.model.add_constraint(outputs[name]['prom_name'], **meta)
+
+        for name, meta in self.subprob_objectives.items():
+            p.model.add_objective(outputs[name]['prom_name'], **meta)
+
+        p.driver.declare_coloring()
+
+        # setup again to compute coloring
+        if self._problem_meta is None:
+            p.setup(force_alloc_complex=False)
+        else:
+            p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'])
+        p.final_setup()
+
+        # get coloring and change row and column names to be prom names for use later
+        self.coloring = p.driver._get_coloring(run_model=True)
+        if self.coloring is not None:
+            self.coloring._row_vars = [meta['prom_name'] for name, meta in self.all_outputs
+                                       if name in self.coloring._row_vars]
+            self.coloring._col_vars = [meta['prom_name'] for _, meta in self.boundary_inputs]
 
         if self.coloring is None:
             self.declare_partials(of='*', wrt='*')
