@@ -278,28 +278,6 @@ _ufunc_test_data = {
 }
 
 
-# 'factorial' will raise a RuntimeError or a deprecation warning depending on scipy version
-if Version(scipy.__version__) >= Version("1.5.0"):
-    _ufunc_test_data['factorial'] = {
-        'str': 'f=factorial(x)',
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)}},
-        'error': (RuntimeError,
-                  "The 'factorial' function is not supported for SciPy "
-                  f"versions >= 1.5, current version: {scipy.__version__}")
-    }
-else:
-    _ufunc_test_data['factorial'] = {
-        'str': 'f=factorial(x)',
-        'check_func': scipy.special.factorial,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)}},
-        'warning': (OMDeprecationWarning,
-                    "The 'factorial' function is deprecated. "
-                    "It is no longer supported for SciPy versions >= 1.5.")
-    }
-
-
 class TestExecComp(unittest.TestCase):
 
     def test_missing_partial_warn(self):
