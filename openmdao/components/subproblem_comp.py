@@ -163,7 +163,7 @@ class SubproblemComp(ExplicitComponent):
         List of outputs added to model.
     """
 
-    def __init__(self, model, inputs=None, outputs=None, output_design_vars=False, driver=None,
+    def __init__(self, model, inputs=None, outputs=None, driver=None,
                  comm=None, name=None, reports=_UNDEFINED, prob_options=None, **kwargs):
         """
         Initialize all attributes.
@@ -206,6 +206,11 @@ class SubproblemComp(ExplicitComponent):
     def add_input(self, name):
         """
         Add input to model before or after setup.
+        
+        Parameters
+        ----------
+        name : str
+            Name of input to be added.
         """
         if not self.is_set_up:
             self.model_input_names.append(name)
@@ -223,6 +228,11 @@ class SubproblemComp(ExplicitComponent):
     def add_output(self, name):
         """
         Add output to model before or after setup.
+        
+        Parameters
+        ----------
+        name : str
+            Name of output to be added.
         """
         if not self.is_set_up:
             self.model_output_names.append(name)
