@@ -2284,7 +2284,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(cr._format_version, format_version)
 
-        self.assertEqual(set(cr.system_options.keys()),
+        self.assertEqual(set(cr._system_options.keys()),
                          set(['root'] + list(prob.model._subsystems_allprocs)))
 
         self.assertEqual(set(cr.problem_metadata.keys()), {
@@ -2312,7 +2312,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(cr._format_version, format_version)
 
-        self.assertEqual(set(cr.system_options.keys()),
+        self.assertEqual(set(cr._system_options.keys()),
                          set(['root'] + list(prob.model._subsystems_allprocs)))
 
         self.assertEqual(set(cr.problem_metadata.keys()), {
@@ -3115,33 +3115,6 @@ class TestSqliteCaseReader(unittest.TestCase):
             self.assertEqual(text.count('\n  y'), 1)
             num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
             self.assertEqual(num_non_empty_lines, 46)
-
-    def test_system_metadata_attribute_deprecated(self):
-        model = om.Group()
-        model.add_recorder(self.recorder)
-        prob = om.Problem(model)
-        prob.setup()
-        prob.run_model()
-        prob.cleanup()
-
-        cr = om.CaseReader(self.filename)
-        msg = "The BaseCaseReader.system_metadata attribute is deprecated. " \
-        "Use `list_model_options` instead."
-        with assert_warning(OMDeprecationWarning, msg):
-            options = cr.system_metadata
-
-    def test_system_options_attribute_deprecated(self):
-        model = om.Group()
-        model.add_recorder(self.recorder)
-        prob = om.Problem(model)
-        prob.setup()
-        prob.run_model()
-        prob.cleanup()
-
-        cr = om.CaseReader(self.filename)
-        msg = "The system_options attribute is deprecated. Use `list_model_options` instead."
-        with assert_warning(OMDeprecationWarning, msg):
-            options = cr.system_options
 
     def test_sqlite_reader_problem_derivatives(self):
 
