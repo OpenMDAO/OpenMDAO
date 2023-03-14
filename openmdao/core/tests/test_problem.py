@@ -1808,19 +1808,19 @@ class TestProblem(unittest.TestCase):
         strout = StringIO()
         sys.stdout = strout
         try:
-            prob.list_problem_vars(print_arrays=True,
-                                   desvar_opts=['lower', 'upper', 'ref', 'ref0',
-                                                'indices', 'adder', 'scaler',
-                                                'parallel_deriv_color',
-                                                'cache_linear_solution'],
-                                   cons_opts=['lower', 'upper', 'equals', 'ref', 'ref0',
-                                              'indices', 'adder', 'scaler', 'linear',
-                                              'parallel_deriv_color',
-                                              'cache_linear_solution'],
-                                   objs_opts=['ref', 'ref0',
-                                              'indices', 'adder', 'scaler',
-                                              'parallel_deriv_color',
-                                              'cache_linear_solution'],
+            l = prob.list_problem_vars(print_arrays=True,
+                                       desvar_opts=['lower', 'upper', 'ref', 'ref0',
+                                                    'indices', 'adder', 'scaler',
+                                                    'parallel_deriv_color',
+                                                    'cache_linear_solution'],
+                                       cons_opts=['lower', 'upper', 'equals', 'ref', 'ref0',
+                                                  'indices', 'adder', 'scaler', 'linear',
+                                                  'parallel_deriv_color',
+                                                  'cache_linear_solution'],
+                                        objs_opts=['ref', 'ref0',
+                                                   'indices', 'adder', 'scaler',
+                                                   'parallel_deriv_color',
+                                                   'cache_linear_solution'],
                                    )
         finally:
             sys.stdout = stdout
@@ -1831,6 +1831,39 @@ class TestProblem(unittest.TestCase):
         self.assertRegex(output[10], r'^\s+array+\(+\[[0-9., e+-]+\]+\)')
         self.assertRegex(output[12], r'^\s+upper:')
         self.assertRegex(output[13], r'^\s+array+\(+\[[0-9., e+-]+\]+\)')
+
+        # design vars
+        self.assertEquals(l['design_vars'][0][1]['name'], 'z')
+        self.assertEquals(l['design_vars'][0][1]['size'], 2)
+        assert(all(l['design_vars'][0][1]['val'] == prob.get_val('z')))
+        self.assertEquals(l['design_vars'][0][1]['scaler'], None)
+        self.assertEquals(l['design_vars'][0][1]['adder'], None)
+
+        self.assertEquals(l['design_vars'][1][1]['name'], 'x')
+        self.assertEquals(l['design_vars'][1][1]['size'], 1)
+        assert(all(l['design_vars'][1][1]['val'] == prob.get_val('x')))
+        self.assertEquals(l['design_vars'][1][1]['scaler'], None)
+        self.assertEquals(l['design_vars'][1][1]['adder'], None)
+
+        # constraints
+        self.assertEquals(l['constraints'][0][1]['name'], 'con1')
+        self.assertEquals(l['constraints'][0][1]['size'], 1)
+        assert(all(l['constraints'][0][1]['val'] == prob.get_val('con1')))
+        self.assertEquals(l['constraints'][0][1]['scaler'], None)
+        self.assertEquals(l['constraints'][0][1]['adder'], None)
+
+        self.assertEquals(l['constraints'][1][1]['name'], 'con2')
+        self.assertEquals(l['constraints'][1][1]['size'], 1)
+        assert(all(l['constraints'][1][1]['val'] == prob.get_val('con2')))
+        self.assertEquals(l['constraints'][1][1]['scaler'], None)
+        self.assertEquals(l['constraints'][1][1]['adder'], None)        
+
+        # objectives
+        self.assertEquals(l['objectives'][0][1]['name'], 'obj')
+        self.assertEquals(l['objectives'][0][1]['size'], 1)
+        assert(all(l['objectives'][0][1]['val'] == prob.get_val('obj')))
+        self.assertEquals(l['objectives'][0][1]['scaler'], None)
+        self.assertEquals(l['objectives'][0][1]['adder'], None)
 
     def test_list_problem_vars_before_final_setup(self):
         prob = om.Problem()

@@ -1891,8 +1891,8 @@ class Problem(object):
 
         des_vars = [[i, j] for i, j in desvars.items()]
         for d in des_vars:
-            d[1]['val'] = vals[d[0]]
             d[1] = {i: j for i, j in d[1].items() if i in col_names}
+            d[1]['val'] = vals[d[0]]
         des_vars = [tuple(d) for d in des_vars]
 
         # Constraints
@@ -1911,8 +1911,8 @@ class Problem(object):
 
         cons_vars = [[i, j] for i, j in cons.items()]
         for c in cons_vars:
-            c[1]['val'] = vals[c[0]]
             c[1] = {i: j for i, j in c[1].items() if i in col_names}
+            c[1]['val'] = vals[c[0]]
         cons_vars = [tuple(c) for c in cons_vars]
 
         objs = self.driver._objs
@@ -1929,8 +1929,8 @@ class Problem(object):
 
         obj_vars = [[i, j] for i, j in objs.items()]
         for o in obj_vars:
-            o[1]['val'] = vals[o[0]]
             o[1] = {i: j for i, j in o[1].items() if i in col_names}
+            o[1]['val'] = vals[o[0]]
         obj_vars = [tuple(o) for o in obj_vars]
 
         prob_vars = {'design_vars': des_vars,
@@ -2018,8 +2018,7 @@ class Problem(object):
             rows.append(row)
 
         col_space = ' ' * col_spacing
-        out_stream.write(add_border(header, '-'))
-        out_stream.write('\n')
+        print(add_border(header, '-'), file=out_stream)
 
         # loop through the rows finding the max widths
         max_width = {}
@@ -2041,10 +2040,8 @@ class Problem(object):
         for col_name in col_names:
             header_div += '-' * max_width[col_name] + col_space
             header_col_names += pad_name(col_name, max_width[col_name], quotes=False) + col_space
-        out_stream.write(header_col_names)
-        out_stream.write('\n')
-        out_stream.write(header_div[:-1])
-        out_stream.write('\n')
+        print(header_col_names, file=out_stream)
+        print(header_div[:-1], file=out_stream)
 
         # print rows with var info
         for row in rows:
@@ -2059,17 +2056,16 @@ class Problem(object):
                 else:
                     out = str(cell)
                 row_string += pad_name(out, max_width[col_name], quotes=False) + col_space
-            out_stream.write(row_string)
-            out_stream.write('\n')
+            print(row_string, file=out_stream)
 
             if print_arrays:
                 spaces = (max_width['name'] + col_spacing) * ' '
                 for col_name in have_array_values:
-                    out_stream.write(f"{spaces}{col_name}:\n")
-                    out_stream.write(textwrap.indent(pprint.pformat(row[col_name]), spaces))
-                    out_stream.write('\n\n')
+                    print(f"{spaces}{col_name}:", file=out_stream)
+                    print(textwrap.indent(pprint.pformat(row[col_name]), spaces), file=out_stream)
+                    print(file=out_stream)
 
-        out_stream.write('\n')
+        print(file=out_stream)
 
     def load_case(self, case):
         """

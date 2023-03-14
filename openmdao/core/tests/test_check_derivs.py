@@ -3769,33 +3769,6 @@ class TestProblemCheckTotals(unittest.TestCase):
         l = prob.list_problem_vars(show_promoted_name=True, print_arrays=False,
                                    cons_opts=['indices', 'alias'])
 
-        # check design vars
-        assert(l['design_vars'][0][1]['size'] == 4)
-        assert(all(l['design_vars'][0][1]['val'] == np.array([0,0,0,0])))
-
-        # check constraints
-        # size
-        assert(l['constraints'][0][1]['size'] == 1)
-        assert(l['constraints'][1][1]['size'] == 1)
-        assert(l['constraints'][2][1]['size'] == 1)
-        assert(l['constraints'][3][1]['size'] == 1)
-
-        # val
-        assert_near_equal(l['constraints'][0][1]['val'], 0)
-        assert_near_equal(l['constraints'][1][1]['val'], 0)
-        assert_near_equal(l['constraints'][2][1]['val'], 0)
-        assert_near_equal(l['constraints'][3][1]['val'], 0)
-
-        # alias
-        assert(l['constraints'][0][1]['alias'] is None)
-        assert(l['constraints'][1][1]['alias'] == 'a2')
-        assert(l['constraints'][2][1]['alias'] == 'a3')
-        assert(l['constraints'][3][1]['alias'] == 'a4')
-
-        # check objectives
-        assert(l['objectives'][0][1]['size'] == 1)
-        assert_near_equal(l['objectives'][0][1]['val'], 0)
-
         # Rev mode
 
         prob = om.Problem()
