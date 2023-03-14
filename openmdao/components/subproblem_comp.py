@@ -6,6 +6,7 @@ from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.general_utils import find_matches
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.core.driver import Driver
+from openmdao.core.constants import _SetupStatus
 
 
 def _get_model_vars(vars, model_vars):
@@ -216,6 +217,9 @@ class SubproblemComp(ExplicitComponent):
             self.model_input_names.append(name)
             return
 
+        if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
+            raise Exception('Cannot call add_input after configure.')
+
         self.options['inputs'].update(_get_model_vars([name], self.boundary_inputs))
 
         meta = self.options['inputs'][name]
@@ -237,6 +241,9 @@ class SubproblemComp(ExplicitComponent):
         if not self.is_set_up:
             self.model_output_names.append(name)
             return
+
+        if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
+            raise Exception('Cannot call add_output after configure.')
 
         self.options['outputs'].update(_get_model_vars([name], self.all_outputs))
 
