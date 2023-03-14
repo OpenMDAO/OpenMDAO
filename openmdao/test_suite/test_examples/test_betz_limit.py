@@ -201,8 +201,8 @@ class TestBetzLimit(unittest.TestCase):
 
         prob.run_driver()
 
-        prob.model.list_inputs(values = False, hierarchical=False)
-        prob.model.list_outputs(values = False, hierarchical=False)
+        prob.model.list_inputs(val=False, hierarchical=False)
+        prob.model.list_outputs(val=False, hierarchical=False)
 
         # minimum value
         assert_near_equal(prob['a_disk.Cp'], 16./27., 1e-4)

@@ -119,25 +119,25 @@ class TestIndepVarComp(unittest.TestCase):
         prob.run_model()
 
         # Outputs no tags
-        outputs = prob.model.list_outputs(values=False, out_stream=None)
+        outputs = prob.model.list_outputs(val=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
             ('openmdao:indep_var', {}),
         ])
 
         # Outputs with automatically added indep_var_comp tag
-        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="openmdao:indep_var")
+        outputs = prob.model.list_outputs(val=False, out_stream=None, tags="openmdao:indep_var")
         self.assertEqual(sorted(outputs), [
             ('openmdao:indep_var', {}),
         ])
 
         # Outputs with tag
-        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag1")
+        outputs = prob.model.list_outputs(val=False, out_stream=None, tags="tag1")
         self.assertEqual(sorted(outputs), [
             ('openmdao:indep_var', {}),
         ])
 
         # Outputs with wrong tag
-        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag_wrong")
+        outputs = prob.model.list_outputs(val=False, out_stream=None, tags="tag_wrong")
         self.assertEqual(sorted(outputs), [])
 
     def test_add_output_with_tags(self):

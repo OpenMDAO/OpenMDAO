@@ -448,11 +448,6 @@ jobs:
           conda install lxml
 
           echo "============================================================="
-          echo "Pre-install jupyter dependencies"
-          echo "============================================================="
-          conda install jupyter-book -q -y
-
-          echo "============================================================="
           echo "Install OpenMDAO"
           echo "============================================================="
           python -m pip install .[all]

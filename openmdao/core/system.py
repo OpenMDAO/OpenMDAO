@@ -100,8 +100,6 @@ resp_size_checks = {
 }
 resp_types = {'con': 'constraint', 'obj': 'objective'}
 
-value_deprecated_msg = "The metadata key 'value' will be deprecated in 4.0. Please use 'val'."
-
 
 class _MatchType(IntEnum):
     """
@@ -120,31 +118,6 @@ class _MatchType(IntEnum):
     NAME = 0
     RENAME = 1
     PATTERN = 2
-
-
-class _MetadataDict(dict):
-    """
-    A dict wrapper for a dict of metadata, to throw deprecation if a user indexes in using value.
-    """
-
-    def __getitem__(self, key):
-        try:
-            return dict.__getitem__(self, key)
-        except KeyError:
-            if key == 'value':
-                warn_deprecation(value_deprecated_msg)
-                return dict.__getitem__(self, 'val')
-            raise
-
-    def __setitem__(self, key, val):
-        try:
-            dict.__setitem__(self, key, val)
-        except KeyError:
-            if key == 'value':
-                dict.__setitem__(self, 'val', val)
-                warn_deprecation(value_deprecated_msg)
-            else:
-                raise
 
 
 def collect_errors(method):
@@ -407,7 +380,11 @@ class System(object):
     _saved_errors : list
         Temporary storage for any saved errors that occur before this System is assigned
         a parent Problem.
-    _output_solver_options : dict
+    _output_solver_options : dict or None
+        Solver output options if set_output_solver_options has been called.
+    _promotion_tree : dict
+        Mapping of system path to promotion info indicating all subsystems where variables
+        were promoted.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -552,6 +529,7 @@ class System(object):
         self._saved_errors = None if env_truthy('OPENMDAO_FAIL_FAST') else []
 
         self._output_solver_options = {}
+        self._promotion_tree = None
 
     @property
     def under_approx(self):
@@ -4142,12 +4120,6 @@ class System(object):
         need_gather = get_remote and self.comm.size > 1
         if metadata_keys is not None:
             keyset = set(metadata_keys)
-            # DEPRECATION: if 'value' in keyset, replace with 'val'
-            if 'value' in keyset:
-                keyset.remove('value')
-                keyset.add('val')
-                warn_deprecation(value_deprecated_msg)
-
             diff = keyset - allowed_meta_names
             if diff:
                 raise RuntimeError(f"{self.msginfo}: {sorted(diff)} are not valid metadata entry "
@@ -4196,9 +4168,9 @@ class System(object):
                     ret_meta = None
                 else:
                     if metadata_keys is None:
-                        ret_meta = _MetadataDict(meta)
+                        ret_meta = dict(meta)
                     else:
-                        ret_meta = _MetadataDict()
+                        ret_meta = {}
                         for key in keyset:
                             try:
                                 ret_meta[key] = meta[key]
@@ -4214,7 +4186,7 @@ class System(object):
 
                         if rank is None or self.comm.rank == rank:
                             if not ret_meta:
-                                ret_meta = _MetadataDict()
+                                ret_meta = {}
                             if distrib:
                                 if 'val' in keyset:
                                     # assemble the full distributed value
@@ -4300,7 +4272,6 @@ class System(object):
                     is_design_var=None,
                     all_procs=False,
                     out_stream=_DEFAULT_OUT_STREAM,
-                    values=None,
                     print_min=False,
                     print_max=False):
         """
@@ -4352,8 +4323,6 @@ class System(object):
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
-        values : bool, optional
-            This argument has been deprecated and will be removed in 4.0.
         print_min : bool
             When true, if the input value is an array, print its smallest value.
         print_max : bool
@@ -4364,20 +4333,12 @@ class System(object):
         list of (name, metadata)
             List of input names and other optional information about those inputs.
         """
-        if values is not None:
-            warn_deprecation(f"{self.msginfo}: The 'values' argument to 'list_inputs()' is "
-                             "deprecated and will be removed in 4.0. Please use 'val' instead.")
-        elif not val and values:
-            values = True
-        else:
-            values = val
-
         if self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             issue_warning("Calling `list_inputs` before `final_setup` will only "
                           "display the default values of variables and will not show the result of "
                           "any `set_val` calls.")
 
-        metavalues = values and self._inputs is None
+        metavalues = val and self._inputs is None
 
         keynames = ['val', 'units', 'shape', 'global_shape', 'desc', 'tags']
         keyvals = [metavalues, units, shape, global_shape, desc, tags is not None]
@@ -4399,7 +4360,7 @@ class System(object):
                 for key in to_remove:
                     del meta[key]
 
-        if values and self._inputs is not None:
+        if val and self._inputs is not None:
             # we want value from the input vector, not from the metadata
             print_options = np.get_printoptions()
             np_precision = print_options['precision']
@@ -4452,7 +4413,6 @@ class System(object):
                      all_procs=False,
                      list_autoivcs=False,
                      out_stream=_DEFAULT_OUT_STREAM,
-                     values=None,
                      print_min=False,
                      print_max=False):
         """
@@ -4519,8 +4479,6 @@ class System(object):
         out_stream : file-like
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
-        values : bool, optional
-            This argument has been deprecated and will be removed in 4.0.
         print_min : bool
             When true, if the output value is an array, print its smallest value.
         print_max : bool
@@ -4531,16 +4489,8 @@ class System(object):
         list of (name, metadata)
             List of output names and other optional information about those outputs.
         """
-        if values is not None:
-            warn_deprecation(f"{self.msginfo}: The 'values' argument to 'list_outputs()' is "
-                             "deprecated and will be removed in 4.0. Please use 'val' instead.")
-        elif not val and values:
-            values = True
-        else:
-            values = val
-
         keynames = ['val', 'units', 'shape', 'global_shape', 'desc', 'tags']
-        keyflags = [values, units, shape, global_shape, desc, tags]
+        keyflags = [val, units, shape, global_shape, desc, tags]
 
         keys = [name for i, name in enumerate(keynames) if keyflags[i]]
 
@@ -4560,13 +4510,13 @@ class System(object):
             outputs = {n: m for n, m in outputs.items() if not n.startswith('_auto_ivc.')}
 
         # get values & resids
-        if self._outputs is not None and (values or residuals or residuals_tol):
+        if self._outputs is not None and (val or residuals or residuals_tol):
             to_remove = []
             print_options = np.get_printoptions()
             np_precision = print_options['precision']
 
             for name, meta in outputs.items():
-                if values:
+                if val:
                     # we want value from the input vector, not from the metadata
                     meta['val'] = self._abs_get_val(name, get_remote=True,
                                                     rank=None if all_procs else 0, kind='output')
@@ -6611,3 +6561,116 @@ class System(object):
             True if this is an explicit component.
         """
         return False
+
+    def _get_sys_promotion_tree(self, tree=None):
+        if tree is None:
+            tree = {}
+
+        tree[self.pathname] = {'proms_out': defaultdict(set), 'proms_in': defaultdict(set)}
+
+        parent = self.pathname.rpartition('.')[0] if self.pathname else None
+        if parent in tree:
+            parent_node = tree[parent]
+            out_promotions = parent_node['proms_out']
+            in_promotions = parent_node['proms_in']
+            maps = self._get_promotion_maps()
+            for prom_out, tup in maps['output'].items():
+                out_promotions[tup[0]].add(self.name + '.' + prom_out)
+            for prom_in, tup in maps['input'].items():
+                in_promotions[tup[0]].add(self.name + '.' + prom_in)
+
+        for subsys in self._subsystems_myproc:
+            subsys._get_sys_promotion_tree(tree=tree)
+
+        return tree
+
+    def _get_promote_lists(self, tree, abs_vnames, io):
+        promotion_list = []
+        if abs_vnames:
+            node_proms = f'proms_{io}'
+            for abs_vname in abs_vnames:
+                # starting vname is just the local
+                vname = abs_vname.rpartition('.')[2]
+                # systems from the bottom up
+                slist = list(all_ancestors(abs_vname))[1:]
+                if not self.pathname:
+                    slist += ['']
+                for spath in slist:
+                    sname = spath.rpartition('.')[2]
+                    node = tree[spath]
+                    proms = node[node_proms]
+                    for pname, subs in proms.items():
+                        if vname in subs:
+                            promotion_list.append((spath, vname, pname))
+                            vname = sname + '.' + pname
+                            break
+                    else:
+                        vname = sname + '.' + vname
+
+        return promotion_list
+
+    def get_promotions(self, inprom=None, outprom=None):
+        """
+        Return all promotions for the given promoted variable(s).
+
+        In other words, how and where did promotions occur to convert absolute variable names into
+        the given promoted name(s) at the current System level.
+
+        Parameters
+        ----------
+        inprom : str or None
+            The promoted input variable name.
+        outprom : str or None
+            The promoted output variable name.
+
+        Returns
+        -------
+        dict
+            Dictionary keyed on system pathname containing input and/or output promotion lists for
+            each System where promotions occurred to produce the given promoted variable(s).
+        """
+        if inprom is None and outprom is None:
+            raise RuntimeError(f"{self.msginfo}: At least one of (inprom, outprom) must be set "
+                               "when calling get_promotions.")
+
+        if self._promotion_tree is None:
+            self._promotion_tree = self._get_sys_promotion_tree()
+        tree = self._promotion_tree
+
+        plist_ins = plist_outs = None
+        if outprom is None and inprom in self._var_allprocs_prom2abs_list['output']:
+            outprom = inprom
+
+        if outprom is not None:
+            try:
+                abs_outs = self._var_allprocs_prom2abs_list['output'][outprom]
+            except KeyError:
+                raise KeyError(f"{self.msginfo}: Promoted output variable '{outprom}' was not "
+                               "found.")
+
+            plist_outs = self._get_promote_lists(tree, abs_outs, 'out')
+
+        if inprom is not None:
+            try:
+                abs_ins = self._var_allprocs_prom2abs_list['input'][inprom]
+            except KeyError:
+                raise KeyError(f"{self.msginfo}: Promoted input variable '{inprom}' was not "
+                               "found.")
+
+            plist_ins = self._get_promote_lists(tree, abs_ins, 'in')
+
+        # create a dict that interleaves all of the input and output promotions, keeping the
+        # number of rows consistent when adding a promotion tree info to a table.
+        sys_prom_map = defaultdict(lambda: [None, set(), None, set()])
+        if plist_outs:
+            for spath, sub, theprom in plist_outs:
+                sys_prom_map[spath][2] = theprom
+                sys_prom_map[spath][3].add(sub)
+
+        if plist_ins:
+            for spath, sub, theprom in plist_ins:
+                sys_prom_map[spath][0] = theprom
+                sys_prom_map[spath][1].add(sub)
+
+        # return regular dict sorted by system pathname
+        return {spath: data for spath, data in sorted(sys_prom_map.items(), key=lambda x: x[0])}
