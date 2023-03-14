@@ -1700,10 +1700,14 @@ class Component(System):
 
         if self._serial_idxs is None:
             ranges = defaultdict(list)
+            output_len = 0 if self.is_explicit() else len(self._outputs)
             for name, offset, end, vec, slc, dist_sizes in self._jac_wrt_iter():
                 if dist_sizes is None:  # not distributed
                     if offset != end:
-                        ranges[vec].append(range(offset, end))
+                        if vec is self._outputs:
+                            ranges[vec].append(range(offset, end))
+                        else:
+                            ranges[vec].append(range(offset - output_len, end - output_len))
 
             self._serial_idxs = []
             for vec, rlist in ranges.items():
