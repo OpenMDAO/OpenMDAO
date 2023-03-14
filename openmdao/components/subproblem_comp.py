@@ -202,8 +202,6 @@ class SubproblemComp(ExplicitComponent):
         self.model_input_names = inputs if inputs is not None else []
         self.model_output_names = outputs if outputs is not None else []
         self.is_set_up = False
-        self._input_names = []
-        self._output_names = []
 
     def add_input(self, name):
         """
@@ -296,17 +294,16 @@ class SubproblemComp(ExplicitComponent):
         inputs = self.options['inputs']
         outputs = self.options['outputs']
 
+        self._input_names = []
+        self._output_names = []
+
         for var, meta in inputs.items():
-            if var in self._input_names:
-                continue
             prom_name = meta.pop('prom_name')
             super().add_input(var, **meta)
             meta['prom_name'] = prom_name
             self._input_names.append(var)
 
         for var, meta in outputs.items():
-            if var in self._output_names:
-                continue
             prom_name = meta.pop('prom_name')
             super().add_output(var, **meta)
             meta['prom_name'] = prom_name
