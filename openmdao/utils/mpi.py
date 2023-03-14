@@ -76,11 +76,7 @@ def check_mpi_env():
     bool
         True if MPI is required, False if it's to be skipped, None if not set.
     """
-    if 'OPENMDAO_REQUIRE_MPI' in os.environ:
-        warn_deprecation("Set OPENMDAO_USE_MPI instead of OPENMDAO_REQUIRE_MPI.")
-
-    mpi_selection = os.environ.get('OPENMDAO_USE_MPI',
-                                   os.environ.get('OPENMDAO_REQUIRE_MPI', None))
+    mpi_selection = os.environ.get('OPENMDAO_USE_MPI', None))
 
     # If OPENMDAO_USE_MPI is set to a postive value, the run will fail
     # immediately if the import fails
