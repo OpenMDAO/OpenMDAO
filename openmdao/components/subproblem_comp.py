@@ -206,7 +206,7 @@ class SubproblemComp(ExplicitComponent):
     def add_input(self, name):
         """
         Add input to model before or after setup.
-        
+
         Parameters
         ----------
         name : str
@@ -228,7 +228,7 @@ class SubproblemComp(ExplicitComponent):
     def add_output(self, name):
         """
         Add output to model before or after setup.
-        
+
         Parameters
         ----------
         name : str
