@@ -83,22 +83,18 @@ class TestSubproblemComp(unittest.TestCase):
         subprob1 = om.SubproblemComp(model=submodel1)
         subprob2 = om.SubproblemComp(model=submodel2)
 
-        p.model.add_subsystem('sub1', subprob1, promotes_inputs=['r','theta'],
-                                    promotes_outputs=['x'])
-        p.model.add_subsystem('sub2', subprob2, promotes_inputs=['r','theta'],
-                                    promotes_outputs=['y'])
+        p.model.add_subsystem('sub1', subprob1)
+        p.model.add_subsystem('sub2', subprob2)
         p.model.add_subsystem('supModel', model, promotes_inputs=['x','y'],
                                     promotes_outputs=['z'])
 
         p.setup(force_alloc_complex=True)
 
-        p.set_val('r', 1)
-        p.set_val('theta', pi)
+        with self.assertRaises(Exception) as ctx:
+            p.set_val('r', 1)
+            p.set_val('theta', pi)
 
-        p.run_model()
-        cpd = p.check_partials(method='cs', out_stream=None)
-        
-        assert_near_equal(p.get_val('z'), 1.0) 
+            p.run_model()
 
     def test_variable_alias(self):
         p = om.Problem()
@@ -184,3 +180,191 @@ class TestSubproblemComp(unittest.TestCase):
         assert(inputs['x2'] == 2)
         assert(inputs['x3'] == 3)
         assert(outputs['z'] == 14)
+    
+    def test_add_io_before_setup(self):
+        p = om.Problem()
+
+        model = om.Group()
+        model.add_subsystem('supComp', om.ExecComp('z = x**2 + y'),
+                            promotes_inputs=['x', 'y'],
+                            promotes_outputs=['z'])
+
+        submodel1 = om.Group()
+        submodel1.add_subsystem('sub1_ivc_r', om.IndepVarComp('r', 1.),
+                                promotes_outputs=['r'])
+        submodel1.add_subsystem('sub1_ivc_theta', om.IndepVarComp('theta', pi),
+                                promotes_outputs=['theta'])
+        submodel1.add_subsystem('subComp1', om.ExecComp('x = r*cos(theta)'),
+                                promotes_inputs=['r', 'theta'],
+                                promotes_outputs=['x'])
+
+        submodel2 = om.Group()
+        submodel2.add_subsystem('sub2_ivc_r', om.IndepVarComp('r', 2),
+                                promotes_outputs=['r'])
+        submodel2.add_subsystem('sub2_ivc_theta', om.IndepVarComp('theta', pi/2),
+                                promotes_outputs=['theta'])
+        submodel2.add_subsystem('subComp2', om.ExecComp('y = r*sin(theta)'),
+                                promotes_inputs=['r', 'theta'],
+                                promotes_outputs=['y'])
+
+        subprob1 = om.SubproblemComp(model=submodel1)
+        subprob2 = om.SubproblemComp(model=submodel2)
+        
+        subprob1.add_input('r')
+        subprob1.add_input('theta')
+        subprob2.add_input('r')
+        subprob2.add_input('theta')
+        
+        subprob1.add_output('x')
+        subprob2.add_output('y')
+
+        p.model.add_subsystem('sub1', subprob1, promotes_inputs=['r','theta'],
+                                    promotes_outputs=['x'])
+        p.model.add_subsystem('sub2', subprob2, promotes_inputs=['r','theta'],
+                                    promotes_outputs=['y'])
+        p.model.add_subsystem('supModel', model, promotes_inputs=['x','y'],
+                                    promotes_outputs=['z'])
+
+        p.setup(force_alloc_complex=True)
+
+        p.set_val('r', 1)
+        p.set_val('theta', pi)
+
+        p.run_model()
+        cpd = p.check_partials(method='cs', out_stream=None)
+        
+        assert_near_equal(p.get_val('z'), 1.0)
+
+    def test_add_io_after_setup(self):
+        p = om.Problem()
+
+        model = om.Group()
+        model.add_subsystem('supComp', om.ExecComp('z = x**2 + y'),
+                            promotes_inputs=['x', 'y'],
+                            promotes_outputs=['z'])
+
+        submodel1 = om.Group()
+        submodel1.add_subsystem('sub1_ivc_r', om.IndepVarComp('r', 1.),
+                                promotes_outputs=['r'])
+        submodel1.add_subsystem('sub1_ivc_theta', om.IndepVarComp('theta', pi),
+                                promotes_outputs=['theta'])
+        submodel1.add_subsystem('subComp1', om.ExecComp('x = r*cos(theta)'),
+                                promotes_inputs=['r', 'theta'],
+                                promotes_outputs=['x'])
+
+        submodel2 = om.Group()
+        submodel2.add_subsystem('sub2_ivc_r', om.IndepVarComp('r', 2),
+                                promotes_outputs=['r'])
+        submodel2.add_subsystem('sub2_ivc_theta', om.IndepVarComp('theta', pi/2),
+                                promotes_outputs=['theta'])
+        submodel2.add_subsystem('subComp2', om.ExecComp('y = r*sin(theta)'),
+                                promotes_inputs=['r', 'theta'],
+                                promotes_outputs=['y'])
+
+        subprob1 = om.SubproblemComp(model=submodel1)
+        subprob2 = om.SubproblemComp(model=submodel2)
+
+        p.model.add_subsystem('sub1', subprob1)
+        p.model.add_subsystem('sub2', subprob2)
+        p.model.add_subsystem('supModel', model, promotes_inputs=['x','y'],
+                              promotes_outputs=['z'])
+        
+        p.model.sub1.setup()
+        p.model.sub2.setup()
+
+        subprob1.add_input('r')
+        subprob1.add_input('theta')
+        
+        p.model.promotes('sub1', ['r', 'theta'])
+        
+        subprob2.add_input('r')
+        subprob2.add_input('theta')
+        
+        p.model.promotes('sub2', ['r', 'theta'])
+
+        subprob1.add_output('x')
+        p.model.promotes('sub1', ['x'])
+
+        subprob2.add_output('y')
+        p.model.promotes('sub2', ['y'])
+
+        p.setup(force_alloc_complex=True)
+
+        p.set_val('r', 1)
+        p.set_val('theta', pi)
+
+        p.run_model()
+        cpd = p.check_partials(method='cs', out_stream=None)
+
+        assert_near_equal(p.get_val('z'), 1.0)
+
+    def test_invalid_io(self):
+        p = om.Problem()
+
+        model = om.Group()
+        model.add_subsystem('supComp', om.ExecComp('z = x**2 + y'),
+                            promotes_inputs=['x', 'y'],
+                            promotes_outputs=['z'])
+
+        submodel1 = om.Group()
+        submodel1.add_subsystem('sub1_ivc_r', om.IndepVarComp('r', 1.),
+                                promotes_outputs=['r'])
+        submodel1.add_subsystem('sub1_ivc_theta', om.IndepVarComp('theta', pi),
+                                promotes_outputs=['theta'])
+        submodel1.add_subsystem('subComp1', om.ExecComp('x = r*cos(theta)'),
+                                promotes_inputs=['r', 'theta'],
+                                promotes_outputs=['x'])
+
+        submodel2 = om.Group()
+        submodel2.add_subsystem('sub2_ivc_r', om.IndepVarComp('r', 2),
+                                promotes_outputs=['r'])
+        submodel2.add_subsystem('sub2_ivc_theta', om.IndepVarComp('theta', pi/2),
+                                promotes_outputs=['theta'])
+        submodel2.add_subsystem('subComp2', om.ExecComp('y = r*sin(theta)'),
+                                promotes_inputs=['r', 'theta'],
+                                promotes_outputs=['y'])
+
+        subprob1 = om.SubproblemComp(model=submodel1)
+        subprob2 = om.SubproblemComp(model=submodel2)
+
+        subprob1.add_input('psi')
+
+        p.model.add_subsystem('sub1', subprob1)
+        p.model.add_subsystem('sub2', subprob2)
+        p.model.add_subsystem('supModel', model, promotes_inputs=['x','y'],
+                              promotes_outputs=['z'])
+
+        with self.assertRaises(Exception) as ctx:
+            p.setup(force_alloc_complex=True)
+
+    def test_multiple_setups(self):
+        p = om.Problem()
+        
+        model = om.Group()
+        model.add_subsystem('supComp', om.ExecComp('y = 3*x + 4'),
+                            promotes_inputs=['x'], promotes_outputs=['y'])
+        
+        submodel = om.Group()
+        submodel.add_subsystem('subComp', om.ExecComp('x = 6*z + 3'),
+                               promotes_inputs=['z'], promotes_outputs=['x'])
+        
+        subprob = om.SubproblemComp(model=submodel)
+        subprob.add_input('z')
+        subprob.add_output('x')
+        
+        p.model.add_subsystem('subprob', subprob, promotes_inputs=['z'],
+                              promotes_outputs=['x'])
+        p.model.add_subsystem('comp', model, promotes_inputs=['x'],
+                              promotes_outputs=['y'])
+        
+        p.setup(force_alloc_complex=False)
+        p.setup(force_alloc_complex=True)
+        # p.setup(force_alloc_complex=True)
+        
+        p.set_val('z', 1)
+        
+        p.run_model()
+        
+        assert_near_equal(p.get_val('z'), 1)
+        assert_near_equal(p.get_val('x'), 9)
+        assert_near_equal(p.get_val('y'), 31)

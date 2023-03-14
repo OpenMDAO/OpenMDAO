@@ -8,7 +8,7 @@ from openmdao.utils.om_warnings import issue_warning
 from openmdao.core.driver import Driver
 
 
-def _get_model_vars(varType, vars, model_vars):
+def _get_model_vars(vars, model_vars):
     """
     Get the requested IO variable data from model's list of IO.
 
@@ -30,13 +30,16 @@ def _get_model_vars(varType, vars, model_vars):
     dict
         Dict to update `self.options` with desired IO data in `SubproblemComp`.
     """
-    var_dict = {varType: {}}
+    var_dict = {}
 
     # check for wildcards and append them to vars list
     patterns = [i for i in vars if isinstance(i, str)]
     var_list = [meta['prom_name'] for _, meta in model_vars]
     for i in patterns:
-        vars.extend(find_matches(i, var_list))
+        matches = find_matches(i, var_list)
+        if len(matches) == 0:
+            continue
+        vars.extend(matches)
         vars.remove(i)
 
     for var in vars:
@@ -47,9 +50,9 @@ def _get_model_vars(varType, vars, model_vars):
 
             # check if variable already exists in var_dict[varType]
             # i.e. no repeated variable names
-            if var[1] in var_dict[varType]:
+            if var[1] in var_dict:
                 raise Exception(f'Variable {var[1]} already exists. Rename variable'
-                                ' or delete copy of variable.')
+                                ' or delete copy.')
 
             # make dict with given var name as key and meta data from model_vars
             # check if name == var[0] -> var[0] is abs name and var[1] is alias
@@ -62,19 +65,18 @@ def _get_model_vars(varType, vars, model_vars):
                 raise Exception(f'Promoted name {var[0]} does not'
                                 ' exist in model.')
 
-            var_dict[varType].update(tmp_dict)
+            var_dict.update(tmp_dict)
 
         elif isinstance(var, str):
             # check if variable already exists in var_dict[varType]
             # i.e. no repeated variable names
-            if var in var_dict[varType]:
+            if var in var_dict:
                 raise Exception(f'Variable {var} already exists. Rename variable'
-                                ' or delete copy of variable.')
+                                ' or delete copy.')
 
             # make dict with given var name as key and meta data from model_vars
             # check if name == var -> given var is abs name
             # check if meta['prom_name'] == var -> given var is prom_name
-            # check if name.endswith('.' + var) -> given var is last part of abs name
             tmp_dict = {var: meta for name, meta in model_vars
                         if name == var or meta['prom_name'] == var}
 
@@ -89,7 +91,7 @@ def _get_model_vars(varType, vars, model_vars):
             elif len(tmp_dict) == 0:
                 raise Exception(f'Variable {var} does not exist in model.')
 
-            var_dict[varType].update(tmp_dict)
+            var_dict.update(tmp_dict)
 
         else:
             raise Exception(f'Type {type(var)} is invalid. Must be'
@@ -152,10 +154,17 @@ class SubproblemComp(ExplicitComponent):
     model_output_names : list of str or tuple
         List of outputs requested by user to be used as outputs in the
         subproblem's system.
+    is_set_up : bool
+        Flag to determne if subproblem is set up. Used for add_input/add_output to
+        determine how to add the io.
+    _input_names : list of str
+        List of inputs added to model.
+    _output_names : list of str
+        List of outputs added to model.
     """
 
-    def __init__(self, model, inputs=None, outputs=None, driver=None, comm=None,
-                 name=None, reports=_UNDEFINED, prob_options=None, **kwargs):
+    def __init__(self, model, inputs=None, outputs=None, output_design_vars=False, driver=None,
+                 comm=None, name=None, reports=_UNDEFINED, prob_options=None, **kwargs):
         """
         Initialize all attributes.
         """
@@ -187,88 +196,119 @@ class SubproblemComp(ExplicitComponent):
                           'comm': comm,
                           'name': name,
                           'reports': reports}
-
         self.prob_args.update(prob_options)
 
         self.model = model
-        self.model_input_names = inputs
-        self.model_output_names = outputs
+        self.model_input_names = inputs if inputs is not None else []
+        self.model_output_names = outputs if outputs is not None else []
+        self.is_set_up = False
+        self._input_names = []
+        self._output_names = []
+
+    def add_input(self, name):
+        """
+        Add input to model before or after setup.
+        """
+        if not self.is_set_up:
+            self.model_input_names.append(name)
+            return
+
+        self.options['inputs'].update(_get_model_vars([name], self.boundary_inputs))
+
+        meta = self.options['inputs'][name]
+
+        prom_name = meta.pop('prom_name')
+        super().add_input(name, **meta)
+        meta['prom_name'] = prom_name
+        self._input_names.append(name)
+
+    def add_output(self, name):
+        """
+        Add output to model before or after setup.
+        """
+        if not self.is_set_up:
+            self.model_output_names.append(name)
+            return
+
+        self.options['outputs'].update(_get_model_vars([name], self.all_outputs))
+
+        meta = self.options['outputs'][name]
+
+        prom_name = meta.pop('prom_name')
+        super().add_output(name, **meta)
+        meta['prom_name'] = prom_name
+        self._output_names.append(name)
 
     def setup(self):
         """
         Perform some final setup and checks.
         """
+        if self.is_set_up is False:
+            self.is_set_up = True
+
         p = self._subprob = Problem(**self.prob_args)
         p.model.add_subsystem('subsys', self.model, promotes=['*'])
 
         # perform first setup to be able to get inputs and outputs
-        p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'])
+        # if subprob.setup is called before the top problem setup, we can't rely
+        # on using the problem meta data, so default to False
+        if self._problem_meta is None:
+            p.setup(force_alloc_complex=False)
+        else:
+            p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'])
         p.final_setup()
 
         # boundary inputs are any inputs that externally come into `SubproblemComp`
-        boundary_inputs = p.model.list_inputs(out_stream=None, prom_name=True,
-                                              units=True, shape=True, desc=True, is_indep_var=True)
-        # want all outputs from the `SubproblemComp`
-        all_outputs = p.model.list_outputs(out_stream=None, prom_name=True,
-                                           units=True, shape=True, desc=True)
+        self.boundary_inputs = p.model.list_inputs(out_stream=None, prom_name=True,
+                                                   units=True, shape=True, desc=True,
+                                                   is_indep_var=True)
+        # want all outputs from the `SubproblemComp`, including ivcs/design vars
+        self.all_outputs = p.model.list_outputs(out_stream=None, prom_name=True,
+                                                units=True, shape=True, desc=True)
 
         # declaring all inputs as design vars and all outputs as constraints allows for coloring
         # to be computed
-        for _, meta in boundary_inputs:
+        for _, meta in self.boundary_inputs:
             p.model.add_design_var(meta['prom_name'])
 
-        for _, meta in all_outputs:
+        for _, meta in self.all_outputs:
             p.model.add_constraint(meta['prom_name'])
 
         p.driver.declare_coloring()
 
         # setup again to compute coloring
-        p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'])
+        if self._problem_meta is None:
+            p.setup(force_alloc_complex=False)
+        else:
+            p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'])
         p.final_setup()
 
         # get coloring and change row and column names to be prom names for use later
         self.coloring = p.driver._get_coloring(run_model=True)
         if self.coloring is not None:
-            self.coloring._row_vars = [meta['prom_name'] for name, meta in all_outputs
+            self.coloring._row_vars = [meta['prom_name'] for name, meta in self.all_outputs
                                        if name in self.coloring._row_vars]
-            self.coloring._col_vars = [meta['prom_name'] for _, meta in boundary_inputs]
+            self.coloring._col_vars = [meta['prom_name'] for _, meta in self.boundary_inputs]
 
-        # self.sparsity = self.coloring.get_subjac_sparsity()
-
-        # TODO clean this up with previously defined lists if I can
-        if self.model_input_names is None:
-            self.model_input_names = [meta['prom_name'] for _, meta in
-                                      boundary_inputs]
-            # self.model_input_names = boundary_inputs
-
-        # don't want to include `IndepVarComp`s as outputs
-        if self.model_output_names is None:
-            self.model_output_names = [meta['prom_name'] for _, meta in
-                                       p.model.list_outputs(out_stream=None, prom_name=True,
-                                                            is_indep_var=False)]
-
-        self.options.update(_get_model_vars('inputs', self.model_input_names, boundary_inputs))
-        self.options.update(_get_model_vars('outputs', self.model_output_names, all_outputs))
+        self.options['inputs'].update(_get_model_vars(self.model_input_names, self.boundary_inputs))
+        self.options['outputs'].update(_get_model_vars(self.model_output_names, self.all_outputs))
 
         inputs = self.options['inputs']
         outputs = self.options['outputs']
 
-        # instantiate input/output name list for use in compute and
-        # compute partials
-        self._input_names = []
-        self._output_names = []
-
-        # remove the `prom_name` from the metadata and then store it for each
-        # input and output
         for var, meta in inputs.items():
+            if var in self._input_names:
+                continue
             prom_name = meta.pop('prom_name')
-            self.add_input(var, **meta)
+            super().add_input(var, **meta)
             meta['prom_name'] = prom_name
             self._input_names.append(var)
 
         for var, meta in outputs.items():
+            if var in self._output_names:
+                continue
             prom_name = meta.pop('prom_name')
-            self.add_output(var, **meta)
+            super().add_output(var, **meta)
             meta['prom_name'] = prom_name
             self._output_names.append(var)
 
@@ -276,8 +316,6 @@ class SubproblemComp(ExplicitComponent):
             self.declare_partials(of='*', wrt='*')
         else:
             for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():
-                if of not in self._output_names or wrt not in self._input_names:
-                    continue
                 self.declare_partials(of=of, wrt=wrt, rows=nzrows, cols=nzcols)
 
     def _set_complex_step_mode(self, active):
@@ -297,18 +335,11 @@ class SubproblemComp(ExplicitComponent):
         """
         p = self._subprob
 
-        # switch subproblem to use complex IO if in complex step mode
-        self._set_complex_step_mode(self.under_complex_step)
-
-        # setup input values
         for inp in self._input_names:
             p.set_val(self.options['inputs'][inp]['prom_name'], inputs[inp])
 
-        # problem.run_driver() calls setup_driver each time, so call run
-        # directly on the driver instead
         p.driver.run()
 
-        # store output vars
         for op in self._output_names:
             outputs[op] = p.get_val(self.options['outputs'][op]['prom_name'])
 
@@ -331,8 +362,6 @@ class SubproblemComp(ExplicitComponent):
         for inp in self._input_names:
             p.set_val(self.options['inputs'][inp]['prom_name'], inputs[inp])
 
-        # need to use driver._compute_totals here else we re-initialize the whole
-        # _TotalJacInfo object every time
         tots = p.driver._compute_totals(of=self._output_names, wrt=self._input_names,
                                         use_abs_names=False)
 
