@@ -378,6 +378,10 @@ class SubproblemComp(ExplicitComponent):
         inputs = self.options['inputs']
         outputs = self.options['outputs']
 
+        # can't have coloring if there are no io declared
+        if len(inputs) == 0 or len(outputs) == 0:
+            return
+
         for name, meta in self.subprob_design_vars.items():
             p.model.add_design_var(inputs[name]['prom_name'], **meta)
 

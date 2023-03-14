@@ -104,9 +104,9 @@ class TestSubproblemComp(unittest.TestCase):
         p.model.add_subsystem('supModel', model, promotes_inputs=['x','y'],
                                     promotes_outputs=['z'])
 
-        with self.assertRaises(Exception) as ctx:
-            p.setup(force_alloc_complex=True)
+        p.setup(force_alloc_complex=True)
 
+        with self.assertRaises(Exception) as ctx:
             p.set_val('r', 1)
             p.set_val('theta', pi)
 
