@@ -4,8 +4,15 @@ import unittest
 import numpy as np
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.mpi import MPI  # MPI will be None here if MPI is not active
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class SerialImplicitDerivConsist(unittest.TestCase):
     N_PROCS = 2
 
