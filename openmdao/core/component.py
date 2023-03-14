@@ -11,7 +11,7 @@ from numpy import ndarray, isscalar, ndim, atleast_1d, atleast_2d, promote_types
 from scipy.sparse import issparse, coo_matrix
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
-    global_meta_names, _MetadataDict, collect_errors
+    global_meta_names, collect_errors
 from openmdao.core.constants import INT_DTYPE
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.array_utils import shape_to_len
@@ -568,7 +568,7 @@ class Component(System):
             # using ._dict below to avoid tons of deprecation warnings
             distributed = distributed or self.options._dict['distributed']['val']
 
-        metadata = _MetadataDict()
+        metadata = {}
 
         metadata.update({
             'val': val,
@@ -635,7 +635,7 @@ class Component(System):
         if tags is not None and not isinstance(tags, (str, list)):
             raise TypeError('%s: The tags argument should be a str or list' % self.msginfo)
 
-        metadata = _MetadataDict()
+        metadata = {}
 
         metadata.update({
             'val': val,
@@ -806,7 +806,7 @@ class Component(System):
             # using ._dict below to avoid tons of deprecation warnings
             distributed = distributed or self.options._dict['distributed']['val']
 
-        metadata = _MetadataDict()
+        metadata = {}
 
         metadata.update({
             'val': val,
@@ -877,7 +877,7 @@ class Component(System):
         if tags is not None and not isinstance(tags, (str, set, list)):
             raise TypeError('%s: The tags argument should be a str, set, or list' % self.msginfo)
 
-        metadata = _MetadataDict()
+        metadata = {}
 
         metadata.update({
             'val': val,
@@ -1087,9 +1087,8 @@ class Component(System):
             absolute, 'rel_avg' for a size relative to the absolute value of the vector input, or
             'rel_element' for a size relative to each value in the vector input. In addition, it
             can be 'rel_legacy' for a size relative to the norm of the vector.  For backwards
-            compatibilty, it can be 'rel', which currently defaults to 'rel_legacy', but in the
-            future will default to 'rel_avg'. Defaults to None, in which case the approximation
-            method provides its default value.
+            compatibilty, it can be 'rel', which is now equivalent to 'rel_avg'. Defaults to None,
+            in which case the approximation method provides its default value.
         minimum_step : float
             Minimum step size allowed when using one of the relative step_calc options.
 
@@ -1279,9 +1278,8 @@ class Component(System):
             absolute, 'rel_avg' for a size relative to the absolute value of the vector input, or
             'rel_element' for a size relative to each value in the vector input. In addition, it
             can be 'rel_legacy' for a size relative to the norm of the vector.  For backwards
-            compatibilty, it can be 'rel', which currently defaults to 'rel_legacy', but in the
-            future will default to 'rel_avg'. Defaults to None, in which case the approximation
-            method provides its default value.
+            compatibilty, it can be 'rel', which is now equivalent to 'rel_avg'. Defaults to None,
+            in which case the approximation method provides its default value..
         minimum_step : float
             Minimum step size allowed when using one of the relative step_calc options.
         directional : bool
@@ -1702,10 +1700,14 @@ class Component(System):
 
         if self._serial_idxs is None:
             ranges = defaultdict(list)
+            output_len = 0 if self.is_explicit() else len(self._outputs)
             for name, offset, end, vec, slc, dist_sizes in self._jac_wrt_iter():
                 if dist_sizes is None:  # not distributed
                     if offset != end:
-                        ranges[vec].append(range(offset, end))
+                        if vec is self._outputs:
+                            ranges[vec].append(range(offset, end))
+                        else:
+                            ranges[vec].append(range(offset - output_len, end - output_len))
 
             self._serial_idxs = []
             for vec, rlist in ranges.items():
