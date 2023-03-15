@@ -162,12 +162,6 @@ class SubproblemComp(ExplicitComponent):
         List of inputs added to model.
     _output_names : list of str
         List of outputs added to model.
-    subprob_design_vars : dict
-        Dict of design vars and their meta data.
-    subprob_constraints : dict
-        Dict of constraints and their meta data.
-    subprob_objectives : dict
-        Dict of objectives and their meta data.
     """
 
     def __init__(self, model, inputs=None, outputs=None, driver=None,
@@ -209,9 +203,6 @@ class SubproblemComp(ExplicitComponent):
         self.model_input_names = inputs if inputs is not None else []
         self.model_output_names = outputs if outputs is not None else []
         self.is_set_up = False
-        self.subprob_design_vars = {}
-        self.subprob_constraints = {}
-        self.subprob_objectives = {}
 
     def add_input(self, name):
         """
@@ -262,66 +253,6 @@ class SubproblemComp(ExplicitComponent):
         super().add_output(name, **meta)
         meta['prom_name'] = prom_name
         self._output_names.append(name)
-
-    def add_design_var(self, name, **kwargs):
-        """
-        Add design variable before or after setup.
-
-        Parameters
-        ----------
-        name : str
-            Name of design variable to be added.
-        **kwargs : named args
-            Meta data associated with design variables.
-        """
-        if not self.is_set_up:
-            self.subprob_design_vars.update({name: kwargs})
-            return
-
-        if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
-            raise Exception('Cannot call add_output after configure.')
-
-        self._subprob.model.add_design_var(self.options['inputs'][name]['prom_name'], **kwargs)
-
-    def add_constraint(self, name, **kwargs):
-        """
-        Add constraint before or after setup.
-
-        Parameters
-        ----------
-        name : str
-            Name of constraint to be added.
-        **kwargs : named args
-            Meta data associated with constraint.
-        """
-        if not self.is_set_up:
-            self.subprob_constraints.update({name: kwargs})
-            return
-
-        if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
-            raise Exception('Cannot call add_output after configure.')
-
-        self._subprob.model.add_constraint(self.options['outputs'][name]['prom_name'], **kwargs)
-
-    def add_objective(self, name, **kwargs):
-        """
-        Add objective before or after setup.
-
-        Parameters
-        ----------
-        name : str
-            Name of objectiveto be added.
-        **kwargs : named args
-            Meta data associated with objective.
-        """
-        if not self.is_set_up:
-            self.subprob_objectives.update({name: kwargs})
-            return
-
-        if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
-            raise Exception('Cannot call add_output after configure.')
-
-        self._subprob.model.add_objective(self.options['outputs'][name]['prom_name'], **kwargs)
 
     def setup(self):
         """
@@ -382,14 +313,11 @@ class SubproblemComp(ExplicitComponent):
         if len(inputs) == 0 or len(outputs) == 0:
             return
 
-        for name, meta in self.subprob_design_vars.items():
-            p.model.add_design_var(inputs[name]['prom_name'], **meta)
+        for inp in self._input_names:
+            p.model.add_design_var(inputs[inp]['prom_name'])
 
-        for name, meta in self.subprob_constraints.items():
-            p.model.add_constraint(outputs[name]['prom_name'], **meta)
-
-        for name, meta in self.subprob_objectives.items():
-            p.model.add_objective(outputs[name]['prom_name'], **meta)
+        for out in self._output_names:
+            p.model.add_constraint(outputs[out]['prom_name'])
 
         p.driver.declare_coloring()
 
