@@ -364,7 +364,7 @@ jobs:
             echo "============================================================="
             echo "Install version of openssl compatible with hosting service"
             echo "============================================================="
-            conda install 'openssl<3.1.0'
+            conda install -c conda-forge 'openssl<3.1.0'
 
             echo "============================================================="
             echo "Publish docs"
