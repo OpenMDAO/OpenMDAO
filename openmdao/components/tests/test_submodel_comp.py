@@ -5,8 +5,8 @@ from openmdao.utils.assert_utils import assert_near_equal
 import unittest
 
 
-class TestSubproblemComp(unittest.TestCase):
-    def test_subproblem_comp(self):
+class TestSubmodelComp(unittest.TestCase):
+    def test_submodel_comp(self):
         p = om.Problem()
 
         model = om.Group()
@@ -32,9 +32,9 @@ class TestSubproblemComp(unittest.TestCase):
                                 promotes_inputs=['r', 'theta'],
                                 promotes_outputs=['y'])
 
-        subprob1 = om.SubproblemComp(model=submodel1, inputs=['r', 'theta'],
+        subprob1 = om.SubmodelComp(model=submodel1, inputs=['r', 'theta'],
                                   outputs=['x'])
-        subprob2 = om.SubproblemComp(model=submodel2, inputs=['r', 'theta'],
+        subprob2 = om.SubmodelComp(model=submodel2, inputs=['r', 'theta'],
                                   outputs=['y'])
 
         p.model.add_subsystem('sub1', subprob1, promotes_inputs=['r','theta'],
@@ -80,8 +80,8 @@ class TestSubproblemComp(unittest.TestCase):
                                 promotes_inputs=['r', 'theta'],
                                 promotes_outputs=['y'])
 
-        subprob1 = om.SubproblemComp(model=submodel1)
-        subprob2 = om.SubproblemComp(model=submodel2)
+        subprob1 = om.SubmodelComp(model=submodel1)
+        subprob2 = om.SubmodelComp(model=submodel2)
 
         p.model.add_subsystem('sub1', subprob1)
         p.model.add_subsystem('sub2', subprob2)
@@ -104,7 +104,7 @@ class TestSubproblemComp(unittest.TestCase):
         model = om.Group()
 
         model.add_subsystem('subsys', om.ExecComp('z = x**2 + y**2'))
-        subprob = om.SubproblemComp(model=model, inputs=[('subsys.x', 'a'), ('subsys.y', 'b')],
+        subprob = om.SubmodelComp(model=model, inputs=[('subsys.x', 'a'), ('subsys.y', 'b')],
                                     outputs=[('subsys.z', 'c')])
 
         p.model.add_subsystem('subprob', subprob, promotes_inputs=['a', 'b'], promotes_outputs=['c'])
@@ -136,7 +136,7 @@ class TestSubproblemComp(unittest.TestCase):
         model.connect('x2Comp.x2', 'model.x2')
         model.add_subsystem('model', om.ExecComp('z = x1**2 + x2**2'))
 
-        subprob = om.SubproblemComp(model=model, inputs=[('x1Comp.x', 'x'), ('x2Comp.x', 'y')],
+        subprob = om.SubmodelComp(model=model, inputs=[('x1Comp.x', 'x'), ('x2Comp.x', 'y')],
                                     outputs=[('model.z', 'z')])
 
         p.model.add_subsystem('subprob', subprob)
@@ -162,7 +162,7 @@ class TestSubproblemComp(unittest.TestCase):
         model = om.Group()
 
         model.add_subsystem('subsys', om.ExecComp('z = x1**2 + x2**2 + x3**2'), promotes=['*'])
-        subprob = om.SubproblemComp(model=model, inputs=['x*'], outputs=['*'])
+        subprob = om.SubmodelComp(model=model, inputs=['x*'], outputs=['*'])
 
         p.model.add_subsystem('prob', subprob, promotes_inputs=['*'], promotes_outputs=['*'])
         p.setup()
@@ -210,8 +210,8 @@ class TestSubproblemComp(unittest.TestCase):
                                 promotes_inputs=['r', 'theta'],
                                 promotes_outputs=['y'])
 
-        subprob1 = om.SubproblemComp(model=submodel1)
-        subprob2 = om.SubproblemComp(model=submodel2)
+        subprob1 = om.SubmodelComp(model=submodel1)
+        subprob2 = om.SubmodelComp(model=submodel2)
         
         subprob1.add_input('r')
         subprob1.add_input('theta')
@@ -245,7 +245,7 @@ class TestSubproblemComp(unittest.TestCase):
                 comp = om.ExecComp('x = r*cos(theta)')
                 model.add_subsystem('comp', comp, promotes_inputs=['r', 'theta'],
                                     promotes_outputs=['x'])
-                self.add_subsystem('subprob1', om.SubproblemComp(model=model))
+                self.add_subsystem('subprob1', om.SubmodelComp(model=model))
 
             def configure(self):
                 self._get_subsystem('subprob1').add_input('r')
@@ -262,7 +262,7 @@ class TestSubproblemComp(unittest.TestCase):
                 comp = om.ExecComp('y = r*sin(theta)')
                 model.add_subsystem('comp', comp, promotes_inputs=['r', 'theta'],
                                     promotes_outputs=['y'])
-                self.add_subsystem('subprob2', om.SubproblemComp(model=model))
+                self.add_subsystem('subprob2', om.SubmodelComp(model=model))
 
             def configure(self):
                 self._get_subsystem('subprob2').add_input('r')
@@ -323,8 +323,8 @@ class TestSubproblemComp(unittest.TestCase):
                                 promotes_inputs=['r', 'theta'],
                                 promotes_outputs=['y'])
 
-        subprob1 = om.SubproblemComp(model=submodel1)
-        subprob2 = om.SubproblemComp(model=submodel2)
+        subprob1 = om.SubmodelComp(model=submodel1)
+        subprob2 = om.SubmodelComp(model=submodel2)
 
         subprob1.add_input('psi')
 
@@ -350,7 +350,7 @@ class TestSubproblemComp(unittest.TestCase):
         submodel.add_subsystem('subComp', om.ExecComp('x = 6*z + 3'),
                                promotes_inputs=['z'], promotes_outputs=['x'])
 
-        subprob = om.SubproblemComp(model=submodel)
+        subprob = om.SubmodelComp(model=submodel)
         subprob.add_input('z')
         subprob.add_output('x')
 

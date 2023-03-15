@@ -1,4 +1,4 @@
-"""Define the SubproblemComp class for evaluating OpenMDAO systems within problems."""
+"""Define the SubmodelComp class for evaluating OpenMDAO systems within components."""
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.problem import Problem
@@ -29,7 +29,7 @@ def _get_model_vars(vars, model_vars):
     Returns
     -------
     dict
-        Dict to update `self.options` with desired IO data in `SubproblemComp`.
+        Dict to update `self.options` with desired IO data in `SubmodelComp`.
     """
     var_dict = {}
 
@@ -101,7 +101,7 @@ def _get_model_vars(vars, model_vars):
     return var_dict
 
 
-class SubproblemComp(ExplicitComponent):
+class SubmodelComp(ExplicitComponent):
     """
     System level container for systems and drivers.
 
@@ -141,7 +141,7 @@ class SubproblemComp(ExplicitComponent):
     prob_options : dict or None
         Remaining named args for problem that are converted to options.
     **kwargs : named args
-        All remaining named args that become options for `SubproblemComp`.
+        All remaining named args that become options for `SubmodelComp`.
 
     Attributes
     ----------
@@ -273,11 +273,11 @@ class SubproblemComp(ExplicitComponent):
             p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'])
         p.final_setup()
 
-        # boundary inputs are any inputs that externally come into `SubproblemComp`
+        # boundary inputs are any inputs that externally come into `SubmodelComp`
         self.boundary_inputs = p.model.list_inputs(out_stream=None, prom_name=True,
                                                    units=True, shape=True, desc=True,
                                                    is_indep_var=True)
-        # want all outputs from the `SubproblemComp`, including ivcs/design vars
+        # want all outputs from the `SubmodelComp`, including ivcs/design vars
         self.all_outputs = p.model.list_outputs(out_stream=None, prom_name=True,
                                                 units=True, shape=True, desc=True)
 
