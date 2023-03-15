@@ -146,6 +146,7 @@ jobs:
         run: |
           conda install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
 
+
           python -m pip install --upgrade pip
 
           echo "============================================================="
@@ -360,6 +361,11 @@ jobs:
           DOCS_LOCATION: ${{ secrets.DOCS_LOCATION }}
         run: |
           if [[ "${#DOCS_LOCATION}" ]]; then
+            echo "============================================================="
+            echo "Install version of openssl compatible with hosting service"
+            echo "============================================================="
+            conda install 'openssl<3.1.0'
+
             echo "============================================================="
             echo "Publish docs"
             echo "============================================================="
