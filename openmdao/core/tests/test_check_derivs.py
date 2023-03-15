@@ -155,7 +155,7 @@ class TestProblemCheckPartials(unittest.TestCase):
     def test_component_only(self):
 
         prob = om.Problem()
-        prob.model = MyComp()
+        prob.model.add_subsystem('comp', MyComp(), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -175,7 +175,7 @@ class TestProblemCheckPartials(unittest.TestCase):
     def test_component_only_suppress(self):
 
         prob = om.Problem()
-        prob.model = MyComp()
+        prob.model.add_subsystem('comp', MyComp(), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -1167,7 +1167,7 @@ class TestProblemCheckPartials(unittest.TestCase):
     def test_compact_print_exceed_tol(self):
 
         prob = om.Problem()
-        prob.model = MyCompGoodPartials()
+        prob.model.add_subsystem('comp', MyCompGoodPartials(), promotes=['*'])
         prob.set_solver_print(level=0)
         prob.setup()
         prob.run_model()
@@ -1177,7 +1177,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count('>REL_TOL'), 0)
 
         prob = om.Problem()
-        prob.model = MyCompBadPartials()
+        prob.model.add_subsystem('comp', MyCompBadPartials(), promotes=['*'])
         prob.set_solver_print(level=0)
         prob.setup()
         prob.run_model()
@@ -1237,7 +1237,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 J['z', 'x2'] = np.array([-4444.0])
 
         prob = om.Problem()
-        prob.model = MyComp()
+        prob.model.add_subsystem('comp', MyComp(), promotes=['*'])
         prob.set_solver_print(level=0)
         prob.setup()
         prob.run_model()
