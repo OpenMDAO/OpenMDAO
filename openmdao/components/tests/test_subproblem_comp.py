@@ -1,7 +1,7 @@
 from numpy import pi
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
+from openmdao.utils.assert_utils import assert_near_equal
 import unittest
 
 
@@ -112,6 +112,9 @@ class TestSubproblemComp(unittest.TestCase):
 
             p.run_model()
 
+        msg = '\'<model> <class Group>: Variable "r" not found.\''
+        self.assertTrue(str(ctx.exception).startswith(msg))
+
     def test_variable_alias(self):
         p = om.Problem()
         model = om.Group()
@@ -138,9 +141,9 @@ class TestSubproblemComp(unittest.TestCase):
         inputs = {inputs[i][0]: inputs[i][1]['val'] for i in range(len(inputs))}
         outputs = {outputs[i][0]: outputs[i][1]['val'] for i in range(len(outputs))}
 
-        assert(inputs['a'] == 1)
-        assert(inputs['b'] == 2)
-        assert(outputs['c'] == 5)
+        assert_near_equal(inputs['a'], 1)
+        assert_near_equal(inputs['b'], 2)
+        assert_near_equal(outputs['c'], 5)
 
     def test_unconnected_same_var(self):
         p = om.Problem()
@@ -174,9 +177,9 @@ class TestSubproblemComp(unittest.TestCase):
         inputs = {inputs[i][0]: inputs[i][1]['val'] for i in range(len(inputs))}
         outputs = {outputs[i][0]: outputs[i][1]['val'] for i in range(len(outputs))}
 
-        assert(inputs['x'] == 1)
-        assert(inputs['y'] == 2)
-        assert(outputs['z'] == 73)
+        assert_near_equal(inputs['x'], 1)
+        assert_near_equal(inputs['y'], 2)
+        assert_near_equal(outputs['z'], 73)
 
     def test_wildcard(self):
         p = om.Problem()
@@ -205,10 +208,10 @@ class TestSubproblemComp(unittest.TestCase):
         inputs = {inputs[i][0]: inputs[i][1]['val'] for i in range(len(inputs))}
         outputs = {outputs[i][0]: outputs[i][1]['val'] for i in range(len(outputs))}
 
-        assert(inputs['x1'] == 1)
-        assert(inputs['x2'] == 2)
-        assert(inputs['x3'] == 3)
-        assert(outputs['z'] == 14)
+        assert_near_equal(inputs['x1'], 1)
+        assert_near_equal(inputs['x2'], 2)
+        assert_near_equal(inputs['x3'], 3)
+        assert_near_equal(outputs['z'], 14)
     
     def test_add_io_before_setup(self):
         p = om.Problem()
@@ -337,7 +340,7 @@ class TestSubproblemComp(unittest.TestCase):
         p.run_model()
         cpd = p.check_partials(method='cs', out_stream=None)
 
-        assert_near_equal(p.get_val('z'), 1.0)
+        assert_near_equal(p.get_val('z'), 1)
 
     def test_invalid_io(self):
         p = om.Problem()
@@ -377,6 +380,9 @@ class TestSubproblemComp(unittest.TestCase):
 
         with self.assertRaises(Exception) as ctx:
             p.setup(force_alloc_complex=True)
+            
+        msg = 'Variable psi does not exist in model.'
+        self.assertTrue(str(ctx.exception), msg)
 
     def test_multiple_setups(self):
         p = om.Problem()
