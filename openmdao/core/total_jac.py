@@ -30,10 +30,7 @@ elif use_mpi is False:
     PETSc = None
 
 _contains_all = ContainsAll()
-
-
 _directional_rng = np.random.default_rng(99)
-
 
 
 class _TotalJacInfo(object):
@@ -99,7 +96,7 @@ class _TotalJacInfo(object):
         The set of names of all systems relevant to the computation of the total derivatives.
     directional : bool
         If True, perform a single directional derivative.
-   """
+    """
 
     def __init__(self, problem, of, wrt, use_abs_names, return_format, approx=False,
                  debug_print=False, driver_scaling=True, get_remote=True, directional=False):
@@ -1133,7 +1130,7 @@ class _TotalJacInfo(object):
 
     def directional_iter(self, imeta, mode):
         """
-        Iterate (once) over a directional index list
+        Iterate (once) over a directional index list.
 
         Parameters
         ----------

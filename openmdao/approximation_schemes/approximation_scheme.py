@@ -43,6 +43,9 @@ class ApproximationScheme(object):
         to only colored columns.
     _jac_scatter : tuple
         Data needed to scatter values from results array to a total jacobian column.
+    _totals_directions : dict
+        If directional derivatives are being computed, this will contain the direction keyed by
+        mode ('fwd' or 'rev').
     """
 
     def __init__(self):
@@ -611,8 +614,6 @@ class ApproximationScheme(object):
             totarr[:] = tvec.array
         else:
             _, sinds, tinds = self._jac_scatter
-            print("approx out array:", outarr)
-            print("approx jacinds:", tinds, "solution inds:", sinds)
             totarr[tinds] = outarr[sinds]
 
         return totarr

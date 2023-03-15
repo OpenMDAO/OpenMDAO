@@ -396,7 +396,7 @@ class TableBuilder(object):
         try:
             return meta['format'].format(cell)
         except Exception:
-            return '{}'.format(cell)
+            return f'{cell}'
 
     def _update_col_meta_from_rows(self):
         """

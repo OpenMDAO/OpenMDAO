@@ -3750,10 +3750,10 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         totals = prob.check_totals(out_stream=None)
 
-        assert_near_equal(totals['comp.areas', 'p1.widths']['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(totals['a2', 'p1.widths']['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(totals['a3', 'p1.widths']['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(totals['a4', 'p1.widths']['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(totals['comp.areas', 'p1.widths']['abs error'][1], 0.0, 1e-6)
+        assert_near_equal(totals['a2', 'p1.widths']['abs error'][1], 0.0, 1e-6)
+        assert_near_equal(totals['a3', 'p1.widths']['abs error'][1], 0.0, 1e-6)
+        assert_near_equal(totals['a4', 'p1.widths']['abs error'][1], 0.0, 1e-6)
 
     def test_alias_constraints_nested(self):
         # Tests a bug where we need to lookup the constraint alias on a response that is from

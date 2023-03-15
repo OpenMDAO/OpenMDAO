@@ -2209,7 +2209,7 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
         # this can happen when a partial is not declared, which means it should be zero
         fd = fd_norm = 0.
 
-    rev_norm = fwd_norm = fwd_error = rev_error = fwd_rev_error =None
+    rev_norm = fwd_norm = fwd_error = rev_error = fwd_rev_error = None
 
     Jforward = derivative_info.get('J_fwd')
     Jreverse = derivative_info.get('J_rev')
@@ -2244,7 +2244,7 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
     if div_norm == 0.:
         derivative_info['rel error'] = _ErrorTuple(nan, nan, nan)
     else:
-        if not totals and matrix_free:
+        if matrix_free and not totals:
             derivative_info['rel error'] = _ErrorTuple(fwd_error / div_norm, rev_error / div_norm,
                                                        fwd_rev_error / div_norm)
         else:
@@ -2343,7 +2343,7 @@ def _iter_derivs(derivatives, sys_name, show_only_incorrect, global_options, tot
     sorted_keys = sorted(derivatives)
 
     for key in sorted_keys:
-        of, wrt = key
+        _, wrt = key
 
         inconsistent = False
         derivative_info = derivatives[key]
@@ -2406,10 +2406,10 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
     if compact_print:
         if print_reverse:
-            deriv_line = "{0} wrt {1} | {2:.4e} | {3} | {4:.4e} | {5:.4e} | {6} | {7}" \
+            deriv_line = "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7}" \
                          " | {8} | {9} | {10}"
         else:
-            deriv_line = "{0} wrt {1} | {2:.4e} | {3:.4e} | {4:.4e} | {5:.4e}"
+            deriv_line = "{0} wrt {1} | {2} | {3} | {4} | {5}"
 
     # Keep track of the worst subjac in terms of relative error for fwd and rev
     if not suppress_output and show_only_incorrect:
@@ -2548,50 +2548,51 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
             if compact_print:
                 if totals:
+                    if magnitude.forward is None:
+                        calc_mag = magnitude.reverse
+                        calc_abs = abs_err.reverse
+                        calc_rel = rel_err.reverse
+                    else:
+                        calc_mag = magnitude.forward
+                        calc_abs = abs_err.forward
+                        calc_rel = rel_err.forward
+
                     out_buffer.write(deriv_line.format(
                         pad_name(of, 30, quotes=True),
                         pad_name(wrt, 30, quotes=True),
-                        magnitude.forward,
-                        magnitude.fd,
-                        abs_err.forward,
-                        rel_err.forward))
+                        _format_cell(calc_mag),
+                        _format_cell(magnitude.fd),
+                        _format_cell(calc_abs),
+                        _format_cell(calc_rel)))
                 else:
                     if directional:
                         wrt_padded = pad_name(f"(d)'{wrt}'", max_width_wrt)
                     else:
                         wrt_padded = pad_name(wrt, max_width_wrt, quotes=True)
                     if print_reverse:
-                        if np.isnan(rel_err.forward):
-                            rel_fwd_str = pad_name('nan')
-                        else:
-                            rel_fwd_str = f"{rel_err.forward:.4e}"
-
                         deriv_info_line = \
                             deriv_line.format(
                                 pad_name(of, max_width_of, quotes=True),
                                 wrt_padded,
-                                magnitude.forward,
-                                _format_if_not_matrix_free(matrix_free and not directional,
-                                                            magnitude.reverse),
-                                magnitude.fd,
-                                abs_err.forward,
-                                _format_if_not_matrix_free(matrix_free, abs_err.reverse),
-                                _format_if_not_matrix_free(matrix_free,
-                                                            abs_err.forward_reverse),
-                                rel_fwd_str,
-                                _format_if_not_matrix_free(matrix_free, rel_err.reverse),
-                                _format_if_not_matrix_free(matrix_free,
-                                                            rel_err.forward_reverse),
+                                _format_cell(magnitude.forward),
+                                _format_cell(magnitude.reverse),
+                                _format_cell(magnitude.fd),
+                                _format_cell(abs_err.forward),
+                                _format_cell(abs_err.reverse),
+                                _format_cell(abs_err.forward_reverse),
+                                _format_cell(rel_err.forward),
+                                _format_cell(rel_err.reverse),
+                                _format_cell(rel_err.forward_reverse),
                             )
                     else:
                         deriv_info_line = \
                             deriv_line.format(
                                 pad_name(of, max_width_of, quotes=True),
                                 wrt_padded,
-                                magnitude.forward,
-                                magnitude.fd,
-                                abs_err.forward,
-                                rel_err.forward,
+                                _format_cell(magnitude.forward),
+                                _format_cell(magnitude.fd),
+                                _format_cell(abs_err.forward),
+                                _format_cell(rel_err.forward),
                             )
 
                     out_buffer.write(deriv_info_line)
@@ -2663,19 +2664,19 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 if do_rev:
                     if fd_norm == 0.:
                         error_descs = ('(Jfor - Jfd) / Jfor ', '(Jrev - Jfd) / Jfor ',
-                                        '(Jfor - Jrev) / Jfor')
+                                       '(Jfor - Jrev) / Jfor')
                     else:
                         error_descs = ('(Jfor - Jfd) / Jfd ', '(Jrev - Jfd) / Jfd ',
-                                        '(Jfor - Jrev) / Jfd')
+                                       '(Jfor - Jrev) / Jfd')
                 elif do_rev_dp:
                     if fd_norm == 0.:
                         error_descs = ('(Jfor - Jfd) / Jfor ',
-                                        '(Jrev - Jfd  Dot Product Test) / Jfor ',
-                                        '(Jrev - Jfor Dot Product Test) / Jfor ')
+                                       '(Jrev - Jfd  Dot Product Test) / Jfor ',
+                                       '(Jrev - Jfor Dot Product Test) / Jfor ')
                     else:
                         error_descs = ('(Jfor - Jfd) / Jfd ',
-                                        '(Jrev - Jfd  Dot Product Test) / Jfd ',
-                                        '(Jrev - Jfor Dot Product Test) / Jfd ')
+                                       '(Jrev - Jfd  Dot Product Test) / Jfd ',
+                                       '(Jrev - Jfor Dot Product Test) / Jfd ')
                 else:
                     if fd_norm == 0.:
                         error_descs = ('(Janalytic - Jfd) / Janalytic ', )
@@ -2718,10 +2719,10 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
                 if directional:
                     out_buffer.write(f"    Directional {fd_opts['method'].upper()}"
-                                        f" Derivative (J{fd_opts['method']})\n{fd}\n")
+                                     f" Derivative (J{fd_opts['method']})\n{fd}\n")
                 else:
                     out_buffer.write(f"    Raw {fd_opts['method'].upper()}"
-                                        f" Derivative (J{fd_opts['method']})\n{fd}\n")
+                                     f" Derivative (J{fd_opts['method']})\n{fd}\n")
 
                 out_buffer.write(' -' * 30 + '\n')
 
@@ -2764,28 +2765,26 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                   "within a matrix free component. See POEM 75 for details.")
 
 
-def _format_if_not_matrix_free(matrix_free, val):
+def _format_cell(val):
     """
     Return string to represent deriv check value in compact display.
 
     Parameters
     ----------
-    matrix_free : bool
-        If True, then the associated Component is matrix-free.
-    val : float
+    val : float or None
         The deriv check value.
 
     Returns
     -------
     str
-        String which is the actual value if matrix-free, otherwise 'n/a'
+        String which is the actual value or 'n/a' if val is None.
     """
-    if matrix_free:
-        if np.isnan(val):
-            return pad_name('nan')
-        return f'{val:.4e}'
-    else:
+    if val is None:
         return pad_name('n/a')
+
+    if np.isnan(val):
+        return pad_name('nan')
+    return f'{val:.4e}'
 
 
 def _format_error(error, tol):
