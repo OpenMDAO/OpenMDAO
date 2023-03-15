@@ -4,8 +4,6 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.problem import Problem
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.general_utils import find_matches
-from openmdao.utils.om_warnings import issue_warning
-from openmdao.core.driver import Driver
 from openmdao.core.constants import _SetupStatus
 
 
@@ -103,7 +101,7 @@ def _get_model_vars(vars, model_vars):
 
 class SubmodelComp(ExplicitComponent):
     """
-    System level container for systems and drivers.
+    System level container for systems.
 
     Parameters
     ----------
@@ -115,18 +113,12 @@ class SubmodelComp(ExplicitComponent):
         then the first element should be the absolute name or group's promoted name, and the
         second element should be the var name you wish to refer to it within the subproblem
         [e.g. (path.to.var, desired_name)].
-        If inputs is None, then inputs not connected to outputs from driver design variables are
-        used.
     outputs : list of str or tuple or None
         List of provided output names in str or tuple form. If an element is a str,
         then it should be the absolute name or the promoted name in its group. If it is a tuple,
         then the first element should be the absolute name or group's promoted name, and the
         second element should be the var name you wish to refer to it within the subproblem
         [e.g. (path.to.var, desired_name)].
-        If outputs is None, then outputs not connected to outputs that are driver design variables
-        and are not tagged as `openmdao:indep_var` are used.
-    driver : <Driver> or None
-        The driver for the problem. If not specified, a simple "Run Once" driver will be used.
     comm : MPI.Comm or <FakeComm> or None
         The global communicator.
     name : str or None
@@ -164,19 +156,11 @@ class SubmodelComp(ExplicitComponent):
         List of outputs added to model.
     """
 
-    def __init__(self, model, inputs=None, outputs=None, driver=None,
-                 comm=None, name=None, reports=_UNDEFINED, prob_options=None, **kwargs):
+    def __init__(self, model, inputs=None, outputs=None, comm=None, name=None,
+                 reports=_UNDEFINED, prob_options=None, **kwargs):
         """
         Initialize all attributes.
         """
-        # check for driver and issue warning about its current use
-        # in subproblem
-        if driver is not None:
-            issue_warning('Driver results may not be accurate if'
-                          ' derivatives are needed. Set driver to'
-                          ' None if your subproblem isn\'t reliant on'
-                          ' a driver.')
-
         # make `prob_options` empty dict to be passed as **options to problem
         # instantiation
         if prob_options is None:
@@ -193,8 +177,7 @@ class SubmodelComp(ExplicitComponent):
 
         # set other variables necessary for subproblem
 
-        self.prob_args = {'driver': driver,
-                          'comm': comm,
+        self.prob_args = {'comm': comm,
                           'name': name,
                           'reports': reports}
         self.prob_args.update(prob_options)
