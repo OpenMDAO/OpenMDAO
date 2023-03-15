@@ -32,6 +32,10 @@ elif use_mpi is False:
 _contains_all = ContainsAll()
 
 
+_directional_rng = np.random.default_rng(99)
+
+
+
 class _TotalJacInfo(object):
     """
     Object to manage computation of total derivatives.
@@ -377,6 +381,10 @@ class _TotalJacInfo(object):
             for mode in modes:
                 self._create_in_idx_map(mode)
 
+            if directional and 'fwd' not in modes:
+                # causes creation of seed for fwd mode that we'll use with fd later
+                self._create_in_idx_map('fwd')
+
             self.sol2jac_map = {}
             for mode in modes:
                 self.sol2jac_map[mode] = self._get_sol2jac_map(self.output_list[mode],
@@ -653,9 +661,6 @@ class _TotalJacInfo(object):
         else:
             non_rel_outs = False
 
-        if self.directional:
-            rng = np.random.default_rng()
-
         for name in input_list:
             if name in self.responses and self.responses[name]['alias'] is not None:
                 path = self.responses[name]['source']
@@ -802,9 +807,13 @@ class _TotalJacInfo(object):
         seed = np.hstack(seed)
 
         if self.directional:
-            seed[:] = rng.random(seed.size)
+            seed[:] = _directional_rng.random(seed.size)
             seed *= 2.0
             seed -= 1.0
+            # # FIXME debugging
+            # seed[:] = 2.5
+
+            print("SEED:", seed)
 
             imeta = defaultdict(bool)
             all_rel_systems = set()
@@ -826,6 +835,9 @@ class _TotalJacInfo(object):
             else:
                 active = slice(None)
 
+            print("LOC_IDXS:", loc_idxs)
+            print("active:", active)
+            print("seed[active]:", seed[active])
             iterdict['local_in_idxs'] = loc_idxs[active]
             iterdict['seeds'] = seed[active]
 
@@ -1515,6 +1527,7 @@ class _TotalJacInfo(object):
         else:  # rev
             for i in inds:
                 J[i, :] = reduced_derivs
+                print(f"J[{i}, :] = {reduced_derivs}")
                 if dist:
                     self._jac_setter_dist(i, mode)
                 break  # only need a single row of jac for directional
@@ -1681,13 +1694,9 @@ class _TotalJacInfo(object):
                     model._update_wrt_matches(model._coloring_info)
 
             if self.directional:
-                if self.mode == 'fwd':
-                    for scheme in model._approx_schemes.values():
-                        seeds = {k: -s for k, s in self.seeds.items()}
-                        scheme._totals_directions = seeds
-                else:
-                    for scheme in model._approx_schemes.values():
-                        scheme._totals_directions = {'rev': None}
+                for scheme in model._approx_schemes.values():
+                    seeds = {k: -s for k, s in self.seeds.items()}
+                    scheme._totals_directions = seeds
             else:
                 for scheme in model._approx_schemes.values():
                     scheme._totals_directions = {}

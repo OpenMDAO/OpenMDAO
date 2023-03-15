@@ -1810,7 +1810,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.setup(force_alloc_complex=True)
         prob.run_model()
-        partials = prob.check_partials(method='cs', out_stream=None)
+        partials = prob.check_partials(method='cs')#, out_stream=None)
 
         self.assertGreater(np.abs(partials['comp']['out2', 'in']['directional_fwd_rev']),
                            1e-3, msg='Reverse deriv is supposed to be wrong.')
@@ -3865,6 +3865,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.model.add_subsystem('comp', DirectionalVectorizedMatFreeComp(n=5))
         prob.model.add_design_var('comp.in')
         prob.model.add_objective('comp.out', index=0)
+        #prob.model.add_constraint('comp.out', lower=0.)
 
         prob.setup(force_alloc_complex=True, mode='rev')
         prob.run_model()

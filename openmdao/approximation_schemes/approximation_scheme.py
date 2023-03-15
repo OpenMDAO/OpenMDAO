@@ -234,7 +234,7 @@ class ApproximationScheme(object):
             wrts_directional = []
             in_inds_directional = []
             vec_inds_directional = defaultdict(list)
-            rng_directional = np.random.default_rng()
+            rng_directional = np.random.default_rng(42)
 
         for wrt, start, end, vec, _, _ in system._jac_wrt_iter(wrt_matches):
             if wrt in self._wrt_meta:
@@ -301,9 +301,12 @@ class ApproximationScheme(object):
                 if 'fwd' in self._totals_directions:
                     vector = self._totals_directions['fwd']
                 else:
-                    vector = rng_directional.random(len(in_inds_directional))
-                    vector *= 2.0
-                    vector -= 1.0
+                    vector = self._totals_directions['rev']
+                    # vector = rng_directional.random(len(in_inds_directional))
+                    # vector *= 2.0
+                    # vector -= 1.0
+                    # # FIXME: debugging
+                    # vector[:] = 2.5
 
                 self._approx_groups = [(tuple(wrts_directional), data_directional,
                                         [in_inds_directional], list(vec_inds_directional.items()),
@@ -421,7 +424,7 @@ class ApproximationScheme(object):
 
     def _vec_ind_iter(self, vec_ind_list):
         if self._totals_directions:
-            yield vec_ind_list, None
+            yield vec_ind_list, vec_ind_list[0][1]
         else:
             entry = [[None, None]]
             ent0 = entry[0]
@@ -503,7 +506,6 @@ class ApproximationScheme(object):
                     if direction is not None or mult != 1.0:
                         result *= mult
 
-                    print("RESULT:", result)
                     if total:
                         result = self._get_total_result(result, tot_result)
 
@@ -609,6 +611,8 @@ class ApproximationScheme(object):
             totarr[:] = tvec.array
         else:
             _, sinds, tinds = self._jac_scatter
+            print("approx out array:", outarr)
+            print("approx jacinds:", tinds, "solution inds:", sinds)
             totarr[tinds] = outarr[sinds]
 
         return totarr

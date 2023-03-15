@@ -405,7 +405,7 @@ def _find_dict_meta(dct, key):
     return False
 
 
-def pad_name(name, pad_num=10, quotes=False):
+def pad_name(name, width=10, quotes=False):
     """
     Pad a string so that they all line up when stacked.
 
@@ -413,7 +413,7 @@ def pad_name(name, pad_num=10, quotes=False):
     ----------
     name : str
         The string to pad.
-    pad_num : int
+    width : int
         The number of total spaces the string should take up.
     quotes : bool
         If name should be quoted.
@@ -424,10 +424,10 @@ def pad_name(name, pad_num=10, quotes=False):
         Padded string.
     """
     name = f"'{name}'" if quotes else name
-    if pad_num > len(name):
-        return f"{name:<{pad_num}}"
+    if width > len(name):
+        return f"{name:<{width}}"
     else:
-        return f'{name}'
+        return f"{name}"
 
 
 def add_border(msg, borderstr='=', vpad=0):
