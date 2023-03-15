@@ -2242,7 +2242,9 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
     div_norm = fd_norm if fd_norm != 0. else calc_norm
 
     if div_norm == 0.:
-        derivative_info['rel error'] = _ErrorTuple(nan, nan, nan)
+        derivative_info['rel error'] = _ErrorTuple(None if fwd_error is None else nan,
+                                                   None if rev_error is None else nan,
+                                                   None if fwd_rev_error is None else nan)
     else:
         if matrix_free and not totals:
             derivative_info['rel error'] = _ErrorTuple(fwd_error / div_norm, rev_error / div_norm,
