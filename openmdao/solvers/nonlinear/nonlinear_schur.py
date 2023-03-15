@@ -349,9 +349,6 @@ class SchurSolver(NonlinearSolver):
                 # do a solve_linear to find C[{ii},:] A^-1
                 subsys1._solve_linear(mode, ContainsAll())
 
-                # the same solve requires in the rhs too, so we save them
-                schur_rhs[ii] = subsys1._vectors["residual"]["linear"].asarray().dot(subsys1_rhs)
-
                 # negate the resdiual first
                 subsys1._vectors["residual"]["linear"] *= -1.0
 
