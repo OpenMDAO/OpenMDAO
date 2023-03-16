@@ -64,7 +64,7 @@ class BroydenSolver(NonlinearSolver):
         Flag that becomes True when Broyden detects it needs to recompute the inverse Jacobian.
     """
 
-    SOLVER = "NL: BROYDEN"
+    SOLVER = 'NL: BROYDEN'
 
     def __init__(self, **kwargs):
         """
@@ -100,69 +100,43 @@ class BroydenSolver(NonlinearSolver):
         """
         super()._declare_options()
 
-        self.options.declare(
-            "alpha",
-            default=0.4,
-            desc="Value to scale the starting Jacobian, which is Identity. This "
-            "option does nothing if you compute the initial Jacobian "
-            "instead.",
-        )
-        self.options.declare(
-            "compute_jacobian",
-            types=bool,
-            default=True,
-            desc="When True, compute an initial Jacobian, otherwise start "
-            "with Identity scaled by alpha. Further Jacobians may also be "
-            "computed depending on the other options.",
-        )
-        self.options.declare(
-            "converge_limit",
-            default=1.0,
-            desc="Ratio of current residual to previous residual above which the "
-            "convergence is considered a failure. The Jacobian will be "
-            "regenerated once this condition has been reached a number of "
-            "consecutive times as specified in max_converge_failures.",
-        )
-        self.options.declare(
-            "cs_reconverge",
-            types=bool,
-            default=True,
-            desc="When True, when this driver solves under a complex step, nudge "
-            "the Solution vector by a small amount so that it reconverges.",
-        )
-        self.options.declare(
-            "diverge_limit",
-            default=2.0,
-            desc="Ratio of current residual to previous residual above which the "
-            "Jacobian will be immediately regenerated.",
-        )
-        self.options.declare(
-            "max_converge_failures",
-            default=3,
-            desc="The number of convergence failures before regenerating the " "Jacobian.",
-        )
-        self.options.declare("max_jacobians", default=10, desc="Maximum number of jacobians to compute.")
-        self.options.declare(
-            "state_vars", [], desc="List of the state-variable/residuals that " "are to be solved here."
-        )
-        self.options.declare(
-            "update_broyden",
-            default=True,
-            desc="Flag controls whether to perform Broyden update to the "
-            "Jacobian. There are some applications where it may be useful "
-            "to turn this off.",
-        )
-        self.options.declare(
-            "reraise_child_analysiserror",
-            types=bool,
-            default=False,
-            desc="When the option is true, a solver will reraise any "
-            "AnalysisError that arises during subsolve; when false, it will "
-            "continue solving.",
-        )
+        self.options.declare('alpha', default=0.4,
+                             desc="Value to scale the starting Jacobian, which is Identity. This "
+                                  "option does nothing if you compute the initial Jacobian "
+                                  "instead.")
+        self.options.declare('compute_jacobian', types=bool, default=True,
+                             desc="When True, compute an initial Jacobian, otherwise start "
+                                  "with Identity scaled by alpha. Further Jacobians may also be "
+                                  "computed depending on the other options.")
+        self.options.declare('converge_limit', default=1.0,
+                             desc="Ratio of current residual to previous residual above which the "
+                                  "convergence is considered a failure. The Jacobian will be "
+                                  "regenerated once this condition has been reached a number of "
+                                  "consecutive times as specified in max_converge_failures.")
+        self.options.declare('cs_reconverge', types=bool, default=True,
+                             desc='When True, when this driver solves under a complex step, nudge '
+                             'the Solution vector by a small amount so that it reconverges.')
+        self.options.declare('diverge_limit', default=2.0,
+                             desc="Ratio of current residual to previous residual above which the "
+                                  "Jacobian will be immediately regenerated.")
+        self.options.declare('max_converge_failures', default=3,
+                             desc="The number of convergence failures before regenerating the "
+                                  "Jacobian.")
+        self.options.declare('max_jacobians', default=10,
+                             desc="Maximum number of jacobians to compute.")
+        self.options.declare('state_vars', [], desc="List of the state-variable/residuals that "
+                                                    "are to be solved here.")
+        self.options.declare('update_broyden', default=True,
+                             desc="Flag controls whether to perform Broyden update to the "
+                                  "Jacobian. There are some applications where it may be useful "
+                                  "to turn this off.")
+        self.options.declare('reraise_child_analysiserror', types=bool, default=False,
+                             desc='When the option is true, a solver will reraise any '
+                             'AnalysisError that arises during subsolve; when false, it will '
+                             'continue solving.')
 
-        self.supports["gradients"] = True
-        self.supports["implicit_components"] = True
+        self.supports['gradients'] = True
+        self.supports['implicit_components'] = True
 
     def _setup_solvers(self, system, depth):
         """
@@ -195,23 +169,23 @@ class BroydenSolver(NonlinearSolver):
         # this check is incorrect (for broyden) and needs to be done differently.
         # self._disallow_distrib_solve()
 
-        states = self.options["state_vars"]
-        prom2abs = system._var_allprocs_prom2abs_list["output"]
+        states = self.options['state_vars']
+        prom2abs = system._var_allprocs_prom2abs_list['output']
 
         # Check names of states.
         bad_names = [name for name in states if name not in prom2abs]
         if len(bad_names) > 0:
             msg = "{}: The following variable names were not found: {}"
-            raise ValueError(msg.format(self.msginfo, ", ".join(bad_names)))
+            raise ValueError(msg.format(self.msginfo, ', '.join(bad_names)))
 
         # Size linear system
         if len(states) > 0:
             # User has specified states, so we must size them.
             n = 0
-            meta = system._var_allprocs_abs2meta["output"]
+            meta = system._var_allprocs_abs2meta['output']
 
             for i, name in enumerate(states):
-                size = meta[prom2abs[name][0]]["global_size"]
+                size = meta[prom2abs[name][0]]['global_size']
                 self._idx[name] = (n, n + size)
                 n += size
         else:
@@ -221,18 +195,18 @@ class BroydenSolver(NonlinearSolver):
 
         self.size = n
         self.Gm = np.empty((n, n))
-        self.xm = np.empty((n,))
-        self.fxm = np.empty((n,))
+        self.xm = np.empty((n, ))
+        self.fxm = np.empty((n, ))
         self.delta_xm = None
         self.delta_fxm = None
 
         if self._full_inverse:
+
             # Can only use DirectSolver here.
             from openmdao.solvers.linear.direct import DirectSolver
-
             if not isinstance(self.linear_solver, DirectSolver):
                 msg = "{}: Linear solver must be DirectSolver when solving the full model."
-                raise ValueError(msg.format(self.msginfo, ", ".join(bad_names)))
+                raise ValueError(msg.format(self.msginfo, ', '.join(bad_names)))
 
             return
 
@@ -240,10 +214,10 @@ class BroydenSolver(NonlinearSolver):
         def sys_recurse(system, all_states):
             subs = system._subsystems_myproc
             if len(subs) == 0:
+
                 # Skip implicit components that appear to solve themselves.
                 from openmdao.core.implicitcomponent import ImplicitComponent
-
-                if overrides_method("solve_nonlinear", system, ImplicitComponent):
+                if overrides_method('solve_nonlinear', system, ImplicitComponent):
                     return
 
                 all_states.extend(system._list_states())
@@ -251,21 +225,19 @@ class BroydenSolver(NonlinearSolver):
             else:
                 for subsys in subs:
                     sub_nl = subsys.nonlinear_solver
-                    if sub_nl and sub_nl.supports["implicit_components"]:
+                    if sub_nl and sub_nl.supports['implicit_components']:
                         continue
                     sys_recurse(subsys, all_states)
 
         all_states = []
         sys_recurse(system, all_states)
-        all_states = [system._var_abs2prom["output"][name] for name in all_states]
+        all_states = [system._var_abs2prom['output'][name] for name in all_states]
 
         missing = set(all_states).difference(states)
         if len(missing) > 0:
-            msg = (
-                "The following states are not covered by a solver, and may have been "
-                + "omitted from the BroydenSolver 'state_vars': "
-            )
-            msg += ", ".join(sorted(missing))
+            msg = "The following states are not covered by a solver, and may have been " + \
+                  "omitted from the BroydenSolver 'state_vars': "
+            msg += ', '.join(sorted(missing))
             issue_warning(msg, category=SetupWarning)
 
     def _assembled_jac_solver_iter(self):
@@ -276,7 +248,7 @@ class BroydenSolver(NonlinearSolver):
             for s in self.linear_solver._assembled_jac_solver_iter():
                 yield s
 
-    def _set_solver_print(self, level=2, type_="all"):
+    def _set_solver_print(self, level=2, type_='all'):
         """
         Control printing for solvers and subsolvers in the model.
 
@@ -291,7 +263,7 @@ class BroydenSolver(NonlinearSolver):
         """
         super()._set_solver_print(level=level, type_=type_)
 
-        if self.linear_solver is not None and type_ != "NL":
+        if self.linear_solver is not None and type_ != 'NL':
             self.linear_solver._set_solver_print(level=level, type_=type_)
 
         if self.linesearch is not None:
@@ -319,9 +291,9 @@ class BroydenSolver(NonlinearSolver):
             Initial absolute error in the user-specified residuals.
         """
         system = self._system()
-        if self.options["debug_print"]:
-            self._err_cache["inputs"] = system._inputs._copy_views()
-            self._err_cache["outputs"] = system._outputs._copy_views()
+        if self.options['debug_print']:
+            self._err_cache['inputs'] = system._inputs._copy_views()
+            self._err_cache['outputs'] = system._outputs._copy_views()
 
         # Convert local storage if we are under complex step.
         if system.under_complex_step:
@@ -342,13 +314,13 @@ class BroydenSolver(NonlinearSolver):
         # When under a complex step from higher in the hierarchy, sometimes the step is too small
         # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
         # one iteration of Broyden.
-        if system.under_complex_step and self.options["cs_reconverge"]:
+        if system.under_complex_step and self.options['cs_reconverge']:
             system._outputs += np.linalg.norm(system._outputs.asarray()) * 1e-10
 
         # Start with initial states.
         self.xm = self.get_vector(system._outputs)
 
-        with Recording("Broyden", 0, self) as rec:
+        with Recording('Broyden', 0, self) as rec:
             self._solver_info.append_solver()
 
             # should call the subsystems solve before computing the first residual
@@ -444,15 +416,16 @@ class BroydenSolver(NonlinearSolver):
         # Determine whether to update Jacobian.
         self._recompute_jacobian = False
         opt = self.options
-        if self._computed_jacobians <= opt["max_jacobians"]:
+        if self._computed_jacobians <= opt['max_jacobians']:
+
             converge_ratio = self.compute_norm(fxm) / self.compute_norm(fxm1)
 
-            if converge_ratio > opt["diverge_limit"]:
+            if converge_ratio > opt['diverge_limit']:
                 self._recompute_jacobian = True
-            elif converge_ratio > opt["converge_limit"]:
+            elif converge_ratio > opt['converge_limit']:
                 self._converge_failures += 1
 
-                if self._converge_failures >= opt["max_converge_failures"]:
+                if self._converge_failures >= opt['max_converge_failures']:
                     self._recompute_jacobian = True
             else:
                 self._converge_failures = 0
@@ -476,17 +449,17 @@ class BroydenSolver(NonlinearSolver):
         Gm = self.Gm
 
         # Apply the Broyden Update approximation to the previous value of the inverse jacobian.
-        if self.options["update_broyden"] and not self._recompute_jacobian:
+        if self.options['update_broyden'] and not self._recompute_jacobian:
             dfxm = self.delta_fxm
             fact = np.linalg.norm(dfxm)
 
             # Sometimes you can get stuck, particularly when enforcing bounds in a linesearch.
             # Make sure we don't update in this case because of divide by zero.
-            if fact > self.options["atol"]:
+            if fact > self.options['atol']:
                 Gm += np.outer((self.delta_xm - Gm.dot(dfxm)), dfxm * (1.0 / fact**2))
 
         # Solve for total derivatives of user-requested residuals wrt states.
-        elif self.options["compute_jacobian"]:
+        elif self.options['compute_jacobian']:
             if self._full_inverse:
                 Gm = self._compute_full_inverse_jacobian()
             else:
@@ -497,7 +470,7 @@ class BroydenSolver(NonlinearSolver):
         # Set inverse Jacobian to identity scaled by alpha.
         # This is the default starting point used by scipy and the general broyden algorithm.
         else:
-            Gm = np.diag(np.full(self.size, -self.options["alpha"], dtype=Gm.dtype))
+            Gm = np.diag(np.full(self.size, -self.options['alpha'], dtype=Gm.dtype))
 
         return Gm
 
@@ -521,7 +494,7 @@ class BroydenSolver(NonlinearSolver):
         if self._full_inverse:
             xm = vec.asarray(copy=True)
         else:
-            states = self.options["state_vars"]
+            states = self.options['state_vars']
             xm = self.xm.copy()
             for name in states:
                 i, j = self._idx[name]
@@ -543,7 +516,7 @@ class BroydenSolver(NonlinearSolver):
         if self._full_inverse:
             outputs.set_val(new_val)
         else:
-            states = self.options["state_vars"]
+            states = self.options['state_vars']
             for name in states:
                 i, j = self._idx[name]
                 outputs[name] = new_val[i:j]
@@ -563,7 +536,7 @@ class BroydenSolver(NonlinearSolver):
             linear.set_val(dx)
         else:
             linear.set_val(0.0)
-            for name in self.options["state_vars"]:
+            for name in self.options['state_vars']:
                 i, j = self._idx[name]
                 linear[name] = dx[i:j]
 
@@ -580,7 +553,7 @@ class BroydenSolver(NonlinearSolver):
         # same code.
         # TODO: Can do each state in parallel if procs are available.
         system = self._system()
-        states = self.options["state_vars"]
+        states = self.options['state_vars']
         d_res = system._dresiduals
         d_out = system._doutputs
 
@@ -606,12 +579,13 @@ class BroydenSolver(NonlinearSolver):
                 d_wrt = d_res[wrt_name]
 
             for j in range(j_wrt - i_wrt):
+
                 # Increment each variable.
                 if wrt_name in d_res:
                     d_wrt[j] = 1.0
 
                 # Solve for total derivatives.
-                ln_solver.solve("fwd")
+                ln_solver.solve('fwd')
 
                 # Extract results.
                 for of_name in states:
