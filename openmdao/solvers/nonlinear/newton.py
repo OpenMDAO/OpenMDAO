@@ -150,7 +150,7 @@ class NewtonSolver(NonlinearSolver):
         bool
             Flag for indicating child linerization
         """
-        return (self.options['solve_subsystems']
+        return (self.options['solve_subsystems'] and not system.under_complex_step
                 and self._iter_count <= self.options['max_sub_solves'])
 
     def _linearize(self):
@@ -175,24 +175,18 @@ class NewtonSolver(NonlinearSolver):
             error at the first iteration.
         """
         system = self._system()
+        solve_subsystems = self.options['solve_subsystems'] and not system.under_complex_step
 
         if self.options['debug_print']:
             self._err_cache['inputs'] = system._inputs._copy_views()
             self._err_cache['outputs'] = system._outputs._copy_views()
-
-        # When under a complex step from higher in the hierarchy, sometimes the step is too small
-        # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
-        # one iteration of Newton.
-        if system.under_complex_step and self.options['cs_reconverge']:
-            system._outputs += np.linalg.norm(system._outputs.asarray()) * 1e-10
 
         # Execute guess_nonlinear if specified.
         system._guess_nonlinear()
 
         with Recording('Newton_subsolve', 0, self) as rec:
 
-            if self.options['solve_subsystems'] and \
-               (self._iter_count <= self.options['max_sub_solves']):
+            if solve_subsystems and self._iter_count <= self.options['max_sub_solves']:
 
                 self._solver_info.append_solver()
 
@@ -216,7 +210,7 @@ class NewtonSolver(NonlinearSolver):
         """
         system = self._system()
         self._solver_info.append_subsolver()
-        do_subsolve = self.options['solve_subsystems'] and \
+        do_subsolve = self.options['solve_subsystems'] and not system.under_complex_step and \
             (self._iter_count < self.options['max_sub_solves'])
         do_sub_ln = self.linear_solver._linearize_children()
 
@@ -236,7 +230,7 @@ class NewtonSolver(NonlinearSolver):
 
         self.linear_solver.solve('fwd')
 
-        if self.linesearch:
+        if self.linesearch and not system.under_complex_step:
             self.linesearch._do_subsolve = do_subsolve
             self.linesearch.solve()
         else:

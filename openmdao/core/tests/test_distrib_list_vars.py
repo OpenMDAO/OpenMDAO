@@ -87,7 +87,7 @@ class DistributedListVarsTest(unittest.TestCase):
 
         stream = StringIO()
         with multi_proc_exception_check(prob.comm):
-            inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream))
+            inputs = sorted(prob.model.list_inputs(val=True, print_arrays=True, out_stream=stream))
             if prob.comm.rank:
                 self.assertEqual(inputs, [])
             else:
@@ -111,7 +111,7 @@ class DistributedListVarsTest(unittest.TestCase):
 
         stream = StringIO()
         with multi_proc_exception_check(prob.comm):
-            outputs = sorted(prob.model.list_outputs(values=True,
+            outputs = sorted(prob.model.list_outputs(val=True,
                                                      units=True,
                                                      shape=True,
                                                      bounds=True,
@@ -192,7 +192,7 @@ class DistributedListVarsTest(unittest.TestCase):
 
         stream = StringIO()
         with multi_proc_exception_check(prob.comm):
-            inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream))
+            inputs = sorted(prob.model.list_inputs(val=True, print_arrays=True, out_stream=stream))
             if prob.comm.rank:
                 self.assertEqual(inputs, [])
             else:
@@ -218,7 +218,7 @@ class DistributedListVarsTest(unittest.TestCase):
 
         stream = StringIO()
         with multi_proc_exception_check(prob.comm):
-            outputs = sorted(prob.model.list_outputs(values=True,
+            outputs = sorted(prob.model.list_outputs(val=True,
                                                      units=True,
                                                      shape=True,
                                                      bounds=True,
@@ -274,7 +274,7 @@ class DistributedListVarsTest(unittest.TestCase):
         #
         stream = StringIO()
         with printoptions(**print_opts):
-            prob.model.list_inputs(values=True, hierarchical=False, out_stream=stream)
+            prob.model.list_inputs(val=True, hierarchical=False, out_stream=stream)
 
         with multi_proc_exception_check(prob.comm):
             if prob.comm.rank == 0:  # Only rank 0 prints
@@ -303,7 +303,7 @@ class DistributedListVarsTest(unittest.TestCase):
         #
         stream = StringIO()
         with printoptions(**print_opts):
-            prob.model.list_inputs(values=True, hierarchical=True, out_stream=stream)
+            prob.model.list_inputs(val=True, hierarchical=True, out_stream=stream)
 
         with multi_proc_exception_check(prob.comm):
             if prob.comm.rank == 0:
@@ -339,7 +339,7 @@ class DistributedListVarsTest(unittest.TestCase):
         #
         stream = StringIO()
         with printoptions(**print_opts):
-            prob.model.list_outputs(values=True, residuals=True, hierarchical=False, out_stream=stream)
+            prob.model.list_outputs(val=True, residuals=True, hierarchical=False, out_stream=stream)
 
         with multi_proc_exception_check(prob.comm):
             if prob.comm.rank == 0:
@@ -372,7 +372,7 @@ class DistributedListVarsTest(unittest.TestCase):
         #
         stream = StringIO()
         with printoptions(**print_opts):
-            prob.model.list_outputs(values=True, residuals=True, hierarchical=True, out_stream=stream)
+            prob.model.list_outputs(val=True, residuals=True, hierarchical=True, out_stream=stream)
 
         with multi_proc_exception_check(prob.comm):
             if prob.comm.rank == 0:

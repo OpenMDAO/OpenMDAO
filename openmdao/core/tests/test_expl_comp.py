@@ -324,7 +324,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         # list outputs with out_stream and all the optional display values True
         stream = StringIO()
-        outputs = prob.model.list_outputs(values=True,
+        outputs = prob.model.list_outputs(val=True,
                                           units=True,
                                           shape=True,
                                           bounds=True,
@@ -393,7 +393,7 @@ class ExplCompTestCase(unittest.TestCase):
         print(inputs)
 
         outputs = prob.model.list_outputs(implicit=False,
-                                          values=True,
+                                          val=True,
                                           units=True,
                                           shape=True,
                                           bounds=True,
@@ -412,7 +412,7 @@ class ExplCompTestCase(unittest.TestCase):
         ])
 
         outputs = prob.model.list_outputs(implicit=False,
-                                          values=True,
+                                          val=True,
                                           units=True,
                                           shape=True,
                                           bounds=True,
@@ -457,7 +457,7 @@ class ExplCompTestCase(unittest.TestCase):
         # logging inputs
         # out_stream - not hierarchical - extras - no print_arrays
         stream = StringIO()
-        prob.model.list_inputs(values=True,
+        prob.model.list_inputs(val=True,
                                units=True,
                                hierarchical=False,
                                print_arrays=False,
@@ -480,7 +480,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         # out_stream - hierarchical - extras - no print_arrays
         stream = StringIO()
-        prob.model.list_inputs(values=True,
+        prob.model.list_inputs(val=True,
                                units=True,
                                hierarchical=True,
                                print_arrays=False,
@@ -498,7 +498,7 @@ class ExplCompTestCase(unittest.TestCase):
         # logging outputs
         # out_stream - not hierarchical - extras - no print_arrays
         stream = StringIO()
-        prob.model.list_outputs(values=True,
+        prob.model.list_outputs(val=True,
                                 units=True,
                                 shape=True,
                                 bounds=True,
@@ -518,7 +518,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         # Hierarchical
         stream = StringIO()
-        prob.model.list_outputs(values=True,
+        prob.model.list_outputs(val=True,
                                 units=True,
                                 shape=True,
                                 bounds=True,
@@ -568,7 +568,7 @@ class ExplCompTestCase(unittest.TestCase):
         # logging inputs
         # out_stream - not hierarchical - extras - no print_arrays
         stream = StringIO()
-        prob.model.list_inputs(values=True,
+        prob.model.list_inputs(val=True,
                                units=True,
                                hierarchical=False,
                                print_arrays=False,
@@ -581,7 +581,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         # out_stream - hierarchical - extras - no print_arrays
         stream = StringIO()
-        prob.model.list_inputs(values=True,
+        prob.model.list_inputs(val=True,
                                units=True,
                                hierarchical=True,
                                print_arrays=False,
@@ -596,7 +596,7 @@ class ExplCompTestCase(unittest.TestCase):
         # logging outputs
         # out_stream - not hierarchical - extras - no print_arrays
         stream = StringIO()
-        prob.model.list_outputs(values=True,
+        prob.model.list_outputs(val=True,
                                 units=True,
                                 shape=True,
                                 bounds=True,
@@ -614,7 +614,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         # Promoted names - no print arrays
         stream = StringIO()
-        prob.model.list_outputs(values=True,
+        prob.model.list_outputs(val=True,
                                 prom_name=True,
                                 print_arrays=False,
                                 out_stream=stream)
@@ -626,7 +626,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         # Hierarchical - no print arrays
         stream = StringIO()
-        prob.model.list_outputs(values=True,
+        prob.model.list_outputs(val=True,
                                 units=True,
                                 shape=True,
                                 bounds=True,
@@ -665,7 +665,7 @@ class ExplCompTestCase(unittest.TestCase):
             # logging outputs
             # out_stream - not hierarchical - extras - print_arrays
             stream = StringIO()
-            prob.model.list_outputs(values=True,
+            prob.model.list_outputs(val=True,
                                     units=True,
                                     shape=True,
                                     bounds=True,
@@ -686,7 +686,7 @@ class ExplCompTestCase(unittest.TestCase):
 
             # Hierarchical
             stream = StringIO()
-            prob.model.list_outputs(values=True,
+            prob.model.list_outputs(val=True,
                                     units=True,
                                     shape=True,
                                     bounds=True,
@@ -736,7 +736,7 @@ class ExplCompTestCase(unittest.TestCase):
         prob['x'] = np.arange(size)
         prob.run_driver()
 
-        prob.model.list_inputs(values=True,
+        prob.model.list_inputs(val=True,
                                units=True,
                                hierarchical=True,
                                print_arrays=True)
@@ -745,7 +745,7 @@ class ExplCompTestCase(unittest.TestCase):
                           linewidth=75, nanstr='nan', precision=8,
                           suppress=False, threshold=1000, formatter=None):
 
-            prob.model.list_outputs(values=True,
+            prob.model.list_outputs(val=True,
                                     implicit=False,
                                     units=True,
                                     shape=True,
@@ -755,7 +755,7 @@ class ExplCompTestCase(unittest.TestCase):
                                     hierarchical=False,
                                     print_arrays=True)
 
-            prob.model.list_outputs(values=True,
+            prob.model.list_outputs(val=True,
                                     implicit=False,
                                     units=True,
                                     shape=True,
@@ -975,49 +975,49 @@ class ExplCompTestCase(unittest.TestCase):
         prob.run_model()
 
         # Inputs no tags
-        inputs = prob.model.list_inputs(values=False, out_stream=None)
+        inputs = prob.model.list_inputs(val=False, out_stream=None)
         self.assertEqual(sorted(inputs), [
             ('length', {}),
             ('width', {}),
         ])
 
         # Inputs with tags
-        inputs = prob.model.list_inputs(values=False, out_stream=None, tags="tag1")
+        inputs = prob.model.list_inputs(val=False, out_stream=None, tags="tag1")
         self.assertEqual(sorted(inputs), [
             ('length', {}),
         ])
 
         # Inputs with multiple tags
-        inputs = prob.model.list_inputs(values=False, out_stream=None, tags=["tag1", "tag2"])
+        inputs = prob.model.list_inputs(val=False, out_stream=None, tags=["tag1", "tag2"])
         self.assertEqual(sorted(inputs), [
             ('length', {}),
             ('width', {}),
         ])
 
         # Inputs with tag that does not match
-        inputs = prob.model.list_inputs(values=False, out_stream=None, tags="tag3")
+        inputs = prob.model.list_inputs(val=False, out_stream=None, tags="tag3")
         self.assertEqual(sorted(inputs), [])
 
         # Outputs no tags
-        outputs = prob.model.list_outputs(values=False, out_stream=None)
+        outputs = prob.model.list_outputs(val=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
             ('area', {}),
         ])
 
         # Outputs with tags
-        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag1")
+        outputs = prob.model.list_outputs(val=False, out_stream=None, tags="tag1")
         self.assertEqual(sorted(outputs), [
             ('area', {}),
         ])
 
         # Outputs with multiple tags
-        outputs = prob.model.list_outputs(values=False, out_stream=None, tags=["tag1", "tag3"])
+        outputs = prob.model.list_outputs(val=False, out_stream=None, tags=["tag1", "tag3"])
         self.assertEqual(sorted(outputs), [
             ('area', {}),
         ])
 
         # Outputs with tag that does not match
-        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag3")
+        outputs = prob.model.list_outputs(val=False, out_stream=None, tags="tag3")
         self.assertEqual(sorted(outputs), [])
 
     def test_compute_inputs_read_only(self):

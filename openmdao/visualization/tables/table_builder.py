@@ -1535,12 +1535,12 @@ class TabulatorJSBuilder(TableBuilder):
                   encoding='utf-8') as f:
             template = f.read()
 
-        with open(os.path.join(libs_dir, 'tabulator.min.js'), "r", encoding='utf-8') as f:
+        with open(os.path.join(libs_dir, 'tabulator.5.4.4.min.js'), "r", encoding='utf-8') as f:
             tabulator_src = f.read()
 
         format_dct['tabulator_src'] = tabulator_src
 
-        with open(os.path.join(style_dir, 'tabulator.min.css'), "r", encoding='utf-8') as f:
+        with open(os.path.join(style_dir, 'tabulator.5.4.4.min.css'), "r", encoding='utf-8') as f:
             tabulator_style = f.read()
 
         format_dct['tabulator_style'] = tabulator_style

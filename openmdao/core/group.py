@@ -176,7 +176,7 @@ class Group(System):
     _order_set : bool
         Flag to check if set_order has been called.
     _auto_ivc_warnings : list
-        List of Auto IVC warnings to be raised later with simple_warnings.
+        List of Auto IVC warnings to be raised later.
     _shapes_graph : nx.Graph
         Dynamic shape dependency graph, or None.
     _shape_knowns : set
@@ -2793,9 +2793,8 @@ class Group(System):
             absolute, 'rel_avg' for a size relative to the absolute value of the vector input, or
             'rel_element' for a size relative to each value in the vector input. In addition, it
             can be 'rel_legacy' for a size relative to the norm of the vector.  For backwards
-            compatibilty, it can be 'rel', which currently defaults to 'rel_legacy', but in the
-            future will default to 'rel_avg'. Defaults to None, in which case the approximation
-            method provides its default value.
+            compatibilty, it can be 'rel', which is now equivalent to 'rel_avg'. Defaults to None,
+            in which case the approximation method provides its default value.
         """
         self._has_approx = True
         self._approx_schemes = {}

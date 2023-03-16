@@ -157,8 +157,6 @@ class ExecComp(ExplicitComponent):
         erfc(x)                    Complementary error function
         exp(x)                     Exponential function
         expm1(x)                   exp(x) - 1
-        factorial(x)               Factorial of all numbers in x
-                                   (DEPRECATED, not available with SciPy >=1.5)
         fmax(x, y)                 Element-wise maximum of x and y
         fmin(x, y)                 Element-wise minimum of x and y
         inner(x, y)                Inner product of arrays x and y
@@ -408,17 +406,6 @@ class ExecComp(ExplicitComponent):
                     raise RuntimeError("%s: the following metadata names were not "
                                        "recognized for variable '%s': %s" %
                                        (self.msginfo, arg, sorted(diff)))
-
-                if 'val' in val and 'value' in val:
-                    raise RuntimeError(f"{self.msginfo}: 'val' and 'value' at the same time, use "
-                                       "'val'.")
-                elif 'value' in val and not warned:
-                    warn_deprecation(f"{self.msginfo}: 'value' will be deprecated in 4.0. Please "
-                                     "use 'val' in the future.")
-
-                if 'value' in val:
-                    val['val'] = val.pop('value')
-                    warned = True
 
                 kwargs2[arg] = val.copy()
 
@@ -1261,25 +1248,6 @@ except ImportError:
     pass
 else:
     _import_functs(scipy.special, _expr_dict, names=['erf', 'erfc'])
-
-    from packaging.version import Version
-    if Version(scipy.__version__) >= Version("1.5.0"):
-        def factorial(*args):
-            """
-            Raise a RuntimeError stating that the factorial function is not supported.
-            """
-            raise RuntimeError("The 'factorial' function is not supported for SciPy "
-                               f"versions >= 1.5, current version: {scipy.__version__}")
-    else:
-        def factorial(*args):
-            """
-            Raise a warning stating that the factorial function is deprecated.
-            """
-            warn_deprecation("The 'factorial' function is deprecated. "
-                             "It is no longer supported for SciPy versions >= 1.5.")
-            return scipy.special.factorial(*args)
-
-    _expr_dict['factorial'] = factorial
 
 
 # put any functions that need custom complex-safe versions here
