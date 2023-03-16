@@ -1283,33 +1283,6 @@ class TestInterpNDFixedPython(unittest.TestCase):
             assert_near_equal(f, f_base[j], 2e-10)
             assert_near_equal(df_dx[0], df_dx_base[j, :], 2e-10)
 
-    def test_deprecated_methods(self):
-
-        p1 = np.linspace(0, 100, 5)
-        p2 = np.linspace(-10, 10, 3)
-        p3 = np.linspace(0, 1, 3)
-
-        # can use meshgrid to create a 3D array of test data
-        P1, P2, P3 = np.meshgrid(p1, p2, p3, indexing='ij')
-        f_p = np.sqrt(P1) + P2 * P3
-
-        x1 = np.linspace(-2, 101, 5)
-        x2 = np.linspace(-10.5, 11, 5)
-        x3 = np.linspace(-0.2, 1.1, 5)
-        X1, X2, X3 = np.meshgrid(x1, x2, x3, indexing='ij')
-        x = np.zeros((125, 3))
-        x[:, 0] = X1.ravel()
-        x[:, 1] = X2.ravel()
-        x[:, 2] = X3.ravel()
-
-        msg = "The 'trilinear' method has been renamed to '3D-slinear'."
-        with assert_warning(OMDeprecationWarning, msg):
-            InterpND(points=(p1, p2, p3), values=f_p, method='trilinear', extrapolate=True)
-
-        msg = "The 'akima1D' method has been renamed to '1D-akima'."
-        with assert_warning(OMDeprecationWarning, msg):
-            InterpND(points=p1, values=p1, method='akima1D')
-
 
 if __name__ == '__main__':
     unittest.main()

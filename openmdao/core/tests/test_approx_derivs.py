@@ -1426,7 +1426,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
         assert_near_equal(J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
 
-    def test_subbed_newton_gs(self):
+    def test_subbed_newton_assembled_csc(self):
 
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
         class SellarDerivatives(om.Group):
@@ -1456,14 +1456,12 @@ class TestGroupComplexStep(unittest.TestCase):
                 con2.declare_partials(of='*', wrt='*', method='cs')
 
                 self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-                self.linear_solver = om.LinearBlockGS()
-                self.linear_solver.options['maxiter'] = 25
-                self.linear_solver.options['atol'] = 1e-16
+                self.linear_solver = om.DirectSolver(assemble_jac=False)
 
         prob = om.Problem()
         prob.model = SellarDerivatives()
 
-        prob.setup()
+        prob.setup(force_alloc_complex=True)
 
         prob.model.approx_totals(method='cs')
 
@@ -1473,67 +1471,14 @@ class TestGroupComplexStep(unittest.TestCase):
         of = ['obj', 'con1', 'con2']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_near_equal(J['obj', 'z'][0][0], 9.61001056, 1.0e-6)
-        assert_near_equal(J['obj', 'z'][0][1], 1.78448534, 1.0e-6)
-        assert_near_equal(J['obj', 'x'][0][0], 2.958960774, 1.0e-6)
-        assert_near_equal(J['con1', 'z'][0][0], -9.61002186, 1.0e-6)
-        assert_near_equal(J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
-        assert_near_equal(J['con1', 'x'][0][0], -0.9589613073511289, 1.0e-6)
+        assert_near_equal(J['obj', 'z'][0][0], 9.61001056, 1.0e-8)
+        assert_near_equal(J['obj', 'z'][0][1], 1.78448534, 1.0e-8)
+        assert_near_equal(J['obj', 'x'][0][0], 2.98061391, 1.0e-8)
+        assert_near_equal(J['con1', 'z'][0][0], -9.61002186, 1.0e-8)
+        assert_near_equal(J['con1', 'z'][0][1], -0.78449158, 1.0e-8)
+        assert_near_equal(J['con1', 'x'][0][0], -0.98061448, 1.0e-8)
 
-    def test_subbed_newton_gs_csc_external_mtx(self):
-
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
-        class SellarDerivatives(om.Group):
-
-            def setup(self):
-                self.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-                self.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-
-                self.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
-                self.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
-                sub = self.add_subsystem('sub', om.Group(), promotes=['*'])
-
-                sub.linear_solver = om.DirectSolver(assemble_jac=True)
-                sub.options['assembled_jac_type'] = 'csc'
-
-                obj = sub.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)', obj=0.0,
-                                                         x=0.0, z=np.array([0.0, 0.0]), y1=0.0, y2=0.0),
-                                  promotes=['obj', 'x', 'z', 'y1', 'y2'])
-
-                con1 = sub.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1', con1=0.0, y1=0.0),
-                                  promotes=['con1', 'y1'])
-                con2 = sub.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0),
-                                  promotes=['con2', 'y2'])
-                obj.declare_partials(of='*', wrt='*', method='cs')
-                con1.declare_partials(of='*', wrt='*', method='cs')
-                con2.declare_partials(of='*', wrt='*', method='cs')
-
-                self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-                self.linear_solver = om.LinearBlockGS()
-                self.linear_solver.options['maxiter'] = 25
-                self.linear_solver.options['atol'] = 1e-16
-
-        prob = om.Problem()
-        prob.model = SellarDerivatives()
-
-        prob.setup()
-
-        prob.model.approx_totals(method='cs')
-
-        prob.run_model()
-
-        wrt = ['z', 'x']
-        of = ['obj', 'con1', 'con2']
-
-        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_near_equal(J['obj', 'z'][0][0], 9.61001056, 1.0e-6)
-        assert_near_equal(J['obj', 'z'][0][1], 1.78448534, 1.0e-6)
-        assert_near_equal(J['obj', 'x'][0][0], 2.958960774, 1.0e-6)
-        assert_near_equal(J['con1', 'z'][0][0], -9.61002186, 1.0e-6)
-        assert_near_equal(J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
-        assert_near_equal(J['con1', 'x'][0][0], -0.9589613073511289, 1.0e-6)
-
-    def test_subbed_newton_gs_dense_external_mtx(self):
+    def test_subbed_newton_assembled_dense(self):
 
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
         class SellarDerivatives(om.Group):
@@ -1563,14 +1508,12 @@ class TestGroupComplexStep(unittest.TestCase):
                 con2.declare_partials(of='*', wrt='*', method='cs')
 
                 self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-                self.linear_solver = om.LinearBlockGS()
-                self.linear_solver.options['maxiter'] = 25
-                self.linear_solver.options['atol'] = 1e-16
+                self.linear_solver = om.DirectSolver(assemble_jac=False)
 
         prob = om.Problem()
         prob.model = SellarDerivatives()
 
-        prob.setup()
+        prob.setup(force_alloc_complex=True)
 
         prob.model.approx_totals(method='cs')
 
@@ -1580,12 +1523,12 @@ class TestGroupComplexStep(unittest.TestCase):
         of = ['obj', 'con1', 'con2']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_near_equal(J['obj', 'z'][0][0], 9.61001056, 1.0e-6)
-        assert_near_equal(J['obj', 'z'][0][1], 1.78448534, 1.0e-6)
-        assert_near_equal(J['obj', 'x'][0][0], 2.958960774, 1.0e-6)
-        assert_near_equal(J['con1', 'z'][0][0], -9.61002186, 1.0e-6)
-        assert_near_equal(J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
-        assert_near_equal(J['con1', 'x'][0][0], -0.9589613073511289, 1.0e-6)
+        assert_near_equal(J['obj', 'z'][0][0], 9.61001056, 1.0e-8)
+        assert_near_equal(J['obj', 'z'][0][1], 1.78448534, 1.0e-8)
+        assert_near_equal(J['obj', 'x'][0][0], 2.98061391, 1.0e-8)
+        assert_near_equal(J['con1', 'z'][0][0], -9.61002186, 1.0e-8)
+        assert_near_equal(J['con1', 'z'][0][1], -0.78449158, 1.0e-8)
+        assert_near_equal(J['con1', 'x'][0][0], -0.98061448, 1.0e-8)
 
     def test_newton_with_krylov_solver(self):
         # Basic sellar test.
@@ -2533,23 +2476,6 @@ class TestFDRelative(unittest.TestCase):
 
         # This derivative requires rel_element to be accurate.
         self.assertTrue(np.abs(totals['comp.y', 'comp.x_element']['J_fd'][2, 2]) < 1e-9)
-
-    def test_deprecation(self):
-        prob = om.Problem()
-        model = prob.model
-        comp = model.add_subsystem('comp', Paraboloid())
-
-        prob.setup()
-        prob.run_model()
-
-        msg = "When using 'rel' as the step_calc, the fd stepsize is currently " + \
-            "scaled by the norm of the vector variable. This is not ideal for" + \
-            " larger vectors, and this behavior is being changed in " + \
-            "OpenMDAO 3.12.0. To preserve the older way of doing this " + \
-            "calculation, set step_calc to 'rel_legacy'."
-
-        with assert_warning(OMDeprecationWarning, msg):
-            prob.check_partials(out_stream=None, method='fd', step_calc='rel')
 
 
 class ParallelFDParametricTestCase(unittest.TestCase):

@@ -43,29 +43,29 @@ class TestIndepVarComp(unittest.TestCase):
     def test_simple(self):
         """Define one independent variable and set its value."""
 
-        comp = om.IndepVarComp('openmdao:indep_var')
+        comp = om.IndepVarComp('indep_var')
         prob = om.Problem(comp).setup()
 
-        assert_near_equal(prob.get_val('openmdao:indep_var'), 1.0)
+        assert_near_equal(prob.get_val('indep_var'), 1.0)
 
-        prob.set_val('openmdao:indep_var', 2.0)
-        assert_near_equal(prob.get_val('openmdao:indep_var'), 2.0)
+        prob.set_val('indep_var', 2.0)
+        assert_near_equal(prob.get_val('indep_var'), 2.0)
 
     def test_simple_default(self):
         """Define one independent variable with a default value."""
 
-        comp = om.IndepVarComp('openmdao:indep_var', val=2.0)
+        comp = om.IndepVarComp('indep_var', val=2.0)
         prob = om.Problem(comp).setup()
 
-        assert_near_equal(prob.get_val('openmdao:indep_var'), 2.0)
+        assert_near_equal(prob.get_val('indep_var'), 2.0)
 
     def test_simple_kwargs(self):
         """Define one independent variable with a default value and additional options."""
 
-        comp = om.IndepVarComp('openmdao:indep_var', val=2.0, units='m', lower=0, upper=10)
+        comp = om.IndepVarComp('indep_var', val=2.0, units='m', lower=0, upper=10)
         prob = om.Problem(comp).setup()
 
-        assert_near_equal(prob.get_val('openmdao:indep_var'), 2.0)
+        assert_near_equal(prob.get_val('indep_var'), 2.0)
 
     def test_simple_array(self):
         """Define one independent array variable."""
@@ -75,10 +75,10 @@ class TestIndepVarComp(unittest.TestCase):
             [3., 4.],
         ])
 
-        comp = om.IndepVarComp('openmdao:indep_var', val=array)
+        comp = om.IndepVarComp('indep_var', val=array)
         prob = om.Problem(comp).setup()
 
-        assert_near_equal(prob.get_val('openmdao:indep_var'), array)
+        assert_near_equal(prob.get_val('indep_var'), array)
 
     def test_add_output(self):
         """Define two independent variables using the add_output method."""
@@ -105,7 +105,7 @@ class TestIndepVarComp(unittest.TestCase):
 
     def test_invalid_tags(self):
         with self.assertRaises(TypeError) as cm:
-            comp = om.IndepVarComp('openmdao:indep_var', tags=99)
+            comp = om.IndepVarComp('indep_var', tags=99)
 
         self.assertEqual(str(cm.exception),
             "IndepVarComp: Value (99) of option 'tags' has type 'int', "
@@ -114,30 +114,30 @@ class TestIndepVarComp(unittest.TestCase):
     def test_simple_with_tags(self):
         """Define one independent variable and set its value. Try filtering with tag"""
 
-        comp = om.IndepVarComp('openmdao:indep_var', tags='tag1')
+        comp = om.IndepVarComp('indep_var', tags='tag1')
         prob = om.Problem(comp).setup(check=False)
         prob.run_model()
 
         # Outputs no tags
-        outputs = prob.model.list_outputs(values=False, out_stream=None)
+        outputs = prob.model.list_outputs(val=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('openmdao:indep_var', {}),
+            ('indep_var', {}),
         ])
 
         # Outputs with automatically added indep_var_comp tag
-        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="openmdao:indep_var")
+        outputs = prob.model.list_outputs(val=False, out_stream=None, tags="openmdao:indep_var")
         self.assertEqual(sorted(outputs), [
-            ('openmdao:indep_var', {}),
+            ('indep_var', {}),
         ])
 
         # Outputs with tag
-        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag1")
+        outputs = prob.model.list_outputs(val=False, out_stream=None, tags="tag1")
         self.assertEqual(sorted(outputs), [
-            ('openmdao:indep_var', {}),
+            ('indep_var', {}),
         ])
 
         # Outputs with wrong tag
-        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag_wrong")
+        outputs = prob.model.list_outputs(val=False, out_stream=None, tags="tag_wrong")
         self.assertEqual(sorted(outputs), [])
 
     def test_add_output_with_tags(self):

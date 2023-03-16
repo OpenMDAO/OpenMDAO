@@ -361,6 +361,11 @@ jobs:
         run: |
           if [[ "${#DOCS_LOCATION}" ]]; then
             echo "============================================================="
+            echo "Install version of openssl compatible with hosting service"
+            echo "============================================================="
+            conda install -c conda-forge 'openssl=3.0'
+
+            echo "============================================================="
             echo "Publish docs"
             echo "============================================================="
             cd openmdao/docs
@@ -446,11 +451,6 @@ jobs:
           echo "Install lxml for Windows (No Python 3.11 version on pypi)"
           echo "============================================================="
           conda install lxml
-
-          echo "============================================================="
-          echo "Pre-install jupyter dependencies"
-          echo "============================================================="
-          conda install jupyter-book -q -y
 
           echo "============================================================="
           echo "Install OpenMDAO"
