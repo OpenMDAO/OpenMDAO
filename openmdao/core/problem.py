@@ -2655,8 +2655,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 if do_rev:
                     error_descs = ('(Jfor - Jfd) ', '(Jrev - Jfd) ', '(Jfor - Jrev)')
                 elif do_rev_dp:
-                    error_descs = ('(Jfor - Jfd) ', '(Jrev - Jfd  Dot Product Test) ',
-                                   '(Jrev - Jfor Dot Product Test) ')
+                    error_descs = ('(Jfor - Jfd) ', '([rev, fd] Dot Product Test) ',
+                                   '([rev, for] Dot Product Test) ')
                 else:
                     error_descs = ('(Jan - Jfd) ', )
 
@@ -2679,12 +2679,12 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 elif do_rev_dp:
                     if fd_norm == 0.:
                         error_descs = ('(Jfor - Jfd) / Jfor ',
-                                       '(Jrev - Jfd  Dot Product Test) / Jfor ',
-                                       '(Jrev - Jfor Dot Product Test) / Jfor ')
+                                       '([rev, fd]  Dot Product Test) / Jfor ',
+                                       '([rev, for] Dot Product Test) / Jfor ')
                     else:
                         error_descs = ('(Jfor - Jfd) / Jfd ',
-                                       '(Jrev - Jfd  Dot Product Test) / Jfd ',
-                                       '(Jrev - Jfor Dot Product Test) / Jfd ')
+                                       '([rev, fd]  Dot Product Test) / Jfd ',
+                                       '([rev, for] Dot Product Test) / Jfd ')
                 else:
                     if fd_norm == 0.:
                         error_descs = ('(Jan - Jfd) / Jan ', )
