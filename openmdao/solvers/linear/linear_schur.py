@@ -5,6 +5,7 @@ import numpy as np
 
 from openmdao.core.constants import _UNDEFINED
 from openmdao.solvers.solver import BlockLinearSolver
+from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
 from openmdao.utils.general_utils import ContainsAll
 import scipy
 
@@ -46,6 +47,12 @@ class LinearSchur(BlockLinearSolver):
         Declare options before kwargs are processed in the init method.
         """
         super()._declare_options()
+        # this solver does not iterate
+        self.options.undeclare("maxiter")
+        self.options.undeclare("err_on_non_converge")
+
+        self.options.undeclare("atol")
+        self.options.undeclare("rtol")
 
         self.options.declare("use_aitken", types=bool, default=False, desc="set to True to use Aitken relaxation")
         self.options.declare("aitken_min_factor", default=0.1, desc="lower limit for Aitken relaxation factor")
@@ -72,12 +79,19 @@ class LinearSchur(BlockLinearSolver):
 
         return super()._iter_initialize()
 
-    def _single_iteration(self):
+    def solve(self, mode, rel_systems=None):
         """
         Perform the operations in the iteration loop.
         """
+
+        if mode != self._mode_linear:
+            raise ValueError(
+                f"The solve function is called with {mode} mode. But the user defined the linear Schur solve to work in {self._mode_linear} mode"
+            )
         system = self._system()
         mode = self._mode_linear
+        self._update_rhs_vec()
+
         use_aitken = self.options["use_aitken"]
 
         if use_aitken:
@@ -236,14 +250,7 @@ class LinearSchur(BlockLinearSolver):
             # add the rhs vector with the resultant negative part
             b_vec2 += subsys2_rhs
 
-            if system.comm.rank == 0:
-                print("\nSchur Jacobian: ", schur_jac, flush=True)
-
             d_subsys2 = scipy.linalg.solve(schur_jac, subsys2._vectors["residual"]["linear"].asarray())
-
-            if system.comm.rank == 0:
-                print("\nupdate vector: ", d_subsys2, flush=True)
-                print("\n==================================================")
 
             # loop over the variables just to be safe with the ordering
             # subsys1._doutputs.set_val(subsys1_output)
@@ -354,19 +361,16 @@ class LinearSchur(BlockLinearSolver):
 
             schur_rhs = subsys2_rhs - schur_rhs
 
-            if system.comm.rank == 0:
-                print("\nSchur Jacobian: ", schur_jac, flush=True)
-
             d_subsys2 = scipy.linalg.solve(schur_jac, schur_rhs)
 
-            if system.comm.rank == 0:
-                print("\nupdate vector: ", d_subsys2, np.linalg.norm(d_subsys2), flush=True)
-                print("\n==================================================")
             # loop over the variables just to be safe with the ordering
-
             for ii, var in enumerate(vars_to_solve):
-                system._doutputs[f"{subsys2.name}.{var}"] = d_subsys2[ii]
+                system._dresiduals[f"{subsys2.name}.{var}"] = d_subsys2[ii]
 
+            if subsys2._iter_call_apply_linear():
+                subsys2._apply_linear(None, None, mode, scope_out, scope_in)
+            else:
+                b_vec2.set_val(0.0)
             ################################
             #### End solve for subsys 2 ####
             ################################
@@ -379,16 +383,6 @@ class LinearSchur(BlockLinearSolver):
 
             b_vec *= -1.0
             # b_vec += subsys1_rhs
-
-            scope_out, scope_in = system._get_matvec_scope(subsys1)
-            scope_out = self._vars_union(self._scope_out, scope_out)
-            scope_in = self._vars_union(self._scope_in, scope_in)
-
-            if subsys1._iter_call_apply_linear():
-                subsys1._dresiduals.set_val(b_vec.asarray())
-                subsys1._apply_linear(None, None, mode, scope_out, scope_in)
-            else:
-                b_vec.set_val(0.0)
 
             b_vec += subsys1_rhs
             subsys1._solve_linear(mode, ContainsAll())
