@@ -1,7 +1,5 @@
 import sys
 import subprocess
-import pipes
-import os
 
 
 def get_tag_info():
