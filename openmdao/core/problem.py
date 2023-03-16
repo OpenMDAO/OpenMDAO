@@ -2226,11 +2226,14 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
 
     if matrix_free:
         if directional:
-            fwd_rev_error = derivative_info['directional_fwd_rev'] if forward and reverse else None
+            fwd_rev_error = \
+                safe_norm(derivative_info['directional_fwd_rev']) if forward and reverse else None
             if reverse:
-                rev_error = derivative_info['directional_fd_rev']
+                rev_error = safe_norm(derivative_info['directional_fd_rev'])
+                if not totals:
+                    rev_norm = None
             if forward and totals:
-                fwd_error = derivative_info['directional_fd_fwd']
+                fwd_error = safe_norm(derivative_info['directional_fd_fwd'])
         elif not totals:
             fwd_rev_error = safe_norm(Jforward - Jreverse)
 
@@ -2250,7 +2253,10 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
             derivative_info['rel error'] = _ErrorTuple(fwd_error / div_norm, rev_error / div_norm,
                                                        fwd_rev_error / div_norm)
         else:
-            derivative_info['rel error'] = _ErrorTuple(calc_error / div_norm, None, None)
+            derivative_info['rel error'] = _ErrorTuple(
+                None if fwd_error is None else fwd_error / div_norm,
+                None if rev_error is None else rev_error / div_norm,
+                None if fwd_rev_error is None else fwd_rev_error / div_norm)
 
     return fd_norm
 
@@ -2681,9 +2687,9 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                        '(Jrev - Jfor Dot Product Test) / Jfd ')
                 else:
                     if fd_norm == 0.:
-                        error_descs = ('(Janalytic - Jfd) / Janalytic ', )
+                        error_descs = ('(Jan - Jfd) / Jan ', )
                     else:
-                        error_descs = ('(Janalytic - Jfd) / Jfd ', )
+                        error_descs = ('(Jan - Jfd) / Jfd ', )
 
                 for error, desc in zip(rel_err, error_descs):
                     if error is not None:

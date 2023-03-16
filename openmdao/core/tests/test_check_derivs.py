@@ -3185,7 +3185,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         totals = prob.check_totals(method='fd', step=1.0e-1, out_stream=None)
 
-        assert_near_equal(totals['z', 'z']['J_fwd'], [[0.0, 1.0]], 1e-5)
+        assert_near_equal(totals['z', 'z']['J_rev'], [[0.0, 1.0]], 1e-5)
         assert_near_equal(totals['z', 'z']['J_fd'], [[0.0, 1.0]], 1e-5)
 
     def test_full_desvar_with_index_obj(self):
@@ -3206,7 +3206,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         totals = prob.check_totals(method='fd', step=1.0e-1, out_stream=None)
 
-        assert_near_equal(totals['z', 'z']['J_fwd'], [[0.0, 1.0]], 1e-5)
+        assert_near_equal(totals['z', 'z']['J_rev'], [[0.0, 1.0]], 1e-5)
         assert_near_equal(totals['z', 'z']['J_fd'], [[0.0, 1.0]], 1e-5)
 
     def test_bug_fd_with_sparse(self):
@@ -3889,8 +3889,8 @@ class TestProblemCheckTotalsMPI(unittest.TestCase):
         prob.run_model()
 
         J = prob.check_totals(out_stream=None)
-        assert_near_equal(J['sum.y', 'sub.sub1.p1.x']['J_fwd'], [[2.0]], 1.0e-6)
-        assert_near_equal(J['sum.y', 'sub.sub2.p2.x']['J_fwd'], [[4.0]], 1.0e-6)
+        assert_near_equal(J['sum.y', 'sub.sub1.p1.x']['J_rev'], [[2.0]], 1.0e-6)
+        assert_near_equal(J['sum.y', 'sub.sub2.p2.x']['J_rev'], [[4.0]], 1.0e-6)
         assert_near_equal(J['sum.y', 'sub.sub1.p1.x']['J_fd'], [[2.0]], 1.0e-6)
         assert_near_equal(J['sum.y', 'sub.sub2.p2.x']['J_fd'], [[4.0]], 1.0e-6)
 
