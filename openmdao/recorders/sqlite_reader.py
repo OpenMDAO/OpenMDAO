@@ -288,7 +288,7 @@ class SqliteCaseReader(BaseCaseReader):
         """
         Load data from the system table.
 
-        Populates the `system_options` attribute of this CaseReader.
+        Populates the `_system_options` attribute of this CaseReader.
 
         Parameters
         ----------
