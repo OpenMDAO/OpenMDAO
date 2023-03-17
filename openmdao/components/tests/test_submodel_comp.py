@@ -337,7 +337,7 @@ class TestSubmodelComp(unittest.TestCase):
             p.setup(force_alloc_complex=True)
             
         msg = 'Variable psi does not exist in model.'
-        self.assertTrue(str(ctx.exception), msg)
+        self.assertEqual(str(ctx.exception), msg)
 
     def test_multiple_setups(self):
         p = om.Problem()
