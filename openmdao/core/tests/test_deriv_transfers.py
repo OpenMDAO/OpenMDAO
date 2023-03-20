@@ -257,13 +257,6 @@ class TestParallelGroups(unittest.TestCase):
         model = prob.model
         size = 3
 
-        comm = prob.comm
-        rank = comm.rank
-
-        sizes, offsets = evenly_distrib_idxs(comm.size, self.arr_size)
-        start = offsets[rank]
-        end = start + sizes[rank]
-
         if not auto:
             model.add_subsystem('indep', om.IndepVarComp('x', np.ones(size)), promotes=['x'])
         model.add_subsystem('C1', DistribExecComp(['y=2.5*x', 'y=3.5*x'], arr_size=size), promotes=['x'])
