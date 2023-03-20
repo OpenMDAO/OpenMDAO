@@ -287,7 +287,8 @@ class Component(System):
                     meta_name: metadata[meta_name]
                     for meta_name in global_meta_names[io]
                 }
-
+                if is_input:
+                    allprocs_abs2meta[abs_name]['has_src_indices'] = False
             for prom_name, val in self._var_discrete[io].items():
                 abs_name = prefix + prom_name
 
@@ -543,6 +544,8 @@ class Component(System):
             'val': val,
             'shape': shape,
             'size': shape_to_len(shape),
+            'src_indices': None,
+            'flat_src_indices': False,
             'units': units,
             'desc': desc,
             'distributed': distributed,
@@ -1610,7 +1613,13 @@ class Component(System):
                 pinfo = abs_in2prom_info[tgt][-1]  # component always last in the plist
                 if pinfo is not None:
                     inds, flat, shape = pinfo
-                    if inds is not None:
+                    if inds is None:
+                        if meta['add_input_src_indices']:
+                            if shape is None:
+                                shape = all_abs2meta_out[conns[tgt]]['global_shape']
+                            meta['src_shape'] = shape
+                            inds = meta['src_indices']
+                    else:
                         all_abs2meta_in[tgt]['has_src_indices'] = True
                         meta['src_shape'] = shape = all_abs2meta_out[conns[tgt]]['global_shape']
                         if inds._flat_src:

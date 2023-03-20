@@ -57,9 +57,6 @@ class TestExplicitComponent(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, msg):
             comp.add_input('arr', val=np.ones((2, 2)), shape=([2]))
 
-        msg = "Shape of indices (2,) does not match shape of (2, 2) for 'arr'."
-        self.assertEqual(str(cm.exception), msg)
-
         msg = ("The shape argument should be an int, tuple, or list "
                "but a '<(.*) 'numpy.ndarray'>' was given")
         with self.assertRaisesRegex(TypeError, msg):
@@ -89,13 +86,6 @@ class TestExplicitComponent(unittest.TestCase):
 
         with self.assertRaisesRegex(TypeError, msg):
             comp.add_output('x', val=val)
-
-        msg = "When specifying src_indices for input 'x': Can't create an index array " \
-              "using indices of non-integral type 'object_'."
-        src = Component
-
-        with self.assertRaisesRegex(TypeError, msg):
-            comp.add_input('x', val=np.ones((2, 2)), src_indices=src)
 
         msg = 'The units argument should be a str or None'
         units = Component

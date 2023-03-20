@@ -1064,16 +1064,12 @@ class TestGroupMPI(unittest.TestCase):
     def test_promote_distrib(self):
 
         class MyComp(om.ExplicitComponent):
-            def setup(self):
-                # decide what parts of the array we want based on our rank
-                if self.comm.rank == 0:
-                    idxs = [0, 1, 2]
-                else:
-                    # use [3, -1] here rather than [3, 4] just to show that we
-                    # can use negative indices.
-                    idxs = [3, -1]
+            def initialize(self):
+                self.options.declare('size', types=int, default=1,
+                                     desc="Size of input vector x.")
 
-                self.add_input('x', np.ones(len(idxs)), src_indices=idxs)
+            def setup(self):
+                self.add_input('x', np.ones(self.options['size']))
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
@@ -1084,8 +1080,16 @@ class TestGroupMPI(unittest.TestCase):
         p.model.add_subsystem('indep', om.IndepVarComp('x', np.arange(5, dtype=float)),
                               promotes_outputs=['x'])
 
-        p.model.add_subsystem('C1', MyComp(),
-                              promotes_inputs=['x'])
+        # decide what parts of the array we want based on our rank
+        if self.comm.rank == 0:
+            idxs = [0, 1, 2]
+        else:
+            # use [3, -1] here rather than [3, 4] just to show that we
+            # can use negative indices.
+            idxs = [3, -1]
+
+        p.model.add_subsystem('C1', MyComp(size=len(idxs)))
+        p.model.promotes('C1', inputs=['x'], src_indices=idxs)
 
         p.setup()
         p.set_val('x', np.arange(5, dtype=float))

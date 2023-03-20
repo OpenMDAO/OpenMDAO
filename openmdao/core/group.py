@@ -1525,6 +1525,8 @@ class Group(System):
 
                         meta = abs2meta[abs_in]
                         meta['manual_connection'] = True
+                        meta['src_indices'] = src_indices
+                        meta['flat_src_indices'] = flat
 
                     src_ind_inputs.add(abs_in)
 
@@ -3321,6 +3323,9 @@ class Group(System):
                 # for an auto_ivc connection, src_indices here, if they exist, must be coming from
                 # an add_input call (this is a deprecated feature and will be removed eventually)
                 src_indices = meta['src_indices']
+
+            # FIXME: the ability to specify src_indices on add_input has been removed, but
+            #        it is unclear to me how to safely excise the related logic here
 
             if src_indices is not None:
                 if val is None:

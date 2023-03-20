@@ -991,46 +991,6 @@ class TestProblem(unittest.TestCase):
         # using absolute value will give us the value of the input C2.x, in its units of 'mm'
         assert_near_equal(prob.get_val('G1.C2.x'), 2000.0, 1e-6)
 
-    def test_feature_get_set_with_src_indices_diff(self):
-
-        prob = om.Problem()
-        G1 = prob.model.add_subsystem('G1', om.Group())
-        G1.add_subsystem('C1', om.ExecComp('y=x*2.',
-                                            x={'val': 1.0, 'units': 'cm', 'src_indices': [0], 'flat_src_indices': True},
-                                            y={'val': 0.0, 'units': 'cm'}),
-                         promotes=['x'])
-        G1.add_subsystem('C2', om.ExecComp('y=x*3.',
-                                            x={'val': np.ones(2), 'units': 'mm', 'src_indices': [1,2], 'flat_src_indices': True},
-                                            y={'val': np.zeros(2), 'units': 'mm'}),
-                         promotes=['x'])
-        G1.add_subsystem('C3', om.ExecComp('y=x*4.',
-                                            x={'val': np.ones(3), 'units': 'mm'},
-                                            y={'val': np.zeros(3), 'units': 'mm'}),
-                         promotes=['x'])
-
-        # units and value to use for the _auto_ivc output are ambiguous.  This fixes that.
-        G1.set_input_defaults('x', units='m', val=np.ones(3))
-
-        prob.setup()
-
-        # set G1.x to 2.0 m, based on the units we gave in the set_input_defaults call
-        prob['G1.x'] = np.ones(3) * 2.0
-
-        prob.run_model()
-
-        # we gave 'G1.x' units of 'm' in the set_input_defaults call
-        assert_near_equal(prob['G1.x'], np.ones(3) * 2.0, 1e-6)
-
-        # using absolute value will give us the value of the input C1.x, in its units of 'cm'
-        assert_near_equal(prob['G1.C1.x'], 200.0, 1e-6)
-
-        assert_near_equal(prob['G1.C1.y'], 400.0, 1e-6)
-
-        # using absolute value will give us the value of the input C2.x, in its units of 'mm'
-        assert_near_equal(prob['G1.C2.x'], np.ones(2) * 2000.0, 1e-6)
-
-        assert_near_equal(prob['G1.C2.y'], np.ones(2) * 6000.0, 1e-6)
-
     def test_feature_get_set_with_units_prom_plus_explicit(self):
 
         prob = om.Problem()
@@ -1856,7 +1816,7 @@ class TestProblem(unittest.TestCase):
         self.assertEquals(l['constraints'][1][1]['size'], 1)
         assert(all(l['constraints'][1][1]['val'] == prob.get_val('con2')))
         self.assertEquals(l['constraints'][1][1]['scaler'], None)
-        self.assertEquals(l['constraints'][1][1]['adder'], None)        
+        self.assertEquals(l['constraints'][1][1]['adder'], None)
 
         # objectives
         self.assertEquals(l['objectives'][0][1]['name'], 'obj')
