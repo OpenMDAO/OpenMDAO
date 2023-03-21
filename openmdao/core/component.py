@@ -476,8 +476,7 @@ class Component(System):
             The initial value of the variable being added in user-defined units.
             Default is 1.0.
         shape : int or tuple or list or None
-            Shape of this variable, only required if src_indices not provided and
-            val is not an array. Default is None.
+            Shape of this variable, only required if val is not an array. Default is None.
         units : str or None
             Units in which this input variable will be provided to the component
             during execution. Default is None, which means it is unitless.

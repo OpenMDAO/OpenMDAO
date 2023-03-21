@@ -210,29 +210,20 @@ class DistribInputDistribOutputDiscreteComp(DistribInputDistribOutputComp):
 
 
 class DistribNoncontiguousComp(om.ExplicitComponent):
-    """Uses 2 procs and takes non-contiguous input var slices and has output
-    var slices as well
-    """
+    """Used in tests of non-contiguous input var slices"""
 
     def initialize(self):
-        self.options.declare('arr_size', types=int, default=11,
+        self.options.declare('size', types=int,
                              desc="Size of input and output vectors.")
-        self.options.declare('local_size', types=int, default=1,
-                             desc="Local size of input and output vectors.")
 
     def compute(self, inputs, outputs):
         outputs['outvec'] = inputs['invec']*2.0
 
     def setup(self):
+        size = self.options['size']
 
-        comm = self.comm
-        rank = comm.rank
-
-        arr_size = self.options['arr_size']
-        local_size = self.options['local_size']
-
-        self.add_input('invec', np.ones(local_size, float), distributed=True)
-        self.add_output('outvec', np.ones(local_size, float), distributed=True)
+        self.add_input('invec', np.ones(size, float), distributed=True)
+        self.add_output('outvec', np.ones(size, float), distributed=True)
 
 
 class DistribGatherComp(om.ExplicitComponent):
@@ -716,12 +707,9 @@ class MPITests(unittest.TestCase):
         comm = p.comm
 
         idxs = list(take_nth(rank, comm.size, range(size)))
-        print(f"{idxs=}")
-        vals = np.ones(len(idxs), float)
-        print(f"{vals=}")
 
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
-        C2 = top.add_subsystem("C2", DistribNoncontiguousComp(arr_size=size, local_size=len(idxs)))
+        C2 = top.add_subsystem("C2", DistribNoncontiguousComp(size=len(idxs)))
         C3 = top.add_subsystem("C3", DistribGatherComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec', src_indices=idxs)
         top.connect('C2.outvec', 'C3.invec')
@@ -734,23 +722,8 @@ class MPITests(unittest.TestCase):
 
         p.run_model()
 
-        print(f"{C2._outputs['outvec']=}")
-        # print(f"{vals*4=}")
-        print(f"{np.array(list(idxs), 'f')*4=}")
-        print("============")
-        print(f"{C2._outputs['outvec'] == np.array(list(idxs), 'f')*4=}")
-        print("============")
-        print(f"{all(C2._outputs['outvec'] == np.array(list(idxs), 'f')*4)=}")
-        print("============")
-        self.assertTrue(all(C2._outputs['outvec'] == np.array(list(idxs), 'f')*4))
-
         if MPI:
-            if p.comm.rank == 0:
-                self.assertTrue(all(C2._outputs['outvec'] ==
-                                    np.array(list(take_nth(0, 2, range(size))), 'f')*4))
-            else:
-                self.assertTrue(all(C2._outputs['outvec'] ==
-                                    np.array(list(take_nth(1, 2, range(size))), 'f')*4))
+            self.assertTrue(all(C2._outputs['outvec'] == np.array(list(idxs), 'f')*4))
 
             full_list = list(take_nth(0, 2, range(size))) + list(take_nth(1, 2, range(size)))
             self.assertTrue(all(C3._outputs['outvec'] == np.array(full_list, 'f')*4))
