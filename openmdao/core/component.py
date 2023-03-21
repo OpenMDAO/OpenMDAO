@@ -545,7 +545,7 @@ class Component(System):
             'shape': shape,
             'size': shape_to_len(shape),
             'src_indices': None,
-            'flat_src_indices': False,
+            'flat_src_indices': None,
             'units': units,
             'desc': desc,
             'distributed': distributed,

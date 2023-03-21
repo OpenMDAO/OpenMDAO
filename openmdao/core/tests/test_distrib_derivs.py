@@ -1294,7 +1294,8 @@ class MPITestsBug(unittest.TestCase):
                 end = start + sizes[rank]
 
                 self.promotes('vanderpol_ode_delay', inputs=['x1'],
-                               flat_src_indices=True)
+                              src_indices=np.arange(start, end, dtype=int),
+                              flat_src_indices=True)
 
                 self.add_subsystem(name='vanderpol_ode_rate_collect',
                                    subsys=vanderpol_ode_rate_collect(num_nodes=nn),

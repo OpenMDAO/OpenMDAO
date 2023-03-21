@@ -101,8 +101,8 @@ class DistribInputComp(om.ExplicitComponent):
 
         # src_indices will be computed automatically
         self.add_input('invec', np.ones(self.sizes[rank], float), distributed=True)
-        self.add_output('outvec', np.ones(arr_size, float), shape=np.int32(arr_size))
-
+        self.add_output('outvec', np.ones(arr_size, float), shape=np.int32(arr_size),
+                        distributed=True)
 
 class DistribOverlappingInputComp(om.ExplicitComponent):
     """Uses 2 procs and takes input var slices"""
@@ -658,13 +658,22 @@ class MPITests(unittest.TestCase):
         size = 11
 
         p = om.Problem()
+
         top = p.model
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribInputComp(arr_size=size))
         C3 = top.add_subsystem("C3", om.ExecComp("y=x", x=np.zeros(size*commsize),
                                                  y=np.zeros(size*commsize)))
-        top.connect('C1.outvec', 'C2.invec')
+
+        comm = p.comm
+        rank = comm.rank
+        sizes, offsets = evenly_distrib_idxs(comm.size, size)
+        start = offsets[rank]
+        end = start + sizes[rank]
+
+        top.connect('C1.outvec', 'C2.invec', src_indices=np.arange(start, end, dtype=int))
         top.connect('C2.outvec', 'C3.x', src_indices=om.slicer[:])
+
         p.setup()
 
         # Conclude setup but don't run model.
