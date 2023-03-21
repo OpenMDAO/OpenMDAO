@@ -1306,13 +1306,11 @@ class TestProblemCheckPartials(unittest.TestCase):
         stream = StringIO()
         partials_data = prob.check_partials(out_stream=stream, compact_print=False)
         # So for this case, they do all provide them, so rev should not be shown
-        self.assertEqual(stream.getvalue().count('Analytic Magnitude'), 2)
-        self.assertEqual(stream.getvalue().count('Forward Magnitude'), 0)
+        self.assertEqual(stream.getvalue().count('Forward Magnitude'), 2)
         self.assertEqual(stream.getvalue().count('Reverse Magnitude'), 0)
         self.assertEqual(stream.getvalue().count('Absolute Error'), 2)
         self.assertEqual(stream.getvalue().count('Relative Error'), 2)
-        self.assertEqual(stream.getvalue().count('Raw Analytic Derivative'), 2)
-        self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 0)
+        self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 2)
         self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'), 0)
         self.assertEqual(stream.getvalue().count('Raw FD Derivative'), 2)
         self.assertEqual(stream.getvalue().count(f"(Jfd)\n{partials_data[''][('z', 'x1')]['J_fd']}"), 1)
@@ -1361,13 +1359,11 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         stream = StringIO()
         partials_data = prob.check_partials(out_stream=stream, compact_print=False)
-        self.assertEqual(stream.getvalue().count('Analytic Magnitude'), 2)
-        self.assertEqual(stream.getvalue().count('Forward Magnitude'), 2)
+        self.assertEqual(stream.getvalue().count('Forward Magnitude'), 4)
         self.assertEqual(stream.getvalue().count('Reverse Magnitude'), 2)
         self.assertEqual(stream.getvalue().count('Absolute Error'), 8)
         self.assertEqual(stream.getvalue().count('Relative Error'), 8)
-        self.assertEqual(stream.getvalue().count('Raw Analytic Derivative'), 2)
-        self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 2)
+        self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 4)
         self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'), 2)
         self.assertEqual(stream.getvalue().count('Raw FD Derivative'), 4)
         self.assertEqual(stream.getvalue().count(f"(Jfd)\n{partials_data['c0'][('z', 'x1')]['J_fd']}"), 1)
@@ -1877,7 +1873,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         data = prob.check_partials(out_stream=stream)
         lines = stream.getvalue().splitlines()
 
-        self.assertTrue("Relative Error (Jan - Jfd) / Jan : 1." in lines[9])
+        self.assertTrue("Relative Error (Jfor - Jfd) / Jfor : 1." in lines[9])
 
     def test_directional_bug_implicit(self):
         # Test for bug in directional derivative direction for implicit var and matrix-free.
@@ -2863,6 +2859,46 @@ class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
     def test_remotevar_compute_totals_rev(self):
         self._remotevar_compute_totals('rev')
 
+
+class I2O2JacVec(om.ExplicitComponent):
+
+    def __init__(self, size, **kwargs):
+        super().__init__(**kwargs)
+        self.size = size
+
+    def setup(self):
+        self.add_input('in1', val=np.ones(self.size))
+        self.add_input('in2', val=np.ones(self.size))
+        self.add_output('out1', val=np.ones(self.size))
+        self.add_output('out2', val=np.ones(self.size))
+
+    def compute(self, inputs, outputs):
+        outputs['out1'] = inputs['in1'] * inputs['in2']
+        outputs['out2'] = 3. * inputs['in1'] + 5. * inputs['in2']
+
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        if mode == 'fwd':
+            if 'out1' in d_outputs:
+                if 'in1' in d_inputs:
+                    d_outputs['out1'] += inputs['in2'] * d_inputs['in1']
+                    d_outputs['out2'] += 3. * d_inputs['in1']
+                if 'in2' in d_inputs:
+                    d_outputs['out1'] += inputs['in1'] * d_inputs['in2']
+                    d_outputs['out2'] += 5. * d_inputs['in2']
+        else:  # rev
+            if 'out1' in d_outputs:
+                if 'in1' in d_inputs:
+                    d_inputs['in1'] += inputs['in2'] * d_outputs['out1']
+                if 'in2' in d_inputs:
+                    d_inputs['in2'] += inputs['in1'] * d_outputs['out1']
+            if 'out2' in d_outputs:
+                if 'in1' in d_inputs:
+                    d_inputs['in1'] += 3. * d_outputs['out2']
+                if 'in2' in d_inputs:
+                    d_inputs['in2'] += 5. * d_outputs['out2']
+
+
+
 class TestProblemCheckTotals(unittest.TestCase):
 
     def test_cs(self):
@@ -3684,8 +3720,8 @@ class TestProblemCheckTotals(unittest.TestCase):
         lines = stream.getvalue().splitlines()
 
         self.assertTrue("Full Model: 'stuff.lcy' wrt 'x' (Linear constraint)" in lines[4])
-        self.assertTrue("Absolute Error (Jan - Jfd)" in lines[7])
-        self.assertTrue("Relative Error (Jan - Jfd) / Jfd" in lines[9])
+        self.assertTrue("Absolute Error (Jfor - Jfd)" in lines[7])
+        self.assertTrue("Relative Error (Jfor - Jfd) / Jfd" in lines[9])
 
         assert_near_equal(J_driver['stuff.y', 'x']['J_fwd'][0, 0], 1.0)
         assert_near_equal(J_driver['stuff.lcy', 'x']['J_fwd'][0, 0], 3.0)
@@ -3856,22 +3892,161 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.setup(force_alloc_complex=True, mode='fwd')
         prob.run_model()
 
-        J = prob.check_totals(method='cs', out_stream=None, directional=True)
-        print(J)
+        stream = StringIO()
+        data = prob.check_totals(method='cs', out_stream=stream, directional=True)
+        content = stream.getvalue()
+
+        self.assertEqual(content.count('Reverse Magnitude:'), 0)
+        self.assertEqual(content.count('Forward Magnitude:'), 1)
+        self.assertEqual(content.count('Fd Magnitude:'), 1)
+        self.assertEqual(content.count('Directional Derivative (Jfor)'), 1)
+        self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 1)
+        self.assertTrue('Relative Error (Jfor - Jfd) / Jfd : ' in content)
+        self.assertTrue('Absolute Error (Jfor - Jfd) : ' in content)
+        assert_near_equal(data[(('comp.out',), 'comp.in')]['directional_fd_fwd'], 0.)
+
+    def test_directional_vectorized_matrix_free_rev_index_0(self):
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', DirectionalVectorizedMatFreeComp(n=5))
+        prob.model.add_design_var('comp.in')
+        prob.model.add_objective('comp.out', index=0)
+
+        prob.setup(force_alloc_complex=True, mode='rev')
+        prob.run_model()
+
+        stream = StringIO()
+        data = prob.check_totals(method='cs', out_stream=stream, directional=True)
+        content = stream.getvalue()
+
+        self.assertEqual(content.count('comp.out (index size: 1)'), 1)
+        self.assertEqual(content.count('Reverse Magnitude:'), 1)
+        self.assertEqual(content.count('Forward Magnitude:'), 0)
+        self.assertEqual(content.count('Fd Magnitude:'), 1)
+        self.assertEqual(content.count('Directional Derivative (Jrev)'), 1)
+        self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 1)
+        self.assertTrue('Relative Error ([rev, fd] Dot Product Test) / Jfd : ' in content)
+        self.assertTrue('Absolute Error ([rev, fd] Dot Product Test) : ' in content)
+        assert_near_equal(data[('comp.out', ('comp.in',))]['directional_fd_rev'], 0.)
 
     def test_directional_vectorized_matrix_free_rev(self):
 
         prob = om.Problem()
         prob.model.add_subsystem('comp', DirectionalVectorizedMatFreeComp(n=5))
         prob.model.add_design_var('comp.in')
-        prob.model.add_objective('comp.out', index=0)
-        #prob.model.add_constraint('comp.out', lower=0.)
+        prob.model.add_constraint('comp.out', lower=0.)
 
         prob.setup(force_alloc_complex=True, mode='rev')
         prob.run_model()
 
-        J = prob.check_totals(method='cs', directional=True)
-        print(J)
+        stream = StringIO()
+        data = prob.check_totals(method='cs', out_stream=stream, directional=True)
+        content = stream.getvalue()
+
+        self.assertEqual(content.count("'comp.out' wrt (d)('comp.in',)"), 1)
+        self.assertEqual(content.count('Reverse Magnitude:'), 1)
+        self.assertEqual(content.count('Forward Magnitude:'), 0)
+        self.assertEqual(content.count('Fd Magnitude:'), 1)
+        self.assertEqual(content.count('Directional Derivative (Jrev)'), 1)
+        self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 1)
+        self.assertTrue('Relative Error ([rev, fd] Dot Product Test) / Jfd : ' in content)
+        self.assertTrue('Absolute Error ([rev, fd] Dot Product Test) : ' in content)
+        assert_near_equal(data[('comp.out', ('comp.in',))]['directional_fd_rev'], 0.)
+
+    def test_directional_vectorized_matrix_free_rev_2in2out(self):
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', I2O2JacVec(size=5))
+        prob.model.add_design_var('comp.in1')
+        prob.model.add_design_var('comp.in2')
+        prob.model.add_constraint('comp.out1', lower=0.)
+        prob.model.add_constraint('comp.out2', lower=0.)
+
+        prob.setup(force_alloc_complex=True, mode='rev')
+        prob.run_model()
+
+        stream = StringIO()
+        data = prob.check_totals(method='cs', out_stream=stream, directional=True)
+        content = stream.getvalue()
+
+        self.assertEqual(content.count("'comp.out1' wrt (d)('comp.in1', 'comp.in2')"), 1)
+        self.assertEqual(content.count("'comp.out2' wrt (d)('comp.in1', 'comp.in2')"), 1)
+        self.assertEqual(content.count('Reverse Magnitude:'), 2)
+        self.assertEqual(content.count('Forward Magnitude:'), 0)
+        self.assertEqual(content.count('Fd Magnitude:'), 2)
+        self.assertEqual(content.count('Directional Derivative (Jrev)'), 2)
+        self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 2)
+        self.assertTrue(content.count('Relative Error ([rev, fd] Dot Product Test) / Jfd :'), 2)
+        self.assertTrue(content.count('Absolute Error ([rev, fd] Dot Product Test) :'), 2)
+        assert_near_equal(data[('comp.out1', ('comp.in1', 'comp.in2'))]['directional_fd_rev'], 0.)
+        assert_near_equal(data[('comp.out2', ('comp.in1', 'comp.in2'))]['directional_fd_rev'], 0.)
+
+    def test_directional_vectorized_matrix_free_rev_2in2out_compact(self):
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', I2O2JacVec(size=5))
+        prob.model.add_design_var('comp.in1')
+        prob.model.add_design_var('comp.in2')
+        prob.model.add_constraint('comp.out1', lower=0.)
+        prob.model.add_constraint('comp.out2', lower=0.)
+
+        prob.setup(force_alloc_complex=True, mode='rev')
+        prob.run_model()
+
+        stream = StringIO()
+        data = prob.check_totals(method='cs', out_stream=stream, compact_print=True, directional=True)
+        content = stream.getvalue().strip()
+        self.assertEqual(content.count("wrt '('comp.in1', 'comp.in2')'"), 2)
+        assert_near_equal(data[('comp.out1', ('comp.in1', 'comp.in2'))]['directional_fd_rev'], 0.)
+        assert_near_equal(data[('comp.out2', ('comp.in1', 'comp.in2'))]['directional_fd_rev'], 0.)
+
+    def test_directional_vectorized_matrix_free_fwd_2in2out(self):
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', I2O2JacVec(size=5))
+        prob.model.add_design_var('comp.in1')
+        prob.model.add_design_var('comp.in2')
+        prob.model.add_constraint('comp.out1', lower=0.)
+        prob.model.add_constraint('comp.out2', lower=0.)
+
+        prob.setup(force_alloc_complex=True, mode='fwd')
+        prob.run_model()
+
+        stream = StringIO()
+        data = prob.check_totals(method='cs', out_stream=stream, directional=True)
+        content = stream.getvalue()
+
+        self.assertEqual(content.count("('comp.out1', 'comp.out2') wrt (d)'comp.in1'"), 1)
+        self.assertEqual(content.count("('comp.out1', 'comp.out2') wrt (d)'comp.in2'"), 1)
+        self.assertEqual(content.count('Reverse Magnitude:'), 0)
+        self.assertEqual(content.count('Forward Magnitude:'), 2)
+        self.assertEqual(content.count('Fd Magnitude:'), 2)
+        self.assertEqual(content.count('Directional Derivative (Jrev)'), 0)
+        self.assertEqual(content.count('Directional Derivative (Jfor)'), 2)
+        self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 2)
+        self.assertEqual(content.count('Relative Error ([rev, fd] Dot Product Test) / Jfd :'), 0)
+        self.assertEqual(content.count('Absolute Error ([rev, fd] Dot Product Test) :'), 0)
+        assert_near_equal(np.linalg.norm(data[(('comp.out1', 'comp.out2'), 'comp.in1')]['directional_fd_fwd']), 0.)
+        assert_near_equal(np.linalg.norm(data[(('comp.out1', 'comp.out2'), 'comp.in2')]['directional_fd_fwd']), 0.)
+
+    def test_directional_vectorized_matrix_free_fwd_2in2out_compact(self):
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', I2O2JacVec(size=5))
+        prob.model.add_design_var('comp.in1')
+        prob.model.add_design_var('comp.in2')
+        prob.model.add_constraint('comp.out1', lower=0.)
+        prob.model.add_constraint('comp.out2', lower=0.)
+
+        prob.setup(force_alloc_complex=True, mode='fwd')
+        prob.run_model()
+
+        stream = StringIO()
+        data = prob.check_totals(method='cs', out_stream=stream, compact_print=True, directional=True)
+        content = stream.getvalue().strip()
+        self.assertEqual(content.count("('comp.out1', 'comp.out2')"), 2)
+        assert_near_equal(np.linalg.norm(data[(('comp.out1', 'comp.out2'), 'comp.in1')]['directional_fd_fwd']), 0.)
+        assert_near_equal(np.linalg.norm(data[(('comp.out1', 'comp.out2'), 'comp.in2')]['directional_fd_fwd']), 0.)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

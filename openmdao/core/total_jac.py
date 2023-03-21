@@ -2,7 +2,7 @@
 Helper class for total jacobian computation.
 """
 from collections import defaultdict
-from itertools import chain
+from itertools import chain, repeat
 from copy import deepcopy
 import pprint
 import sys
@@ -780,7 +780,11 @@ class _TotalJacInfo(object):
                 else:
                     imeta = idx_iter_dict[parallel_deriv_color][0]
                     imeta['idx_list'].append((start, end))
-            elif not simul_coloring and not self.directional:  # plain old single index iteration
+            elif self.directional:
+                imeta = defaultdict(bool)
+                imeta['idx_list'] = range(start, end)
+                idx_iter_dict[name] = (imeta, self.directional_iter)
+            elif not simul_coloring:  # plain old single index iteration
                 imeta = defaultdict(bool)
                 imeta['idx_list'] = range(start, end)
                 idx_iter_dict[name] = (imeta, self.single_index_iter)
@@ -807,42 +811,34 @@ class _TotalJacInfo(object):
             seed[:] = _directional_rng.random(seed.size)
             seed *= 2.0
             seed -= 1.0
-            # # FIXME debugging
-            # seed[:] = 2.5
 
-            print("SEED:", seed)
+            # imeta = defaultdict(bool)
+            # all_rel_systems = set()
+            # imeta['itermeta'] = itermeta = []
+            # locs = None
 
-            imeta = defaultdict(bool)
-            all_rel_systems = set()
-            imeta['itermeta'] = itermeta = []
-            locs = None
+            # for name in input_list:
+            #     if name in relevant and not non_rel_outs:
+            #         relsystems = relevant[name]['@all'][1]
+            #         _update_rel_systems(all_rel_systems, relsystems)
+            #     else:
+            #         all_rel_systems = _contains_all
+            #         break
 
-            for name in input_list:
-                if name in relevant and not non_rel_outs:
-                    relsystems = relevant[name]['@all'][1]
-                    _update_rel_systems(all_rel_systems, relsystems)
-                else:
-                    all_rel_systems = _contains_all
-                    break
+            # iterdict['relevant'] = all_rel_systems
 
-            iterdict = defaultdict(bool)
+            # iterdict = defaultdict(bool)
 
-            if -1 in loc_idxs:
-                active = loc_idxs != -1
-            else:
-                active = slice(None)
+            # if -1 in loc_idxs:
+            #     active = loc_idxs != -1
+            # else:
+            #     active = slice(None)
 
-            print("LOC_IDXS:", loc_idxs)
-            print("active:", active)
-            print("seed[active]:", seed[active])
-            iterdict['local_in_idxs'] = loc_idxs[active]
-            iterdict['seeds'] = seed[active]
+            # iterdict['local_in_idxs'] = loc_idxs[active]
+            # iterdict['seeds'] = seed[active]
 
-            iterdict['relevant'] = all_rel_systems
-            iterdict['cache_lin_solve'] = False
-            itermeta.append(iterdict)
-
-            idx_iter_dict['@directional'] = (imeta, self.directional_iter)
+            # iterdict['cache_lin_solve'] = False
+            # itermeta.append(iterdict)
         elif simul_coloring and simul_color_modes[mode] is not None:
             imeta = defaultdict(bool)
             imeta['coloring'] = simul_coloring
@@ -1148,12 +1144,8 @@ class _TotalJacInfo(object):
         method
             Jac setter method.
         """
-        if mode == 'fwd':
-            ilist = range(self.J.shape[1])
-        else:  # 'rev'
-            ilist = range(self.J.shape[0])
-
-        yield ilist, self.directional_input_setter, self.directional_jac_setter, imeta
+        for ilist, itermeta in zip([imeta['idx_list']], repeat(imeta)):
+            yield ilist, self.directional_input_setter, self.directional_jac_setter, itermeta
 
     def _zero_vecs(self, mode):
         # clean out vectors from last solve
@@ -1295,10 +1287,21 @@ class _TotalJacInfo(object):
         None
             Not used.
         """
-        _, rel_systems, _, _ = self.in_idx_map[mode][0]
+        # _, rel_systems, _, _ = self.in_idx_map[mode][0]
+        # self._zero_vecs(mode)
+        # self.input_vec[mode].set_val(itermeta['seeds'], itermeta['local_in_idxs'])
+
+        # return rel_systems, None, None
+        for i in inds:
+            _, rel_systems, _, _ = self.in_idx_map[mode][i]
+            break
+
         self._zero_vecs(mode)
-        imeta = itermeta['itermeta'][0]
-        self.input_vec[mode].set_val(imeta['seeds'], imeta['local_in_idxs'])
+
+        loc_idxs = self.in_loc_idxs[mode][inds]
+        loc_idxs = loc_idxs[loc_idxs >= 0]
+        if loc_idxs.size > 0:
+            self.input_vec[mode].set_val(self.seeds[mode][inds], loc_idxs)
 
         return rel_systems, None, None
 
@@ -1524,7 +1527,6 @@ class _TotalJacInfo(object):
         else:  # rev
             for i in inds:
                 J[i, :] = reduced_derivs
-                print(f"J[{i}, :] = {reduced_derivs}")
                 if dist:
                     self._jac_setter_dist(i, mode)
                 break  # only need a single row of jac for directional
@@ -1587,11 +1589,11 @@ class _TotalJacInfo(object):
                                 print(f'In mode: {mode}, Solving variable(s) using simul '
                                       'coloring:')
                                 for local_ind in imeta['coloring']._local_indices(inds=inds,
-                                                                                  mode=self.mode):
+                                                                                  mode=mode):
                                     print(f"   {local_ind}", flush=True)
-                            elif key == '@directional':
-                                print(f'In mode: {mode}, Solving variable(s) using directional '
-                                      'derivative:')
+                            elif self.directional:
+                                print(f"In mode: {mode}.\n, Solving for directional derivative "
+                                      f"wrt '{self.ivc_print_names.get(key, key)}'",)
                             else:
                                 print(f"In mode: {mode}.\n('{self.ivc_print_names.get(key, key)}'"
                                       f", [{inds}])", flush=True)
@@ -1602,9 +1604,9 @@ class _TotalJacInfo(object):
                     # any input variables involved in this linear solution.
                     with model._scaled_context_all():
                         if cache_key is not None and not has_lin_cons and self.mode == mode:
-                            self._restore_linear_solution(cache_key, self.mode)
-                            model._solve_linear(self.mode, rel_systems)
-                            self._save_linear_solution(cache_key, self.mode)
+                            self._restore_linear_solution(cache_key, mode)
+                            model._solve_linear(mode, rel_systems)
+                            self._save_linear_solution(cache_key, mode)
                         else:
                             model._solve_linear(mode, rel_systems)
 
@@ -1694,9 +1696,11 @@ class _TotalJacInfo(object):
                 for scheme in model._approx_schemes.values():
                     seeds = {k: -s for k, s in self.seeds.items()}
                     scheme._totals_directions = seeds
+                    scheme._totals_directional_mode = self.mode
             else:
                 for scheme in model._approx_schemes.values():
                     scheme._totals_directions = {}
+                    scheme._totals_directional_mode = None
 
             # Linearize Model
             if len(model._subsystems_allprocs) > 0:
@@ -1910,8 +1914,8 @@ class _TotalJacInfo(object):
                 if iscaler is not None:
                     val *= 1.0 / iscaler
         else:
-            raise RuntimeError("Derivative scaling by the driver only supports the 'dict' and "
-                               "'array' formats at present.")
+            raise RuntimeError("Derivative scaling by the driver only supports 'dict', "
+                               "'array' and 'flat_array' formats at present.")
 
     def _print_derivatives(self):
         """
@@ -1973,6 +1977,43 @@ class _TotalJacInfo(object):
             Array to be copied into the jacobian column.
         """
         self.J[:, icol] = column
+
+    def _get_as_directional(self, mode=None):
+        if mode is None:
+            mode = self.mode
+
+        # get a nested dict version of J
+        Jdict = self._get_dict_J(self.J, self.wrt, self.prom_wrt, self.of, self.prom_of,
+                                 self.wrt_meta, self.of_meta, 'dict')
+        ofsizes = {}
+        wrtsizes = {}
+        slices = {'of': {}, 'wrt': {}}
+        ofstart = ofend = 0
+        for i, (of, wrtdict) in enumerate(Jdict.items()):
+            if i == 0:
+                wrtstart = wrtend = 0
+                for wrt, sjac in wrtdict.items():
+                    wrtend += sjac.shape[1]
+                    wrtsizes[wrt] = sjac.shape[1]
+                    slices['wrt'][wrt] = slice(wrtstart, wrtend)
+                    wrtstart = wrtend
+
+            ofend += sjac.shape[0]
+            ofsizes[of] = sjac.shape[0]
+            slices['of'][of] = slice(ofstart, ofend)
+            ofstart = ofend
+
+        newJ = {}
+        if mode == 'fwd':
+            oftup = tuple(slices['of'])
+            for wrt, slc in slices['wrt'].items():
+                newJ[oftup, wrt] = np.atleast_2d(self.J[:, slc])
+        else:  # rev
+            wrttup = tuple(slices['wrt'])
+            for of, slc in slices['of'].items():
+                newJ[of, wrttup] = np.atleast_2d(self.J[slc, :])
+
+        return newJ, slices
 
 
 def _check_voi_meta(name, parallel_deriv_color, simul_coloring):

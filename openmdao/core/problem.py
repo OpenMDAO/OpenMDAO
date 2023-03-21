@@ -1599,7 +1599,7 @@ class Problem(object):
             out_stream = sys.stdout
 
         # Check to see if approximation options are the same as that used to compute totals
-        # If yes, issue an warning
+        # If yes, issue a warning
         if self.model._owns_approx_jac and method in self.model._approx_schemes:
             scheme = self.model._get_approx_scheme(method)
 
@@ -1715,11 +1715,15 @@ class Problem(object):
         if directional:
             # for fd, use the same seeds as the analytical derives used
             fd_tot_info.seeds = total_info.seeds
+            Jcalc, Jcalc_slices = total_info._get_as_directional()
 
         if show_progress:
             Jfd = fd_tot_info.compute_totals_approx(initialize=True, progress_out_stream=out_stream)
         else:
             Jfd = fd_tot_info.compute_totals_approx(initialize=True)
+
+        if directional:
+            Jfd, Jfd_slices = fd_tot_info._get_as_directional(total_info.mode)
 
         # reset the _owns_approx_jac flag after approximation is complete.
         if not approx:
@@ -1733,27 +1737,41 @@ class Problem(object):
         data = {'': {}}
         resp = self.driver._responses
 
-        if directional:
-            if self._mode == 'fwd':
-                # check directional fwd against fd (one must have negative seed of the other)
-                directional_fd_fwd = total_info.J - fd_tot_info.J
-            elif self._mode == 'rev':
-                # check directional rev against fd (different seeds)
+        # if directional:
+        #     if self._mode == 'fwd':
+        #         # check directional fwd against fd (one must have negative seed of the other)
+        #         directional_fd_fwd = total_info.J - fd_tot_info.J
+        #     else:  # rev
+        #         # check directional rev against fd (different seeds)
 
-                dhat = total_info.J.T[:, 0]
-                d = total_info.seeds['fwd']  # used as direction for fd
-                mhat = fd_tot_info.J[:, 0]
-                m = total_info.seeds['rev']
+        #         dhat = total_info.J.T[:, 0]
+        #         d = total_info.seeds['fwd']  # used as direction for fd
+        #         mhat = fd_tot_info.J[:, 0]
+        #         m = total_info.seeds['rev']
 
-                # Dot product test for adjoint validity.
-                directional_fd_rev = dhat.dot(d) - mhat.dot(m)
+        #         # Dot product test for adjoint validity.
+        #         directional_fd_rev = dhat.dot(d) - mhat.dot(m)
 
         for key, val in Jcalc.items():
             data[''][key] = {Jcalc_name: val, 'J_fd': Jfd[key]}
             if directional:
                 if self._mode == 'fwd':
+                    _, wrt = key
+                    # check directional fwd against fd (one must have negative seed of the other)
+                    directional_fd_fwd = total_info.J[:, Jcalc_slices['wrt'][wrt].start] - \
+                        fd_tot_info.J[:, Jcalc_slices['wrt'][wrt].start]
                     data[''][key]['directional_fd_fwd'] = directional_fd_fwd
-                else:
+                else:  # rev
+                    of, _ = key
+                    # check directional rev against fd (different seeds)
+                    dhat = total_info.J.T[:, Jcalc_slices['of'][of].start]  # first row of 'of' var
+                    d = total_info.seeds['fwd']  # used as direction for fd
+                    mhat = fd_tot_info.J[Jcalc_slices['of'][of], 0]
+                    m = total_info.seeds['rev'][Jcalc_slices['of'][of]]
+
+                    # Dot product test for adjoint validity.
+                    directional_fd_rev = dhat.dot(d) - mhat.dot(m)
+
                     data[''][key]['directional_fd_rev'] = directional_fd_rev
 
             # Display whether indices were declared when response was added.
@@ -2218,11 +2236,12 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
 
     if reverse:
         rev_norm = calc_norm = safe_norm(Jreverse)
-        rev_error = calc_error = safe_norm(Jreverse - fd)
+        if not directional:
+            rev_error = safe_norm(Jreverse - fd)
 
     if forward:
         fwd_norm = calc_norm = safe_norm(Jforward)
-        fwd_error = calc_error = safe_norm(Jforward - fd)
+        fwd_error = safe_norm(Jforward - fd)
 
     if matrix_free:
         if directional:
@@ -2536,9 +2555,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             of, wrt = key
             derivative_info = derivatives[key]
 
-            do_rev = not totals and matrix_free and not directional
-            do_rev_dp = matrix_free and directional
-
             if above_abs or above_rel or inconsistent:
                 num_bad_jacs += 1
 
@@ -2554,17 +2570,23 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             rel_err = derivative_info['rel error']
             magnitude = derivative_info['magnitude']
 
+            if magnitude.reverse is not None:
+                calc_mag = magnitude.reverse
+                calc_abs = abs_err.reverse
+                calc_rel = rel_err.reverse
+                Jname = 'J_rev'
+                Jrev = J = derivative_info[Jname]
+
+            # use forward even if both fwd and rev are defined
+            if magnitude.forward is not None:
+                calc_mag = magnitude.forward
+                calc_abs = abs_err.forward
+                calc_rel = rel_err.forward
+                Jname = 'J_fwd'
+                Jfor = J = derivative_info[Jname]
+
             if compact_print:
                 if totals:
-                    if magnitude.forward is None:
-                        calc_mag = magnitude.reverse
-                        calc_abs = abs_err.reverse
-                        calc_rel = rel_err.reverse
-                    else:
-                        calc_mag = magnitude.forward
-                        calc_abs = abs_err.forward
-                        calc_rel = rel_err.forward
-
                     out_buffer.write(deriv_line.format(
                         pad_name(of, 30, quotes=True),
                         pad_name(wrt, 30, quotes=True),
@@ -2623,79 +2645,97 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
             else:  # not compact print
 
-                J = derivative_info.get('J_fwd')
-                mag = magnitude.forward
-                if totals and J is None:
-                    J = derivative_info['J_rev']
-                    mag = magnitude.reverse
-
-                fd_desc = f"{fd_opts['method']}:{fd_opts['form']}"
-
                 # Magnitudes
                 if directional:
-                    out_buffer.write(f"  {sys_name}: '{of}' wrt (d)'{wrt}'")
+                    ofstr = f"'{of}'" if isinstance(of, str) else f"{of}"
+                    wrtstr = f"'{wrt}'" if isinstance(wrt, str) else f"{wrt}"
+                    out_buffer.write(f"  {sys_name}: {ofstr} wrt (d){wrtstr}")
                 else:
                     out_buffer.write(f"  {sys_name}: '{of}' wrt '{wrt}'")
                 if lcons and of in lcons:
                     out_buffer.write(" (Linear constraint)")
 
                 out_buffer.write('\n')
-                if do_rev or do_rev_dp:
-                    out_buffer.write('     Forward')
-                else:
-                    out_buffer.write('    Analytic')
-                out_buffer.write(f' Magnitude: {mag:.6e}\n')
+                if magnitude.forward is not None:
+                    out_buffer.write(f'     Forward Magnitude: {magnitude.forward:.6e}\n')
 
-                if do_rev:
+                if magnitude.reverse is not None:
                     out_buffer.write(f'     Reverse Magnitude: {magnitude.reverse:.6e}\n')
 
+                fd_desc = f"{fd_opts['method']}:{fd_opts['form']}"
                 out_buffer.write(f'          Fd Magnitude: {magnitude.fd:.6e} ({fd_desc})\n')
 
                 # Absolute Errors
-                if do_rev:
-                    error_descs = ('(Jfor - Jfd) ', '(Jrev - Jfd) ', '(Jfor - Jrev)')
-                elif do_rev_dp:
-                    error_descs = ('(Jfor - Jfd) ', '([rev, fd] Dot Product Test) ',
-                                   '([rev, for] Dot Product Test) ')
-                else:
-                    error_descs = ('(Jan - Jfd) ', )
+                if out_stream:
+                    if directional:
+                        if totals and abs_err.forward is not None:
+                            err = _format_error(abs_err.forward, abs_error_tol)
+                            out_buffer.write(f'    Absolute Error (Jfor - Jfd) : {err}\n')
 
-                for error, desc in zip(abs_err, error_descs):
-                    if error is not None:
-                        error_str = _format_error(error, abs_error_tol)
-                        if out_stream:
-                            out_buffer.write(f'    Absolute Error {desc}: {error_str}\n')
+                        if abs_err.reverse is not None:
+                            err = _format_error(abs_err.reverse, abs_error_tol)
+                            out_buffer.write('    Absolute Error ([rev, fd] Dot Product Test) : '
+                                             f'{err}\n')
+
+                        if abs_err.forward_reverse is not None:
+                            err = _format_error(abs_err.forward_reverse, abs_error_tol)
+                            out_buffer.write('    Absolute Error ([rev, for] Dot Product Test) : '
+                                             f'{err}\n')
+                    else:
+                        if abs_err.forward is not None:
+                            err = _format_error(abs_err.forward, abs_error_tol)
+                            out_buffer.write(f'    Absolute Error (Jfor - Jfd) : {err}\n')
+
+                        if abs_err.reverse is not None:
+                            err = _format_error(abs_err.reverse, abs_error_tol)
+                            out_buffer.write(f'    Absolute Error (Jrev - Jfd) : {err}\n')
+
+                        if abs_err.forward_reverse is not None:
+                            err = _format_error(abs_err.forward_reverse, abs_error_tol)
+                            out_buffer.write(f'    Absolute Error (Jrev - Jfor) : {err}\n')
 
                 out_buffer.write('\n')
 
                 # Relative Errors
-                if do_rev:
-                    if fd_norm == 0.:
-                        error_descs = ('(Jfor - Jfd) / Jfor ', '(Jrev - Jfd) / Jfor ',
-                                       '(Jfor - Jrev) / Jfor')
+                if fd_norm == 0.:
+                    if magnitude.forward is None:
+                        divname = 'Jrev'
                     else:
-                        error_descs = ('(Jfor - Jfd) / Jfd ', '(Jrev - Jfd) / Jfd ',
-                                       '(Jfor - Jrev) / Jfd')
-                elif do_rev_dp:
-                    if fd_norm == 0.:
-                        error_descs = ('(Jfor - Jfd) / Jfor ',
-                                       '([rev, fd]  Dot Product Test) / Jfor ',
-                                       '([rev, for] Dot Product Test) / Jfor ')
-                    else:
-                        error_descs = ('(Jfor - Jfd) / Jfd ',
-                                       '([rev, fd]  Dot Product Test) / Jfd ',
-                                       '([rev, for] Dot Product Test) / Jfd ')
+                        divname = 'Jfor'
                 else:
-                    if fd_norm == 0.:
-                        error_descs = ('(Jan - Jfd) / Jan ', )
+                    divname = 'Jfd'
+
+                if out_stream:
+                    if directional:
+                        if totals and rel_err.forward is not None:
+                            err = _format_error(rel_err.forward, rel_error_tol)
+                            out_buffer.write(f'    Relative Error (Jfor - Jfd) / {divname} : '
+                                             f'{err}\n')
+
+                        if rel_err.reverse is not None:
+                            err = _format_error(rel_err.reverse, rel_error_tol)
+                            out_buffer.write(f'    Relative Error ([rev, fd] Dot Product Test) / '
+                                             f'{divname} : {err}\n')
+
+                        if rel_err.forward_reverse is not None:
+                            err = _format_error(rel_err.forward_reverse, rel_error_tol)
+                            out_buffer.write(f'    Relative Error ([rev, for] Dot Product Test) / '
+                                             f'{divname} : {err}\n')
                     else:
-                        error_descs = ('(Jan - Jfd) / Jfd ', )
+                        if rel_err.forward is not None:
+                            err = _format_error(rel_err.forward, rel_error_tol)
+                            out_buffer.write(f'    Relative Error (Jfor - Jfd) / {divname} : '
+                                             f'{err}\n')
 
-                for error, desc in zip(rel_err, error_descs):
-                    if error is not None:
-                        error_str = _format_error(error, rel_error_tol)
+                        if rel_err.reverse is not None:
+                            err = _format_error(rel_err.reverse, rel_error_tol)
+                            out_buffer.write(f'    Relative Error (Jrev - Jfd) / {divname} : '
+                                             f'{err}\n')
 
-                        out_buffer.write(f'    Relative Error {desc}: {error_str}\n')
+                        if rel_err.forward_reverse is not None:
+                            err = _format_error(rel_err.forward_reverse, rel_error_tol)
+                            out_buffer.write(f'    Relative Error (Jrev - Jfor) / {divname} : '
+                                             f'{err}\n')
 
                 if inconsistent:
                     out_buffer.write('\n    * Inconsistent value across ranks *\n')
@@ -2705,20 +2745,21 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 out_buffer.write('\n')
 
                 # Raw Derivatives
-                if do_rev_dp:
-                    out_buffer.write('    Directional Forward Derivative (Jfor)\n')
-                else:
-                    if not totals and matrix_free:
-                        out_buffer.write('    Raw Forward')
+                if magnitude.forward is not None:
+                    if directional:
+                        out_buffer.write('    Directional Derivative (Jfor)\n')
+                        out_buffer.write(str(Jfor[:, 0]) + '\n\n')
                     else:
-                        out_buffer.write('    Raw Analytic')
-                    out_buffer.write(' Derivative (Jfor)\n')
-                out_buffer.write(str(J) + '\n\n')
+                        out_buffer.write('    Raw Forward Derivative (Jfor)\n')
+                        out_buffer.write(str(Jfor) + '\n\n')
 
-                if not totals and matrix_free and not directional:
-                    reverse = derivative_info.get('J_rev')
-                    out_buffer.write('    Raw Reverse Derivative (Jrev)\n')
-                    out_buffer.write(str(reverse) + '\n\n')
+                if magnitude.reverse is not None:
+                    if directional:
+                        out_buffer.write('    Directional Derivative (Jrev)\n')
+                        out_buffer.write(str(Jrev[0, :]) + '\n\n')
+                    else:
+                        out_buffer.write('    Raw Reverse Derivative (Jrev)\n')
+                        out_buffer.write(str(Jrev) + '\n\n')
 
                 try:
                     fd = derivative_info['J_fd']
@@ -2727,10 +2768,10 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
                 if directional:
                     out_buffer.write(f"    Directional {fd_opts['method'].upper()}"
-                                     f" Derivative (J{fd_opts['method']})\n{fd}\n")
+                                     f" Derivative (Jfd)\n{fd[:, 0].reshape((fd.shape[0], 1))}\n")
                 else:
                     out_buffer.write(f"    Raw {fd_opts['method'].upper()}"
-                                     f" Derivative (J{fd_opts['method']})\n{fd}\n")
+                                     f" Derivative (Jfd)\n{fd}\n")
 
                 out_buffer.write(' -' * 30 + '\n')
 

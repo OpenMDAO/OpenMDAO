@@ -44,8 +44,11 @@ class ApproximationScheme(object):
     _jac_scatter : tuple
         Data needed to scatter values from results array to a total jacobian column.
     _totals_directions : dict
-        If directional derivatives are being computed, this will contain the direction keyed by
-        mode ('fwd' or 'rev').
+        If directional total derivatives are being computed, this will contain the direction keyed
+        by mode ('fwd' or 'rev').
+    _totals_directional_mode : str or None
+        If directional total derivatives are being computed, this will contain the top level
+        mode ('fwd' or 'rev'), else None.
     """
 
     def __init__(self):
@@ -60,6 +63,7 @@ class ApproximationScheme(object):
         self._during_sparsity_comp = False
         self._jac_scatter = None
         self._totals_directions = {}
+        self._totals_directional_mode = None
 
     def __repr__(self):
         """
@@ -233,11 +237,10 @@ class ApproximationScheme(object):
         else:
             wrt_matches = None
 
-        if self._totals_directions:
+        if self._totals_directional_mode == 'rev':
             wrts_directional = []
             in_inds_directional = []
             vec_inds_directional = defaultdict(list)
-            rng_directional = np.random.default_rng(42)
 
         for wrt, start, end, vec, _, _ in system._jac_wrt_iter(wrt_matches):
             if wrt in self._wrt_meta:
@@ -289,27 +292,26 @@ class ApproximationScheme(object):
                 else:
                     self._nruns_uncolored += end - start
 
-                if not self._totals_directions:
-                    self._approx_groups.append((wrt, data, in_idx, [(vec, vec_idx)], directional,
-                                                meta['vector']))
-                else:
+                if self._totals_directional_mode == 'rev':
                     wrts_directional.append(wrt)
                     data_directional = data
                     in_inds_directional.extend(in_idx[0])
                     vec_inds_directional[vec].extend(vec_idx[0])
+                else:
+                    if self._totals_directions:
+                        direction = self._totals_directions['fwd'][slices[wrt]]
+                    else:
+                        direction = meta['vector']
+                    self._approx_groups.append((wrt, data, in_idx, [(vec, vec_idx)], directional,
+                                                direction))
 
         if total:
-            if self._totals_directions:
+            if self._totals_directional_mode == 'rev':
                 self._nruns_uncolored = 1
-                if 'fwd' in self._totals_directions:
-                    vector = self._totals_directions['fwd']
-                else:
-                    vector = self._totals_directions['rev']
-                    # vector = rng_directional.random(len(in_inds_directional))
-                    # vector *= 2.0
-                    # vector -= 1.0
-                    # # FIXME: debugging
-                    # vector[:] = 2.5
+                # if 'fwd' in self._totals_directions:
+                vector = self._totals_directions['fwd']
+                # else:
+                #     vector = self._totals_directions['rev']
 
                 self._approx_groups = [(tuple(wrts_directional), data_directional,
                                         [in_inds_directional], list(vec_inds_directional.items()),
