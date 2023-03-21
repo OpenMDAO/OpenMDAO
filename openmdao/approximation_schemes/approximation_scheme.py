@@ -308,11 +308,7 @@ class ApproximationScheme(object):
         if total:
             if self._totals_directional_mode == 'rev':
                 self._nruns_uncolored = 1
-                # if 'fwd' in self._totals_directions:
                 vector = self._totals_directions['fwd']
-                # else:
-                #     vector = self._totals_directions['rev']
-
                 self._approx_groups = [(tuple(wrts_directional), data_directional,
                                         [in_inds_directional], list(vec_inds_directional.items()),
                                         True, vector)]
@@ -428,6 +424,21 @@ class ApproximationScheme(object):
                     yield col, scratch
 
     def _vec_ind_iter(self, vec_ind_list):
+        """
+        Yield the vector index list as one chunk if doing directional totals.
+
+        If not, yield each index individually, along with the vector to index into.
+
+        Parameters
+        ----------
+        vec_ind_list : list
+            List of (Vector, indices) tuples.
+
+        Yields
+        ------
+        list
+            [[Vector, inds]]
+        """
         if self._totals_directions:
             yield vec_ind_list, vec_ind_list[0][1]
         else:

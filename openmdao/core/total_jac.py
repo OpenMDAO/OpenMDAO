@@ -811,34 +811,6 @@ class _TotalJacInfo(object):
             seed[:] = _directional_rng.random(seed.size)
             seed *= 2.0
             seed -= 1.0
-
-            # imeta = defaultdict(bool)
-            # all_rel_systems = set()
-            # imeta['itermeta'] = itermeta = []
-            # locs = None
-
-            # for name in input_list:
-            #     if name in relevant and not non_rel_outs:
-            #         relsystems = relevant[name]['@all'][1]
-            #         _update_rel_systems(all_rel_systems, relsystems)
-            #     else:
-            #         all_rel_systems = _contains_all
-            #         break
-
-            # iterdict['relevant'] = all_rel_systems
-
-            # iterdict = defaultdict(bool)
-
-            # if -1 in loc_idxs:
-            #     active = loc_idxs != -1
-            # else:
-            #     active = slice(None)
-
-            # iterdict['local_in_idxs'] = loc_idxs[active]
-            # iterdict['seeds'] = seed[active]
-
-            # iterdict['cache_lin_solve'] = False
-            # itermeta.append(iterdict)
         elif simul_coloring and simul_color_modes[mode] is not None:
             imeta = defaultdict(bool)
             imeta['coloring'] = simul_coloring
@@ -1287,11 +1259,6 @@ class _TotalJacInfo(object):
         None
             Not used.
         """
-        # _, rel_systems, _, _ = self.in_idx_map[mode][0]
-        # self._zero_vecs(mode)
-        # self.input_vec[mode].set_val(itermeta['seeds'], itermeta['local_in_idxs'])
-
-        # return rel_systems, None, None
         for i in inds:
             _, rel_systems, _, _ = self.in_idx_map[mode][i]
             break
@@ -1979,6 +1946,24 @@ class _TotalJacInfo(object):
         self.J[:, icol] = column
 
     def _get_as_directional(self, mode=None):
+        """
+        Return a dict jac with of's combined into a single key (rev mode) or wrt's (fwd mode).
+
+        Parameters
+        ----------
+        mode : str
+            Indicates the direction of the derivative computation.  Must be 'fwd' or 'rev'.
+
+        Returns
+        -------
+        dict
+            Total jacobian dict with ((of1, of2, ... of_n), wrt) keys for each 'wrt' (fwd mode), or
+            (of, (wrt1, wrt2, ... wrt_n)) keys for each 'of' (rev mode).
+        dict
+            Dict of the form {'of': {...}, 'wrt': {...}}, where each sub-entry of 'of' is the
+            'of' variable name keyed to its corresponding row slice and each sub-entry of 'wrt'
+            is the 'wrt' variable name keyed to its corresponding column slice.
+        """
         if mode is None:
             mode = self.mode
 

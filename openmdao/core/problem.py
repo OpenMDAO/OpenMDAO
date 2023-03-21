@@ -1581,7 +1581,8 @@ class Problem(object):
         show_only_incorrect : bool, optional
             Set to True if output should print only the subjacs found to be incorrect.
         directional : bool
-            If True, compute a single directional derivative for all supplied of's and wrt's.
+            If True, compute a single directional derivative for each 'of' in rev mode or each
+            'wrt' in fwd mode.
 
         Returns
         -------
@@ -1713,7 +1714,7 @@ class Problem(object):
         fd_tot_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True,
                                     driver_scaling=driver_scaling, directional=directional)
         if directional:
-            # for fd, use the same seeds as the analytical derives used
+            # for fd, use the same fwd mode seeds as the analytical derives used
             fd_tot_info.seeds = total_info.seeds
             Jcalc, Jcalc_slices = total_info._get_as_directional()
 
@@ -1736,21 +1737,6 @@ class Problem(object):
         # Assemble and Return all metrics.
         data = {'': {}}
         resp = self.driver._responses
-
-        # if directional:
-        #     if self._mode == 'fwd':
-        #         # check directional fwd against fd (one must have negative seed of the other)
-        #         directional_fd_fwd = total_info.J - fd_tot_info.J
-        #     else:  # rev
-        #         # check directional rev against fd (different seeds)
-
-        #         dhat = total_info.J.T[:, 0]
-        #         d = total_info.seeds['fwd']  # used as direction for fd
-        #         mhat = fd_tot_info.J[:, 0]
-        #         m = total_info.seeds['rev']
-
-        #         # Dot product test for adjoint validity.
-        #         directional_fd_rev = dhat.dot(d) - mhat.dot(m)
 
         for key, val in Jcalc.items():
             data[''][key] = {Jcalc_name: val, 'J_fd': Jfd[key]}
@@ -2748,7 +2734,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 if magnitude.forward is not None:
                     if directional:
                         out_buffer.write('    Directional Derivative (Jfor)\n')
-                        out_buffer.write(str(Jfor[:, 0]) + '\n\n')
+                        out_buffer.write(str(Jfor[:, 0].reshape((Jfor.shape[0], 1))) + '\n\n')
                     else:
                         out_buffer.write('    Raw Forward Derivative (Jfor)\n')
                         out_buffer.write(str(Jfor) + '\n\n')
@@ -2809,7 +2795,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                   f"{ders}.\nThis can happen if a component 'compute_jacvec_product' "
                   "or 'apply_linear'\nmethod does not properly reduce the value of a distributed "
                   "output when computing the\nderivative of that output with respect to a serial "
-                  "input.  Try reverting back to OpenMDAO 3.24 \nwhich used a different convention "
+                  "input.\nOpenMDAO 3.25 changed the convention used"
                   "when transferring data between distributed and non-distributed \nvariables "
                   "within a matrix free component. See POEM 75 for details.")
 
