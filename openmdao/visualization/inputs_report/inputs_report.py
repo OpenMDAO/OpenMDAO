@@ -105,12 +105,7 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
             sprom = model._var_allprocs_abs2prom['output'][src]
             val = model.get_val(target, get_remote=True, from_src=not src.startswith('_auto_ivc.'))
             smeta = model._var_allprocs_abs2meta['output'][src]
-            src_is_ivc = 'openmdao:indep_var' in smeta['tags'] or 'indep_var' in smeta['tags']
-            if 'indep_var' in smeta['tags'] and 'openmdao:indep_var' not in smeta['tags']:
-                issue_warning(f'source output {sprom} is tagged with the deprecated `indep_var`'
-                              f' tag. Please change this tag to `openmdao:indep_var` as'
-                              f' `indep_var` will be deprecated in a future release.',
-                              category=OMDeprecationWarning)
+            src_is_ivc = 'openmdao:indep_var' in smeta['tags']
 
             vcell, mincell, maxcell = _get_val_cells(val)
 
@@ -122,12 +117,7 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
         src = connections[target]
         val = model.get_val(target, get_remote=True, from_src=not src.startswith('_auto_ivc.'))
         smeta = model._var_discrete['output'][src]
-        src_is_ivc = 'openmdao:indep_var' in smeta['tags'] or 'indep_var' in smeta['tags']
-        if 'indep_var' in smeta['tags'] and 'openmdao:indep_var' not in smeta['tags']:
-            issue_warning(f'source output {src} is tagged with the deprecated `indep_var` tag.'
-                          f' Please change this tag to `openmdao:indep_var` as `indep_var` will be'
-                          f' deprecated in a future release.',
-                          category=OMDeprecationWarning)
+        src_is_ivc = 'openmdao:indep_var' in smeta['tags']
 
         rows.append([target, prom, src, src_is_ivc, src in desvars, '', None, sorted(meta['tags']),
                      val, None, None, src])

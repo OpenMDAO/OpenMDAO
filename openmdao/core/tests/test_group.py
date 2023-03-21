@@ -1252,9 +1252,12 @@ class TestGroup(unittest.TestCase):
         class Discipline(om.Group):
 
             def setup(self):
-                self.add_subsystem('comp0', om.ExecComp('y=x**2'))
-                self.add_subsystem('comp1', om.ExecComp('z=2*external_input'),
-                                   promotes_inputs=['external_input'])
+                comp0 = self.add_subsystem('comp0', om.ExecComp('y=x**2'))
+                comp0.declare_partials(of='*', wrt='*', method='cs')
+
+                comp1 = self.add_subsystem('comp1', om.ExecComp('z=2*external_input'),
+                                           promotes_inputs=['external_input'])
+                comp1.declare_partials(of='*', wrt='*', method='cs')
 
                 self.add_subsystem('balance', om.BalanceComp('x', lhs_name='y', rhs_name='z'),
                                    promotes_outputs=['x'])

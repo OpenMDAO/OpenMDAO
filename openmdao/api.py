@@ -14,7 +14,6 @@ from openmdao.core.analysis_error import AnalysisError
 from openmdao.components.add_subtract_comp import AddSubtractComp
 from openmdao.components.balance_comp import BalanceComp
 from openmdao.components.cross_product_comp import CrossProductComp
-from openmdao.components.demux_comp import DemuxComp
 from openmdao.components.dot_product_comp import DotProductComp
 from openmdao.components.eq_constraint_comp import EQConstraintComp
 from openmdao.components.exec_comp import ExecComp

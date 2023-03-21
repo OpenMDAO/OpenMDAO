@@ -203,8 +203,8 @@ class BalanceComp(ImplicitComponent):
             lhs = inputs[lhs_name]
             rhs = inputs[rhs_name]
 
-            _scale_factor = np.ones((rhs.shape))
-            _dscale_drhs = np.zeros((rhs.shape))
+            _scale_factor = np.ones((rhs.shape), dtype=rhs.dtype)
+            _dscale_drhs = np.zeros((rhs.shape), dtype=rhs.dtype)
 
             if options['normalize']:
                 # Indices where the rhs is near zero or not near zero
