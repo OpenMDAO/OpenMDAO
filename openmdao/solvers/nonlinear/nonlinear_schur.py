@@ -11,7 +11,7 @@ from openmdao.utils.general_utils import ContainsAll
 import scipy
 
 
-class SchurSolver(NonlinearSolver):
+class NonlinearSchurSolver(NonlinearSolver):
     """
     Newton solver.
 
@@ -26,7 +26,7 @@ class SchurSolver(NonlinearSolver):
         Line search algorithm. Default is None for no line search.
     """
 
-    SOLVER = "NL: SCHUR"
+    SOLVER = "NL: NLSCHUR"
 
     def __init__(self, mode_nonlinear="rev", groupNames=["group1", "group2"], **kwargs):
         """
@@ -157,10 +157,14 @@ class SchurSolver(NonlinearSolver):
 
         Returns
         -------
-        boolean
+        bool
             Flag for indicating child linerization
         """
-        return self.options["solve_subsystems"] and self._iter_count <= self.options["max_sub_solves"]
+        return (
+            self.options["solve_subsystems"]
+            and not system.under_complex_step
+            and self._iter_count <= self.options["max_sub_solves"]
+        )
 
     def _linearize(self):
         """
@@ -184,22 +188,17 @@ class SchurSolver(NonlinearSolver):
             error at the first iteration.
         """
         system = self._system()
+        solve_subsystems = self.options["solve_subsystems"] and not system.under_complex_step
 
         if self.options["debug_print"]:
             self._err_cache["inputs"] = system._inputs._copy_views()
             self._err_cache["outputs"] = system._outputs._copy_views()
 
-        # When under a complex step from higher in the hierarchy, sometimes the step is too small
-        # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
-        # one iteration of Newton.
-        if system.under_complex_step and self.options["cs_reconverge"]:
-            system._outputs += np.linalg.norm(system._outputs.asarray()) * 1e-10
-
         # Execute guess_nonlinear if specified.
         system._guess_nonlinear()
 
-        with Recording("Newton_subsolve", 0, self):
-            if self.options["solve_subsystems"] and (self._iter_count <= self.options["max_sub_solves"]):
+        with Recording("Newton_subsolve", 0, self) as rec:
+            if solve_subsystems and self._iter_count <= self.options["max_sub_solves"]:
                 self._solver_info.append_solver()
 
                 # should call the subsystems solve before computing the first residual
@@ -207,10 +206,13 @@ class SchurSolver(NonlinearSolver):
 
                 self._solver_info.pop()
 
-        self._run_apply()
-        norm = self._iter_get_norm()
+            self._run_apply()
+            norm = self._iter_get_norm()
 
-        norm0 = norm if norm != 0.0 else 1.0
+            rec.abs = norm
+            norm0 = norm if norm != 0.0 else 1.0
+            rec.rel = norm / norm0
+
         return norm0, norm
 
     def _single_iteration(self):
@@ -219,7 +221,11 @@ class SchurSolver(NonlinearSolver):
         """
         system = self._system()
         self._solver_info.append_subsolver()
-        do_subsolve = self.options["solve_subsystems"] and (self._iter_count < self.options["max_sub_solves"])
+        do_subsolve = (
+            self.options["solve_subsystems"]
+            and not system.under_complex_step
+            and (self._iter_count < self.options["max_sub_solves"])
+        )
         do_sub_ln = self.linear_solver._linearize_children()
 
         # Disable local fd
@@ -373,16 +379,16 @@ class SchurSolver(NonlinearSolver):
         subsys2._vectors["residual"]["linear"].set_vec(subsys2._residuals)
         subsys2._vectors["residual"]["linear"] *= -1.0
 
-        if system.comm.rank == 0:
-            print("\nSchur Jacobian: ", schur_jac, flush=True)
-            # print("My    Jacobian:\n", custom_jac, flush=True)
+        # if system.comm.rank == 0:
+        #     print("\nSchur Jacobian: ", schur_jac, flush=True)
+        # print("My    Jacobian:\n", custom_jac, flush=True)
         # system.comm.barrier()
         # quit()
         d_subsys2 = scipy.linalg.solve(schur_jac, subsys2._vectors["residual"]["linear"].asarray())
 
-        if system.comm.rank == 0:
-            print("\nupdate vector: ", d_subsys2, flush=True)
-            print("\n==================================================")
+        # if system.comm.rank == 0:
+        #     print("\nupdate vector: ", d_subsys2, flush=True)
+        #     print("\n==================================================")
 
         # loop over the variables just to be safe with the ordering
         for ii, var in enumerate(vars_to_solve):

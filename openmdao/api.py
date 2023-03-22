@@ -48,7 +48,7 @@ from openmdao.solvers.nonlinear.broyden import BroydenSolver
 from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
 from openmdao.solvers.nonlinear.nonlinear_block_jac import NonlinearBlockJac
 from openmdao.solvers.nonlinear.newton import NewtonSolver
-from openmdao.solvers.nonlinear.nonlinear_schur import SchurSolver
+from openmdao.solvers.nonlinear.nonlinear_schur import NonlinearSchurSolver
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 
 # Surrogate Models
