@@ -216,10 +216,15 @@ def _serialize_single_option(option):
 
 def _get_tree_dict(system, is_parallel=False):
     """Get a dictionary representation of the system hierarchy."""
+    try:
+        class_path = '.'.join((system.__class__.__module__, system.__class__.__name__))
+    except Exception:
+        class_path = system.__class__.__name__
+
     tree_dict = {
         'name': system.name if system.name else 'root',
         'type': 'subsystem' if system.name else 'root',
-        'class': system.__class__.__name__,
+        'class': class_path,
         'expressions': None,
         'nonlinear_solver': "",
         'nonlinear_solver_options': None,
