@@ -6518,6 +6518,8 @@ class System(object):
 
         saved_errors = self._get_saved_errors()
 
+        # if saved_errors is None it means we have already finished setup and all errors should
+        # be raised as exceptions immediately.
         if saved_errors is None or env_truthy('OPENMDAO_FAIL_FAST'):
             raise exc_type(msg).with_traceback(tback)
 
