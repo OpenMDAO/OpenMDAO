@@ -1,7 +1,7 @@
 {
     "name": "root",
     "type": "root",
-    "class": "openmdao.test_suite.components.sellar.SellarStateConnection",
+    "class": "openmdao.test_suite.components.sellar:SellarStateConnection",
     "expressions": null,
     "component_type": null,
     "subsystem_type": "group",
@@ -38,7 +38,7 @@
         {
             "name": "_auto_ivc",
             "type": "subsystem",
-            "class": "openmdao.core.indepvarcomp._AutoIndepVarComp",
+            "class": "openmdao.core.indepvarcomp:_AutoIndepVarComp",
             "expressions": null,
             "subsystem_type": "component",
             "is_parallel": false,
@@ -112,7 +112,7 @@
         {
             "name": "sub",
             "type": "subsystem",
-            "class": "openmdao.core.group.Group",
+            "class": "openmdao.core.group:Group",
             "expressions": null,
             "component_type": null,
             "subsystem_type": "group",
@@ -136,7 +136,7 @@
                 {
                     "name": "state_eq_group",
                     "type": "subsystem",
-                    "class": "openmdao.core.group.Group",
+                    "class": "openmdao.core.group:Group",
                     "expressions": null,
                     "component_type": null,
                     "subsystem_type": "group",
@@ -160,7 +160,7 @@
                         {
                             "name": "state_eq",
                             "type": "subsystem",
-                            "class": "openmdao.test_suite.components.sellar.StateConnection",
+                            "class": "openmdao.test_suite.components.sellar:StateConnection",
                             "expressions": null,
                             "subsystem_type": "component",
                             "is_parallel": false,
@@ -226,7 +226,7 @@
                 {
                     "name": "d1",
                     "type": "subsystem",
-                    "class": "openmdao.test_suite.components.sellar.SellarDis1withDerivatives",
+                    "class": "openmdao.test_suite.components.sellar:SellarDis1withDerivatives",
                     "expressions": null,
                     "subsystem_type": "component",
                     "is_parallel": false,
@@ -327,7 +327,7 @@
                 {
                     "name": "d2",
                     "type": "subsystem",
-                    "class": "openmdao.test_suite.components.sellar.SellarDis2withDerivatives",
+                    "class": "openmdao.test_suite.components.sellar:SellarDis2withDerivatives",
                     "expressions": null,
                     "subsystem_type": "component",
                     "is_parallel": false,
@@ -413,7 +413,7 @@
         {
             "name": "obj_cmp",
             "type": "subsystem",
-            "class": "openmdao.components.exec_comp.ExecComp",
+            "class": "openmdao.components.exec_comp:ExecComp",
             "expressions": [
                 "obj = x**2 + z[1] + y1 + exp(-y2)"
             ],
@@ -541,7 +541,7 @@
         {
             "name": "con_cmp1",
             "type": "subsystem",
-            "class": "openmdao.components.exec_comp.ExecComp",
+            "class": "openmdao.components.exec_comp:ExecComp",
             "expressions": [
                 "con1 = 3.16 - y1"
             ],
@@ -608,7 +608,7 @@
         {
             "name": "con_cmp2",
             "type": "subsystem",
-            "class": "openmdao.components.exec_comp.ExecComp",
+            "class": "openmdao.components.exec_comp:ExecComp",
             "expressions": [
                 "con2 = y2 - 24.0"
             ],

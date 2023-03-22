@@ -579,7 +579,7 @@ class TestUnderMPI(unittest.TestCase):
             """
             if subsys['type'] == 'subsystem':
                 # Group or Component, recurse to children
-                parallel = parallel or subsys['class'] == 'openmdao.core.parallel_group.ParallelGroup'
+                parallel = parallel or subsys['class'] == 'openmdao.core.parallel_group:ParallelGroup'
                 for child in subsys['children']:
                     check_initial_value(child, parallel)
             else:
