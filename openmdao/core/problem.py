@@ -8,6 +8,7 @@ import os
 import weakref
 import pathlib
 import textwrap
+import traceback
 
 from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
@@ -573,7 +574,22 @@ class Problem(object):
                 nerrs = len(errors)
             total_nerrs = self.comm.allreduce(nerrs)
             if total_nerrs > 0:
+                # since we have errors at least on some ranks, gather info for first error to
+                # rank 0 for display, changing the traceback to a string since it won't pickle.
                 if nerrs == 0:
+                    einfo = []
+                else:
+                    einfo = list(errors[0])
+                    einfo[-1] = '\n'.join(s.rstrip() for s in traceback.format_tb(einfo[-1]))
+
+                errinfos = self.comm.gather(einfo, root=0)
+                if nerrs == 0:
+                    if self.comm.rank == 0:
+                        for e in errinfos:
+                            if e:
+                                errors = [tuple(e)]
+                                break
+                else:
                     errors = [(self._name, "Exception occurred on other rank.", RuntimeError,
                                make_traceback())]
 
@@ -594,7 +610,10 @@ class Problem(object):
 
                 # if there's only one error, include its traceback if there is one.
                 if len(errors) == 1:
-                    raise exc_type('\n'.join(final_msg)).with_traceback(tback)
+                    if isinstance(tback, str):
+                        raise exc_type('\n'.join(final_msg))
+                    else:
+                        raise exc_type('\n'.join(final_msg)).with_traceback(tback)
 
             raise RuntimeError('\n'.join(final_msg))
 
