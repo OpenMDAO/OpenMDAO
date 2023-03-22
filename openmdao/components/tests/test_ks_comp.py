@@ -7,6 +7,7 @@ import openmdao.api as om
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_stress import MultipointBeamGroup
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.testing_utils import force_check_partials
 
 
 class TestKSFunction(unittest.TestCase):
@@ -58,9 +59,7 @@ class TestKSFunction(unittest.TestCase):
         assert_near_equal(prob.get_val('ks.KS', indices=1), 34.0)
         assert_near_equal(prob.get_val('ks.KS', indices=2), 51.0)
 
-        prob.model.ks._no_check_partials = False  # override skipping of check_partials
-
-        partials = prob.check_partials(includes=['ks'], out_stream=None)
+        partials = force_check_partials(prob, includes=['ks'], out_stream=None)
 
         for (of, wrt) in partials['ks']:
             assert_near_equal(partials['ks'][of, wrt]['abs error'][0], 0.0, 1e-6)

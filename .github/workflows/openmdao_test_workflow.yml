@@ -288,6 +288,8 @@ jobs:
 
       - name: Run tests
         if: matrix.TESTS
+        env:
+          OPENMDAO_CI: true
         run: |
           echo "============================================================="
           echo "Run tests with coverage (from directory other than repo root)"
@@ -490,6 +492,8 @@ jobs:
                     f'Scipy version {scipy.__version__} is not the requested version (${{ matrix.SCIPY }})'"
 
       - name: Run tests
+        env:
+          OPENMDAO_CI: true
         run: |
           echo "============================================================="
           echo "Run tests with coverage (from directory other than repo root)"

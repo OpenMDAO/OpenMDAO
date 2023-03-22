@@ -197,6 +197,7 @@ class set_env_vars(object):
         fnc : function
             The function being wrapped.
         """
+        @functools.wraps(fnc)
         def wrap(*args, **kwargs):
             saved = {}
             try:
@@ -245,6 +246,28 @@ def set_env_vars_context(**kwargs):
                 del os.environ[k]
             else:
                 os.environ[k] = v
+
+
+@set_env_vars(OPENMDAO_CI="1")
+def force_check_partials(prob, *args, **kwargs):
+    r"""
+    Force the checking of partials even for components with _no_check_partials set.
+
+    Parameters
+    ----------
+    prob : Problem
+        The Problem being checked.
+    *args : list
+        Positional args.
+    **kwargs : dict
+        Keyword args.
+
+    Returns
+    -------
+    dict
+        Total derivative comparison data.
+    """
+    return prob.check_partials(*args, **kwargs)
 
 
 class _ModelViewerDataTreeEncoder(json.JSONEncoder):

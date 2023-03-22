@@ -12,7 +12,7 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_warning, asser
      assert_check_totals
 
 from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.utils.testing_utils import use_tempdirs, force_check_partials
 
 scipy_gte_019 = True
 try:
@@ -691,9 +691,7 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
 
         prob.run_model()
 
-        prob.model.comp._no_check_partials = False  # override skipping of check_partials
-
-        derivs = prob.check_partials(out_stream=None)
+        derivs = force_check_partials(prob, out_stream=None)
 
         for i in derivs['comp'].keys():
             if verbose:
@@ -779,9 +777,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         prob.run_model()
 
-        prob.model.comp._no_check_partials = False  # override skipping of check_partials
-
-        derivs = prob.check_partials(method='cs', out_stream=None)
+        derivs = force_check_partials(prob, method='cs', out_stream=None)
 
         for i in derivs['comp'].keys():
             if verbose:
@@ -877,7 +873,6 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
         comp = om.MetaModelStructuredComp(method='slinear', extrapolate=True, vec_size=3)
-        comp._no_check_partials = False  # override skipping of check_partials
 
         for param in params:
             comp.add_input(param['name'], np.array([param['default'], param['default'], param['default']]),
@@ -896,7 +891,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         prob.run_model()
 
-        partials = prob.check_partials(method='cs', out_stream=None)
+        partials = force_check_partials(prob, method='cs', out_stream=None)
         assert_check_partials(partials, rtol=1e-8)
 
     def test_vectorized_lagrange2(self):
@@ -920,7 +915,6 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
         comp = om.MetaModelStructuredComp(method='lagrange2', extrapolate=True, vec_size=3)
-        comp._no_check_partials = False  # override skipping of check_partials
 
         for param in params:
             comp.add_input(param['name'], np.array([param['default'], param['default'], param['default']]),
@@ -939,7 +933,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         prob.run_model()
 
-        partials = prob.check_partials(method='cs', out_stream=None)
+        partials = force_check_partials(prob, method='cs', out_stream=None)
         # Derivs are large, so ignore atol.
         assert_check_partials(partials, atol=1e10, rtol=1e-10)
 
@@ -954,7 +948,6 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         outs = mapdata.output_data
 
         comp = om.MetaModelStructuredComp(method='lagrange3', extrapolate=True, vec_size=3)
-        comp._no_check_partials = False  # override skipping of check_partials
 
         for param in params:
             comp.add_input(param['name'], np.array([param['default'], param['default'], param['default']]),
@@ -973,7 +966,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         prob.run_model()
 
-        partials = prob.check_partials(method='cs', out_stream=None)
+        partials = force_check_partials(prob, method='cs', out_stream=None)
         # Derivs are large, so ignore atol.
         assert_check_partials(partials, atol=1e10, rtol=1e-10)
 
@@ -998,7 +991,6 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
         comp = om.MetaModelStructuredComp(method='akima', extrapolate=True, vec_size=3)
-        comp._no_check_partials = False  # override skipping of check_partials
 
         for param in params:
             comp.add_input(param['name'], np.array([param['default'], param['default'], param['default']]),
@@ -1017,7 +1009,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         prob.run_model()
 
-        partials = prob.check_partials(method='cs', out_stream=None)
+        partials = force_check_partials(prob, method='cs', out_stream=None)
         # Derivs are large, so ignore atol.
         assert_check_partials(partials, atol=1e10, rtol=1e-10)
 
@@ -1042,7 +1034,6 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
         comp = om.MetaModelStructuredComp(method='cubic', extrapolate=True, vec_size=3)
-        comp._no_check_partials = False  # override skipping of check_partials
 
         for param in params:
             comp.add_input(param['name'], np.array([param['default'], param['default'], param['default']]),
@@ -1061,7 +1052,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         prob.run_model()
 
-        partials = prob.check_partials(method='cs', out_stream=None)
+        partials = force_check_partials(prob, method='cs', out_stream=None)
         # Derivs are large, so ignore atol.
         assert_check_partials(partials, atol=1e10, rtol=1e-10)
 
@@ -1204,7 +1195,6 @@ class TestMetaModelStructuredPython(unittest.TestCase):
                 comp.add_output('C_L', 0.0, grid)
 
                 self.add_subsystem('comp', comp, promotes=["*"])
-                self.comp._no_check_partials = False  # override skipping of check_partials
 
         model = om.Group()
         model.add_subsystem('InterpSubsystem', MGroup())
@@ -1214,7 +1204,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         p.set_val('InterpSubsystem.mach', 7.0)
         p.run_model()
 
-        cpd = p.check_partials(compact_print=False, out_stream=None, method='cs')
+        cpd = force_check_partials(p, compact_print=False, out_stream=None, method='cs')
         assert_check_partials(cpd, atol=1.0E-8, rtol=1.0E-8)
 
     def test_training_gradient_unsupported(self):
@@ -1314,7 +1304,6 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
 
         # Create regular grid interpolator instance
         xor_interp = om.MetaModelStructuredComp(method='scipy_slinear')
-        xor_interp._no_check_partials = False  # override skipping of check_partials
 
         # set up inputs and outputs
         xor_interp.add_input('x', 0.0, training_data=np.array([0.0, 1.0]), units=None)
@@ -1343,7 +1332,7 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
         assert_almost_equal(computed, actual)
 
         # we can verify all gradients by checking against finite-difference
-        prob.check_partials(compact_print=True)
+        force_check_partials(prob, compact_print=True)
 
     @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
     def test_shape(self):
@@ -1362,7 +1351,6 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
 
         # Create regular grid interpolator instance
         interp = om.MetaModelStructuredComp(method='scipy_cubic')
-        interp._no_check_partials = False  # override skipping of check_partials
 
         interp.add_input('p1', 0.5, training_data=p1)
         interp.add_input('p2', 0.0, training_data=p2)
@@ -1389,7 +1377,7 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
         assert_almost_equal(computed, actual)
 
         # we can verify all gradients by checking against finite-difference
-        prob.check_partials(compact_print=True)
+        force_check_partials(prob, compact_print=True)
 
     @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
     def test_vectorized(self):
@@ -1446,7 +1434,6 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
 
         # Create regular grid interpolator instance
         interp = om.MetaModelStructuredComp(method='scipy_cubic', training_data_gradients=True)
-        interp._no_check_partials = False  # override skipping of check_partials
 
         interp.add_input('p1', 0.5, p1)
         interp.add_input('p2', 0.0, p2)
@@ -1473,7 +1460,7 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
         assert_almost_equal(computed, actual)
 
         # we can verify all gradients by checking against finite-difference
-        prob.check_partials(compact_print=True)
+        force_check_partials(prob, compact_print=True)
 
     def test_error_messages_scalar_only(self):
         prob = om.Problem()
