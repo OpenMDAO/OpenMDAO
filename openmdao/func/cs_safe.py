@@ -4,7 +4,7 @@ collection of complex-step safe functions to replace standard numpy operations.
 
 import numpy as np
 
-from .from_numpy import sum as omfunc_sum, d_sum
+from .numpy import sum as omfunc_sum, d_sum
 
 
 def abs(x):

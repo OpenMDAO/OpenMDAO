@@ -44,7 +44,7 @@ from .smooth import act_tanh, d_act_tanh
 
 from .cs_safe import abs, d_abs, arctanh, d_arctanh, arctan2, d_arctan2, norm, d_norm
 
-from .from_numpy import arcsin, d_arcsin, arccos, d_arccos, arccosh, d_arccosh, \
+from .numpy import arcsin, d_arcsin, arccos, d_arccos, arccosh, d_arccosh, \
     arcsinh, d_arcsinh, arctan, d_arctan, cos, d_cos, cosh, d_cosh, cumsum, d_cumsum, dot, d_dot, \
     erf, d_erf, erfc, d_erfc, exp, d_exp, log, d_log, log10, d_log10, sin, d_sin, sinh, d_sinh, \
     sqrt, d_sqrt, sum, d_sum, tan, d_tan, tanh, d_tanh

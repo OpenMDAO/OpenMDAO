@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.sparse as sp
 
 
 def act_tanh(x, mu=1., z=0., a=-1., b=1.):
@@ -28,7 +29,7 @@ def act_tanh(x, mu=1., z=0., a=-1., b=1.):
     return 0.5 * dy * (1 + tanh_term) + a
 
 
-def d_act_tanh(x, mu=1.0, z=0.0, a=-1.0, b=1.0, dx=True, dmu=True, dz=True, da=True, db=True):
+def d_act_tanh(x, mu=1.0, z=0.0, a=-1.0, b=1.0, dx=True, dmu=True, dz=True, da=True, db=True, sparse=True):
     """
     A function which provides a differentiable activation function based on the hyperbolic tangent.
 
@@ -39,7 +40,7 @@ def d_act_tanh(x, mu=1.0, z=0.0, a=-1.0, b=1.0, dx=True, dmu=True, dz=True, da=T
     mu : float
         A shaping parameter which impacts the "abruptness" of the activation function. As this value approaches zero
         the response approaches that of a step function.
-    z : float
+    z : float or np.array
         The value of the independent variable about which the activation response is centered.
     a : float
         The initial value that the input asymptotically approaches negative infinity.
@@ -60,11 +61,22 @@ def d_act_tanh(x, mu=1.0, z=0.0, a=-1.0, b=1.0, dx=True, dmu=True, dz=True, da=T
     db : bool
         True if the derivative of act_tanh wrt b should be calculated. Setting this to False can save time when
         the derivative is not needed.
+    sparse : bool
+        If True, return only the known nonzero elements of the derivative. These will be flat arrays which correspond
+        to the diagonal of d_dx and d_dz, and the column vectors of d_mu, d_a, and d_b.
+
     Returns
     -------
-    dict
-        A dictionary which contains the partial derivatives of the tanh activation function wrt inputs, stored in the
-        keys 'x', 'mu', 'z', 'a', 'b'.
+    d_dx : float or np.ndarray or None
+        Derivatives of act_tanh wrt x or None if argument dx is False.
+    d_dmu : float or np.ndarray or None
+        Derivatives of act_tanh wrt mu or None if argument dmu is False.
+    d_dz : float or np.ndarray or None
+        Derivatives of act_tanh wrt z or None if argument dz is False.
+    d_da : float or np.ndarray or None
+        Derivatives of act_tanh wrt a or None if argument da is False.
+    d_db : float or np.ndarray or None
+        Derivatives of act_tanh wrt b or None if argument db is False.
     """
     dy = b - a
     dy_d_2 = 0.5 * dy
@@ -74,9 +86,17 @@ def d_act_tanh(x, mu=1.0, z=0.0, a=-1.0, b=1.0, dx=True, dmu=True, dz=True, da=T
     cosh2 = np.cosh(xmz_d_mu) ** 2
     mu_cosh2 = mu * cosh2
 
-    return (dy_d_2 / mu_cosh2 if dx else None,  # d_dx
+    d_dx = ((dy_d_2 / mu_cosh2).ravel() if sparse else np.diagflat(dy_d_2 / mu_cosh2)) if dx else None
+
+    if dz:
+        if z.size == x.size:
+            d_dz = (-dy_d_2 / mu_cosh2).ravel() if sparse else np.diagflat(-dy_d_2 / mu_cosh2)
+        else:
+            d_dz = (-dy_d_2 / mu_cosh2).ravel() if sparse else np.reshape(-dy_d_2 / mu_cosh2, (x.size, 1))
+
+    return (d_dx,  # d_dx
             -(dy_d_2 * xmz_d_mu) / mu_cosh2 if dmu else None,  # d_dmu
-            (-dy_d_2) / mu_cosh2 if dz else None,  # d_dz
+            d_dz if dz else None,  # d_dz
             0.5 * (1 - tanh_term) if da else None,  # d_da
             0.5 * (1 + tanh_term) if db else None)  # d_db
 
