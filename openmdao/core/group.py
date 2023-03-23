@@ -3320,12 +3320,7 @@ class Group(System):
                         newshape = src_indices.indexed_src_shape
 
             if src_indices is None:
-                # for an auto_ivc connection, src_indices here, if they exist, must be coming from
-                # an add_input call (this is a deprecated feature and will be removed eventually)
                 src_indices = meta['src_indices']
-
-            # FIXME: the ability to specify src_indices on add_input has been removed, but
-            #        it is unclear to me how to safely excise the related logic here
 
             if src_indices is not None:
                 if val is None:
