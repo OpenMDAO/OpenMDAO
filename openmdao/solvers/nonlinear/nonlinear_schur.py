@@ -240,6 +240,7 @@ class NonlinearSchurSolver(NonlinearSolver):
         if my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac:
             my_asm_jac._update(system)
 
+        self._linearize()
         # extract the first and second subsystems
         subsys1, _ = system._subsystems_allprocs[self._groupNames[0]]
         subsys2, _ = system._subsystems_allprocs[self._groupNames[1]]
