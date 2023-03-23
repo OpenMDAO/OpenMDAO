@@ -14,28 +14,6 @@ funcs_2_arg = ['arctan2']
 
 class TestNorm(unittest.TestCase):
 
-    def test_array(self):
-        N = 10
-
-        a = np.linspace(1, 5, N, dtype=complex)
-        assert_near_equal(cs_safe.norm(a), np.linalg.norm(a))
-
-        deriv_f = cs_safe.d_norm(a.real)
-        cs_deriv_f = np.zeros((1, N))
-
-        for i in range(N):
-            a[i] += (0 + 1.0E-40j)
-            cs_deriv_f[0, i] = cs_safe.norm(a).imag / 1.0E-40
-            a[i] = a[i].real
-
-
-        with np.printoptions(linewidth=1024):
-            print(cs_deriv_f)
-            print()
-            print(deriv_f)
-
-        assert_near_equal(deriv_f, cs_deriv_f, tolerance=1.0E-12)
-
     def test_tensor(self):
 
         for X_SHAPE in [(12,), (4, 5), (3, 2, 6), (2, 3, 2, 3), (4, 3, 2, 1, 5)]:
@@ -71,71 +49,6 @@ class TestNorm(unittest.TestCase):
                     with np.printoptions(linewidth=1024):
                         cpd = p.check_partials(method='cs', out_stream=None)
                     assert_check_partials(cpd)
-
-    def test_vec(self):
-        N = 10
-
-        a = np.zeros((10, 1), dtype=complex)
-        a[:, 0] = np.linspace(1, 5, N, dtype=complex)
-        assert_near_equal(cs_safe.norm(a), np.linalg.norm(a))
-
-        deriv_f = cs_safe.d_norm(a.real)
-        cs_deriv_f = np.zeros((1, N))
-
-        for i in range(N):
-            a.ravel()[i] += (0 + 1.0E-40j)
-            cs_deriv_f[0, i] = cs_safe.norm(a).imag / 1.0E-40
-            a.ravel()[i] = a.ravel()[i].real
-
-        with np.printoptions(linewidth=1024):
-            print(cs_deriv_f)
-            print()
-            print(deriv_f)
-
-        assert_near_equal(deriv_f, cs_deriv_f, tolerance=1.0E-12)
-
-    def test_vec_axis_0(self):
-        N = 10
-
-        a = np.zeros((10, 1), dtype=complex)
-        a[:, 0] = np.linspace(1, 5, N, dtype=complex)
-        assert_near_equal(cs_safe.norm(a, axis=0), np.linalg.norm(a, axis=0))
-
-        deriv_f = cs_safe.d_norm(a.real, axis=0)
-        cs_deriv_f = np.zeros((N))
-
-        for i in range(N):
-            a.ravel()[i] += (0 + 1.0E-40j)
-            cs_deriv_f[i] = cs_safe.norm(a, axis=0).imag / 1.0E-40
-            a.ravel()[i] = a.ravel()[i].real
-
-        with np.printoptions(linewidth=1024):
-            print(cs_deriv_f)
-            print(deriv_f)
-
-        assert_near_equal(deriv_f, cs_deriv_f, tolerance=1.0E-12)
-
-    def test_vec_axis_1(self):
-        N = 10
-
-        a = np.zeros((10, 1), dtype=complex)
-        a[:, 0] = np.linspace(1, 5, N, dtype=complex)
-
-        assert_near_equal(cs_safe.norm(a, axis=1), np.linalg.norm(a, axis=1))
-
-        deriv_f = cs_safe.d_norm(a.real, axis=1)
-        cs_deriv_f = np.zeros((N, N))
-
-        for row in range(N):
-            a[row, 0] += (0 + 1.0E-40j)
-            cs_deriv_f[row, :] = cs_safe.norm(a, axis=1).imag / 1.0E-40
-            a[row, 0] -= (0 + 1.0E-40j)
-
-        with np.printoptions(linewidth=1024):
-            print(cs_deriv_f)
-            print(deriv_f)
-
-        assert_near_equal(deriv_f, cs_deriv_f, tolerance=1.0E-12)
 
 
 class TestOthers(unittest.TestCase):
@@ -192,6 +105,3 @@ class TestOthers(unittest.TestCase):
         for func_name in funcs_2_arg:
             with self.subTest(msg=func_name):
                 self._test_func_derivs_cs(func_name, x, y)
-
-
-

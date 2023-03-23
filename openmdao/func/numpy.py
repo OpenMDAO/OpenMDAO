@@ -405,17 +405,17 @@ def d_sum(x, axis=None):
         # Start with the kronecker product of the last two arguments
         arg2 = kron_args.pop()
         arg1 = kron_args.pop()
-        J = kron(arg1, arg2)
+        jac = kron(arg1, arg2)
 
         # Now proceed through the remaining ones, fromr right to left
         while kron_args:
             arg1 = kron_args.pop()
-            J = kron(arg1, J)
+            jac = kron(arg1, jac)
 
         ax0 = np.prod([ax_size for i, ax_size in enumerate(x.shape) if i != axis])
 
-        J = np.reshape(J, (ax0,) + x.shape)
-        return J
+        jac = np.reshape(jac, (ax0,) + x.shape)
+        return jac
 
 
 def d_tan(x):

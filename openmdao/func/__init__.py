@@ -40,7 +40,7 @@ da_dx, da_dy, da_dz, db_dx, db_dy, db_dz = d_foo(x, y, z=1.0, d_z=False)
 Now, da_dz and db_dz will both be None.
 """
 
-from .act_tanh import act_tanh, d_act_tanh
+from .smooth import act_tanh, d_act_tanh
 
 from .cs_safe import abs, d_abs, arctanh, d_arctanh, arctan2, d_arctan2, norm, d_norm
 
