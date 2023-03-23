@@ -1737,26 +1737,30 @@ class Problem(object):
         resp = self.driver._responses
 
         for key, val in Jcalc.items():
-            data[''][key] = {Jcalc_name: val, 'J_fd': Jfd[key]}
             if directional:
+                data[''][key] = {}
                 if self._mode == 'fwd':
                     _, wrt = key
                     # check directional fwd against fd (one must have negative seed of the other)
                     directional_fd_fwd = total_info.J[:, Jcalc_slices['wrt'][wrt].start] - \
                         fd_tot_info.J[:, Jcalc_slices['wrt'][wrt].start]
                     data[''][key]['directional_fd_fwd'] = directional_fd_fwd
+                    data[''][key]['J_fwd'] = total_info.J[:, Jcalc_slices['wrt'][wrt].start]
+                    data[''][key]['J_fd'] = fd_tot_info.J[:, Jcalc_slices['wrt'][wrt].start]
                 else:  # rev
                     of, _ = key
                     # check directional rev against fd (different seeds)
-                    dhat = total_info.J.T[:, Jcalc_slices['of'][of].start]  # first row of 'of' var
+                    dhat = total_info.J[Jcalc_slices['of'][of].start, :]  # first row of 'of' var
                     d = total_info.seeds['fwd']  # used as direction for fd
                     mhat = fd_tot_info.J[Jcalc_slices['of'][of], 0]
                     m = total_info.seeds['rev'][Jcalc_slices['of'][of]]
 
                     # Dot product test for adjoint validity.
-                    directional_fd_rev = dhat.dot(d) - mhat.dot(m)
-
-                    data[''][key]['directional_fd_rev'] = directional_fd_rev
+                    data[''][key]['directional_fd_rev'] = dhat.dot(d) - mhat.dot(m)
+                    data[''][key]['J_rev'] = dhat.dot(d)
+                    data[''][key]['J_fd'] = mhat.dot(m)
+            else:
+                data[''][key] = {Jcalc_name: val, 'J_fd': Jfd[key]}
 
             # Display whether indices were declared when response was added.
             of = key[0]
@@ -2779,18 +2783,18 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 # Raw Derivatives
                 if magnitude.forward is not None:
                     if directional:
-                        out_buffer.write('    Directional Derivative (Jfor)\n')
-                        out_buffer.write(str(Jfor[:, 0].reshape((Jfor.shape[0], 1))) + '\n\n')
+                        out_buffer.write('    Directional Derivative (Jfor)\n    ')
+                        out_buffer.write(str(Jfor) + '\n\n')
                     else:
-                        out_buffer.write('    Raw Forward Derivative (Jfor)\n')
+                        out_buffer.write('    Raw Forward Derivative (Jfor)\n    ')
                         out_buffer.write(str(Jfor) + '\n\n')
 
                 if magnitude.reverse is not None:
                     if directional:
-                        out_buffer.write('    Directional Derivative (Jrev)\n')
-                        out_buffer.write(str(Jrev[0, :]) + '\n\n')
+                        out_buffer.write('    Directional Derivative (Jrev)\n    ')
+                        out_buffer.write(str(Jrev) + '\n\n')
                     else:
-                        out_buffer.write('    Raw Reverse Derivative (Jrev)\n')
+                        out_buffer.write('    Raw Reverse Derivative (Jrev)\n    ')
                         out_buffer.write(str(Jrev) + '\n\n')
 
                 try:
@@ -2800,10 +2804,10 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
                 if directional:
                     out_buffer.write(f"    Directional {fd_opts['method'].upper()}"
-                                     f" Derivative (Jfd)\n{fd[:, 0].reshape((fd.shape[0], 1))}\n")
+                                     f" Derivative (Jfd)\n    {fd}\n")
                 else:
                     out_buffer.write(f"    Raw {fd_opts['method'].upper()}"
-                                     f" Derivative (Jfd)\n{fd}\n")
+                                     f" Derivative (Jfd)\n    {fd}\n")
 
                 out_buffer.write(' -' * 30 + '\n')
 
