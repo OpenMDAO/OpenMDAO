@@ -8,7 +8,6 @@ import os
 import weakref
 import pathlib
 import textwrap
-import traceback
 
 from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
@@ -51,8 +50,7 @@ from openmdao.utils.array_utils import scatter_dist_to_local
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
     clear_reports, get_reports_dir, _load_report_plugins
 from openmdao.utils.general_utils import ContainsAll, pad_name, LocalRangeIterable, \
-    _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs, \
-    make_traceback
+    _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
@@ -566,38 +564,12 @@ class Problem(object):
         """
         If any collected errors are found, raise an exception containing all of them.
         """
-        errors = self._metadata['saved_errors']
-        if self.comm.size > 1:
-            if errors is None:
-                nerrs = 0
-            else:
-                nerrs = len(errors)
-            total_nerrs = self.comm.allreduce(nerrs)
-            if total_nerrs > 0:
-                # since we have errors at least on some ranks, gather info for first error to
-                # rank 0 for display, changing the traceback to a string since it won't pickle.
-                if nerrs == 0:
-                    einfo = []
-                else:
-                    einfo = list(errors[0])
-                    einfo[-1] = '\n'.join(s.rstrip() for s in traceback.format_tb(einfo[-1]))
-
-                errinfos = self.comm.gather(einfo, root=0)
-                if nerrs == 0:
-                    if self.comm.rank == 0:
-                        for e in errinfos:
-                            if e:
-                                errors = [tuple(e)]
-                                break
-                else:
-                    errors = [(self._name, "Exception occurred on other rank.", RuntimeError,
-                               make_traceback())]
-
-        if errors is None:
+        if self._metadata['saved_errors'] is None:
             return
 
-        # set the errors to None so that all future _collect_error calls will immediately
-        # raise an exception.
+        errors = self._metadata['saved_errors']
+
+        # set the errors to None so that all future calls will immediately raise an exception.
         self._metadata['saved_errors'] = None
 
         if errors:
@@ -610,10 +582,7 @@ class Problem(object):
 
                 # if there's only one error, include its traceback if there is one.
                 if len(errors) == 1:
-                    if isinstance(tback, str):
-                        raise exc_type('\n'.join(final_msg))
-                    else:
-                        raise exc_type('\n'.join(final_msg)).with_traceback(tback)
+                    raise exc_type('\n'.join(final_msg)).with_traceback(tback)
 
             raise RuntimeError('\n'.join(final_msg))
 
