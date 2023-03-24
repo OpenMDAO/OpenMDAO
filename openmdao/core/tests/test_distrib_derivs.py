@@ -1259,7 +1259,7 @@ class MPITestsBug(unittest.TestCase):
 
                 for name, options in self.state_options.items():
                     indep.add_output(name='states:{0}'.format(name),
-                                     shape=(3, np.prod(options['shape'])))
+                                     shape=(4, np.prod(options['shape'])))
 
                 self.add_subsystem('indep_states', indep, promotes_outputs=['*'])
 
