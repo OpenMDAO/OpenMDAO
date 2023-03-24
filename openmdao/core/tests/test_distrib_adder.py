@@ -23,7 +23,7 @@ class DistributedAdder(ExplicitComponent):
 
     def initialize(self):
         self.options.declare('local_size', types=int, default=1,
-                             desc="Loca; size of input and output vectors.")
+                             desc="Local size of input and output vectors.")
 
     def setup(self):
         """

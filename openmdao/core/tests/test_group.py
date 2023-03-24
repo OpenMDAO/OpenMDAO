@@ -2096,7 +2096,6 @@ class MyComp(om.ExplicitComponent):
 
     def setup(self):
         self.add_input('x', val=np.zeros(self._input_shape))
-                    #    src_indices=self._src_indices, flat_src_indices=self._flat_src_indices)
         self.add_output('y', val=np.zeros(self._input_shape))
 
     def compute(self, inputs, outputs):
@@ -2446,8 +2445,6 @@ class TestConnect(unittest.TestCase):
 
 
 class TestSrcIndices(unittest.TestCase):
-
-    maxDiff = None
 
     def create_problem(self, src_shape, tgt_shape, src_indices=None, flat_src_indices=False,
                        promotes=None, name=None):
