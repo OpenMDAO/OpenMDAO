@@ -48,12 +48,12 @@ class LinearSchur(BlockLinearSolver):
         """
         super()._declare_options()
         # this solver does not iterate
-        self.options.undeclare("maxiter")
-        self.options.undeclare("err_on_non_converge")
+        # self.options.undeclare("maxiter")
+        # self.options.undeclare("err_on_non_converge")
 
-        self.options.undeclare("atol")
-        self.options.undeclare("rtol")
-
+        # self.options.undeclare("atol")
+        # self.options.undeclare("rtol")
+        self.options["maxiter"] = 1
         self.options.declare("use_aitken", types=bool, default=False, desc="set to True to use Aitken relaxation")
         self.options.declare("aitken_min_factor", default=0.1, desc="lower limit for Aitken relaxation factor")
         self.options.declare("aitken_max_factor", default=1.5, desc="upper limit for Aitken relaxation factor")
@@ -79,18 +79,18 @@ class LinearSchur(BlockLinearSolver):
 
         return super()._iter_initialize()
 
-    def solve(self, mode, rel_systems=None):
+    def _single_iteration(self):
         """
         Perform the operations in the iteration loop.
         """
 
-        if mode != self._mode_linear:
-            raise ValueError(
-                f"The solve function is called with {mode} mode. But the user defined the linear Schur solve to work in {self._mode_linear} mode"
-            )
+        # if mode != self._mode_linear:
+        #     raise ValueError(
+        #         f"The solve function is called with {mode} mode. But the user defined the linear Schur solve to work in {self._mode_linear} mode"
+        #     )
         system = self._system()
         mode = self._mode_linear
-        self._update_rhs_vec()
+        # self._update_rhs_vec()
 
         use_aitken = self.options["use_aitken"]
 
@@ -295,12 +295,16 @@ class LinearSchur(BlockLinearSolver):
             parent_offset = system._doutputs._root_offset
 
             # update the output of subsys2
-            system._transfer("linear", mode, subsys2.name)
-
+            # system._transfer("linear", mode, subsys2.name)
+            dinputs_cahce = system._dinputs.asarray(copy=True)
             b_vec = subsys1._doutputs
+            # b_vec_cache1 = subsys1._doutputs.asarray(copy=True)
             off = b_vec._root_offset - parent_offset
+
             b_vec2 = subsys2._doutputs
+            # b_vec_cache2 = subsys2._doutputs.asarray(copy=True)
             off2 = b_vec2._root_offset - parent_offset
+
             subsys1_rhs = self._rhs_vec[off : off + len(b_vec)].copy()
             subsys2_rhs = self._rhs_vec[off2 : off2 + len(b_vec2)].copy()
 
@@ -312,6 +316,10 @@ class LinearSchur(BlockLinearSolver):
 
             rvec.set_val(np.zeros(len(rvec)))
 
+            # inpu_cache=system._doutputs.asarray(copy=True)
+            outp_cache = system._doutputs.asarray(copy=True)
+            resd_cache = system._dresiduals.asarray(copy=True)
+
             for ii, var in enumerate(resd_to_solve):
                 # set the linear seed of the variable we want to solve for in subsys 2
 
@@ -321,10 +329,14 @@ class LinearSchur(BlockLinearSolver):
                 scope_out, scope_in = system._get_matvec_scope()
                 scope_out = self._vars_union(self._scope_out, scope_out)
                 scope_in = self._vars_union(self._scope_in, scope_in)
-                system._apply_linear(None, None, mode, scope_out, scope_in)
+                system._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+
+                scope_out, scope_in = system._get_matvec_scope(subsys1)
+                scope_out = self._vars_union(self._scope_out, scope_out)
+                scope_in = self._vars_union(self._scope_in, scope_in)
 
                 # do a solve_linear to find C[{ii},:] A^-1
-                subsys1._solve_linear(mode, ContainsAll())
+                subsys1._solve_linear(mode, self._rel_systems, scope_out, scope_in)
 
                 # the same solve requires in the rhs too, so we save them
                 schur_rhs[ii] = subsys1._vectors["residual"]["linear"].asarray().dot(subsys1_rhs)
@@ -336,7 +348,7 @@ class LinearSchur(BlockLinearSolver):
                 scope_out, scope_in = system._get_matvec_scope(subsys1)
                 scope_out = self._vars_union(self._scope_out, scope_out)
                 scope_in = self._vars_union(self._scope_in, scope_in)
-                subsys1._apply_linear(None, None, mode, scope_out, scope_in)
+                subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
 
                 system._transfer("linear", mode, subsys2.name)
 
@@ -358,19 +370,55 @@ class LinearSchur(BlockLinearSolver):
             ################################
             #### Beg solve for subsys 2 ####
             ################################
+            system._dinputs.set_val(dinputs_cahce)
+            system._doutputs.set_val(outp_cache)
+            system._dresiduals.set_val(resd_cache)
+            b_vec2.set_val(0.0)
 
+            system._transfer("linear", mode, subsys2.name)
+
+            b_vec2 *= -1.0
+            # b_vec += subsys1_rhs
+
+            b_vec2 += subsys2_rhs
+
+            # b_vec.set_val(b_vec_cache1)
+            # if self._rel_systems is None and subsys2.pathname in self._rel_systems:
+
+            #     if subsys2._is_local:
+            # b_vec2.set_val(b_vec_cache2)
+
+            # b_vec2.set_val(0.0)
+            # system._transfer("linear", mode, subsys2.name)
+            # b_vec2 *= -1.0
+            # b_vec2 += subsys2_rhs
             schur_rhs = subsys2_rhs - schur_rhs
 
             d_subsys2 = scipy.linalg.solve(schur_jac, schur_rhs)
 
+            if system.comm.rank == 0:
+                print("\nupdate vector: ", d_subsys2, flush=True)
+
+            scope_out, scope_in = system._get_matvec_scope(subsys2)
+            scope_out = self._vars_union(self._scope_out, scope_out)
+            scope_in = self._vars_union(self._scope_in, scope_in)
+
             # loop over the variables just to be safe with the ordering
-            for ii, var in enumerate(vars_to_solve):
+            for ii, var in enumerate(resd_to_solve):
                 system._dresiduals[f"{subsys2.name}.{var}"] = d_subsys2[ii]
 
+            # scope_out, scope_in = system._get_matvec_scope()
+            # scope_out = self._vars_union(self._scope_out, scope_out)
+            # scope_in = self._vars_union(self._scope_in, scope_in)
+            # subsys1._dresiduals.set_val(0.0)
+            # system._apply_linear(None, None, mode, scope_out, scope_in)
+
             if subsys2._iter_call_apply_linear():
-                subsys2._apply_linear(None, None, mode, scope_out, scope_in)
+                subsys2._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
             else:
                 b_vec2.set_val(0.0)
+                # else:
+                #     system._transfer('linear', mode, subsys2.name)
             ################################
             #### End solve for subsys 2 ####
             ################################
@@ -378,14 +426,28 @@ class LinearSchur(BlockLinearSolver):
             ################################
             #### Beg solve for subsys 1 ####
             ################################
+            # if self._rel_systems is None and subsys1.pathname in self._rel_systems:
+            #     if subsys1._is_local:
             b_vec.set_val(0.0)
+
             system._transfer("linear", mode, subsys1.name)
 
             b_vec *= -1.0
             # b_vec += subsys1_rhs
 
             b_vec += subsys1_rhs
-            subsys1._solve_linear(mode, ContainsAll())
+
+            scope_out, scope_in = system._get_matvec_scope(subsys1)
+            scope_out = self._vars_union(self._scope_out, scope_out)
+            scope_in = self._vars_union(self._scope_in, scope_in)
+            subsys1._solve_linear(mode, self._rel_systems, scope_out, scope_in)
+
+            if subsys1._iter_call_apply_linear():
+                subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+            else:
+                b_vec.set_val(0.0)
+                # else:
+                #     system._transfer('linear', mode, subsys1.name)
 
             ################################
             #### End solve for subsys 1 ####
