@@ -69,16 +69,28 @@ They're useful for "functionalizing" OpenMDAO systems so that other tools can be
 They provide a clean mechanism through which drivers can be nested (such as in the previous topic).
 
 They're also full of pitfalls when it comes to things like getting complex-step differentiation to work through them or with MPI.
-  
+
+In OpenMDAO, their utility can be extended by allowing us to isolate drivers ... having a DOEDriver drive a subproblem
+with an optimization driver, for instance. This application is an advanced feature. Getting derivatives through an
+optimization is not necessary for a DOEDriver, but getting derivatives across optimization might be applicable for future
+use cases.
+
 ### Goal:  
 
 Develop a standard subproblem component that handles the tricky bits of the implementation for most use cases.
-Quantify potential improvements that come from "hiding" data from deeper models through the subproblem interface.
+We'll begin with a driver-free Submodel implementation.
+Our experience has shown that "hiding" parts of a model in a subproblem can be beneficial for performance when
+the number of inputs and outputs to that submodel is smaller than the number of variables within it.
+
+A SubOptimization component will be a further goal, enabling the attachment and modification of a driver on the
+enclosed problem.
+At first, this will be a derivative-free implementation useful for being driven by DOEDriver or gradient-free drivers
+such as GA.
 
 ## Local Model Configuration
 
 When assembling complicated models, users often find themselves changing the way models behave.
-In many cases, this involves making modifications in the setup methods of the source code of these models.
+In many cases, this involves making modifications in the setup methods of the source code of models that are dependencies of the users' work.
 This is generally a poor practice, as it leads to modified source files that can cause unintended behavior when used elsewhere.
 Users may forget about modifications they make and accidentally commit changed code to version control repositories.
 We want to discourage this as much as possible, and provide users with a means by which they can tweak the behavior of a model from a run script.
@@ -89,6 +101,20 @@ To some extent, we've done this through [POEM 072](https://github.com/OpenMDAO/P
 We want to continue to push this capability by providing a dictionary at the problem level that contains options to be consumed by subsystems within the problem model.
 
 We may provide users with a standard file interface that allows them to provide model configuration in a flat file. This way, the code implementation would not need to be touched by the user in order to exercise the model.
+
+## Ease-of-Use: Common math functions
+
+Users often find themselves implementing common mathematics formulas in their models.
+When providing analytic derivatives, this usually involves some referencing of textbooks or online differentiation tools.
+
+### Goal
+
+Rather than having the user go through this friction often, we will provide a set of common mathematical routines as
+functions along with functions that provide their derivatives.
+This should make it significantly easier for users to put together their own derivatives in `compute_partials`.
+
+While we considered automatic differentiation tools, that involves bringing in some significant dependencies and in
+some cases the tools aren't capable.  For instance, `jax.grad` will only provide derivatives for scalar outputs.
 
 ## Hessian Information 
 
