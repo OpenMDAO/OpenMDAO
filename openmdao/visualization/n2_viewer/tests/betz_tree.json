@@ -1,7 +1,7 @@
 {
     "name": "root",
     "type": "root",
-    "class": "Group",
+    "class": "openmdao.core.group:Group",
     "expressions": null,
     "component_type": null,
     "subsystem_type": "group",
@@ -23,7 +23,7 @@
         {
             "name": "indeps",
             "type": "subsystem",
-            "class": "IndepVarComp",
+            "class": "openmdao.core.indepvarcomp:IndepVarComp",
             "expressions": null,
             "subsystem_type": "component",
             "is_parallel": false,
@@ -138,7 +138,7 @@
         {
             "name": "a_disk",
             "type": "subsystem",
-            "class": "ActuatorDisc",
+            "class": "openmdao.test_suite.test_examples.test_betz_limit:ActuatorDisc",
             "expressions": null,
             "subsystem_type": "component",
             "is_parallel": false,

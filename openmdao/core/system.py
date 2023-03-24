@@ -4333,7 +4333,7 @@ class System(object):
         list of (name, metadata)
             List of input names and other optional information about those inputs.
         """
-        if self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
+        if (self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP) and val:
             issue_warning("Calling `list_inputs` before `final_setup` will only "
                           "display the default values of variables and will not show the result of "
                           "any `set_val` calls.")
