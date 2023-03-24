@@ -498,25 +498,6 @@ class TestGroup(unittest.TestCase):
         np.testing.assert_allclose(p['comp1.y'], 60.)
         np.testing.assert_allclose(p['comp2.y'], 5.)
 
-    def test_double_src_indices(self):
-        class SlicerComp(om.ExplicitComponent):
-            def setup(self):
-                self.add_input('x', np.ones(3), src_indices=[0, 1, 2])
-
-        p = om.Problem(name='double_src_indices')
-
-        p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)))
-        p.model.add_subsystem('C1', SlicerComp())
-        p.model.connect('indep.x', 'C1.x', src_indices=[1, 0, 2])
-
-        with self.assertRaises(Exception) as context:
-            p.setup()
-        self.assertEqual(str(context.exception),
-            "\nCollected errors for problem 'double_src_indices':"
-            "\n   <model> <class Group>: src_indices has been defined in both connect('indep.x', 'C1.x') "
-            "and add_input('C1.x', ...).")
-
-
     def test_incompatible_src_indices_error(self):
         class ControlInterpComp(om.ExplicitComponent):
 
@@ -728,13 +709,13 @@ class TestGroup(unittest.TestCase):
     def test_om_slice_in_add_input(self):
         class SlicerComp(om.ExplicitComponent):
             def setup(self):
-                self.add_input('x', np.ones(4), src_indices=om.slicer[:, 2])
+                self.add_input('x', np.ones(4))
 
         p = om.Problem()
 
         p.model.add_subsystem('indep', om.IndepVarComp('x', arr_order_4x4))
         p.model.add_subsystem('C1', SlicerComp())
-        p.model.connect('indep.x', 'C1.x')
+        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[:, 2])
 
         p.setup()
         p.run_model()
@@ -744,13 +725,13 @@ class TestGroup(unittest.TestCase):
     def test_om_slice_negative_stop(self):
         class SlicerComp(om.ExplicitComponent):
             def setup(self):
-                self.add_input('x', np.ones(4), src_indices=om.slicer[:, -1])
+                self.add_input('x', np.ones(4))
 
         p = om.Problem()
 
         p.model.add_subsystem('indep', om.IndepVarComp('x', arr_order_4x4))
         p.model.add_subsystem('C1', SlicerComp())
-        p.model.connect('indep.x', 'C1.x')
+        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[:, -1])
 
         p.setup()
         p.run_model()
@@ -760,7 +741,7 @@ class TestGroup(unittest.TestCase):
     def test_om_slice_3d(self):
         class SlicerComp(om.ExplicitComponent):
             def setup(self):
-                self.add_input('x', np.ones(4), src_indices=om.slicer[:, 1, 2])
+                self.add_input('x', np.ones(4))
 
         arr = np.arange(64, dtype=int).reshape(4, 4, 4)
 
@@ -768,7 +749,7 @@ class TestGroup(unittest.TestCase):
 
         p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
         p.model.add_subsystem('C1', SlicerComp())
-        p.model.connect('indep.x', 'C1.x')
+        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[:, 1, 2])
 
         p.setup()
         p.run_model()
@@ -1116,7 +1097,7 @@ class TestGroup(unittest.TestCase):
     def test_promote_src_indices_nonflat_to_scalars(self):
         class MyComp(om.ExplicitComponent):
             def setup(self):
-                self.add_input('x', 1.0, src_indices=[[3],[1]], shape=(1,))
+                self.add_input('x', 1.0, shape=(1,))
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
@@ -1128,6 +1109,7 @@ class TestGroup(unittest.TestCase):
                               om.IndepVarComp('x', np.arange(12).reshape((4, 3))),
                               promotes_outputs=['x'])
         p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
+        p.model.promotes('C1', inputs=['x'], src_indices=[[3],[1]])
 
         p.set_solver_print(level=0)
         p.setup()
@@ -1148,14 +1130,12 @@ class TestGroup(unittest.TestCase):
 
         class MyComp(om.ExplicitComponent):
             def setup(self):
-                sidxs = idxvals
                 if len(tgt_shape) == 1:
                     tshape = None  # don't need to set shape if input is flat
                 else:
                     tshape = tgt_shape
 
-                self.add_input('x', np.ones(4).reshape(tgt_shape),
-                               src_indices=sidxs, flat_src_indices=flat, shape=tshape)
+                self.add_input('x', np.ones(4).reshape(tgt_shape), shape=tshape)
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
@@ -1167,6 +1147,7 @@ class TestGroup(unittest.TestCase):
                               om.IndepVarComp('x', np.arange(12).reshape(src_shape)),
                               promotes_outputs=['x'])
         p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
+        p.model.promotes('C1', inputs=['x'], src_indices=idxvals, flat_src_indices=flat)
 
         p.set_solver_print(level=0)
         p.setup()
@@ -1464,7 +1445,7 @@ class TestGroupMPISlice(unittest.TestCase):
     def test_om_slice_2d_mpi(self):
         class MyComp1(om.ExplicitComponent):
             def setup(self):
-                self.add_input('x', np.ones(4), src_indices=om.slicer[:, 2], distributed=True)
+                self.add_input('x', np.ones(4), distributed=True)
                 self.add_output('y', 1.0, distributed=True)
 
             def compute(self, inputs, outputs):
@@ -1476,7 +1457,7 @@ class TestGroupMPISlice(unittest.TestCase):
 
         p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
         p.model.add_subsystem('C1', MyComp1())
-        p.model.connect('indep.x', 'C1.x')
+        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[:, 2])
 
         p.setup()
         p.run_model()
@@ -1487,7 +1468,7 @@ class TestGroupMPISlice(unittest.TestCase):
     def test_om_slice_3d_mpi(self):
         class MyComp1(om.ExplicitComponent):
             def setup(self):
-                self.add_input('x', np.ones(4), src_indices=om.slicer[:, 1, 2], distributed=True)
+                self.add_input('x', np.ones(4), distributed=True)
                 self.add_output('y', 1.0, distributed=True)
 
             def compute(self, inputs, outputs):
@@ -1499,7 +1480,7 @@ class TestGroupMPISlice(unittest.TestCase):
 
         p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
         p.model.add_subsystem('C1', MyComp1())
-        p.model.connect('indep.x', 'C1.x')
+        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[:, 1, 2])
 
         p.setup()
         p.run_model()
@@ -1533,7 +1514,7 @@ class TestGroupMPISlice(unittest.TestCase):
     def test_om_slice_negative_stop_mpi(self):
         class MyComp1(om.ExplicitComponent):
             def setup(self):
-                self.add_input('x', np.ones(4), src_indices=om.slicer[:,-1], distributed=True)
+                self.add_input('x', np.ones(4), distributed=True)
                 self.add_output('y', 1.0, distributed=True)
 
             def compute(self, inputs, outputs):
@@ -1545,7 +1526,7 @@ class TestGroupMPISlice(unittest.TestCase):
 
         p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
         p.model.add_subsystem('C1', MyComp1())
-        p.model.connect('indep.x', 'C1.x')
+        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[:,-1])
 
         p.setup()
         p.run_model()
@@ -1942,35 +1923,6 @@ class TestGroupPromotes(unittest.TestCase):
         assert_near_equal(p['comp1.y'], np.array([3, 6, 9]))
         assert_near_equal(p['comp1.z'], np.array([3, 10, 17]))
 
-    def test_promotes_src_indices_mixed(self):
-
-        class SimpleGroup(om.Group):
-            def setup(self):
-                self.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
-                self.add_subsystem('comp1', om.ExecComp('z=x+y',
-                                                        x=np.ones(3),
-                                                        y={'val': np.ones(3),
-                                                           'src_indices': [1, 2, 3]},
-                                                        z=np.ones(3)),
-                                    promotes_inputs=['y'])
-
-            def configure(self):
-                self.indep.add_output('x', 2*np.array(range(5)))
-                self.indep.add_output('y', 3*np.array(range(5)))
-                self.promotes('comp1', inputs=['x'], src_indices=[0, 2, 4])
-
-        p = om.Problem(model=SimpleGroup())
-
-        p.setup()
-        p.run_model()
-
-        assert_near_equal(p['indep.x'], np.array([0, 2, 4, 6, 8]))
-        assert_near_equal(p['indep.y'], np.array([0, 3, 6, 9, 12]))
-
-        assert_near_equal(p['comp1.x'], np.array([0, 4, 8]))
-        assert_near_equal(p['comp1.y'], np.array([3, 6, 9]))
-        assert_near_equal(p['comp1.z'], np.array([3, 10, 17]))
-
     def test_promotes_src_indices_mixed_array(self):
 
         class SimpleGroup(om.Group):
@@ -1978,16 +1930,15 @@ class TestGroupPromotes(unittest.TestCase):
                 self.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
                 self.add_subsystem('comp1', om.ExecComp('z=x+y',
                                                         x=np.ones(3),
-                                                        y={'val': np.ones(3),
-                                                           'src_indices': [1, 2, 3]},
+                                                        y={'val': np.ones(3)},
                                                         z=np.ones(3)),
                                     promotes_inputs=['y'])
 
             def configure(self):
                 self.indep.add_output('x', 2*np.array(range(5)))
                 self.indep.add_output('y', 3*np.array(range(5)))
-                self.promotes('comp1', inputs=['x'],
-                              src_indices=np.array([0, 2, 4]))
+                self.promotes('comp1', inputs=['x'], src_indices=np.array([0, 2, 4]))
+                self.promotes('comp1', inputs=['y'], src_indices=[1, 2, 3])
 
         p = om.Problem(model=SimpleGroup())
 
@@ -2144,8 +2095,7 @@ class MyComp(om.ExplicitComponent):
         self._flat_src_indices = flat_src_indices
 
     def setup(self):
-        self.add_input('x', val=np.zeros(self._input_shape),
-                       src_indices=self._src_indices, flat_src_indices=self._flat_src_indices)
+        self.add_input('x', val=np.zeros(self._input_shape))
         self.add_output('y', val=np.zeros(self._input_shape))
 
     def compute(self, inputs, outputs):
@@ -2499,12 +2449,12 @@ class TestSrcIndices(unittest.TestCase):
     def create_problem(self, src_shape, tgt_shape, src_indices=None, flat_src_indices=False,
                        promotes=None, name=None):
         prob = om.Problem(name=name)
-        prob.model.add_subsystem('indeps', om.IndepVarComp('x', shape=src_shape),
-                                 promotes=promotes)
-        prob.model.add_subsystem('C1', MyComp(tgt_shape,
-                                              src_indices=src_indices if promotes else None,
-                                              flat_src_indices=flat_src_indices),
-                                 promotes=promotes)
+        prob.model.add_subsystem('indeps', om.IndepVarComp('x', shape=src_shape), promotes=promotes)
+        prob.model.add_subsystem('C1', MyComp(tgt_shape))
+
+        if promotes:
+            prob.model.promotes('C1', inputs=promotes, src_indices=src_indices, flat_src_indices=flat_src_indices)
+
         if promotes is None:
             prob.model.connect('indeps.x', 'C1.x', src_indices=src_indices,
                                flat_src_indices=flat_src_indices)
@@ -2522,8 +2472,8 @@ class TestSrcIndices(unittest.TestCase):
               "of bounds for source dimension of size 9."
 
         p = self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
-                            src_indices=[4, 7, 5, 9],
-                            flat_src_indices=True, name='src_indices_shape_bad_idx_flat')
+                                src_indices=[4, 7, 5, 9], flat_src_indices=True,
+                                name='src_indices_shape_bad_idx_flat')
         try:
             p.setup()
         except Exception as err:
@@ -2533,12 +2483,12 @@ class TestSrcIndices(unittest.TestCase):
 
     def test_src_indices_shape_bad_idx_flat_promotes(self):
         p = self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
-                            src_indices=[4, 5, 7, 9],
-                            flat_src_indices=True, promotes=['x'], name='src_indices_shape_bad_idx_flat_promotes')
+                                src_indices=[4, 5, 7, 9], flat_src_indices=True, promotes=['x'],
+                                name='src_indices_shape_bad_idx_flat_promotes')
 
         msg = "\nCollected errors for problem 'src_indices_shape_bad_idx_flat_promotes':" + \
-              "\n   'C1' <class MyComp>: When accessing 'indeps.x' with src_shape (3, 3) from 'x' " + \
-              "using src_indices [4 5 7 9]: index 9 is out of bounds for source dimension of size 9."
+              "\n   <model> <class Group>: When connecting 'indeps.x' to 'C1.x':" + \
+              " index 9 is out of bounds for source dimension of size 9."
         try:
             p.setup()
         except Exception as err:
@@ -2551,8 +2501,8 @@ class TestSrcIndices(unittest.TestCase):
               "\n   <model> <class Group>: When connecting 'indeps.x' to 'C1.x': index -10 is out " + \
               "of bounds for source dimension of size 9."
         p = self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
-                            src_indices=[-10, 5, 7, 8],
-                            flat_src_indices=True, name='src_indices_shape_bad_idx_flat_neg')
+                                src_indices=[-10, 5, 7, 8], flat_src_indices=True,
+                                name='src_indices_shape_bad_idx_flat_neg')
         try:
             p.setup()
         except Exception as err:
@@ -3532,7 +3482,7 @@ class TestFeatureSrcIndices(unittest.TestCase):
         class MyComp1(om.ExplicitComponent):
             def setup(self):
                 # this input will connect to entries 0, 1, and 2 of its source
-                self.add_input('x', np.ones(3), src_indices=[0, 1, 2])
+                self.add_input('x', np.ones(3))
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
@@ -3541,7 +3491,7 @@ class TestFeatureSrcIndices(unittest.TestCase):
         class MyComp2(om.ExplicitComponent):
             def setup(self):
                 # this input will connect to entries 3 and 4 of its source
-                self.add_input('x', np.ones(2), src_indices=[3, 4])
+                self.add_input('x', np.ones(2))
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
@@ -3555,6 +3505,9 @@ class TestFeatureSrcIndices(unittest.TestCase):
                               promotes_outputs=['x'])
         p.model.add_subsystem('C1', MyComp1(), promotes_inputs=['x'])
         p.model.add_subsystem('C2', MyComp2(), promotes_inputs=['x'])
+
+        p.model.promotes('C1', inputs=['x'], src_indices=[0, 1, 2])
+        p.model.promotes('C2', inputs=['x'], src_indices=[3, 4])
 
         p.setup()
         p.run_model()
@@ -3570,9 +3523,7 @@ class TestFeatureSrcIndices(unittest.TestCase):
             def setup(self):
                 # We want to pull the following 4 values out of the source:
                 # [(0,0), (3,1), (2,1), (1,1)].
-                self.add_input('x', np.ones((2, 2)),
-                               src_indices=[[0,3,2,1],[0,1,1,1]],
-                               flat_src_indices=False)
+                self.add_input('x', np.ones((2, 2)))
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
@@ -3585,9 +3536,11 @@ class TestFeatureSrcIndices(unittest.TestCase):
         p.model.add_subsystem('indep',
                               om.IndepVarComp('x', np.arange(12).reshape((4, 3))),
                               promotes_outputs=['x'])
-        p.model.add_subsystem('C1', MyComp(),
-                              promotes_inputs=['x'])
+        p.model.add_subsystem('C1', MyComp())
 
+        p.model.promotes('C1', inputs=['x'],
+                               src_indices=[[0,3,2,1],[0,1,1,1]],
+                               flat_src_indices=False)
         p.setup()
         p.run_model()
 

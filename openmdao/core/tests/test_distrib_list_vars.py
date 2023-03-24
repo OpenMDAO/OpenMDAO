@@ -30,8 +30,8 @@ class DistributedAdder(om.ExplicitComponent):
     """
 
     def initialize(self):
-        self.options.declare('size', types=int, default=1,
-                             desc="Size of input and output vectors.")
+        self.options.declare('local_size', types=int, default=1,
+                             desc="Local size of input and output vectors.")
 
     def setup(self):
         """
@@ -39,19 +39,8 @@ class DistributedAdder(om.ExplicitComponent):
         distributed component will handle. Indices do NOT need to be sequential or
         contiguous!
         """
-        comm = self.comm
-        rank = comm.rank
-
-        # NOTE: evenly_distrib_idxs is a helper function to split the array
-        #       up as evenly as possible
-        sizes, offsets = evenly_distrib_idxs(comm.size,self.options['size'])
-        local_size, local_offset = sizes[rank], offsets[rank]
-
-        start = local_offset
-        end = local_offset + local_size
-
-        self.add_input('x', val=np.zeros(local_size, float), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
+        local_size = self.options['local_size']
+        self.add_input('x', val=np.zeros(local_size, float), distributed=True)
         self.add_output('y', val=np.zeros(local_size, float), distributed=True)
 
     def compute(self, inputs, outputs):
@@ -74,9 +63,22 @@ class DistributedListVarsTest(unittest.TestCase):
 
         prob = om.Problem()
 
+        comm = prob.comm
+        rank = comm.rank
+
+        # NOTE: evenly_distrib_idxs is a helper function to split the array
+        #       up as evenly as possible
+        sizes, offsets = evenly_distrib_idxs(comm.size, size)
+        local_size, local_offset = sizes[rank], offsets[rank]
+
+        start = local_offset
+        end = local_offset + local_size
+
         prob.model.add_subsystem('des_vars', om.IndepVarComp('x', np.ones(size)), promotes=['x'])
-        prob.model.add_subsystem('plus', DistributedAdder(size=size), promotes=['x', 'y'])
+        prob.model.add_subsystem('plus', DistributedAdder(local_size=int(local_size)), promotes_outputs=['y'])
         prob.model.add_subsystem('summer', Summer(size=size), promotes_outputs=['sum'])
+
+        prob.model.promotes('plus', inputs=['x'],  src_indices=np.arange(start, end, dtype=int))
         prob.model.promotes('summer', inputs=[('invec', 'y')], src_indices=om.slicer[:])
 
         prob.setup(force_alloc_complex=True)  # force complex array storage to detect mpi bug

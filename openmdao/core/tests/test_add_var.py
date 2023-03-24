@@ -38,51 +38,15 @@ class CompAddWithShape(om.ExplicitComponent):
         self.add_output('y_c', shape=[3, 3])
 
 
-class CompAddWithIndices(om.ExplicitComponent):
-    """Component for tests for declaring only indices."""
-
-    def setup(self):
-        self.add_input('x_a', src_indices=0, flat_src_indices=True)
-        self.add_input('x_b', src_indices=[0, 1], flat_src_indices=True)
-        self.add_input('x_c', src_indices=[0, 1], flat_src_indices=True)
-        self.add_input('x_d', src_indices=np.arange(6), flat_src_indices=True)
-        self.add_input('x_e', src_indices=np.arange(6), shape=(3, 2), flat_src_indices=True)
-
-        self.add_output('y')
-
-
-class CompAddWithShapeAndIndices(om.ExplicitComponent):
-    """Component for tests for declaring shape and array indices."""
-
-    def setup(self):
-        self.add_input('x_a', shape=2, src_indices=[0, 1])
-        self.add_input('x_b', shape=(2,), src_indices=[0, 1])
-        self.add_input('x_c', shape=(2, 2), src_indices=np.arange(4), flat_src_indices=True)
-        self.add_input('x_d', shape=[2, 2], src_indices=np.arange(4), flat_src_indices=True)
-
-
 class CompAddArrayWithScalar(om.ExplicitComponent):
     """Component for tests for declaring a scalar val with an array variable."""
 
     def setup(self):
         self.add_input('x_a', val=2.0, shape=(6))
         self.add_input('x_b', val=2.0, shape=(3, 2))
-        self.add_input('x_c', val=2.0, src_indices=np.arange(6), flat_src_indices=True)
-        self.add_input('x_d', val=2.0, src_indices=np.arange(6), shape=(3,2), flat_src_indices=True)
 
         self.add_output('y_a', val=3.0, shape=(6))
         self.add_output('y_b', val=3.0, shape=(3, 2))
-
-
-class CompAddWithArrayIndices(om.ExplicitComponent):
-    """Component for tests for declaring with array val and array indices."""
-
-    def setup(self):
-        self.add_input('x_a', val=2.0 * np.ones(6), src_indices=np.arange(6))
-        self.add_input('x_b', val=2.0 * np.ones((3, 2)), src_indices=np.arange(6),
-                       flat_src_indices=True)
-
-        self.add_output('y')
 
 
 class CompAddWithBounds(om.ExplicitComponent):
@@ -132,31 +96,6 @@ class TestAddVar(unittest.TestCase):
         assert_near_equal(p.get_val('y_b'), np.ones((3, 3)))
         assert_near_equal(p.get_val('y_c'), np.ones((3, 3)))
 
-    def test_indices(self):
-        """Test declaring only indices."""
-
-        p = om.Problem()
-        p.model.add_subsystem('comp', CompAddWithIndices(), promotes=['*'])
-        p.setup()
-
-        assert_near_equal(p.get_val('x_a'), 1.)
-        assert_near_equal(p.get_val('x_b'), np.ones(2))
-        assert_near_equal(p.get_val('x_c'), np.ones(2))
-        assert_near_equal(p.get_val('x_d'), np.ones(6))
-        assert_near_equal(p.get_val('x_e'), np.ones((3,2)))
-
-    def test_shape_and_indices(self):
-
-        """Test declaring shape and indices."""
-        p = om.Problem()
-        p.model.add_subsystem('comp', CompAddWithShapeAndIndices(), promotes=['*'])
-        p.setup()
-
-        assert_near_equal(p.get_val('x_a'), np.ones(2))
-        assert_near_equal(p.get_val('x_b'), np.ones(2))
-        assert_near_equal(p.get_val('x_c'), np.ones((2,2)))
-        assert_near_equal(p.get_val('x_d'), np.ones((2,2)))
-
     def test_scalar_array(self):
         """Test declaring a scalar val with an array variable."""
 
@@ -166,20 +105,8 @@ class TestAddVar(unittest.TestCase):
 
         assert_near_equal(p.get_val('x_a'), 2. * np.ones(6))
         assert_near_equal(p.get_val('x_b'), 2. * np.ones((3, 2)))
-        assert_near_equal(p.get_val('x_c'), 2. * np.ones(6))
-        assert_near_equal(p.get_val('x_d'), 2. * np.ones((3, 2)))
         assert_near_equal(p.get_val('y_a'), 3. * np.ones(6))
         assert_near_equal(p.get_val('y_b'), 3. * np.ones((3, 2)))
-
-    def test_array_indices(self):
-        """Test declaring with array val and array indices."""
-
-        p = om.Problem()
-        p.model.add_subsystem('comp', CompAddWithArrayIndices(), promotes=['*'])
-        p.setup()
-
-        assert_near_equal(p.get_val('x_a'), 2. * np.ones(6))
-        assert_near_equal(p.get_val('x_b'), 2. * np.ones((3, 2)))
 
     def test_bounds(self):
         """Test declaring bounds."""

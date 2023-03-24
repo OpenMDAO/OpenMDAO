@@ -1304,11 +1304,6 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         # Derivatives have large magniudes, so tols are high.
         assert_check_totals(totals, atol=1e3, rtol=1e-4)
 
-    def test_deprecated(self):
-        # Make sure deprecated methods are still in the table_methods list.
-        om.MetaModelStructuredComp(method='trilinear')
-        om.MetaModelStructuredComp(method='akima1D')
-
 
 @use_tempdirs
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
