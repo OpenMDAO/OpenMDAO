@@ -29,7 +29,7 @@ class LinearSchur(BlockLinearSolver):
         option is turned on.
     """
 
-    SOLVER = "LN: SCHUR"
+    SOLVER = "LN: LNSCHUR"
 
     def __init__(self, mode_linear="rev", groupNames=["group1", "group2"], **kwargs):
         """
