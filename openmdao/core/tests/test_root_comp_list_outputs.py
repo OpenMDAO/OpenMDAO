@@ -9,11 +9,12 @@ class TestRootComponentListOutputs(unittest.TestCase):
         """Test list_outputs when the root model is a Component."""
 
         comp1 = om.IndepVarComp()
-        comp1.add_output('comp1_a', 1.0)
-        comp1.add_output('comp1_b', 2.0)
-        comp1.add_output('comp1_c', 3.0)
+        comp1.add_output('a', 1.0)
+        comp1.add_output('b', 2.0)
+        comp1.add_output('c', 3.0)
 
-        prob = om.Problem(model=comp1)
+        prob = om.Problem()
+        prob.model.add_subsystem('comp1', comp1)
         prob.setup()
         prob.run_model()
 
@@ -21,12 +22,12 @@ class TestRootComponentListOutputs(unittest.TestCase):
         outputs = prob.model.list_outputs(hierarchical=False, out_stream=stream)
 
         self.assertEqual(sorted(outputs), [
-            ('comp1_a', {'val': [1.]}),
-            ('comp1_b', {'val': [2.]}),
-            ('comp1_c', {'val': [3.]})
+            ('comp1.a', {'val': [1.]}),
+            ('comp1.b', {'val': [2.]}),
+            ('comp1.c', {'val': [3.]})
         ])
         text = stream.getvalue()
-        self.assertEqual(text.count('comp1_'), 3)
+        self.assertEqual(text.count('comp1.'), 3)
 
 if __name__ == '__main__':
     unittest.main()

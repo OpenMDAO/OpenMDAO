@@ -41,7 +41,8 @@ class TestProblem(unittest.TestCase):
             def compute_partials(self, inputs, J):
                 J['bar', 'foo'] = 1.
 
-        p = om.Problem(model=TestComp())
+        p = om.Problem()
+        p.model.add_subsystem('comp', TestComp(), promotes=['*'])
         p.setup()
 
         p.set_val('foo', 5, units='lbf')
