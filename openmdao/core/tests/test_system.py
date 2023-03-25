@@ -251,54 +251,57 @@ class TestSystem(unittest.TestCase):
         outputs = model.list_outputs(excludes=['circuit*'], implicit=False, out_stream=None)
         self.assertEqual(len(outputs), 2)
 
-    def test_list_inputs_outputs_val_deprecation(self):
-        p = Problem()
-        p.model.add_subsystem('comp', ExecComp('b=2*a'), promotes=['a', 'b'])
-        p.setup()
-        p.run_model()
+    def test_list_inputs_outputs_is_indep_is_des_var(self):
+        from openmdao.test_suite.components.sellar_feature import SellarMDA
 
-        msg = "<model> <class Group>: The 'values' argument to 'list_inputs()' " \
-              "is deprecated and will be removed in 4.0. Please use 'val' instead."
+        model = SellarMDA()
 
-        with assert_warning(OMDeprecationWarning, msg):
-            inputs = p.model.list_inputs(values=False, out_stream=None)
-        self.assertEqual(inputs, [('comp.a', {})])
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        # model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
 
-        with assert_warning(OMDeprecationWarning, msg):
-            inputs = p.model.list_inputs(values=True, out_stream=None)
-        self.assertEqual(inputs, [('comp.a', {'val': 1})])
+        prob = Problem(model)
 
-        msg = "The metadata key 'value' will be deprecated in 4.0. Please use 'val'."
-        with assert_warning(OMDeprecationWarning, msg):
-            self.assertEqual(inputs[0][1]['value'], 1)
+        prob.setup()
+        prob.final_setup()
 
-        msg = "<model> <class Group>: The 'values' argument to 'list_outputs()' " \
-              "is deprecated and will be removed in 4.0. Please use 'val' instead."
+        indeps = model.list_inputs(is_indep_var=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in indeps]),
+                         ['cycle.d1.x', 'cycle.d1.z', 'cycle.d2.z',
+                          'obj_cmp.x', 'obj_cmp.z'])
 
-        with assert_warning(OMDeprecationWarning, msg):
-            outputs = p.model.list_outputs(values=False, out_stream=None)
-        self.assertEqual(outputs, [('comp.b', {})])
+        desvars = model.list_inputs(is_design_var=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in desvars]),
+                         ['cycle.d1.z', 'cycle.d2.z', 'obj_cmp.z'])
 
-        with assert_warning(OMDeprecationWarning, msg):
-            outputs = p.model.list_outputs(values=True, out_stream=None)
-        self.assertEqual(outputs, [('comp.b', {'val': 2})])
+        non_desvars = model.list_inputs(is_design_var=False, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in non_desvars]),
+                         ['con_cmp1.y1', 'con_cmp2.y2',
+                          'cycle.d1.x', 'cycle.d1.y2', 'cycle.d2.y1',
+                          'obj_cmp.x', 'obj_cmp.y1', 'obj_cmp.y2'])
 
-        msg = "The metadata key 'value' will be deprecated in 4.0. Please use 'val'."
-        with assert_warning(OMDeprecationWarning, msg):
-            self.assertEqual(outputs[0][1]['value'], 2)
+        nonDV_indeps = model.list_inputs(is_indep_var=True, is_design_var=False, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in nonDV_indeps]),
+                         ['cycle.d1.x', 'obj_cmp.x'])
 
-        meta = p.model.get_io_metadata(metadata_keys=('val',))
-        with assert_warning(OMDeprecationWarning, msg):
-            self.assertEqual(meta['comp.a']['value'], 1)
+        indeps = model.list_outputs(is_indep_var=True, list_autoivcs=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in indeps]),
+                         ['_auto_ivc.v0', '_auto_ivc.v1'])
 
-        with assert_warning(OMDeprecationWarning, msg):
-            meta = p.model.get_io_metadata(metadata_keys=('value',))
-        self.assertEqual(meta['comp.a']['val'], 1)
+        desvars = model.list_outputs(is_design_var=True, list_autoivcs=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in desvars]),
+                         ['_auto_ivc.v0'])
 
-        with assert_warning(OMDeprecationWarning, msg):
-            meta = p.model.get_io_metadata(metadata_keys=('value',))
-        with assert_warning(OMDeprecationWarning, msg):
-            self.assertEqual(meta['comp.a']['value'], 1)
+        non_desvars = model.list_outputs(is_design_var=False, list_autoivcs=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in non_desvars]),
+                         ['_auto_ivc.v1', 'con_cmp1.con1', 'con_cmp2.con2',
+                          'cycle.d1.y1', 'cycle.d2.y2', 'obj_cmp.obj'])
+
+        nonDV_indeps = model.list_outputs(is_indep_var=True, is_design_var=False, list_autoivcs=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in nonDV_indeps]),
+                         ['_auto_ivc.v1'])
 
     def test_setup_check_group(self):
 

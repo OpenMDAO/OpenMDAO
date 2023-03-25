@@ -1573,7 +1573,7 @@ class _TotalJacInfo(object):
             Index array of zero entries.
         """
         inds = tup[1]  # these must be indices into the flattened var
-        shname = 'shape' if self.get_remote else 'global_shape'
+        shname = 'global_shape' if self.get_remote else 'shape'
         shape = self.model._var_allprocs_abs2meta['output'][name][shname]
         vslice = jac_arr[tup[0]]
 

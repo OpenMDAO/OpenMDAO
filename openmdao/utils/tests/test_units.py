@@ -6,7 +6,7 @@ import warnings
 
 import openmdao.api as om
 from openmdao.utils.units import NumberDict, PhysicalUnit, _find_unit, import_library, \
-    add_unit, add_offset_unit, unit_conversion, get_conversion, simplify_unit
+    add_unit, add_offset_unit, unit_conversion, simplify_unit
 from openmdao.utils.assert_utils import assert_warning, assert_near_equal
 from openmdao.utils.om_warnings import OMDeprecationWarning
 
@@ -257,20 +257,6 @@ class TestPhysicalUnit(unittest.TestCase):
             self.assertEqual(str(err), "The units '1.0' are invalid.")
         else:
             self.fail("Expecting RuntimeError")
-
-    def test_get_conversion(self):
-        msg = "'get_conversion' has been deprecated. Use 'unit_conversion' instead."
-        with assert_warning(OMDeprecationWarning, msg):
-            get_conversion('km', 'm'), (1000., 0.)
-
-        self.assertEqual(get_conversion('km', 'm'), (1000., 0.))
-
-        try:
-            get_conversion('km', 1.0)
-        except ValueError as err:
-            self.assertEqual(str(err), "The units '1.0' are invalid.")
-        else:
-            self.fail("Expecting ValueError")
 
     def test_unit_simplification(self):
         test_strings = ['ft/s*s',

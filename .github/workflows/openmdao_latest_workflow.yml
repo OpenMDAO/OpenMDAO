@@ -1,0 +1,299 @@
+# Run OpenMDAO tests on latest/pre-release versions
+name: OpenMDAO Latest
+
+on:
+
+  # Run the workflow daily at 0400 UTC
+  schedule:
+    - cron: '0 4 * * *'
+
+  # Allow running the workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+
+  tests:
+
+    timeout-minutes: 120
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # test latest versions on ubuntu
+          - NAME: Ubuntu Latest
+            OS: ubuntu-latest
+            PY: 3
+            PETSc: 3
+            SNOPT: 7.7
+
+    runs-on: ${{ matrix.OS }}
+
+    name: ${{ matrix.NAME }}
+
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+      - name: Display run details
+        run: |
+          echo "============================================================="
+          echo "Run #${GITHUB_RUN_NUMBER}"
+          echo "Run ID: ${GITHUB_RUN_ID}"
+          echo "Testing: ${GITHUB_REPOSITORY}"
+          echo "Triggered by: ${GITHUB_EVENT_NAME}"
+          echo "Initiated by: ${GITHUB_ACTOR}"
+          echo "============================================================="
+
+      - name: Create SSH key
+        if: (matrix.SNOPT || matrix.BUILD_DOCS)
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh/
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          sudo chmod 600 ~/.ssh/id_rsa
+          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup conda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          python-version: ${{ matrix.PY }}
+          conda-version: "*"
+          channels: conda-forge
+          channel-priority: true
+
+      - name: Install OpenMDAO
+        run: |
+          echo "============================================================="
+          echo "Upgrade conda environment to latest"
+          echo "============================================================="
+          conda upgrade -c conda-forge --all
+
+          echo "============================================================="
+          echo "Define useful functions"
+          echo "============================================================="
+          function latest_version() {
+            local REPO_URL=$1/releases/latest
+            local LATEST_URL=`curl -fsSLI -o /dev/null -w %{url_effective} $REPO_URL`
+            local LATEST_VER=`echo $LATEST_URL | awk '{split($0,a,"/tag/"); print a[2]}'`
+            echo $LATEST_VER
+          }
+          function latest_branch() {
+            local LATEST_VER=$(latest_version $1)
+            echo git+$1@$LATEST_VER
+          }
+
+          echo "============================================================="
+          echo "Upgrade to latest pip"
+          echo "============================================================="
+          python -m pip install --upgrade pip
+
+          echo "============================================================="
+          echo "Install latest versions of NumPy/SciPy"
+          echo "============================================================="
+          python -m pip install --pre numpy
+          python -m pip install --pre scipy
+
+          # remember versions so we can check them later
+          NUMPY_VER=`python -c "import numpy; print(numpy.__version__)"`
+          SCIPY_VER=`python -c "import scipy; print(scipy.__version__)"`
+          echo "NUMPY_VER=$NUMPY_VER" >> $GITHUB_ENV
+          echo "SCIPY_VER=$SCIPY_VER" >> $GITHUB_ENV
+
+          echo "============================================================="
+          echo "Install latest versions of 'docs' dependencies"
+          echo "============================================================="
+          python -m pip install --pre matplotlib
+          python -m pip install --pre numpydoc
+          python -m pip install --pre jupyter-book
+          python -m pip install --pre sphinx-sitemap
+          python -m pip install --pre ipyparallel
+
+          echo "============================================================="
+          echo "Install latest versions of 'doe' dependencies"
+          echo "============================================================="
+          python -m pip install --pre pyDOE2
+
+          echo "============================================================="
+          echo "Install latest versions of 'notebooks' dependencies"
+          echo "============================================================="
+          python -m pip install --pre notebook
+          python -m pip install --pre ipympl
+
+          echo "============================================================="
+          echo "Install latest versions of 'visualization' dependencies"
+          echo "============================================================="
+          python -m pip install --pre bokeh
+          python -m pip install --pre colorama
+
+          echo "============================================================="
+          echo "Install latest versions of 'test' dependencies"
+          echo "============================================================="
+          python -m pip install --pre parameterized
+          python -m pip install --pre numpydoc
+          python -m pip install --pre pycodestyle
+          python -m pip install --pre pydocstyle
+          python -m pip install --pre testflo
+          python -m pip install --pre websockets
+          python -m pip install --pre aiounittest
+          python -m pip install --pre playwright
+          python -m pip install --pre num2words
+
+          echo "============================================================="
+          echo "Install latest versions of other optional packages"
+          echo "============================================================="
+          python -m pip install --pre pyparsing psutil objgraph pyxdsm
+          python -m pip install --pre jax jaxlib
+
+          echo "============================================================="
+          echo "Install latest pyoptsparse"
+          echo "============================================================="
+          python -m pip install git+https://github.com/OpenMDAO/build_pyoptsparse
+          BRANCH="-b $(latest_version https://github.com/mdolab/pyoptsparse)"
+          if [[ "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
+              echo "  > Secure copying SNOPT 7.7 over SSH"
+              mkdir SNOPT
+              scp -qr ${{ secrets.SNOPT_LOCATION_77 }} SNOPT
+              SNOPT="-s SNOPT/src"
+          else
+              echo "SNOPT source is not available"
+          fi
+          build_pyoptsparse $BRANCH $SNOPT
+
+          echo "============================================================="
+          echo "Install OpenMDAO"
+          echo "============================================================="
+          python -m pip install .
+
+      - name: Install PETSc
+        if: matrix.PETSc
+        run: |
+          echo "============================================================="
+          echo "Install latest PETSc"
+          echo "============================================================="
+          conda install mpi4py petsc petsc4py -q -y
+
+          echo "============================================================="
+          echo "Check MPI and PETSc installation"
+          echo "============================================================="
+          export OMPI_MCA_rmaps_base_oversubscribe=1
+          echo "-----------------------"
+          echo "Quick test of mpi4py:"
+          mpirun -n 3 python -c "from mpi4py import MPI; print(f'Rank: {MPI.COMM_WORLD.rank}')"
+          echo "-----------------------"
+          echo "Quick test of petsc4py:"
+          mpirun -n 3 python -c "import numpy; from mpi4py import MPI; comm = MPI.COMM_WORLD; \
+                                 import petsc4py; petsc4py.init(); \
+                                 x = petsc4py.PETSc.Vec().createWithArray(numpy.ones(5)*comm.rank, comm=comm);  \
+                                 print(x.getArray())"
+          echo "-----------------------"
+
+          echo "============================================================="
+          echo "Export MPI-related environment variables"
+          echo "============================================================="
+          echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> $GITHUB_ENV
+          echo "Workaround for intermittent failures with OMPI https://github.com/open-mpi/ompi/issues/7393"
+          echo "TMPDIR=/tmp" >> $GITHUB_ENV
+
+      - name: Display environment info
+        run: |
+          conda info
+          conda list
+
+          echo "============================================================="
+          echo "Check installed versions of Python, Numpy and Scipy"
+          echo "============================================================="
+          python -c "import platform; assert  platform.python_version().startswith(str(${{ matrix.PY }})), \
+                    f'Python was changed from version ${{ matrix.PY }} to {platform.python_version()}'"
+
+          python -c "import numpy; assert str(numpy.__version__).startswith('$NUMPY_VER'), \
+                    f'NumPy was changed from version $NUMPY_VER to {numpy.__version__}'"
+
+          python -c "import scipy; assert str(scipy.__version__).startswith('$SCIPY_VER'), \
+                    f'SciPy was changed from version $SCIPY_VER to {scipy.__version__}'"
+
+      - name: Run tests
+        id: run_tests
+        continue-on-error: true
+        run: |
+          echo "============================================================="
+          echo "Run tests (from directory other than repo root)"
+          echo "============================================================="
+          cd $HOME
+          RPT_FILE=`pwd`/deprecations.txt
+          echo "RPT_FILE=$RPT_FILE" >> $GITHUB_ENV
+          testflo -n 1 openmdao --timeout=240 --deprecations_report=$RPT_FILE --exclude=test_warnings_filters
+
+      - name: Build docs
+        id: build_docs
+        continue-on-error: true
+        run: |
+          export OPENMDAO_REPORTS=0
+          export PYDEVD_DISABLE_FILE_VALIDATION=1
+
+          cd openmdao/docs
+          if [[ "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
+            echo "============================================================="
+            echo "Building docs with SNOPT examples."
+            echo "============================================================="
+          else
+            echo "============================================================="
+            echo "Disabling SNOPT cells in notebooks."
+            echo "============================================================="
+            python openmdao_book/other/disable_snopt_cells.py
+          fi
+
+          # start ipcluster to run MPI under notebooks
+          ./ipcluster_start.sh
+          sleep 12
+
+          echo "============================================================="
+          echo "Build the docs"
+          echo "============================================================="
+          python build_source_docs.py
+          jupyter-book build -W --keep-going openmdao_book
+          python copy_build_artifacts.py
+
+      - name: Display doc build reports
+        if: failure() && steps.build_docs.outcome == 'failure'
+        run: |
+          for f in /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports/*; do
+            echo "============================================================="
+            echo $f
+            echo "============================================================="
+            cat $f
+          done
+
+      - name: Deprecations Report
+        id: deprecations_report
+        run: |
+          echo "============================================================="
+          echo "Display deprecations report"
+          echo "============================================================="
+          cat $RPT_FILE
+
+          echo 'summary<<EOF' >> $GITHUB_OUTPUT
+          head -n 6 $RPT_FILE | cut -d':' -f 1 >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+      - name: Slack summary
+        uses: act10ns/slack@v2.0.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: ${{ job.status }}
+          message: |
+            ```${{ steps.deprecations_report.outputs.summary }}```
+        if: always()
+
+      - name: Slack status
+        uses: act10ns/slack@v2.0.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: ${{ job.status }}
+        if: always()

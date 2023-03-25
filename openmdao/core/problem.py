@@ -13,7 +13,7 @@ from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
 from itertools import product
 
-from io import StringIO
+from io import StringIO, TextIOBase
 
 import numpy as np
 import scipy.sparse as sparse
@@ -1079,9 +1079,8 @@ class Problem(object):
             absolute, 'rel_avg' for a size relative to the absolute value of the vector input, or
             'rel_element' for a size relative to each value in the vector input. In addition, it
             can be 'rel_legacy' for a size relative to the norm of the vector.  For backwards
-            compatibilty, it can be 'rel', which currently defaults to 'rel_legacy', but in the
-            future will default to 'rel_avg'. Defaults to None, in which case the approximation
-            method provides its default value.
+            compatibilty, it can be 'rel', which is now equivalent to 'rel_avg'. Defaults to None,
+            in which case the approximation method provides its default value.
         minimum_step : float
             Minimum step size allowed when using one of the relative step_calc options.
         force_dense : bool
@@ -1574,9 +1573,8 @@ class Problem(object):
             absolute, 'rel_avg' for a size relative to the absolute value of the vector input, or
             'rel_element' for a size relative to each value in the vector input. In addition, it
             can be 'rel_legacy' for a size relative to the norm of the vector.  For backwards
-            compatibilty, it can be 'rel', which currently defaults to 'rel_legacy', but in the
-            future will default to 'rel_avg'. Defaults to None, in which case the approximation
-            method provides its default value.
+            compatibilty, it can be 'rel', which is now equivalent to 'rel_avg'. Defaults to None,
+            in which case the approximation method provides its default value..
         show_progress : bool
             True to show progress of check_totals.
         show_only_incorrect : bool, optional
@@ -1827,6 +1825,7 @@ class Problem(object):
                           desvar_opts=[],
                           cons_opts=[],
                           objs_opts=[],
+                          out_stream=_DEFAULT_OUT_STREAM
                           ):
         """
         Print all design variables and responses (objectives and constraints).
@@ -1860,6 +1859,15 @@ class Problem(object):
             Allowed values are:
             ['ref', 'ref0', 'indices', 'adder', 'scaler', 'units',
             'parallel_deriv_color', 'cache_linear_solution'].
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+
+        Returns
+        -------
+        dict
+            Name, size, val, and other requested parameters of design variables, constraints,
+            and objectives.
         """
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             raise RuntimeError(f"{self.msginfo}: Problem.list_problem_vars() cannot be called "
@@ -1875,10 +1883,17 @@ class Problem(object):
         def_desvar_opts = [opt for opt in ('indices',) if opt not in desvar_opts and
                            _find_dict_meta(desvars, opt)]
         col_names = default_col_names + def_desvar_opts + desvar_opts
-        self._write_var_info_table(header, col_names, desvars, vals,
-                                   show_promoted_name=show_promoted_name,
-                                   print_arrays=print_arrays,
-                                   col_spacing=2)
+        if out_stream:
+            self._write_var_info_table(header, col_names, desvars, vals,
+                                       show_promoted_name=show_promoted_name,
+                                       print_arrays=print_arrays,
+                                       col_spacing=2)
+
+        des_vars = [[i, j] for i, j in desvars.items()]
+        for d in des_vars:
+            d[1] = {i: j for i, j in d[1].items() if i in col_names}
+            d[1]['val'] = vals[d[0]]
+        des_vars = [tuple(d) for d in des_vars]
 
         # Constraints
         cons = self.driver._cons
@@ -1888,10 +1903,17 @@ class Problem(object):
         def_cons_opts = [opt for opt in ('indices', 'alias') if opt not in cons_opts and
                          _find_dict_meta(cons, opt)]
         col_names = default_col_names + def_cons_opts + cons_opts
-        self._write_var_info_table(header, col_names, cons, vals,
-                                   show_promoted_name=show_promoted_name,
-                                   print_arrays=print_arrays,
-                                   col_spacing=2)
+        if out_stream:
+            self._write_var_info_table(header, col_names, cons, vals,
+                                       show_promoted_name=show_promoted_name,
+                                       print_arrays=print_arrays,
+                                       col_spacing=2)
+
+        cons_vars = [[i, j] for i, j in cons.items()]
+        for c in cons_vars:
+            c[1] = {i: j for i, j in c[1].items() if i in col_names}
+            c[1]['val'] = vals[c[0]]
+        cons_vars = [tuple(c) for c in cons_vars]
 
         objs = self.driver._objs
         vals = self.driver.get_objective_values(driver_scaling=driver_scaling)
@@ -1899,13 +1921,27 @@ class Problem(object):
         def_obj_opts = [opt for opt in ('indices',) if opt not in objs_opts and
                         _find_dict_meta(objs, opt)]
         col_names = default_col_names + def_obj_opts + objs_opts
-        self._write_var_info_table(header, col_names, objs, vals,
-                                   show_promoted_name=show_promoted_name,
-                                   print_arrays=print_arrays,
-                                   col_spacing=2)
+        if out_stream:
+            self._write_var_info_table(header, col_names, objs, vals,
+                                       show_promoted_name=show_promoted_name,
+                                       print_arrays=print_arrays,
+                                       col_spacing=2)
+
+        obj_vars = [[i, j] for i, j in objs.items()]
+        for o in obj_vars:
+            o[1] = {i: j for i, j in o[1].items() if i in col_names}
+            o[1]['val'] = vals[o[0]]
+        obj_vars = [tuple(o) for o in obj_vars]
+
+        prob_vars = {'design_vars': des_vars,
+                     'constraints': cons_vars,
+                     'objectives': obj_vars}
+
+        return prob_vars
 
     def _write_var_info_table(self, header, col_names, meta, vals, print_arrays=False,
-                              show_promoted_name=True, col_spacing=1):
+                              show_promoted_name=True, col_spacing=1,
+                              out_stream=_DEFAULT_OUT_STREAM):
         """
         Write a table of information for the problem variable in meta and vals.
 
@@ -1929,7 +1965,17 @@ class Problem(object):
             If True, then show the promoted names of the variables.
         col_spacing : int
             Number of spaces between columns in the table.
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
         """
+        if out_stream is None:
+            return
+        elif out_stream is _DEFAULT_OUT_STREAM:
+            out_stream = sys.stdout
+        elif not isinstance(out_stream, TextIOBase):
+            raise TypeError("Invalid output stream specified for 'out_stream'")
+
         abs2prom = self.model._var_abs2prom
 
         # Gets the current numpy print options for consistent decimal place
@@ -1972,7 +2018,7 @@ class Problem(object):
             rows.append(row)
 
         col_space = ' ' * col_spacing
-        print(add_border(header, '-'))
+        print(add_border(header, '-'), file=out_stream)
 
         # loop through the rows finding the max widths
         max_width = {}
@@ -1994,8 +2040,8 @@ class Problem(object):
         for col_name in col_names:
             header_div += '-' * max_width[col_name] + col_space
             header_col_names += pad_name(col_name, max_width[col_name], quotes=False) + col_space
-        print(header_col_names)
-        print(header_div[:-1])
+        print(header_col_names, file=out_stream)
+        print(header_div[:-1], file=out_stream)
 
         # print rows with var info
         for row in rows:
@@ -2010,16 +2056,16 @@ class Problem(object):
                 else:
                     out = str(cell)
                 row_string += pad_name(out, max_width[col_name], quotes=False) + col_space
-            print(row_string)
+            print(row_string, file=out_stream)
 
             if print_arrays:
                 spaces = (max_width['name'] + col_spacing) * ' '
                 for col_name in have_array_values:
-                    print(f"{spaces}{col_name}:")
-                    print(textwrap.indent(pprint.pformat(row[col_name]), spaces))
-                    print()
+                    print(f"{spaces}{col_name}:", file=out_stream)
+                    print(textwrap.indent(pprint.pformat(row[col_name]), spaces), file=out_stream)
+                    print(file=out_stream)
 
-        print()
+        print(file=out_stream)
 
     def load_case(self, case):
         """
@@ -2684,9 +2730,11 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         fd = 0.
 
                     if directional:
-                        out_buffer.write(f'    Directional FD Derivative (Jfd)\n{fd}\n')
+                        out_buffer.write(f"    Directional {fd_opts['method'].upper()}"
+                                         f" Derivative (J{fd_opts['method']})\n{fd}\n")
                     else:
-                        out_buffer.write(f'    Raw FD Derivative (Jfd)\n{fd}\n')
+                        out_buffer.write(f"    Raw {fd_opts['method'].upper()}"
+                                         f" Derivative (J{fd_opts['method']})\n{fd}\n")
 
                     out_buffer.write(' -' * 30 + '\n')
 

@@ -7,7 +7,7 @@ from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.visualization.inputs_report.inputs_report import inputs_report
-
+from openmdao.utils.mpi import MPI
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -65,46 +65,6 @@ class TestInputsReport(unittest.TestCase):
             report_content = f.read()
         self.assertEqual(expected, report_content)
 
-    def test_deprecated_flag(self):
-
-        prob = om.Problem(reports=None)
-        model = prob.model
-
-        # Kludge to fake something like an IndepVarComp with an 'indep_var' tag on an output.
-        class _SimpleIVC(om.ExecComp):
-
-            def setup(self):
-                self.add_output('x', val=2.0, tags=['indep_var'])
-                self.add_output('y', val=5.0, tags=['openmdao:indep_var'])
-
-            def compute(self, inputs, outputs):
-                pass
-
-        model.add_subsystem('c1', _SimpleIVC(), promotes_outputs=['x', 'y'])
-        model.add_subsystem('c2', om.ExecComp('z = x + y'), promotes_inputs=['x', 'y'], promotes_outputs=['z'])
-
-        prob.setup()
-
-        prob.run_model()
-
-        z = prob.get_val('z')
-
-        assert_near_equal(7, z)
-
-        expected = """| Absolute Name | Input Name | Source Name | Source is IVC | Source is DV | Units | Shape | Tags | Val | Min Val | Max Val | Absolute Source |
-| :------------ | :--------- | :---------- | :-----------: | :----------: | :---- | :---- | :--- | :-- | ------: | ------: | :-------------- |
-| c2.x          | x          | x           |     True      |    False     |       | (1,)  | []   | [2] |       2 |       2 | c1.x            |
-| c2.y          | y          | y           |     True      |    False     |       | (1,)  | []   | [5] |       5 |       5 | c1.y            |
-"""
-        with assert_warning(om.OMDeprecationWarning, 'source output x is tagged with the deprecated'
-                                                     ' `indep_var` tag. Please change this tag to'
-                                                     ' `openmdao:indep_var` as `indep_var` will'
-                                                     ' be deprecated in a future release.'):
-            inputs_report(prob, outfile='temp_inputs_report.md', display=True, precision=6, title=None, tablefmt='github')
-        with open('temp_inputs_report.md') as f:
-            report_content = f.read()
-        self.assertEqual(expected, report_content)
-
     def test_zero_size_input(self):
         class TestComp(om.ExplicitComponent):
             def setup(self):
@@ -130,3 +90,36 @@ class TestInputsReport(unittest.TestCase):
         with open('temp_inputs_report.md') as f:
             report_content = f.read()
         self.assertEqual(expected, report_content)
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@use_tempdirs
+class TestInputReportsMPI(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_multidim(self):
+        # this test would error out before the fix
+        class Adder(om.ExplicitComponent):
+            def initialize(self):
+                self.options.declare('n0')
+
+            def setup(self):
+                n0 = self.options['n0']
+                self.add_input('x', shape_by_conn=True, distributed=True)
+                self.add_output('x_sum', shape=1)
+
+            def compute(self, inputs, outputs):
+                outputs['x_sum'] = self.comm.allreduce(np.sum(inputs['x']))
+
+
+        n0 = (20,2) if MPI.COMM_WORLD.rank ==0 else (8,2)
+        p = om.Problem()
+        ivc = p.model.add_subsystem('ivc',om.IndepVarComp())
+        ivc.add_output('x', val = np.random.random(n0), distributed=True)
+
+        p.model.add_subsystem('adder', Adder(n0=n0))
+        p.model.connect('ivc.x','adder.x')
+
+        p.setup()
+        p.run_model()
+
+        inputs_report(p, outfile='temp_inputs_report.md', display=True, precision=6, title=None, tablefmt='github')

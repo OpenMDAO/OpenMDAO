@@ -296,25 +296,6 @@ class TestExplicitComponent(unittest.TestCase):
         # pretend we reconfigured
         prob.setup()
 
-    def test_value_getitem_deprecation(self):
-        comp = TestExplCompSimple()
-        prob = Problem(comp).setup()
-
-        # check optional metadata (desc)
-        msg = ("The metadata key 'value' will be deprecated in 4.0. Please use 'val'.")
-
-        prob.setup()
-        with assert_warning(OMDeprecationWarning, msg):
-            comp._var_rel2meta['length']['value']
-
-    def test_return_metadata_value_deprecation(self):
-        prob = Problem()
-        idv = prob.model.add_subsystem('idv', IndepVarComp())
-        meta = idv.add_output('x', 1.0)
-
-        msg = ("The metadata key 'value' will be deprecated in 4.0. Please use 'val'.")
-        with assert_warning(OMDeprecationWarning, msg):
-            meta['value']
 
 class TestImplicitComponent(unittest.TestCase):
 

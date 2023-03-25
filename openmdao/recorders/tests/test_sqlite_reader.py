@@ -1052,7 +1052,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         system_cases = cr.list_cases('root.d1', out_stream=None)
         case = cr.get_case(system_cases[-1])
 
-        outputs = case.list_outputs(explicit=True, implicit=True, values=True,
+        outputs = case.list_outputs(explicit=True, implicit=True, val=True,
                                     residuals=True, residuals_tol=None,
                                     units=True, shape=True, bounds=True, desc=True,
                                     scaling=True, hierarchical=True, print_arrays=True,
@@ -1236,7 +1236,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         case = cr.get_case(system_cases[-1])
 
-        inputs = case.list_inputs(values=True, desc=True, out_stream=None)
+        inputs = case.list_inputs(val=True, desc=True, out_stream=None)
 
         for name, meta in inputs:
             expected = expected_inputs_case[name]
@@ -1294,6 +1294,55 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         for i, line in enumerate(expected):
             self.assertEqual(text[i], line)
+
+    def test_list_inputs_outputs_indep_desvar(self):
+        prob = SellarProblem(SellarDerivativesGrouped)
+        prob.setup()
+
+        prob.model.recording_options['record_inputs'] = True
+        prob.model.add_recorder(self.recorder)
+
+        prob.set_solver_print(-1)
+        prob.run_model()
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+        case = cr.get_case(-1)
+
+        indeps = case.list_inputs(is_indep_var=True, prom_name=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in indeps]),
+                         ['mda.d1.x', 'mda.d1.z', 'mda.d2.z', 'obj_cmp.x', 'obj_cmp.z'])
+
+        desvars = case.list_inputs(is_design_var=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in desvars]),
+                          ['mda.d1.x', 'mda.d1.z', 'mda.d2.z', 'obj_cmp.x', 'obj_cmp.z'])
+
+        non_desvars = case.list_inputs(is_design_var=False, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in non_desvars]),
+                         ['con_cmp1.y1', 'con_cmp2.y2',
+                          'mda.d1.y2', 'mda.d2.y1',
+                          'obj_cmp.y1', 'obj_cmp.y2'])
+
+        nonDV_indeps = case.list_inputs(is_indep_var=True, is_design_var=False, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in nonDV_indeps]),
+                         [])
+
+        indeps = case.list_outputs(is_indep_var=True, list_autoivcs=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in indeps]),
+                         ['_auto_ivc.v0', '_auto_ivc.v1'])
+
+        desvars = case.list_outputs(is_design_var=True, list_autoivcs=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in desvars]),
+                         ['_auto_ivc.v0', '_auto_ivc.v1'])
+
+        non_desvars = case.list_outputs(is_design_var=False, list_autoivcs=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in non_desvars]),
+                         ['con_cmp1.con1', 'con_cmp2.con2',
+                          'mda.d1.y1', 'mda.d2.y2', 'obj_cmp.obj'])
+
+        nonDV_indeps = case.list_outputs(is_indep_var=True, is_design_var=False, list_autoivcs=True, out_stream=None)
+        self.assertEqual(sorted([name for name, _ in nonDV_indeps]),
+                         [])
 
     def test_list_input_and_outputs_with_tags(self):
         prob = om.Problem(RectangleCompWithTags())
@@ -2028,7 +2077,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_model()
 
         # make sure the loaded unit strings are compatible with `convert_units`
-        outputs = case.list_outputs(explicit=True, implicit=True, values=True,
+        outputs = case.list_outputs(explicit=True, implicit=True, val=True,
                                     units=True, shape=True, out_stream=None)
         meta = {}
         for name, vals in outputs:
@@ -2061,8 +2110,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        inputs_before = prob.model.list_inputs(values=True, units=True, out_stream=None)
-        outputs_before = prob.model.list_outputs(values=True, units=True, out_stream=None)
+        inputs_before = prob.model.list_inputs(val=True, units=True, out_stream=None)
+        outputs_before = prob.model.list_outputs(val=True, units=True, out_stream=None)
 
         cr = om.CaseReader(self.filename)
 
@@ -2087,8 +2136,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        inputs_after = prob.model.list_inputs(values=True, units=True, out_stream=None)
-        outputs_after = prob.model.list_outputs(values=True, units=True, out_stream=None)
+        inputs_after = prob.model.list_inputs(val=True, units=True, out_stream=None)
+        outputs_after = prob.model.list_outputs(val=True, units=True, out_stream=None)
 
         iter_count_after = driver.iter_count
 
@@ -2235,7 +2284,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(cr._format_version, format_version)
 
-        self.assertEqual(set(cr.system_options.keys()),
+        self.assertEqual(set(cr._system_options.keys()),
                          set(['root'] + list(prob.model._subsystems_allprocs)))
 
         self.assertEqual(set(cr.problem_metadata.keys()), {
@@ -2263,7 +2312,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(cr._format_version, format_version)
 
-        self.assertEqual(set(cr.system_options.keys()),
+        self.assertEqual(set(cr._system_options.keys()),
                          set(['root'] + list(prob.model._subsystems_allprocs)))
 
         self.assertEqual(set(cr.problem_metadata.keys()), {
@@ -2923,7 +2972,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         # list inputs
         # out_stream - not hierarchical - extras - no print_arrays
         stream = StringIO()
-        case.list_inputs(values=True,
+        case.list_inputs(val=True,
                          units=True,
                          prom_name=True,
                          hierarchical=False,
@@ -2938,7 +2987,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # out_stream - hierarchical - extras - no print_arrays
         stream = StringIO()
-        case.list_inputs(values=True,
+        case.list_inputs(val=True,
                          units=True,
                          shape=True,
                          hierarchical=True,
@@ -2954,7 +3003,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         # list outputs
         # out_stream - not hierarchical - extras - no print_arrays
         stream = StringIO()
-        case.list_outputs(values=True,
+        case.list_outputs(val=True,
                           units=True,
                           shape=True,
                           bounds=True,
@@ -2973,7 +3022,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Promoted names - no print arrays
         stream = StringIO()
-        case.list_outputs(values=True,
+        case.list_outputs(val=True,
                           prom_name=True,
                           print_arrays=False,
                           out_stream=stream)
@@ -2985,7 +3034,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Hierarchical - no print arrays
         stream = StringIO()
-        case.list_outputs(values=True,
+        case.list_outputs(val=True,
                           units=True,
                           shape=True,
                           bounds=True,
@@ -3024,7 +3073,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             # list outputs
             # out_stream - not hierarchical - extras - print_arrays
             stream = StringIO()
-            case.list_outputs(values=True,
+            case.list_outputs(val=True,
                               units=True,
                               shape=True,
                               bounds=True,
@@ -3046,7 +3095,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
             # Hierarchical
             stream = StringIO()
-            case.list_outputs(values=True,
+            case.list_outputs(val=True,
                               units=True,
                               shape=True,
                               bounds=True,
@@ -3066,33 +3115,6 @@ class TestSqliteCaseReader(unittest.TestCase):
             self.assertEqual(text.count('\n  y'), 1)
             num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
             self.assertEqual(num_non_empty_lines, 46)
-
-    def test_system_metadata_attribute_deprecated(self):
-        model = om.Group()
-        model.add_recorder(self.recorder)
-        prob = om.Problem(model)
-        prob.setup()
-        prob.run_model()
-        prob.cleanup()
-
-        cr = om.CaseReader(self.filename)
-        msg = "The BaseCaseReader.system_metadata attribute is deprecated. " \
-        "Use `list_model_options` instead."
-        with assert_warning(OMDeprecationWarning, msg):
-            options = cr.system_metadata
-
-    def test_system_options_attribute_deprecated(self):
-        model = om.Group()
-        model.add_recorder(self.recorder)
-        prob = om.Problem(model)
-        prob.setup()
-        prob.run_model()
-        prob.cleanup()
-
-        cr = om.CaseReader(self.filename)
-        msg = "The system_options attribute is deprecated. Use `list_model_options` instead."
-        with assert_warning(OMDeprecationWarning, msg):
-            options = cr.system_options
 
     def test_sqlite_reader_problem_derivatives(self):
 

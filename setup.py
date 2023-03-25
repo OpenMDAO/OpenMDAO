@@ -18,24 +18,16 @@ optional_dependencies = {
     'docs': [
         'matplotlib',
         'numpydoc>=1.1',
-        'jupyter-core>=4.11.2',
-        'jupyter-book>=0.8.0,<0.13',
-        'jupyter-client>=7.4.0',
-        'jupyter',
-        'jupyter-sphinx',
+        'jupyter-book==0.14',
         'sphinx-sitemap',
-        'ipyparallel',
-        'nbconvert>=6.3'
+        'ipyparallel'
     ],
     'doe': [
         'pyDOE2'
     ],
     'notebooks': [
         'notebook',
-        'ipython',
-        'ipywidgets>=7.6.5',
-        'ipympl',
-        'myst_nb'
+        'ipympl'
     ],
     'visualization': [
         'bokeh>=1.3.4',
@@ -134,7 +126,9 @@ setup(
         'openmdao.devtools': ['*.wpr', ],
         'openmdao.visualization': [
             'common/libs/*.js',
-            'common/style/*.css'
+            'common/libs/*.js.map',
+            'common/style/*.css',
+            'common/style/*.css.map'
         ],
         'openmdao.visualization.n2_viewer': [
             'assets/*png*',
@@ -212,7 +206,6 @@ setup(
             'addsubtractcomp=openmdao.components.add_subtract_comp:AddSubtractComp',
             'balancecomp=openmdao.components.balance_comp:BalanceComp',
             'crossproductcomp=openmdao.components.cross_product_comp:CrossProductComp',
-            'demuxcomp=openmdao.components.demux_comp:DemuxComp',
             'dotproductcomp=openmdao.components.dot_product_comp:DotProductComp',
             'eqconstraintcomp=openmdao.components.eq_constraint_comp:EQConstraintComp',
             'execcomp=openmdao.components.exec_comp:ExecComp',

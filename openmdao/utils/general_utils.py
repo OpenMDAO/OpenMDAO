@@ -43,24 +43,6 @@ def _convert_auto_ivc_to_conn_name(conns_dict, name):
             return key
 
 
-def simple_warning(msg, category=UserWarning, stacklevel=2):
-    """
-    Display a simple warning message without the annoying extra line showing the warning call.
-
-    Parameters
-    ----------
-    msg : str
-        The warning message.
-    category : class
-        The warning class.
-    stacklevel : int
-        Number of levels up the stack to identify as the warning location.
-    """
-    warn_deprecation('simple_warning is deprecated. '
-                     'Use openmdao.utils.om_warnings.issue_warning instead.')
-    issue_warning(msg, stacklevel=stacklevel, category=category)
-
-
 def ensure_compatible(name, value, shape=None, indices=None):
     """
     Make value compatible with the specified shape or the shape of indices.
@@ -915,6 +897,23 @@ def env_truthy(env_var):
         True if the specified environment variable is 'truthy'.
     """
     return is_truthy(os.environ.get(env_var, ''))
+
+
+def env_none(env_var):
+    """
+    Return True if the given environment variable is None.
+
+    Parameters
+    ----------
+    env_var : str
+        The name of the environment variable.
+
+    Returns
+    -------
+    bool
+        True if the specified environment variable is None.
+    """
+    return os.environ.get(env_var) is None
 
 
 def common_subpath(pathnames):
