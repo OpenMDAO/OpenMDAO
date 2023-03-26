@@ -62,6 +62,8 @@ class OptionsDictionary(object):
         If True, no options can be set after declaration.
     _all_recordable : bool
         Flag to determine if all options in UserOptions are recordable.
+    _context_cache : dict
+        A dictionary to store cached option/value pairs when using the OptionsDictionary as a context manager.
     """
 
     def __init__(self, parent_name=None, read_only=False):
@@ -310,7 +312,7 @@ class OptionsDictionary(object):
     @contextlib.contextmanager
     def __call__(self, **kwargs):
         """
-        A context manager that provides temporary option values within the context.
+        Provide a context manager for temporary option values within the context.
 
         Parameters
         ----------
