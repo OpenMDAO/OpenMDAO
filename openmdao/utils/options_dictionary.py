@@ -63,7 +63,8 @@ class OptionsDictionary(object):
     _all_recordable : bool
         Flag to determine if all options in UserOptions are recordable.
     _context_cache : dict
-        A dictionary to store cached option/value pairs when using the OptionsDictionary as a context manager.
+        A dictionary to store cached option/value pairs when using the
+        OptionsDictionary as a context manager.
     """
 
     def __init__(self, parent_name=None, read_only=False):
