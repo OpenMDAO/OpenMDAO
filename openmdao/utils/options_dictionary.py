@@ -309,8 +309,21 @@ class OptionsDictionary(object):
         if meta['check_valid'] is not None:
             meta['check_valid'](name, value)
 
+    def set(self, **kwargs):
+        """
+        Set one or more options in the options dictionary simultaneously.
+
+        Parameters
+        ----------
+        **kwargs
+            Keyword arguments where the option names in the OptionsDictionary are the keywords
+            and the associated values are the values for those options.
+        """
+        for option, val in kwargs.items():
+            self[option] = val
+
     @contextlib.contextmanager
-    def __call__(self, **kwargs):
+    def temporary(self, **kwargs):
         """
         Provide a context manager for temporary option values within the context.
 
