@@ -78,7 +78,7 @@ or later and is maintained [here][4]. To upgrade to the latest release, run:
 
     pip install --upgrade openmdao
 
-**OpenMDAO 2.10.x** was the last version to support Python2.x and is no longer supported.
+**OpenMDAO 2.10.x** was the last version to support Python 2.x and is no longer supported.
 To install this older release, run:
 
     pip install "openmdao<3"
