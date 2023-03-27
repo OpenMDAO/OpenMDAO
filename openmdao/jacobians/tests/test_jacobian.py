@@ -569,11 +569,12 @@ class TestJacobian(unittest.TestCase):
                     outputs['y'], self.rows,
                     self.val * inputs['x'][self.cols])
 
-        prob = Problem(model=Comp())
+        prob = Problem()
+        prob.model.add_subsystem('comp', Comp())
         prob.setup()
         prob.run_model()
 
-        assert_near_equal(prob['y'], 2 * np.ones(2))
+        assert_near_equal(prob['comp.y'], 2 * np.ones(2))
 
     def test_declare_partials_row_col_size_mismatch(self):
         # Make sure we have clear error messages.
