@@ -5,6 +5,7 @@ from openmdao.core.problem import Problem
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.general_utils import find_matches
 from openmdao.core.constants import _SetupStatus
+from openmdao.utils.om_warnings import issue_warning
 
 
 def _get_model_vars(vars, model_vars):
@@ -54,30 +55,32 @@ def _get_model_vars(vars, model_vars):
                                 ' or delete copy.')
 
             # make dict with given var name as key and meta data from model_vars
-            # check if name == var[0] -> var[0] is abs name and var[1] is alias
+            # check if name[7:] == var[0] -> var[0] is abs name and var[1] is alias
             # check if meta['prom_name'] == var[0] -> var[0] is prom name and var[1] is alias
+            # NOTE name[7:] is the path name with out the 'subsys.' group level
             tmp_dict = {var[1]: meta for name, meta in model_vars
-                        if name == var[0] or meta['prom_name'] == var[0]}
+                        if name[7:] == var[0] or meta['prom_name'] == var[0]}
 
             # check if dict is empty (no vars added)
             if len(tmp_dict) == 0:
-                raise Exception(f'Promoted name {var[0]} does not'
+                raise Exception(f'Path name {var[0]} does not'
                                 ' exist in model.')
 
             var_dict.update(tmp_dict)
 
         elif isinstance(var, str):
-            # check if variable already exists in var_dict[varType]
-            # i.e. no repeated variable names
+            # if variable already exists in dict, it is connected so continue
             if var in var_dict:
-                raise Exception(f'Variable {var} already exists. Rename variable'
-                                ' or delete copy.')
+                continue
+                # raise Exception(f'Variable {var} already exists. Rename variable'
+                #                 ' or delete copy.')
 
             # make dict with given var name as key and meta data from model_vars
-            # check if name == var -> given var is abs name
+            # check if name[7:] == var -> given var is abs name
             # check if meta['prom_name'] == var -> given var is prom_name
+            # NOTE name[7:] is the path name with out the 'subsys.' group level
             tmp_dict = {var: meta for name, meta in model_vars
-                        if name == var or meta['prom_name'] == var}
+                        if name[7:] == var or meta['prom_name'] == var}
 
             # check if provided variable appears more than once in model
             if len(tmp_dict) > 1:
@@ -187,55 +190,69 @@ class SubmodelComp(ExplicitComponent):
         self.model_output_names = outputs if outputs is not None else []
         self.is_set_up = False
 
-    def add_input(self, name):
+    def add_input(self, path, name=None):
         """
         Add input to model before or after setup.
 
         Parameters
         ----------
-        name : str
-            Name of input to be added.
+        path : str
+            Absolute path name of input.
+        name : str or None
+            Name of input to be added. If none, it will default to the var name after
+            the last '.'.
         """
+        if name is None:
+            name = path.split('.')[-1]
+
         if not self.is_set_up:
-            self.model_input_names.append(name)
+            self.model_input_names.append((path, name))
             return
 
         if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
             raise Exception('Cannot call add_input after configure.')
 
-        self.options['inputs'].update(_get_model_vars([name], self.boundary_inputs))
+        self.options['inputs'].update(_get_model_vars([(path, name)], self.boundary_inputs))
 
         meta = self.options['inputs'][name]
 
+        interface_name = name.replace('.', ':')
         prom_name = meta.pop('prom_name')
         super().add_input(name, **meta)
         meta['prom_name'] = prom_name
-        self._input_names.append(name)
+        self._input_names[interface_name] = name
 
-    def add_output(self, name):
+    def add_output(self, path, name=None):
         """
         Add output to model before or after setup.
 
         Parameters
         ----------
-        name : str
-            Name of output to be added.
+        path : str
+            Absolute path name of output.
+        name : str or None
+            Name of output to be added. If none, it will default to the var name after
+            the last '.'.
         """
+        if name is None:
+            name = path.split('.')[-1]
+
         if not self.is_set_up:
-            self.model_output_names.append(name)
+            self.model_output_names.append((path, name))
             return
 
         if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
             raise Exception('Cannot call add_output after configure.')
 
-        self.options['outputs'].update(_get_model_vars([name], self.all_outputs))
+        self.options['outputs'].update(_get_model_vars([(path, name)], self.all_outputs))
 
         meta = self.options['outputs'][name]
 
+        interface_name = name.replace('.', ':')
         prom_name = meta.pop('prom_name')
         super().add_output(name, **meta)
         meta['prom_name'] = prom_name
-        self._output_names.append(name)
+        self._output_names[interface_name] = name
 
     def setup(self):
         """
@@ -262,7 +279,8 @@ class SubmodelComp(ExplicitComponent):
                                                    is_indep_var=True)
         # want all outputs from the `SubmodelComp`, including ivcs/design vars
         self.all_outputs = p.model.list_outputs(out_stream=None, prom_name=True,
-                                                units=True, shape=True, desc=True)
+                                                units=True, shape=True, desc=True,
+                                                is_indep_var=False)
 
         self.options['inputs'].update(_get_model_vars(self.model_input_names, self.boundary_inputs))
         self.options['outputs'].update(_get_model_vars(self.model_output_names, self.all_outputs))
@@ -270,20 +288,24 @@ class SubmodelComp(ExplicitComponent):
         inputs = self.options['inputs']
         outputs = self.options['outputs']
 
-        self._input_names = []
-        self._output_names = []
+        self._input_names = {}
+        self._output_names = {}
 
+        # NOTE interface name -> what SubmodelComp refers to the var as
+        # NOTE interior name -> what the user refers to the var as
         for var, meta in inputs.items():
+            interface_name = var.replace('.', ':')
             prom_name = meta.pop('prom_name')
-            super().add_input(var, **meta)
+            super().add_input(interface_name, **meta)
             meta['prom_name'] = prom_name
-            self._input_names.append(var)
+            self._input_names[interface_name] = var
 
         for var, meta in outputs.items():
+            interface_name = var.replace('.', ':')
             prom_name = meta.pop('prom_name')
-            super().add_output(var, **meta)
+            super().add_output(interface_name, **meta)
             meta['prom_name'] = prom_name
-            self._output_names.append(var)
+            self._output_names[interface_name] = var
 
     def _setup_var_data(self):
         super()._setup_var_data()
@@ -296,11 +318,11 @@ class SubmodelComp(ExplicitComponent):
         if len(inputs) == 0 or len(outputs) == 0:
             return
 
-        for inp in self._input_names:
-            p.model.add_design_var(inputs[inp]['prom_name'])
+        for _, interior_name in self._input_names.items():
+            p.model.add_design_var(inputs[interior_name]['prom_name'])
 
-        for out in self._output_names:
-            p.model.add_constraint(outputs[out]['prom_name'])
+        for _, interior_name in self._output_names.items():
+            p.model.add_constraint(outputs[interior_name]['prom_name'])
 
         p.driver.declare_coloring()
 
@@ -341,12 +363,12 @@ class SubmodelComp(ExplicitComponent):
         """
         p = self._subprob
 
-        for inp in self._input_names:
+        for inp in self._input_names.values():
             p.set_val(self.options['inputs'][inp]['prom_name'], inputs[inp])
 
         p.driver.run()
 
-        for op in self._output_names:
+        for op in self._output_names.values():
             outputs[op] = p.get_val(self.options['outputs'][op]['prom_name'])
 
     def compute_partials(self, inputs, partials):
@@ -368,7 +390,8 @@ class SubmodelComp(ExplicitComponent):
         for inp in self._input_names:
             p.set_val(self.options['inputs'][inp]['prom_name'], inputs[inp])
 
-        tots = p.driver._compute_totals(of=self._output_names, wrt=self._input_names,
+        tots = p.driver._compute_totals(of=list(self._output_names.values()),
+                                        wrt=list(self._input_names.values()),
                                         use_abs_names=False)
 
         if self.coloring is None:

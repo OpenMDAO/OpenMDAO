@@ -213,13 +213,13 @@ class TestSubmodelComp(unittest.TestCase):
         subprob1 = om.SubmodelComp(model=submodel1)
         subprob2 = om.SubmodelComp(model=submodel2)
         
-        subprob1.add_input('r')
-        subprob1.add_input('theta')
-        subprob2.add_input('r')
-        subprob2.add_input('theta')
+        subprob1.add_input('subComp1.r')
+        subprob1.add_input('subComp1.theta')
+        subprob2.add_input('subComp2.r')
+        subprob2.add_input('subComp2.theta')
         
-        subprob1.add_output('x')
-        subprob2.add_output('y')
+        subprob1.add_output('subComp1.x')
+        subprob2.add_output('subComp2.y')
 
         p.model.add_subsystem('sub1', subprob1, promotes_inputs=['r','theta'],
                                     promotes_outputs=['x'])
@@ -252,9 +252,7 @@ class TestSubmodelComp(unittest.TestCase):
                 self._get_subsystem('subprob1').add_input('theta')
                 self._get_subsystem('subprob1').add_output('x')
 
-                self.promotes('subprob1', ['r'])
-                self.promotes('subprob1', ['theta'])
-                self.promotes('subprob1', ['x'])
+                self.promotes('subprob1', ['r', 'theta', 'x'])
 
         class Subsys2(om.Group):
             def setup(self):
@@ -269,9 +267,7 @@ class TestSubmodelComp(unittest.TestCase):
                 self._get_subsystem('subprob2').add_input('theta')
                 self._get_subsystem('subprob2').add_output('y')
 
-                self.promotes('subprob2', ['r'])
-                self.promotes('subprob2', ['theta'])
-                self.promotes('subprob2', ['y'])
+                self.promotes('subprob2', ['r', 'theta', 'y'])
 
         p = om.Problem()
 
@@ -336,7 +332,7 @@ class TestSubmodelComp(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             p.setup(force_alloc_complex=True)
             
-        msg = 'Variable psi does not exist in model.'
+        msg = 'Path name psi does not exist in model.'
         self.assertEqual(str(ctx.exception), msg)
 
     def test_multiple_setups(self):
