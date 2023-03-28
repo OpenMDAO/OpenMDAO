@@ -120,11 +120,11 @@ class B_distrib(om.ExplicitComponent):
 class C_distrib(om.ExplicitComponent):
     def setup(self):
         if self.comm.rank == 0:
-            self.add_input('in', shape=1, src_indices=np.arange(0,1, dtype=int), distributed=True)
+            self.add_input('in', shape=1, distributed=True)
         elif self.comm.rank == 1:
-            self.add_input('in', shape=2, src_indices=np.arange(1,3, dtype=int), distributed=True)
+            self.add_input('in', shape=2, distributed=True)
         else:
-            self.add_input('in', shape=0, src_indices=np.arange(3,3, dtype=int), distributed=True)
+            self.add_input('in', shape=0, distributed=True)
 
         self.add_output('out', shape=3, distributed=True)
 
@@ -238,7 +238,12 @@ class TestPassSizeDistributed(unittest.TestCase):
         prob.model.connect('A.out', ['B.in'])
 
         prob.model.add_subsystem('C', C_distrib())
-        prob.model.connect('B.out', ['C.in'])
+        if self.comm.rank == 0:
+            prob.model.connect('B.out', ['C.in'], src_indices=np.arange(0,1, dtype=int))
+        elif self.comm.rank == 1:
+            prob.model.connect('B.out', ['C.in'], src_indices=np.arange(1,3, dtype=int))
+        else:
+            prob.model.connect('B.out', ['C.in'], src_indices=np.arange(3,3, dtype=int))
 
         prob.model.add_subsystem('D', D_distrib())
         prob.model.connect('C.out', ['D.in'])

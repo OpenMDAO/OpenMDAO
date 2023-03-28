@@ -290,10 +290,6 @@ class Component(System):
                 if is_input and 'src_indices' in metadata:
                     allprocs_abs2meta[abs_name]['has_src_indices'] = \
                         metadata['src_indices'] is not None
-                    if metadata['add_input_src_indices'] and abs_name not in abs_in2prom_info:
-                        # need a level for each system including '', so we don't
-                        # subtract 1 from abs_in.split('.') which includes the var name
-                        abs_in2prom_info[abs_name] = [None for s in abs_name.split('.')]
 
             for prom_name, val in self._var_discrete[io].items():
                 abs_name = prefix + prom_name
@@ -467,9 +463,8 @@ class Component(System):
                     # add sparsity info to existing partial info
                     self._subjacs_info[abs_key]['sparsity'] = tup
 
-    def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
-                  units=None, desc='', tags=None, shape_by_conn=False, copy_shape=None,
-                  distributed=None):
+    def add_input(self, name, val=1.0, shape=None, units=None, desc='', tags=None,
+                  shape_by_conn=False, copy_shape=None, distributed=None):
         """
         Add an input variable to the component.
 
@@ -481,16 +476,7 @@ class Component(System):
             The initial value of the variable being added in user-defined units.
             Default is 1.0.
         shape : int or tuple or list or None
-            Shape of this variable, only required if src_indices not provided and
-            val is not an array. Default is None.
-        src_indices : int or list or tuple or int ndarray or Iterable or None
-            The global indices of the source variable to transfer data from.
-            A value of None implies this input depends on all entries of the source array.
-            Default is None. The shapes of the target and src_indices must match,
-            and the form of the entries within is determined by the value of 'flat_src_indices'.
-        flat_src_indices : bool
-            If True and the source is non-flat, each entry of src_indices is assumed to be an index
-            into the flattened source.  Ignored if the source is flat.
+            Shape of this variable, only required if val is not an array. Default is None.
         units : str or None
             Units in which this input variable will be provided to the component
             during execution. Default is None, which means it is unitless.
@@ -525,12 +511,6 @@ class Component(System):
         if shape is not None and not isinstance(shape, (Integral, tuple, list)):
             raise TypeError("%s: The shape argument should be an int, tuple, or list but "
                             "a '%s' was given" % (self.msginfo, type(shape)))
-        if src_indices is not None:
-            try:
-                src_indices = indexer(src_indices, flat_src=flat_src_indices)
-            except Exception as err:
-                raise TypeError(f"{self.msginfo}: When specifying src_indices for input "
-                                f"'{name}': {err}")
         if units is not None:
             if not isinstance(units, str):
                 raise TypeError('%s: The units argument should be a str or None.' % self.msginfo)
@@ -545,19 +525,9 @@ class Component(System):
                                  "'copy_shape', 'shape' and 'val' should be a scalar, "
                                  "but shape of '%s' and val of '%s' was given for variable '%s'."
                                  % (self.msginfo, shape, val, name))
-            if src_indices is not None:
-                raise ValueError("%s: Setting of 'src_indices' along with 'shape_by_conn' or "
-                                 "'copy_shape' for variable '%s' is currently unsupported." %
-                                 (self.msginfo, name))
         else:
             # value, shape: based on args, making sure they are compatible
-            val, shape = ensure_compatible(name, val, shape, src_indices)
-
-        if src_indices is not None:
-            warn_deprecation(f"{self.msginfo}: Passing `src_indices` as an arg to "
-                             f"`add_input('{name}', ...` is deprecated and will become an error "
-                             "in a future release.  Add `src_indices` to a `promotes` or `connect` "
-                             "call instead.")
+            val, shape = ensure_compatible(name, val, shape)
 
         # until we get rid of component level distributed option, handle the case where
         # component distributed has been set to True but variable distributed has been set
@@ -574,9 +544,8 @@ class Component(System):
             'val': val,
             'shape': shape,
             'size': shape_to_len(shape),
-            'src_indices': src_indices,
-            'flat_src_indices': flat_src_indices,
-            'add_input_src_indices': src_indices is not None,
+            'src_indices': None,
+            'flat_src_indices': None,
             'units': units,
             'desc': desc,
             'distributed': distributed,
@@ -1644,23 +1613,14 @@ class Component(System):
                 pinfo = abs_in2prom_info[tgt][-1]  # component always last in the plist
                 if pinfo is not None:
                     inds, flat, shape = pinfo
-                    if inds is None:
-                        if meta['add_input_src_indices']:
-                            if shape is None:
-                                shape = all_abs2meta_out[conns[tgt]]['global_shape']
-                            meta['src_shape'] = shape
-                            inds = meta['src_indices']
-                    else:
+                    if inds is not None:
                         all_abs2meta_in[tgt]['has_src_indices'] = True
                         meta['src_shape'] = shape = all_abs2meta_out[conns[tgt]]['global_shape']
-                        if meta['add_input_src_indices']:
-                            inds = convert_src_inds(inds, shape, meta['src_indices'], shape)
-                        elif inds._flat_src:
+                        if inds._flat_src:
                             meta['flat_src_indices'] = True
                         elif meta['flat_src_indices'] is None:
                             meta['flat_src_indices'] = flat
 
-                    if inds is not None:
                         try:
                             if not isinstance(inds, Indexer):
                                 meta['src_indices'] = inds = indexer(inds, flat_src=flat,
@@ -1675,10 +1635,6 @@ class Component(System):
                                                 f"{shape} from '{pinfo.prom_path()}' using "
                                                 f"src_indices {inds}: {exc}", exc_type=type_exc,
                                                 tback=tb, ident=(conns[tgt], tgt))
-
-            elif meta['add_input_src_indices']:
-                self._var_prom2inds[abs2prom[tgt]] = [meta['shape'], meta['src_indices'],
-                                                      meta['src_indices']._flat_src]
 
     def _check_consistent_serial_dinputs(self, nz_dist_outputs):
         """
