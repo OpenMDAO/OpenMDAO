@@ -407,6 +407,10 @@ test       **Required**  ['a', 'b']         N/A                    Test integer 
         with options.temporary(foo='c', bar=5):
             self.assertEqual(options['foo'], 'c')
             self.assertEqual(options['bar'], 5)
+            with options.temporary(foo='a'):
+                self.assertEqual(options['foo'], 'a')
+            self.assertEqual(options['foo'], 'c')
+            self.assertEqual(options['bar'], 5)
 
         self.assertEqual(options['foo'], 'b')
         self.assertAlmostEqual(options['bar'], 3.14)

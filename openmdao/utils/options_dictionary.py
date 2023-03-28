@@ -335,11 +335,15 @@ class OptionsDictionary(object):
             and the associated values are the temporary values for those options.
         """
         for option, val in kwargs.items():
-            self._context_cache[option] = self[option]
+            if option not in self._context_cache:
+                self._context_cache[option] = []
+            self._context_cache[option].append(self[option])
             self[option] = val
         yield
         for option, val in kwargs.items():
-            self[option] = self._context_cache.pop(option)
+            self[option] = self._context_cache[option].pop()
+            if len(self._context_cache[option]) == 0:
+                self._context_cache.pop(option)
 
     def declare(self, name, default=_UNDEFINED, values=None, types=None, desc='',
                 upper=None, lower=None, check_valid=None, allow_none=False, recordable=True,
