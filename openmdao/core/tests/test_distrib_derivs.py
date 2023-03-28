@@ -91,8 +91,6 @@ class DistribExecComp(om.ExecComp):
                     kwargs[name] = {}
                 meta = kwargs[name]
                 meta['val'] = np.ones(sizes[rank], float)
-                # src_indices will be computed automatically
-                # meta['src_indices'] = np.arange(start, end, dtype=int)
 
         super().setup()
 
