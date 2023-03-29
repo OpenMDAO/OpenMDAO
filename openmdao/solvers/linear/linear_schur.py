@@ -290,8 +290,7 @@ class LinearSchur(BlockLinearSolver):
             ########################
             #### schur_jacobian ####
             ########################
-            if system.comm.rank == 0:
-                print(subsys1_rhs, subsys2_rhs, self._rhs_vec)
+
             ## Schur_Jac = D - C A^-1 B ##
 
             rvec.set_val(np.zeros(len(rvec)))
@@ -366,8 +365,7 @@ class LinearSchur(BlockLinearSolver):
             b_vec2.set_val(0.0)
 
             system._transfer("linear", mode, subsys2.name)
-            if system.comm.rank == 0:
-                print("\nSchur Jacobian: ", schur_jac, schur_rhs, subsys2_rhs, flush=True)
+
             # b_vec2 *= -1.0
             # # b_vec += subsys1_rhs
 
@@ -386,9 +384,6 @@ class LinearSchur(BlockLinearSolver):
             schur_rhs = subsys2_rhs - schur_rhs
 
             d_subsys2 = scipy.linalg.solve(schur_jac, schur_rhs)
-
-            if system.comm.rank == 0:
-                print("\nupdate vector: ", d_subsys2, flush=True)
 
             scope_out, scope_in = system._get_matvec_scope(subsys2)
             scope_out = self._vars_union(self._scope_out, scope_out)
