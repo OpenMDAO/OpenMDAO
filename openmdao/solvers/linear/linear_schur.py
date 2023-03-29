@@ -119,36 +119,6 @@ class LinearSchur(BlockLinearSolver):
             subsys2_rhs = self._rhs_vec[off2 : off2 + len(b_vec2)].copy()
 
             ################################
-            #### Beg solve for subsys 1 ####
-            ################################
-
-            # subsys1._doutputs.set_val(0.0)
-            # if self._rel_systems is not None and subsys1.pathname not in self._rel_systems:
-            #     return
-            # must always do the transfer on all procs even if subsys not local
-            system._transfer("linear", mode, subsys1.name)
-
-            # if not subsys1._is_local:
-            #     return
-
-            scope_out, scope_in = system._get_matvec_scope(subsys1)
-            scope_out = self._vars_union(self._scope_out, scope_out)
-            scope_in = self._vars_union(self._scope_in, scope_in)
-
-            if subsys1._iter_call_apply_linear():
-                subsys1._apply_linear(None, None, mode, scope_out, scope_in)
-                b_vec *= -1.0
-                b_vec += self._rhs_vec[off : off + len(b_vec)]
-            else:
-                b_vec.set_val(self._rhs_vec[off : off + len(b_vec)])
-
-            subsys1._solve_linear(mode, ContainsAll(), scope_out, scope_in)
-
-            ################################
-            #### End solve for subsys 1 ####
-            ################################
-
-            ################################
             #### Beg solve for subsys 2 ####
             ################################
 
@@ -170,9 +140,9 @@ class LinearSchur(BlockLinearSolver):
             ## Schur_Jac = D - C A^-1 B ##
 
             # put back the vectors
-            rvec.set_val(r_data)
-            ovec.set_val(o_data)
-            ivec.set_val(i_data)
+            rvec.set_val(np.zeros(len(rvec)))
+            ovec.set_val(np.zeros(len(ovec)))
+            ivec.set_val(np.zeros(len(ivec)))
 
             for ii, var in enumerate(vars_to_solve):
                 # set the linear seed of the variable we want to solve for in subsys 2
@@ -211,14 +181,51 @@ class LinearSchur(BlockLinearSolver):
                 system._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
 
                 # put this value into the jacobian.
-                schur_jac[:, ii] = subsys2._vectors["residual"]["linear"].asarray()
+                schur_jac[:, ii] = subsys2._vectors["residual"]["linear"].asarray(copy=True)
 
                 # set back the seed to zero for the next vector
                 ovec[f"{subsys2.name}.{var}"] = 0.0
                 # put back the vectors
-                rvec.set_val(r_data)
-                ovec.set_val(o_data)
-                ivec.set_val(i_data)
+                rvec.set_val(np.zeros(len(rvec)))
+                ovec.set_val(np.zeros(len(ovec)))
+                ivec.set_val(np.zeros(len(ivec)))
+
+                # set the rhs vector
+                # b_vec.set_val(subsys1_rhs)
+                # subsys1._vectors["output"]["linear"].set_val(0.0)
+
+                subsys1._vectors["residual"]["linear"].set_val(subsys1_rhs)
+
+                # now we work with the RHS
+                subsys1._solve_linear(mode, ContainsAll())
+
+                # set the inputs to be zero
+                subsys2._vectors["input"]["linear"].set_val(0.0)
+                system._transfer("linear", "fwd", subsys2.name)
+
+                # we do an apply linear on the subsys2 to get the negative part of the rhs
+                scope_out, scope_in = system._get_matvec_scope(subsys2)
+                scope_out = self._vars_union(self._scope_out, scope_out)
+                scope_in = self._vars_union(self._scope_in, scope_in)
+                subsys2._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+
+                schur_rhs[ii] = subsys2._vectors["residual"]["linear"].asarray(copy=True)
+                rvec.set_val(np.zeros(len(rvec)))
+                ovec.set_val(np.zeros(len(ovec)))
+                ivec.set_val(np.zeros(len(ivec)))
+
+            ########################
+            #### schur_jacobian ####
+            ########################
+
+            ################################
+            #### Beg solve for subsys 2 ####
+            ################################
+
+            # add the rhs vector with the resultant negative part
+            schur_rhs = subsys2_rhs - schur_rhs
+
+            d_subsys2 = scipy.linalg.solve(schur_jac, schur_rhs)
 
             # backup the vectors here
             rvec.set_val(r_data)
@@ -229,39 +236,6 @@ class LinearSchur(BlockLinearSolver):
             system._doutputs.set_val(outp_cache)
             system._dresiduals.set_val(resd_cache)
 
-            # set the rhs vector
-            b_vec.set_val(subsys1_rhs)
-
-            ########################
-            #### schur_jacobian ####
-            ########################
-            if system.comm.rank == 0:
-                print("\nSchur Jacobian: ", schur_jac, flush=True)
-            ################################
-            #### Beg solve for subsys 2 ####
-            ################################
-            # now we work with the RHS
-            subsys1._solve_linear(mode, ContainsAll())
-
-            # first negate the vector from the linear solve
-            subsys1._vectors["output"]["linear"] *= -1.0
-
-            # set the inputs to be zero
-            subsys2._doutputs.set_val(0.0)
-            system._dinputs.set_val(0.0)
-            system._transfer("linear", "fwd")
-
-            # we do an apply linear on the subsys2 to get the negative part of the rhs
-            scope_out, scope_in = system._get_matvec_scope()
-            scope_out = self._vars_union(self._scope_out, scope_out)
-            scope_in = self._vars_union(self._scope_in, scope_in)
-            system._apply_linear(None, None, mode, scope_out, scope_in)
-
-            # add the rhs vector with the resultant negative part
-            b_vec2 += subsys2_rhs
-
-            d_subsys2 = scipy.linalg.solve(schur_jac, b_vec2.asarray())
-
             # loop over the variables just to be safe with the ordering
             # subsys1._doutputs.set_val(subsys1_output)
             for ii, var in enumerate(vars_to_solve):
@@ -269,6 +243,32 @@ class LinearSchur(BlockLinearSolver):
 
             ################################
             #### End solve for subsys 2 ####
+            ################################
+
+            # subsys1._doutputs.set_val(0.0)
+            # if self._rel_systems is not None and subsys1.pathname not in self._rel_systems:
+            #     return
+            # must always do the transfer on all procs even if subsys not local
+            system._transfer("linear", mode, subsys1.name)
+
+            # if not subsys1._is_local:
+            #     return
+
+            scope_out, scope_in = system._get_matvec_scope(subsys1)
+            scope_out = self._vars_union(self._scope_out, scope_out)
+            scope_in = self._vars_union(self._scope_in, scope_in)
+
+            if subsys1._iter_call_apply_linear():
+                subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+                b_vec *= -1.0
+                b_vec += self._rhs_vec[off : off + len(b_vec)]
+            else:
+                b_vec.set_val(self._rhs_vec[off : off + len(b_vec)])
+
+            subsys1._solve_linear(mode, self._rel_systems, scope_out, scope_in)
+
+            ################################
+            #### Beg solve for subsys 1 ####
             ################################
 
         else:  # rev
@@ -290,7 +290,8 @@ class LinearSchur(BlockLinearSolver):
             ########################
             #### schur_jacobian ####
             ########################
-
+            if system.comm.rank == 0:
+                print(subsys1_rhs, subsys2_rhs, self._rhs_vec)
             ## Schur_Jac = D - C A^-1 B ##
 
             rvec.set_val(np.zeros(len(rvec)))
@@ -335,39 +336,11 @@ class LinearSchur(BlockLinearSolver):
                 subsys1._solve_linear(mode, self._rel_systems, scope_out, scope_in)
 
                 subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
-                if system.comm.rank == 0:
-                    print(
-                        "subsys1 F",
-                        subsys1._vectors["residual"]["linear"],
-                        subsys1._vectors["output"]["linear"],
-                        subsys1._vectors["input"]["linear"],
-                    )
-                    print(
-                        "subsys2",
-                        subsys2._vectors["residual"]["linear"],
-                        subsys2._vectors["output"]["linear"],
-                        subsys2._vectors["input"]["linear"],
-                    )
+
                 # subsys2_output = subsys2._vectors["output"]["linear"].asarray(copy=True)
                 subsys2._vectors["output"]["linear"].set_val(0.0)
                 system._transfer("linear", mode, subsys2.name)
-                # subsys2_output += subsys2._vectors["output"]["linear"].asarray(copy=True)
-                # subsys2._vectors["output"]["linear"].set_val(subsys2_output)
 
-                if system.comm.rank == 0:
-                    print(
-                        "subsys1 G",
-                        subsys1._vectors["residual"]["linear"],
-                        subsys1._vectors["output"]["linear"],
-                        subsys1._vectors["input"]["linear"],
-                    )
-                    print(
-                        "subsys2",
-                        subsys2._vectors["residual"]["linear"],
-                        subsys2._vectors["output"]["linear"],
-                        subsys2._vectors["input"]["linear"],
-                    )
-                # subsys2._vectors["output"]["linear"].set_val(-4.0)
                 # the same solve requires in the rhs too, so we save them
                 schur_rhs[ii] = subsys2._vectors["output"]["linear"].asarray(copy=True)
                 rvec.set_val(np.zeros(len(rvec)))
@@ -394,7 +367,7 @@ class LinearSchur(BlockLinearSolver):
 
             system._transfer("linear", mode, subsys2.name)
             if system.comm.rank == 0:
-                print("\nSchur Jacobian: ", schur_jac, flush=True)
+                print("\nSchur Jacobian: ", schur_jac, schur_rhs, subsys2_rhs, flush=True)
             # b_vec2 *= -1.0
             # # b_vec += subsys1_rhs
 
