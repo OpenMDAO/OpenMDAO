@@ -2188,6 +2188,52 @@ class Problem(object):
 
         return reports_dirpath
 
+    def get_indep_vars(self, include_design_vars=True):
+        """
+        Retrieve the independent variables in the Problem.
+
+        Returns a dictionary mapping the promoted names of indep_vars which the user is
+        expected to provide to the metadata for the associated independent variable.
+
+        A output is designated as an independent variable if it is tagged with
+        'openmdao:indep_var'. This includes IndepVarComp by default, and users are
+        able to apply this tag to their own component outputs if they wish
+        to provide components with IndepVarComp-like capaability.
+
+        Parameters
+        ----------
+        include_design_vars : bool
+            If True, include design variables in the list of problem inputs.
+            The user may provide values for these but ultimately they will
+            be overwritten by the Driver.
+
+        Returns
+        -------
+        dict
+            A dictionary mapping the promoted names of all independent variables
+            in the model to their metadata.
+        """
+        model = self.model
+        if model._outputs is None:
+            raise RuntimeError("get_indep_vars requires that final_setup has been "
+                               "run for the Problem.")
+
+        connections = model._conn_global_abs_in2out
+        desvar_prom_names = set(model.get_design_vars(recurse=True, use_prom_ivc=True).keys())
+        problem_inputs = {}
+
+        for target, meta in model._var_allprocs_abs2meta['input'].items():
+            prom = model._var_allprocs_abs2prom['input'][target]
+            src = connections[target]
+            smeta = model._var_allprocs_abs2meta['output'][src]
+            src_is_ivc = 'openmdao:indep_var' in smeta['tags']
+            input_name = model._var_allprocs_abs2prom['input'][target]
+
+            if src_is_ivc and (include_design_vars or input_name not in desvar_prom_names):
+                problem_inputs[input_name] = model._var_allprocs_abs2meta['output'][src]
+
+        return problem_inputs
+
 
 _ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 _MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])

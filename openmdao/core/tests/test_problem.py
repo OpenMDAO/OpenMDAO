@@ -2211,6 +2211,26 @@ class RelevanceTestCase(unittest.TestCase):
 
         self._finish_setup_and_check(p, ['C2', 'C3', 'C4', 'C5', 'C6'])
 
+    def test_get_indep_vars(self):
+        prob = om.Problem()
+        prob.model = SellarDerivatives()
+        prob.model.add_design_var('x')
+        prob.model.add_design_var('z')
+
+        prob.setup()
+        prob.final_setup()
+
+        all_indep_vars = prob.get_indep_vars()
+
+        self.assertIn('x', all_indep_vars)
+        self.assertIn('z', all_indep_vars)
+
+        indep_vars_no_desvars = prob.get_indep_vars(include_design_vars=False)
+
+        self.assertNotIn('x', indep_vars_no_desvars)
+        self.assertNotIn('z', indep_vars_no_desvars)
+
+
 class NestedProblemTestCase(unittest.TestCase):
 
     def test_nested_prob(self):
