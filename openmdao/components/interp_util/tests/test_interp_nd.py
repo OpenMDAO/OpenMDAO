@@ -13,6 +13,7 @@ from openmdao.components.interp_util.interp import InterpND, SPLINE_METHODS, TAB
 from openmdao.components.interp_util.interp_semi import InterpNDSemi
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 from openmdao.utils.assert_utils import assert_near_equal, assert_equal_arrays, assert_warning, assert_check_partials
+from openmdao.utils.testing_utils import force_check_partials
 from openmdao.utils.om_warnings import OMDeprecationWarning
 
 def rel_error(actual, computed):
@@ -902,7 +903,7 @@ class TestInterpNDPython(unittest.TestCase):
             prob.setup(force_alloc_complex=True)
             prob.run_model()
 
-            derivs = prob.check_partials(method='fd', out_stream=None)
+            derivs = force_check_partials(prob, method='fd', out_stream=None)
             assert_check_partials(derivs, atol=1e-3, rtol=1e-4)
 
 

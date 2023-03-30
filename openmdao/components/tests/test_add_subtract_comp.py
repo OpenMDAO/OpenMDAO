@@ -4,6 +4,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
+from openmdao.utils.testing_utils import force_check_partials
 
 
 class TestAddSubtractCompScalars(unittest.TestCase):
@@ -41,7 +42,7 @@ class TestAddSubtractCompScalars(unittest.TestCase):
         assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
-        partials = self.p.check_partials(method='fd', out_stream=None)
+        partials = force_check_partials(self.p, method='fd', out_stream=None)
         assert_check_partials(partials)
 
 
@@ -82,7 +83,7 @@ class TestAddSubtractCompNx1(unittest.TestCase):
         assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
-        partials = self.p.check_partials(method='fd', out_stream=None)
+        partials = force_check_partials(self.p, method='fd', out_stream=None)
         assert_check_partials(partials)
 
 
@@ -123,7 +124,7 @@ class TestAddSubtractCompNx3(unittest.TestCase):
         assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
-        partials = self.p.check_partials(method='fd', out_stream=None)
+        partials = force_check_partials(self.p, method='fd', out_stream=None)
         assert_check_partials(partials)
 
 
@@ -168,7 +169,7 @@ class TestAddSubtractMultipleInputs(unittest.TestCase):
         assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
-        partials = self.p.check_partials(method='fd', out_stream=None)
+        partials = force_check_partials(self.p, method='fd', out_stream=None)
         assert_check_partials(partials)
 
 
@@ -213,7 +214,7 @@ class TestAddSubtractScalingFactors(unittest.TestCase):
         assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
-        partials = self.p.check_partials(method='fd', out_stream=None)
+        partials = force_check_partials(self.p, method='fd', out_stream=None)
         assert_check_partials(partials)
 
 
@@ -256,7 +257,7 @@ class TestAddSubtractMIMO(unittest.TestCase):
         assert_near_equal(z, 3.3*a - 1.5*b + 5*c,1e-16)
 
     def test_partials(self):
-        partials = self.p.check_partials(method='fd', out_stream=None)
+        partials = force_check_partials(self.p, method='fd', out_stream=None)
         assert_check_partials(partials)
 
 
@@ -302,7 +303,7 @@ class TestAddSubtractUnits(unittest.TestCase):
         assert_near_equal(out, expected,1e-8)
 
     def test_partials(self):
-        partials = self.p.check_partials(method='fd', out_stream=None)
+        partials = force_check_partials(self.p, method='fd', out_stream=None)
         assert_check_partials(partials)
 
 
@@ -353,7 +354,7 @@ class TestAddSubtractInit(unittest.TestCase):
         assert_near_equal(out, expected, 1e-8)
 
     def test_partials(self):
-        partials = self.p.check_partials(method='fd', out_stream=None)
+        partials = force_check_partials(self.p, method='fd', out_stream=None)
         assert_check_partials(partials)
 
 

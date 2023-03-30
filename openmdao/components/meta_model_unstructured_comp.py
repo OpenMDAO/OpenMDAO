@@ -384,7 +384,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                     output_shape = (vec_size, ) + shape
                 else:
                     output_shape = (vec_size, )
-                predicted = np.zeros(output_shape)
+                predicted = np.zeros(output_shape, dtype=flat_inputs.dtype)
                 rmse = self._metadata(name)['rmse'] = []
                 for i in range(vec_size):
                     pred_i = surrogate.predict(flat_inputs[i])
@@ -409,16 +409,11 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         ndarray
             flattened array of input data
         """
-        array_real = True
-
-        arr = np.zeros(self._input_size)
+        arr = np.zeros(self._input_size, dtype=vec.asarray().dtype)
 
         idx = 0
         for name, sz in self._surrogate_input_names:
             val = vec[name]
-            if array_real and np.issubdtype(val.dtype, np.complexfloating):
-                array_real = False
-                arr = arr.astype(np.complexfloating)
             arr[idx:idx + sz] = val.flat
             idx += sz
 
@@ -439,17 +434,12 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             2d array, self._vectorize rows of flattened input data.
         """
         vec_size = self.options['vec_size']
-        array_real = True
+        arr = np.zeros((vec_size, self._input_size), dtype=vec.asarray().dtype)
 
-        arr = np.zeros((vec_size, self._input_size))
-
+        vecvals = [(vec[n], sz) for n, sz in self._surrogate_input_names]
         for row in range(vec_size):
             idx = 0
-            for name, sz in self._surrogate_input_names:
-                val = vec[name]
-                if array_real and np.issubdtype(val.dtype, np.complexfloating):
-                    array_real = False
-                    arr = arr.astype(np.complexfloating)
+            for val, sz in vecvals:
                 arr[row][idx:idx + sz] = val[row].flat
                 idx += sz
 
