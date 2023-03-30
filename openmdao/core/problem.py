@@ -1755,10 +1755,13 @@ class Problem(object):
                     mhat = fd_tot_info.J[Jcalc_slices['of'][of], 0]
                     m = total_info.seeds['rev'][Jcalc_slices['of'][of]]
 
+                    dhat_dot_d = dhat.dot(d)
+                    mhat_dot_m = mhat.dot(m)
+
                     # Dot product test for adjoint validity.
-                    data[''][key]['directional_fd_rev'] = dhat.dot(d) - mhat.dot(m)
-                    data[''][key]['J_rev'] = dhat.dot(d)
-                    data[''][key]['J_fd'] = mhat.dot(m)
+                    data[''][key]['directional_fd_rev'] = dhat_dot_d - mhat_dot_m
+                    data[''][key]['J_rev'] = dhat_dot_d
+                    data[''][key]['J_fd'] = mhat_dot_m
             else:
                 data[''][key] = {Jcalc_name: val, 'J_fd': Jfd[key]}
 
@@ -2623,9 +2626,13 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
             if compact_print:
                 if totals:
+                    wrtname = pad_name(wrt, 30, quotes=isinstance(wrt, str))
+                    if directional:
+                        wrtname = f"(d){wrtname}"
+
                     out_buffer.write(deriv_line.format(
-                        pad_name(of, 30, quotes=True),
-                        pad_name(wrt, 30, quotes=True),
+                        pad_name(of, 30, quotes=isinstance(of, str)),
+                        wrtname,
                         _format_cell(calc_mag),
                         _format_cell(magnitude.fd),
                         _format_cell(calc_abs),
@@ -2783,19 +2790,22 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 # Raw Derivatives
                 if magnitude.forward is not None:
                     if directional:
-                        out_buffer.write('    Directional Derivative (Jfor)\n    ')
-                        out_buffer.write(str(Jfor) + '\n\n')
+                        out_buffer.write('    Directional Derivative (Jfor)')
                     else:
-                        out_buffer.write('    Raw Forward Derivative (Jfor)\n    ')
-                        out_buffer.write(str(Jfor) + '\n\n')
+                        out_buffer.write('    Raw Forward Derivative (Jfor)')
+                    out_buffer.write(f"\n    {Jfor}\n\n")
+
+                fdtype = fd_opts['method'].upper()
 
                 if magnitude.reverse is not None:
                     if directional:
-                        out_buffer.write('    Directional Derivative (Jrev)\n    ')
-                        out_buffer.write(str(Jrev) + '\n\n')
+                        if totals:
+                            out_buffer.write('    Directional Derivative (Jrev) Dot Product')
+                        else:
+                            out_buffer.write('    Directional Derivative (Jrev)')
                     else:
-                        out_buffer.write('    Raw Reverse Derivative (Jrev)\n    ')
-                        out_buffer.write(str(Jrev) + '\n\n')
+                        out_buffer.write('    Raw Reverse Derivative (Jrev)')
+                    out_buffer.write(f"\n    {Jrev}\n\n")
 
                 try:
                     fd = derivative_info['J_fd']
@@ -2803,11 +2813,13 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     fd = 0.
 
                 if directional:
-                    out_buffer.write(f"    Directional {fd_opts['method'].upper()}"
-                                     f" Derivative (Jfd)\n    {fd}\n")
+                    if totals and magnitude.reverse is not None:
+                        out_buffer.write(f'    Directional {fdtype} Derivative (Jfd) '
+                                         f'Dot Product\n    {fd}\n')
+                    else:
+                        out_buffer.write(f"    Directional {fdtype} Derivative (Jfd)\n    {fd}\n")
                 else:
-                    out_buffer.write(f"    Raw {fd_opts['method'].upper()}"
-                                     f" Derivative (Jfd)\n    {fd}\n")
+                    out_buffer.write(f"    Raw {fdtype} Derivative (Jfd)\n    {fd}\n")
 
                 out_buffer.write(' -' * 30 + '\n')
 

@@ -405,7 +405,7 @@ def pad_name(name, width=10, quotes=False):
     str
         Padded string.
     """
-    name = f"'{name}'" if quotes else name
+    name = f"'{name}'" if quotes else str(name)
     if width > len(name):
         return f"{name:<{width}}"
     else:
