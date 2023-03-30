@@ -269,7 +269,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         comp2._no_check_partials = True
 
         # Make check_partials think we're not on CI so we'll get the expected  non-CI behavior
-        with set_env_vars_context(OPENMDAO_CI='0'):
+        with set_env_vars_context(OPENMDAO_CHECK_ALL_PARTIALS='0'):
             data = prob.check_partials(out_stream=None)
 
         # no derivative data for 'comp2'

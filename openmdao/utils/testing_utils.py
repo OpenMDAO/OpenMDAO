@@ -248,7 +248,7 @@ def set_env_vars_context(**kwargs):
                 os.environ[k] = v
 
 
-@set_env_vars(OPENMDAO_CI="1")
+@set_env_vars(OPENMDAO_CHECK_ALL_PARTIALS="1")
 def force_check_partials(prob, *args, **kwargs):
     r"""
     Force the checking of partials even for components with _no_check_partials set.
