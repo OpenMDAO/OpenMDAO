@@ -268,7 +268,7 @@ class Component(System):
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
 
         # Compute the prefix for turning rel/prom names into abs names
-        prefix = self.pathname + '.' if self.pathname else ''
+        prefix = self.pathname + '.'
 
         for io in ['input', 'output']:
             abs2meta = self._var_abs2meta[io]
@@ -451,13 +451,11 @@ class Component(System):
             A nested dict of the form dct[of][wrt] = (rows, cols, shape)
         """
         # sparsity uses relative names, so we need to convert to absolute
-        prefix = self.pathname + '.' if self.pathname else None
+        prefix = self.pathname + '.'
         for of, sub in sparsity.items():
-            if prefix:
-                of = prefix + of
+            of = prefix + of
             for wrt, tup in sub.items():
-                if prefix:
-                    wrt = prefix + wrt
+                wrt = prefix + wrt
                 abs_key = (of, wrt)
                 if abs_key in self._subjacs_info:
                     # add sparsity info to existing partial info
