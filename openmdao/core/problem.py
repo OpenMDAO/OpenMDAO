@@ -2188,7 +2188,8 @@ class Problem(object):
 
         return reports_dirpath
 
-    def get_indep_vars(self, include_design_vars=True):
+    def list_indep_vars(self, include_design_vars=True, print_arrays=False,
+                        options=None, out_stream=_DEFAULT_OUT_STREAM):
         """
         Retrieve the independent variables in the Problem.
 
@@ -2198,7 +2199,7 @@ class Problem(object):
         A output is designated as an independent variable if it is tagged with
         'openmdao:indep_var'. This includes IndepVarComp by default, and users are
         able to apply this tag to their own component outputs if they wish
-        to provide components with IndepVarComp-like capaability.
+        to provide components with IndepVarComp-like capability.
 
         Parameters
         ----------
@@ -2206,6 +2207,20 @@ class Problem(object):
             If True, include design variables in the list of problem inputs.
             The user may provide values for these but ultimately they will
             be overwritten by the Driver.
+            Default is False.
+        options : list of str or None
+            List of optional columns to be displayed in the independent variable table.
+            Allowed values are:
+            ['name', 'units', 'shape', 'size', 'desc', 'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper',
+            'tags', 'shape_by_conn', 'copy_shape', 'global_size', 'global_shape', 'value'].
+        print_arrays : bool, optional
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format is affected
+            by the values set with numpy.set_printoptions.
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
 
         Returns
         -------
@@ -2219,20 +2234,40 @@ class Problem(object):
                                "run for the Problem.")
 
         connections = model._conn_global_abs_in2out
-        desvar_prom_names = set(model.get_design_vars(recurse=True, use_prom_ivc=True).keys())
-        problem_inputs = {}
+        desvar_prom_names = model.get_design_vars(recurse=True, use_prom_ivc=True).keys()
+        problem_indep_vars = []
+
+        default_col_names = ['name', 'units', 'value']
+        col_names = default_col_names + ([] if options is None else options)
 
         for target, meta in model._var_allprocs_abs2meta['input'].items():
-            prom = model._var_allprocs_abs2prom['input'][target]
             src = connections[target]
             smeta = model._var_allprocs_abs2meta['output'][src]
             src_is_ivc = 'openmdao:indep_var' in smeta['tags']
             input_name = model._var_allprocs_abs2prom['input'][target]
 
-            if src_is_ivc and (include_design_vars or input_name not in desvar_prom_names):
-                problem_inputs[input_name] = model._var_allprocs_abs2meta['output'][src]
+            smeta = {key: val for key, val in smeta.items() if key in col_names}
+            smeta['value'] = self.get_val(input_name)
 
-        return problem_inputs
+            if src_is_ivc and (include_design_vars or input_name not in desvar_prom_names):
+                problem_indep_vars.append((input_name, smeta))
+
+        if out_stream is not None:
+            header = f'Problem {self._name} Independent Variables'
+            if problem_indep_vars:
+                meta = {key: meta for key, meta in problem_indep_vars}
+                vals = {key: self.get_val(key) for key in meta}
+                self._write_var_info_table(header, col_names, meta, vals, print_arrays=print_arrays,
+                                           show_promoted_name=True, col_spacing=1,
+                                           out_stream=out_stream)
+            else:
+                if out_stream is _DEFAULT_OUT_STREAM:
+                    out_stream = sys.stdout
+                hr = '-'*len(header)
+                print(f'{hr}\n{header}\n{hr}', file=out_stream)
+                print(f'None found', file=out_stream)
+
+        return problem_indep_vars
 
 
 _ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
