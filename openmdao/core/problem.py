@@ -2211,8 +2211,9 @@ class Problem(object):
         options : list of str or None
             List of optional columns to be displayed in the independent variable table.
             Allowed values are:
-            ['name', 'units', 'shape', 'size', 'desc', 'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper',
-            'tags', 'shape_by_conn', 'copy_shape', 'global_size', 'global_shape', 'value'].
+            ['name', 'units', 'shape', 'size', 'desc', 'ref', 'ref0', 'res_ref',
+            'distributed', 'lower', 'upper', 'tags', 'shape_by_conn', 'copy_shape',
+            'global_size', 'global_shape', 'value'].
         print_arrays : bool, optional
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
             The norm is surrounded by vertical bars to indicate that it is a norm.
@@ -2234,7 +2235,9 @@ class Problem(object):
                                "run for the Problem.")
 
         connections = model._conn_global_abs_in2out
-        desvar_prom_names = model.get_design_vars(recurse=True, use_prom_ivc=True, get_sizes=False).keys()
+        desvar_prom_names = model.get_design_vars(recurse=True,
+                                                  use_prom_ivc=True,
+                                                  get_sizes=False).keys()
         problem_indep_vars = []
 
         default_col_names = ['name', 'units', 'value']
@@ -2263,7 +2266,7 @@ class Problem(object):
             else:
                 if out_stream is _DEFAULT_OUT_STREAM:
                     out_stream = sys.stdout
-                hr = '-'*len(header)
+                hr = '-' * len(header)
                 print(f'{hr}\n{header}\n{hr}', file=out_stream)
                 print(f'None found', file=out_stream)
 
