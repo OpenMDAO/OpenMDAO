@@ -190,34 +190,32 @@ class LinearSchur(BlockLinearSolver):
                 ovec.set_val(np.zeros(len(ovec)))
                 ivec.set_val(np.zeros(len(ivec)))
 
-                # set the rhs vector
-                # b_vec.set_val(subsys1_rhs)
-                # subsys1._vectors["output"]["linear"].set_val(0.0)
-
-                subsys1._vectors["residual"]["linear"].set_val(subsys1_rhs)
-
-                # now we work with the RHS
-                subsys1._solve_linear(mode, ContainsAll())
-
-                # set the inputs to be zero
-                subsys2._vectors["input"]["linear"].set_val(0.0)
-                system._transfer("linear", "fwd", subsys2.name)
-
-                # we do an apply linear on the subsys2 to get the negative part of the rhs
-                scope_out, scope_in = system._get_matvec_scope(subsys2)
-                scope_out = self._vars_union(self._scope_out, scope_out)
-                scope_in = self._vars_union(self._scope_in, scope_in)
-                subsys2._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
-
-                schur_rhs[ii] = subsys2._vectors["residual"]["linear"].asarray(copy=True)
-                rvec.set_val(np.zeros(len(rvec)))
-                ovec.set_val(np.zeros(len(ovec)))
-                ivec.set_val(np.zeros(len(ivec)))
-
             ########################
             #### schur_jacobian ####
             ########################
+            # set the rhs vector
+            # b_vec.set_val(subsys1_rhs)
+            # subsys1._vectors["output"]["linear"].set_val(0.0)
 
+            subsys1._vectors["residual"]["linear"].set_val(subsys1_rhs)
+
+            # now we work with the RHS
+            subsys1._solve_linear(mode, ContainsAll())
+
+            # set the inputs to be zero
+            subsys2._vectors["input"]["linear"].set_val(0.0)
+            system._transfer("linear", "fwd", subsys2.name)
+
+            # we do an apply linear on the subsys2 to get the negative part of the rhs
+            scope_out, scope_in = system._get_matvec_scope(subsys2)
+            scope_out = self._vars_union(self._scope_out, scope_out)
+            scope_in = self._vars_union(self._scope_in, scope_in)
+            subsys2._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+
+            schur_rhs = subsys2._vectors["residual"]["linear"].asarray(copy=True)
+            rvec.set_val(np.zeros(len(rvec)))
+            ovec.set_val(np.zeros(len(ovec)))
+            ivec.set_val(np.zeros(len(ivec)))
             ################################
             #### Beg solve for subsys 2 ####
             ################################
@@ -326,30 +324,29 @@ class LinearSchur(BlockLinearSolver):
                 rvec.set_val(np.zeros(len(rvec)))
                 ovec.set_val(np.zeros(len(ovec)))
                 ivec.set_val(np.zeros(len(ivec)))
-                # subsys1._vectors["output"]["linear"].set_val(0.0)
-                subsys1._vectors["output"]["linear"].set_val(subsys1_rhs)
-
-                scope_out, scope_in = system._get_matvec_scope(subsys1)
-                scope_out = self._vars_union(self._scope_out, scope_out)
-                scope_in = self._vars_union(self._scope_in, scope_in)
-                subsys1._solve_linear(mode, self._rel_systems, scope_out, scope_in)
-
-                subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
-
-                # subsys2_output = subsys2._vectors["output"]["linear"].asarray(copy=True)
-                subsys2._vectors["output"]["linear"].set_val(0.0)
-                system._transfer("linear", mode, subsys2.name)
-
-                # the same solve requires in the rhs too, so we save them
-                schur_rhs[ii] = subsys2._vectors["output"]["linear"].asarray(copy=True)
-                rvec.set_val(np.zeros(len(rvec)))
-                ovec.set_val(np.zeros(len(ovec)))
-                ivec.set_val(np.zeros(len(ivec)))
 
             ########################
             #### schur_jacobian ####
             ########################
+            # subsys1._vectors["output"]["linear"].set_val(0.0)
+            subsys1._vectors["output"]["linear"].set_val(subsys1_rhs)
 
+            scope_out, scope_in = system._get_matvec_scope(subsys1)
+            scope_out = self._vars_union(self._scope_out, scope_out)
+            scope_in = self._vars_union(self._scope_in, scope_in)
+            subsys1._solve_linear(mode, self._rel_systems, scope_out, scope_in)
+
+            subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+
+            # subsys2_output = subsys2._vectors["output"]["linear"].asarray(copy=True)
+            subsys2._vectors["output"]["linear"].set_val(0.0)
+            system._transfer("linear", mode, subsys2.name)
+
+            # the same solve requires in the rhs too, so we save them
+            schur_rhs = subsys2._vectors["output"]["linear"].asarray(copy=True)
+            rvec.set_val(np.zeros(len(rvec)))
+            ovec.set_val(np.zeros(len(ovec)))
+            ivec.set_val(np.zeros(len(ivec)))
             # put back the vectors
             rvec.set_val(r_data)
             ovec.set_val(o_data)
