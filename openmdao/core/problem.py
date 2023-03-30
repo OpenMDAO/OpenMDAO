@@ -2234,7 +2234,7 @@ class Problem(object):
                                "run for the Problem.")
 
         connections = model._conn_global_abs_in2out
-        desvar_prom_names = model.get_design_vars(recurse=True, use_prom_ivc=True).keys()
+        desvar_prom_names = model.get_design_vars(recurse=True, use_prom_ivc=True, get_sizes=False).keys()
         problem_indep_vars = []
 
         default_col_names = ['name', 'units', 'value']
