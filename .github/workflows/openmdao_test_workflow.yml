@@ -289,7 +289,7 @@ jobs:
       - name: Run tests
         if: matrix.TESTS
         env:
-          OPENMDAO_CI: true
+          OPENMDAO_CHECK_ALL_PARTIALS: true
         run: |
           echo "============================================================="
           echo "Run tests with coverage (from directory other than repo root)"
@@ -493,7 +493,7 @@ jobs:
 
       - name: Run tests
         env:
-          OPENMDAO_CI: true
+          OPENMDAO_CHECK_ALL_PARTIALS: true
         run: |
           echo "============================================================="
           echo "Run tests with coverage (from directory other than repo root)"
