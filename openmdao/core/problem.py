@@ -2231,7 +2231,7 @@ class Problem(object):
         """
         model = self.model
         if model._outputs is None:
-            raise RuntimeError("get_indep_vars requires that final_setup has been "
+            raise RuntimeError("list_indep_vars requires that final_setup has been "
                                "run for the Problem.")
 
         connections = model._conn_global_abs_in2out
