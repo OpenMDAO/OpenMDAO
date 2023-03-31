@@ -720,9 +720,9 @@ class TestProblemCheckPartials(unittest.TestCase):
         data = prob.check_partials(out_stream=stream, compact_print=True)
         txt = stream.getvalue()
 
-        self.assertTrue("'g'        wrt 'z'" in txt)
+        self.assertTrue("'g'             | 'z'" in txt)
         self.assertTrue(('g', 'z') in data['comp'])
-        self.assertTrue("'g'        wrt 'x'" in txt)
+        self.assertTrue("'g'             | 'x'" in txt)
         self.assertTrue(('g', 'x') in data['comp'])
 
     def test_dependent_false_show(self):
@@ -1181,9 +1181,15 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.check_partials(out_stream=stream, compact_print=True)
         lines = stream.getvalue().splitlines()
         # Check to make sure all the header and value lines have their columns lined up
-        header_locations_of_bars = None
+        tabnum = 0
         sep = '|'
+        header_locations_of_bars = None
         for line in lines:
+            if '#' in line and tabnum == 0:
+                # transition to 2nd table (worst error table)
+                tabnum = 1
+                header_locations_of_bars = None
+            
             if sep in line:
                 if header_locations_of_bars:
                     value_locations_of_bars = [i for i, ltr in enumerate(line) if ltr == sep]
@@ -1206,9 +1212,15 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.check_partials(out_stream=stream, compact_print=True)
         lines = stream.getvalue().splitlines()
         # Check to make sure all the header and value lines have their columns lined up
-        header_locations_of_bars = None
+        tabnum = 0
         sep = '|'
+        header_locations_of_bars = None
         for line in lines:
+            if '#' in line and tabnum == 0:
+                # transition to 2nd table (worst error table)
+                tabnum = 1
+                header_locations_of_bars = None
+            
             if sep in line:
                 if header_locations_of_bars:
                     value_locations_of_bars = [i for i, ltr in enumerate(line) if ltr == sep]
@@ -1264,7 +1276,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count('n/a'), 25)
         self.assertEqual(stream.getvalue().count('rev'), 15)
         self.assertEqual(stream.getvalue().count('Component'), 2)
-        self.assertEqual(stream.getvalue().count('wrt'), 12)
+        self.assertEqual(len([l for l in stream.getvalue().splitlines() if l.startswith('| ')]), 12) # counts rows (including headers)
 
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=False)
@@ -1350,8 +1362,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count('n/a'), 10)
         self.assertEqual(stream.getvalue().count('rev'), 15)
         self.assertEqual(stream.getvalue().count('Component'), 2)
-        self.assertEqual(stream.getvalue().count('wrt'), 8)
-
+        self.assertEqual(len([l for l in stream.getvalue().splitlines() if l.startswith('| ')]), 8)
+        
         stream = StringIO()
         partials_data = prob.check_partials(out_stream=stream, compact_print=False)
         self.assertEqual(stream.getvalue().count('Forward Magnitude'), 4)
@@ -1389,7 +1401,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
-        self.assertEqual(stream.getvalue().count("'z'        wrt 'y1'"), 2)
+        self.assertEqual(stream.getvalue().count("'z'             | 'y1'"), 2)
 
     def test_check_partials_show_only_incorrect(self):
         # The second is adding an option to show only the incorrect subjacs
@@ -1415,7 +1427,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True, show_only_incorrect=True)
         self.assertEqual(stream.getvalue().count("MyCompBadPartials"), 2)
-        self.assertEqual(stream.getvalue().count("'z'        wrt 'y1'"), 2)
+        self.assertEqual(stream.getvalue().count("'z'             | 'y1'"), 2)
         self.assertEqual(stream.getvalue().count("MyCompGoodPartials"), 0)
 
         stream = StringIO()
@@ -1544,8 +1556,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         J = prob.check_partials(method='cs', out_stream=stream, compact_print=True)
         lines = stream.getvalue().splitlines()
 
-        self.assertEqual(lines[7][43:46], 'n/a')
-        assert_near_equal(float(lines[7][95:105]), 0.0, 1e-15)
+        self.assertEqual(lines[7][53:56], 'n/a')
+        assert_near_equal(float(lines[7][121:131]), 0.0, 1e-15)
 
     def test_directional_mixed_matrix_free(self):
 

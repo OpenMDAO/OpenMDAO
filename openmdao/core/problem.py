@@ -2614,8 +2614,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         if err is None or np.isnan(err):
                             continue
 
-                        if worst_subjac is None or err > worst_subjac[3]:
-                            worst_subjac = (sys_class_name, sys_name, err, len(table_data) - 1)
+                        if worst_subjac is None or err > worst_subjac[2]:
+                            worst_subjac = (sys_class_name, sys_name, err, table_data[-1])
 
             else:  # not compact print
 
@@ -2777,13 +2777,13 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
     if not suppress_output:
         if compact_print and not totals and worst_subjac:
-            class_name, name, _, row_id = worst_subjac
+            class_name, name, _, worst_row = worst_subjac
 
             worst_header = f"Sub Jacobian with Largest Relative Error: {class_name} '{name}'"
-            worst_table = generate_table([table_data[row_id]], headers=headers,
-                                         tablefmt='grid', column_meta=column_meta,
+            worst_table = generate_table([worst_row[:-1]], headers=headers[:-1],
+                                         tablefmt='grid', column_meta=column_meta[:-1],
                                          missing_val='n/a')
-            print(f"\n{add_border(worst_header, '#')}\n, {worst_table}", file=out_stream)
+            print(f"\n{add_border(worst_header, '#')}\n{worst_table}", file=out_stream)
 
     if incon_keys:
         # stick incon_keys into the first key's dict in order to avoid breaking existing code
