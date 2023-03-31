@@ -91,7 +91,6 @@ class DistribExecComp(om.ExecComp):
                     kwargs[name] = {}
                 meta = kwargs[name]
                 meta['val'] = np.ones(sizes[rank], float)
-                meta['src_indices'] = np.arange(start, end, dtype=int)
 
         super().setup()
 
@@ -103,14 +102,10 @@ class DistribCoordComp(om.ExplicitComponent):
         rank = comm.rank
 
         if rank == 0:
-            self.add_input('invec', np.zeros((5, 3)), distributed=True,
-                           src_indices=[[0,0,0,1,1,1,2,2,2,3,3,3,4,4,4],[0,1,2,0,1,2,0,1,2,0,1,2,0,1,2]])
+            self.add_input('invec', np.zeros((5, 3)), distributed=True)
             self.add_output('outvec', np.zeros((5, 3)), distributed=True)
         else:
-            self.add_input('invec', np.zeros((4, 3)), distributed=True,
-                           # use some negative indices here to
-                           # make sure they work
-                           src_indices=[[5,5,5,6,6,6,7,7,7,-1,8,-1],[0,1,2,0,1,2,0,1,2,0,1,2]])
+            self.add_input('invec', np.zeros((4, 3)), distributed=True)
             self.add_output('outvec', np.zeros((4, 3)), distributed=True)
 
     def compute(self, inputs, outputs):
@@ -219,9 +214,19 @@ class MPITests2(unittest.TestCase):
         prob.model.add_subsystem('indep', om.IndepVarComp('x', points))
         prob.model.add_subsystem('comp', DistribCoordComp())
         prob.model.add_subsystem('total', om.ExecComp('y=x',
-                                                   x=np.zeros((9, 3)),
-                                                   y=np.zeros((9, 3))))
-        prob.model.connect('indep.x', 'comp.invec')
+                                                      x=np.zeros((9, 3)),
+                                                      y=np.zeros((9, 3))))
+
+        if prob.comm.rank == 0:
+            prob.model.connect('indep.x', 'comp.invec',
+                               src_indices=[[0,0,0,1,1,1,2,2,2,3,3,3,4,4,4],
+                                            [0,1,2,0,1,2,0,1,2,0,1,2,0,1,2]])
+        else:
+            prob.model.connect('indep.x', 'comp.invec',
+                               # use some negative indices here to make sure they work
+                               src_indices=[[5,5,5,6,6,6,7,7,7,-1,8,-1],
+                                            [0,1,2,0,1,2,0,1,2,0,1,2]])
+
         prob.model.connect('comp.outvec', 'total.x', src_indices=om.slicer[:], flat_src_indices=True)
 
         prob.setup(check=False, mode='fwd')
@@ -935,7 +940,7 @@ class DistribStateImplicit(om.ImplicitComponent):
     """
 
     def setup(self):
-        self.add_input('a', val=10., units='m', src_indices=[0], flat_src_indices=True, distributed=True)
+        self.add_input('a', val=10., units='m', distributed=True)
 
         rank = self.comm.rank
 
@@ -1014,17 +1019,12 @@ class DistParab2(om.ExplicitComponent):
         rank = comm.rank
 
         sizes, offsets = evenly_distrib_idxs(comm.size, arr_size)
-        start = offsets[rank]
         self.io_size = sizes[rank]
-        self.offset = offsets[rank]
-        end = start + self.io_size
 
-        self.add_input('x', val=np.ones(self.io_size), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
-        self.add_input('y', val=np.ones(self.io_size), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
-        self.add_input('a', val=-3.0 * np.ones(self.io_size), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
+        # src_indices will be computed automatically
+        self.add_input('x', val=np.ones(self.io_size), distributed=True)
+        self.add_input('y', val=np.ones(self.io_size), distributed=True)
+        self.add_input('a', val=-3.0 * np.ones(self.io_size), distributed=True)
 
         self.add_output('f_xy', val=np.ones(self.io_size), distributed=True)
 
@@ -1055,7 +1055,9 @@ class MPITests3(unittest.TestCase):
         p = om.Problem()
 
         p.model.add_subsystem('des_vars', om.IndepVarComp('a', val=10., units='m'), promotes=['*'])
-        p.model.add_subsystem('icomp', DistribStateImplicit(), promotes=['*'])
+        p.model.add_subsystem('icomp', DistribStateImplicit(), promotes_outputs=['*'])
+
+        p.model.promotes('icomp', inputs=['a'], src_indices=[0], flat_src_indices=True)
 
         expected = np.array([5.])
 
@@ -1256,7 +1258,7 @@ class MPITestsBug(unittest.TestCase):
 
                 for name, options in self.state_options.items():
                     indep.add_output(name='states:{0}'.format(name),
-                                     shape=(3, np.prod(options['shape'])))
+                                     shape=(4, np.prod(options['shape'])))
 
                 self.add_subsystem('indep_states', indep, promotes_outputs=['*'])
 
@@ -1281,8 +1283,18 @@ class MPITestsBug(unittest.TestCase):
                 nn = self.options['num_nodes']
 
                 self.add_subsystem(name='vanderpol_ode_delay',
-                                   subsys=vanderpol_ode_delay(num_nodes=nn),
-                                   promotes_inputs=['x1'])
+                                   subsys=vanderpol_ode_delay(num_nodes=nn))
+
+                comm = self.comm
+                rank = comm.rank
+
+                sizes, offsets = evenly_distrib_idxs(comm.size, nn)
+                start = offsets[rank]
+                end = start + sizes[rank]
+
+                self.promotes('vanderpol_ode_delay', inputs=['x1'],
+                              src_indices=np.arange(start, end, dtype=int),
+                              flat_src_indices=True)
 
                 self.add_subsystem(name='vanderpol_ode_rate_collect',
                                    subsys=vanderpol_ode_rate_collect(num_nodes=nn),
@@ -1302,12 +1314,8 @@ class MPITestsBug(unittest.TestCase):
                 rank = comm.rank
 
                 sizes, offsets = evenly_distrib_idxs(comm.size, nn)
-                start = offsets[rank]
-                end = start + sizes[rank]
 
-                self.add_input('x1', val=np.ones(sizes[rank]), distributed=True,
-                               src_indices=np.arange(start, end, dtype=int),
-                               flat_src_indices=True)
+                self.add_input('x1', val=np.ones(sizes[rank]), distributed=True)
 
                 self.add_output('x0dot', val=np.ones(sizes[rank]), distributed=True)
 
@@ -1653,9 +1661,13 @@ class DistribCompDenseJac(om.ExplicitComponent):
     def setup(self):
         N = self.options['size']
         rank = self.comm.rank
-        self.add_input('x', shape=1, src_indices=rank, distributed=True)
+
+        # src_indices will be computed automatically
+        self.add_input('x', shape=1, distributed=True)
+
         sizes, offsets = evenly_distrib_idxs(self.comm.size, N)
         self.add_output('y', shape=sizes[rank], distributed=True)
+
         # automatically infer dimensions without specifying rows, cols
         self.declare_partials('y', 'x')
 

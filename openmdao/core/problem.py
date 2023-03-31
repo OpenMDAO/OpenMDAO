@@ -49,7 +49,7 @@ from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.array_utils import scatter_dist_to_local
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
     clear_reports, get_reports_dir, _load_report_plugins
-from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable, \
+from openmdao.utils.general_utils import ContainsAll, pad_name, LocalRangeIterable, \
     _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
@@ -884,10 +884,9 @@ class Problem(object):
                 warn_deprecation(msg)
 
         if not isinstance(self.model, Group):
-            warn_deprecation("The model for this Problem is of type "
-                             f"'{self.model.__class__.__name__}'. "
-                             "A future release will require that the model "
-                             "be a Group or a sub-class of Group.")
+            raise TypeError("The model for this Problem is of type "
+                            f"'{self.model.__class__.__name__}'. "
+                            "The model must be a Group or a sub-class of Group.")
 
         # A distributed vector type is required for MPI
         if comm.size > 1:
@@ -1118,7 +1117,7 @@ class Problem(object):
         excludes = [excludes] if isinstance(excludes, str) else excludes
 
         comps = []
-        under_CI = env_truthy('CI')
+        under_CI = env_truthy('OPENMDAO_CHECK_ALL_PARTIALS')
 
         for comp in model.system_iter(typ=Component, include_self=True):
             # if we're under CI, do all of the partials, ignoring _no_check_partials

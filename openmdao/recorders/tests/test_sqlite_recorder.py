@@ -1821,7 +1821,10 @@ class TestSqliteRecorder(unittest.TestCase):
         # component TestExplCompArray, put in a model and run it; its outputs are multi-d-arrays.
         from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
         comp = TestExplCompArray(thickness=1.)
-        prob = om.Problem(comp).setup()
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', comp, promotes=['*'])
+        prob.setup()
 
         prob['lengths'] = 3.
         prob['widths'] = 2.
@@ -1835,22 +1838,22 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.cleanup()
 
-        # coordinate = rank0:._solve_nonlinear | 0
-        coordinate = [0, 'Driver', (0,), '._solve_nonlinear', (0,)]
+        # coordinate = rank0:Driver|0|root._solve_nonlinear|0|NLRunOnce|0|comp._solve_nonlinear|0
+        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NLRunOnce', (0,), 'comp._solve_nonlinear', (0,)]
 
         expected_inputs = {
-            'lengths': [[3., 3.], [3., 3.]],
-            'widths': [[2., 2.], [2., 2.]],
+            'comp.lengths': [[3., 3.], [3., 3.]],
+            'comp.widths': [[2., 2.], [2., 2.]],
         }
 
         expected_outputs = {
-            'total_volume': [24.],
-            'areas': [[6., 6.], [6., 6.]],
+            'comp.total_volume': [24.],
+            'comp.areas': [[6., 6.], [6., 6.]],
         }
 
         expected_residuals = {
-            'total_volume': [0.],
-            'areas': [[0., 0.], [0., 0.]],
+            'comp.total_volume': [0.],
+            'comp.areas': [[0., 0.], [0., 0.]],
         }
 
         expected_data = (

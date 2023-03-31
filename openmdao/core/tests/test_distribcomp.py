@@ -98,14 +98,11 @@ class DistribInputComp(om.ExplicitComponent):
         arr_size = self.options['arr_size']
 
         self.sizes, self.offsets = evenly_distrib_idxs(comm.size, arr_size)
-        start = self.offsets[rank]
-        end = start + self.sizes[rank]
 
-        self.add_input('invec', np.ones(self.sizes[rank], float), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
+        # src_indices will be computed automatically
+        self.add_input('invec', np.ones(self.sizes[rank], float), distributed=True)
         self.add_output('outvec', np.ones(arr_size, float), shape=np.int32(arr_size),
                         distributed=True)
-
 
 class DistribOverlappingInputComp(om.ExplicitComponent):
     """Uses 2 procs and takes input var slices"""
@@ -113,6 +110,8 @@ class DistribOverlappingInputComp(om.ExplicitComponent):
     def initialize(self):
         self.options.declare('arr_size', types=int, default=11,
                              desc="Size of input and output vectors.")
+        self.options.declare('local_size', types=int, default=1,
+                             desc="Local size of output vector.")
 
     def compute(self, inputs, outputs):
         outputs['outvec'][:] = 0
@@ -133,20 +132,10 @@ class DistribOverlappingInputComp(om.ExplicitComponent):
         rank = comm.rank
 
         arr_size = self.options['arr_size']
-
-        # need to initialize the input to have the correct local size
-        if rank == 0:
-            size = 8
-            start = 0
-            end = 8
-        else:
-            size = 7
-            start = 4
-            end = 11
+        local_size = self.options['local_size']
 
         self.add_output('outvec', np.zeros(arr_size, float), distributed=True)
-        self.add_input('invec', np.ones(size, float), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
+        self.add_input('invec', np.ones(local_size, float), distributed=True)
 
 
 class DistribInputDistribOutputComp(om.ExplicitComponent):
@@ -168,10 +157,6 @@ class DistribInputDistribOutputComp(om.ExplicitComponent):
 
         sizes, offsets = evenly_distrib_idxs(comm.size, arr_size)
         self.sizes = sizes
-        self.offsets = offsets
-
-        start = offsets[rank]
-        end = start + sizes[rank]
 
         # don't set src_indices on the input and just use default behavior
         self.add_input('invec', np.ones(sizes[rank], float), distributed=True)
@@ -204,10 +189,6 @@ class DistribCompWithDerivs(om.ExplicitComponent):
 
         sizes, offsets = evenly_distrib_idxs(comm.size, arr_size)
         self.sizes = sizes
-        self.offsets = offsets
-
-        start = offsets[rank]
-        end = start + sizes[rank]
 
         # don't set src_indices on the input and just use default behavior
         self.add_input('invec', np.ones(sizes[rank], float), distributed=True)
@@ -229,29 +210,20 @@ class DistribInputDistribOutputDiscreteComp(DistribInputDistribOutputComp):
 
 
 class DistribNoncontiguousComp(om.ExplicitComponent):
-    """Uses 2 procs and takes non-contiguous input var slices and has output
-    var slices as well
-    """
+    """Used in tests of non-contiguous input var slices"""
 
     def initialize(self):
-        self.options.declare('arr_size', types=int, default=11,
+        self.options.declare('size', types=int,
                              desc="Size of input and output vectors.")
 
     def compute(self, inputs, outputs):
         outputs['outvec'] = inputs['invec']*2.0
 
     def setup(self):
+        size = self.options['size']
 
-        comm = self.comm
-        rank = comm.rank
-
-        arr_size = self.options['arr_size']
-
-        idxs = list(take_nth(rank, comm.size, range(arr_size)))
-
-        self.add_input('invec', np.ones(len(idxs), float), distributed=True,
-                       src_indices=idxs)
-        self.add_output('outvec', np.ones(len(idxs), float), distributed=True)
+        self.add_input('invec', np.ones(size, float), distributed=True)
+        self.add_output('outvec', np.ones(size, float), distributed=True)
 
 
 class DistribGatherComp(om.ExplicitComponent):
@@ -276,14 +248,11 @@ class DistribGatherComp(om.ExplicitComponent):
 
         arr_size = self.options['arr_size']
 
-        self.sizes, self.offsets = evenly_distrib_idxs(comm.size,
-                                                       arr_size)
-        start = self.offsets[rank]
-        end = start + self.sizes[rank]
+        self.sizes, self.offsets = evenly_distrib_idxs(comm.size, arr_size)
 
         # need to initialize the variable to have the correct local size
-        self.add_input('invec', np.ones(self.sizes[rank], float), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
+        # src_indices will be computed automatically
+        self.add_input('invec', np.ones(self.sizes[rank], float), distributed=True)
         self.add_output('outvec', np.ones(arr_size, float), distributed=True)
 
 
@@ -689,13 +658,22 @@ class MPITests(unittest.TestCase):
         size = 11
 
         p = om.Problem()
+
         top = p.model
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribInputComp(arr_size=size))
         C3 = top.add_subsystem("C3", om.ExecComp("y=x", x=np.zeros(size*commsize),
                                                  y=np.zeros(size*commsize)))
-        top.connect('C1.outvec', 'C2.invec')
+
+        comm = p.comm
+        rank = comm.rank
+        sizes, offsets = evenly_distrib_idxs(comm.size, size)
+        start = offsets[rank]
+        end = start + sizes[rank]
+
+        top.connect('C1.outvec', 'C2.invec', src_indices=np.arange(start, end, dtype=int))
         top.connect('C2.outvec', 'C3.x', src_indices=om.slicer[:])
+
         p.setup()
 
         # Conclude setup but don't run model.
@@ -735,10 +713,14 @@ class MPITests(unittest.TestCase):
 
         p = om.Problem()
         top = p.model
+        comm = p.comm
+
+        idxs = list(take_nth(rank, comm.size, range(size)))
+
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
-        C2 = top.add_subsystem("C2", DistribNoncontiguousComp(arr_size=size))
+        C2 = top.add_subsystem("C2", DistribNoncontiguousComp(size=len(idxs)))
         C3 = top.add_subsystem("C3", DistribGatherComp(arr_size=size))
-        top.connect('C1.outvec', 'C2.invec')
+        top.connect('C1.outvec', 'C2.invec', src_indices=idxs)
         top.connect('C2.outvec', 'C3.invec')
         p.setup()
 
@@ -750,12 +732,7 @@ class MPITests(unittest.TestCase):
         p.run_model()
 
         if MPI:
-            if p.comm.rank == 0:
-                self.assertTrue(all(C2._outputs['outvec'] ==
-                                    np.array(list(take_nth(0, 2, range(size))), 'f')*4))
-            else:
-                self.assertTrue(all(C2._outputs['outvec'] ==
-                                    np.array(list(take_nth(1, 2, range(size))), 'f')*4))
+            self.assertTrue(all(C2._outputs['outvec'] == np.array(list(idxs), 'f')*4))
 
             full_list = list(take_nth(0, 2, range(size))) + list(take_nth(1, 2, range(size)))
             self.assertTrue(all(C3._outputs['outvec'] == np.array(full_list, 'f')*4))
@@ -768,11 +745,21 @@ class MPITests(unittest.TestCase):
         # entries are distributed to multiple processes
         size = 11
 
+        # need to initialize the input to have the correct local size
+        if rank == 0:
+            local_size = 8
+            start = 0
+            end = 8
+        else:
+            local_size = 7
+            start = 4
+            end = 11
+
         p = om.Problem()
         top = p.model
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
-        C2 = top.add_subsystem("C2", DistribOverlappingInputComp(arr_size=size))
-        top.connect('C1.outvec', 'C2.invec')
+        C2 = top.add_subsystem("C2", DistribOverlappingInputComp(arr_size=size, local_size=local_size))
+        top.connect('C1.outvec', 'C2.invec', src_indices=np.arange(start, end, dtype=int))
         p.setup()
 
         # Conclude setup but don't run model.
@@ -1064,16 +1051,12 @@ class TestGroupMPI(unittest.TestCase):
     def test_promote_distrib(self):
 
         class MyComp(om.ExplicitComponent):
-            def setup(self):
-                # decide what parts of the array we want based on our rank
-                if self.comm.rank == 0:
-                    idxs = [0, 1, 2]
-                else:
-                    # use [3, -1] here rather than [3, 4] just to show that we
-                    # can use negative indices.
-                    idxs = [3, -1]
+            def initialize(self):
+                self.options.declare('size', types=int, default=1,
+                                     desc="Size of input vector x.")
 
-                self.add_input('x', np.ones(len(idxs)), src_indices=idxs)
+            def setup(self):
+                self.add_input('x', np.ones(self.options['size']))
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
@@ -1084,8 +1067,16 @@ class TestGroupMPI(unittest.TestCase):
         p.model.add_subsystem('indep', om.IndepVarComp('x', np.arange(5, dtype=float)),
                               promotes_outputs=['x'])
 
-        p.model.add_subsystem('C1', MyComp(),
-                              promotes_inputs=['x'])
+        # decide what parts of the array we want based on our rank
+        if self.comm.rank == 0:
+            idxs = [0, 1, 2]
+        else:
+            # use [3, -1] here rather than [3, 4] just to show that we
+            # can use negative indices.
+            idxs = [3, -1]
+
+        p.model.add_subsystem('C1', MyComp(size=len(idxs)))
+        p.model.promotes('C1', inputs=['x'], src_indices=idxs)
 
         p.setup()
         p.set_val('x', np.arange(5, dtype=float))

@@ -11,6 +11,7 @@ from openmdao.utils.assert_utils import assert_check_partials, assert_near_equal
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.spline_distributions import cell_centered, sine_distribution
 from openmdao.components.interp_util.interp import InterpND
+from openmdao.utils.testing_utils import force_check_partials
 
 
 class SplineCompTestCase(unittest.TestCase):
@@ -108,7 +109,7 @@ class SplineCompTestCase(unittest.TestCase):
 
         assert_near_equal(akima_y.flatten(), self.prob['akima1.y_val'].flatten(), tolerance=1e-8)
 
-        derivs = self.prob.check_partials(out_stream=None, method='cs')
+        derivs = force_check_partials(self.prob, out_stream=None, method='cs')
         assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
 
     def test_no_ycp_val(self):
@@ -147,7 +148,7 @@ class SplineCompTestCase(unittest.TestCase):
 
         assert_near_equal(y.flatten(), self.prob['akima1.y_val'].flatten(), tolerance=1e-8)
 
-        derivs = self.prob.check_partials(out_stream=None, method='cs')
+        derivs = force_check_partials(self.prob, out_stream=None, method='cs')
         assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
 
     def test_vectorized_all_derivs(self):
@@ -178,11 +179,11 @@ class SplineCompTestCase(unittest.TestCase):
             prob.run_model()
 
             if method.startswith('scipy'):
-                derivs = prob.check_partials(out_stream=None)
+                derivs = force_check_partials(prob, out_stream=None)
                 assert_check_partials(derivs, atol=1e-7, rtol=1e-7)
 
             else:
-                derivs = prob.check_partials(out_stream=None, method='cs')
+                derivs = force_check_partials(prob, out_stream=None, method='cs')
                 assert_check_partials(derivs, atol=1e-12, rtol=1e-12)
 
     def test_bspline_interp_basic(self):
@@ -222,7 +223,7 @@ class SplineCompTestCase(unittest.TestCase):
         # And that it gets middle points a little better.
         self.assertLess(max(delta[15:-15]), .06)
 
-        derivs = prob.check_partials(out_stream=None, method='cs')
+        derivs = force_check_partials(prob, out_stream=None, method='cs')
         assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
 
     def test_bsplines_vectorized(self):
@@ -274,7 +275,7 @@ class SplineCompTestCase(unittest.TestCase):
             ]), 1e-5)
 
 
-        derivs = prob.check_partials(out_stream=None, method='cs')
+        derivs = force_check_partials(prob, out_stream=None, method='cs')
         assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
 
     def test_bspline_bug(self):

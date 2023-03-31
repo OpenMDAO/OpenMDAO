@@ -1524,12 +1524,6 @@ class Group(System):
                                 continue
 
                         meta = abs2meta[abs_in]
-                        if meta['src_indices'] is not None:
-                            self._collect_error(
-                                f"{self.msginfo}: src_indices has been defined in both "
-                                f"connect('{prom_out}', '{prom_in}') and "
-                                f"add_input('{prom_in}', ...).")
-
                         meta['manual_connection'] = True
                         meta['src_indices'] = src_indices
                         meta['flat_src_indices'] = flat
@@ -3326,8 +3320,6 @@ class Group(System):
                         newshape = src_indices.indexed_src_shape
 
             if src_indices is None:
-                # for an auto_ivc connection, src_indices here, if they exist, must be coming from
-                # an add_input call (this is a deprecated feature and will be removed eventually)
                 src_indices = meta['src_indices']
 
             if src_indices is not None:

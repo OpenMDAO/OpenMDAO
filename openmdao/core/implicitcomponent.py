@@ -466,7 +466,7 @@ class ImplicitComponent(Component):
         """
         if self._has_resid_scaling:
             scale_factors = super()._compute_root_scale_factors()
-            prefix = self.pathname + '.' if self.pathname else ''
+            prefix = self.pathname + '.'
             for resid, meta in self._declared_residuals.items():
                 ref = meta['ref']
                 if ref is not None:
@@ -547,7 +547,7 @@ class ImplicitComponent(Component):
 
             resbundle = self._find_partial_matches(of, wrt, use_resname=True)[0]
 
-            plen = len(self.pathname) + 1 if self.pathname else 0
+            plen = len(self.pathname) + 1
             rmap = self._resid2out_subjac_map
             for _, resids in resbundle:
                 if not resids:
@@ -583,7 +583,7 @@ class ImplicitComponent(Component):
         """
         resmeta = self._declared_residuals[resid]
         outmeta = self._var_abs2meta['output'][output]
-        loc_out = output[len(self.pathname) + 1:] if self.pathname else output
+        loc_out = output[len(self.pathname) + 1:]
 
         ref = resmeta['ref']
         res_ref = outmeta['res_ref']
@@ -781,7 +781,7 @@ class ImplicitComponent(Component):
         list
             List of all states.
         """
-        prefix = self.pathname + '.' if self.pathname else ''
+        prefix = self.pathname + '.'
         return sorted(list(self._var_abs2meta['output']) +
                       [prefix + n for n in self._var_discrete['output']])
 

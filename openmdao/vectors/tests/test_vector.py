@@ -104,8 +104,8 @@ class DistribQuadtric(om.ImplicitComponent):
         # Get the local slice of A that this processor will be working with
         self.A_local = A[start:end,:]
 
-        self.add_input('x', np.ones(size_local, float), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
+        # src_indices will be computed automatically
+        self.add_input('x', np.ones(size_local, float), distributed=True)
 
         self.add_output('y', np.ones(size_local, float), distributed=True)
 
