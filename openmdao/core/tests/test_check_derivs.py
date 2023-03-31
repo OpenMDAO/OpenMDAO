@@ -152,48 +152,6 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertTrue(lines[y_wrt_x2_line+5].endswith('*'),
                         msg='Error flag not expected in output but displayed')
 
-    def test_component_only(self):
-
-        prob = om.Problem()
-        prob.model = MyComp()
-
-        prob.set_solver_print(level=0)
-
-        prob.setup()
-        prob.run_model()
-
-        stream = StringIO()
-        prob.check_partials(out_stream=stream)
-        lines = stream.getvalue().splitlines()
-
-        y_wrt_x1_line = lines.index("  : 'y' wrt 'x1'")
-        self.assertTrue(lines[y_wrt_x1_line+3].endswith('*'),
-                        msg='Error flag expected in output but not displayed')
-        self.assertTrue(lines[y_wrt_x1_line+5].endswith('*'),
-                        msg='Error flag expected in output but not displayed')
-
-    def test_component_only_suppress(self):
-
-        prob = om.Problem()
-        prob.model = MyComp()
-
-        prob.set_solver_print(level=0)
-
-        prob.setup()
-        prob.run_model()
-
-        stream = StringIO()
-        data = prob.check_partials(out_stream=None)
-
-        subheads = data[''][('y', 'x1')]
-        self.assertTrue('J_fwd' in subheads)
-        self.assertTrue('rel error' in subheads)
-        self.assertTrue('abs error' in subheads)
-        self.assertTrue('magnitude' in subheads)
-
-        lines = stream.getvalue().splitlines()
-        self.assertEqual(len(lines), 0)
-
     def test_component_has_no_outputs(self):
         prob = om.Problem()
         model = prob.model
@@ -1167,7 +1125,7 @@ class TestProblemCheckPartials(unittest.TestCase):
     def test_compact_print_exceed_tol(self):
 
         prob = om.Problem()
-        prob.model = MyCompGoodPartials()
+        prob.model.add_subsystem('comp', MyCompGoodPartials(), promotes=['*'])
         prob.set_solver_print(level=0)
         prob.setup()
         prob.run_model()
@@ -1177,7 +1135,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count('>REL_TOL'), 0)
 
         prob = om.Problem()
-        prob.model = MyCompBadPartials()
+        prob.model.add_subsystem('comp', MyCompBadPartials(), promotes=['*'])
         prob.set_solver_print(level=0)
         prob.setup()
         prob.run_model()
@@ -1237,7 +1195,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 J['z', 'x2'] = np.array([-4444.0])
 
         prob = om.Problem()
-        prob.model = MyComp()
+        prob.model.add_subsystem('comp', MyComp(), promotes=['*'])
         prob.set_solver_print(level=0)
         prob.setup()
         prob.run_model()
@@ -1257,8 +1215,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 0)
         self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'), 0)
         self.assertEqual(stream.getvalue().count('Raw FD Derivative'), 2)
-        self.assertEqual(stream.getvalue().count(f"(Jfd)\n{partials_data[''][('z', 'x1')]['J_fd']}"), 1)
-        self.assertEqual(stream.getvalue().count(f"(Jfd)\n{partials_data[''][('z', 'x2')]['J_fd']}"), 1)
+        self.assertEqual(stream.getvalue().count(f"(Jfd)\n{partials_data['comp'][('z', 'x1')]['J_fd']}"), 1)
+        self.assertEqual(stream.getvalue().count(f"(Jfd)\n{partials_data['comp'][('z', 'x2')]['J_fd']}"), 1)
         # 3: Explicit comp that does not define Jacobian. It defines compute_jacvec_product
         #      For both compact and non-compact display
         prob = om.Problem()

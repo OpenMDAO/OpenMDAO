@@ -67,7 +67,8 @@ class TestAddVar(unittest.TestCase):
     def test_val(self):
         """Test declaring only default value."""
 
-        p = om.Problem(model=CompAddWithDefault())
+        p = om.Problem()
+        p.model.add_subsystem('comp', CompAddWithDefault(), promotes=['*'])
         p.setup()
 
         assert_near_equal(p.get_val('x_a'), 1.)
@@ -84,7 +85,8 @@ class TestAddVar(unittest.TestCase):
     def test_shape(self):
         """Test declaring only shape."""
 
-        p = om.Problem(model=CompAddWithShape())
+        p = om.Problem()
+        p.model.add_subsystem('comp', CompAddWithShape(), promotes=['*'])
         p.setup()
 
         assert_near_equal(p.get_val('x_a'), np.ones(2))
@@ -97,7 +99,8 @@ class TestAddVar(unittest.TestCase):
     def test_scalar_array(self):
         """Test declaring a scalar val with an array variable."""
 
-        p = om.Problem(model=CompAddArrayWithScalar())
+        p = om.Problem()
+        p.model.add_subsystem('comp', CompAddArrayWithScalar(), promotes=['*'])
         p.setup()
 
         assert_near_equal(p.get_val('x_a'), 2. * np.ones(6))
@@ -108,7 +111,8 @@ class TestAddVar(unittest.TestCase):
     def test_bounds(self):
         """Test declaring bounds."""
 
-        p = om.Problem(model=CompAddWithBounds())
+        p = om.Problem()
+        p.model.add_subsystem('comp', CompAddWithBounds(), promotes=['*'])
         p.setup()
 
         assert_near_equal(p.get_val('y_a'), 2.)

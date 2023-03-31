@@ -8,8 +8,7 @@ from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.impl_comp_simple import TestImplCompSimple
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
-from openmdao.utils.om_warnings import OMDeprecationWarning
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestExplicitComponent(unittest.TestCase):
@@ -17,18 +16,17 @@ class TestExplicitComponent(unittest.TestCase):
     def test___init___simple(self):
         """Test a simple explicit component."""
         comp = TestExplCompSimple()
-        prob = Problem(comp).setup()
 
+        prob = Problem()
+        prob.model.add_subsystem('comp', comp, promotes=['*'])
+        prob.setup()
         # check optional metadata (desc)
-        self.assertEqual(
-            comp._var_abs2meta['input']['length']['desc'],
-            'length of rectangle')
-        self.assertEqual(
-            comp._var_abs2meta['input']['width']['desc'],
-            'width of rectangle')
-        self.assertEqual(
-            comp._var_abs2meta['output']['area']['desc'],
-            'area of rectangle')
+        self.assertEqual(comp._var_abs2meta['input']['comp.length']['desc'],
+                         'length of rectangle')
+        self.assertEqual(comp._var_abs2meta['input']['comp.width']['desc'],
+                         'width of rectangle')
+        self.assertEqual(comp._var_abs2meta['output']['comp.area']['desc'],
+                         'area of rectangle')
 
         prob['length'] = 3.
         prob['width'] = 2.
@@ -38,7 +36,10 @@ class TestExplicitComponent(unittest.TestCase):
     def test___init___array(self):
         """Test an explicit component with array inputs/outputs."""
         comp = TestExplCompArray(thickness=1.)
-        prob = Problem(comp).setup()
+
+        prob = Problem()
+        prob.model.add_subsystem('comp', comp, promotes=['*'])
+        prob.setup()
 
         prob['lengths'] = 3.
         prob['widths'] = 2.
@@ -292,7 +293,10 @@ class TestImplicitComponent(unittest.TestCase):
         a = np.abs(np.exp(0.5 * x) / x)
 
         comp = TestImplCompSimple()
-        prob = Problem(comp).setup()
+
+        prob = Problem()
+        prob.model.add_subsystem('comp', comp, promotes=['*'])
+        prob.setup()
 
         prob['a'] = a
         prob.run_model()
@@ -301,7 +305,10 @@ class TestImplicitComponent(unittest.TestCase):
     def test___init___array(self):
         """Test an implicit component with array inputs/outputs."""
         comp = TestImplCompArray()
-        prob = Problem(comp).setup()
+
+        prob = Problem()
+        prob.model.add_subsystem('comp', comp, promotes=['*'])
+        prob.setup()
 
         prob['rhs'] = np.ones(2)
         prob.run_model()

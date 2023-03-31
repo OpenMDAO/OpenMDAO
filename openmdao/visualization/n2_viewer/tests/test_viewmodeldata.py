@@ -484,32 +484,6 @@ class TestViewModelData(unittest.TestCase):
         self.assertTrue('OpenMDAO Model Hierarchy and N2 diagram: Bad Connection'
                         in open(self.conn_html_filename, 'r', encoding='utf-8').read())
 
-    def test_component_as_model(self):
-
-        prob = om.Problem()
-
-        prob.model = om.ExecComp('z = x + y')
-
-        prob.setup()
-
-        prob.set_val('x', 2)
-        prob.set_val('y', 5)
-
-        prob.run_model()
-
-        msg = "The model is of type ExecComp, viewer data is only available if the model is a Group."
-
-        with self.assertRaises(TypeError) as cm:
-            _get_viewer_data(prob)
-
-        self.assertEqual(str(cm.exception), msg)
-
-        n2(prob, outfile=self.component_model_filename, show_browser=DEBUG_BROWSER,
-           title="Component as model")
-
-        with open(self.component_model_filename, 'r') as f:
-            self.assertTrue(f.read(), msg)
-
 
 @use_tempdirs
 class TestUnderMPI(unittest.TestCase):
