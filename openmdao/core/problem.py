@@ -2188,8 +2188,8 @@ class Problem(object):
 
         return reports_dirpath
 
-    def list_indep_vars(self, include_design_vars=True, print_arrays=False,
-                        options=None, out_stream=_DEFAULT_OUT_STREAM):
+    def list_indep_vars(self, include_design_vars=True, options=None,
+                        print_arrays=False, out_stream=_DEFAULT_OUT_STREAM):
         """
         Retrieve the independent variables in the Problem.
 
