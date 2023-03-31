@@ -2,6 +2,7 @@
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.problem import Problem
+from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.general_utils import find_matches
 from openmdao.core.constants import _SetupStatus
@@ -51,6 +52,7 @@ def _get_model_vars(vars, model_vars):
             # check if variable already exists in var_dict[varType]
             # i.e. no repeated variable names
             if var[1] in var_dict:
+                continue
                 raise Exception(f'Variable {var[1]} already exists. Rename variable'
                                 ' or delete copy.')
 
@@ -158,6 +160,7 @@ class SubmodelComp(ExplicitComponent):
     _output_names : list of str
         List of outputs added to model.
     """
+    # TODO change doc string for _input_names and _output_names
 
     def __init__(self, model, inputs=None, outputs=None, comm=None, name=None,
                  reports=_UNDEFINED, prob_options=None, **kwargs):
@@ -190,6 +193,11 @@ class SubmodelComp(ExplicitComponent):
         self.model_output_names = outputs if outputs is not None else []
         self.is_set_up = False
 
+        # map used for interface name, prom name, and abs path name
+        self.input_name_map = {}
+        self.output_name_map = {}
+
+    # TODO make path as name the default behavior
     def add_input(self, path, name=None):
         """
         Add input to model before or after setup.
@@ -216,11 +224,13 @@ class SubmodelComp(ExplicitComponent):
 
         meta = self.options['inputs'][name]
 
-        interface_name = name.replace('.', ':')
         prom_name = meta.pop('prom_name')
         super().add_input(name, **meta)
         meta['prom_name'] = prom_name
-        self._input_names[interface_name] = name
+        self._input_names.append(name)
+        
+        prom2abs_mapping = {meta['prom_name']: inp for inp, meta in self.boundary_inputs}
+        self.input_name_map[name] = {'prom_name': prom_name, 'abs_name': prom2abs_mapping[prom_name]}
 
     def add_output(self, path, name=None):
         """
@@ -234,7 +244,7 @@ class SubmodelComp(ExplicitComponent):
             Name of output to be added. If none, it will default to the var name after
             the last '.'.
         """
-        if name is None:
+        if name == None:
             name = path.split('.')[-1]
 
         if not self.is_set_up:
@@ -248,11 +258,13 @@ class SubmodelComp(ExplicitComponent):
 
         meta = self.options['outputs'][name]
 
-        interface_name = name.replace('.', ':')
         prom_name = meta.pop('prom_name')
         super().add_output(name, **meta)
         meta['prom_name'] = prom_name
-        self._output_names[interface_name] = name
+        self._output_names.append(name)
+        
+        prom2abs_mapping = {meta['prom_name']: out for out, meta in self.all_outputs}
+        self.output_name_map[name] = {'prom_name': prom_name, 'abs_name': prom2abs_mapping[prom_name]}
 
     def setup(self):
         """
@@ -274,9 +286,24 @@ class SubmodelComp(ExplicitComponent):
         p.final_setup()
 
         # boundary inputs are any inputs that externally come into `SubmodelComp`
+        # for sys in p.model.system_iter(include_self=True, recurse=True, typ=IndepVarComp):
+        #     print(sys.pathname)
+        #     sys.list_outputs(prom_name=True)
+        
+        # raise ValueError('stop')
+
         self.boundary_inputs = p.model.list_inputs(out_stream=None, prom_name=True,
                                                    units=True, shape=True, desc=True,
                                                    is_indep_var=True)
+        # self.boundary_inputs = p.model.list_outputs(prom_name=True,
+        #                                            units=True, shape=True, desc=True,
+        #                                            is_indep_var=True)
+        # exit(0)
+        
+        self.boundary_inputs.extend(p.model.list_outputs(out_stream=None, prom_name=True,
+                                                         units=True, shape=True, desc=True,
+                                                         is_indep_var=True))
+        
         # want all outputs from the `SubmodelComp`, including ivcs/design vars
         self.all_outputs = p.model.list_outputs(out_stream=None, prom_name=True,
                                                 units=True, shape=True, desc=True,
@@ -288,24 +315,31 @@ class SubmodelComp(ExplicitComponent):
         inputs = self.options['inputs']
         outputs = self.options['outputs']
 
-        self._input_names = {}
-        self._output_names = {}
+        self._input_names = []
+        self._output_names = []
 
         # NOTE interface name -> what SubmodelComp refers to the var as
         # NOTE interior name -> what the user refers to the var as
+        # TODO maybe don't need this here ^^^
+        # TODO move prom2abs_map to outside of loop
         for var, meta in inputs.items():
-            interface_name = var.replace('.', ':')
+            # interface_name = var.replace('.', ':')
             prom_name = meta.pop('prom_name')
-            super().add_input(interface_name, **meta)
+            super().add_input(var, **meta)
             meta['prom_name'] = prom_name
-            self._input_names[interface_name] = var
+            self._input_names.append(var)
+            
+            prom2abs_mapping = {meta['prom_name']: name for name, meta in self.boundary_inputs}
+            self.input_name_map[var] = {'prom_name': prom_name, 'abs_name': prom2abs_mapping[prom_name]}
 
         for var, meta in outputs.items():
-            interface_name = var.replace('.', ':')
             prom_name = meta.pop('prom_name')
-            super().add_output(interface_name, **meta)
+            super().add_output(var, **meta)
             meta['prom_name'] = prom_name
-            self._output_names[interface_name] = var
+            self._output_names.append(var)
+            
+            prom2abs_mapping = {meta['prom_name']: name for name, meta in self.all_outputs}
+            self.output_name_map[var] = {'prom_name': prom_name, 'abs_name': prom2abs_mapping[prom_name]}
 
     def _setup_var_data(self):
         super()._setup_var_data()
@@ -318,11 +352,13 @@ class SubmodelComp(ExplicitComponent):
         if len(inputs) == 0 or len(outputs) == 0:
             return
 
-        for _, interior_name in self._input_names.items():
-            p.model.add_design_var(inputs[interior_name]['prom_name'])
+        for inp in self._input_names:
+            # self.add_design_var(interior_name)
+            p.model.add_design_var(inputs[inp]['prom_name'])
 
-        for _, interior_name in self._output_names.items():
-            p.model.add_constraint(outputs[interior_name]['prom_name'])
+        for out in self._output_names:
+            # self.add_constraint(interior_name)
+            p.model.add_constraint(outputs[out]['prom_name'])
 
         p.driver.declare_coloring()
 
@@ -334,17 +370,26 @@ class SubmodelComp(ExplicitComponent):
         p.final_setup()
 
         # get coloring and change row and column names to be prom names for use later
+        # TODO replace meta['prom_name'] with interface name
         self.coloring = p.driver._get_coloring(run_model=True)
         if self.coloring is not None:
-            self.coloring._row_vars = [meta['prom_name'] for name, meta in self.all_outputs
-                                       if name in self.coloring._row_vars]
-            self.coloring._col_vars = [meta['prom_name'] for _, meta in self.boundary_inputs]
+            # self.coloring._row_vars = [interface_name for _, interface_name in self._output_names if ]
+            # self.coloring._row_vars = [outputs[interface_name]['prom_name'] for _, interface_name in self._output_names.items() if
+            #                            interface_name in self.coloring._row_vars]
+            # self.coloring._row_vars = [meta['prom_name'] for name, meta in self.all_outputs
+            #                            if name in self.coloring._row_vars]
+            # self.coloring._col_vars = [inputs[interface_name]['prom_name'] for _, interface_name in self._input_names.items()]
+            # self.coloring._col_vars = [meta['prom_name'] for _, meta in self.boundary_inputs]
+            # NOTE might need to revisit col_vars
+            self.coloring._row_vars = [interface_name for interface_name in self._output_names if self.output_name_map[interface_name]['abs_name'] in self.coloring._row_vars]
+            self.coloring._col_vars = [interface_name for interface_name in self._input_names if self.input_name_map[interface_name]['abs_name'] in self.coloring._col_vars]
 
-        if self.coloring is None:
-            self.declare_partials(of='*', wrt='*')
-        else:
-            for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():
-                self.declare_partials(of=of, wrt=wrt, rows=nzrows, cols=nzcols)
+        # if self.coloring is None:
+        self.declare_partials(of='*', wrt='*')
+        # else:
+        #     for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():
+        #         print(of, wrt, max(nzrows), max(nzcols))
+        #         self.declare_partials(of=of, wrt=wrt, rows=nzrows, cols=nzcols)
 
     def _set_complex_step_mode(self, active):
         super()._set_complex_step_mode(active)
@@ -363,12 +408,12 @@ class SubmodelComp(ExplicitComponent):
         """
         p = self._subprob
 
-        for inp in self._input_names.values():
+        for inp in self._input_names:
             p.set_val(self.options['inputs'][inp]['prom_name'], inputs[inp])
 
         p.driver.run()
 
-        for op in self._output_names.values():
+        for op in self._output_names:
             outputs[op] = p.get_val(self.options['outputs'][op]['prom_name'])
 
     def compute_partials(self, inputs, partials):
@@ -390,8 +435,11 @@ class SubmodelComp(ExplicitComponent):
         for inp in self._input_names:
             p.set_val(self.options['inputs'][inp]['prom_name'], inputs[inp])
 
-        tots = p.driver._compute_totals(of=list(self._output_names.values()),
-                                        wrt=list(self._input_names.values()),
+        of = [self.output_name_map[out]['prom_name'] for out in self._output_names]
+        wrt = [self.input_name_map[inp]['prom_name'] for inp in self._input_names]
+
+        tots = p.driver._compute_totals(of=of,
+                                        wrt=wrt,
                                         use_abs_names=False)
 
         if self.coloring is None:
@@ -399,4 +447,7 @@ class SubmodelComp(ExplicitComponent):
                 partials[key] = tot
         else:
             for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():
+                # of = self.output_name_map[of]['prom_name']
+                # wrt = self.input_name_map[wrt]['prom_name']
+                
                 partials[of, wrt] = tots[of, wrt][nzrows, nzcols].ravel()
