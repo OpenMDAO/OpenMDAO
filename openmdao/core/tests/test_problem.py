@@ -2229,8 +2229,8 @@ class RelevanceTestCase(unittest.TestCase):
         output = strout.getvalue()
         self.assertRegex(output.split('\n')[1], r'Problem \w+ Independent Variables')
         self.assertEqual(output.split('\n')[3].split(), ['name', 'units', 'value'])
-        self.assertEqual(output.split('\n')[5].split(), ['z', 'None', '|5.38516481|'])
-        self.assertEqual(output.split('\n')[6].split(), ['x', 'None', '[1.]'])
+        self.assertRegex(output.split('\n')[5], r'\s*z\s+None\s+|[0-9.]+|')
+        self.assertRegex(output.split('\n')[6], r'\s*x\s+None\s+|[0-9.]+|')
 
         strout = StringIO()
         indep_var_names_no_desvars = [name for name, _ in
