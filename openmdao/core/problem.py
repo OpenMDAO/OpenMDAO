@@ -54,6 +54,7 @@ from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, L
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
+from openmdao.visualization.tables.table_builder import generate_table
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -2470,13 +2471,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
     """
     suppress_output = out_stream is None
 
-    if compact_print:
-        if print_reverse:
-            deriv_line = "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7}" \
-                         " | {8} | {9} | {10}"
-        else:
-            deriv_line = "{0} wrt {1} | {2} | {3} | {4} | {5}"
-
     # Keep track of the worst subjac in terms of relative error for fwd and rev
     if not suppress_output and show_only_incorrect:
         if totals:
@@ -2486,7 +2480,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             out_stream.write('\n** Only writing information about components with '
                              'incorrect Jacobians **\n\n')
 
-    worst_subjac_rel_err = 0.0
     worst_subjac = None
     incon_keys = ()
 
@@ -2519,66 +2512,22 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         num_bad_jacs = 0  # Keep track of number of bad derivative values for each component
 
         if not suppress_output:
+            num_format = '{: 1.4e}'
+            num_col_meta = {'format': num_format}
+
             # Need to capture the output of a component's derivative
             # info so that it can be used if that component is the
             # worst subjac. That info is printed at the bottom of all the output
             out_buffer = StringIO()
 
             if totals:
-                header = f"Total Derivatives"
+                title = f"Total Derivatives"
             else:
-                header = f"{sys_type}: {sys_class_name} '{sys_name}'"
+                title = f"{sys_type}: {sys_class_name} '{sys_name}'"
 
-            print(f"{add_border(header, '-')}\n", file=out_buffer)
+            print(f"{add_border(title, '-')}\n", file=out_buffer)
 
-            if compact_print:
-                # Error Header
-                if totals:
-                    header = "{0} wrt {1} | {2} | {3} | {4} | {5}"\
-                        .format(
-                            pad_name('<output>', 30, quotes=True),
-                            pad_name('<variable>', 30, quotes=True),
-                            pad_name('calc mag.'),
-                            pad_name('check mag.'),
-                            pad_name('a(cal-chk)'),
-                            pad_name('r(cal-chk)'),
-                        )
-                else:
-                    max_width_of = len("'<output>'")
-                    max_width_wrt = len("'<variable>'")
-                    for of, wrt in derivatives:
-                        max_width_of = max(max_width_of, len(of) + 2)  # 2 to include quotes
-                        max_width_wrt = max(max_width_wrt, len(wrt) + 2)
-
-                    if print_reverse:
-                        header = \
-                            "{0} wrt {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10}" \
-                            .format(
-                                pad_name('<output>', max_width_of, quotes=True),
-                                pad_name('<variable>', max_width_wrt, quotes=True),
-                                pad_name('fwd mag.'),
-                                pad_name('rev mag.'),
-                                pad_name('check mag.'),
-                                pad_name('a(fwd-chk)'),
-                                pad_name('a(rev-chk)'),
-                                pad_name('a(fwd-rev)'),
-                                pad_name('r(fwd-chk)'),
-                                pad_name('r(rev-chk)'),
-                                pad_name('r(fwd-rev)')
-                            )
-                    else:
-                        header = "{0} wrt {1} | {2} | {3} | {4} | {5}"\
-                            .format(
-                                pad_name('<output>', max_width_of, quotes=True),
-                                pad_name('<variable>', max_width_wrt, quotes=True),
-                                pad_name('calc mag.'),
-                                pad_name('check mag.'),
-                                pad_name('a(cal-chk)'),
-                                pad_name('r(cal-chk)'),
-                            )
-
-                out_buffer.write(header + '\n')
-                out_buffer.write('-' * len(header) + '\n\n')
+            table_data = []
 
         for key, fd_norm, fd_opts, directional, above_abs, above_rel, inconsistent in \
                 _iter_derivs(derivatives, sys_name, show_only_incorrect,
@@ -2624,78 +2573,55 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 Jname = 'J_fwd'
                 Jfor = J = derivative_info[Jname]
 
+            if isinstance(wrt, str):
+                wrt = f"'{wrt}'"
+            if isinstance(of, str):
+                of = f"'{of}'"
+
+            if directional:
+                wrt = f"(d){wrt}"
+
             if compact_print:
+                err_desc = []
+                if above_abs:
+                    err_desc.append(' >ABS_TOL')
+                if above_rel:
+                    err_desc.append(' >REL_TOL')
+                if inconsistent:
+                    err_desc.append(' <RANK INCONSISTENT>')
+                err_desc = ''.join(err_desc)
+
                 if totals:
-                    wrtname = pad_name(wrt, 30, quotes=isinstance(wrt, str))
-                    if directional:
-                        wrtname = f"(d){wrtname}"
-
-                    out_buffer.write(deriv_line.format(
-                        pad_name(of, 30, quotes=isinstance(of, str)),
-                        wrtname,
-                        _format_cell(calc_mag),
-                        _format_cell(magnitude.fd),
-                        _format_cell(calc_abs),
-                        _format_cell(calc_rel)))
+                    table_data.append([of, wrt, calc_mag, magnitude.fd, calc_abs, calc_rel,
+                                       err_desc])
                 else:
-                    if directional:
-                        wrt_padded = pad_name(f"(d)'{wrt}'", max_width_wrt)
-                    else:
-                        wrt_padded = pad_name(wrt, max_width_wrt, quotes=True)
                     if print_reverse:
-                        deriv_info_line = \
-                            deriv_line.format(
-                                pad_name(of, max_width_of, quotes=True),
-                                wrt_padded,
-                                _format_cell(magnitude.forward),
-                                _format_cell(magnitude.reverse),
-                                _format_cell(magnitude.fd),
-                                _format_cell(abs_err.forward),
-                                _format_cell(abs_err.reverse),
-                                _format_cell(abs_err.forward_reverse),
-                                _format_cell(rel_err.forward),
-                                _format_cell(rel_err.reverse),
-                                _format_cell(rel_err.forward_reverse),
-                            )
+                        table_data.append([of, wrt, magnitude.forward, magnitude.reverse,
+                                           magnitude.fd, abs_err.forward, abs_err.reverse,
+                                           abs_err.forward_reverse, rel_err.forward,
+                                           rel_err.reverse, rel_err.forward_reverse, err_desc])
                     else:
-                        deriv_info_line = \
-                            deriv_line.format(
-                                pad_name(of, max_width_of, quotes=True),
-                                wrt_padded,
-                                _format_cell(magnitude.forward),
-                                _format_cell(magnitude.fd),
-                                _format_cell(abs_err.forward),
-                                _format_cell(rel_err.forward),
-                            )
-
-                    out_buffer.write(deriv_info_line)
+                        table_data.append([of, wrt, magnitude.forward, magnitude.fd,
+                                           abs_err.forward, rel_err.forward, err_desc])
+                        assert abs_err.forward_reverse is None
+                        assert rel_err.forward_reverse is None
+                        assert abs_err.reverse is None
+                        assert rel_err.reverse is None
 
                     # See if this component has the greater error in the derivative computation
                     # compared to the other components so far
                     for err in rel_err[:2]:
-                        if err is not None and not np.isnan(err) and err > worst_subjac_rel_err:
-                            worst_subjac_rel_err = err
-                            worst_subjac = (sys_type, sys_class_name, sys_name)
-                            worst_subjac_line = deriv_info_line
+                        if err is None or np.isnan(err):
+                            continue
 
-                if above_abs:
-                    out_buffer.write(' >ABS_TOL')
-                if above_rel:
-                    out_buffer.write(' >REL_TOL')
-                if inconsistent:
-                    out_buffer.write(' <RANK INCONSISTENT>')
-                out_buffer.write('\n')
+                        if worst_subjac is None or err > worst_subjac[3]:
+                            worst_subjac = (sys_class_name, sys_name, err, len(table_data) - 1)
 
             else:  # not compact print
 
                 # Magnitudes
-                if directional:
-                    ofstr = f"'{of}'" if isinstance(of, str) else f"{of}"
-                    wrtstr = f"'{wrt}'" if isinstance(wrt, str) else f"{wrt}"
-                    out_buffer.write(f"  {sys_name}: {ofstr} wrt (d){wrtstr}")
-                else:
-                    out_buffer.write(f"  {sys_name}: '{of}' wrt '{wrt}'")
-                if lcons and of in lcons:
+                out_buffer.write(f"  {sys_name}: {of} wrt {wrt}")
+                if lcons and of.strip("'") in lcons:
                     out_buffer.write(" (Linear constraint)")
 
                 out_buffer.write('\n')
@@ -2827,6 +2753,23 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         # End of for of, wrt in sorted_keys
 
         if not suppress_output:
+            if compact_print and table_data:
+                headers = ["of '<variable>'", "wrt '<variable>'"]
+                column_meta = [{}, {}]
+
+                if print_reverse:
+                    headers.extend(['fwd mag.', 'rev mag.', 'check mag.', 'a(fwd-chk)',
+                                    'a(rev-chk)', 'a(fwd-rev)', 'r(fwd-chk)', 'r(rev-chk)',
+                                    'r(fwd-rev)', 'error desc'])
+                else:
+                    headers.extend(['calc mag.', 'check mag.', 'a(cal-chk)', 'r(cal-chk)',
+                                    'error desc'])
+
+                column_meta.extend([num_col_meta.copy() for _ in range(len(headers) - 3)])
+                column_meta.append({})
+                print(generate_table(table_data, headers=headers, tablefmt='grid',
+                                     column_meta=column_meta, missing_val='n/a'), file=out_buffer)
+
             if totals or not show_only_incorrect or num_bad_jacs > 0:
                 out_stream.write(out_buffer.getvalue())
 
@@ -2834,12 +2777,13 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
     if not suppress_output:
         if compact_print and not totals and worst_subjac:
-            _, class_name, name = worst_subjac
+            class_name, name, _, row_id = worst_subjac
+
             worst_header = f"Sub Jacobian with Largest Relative Error: {class_name} '{name}'"
-            print(f"\n{add_border(worst_header, '#')}\n", file=out_stream)
-            print(header, file=out_stream)
-            print('-' * len(header), file=out_stream)
-            print(worst_subjac_line, file=out_stream)
+            worst_table = generate_table([table_data[row_id]], headers=headers,
+                                         tablefmt='grid', column_meta=column_meta,
+                                         missing_val='n/a')
+            print(f"\n{add_border(worst_header, '#')}\n, {worst_table}", file=out_stream)
 
     if incon_keys:
         # stick incon_keys into the first key's dict in order to avoid breaking existing code

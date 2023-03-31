@@ -2423,7 +2423,9 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        prob.check_partials(form='central', compact_print=True)
+        stream = StringIO()
+        prob.check_partials(form='central', compact_print=True, out_stream=stream)
+        contents = stream.getvalue()
 
     def test_set_step_calc_global(self):
 

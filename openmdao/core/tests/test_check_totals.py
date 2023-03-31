@@ -318,10 +318,10 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         compact_lines = compact_stream.getvalue().splitlines()
 
-        self.assertTrue('<output>' in compact_lines[4],
-            "'<output>' not found in '%s'" % compact_lines[4])
-        self.assertTrue('9.7743e+00' in compact_lines[12],
-            "'9.7743e+00' not found in '%s'" % compact_lines[12])
+        self.assertTrue("of '<variable>'" in compact_lines[5],
+            "of '<variable>' not found in '%s'" % compact_lines[5])
+        self.assertTrue('9.7743e+00' in compact_lines[-2],
+            "'9.7743e+00' not found in '%s'" % compact_lines[-2])
 
     def test_check_totals_show_progress(self):
         prob = om.Problem()
@@ -1412,7 +1412,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         stream = StringIO()
         data = prob.check_totals(method='cs', out_stream=stream, compact_print=True, directional=True)
         content = stream.getvalue().strip()
-        self.assertEqual(content.count("wrt '('comp.in1', 'comp.in2')'"), 2)
+        self.assertEqual(content.count("('comp.in1', 'comp.in2')"), 2)
         assert_near_equal(data[('comp.out1', ('comp.in1', 'comp.in2'))]['directional_fd_rev'], 0., tolerance=2e-15)
         assert_near_equal(data[('comp.out2', ('comp.in1', 'comp.in2'))]['directional_fd_rev'], 0., tolerance=2e-15)
 

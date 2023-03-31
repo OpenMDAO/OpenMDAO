@@ -435,7 +435,8 @@ def add_border(msg, borderstr='=', vpad=0):
     border = len(msg) * borderstr
     # handle borderstr of more than 1 char
     border = border[:len(msg)]
-    return f"{border}\n{msg}\n{border}"
+    padding = '\n' * (vpad + 1)
+    return f"{border}{padding}{msg}{padding}{border}"
 
 
 def run_model(prob, ignore_exception=False):
