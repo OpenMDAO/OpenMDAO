@@ -161,9 +161,9 @@ class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
                                     om.IndepVarComp(distributed=False),
                                     promotes=['*'])
         ivc.add_output('w', 2.0)
-        p.model.add_subsystem('dp', DistribParaboloid2D(), promotes=['*'])
-        p.model.promotes('dp', inputs=['*'], outputs=['*'],
-                         src_indices=np.array([0]), flat_src_indices=True)
+        p.model.add_subsystem('dp', DistribParaboloid2D(), promotes_outputs=['*'])
+        p.model.connect('w', 'dp.w', src_indices=np.array([0]), flat_src_indices=True)
+        p.model.connect('x', 'dp.x')
 
         p.model.add_design_var('x', lower=-100, upper=100)
         p.model.add_objective('y')
