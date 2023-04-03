@@ -2212,6 +2212,40 @@ class RelevanceTestCase(unittest.TestCase):
 
         self._finish_setup_and_check(p, ['C2', 'C3', 'C4', 'C5', 'C6'])
 
+    def test_list_indep_vars(self):
+        prob = om.Problem()
+        prob.model = SellarDerivatives()
+        prob.model.add_design_var('x')
+        prob.model.add_design_var('z')
+
+        prob.setup()
+        prob.final_setup()
+
+        strout = StringIO()
+        all_indep_var_names = [name for name, _ in prob.list_indep_vars(out_stream=strout)]
+
+        self.assertIn('x', all_indep_var_names)
+        self.assertIn('z', all_indep_var_names)
+
+        output = strout.getvalue()
+        self.assertRegex(output.split('\n')[1], r'Problem \w+ Independent Variables')
+        self.assertEqual(output.split('\n')[3].split(), ['name', 'units', 'value'])
+        self.assertRegex(output.split('\n')[5], r'\s*z\s+None\s+|[0-9.]+|')
+        self.assertRegex(output.split('\n')[6], r'\s*x\s+None\s+|[0-9.]+|')
+
+        strout = StringIO()
+        indep_var_names_no_desvars = [name for name, _ in
+                                      prob.list_indep_vars(include_design_vars=False,
+                                                           out_stream=strout)]
+
+        self.assertNotIn('x', indep_var_names_no_desvars)
+        self.assertNotIn('z', indep_var_names_no_desvars)
+
+        output = strout.getvalue()
+        self.assertRegex(output.split('\n')[1], r'Problem \w+ Independent Variables')
+        self.assertEqual(output.split('\n')[3].split(), ['None', 'found'])
+
+
 class NestedProblemTestCase(unittest.TestCase):
 
     def test_nested_prob(self):
