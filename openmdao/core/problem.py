@@ -1494,7 +1494,7 @@ class Problem(object):
                 wrt = rel_key[1]
                 if wrt in local_opts and local_opts[wrt]['directional']:
                     deriv = partials_data[c_name][rel_key]
-                    deriv['J_fwd'] = np.atleast_2d(np.sum(deriv['J_fwd'], axis=1)).T
+                    deriv[f'J_fwd'] = np.atleast_2d(np.sum(deriv['J_fwd'], axis=1)).T
 
                     if comp.matrix_free:
                         deriv['J_rev'] = np.atleast_2d(np.sum(deriv['J_rev'], axis=0)).T
