@@ -7,6 +7,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.testing_utils import force_check_partials
 
 
 class TestDotProductCompNx3(unittest.TestCase):
@@ -49,7 +50,7 @@ class TestDotProductCompNx3(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(compact_print=True, out_stream=None)
+        cpd = force_check_partials(self.p, compact_print=True, out_stream=None)
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:
@@ -96,7 +97,7 @@ class TestDotProductCompNx4(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(compact_print=True, out_stream=None)
+        cpd = force_check_partials(self.p, compact_print=True, out_stream=None)
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:
@@ -147,7 +148,7 @@ class TestUnits(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(compact_print=True, out_stream=None)
+        cpd = force_check_partials(self.p, compact_print=True, out_stream=None)
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:
@@ -211,7 +212,7 @@ class TestMultipleUnits(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(compact_print=True, out_stream=None)
+        cpd = force_check_partials(self.p, compact_print=True, out_stream=None)
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:
@@ -280,7 +281,7 @@ class TestMultipleConfigure(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(compact_print=True, out_stream=None)
+        cpd = force_check_partials(self.p, compact_print=True, out_stream=None)
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:
@@ -341,7 +342,7 @@ class TestMultipleCommonA(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(compact_print=True, out_stream=None)
+        cpd = force_check_partials(self.p, compact_print=True, out_stream=None)
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:
@@ -402,7 +403,7 @@ class TestMultipleCommonB(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(compact_print=True, out_stream=None)
+        cpd = force_check_partials(self.p, compact_print=True, out_stream=None)
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:

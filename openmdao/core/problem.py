@@ -49,7 +49,7 @@ from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.array_utils import scatter_dist_to_local
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
     clear_reports, get_reports_dir, _load_report_plugins
-from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable, \
+from openmdao.utils.general_utils import ContainsAll, pad_name, LocalRangeIterable, \
     _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
@@ -883,10 +883,9 @@ class Problem(object):
                 warn_deprecation(msg)
 
         if not isinstance(self.model, Group):
-            warn_deprecation("The model for this Problem is of type "
-                             f"'{self.model.__class__.__name__}'. "
-                             "A future release will require that the model "
-                             "be a Group or a sub-class of Group.")
+            raise TypeError("The model for this Problem is of type "
+                            f"'{self.model.__class__.__name__}'. "
+                            "The model must be a Group or a sub-class of Group.")
 
         # A distributed vector type is required for MPI
         if comm.size > 1:
@@ -1117,7 +1116,7 @@ class Problem(object):
         excludes = [excludes] if isinstance(excludes, str) else excludes
 
         comps = []
-        under_CI = env_truthy('CI')
+        under_CI = env_truthy('OPENMDAO_CHECK_ALL_PARTIALS')
 
         for comp in model.system_iter(typ=Component, include_self=True):
             # if we're under CI, do all of the partials, ignoring _no_check_partials
@@ -2187,6 +2186,90 @@ class Problem(object):
             pathlib.Path(reports_dirpath).mkdir(parents=True, exist_ok=True)
 
         return reports_dirpath
+
+    def list_indep_vars(self, include_design_vars=True, options=None,
+                        print_arrays=False, out_stream=_DEFAULT_OUT_STREAM):
+        """
+        Retrieve the independent variables in the Problem.
+
+        Returns a dictionary mapping the promoted names of indep_vars which the user is
+        expected to provide to the metadata for the associated independent variable.
+
+        A output is designated as an independent variable if it is tagged with
+        'openmdao:indep_var'. This includes IndepVarComp by default, and users are
+        able to apply this tag to their own component outputs if they wish
+        to provide components with IndepVarComp-like capability.
+
+        Parameters
+        ----------
+        include_design_vars : bool
+            If True, include design variables in the list of problem inputs.
+            The user may provide values for these but ultimately they will
+            be overwritten by the Driver.
+            Default is False.
+        options : list of str or None
+            List of optional columns to be displayed in the independent variable table.
+            Allowed values are:
+            ['name', 'units', 'shape', 'size', 'desc', 'ref', 'ref0', 'res_ref',
+            'distributed', 'lower', 'upper', 'tags', 'shape_by_conn', 'copy_shape',
+            'global_size', 'global_shape', 'value'].
+        print_arrays : bool, optional
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format is affected
+            by the values set with numpy.set_printoptions.
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+
+        Returns
+        -------
+        dict
+            A dictionary mapping the promoted names of all independent variables
+            in the model to their metadata.
+        """
+        model = self.model
+        if model._outputs is None:
+            raise RuntimeError("list_indep_vars requires that final_setup has been "
+                               "run for the Problem.")
+
+        connections = model._conn_global_abs_in2out
+        desvar_prom_names = model.get_design_vars(recurse=True,
+                                                  use_prom_ivc=True,
+                                                  get_sizes=False).keys()
+        problem_indep_vars = []
+
+        default_col_names = ['name', 'units', 'value']
+        col_names = default_col_names + ([] if options is None else options)
+
+        for target, meta in model._var_allprocs_abs2meta['input'].items():
+            src = connections[target]
+            smeta = model._var_allprocs_abs2meta['output'][src]
+            src_is_ivc = 'openmdao:indep_var' in smeta['tags']
+            input_name = model._var_allprocs_abs2prom['input'][target]
+
+            smeta = {key: val for key, val in smeta.items() if key in col_names}
+            smeta['value'] = self.get_val(input_name)
+
+            if src_is_ivc and (include_design_vars or input_name not in desvar_prom_names):
+                problem_indep_vars.append((input_name, smeta))
+
+        if out_stream is not None:
+            header = f'Problem {self._name} Independent Variables'
+            if problem_indep_vars:
+                meta = {key: meta for key, meta in problem_indep_vars}
+                vals = {key: self.get_val(key) for key in meta}
+                self._write_var_info_table(header, col_names, meta, vals, print_arrays=print_arrays,
+                                           show_promoted_name=True, col_spacing=1,
+                                           out_stream=out_stream)
+            else:
+                if out_stream is _DEFAULT_OUT_STREAM:
+                    out_stream = sys.stdout
+                hr = '-' * len(header)
+                print(f'{hr}\n{header}\n{hr}', file=out_stream)
+                print(f'None found', file=out_stream)
+
+        return problem_indep_vars
 
 
 _ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])

@@ -34,7 +34,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer
-from openmdao.utils.om_warnings import issue_warning, warn_deprecation, \
+from openmdao.utils.om_warnings import issue_warning, \
     DerivativesWarning, PromotionWarning, UnusedOptionWarning
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, \
@@ -4333,7 +4333,7 @@ class System(object):
         list of (name, metadata)
             List of input names and other optional information about those inputs.
         """
-        if self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
+        if (self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP) and val:
             issue_warning("Calling `list_inputs` before `final_setup` will only "
                           "display the default values of variables and will not show the result of "
                           "any `set_val` calls.")
@@ -6518,6 +6518,8 @@ class System(object):
 
         saved_errors = self._get_saved_errors()
 
+        # if saved_errors is None it means we have already finished setup and all errors should
+        # be raised as exceptions immediately.
         if saved_errors is None or env_truthy('OPENMDAO_FAIL_FAST'):
             raise exc_type(msg).with_traceback(tback)
 

@@ -393,6 +393,42 @@ test       **Required**  ['a', 'b']         N/A                    Test integer 
         with assert_warning(OMDeprecationWarning, msg):
             opt.declare('foo:bar', 1.0)
 
+    def test_context_manager(self):
+        options = OptionsDictionary()
+        options.declare('foo', values=['a', 'b', 'c'], default=None, allow_none=True)
+        options.declare('bar', types=(float, int))
+
+        options['foo'] = 'b'
+        options['bar'] = 3.14
+
+        self.assertEqual(options['foo'], 'b')
+        self.assertAlmostEqual(options['bar'], 3.14)
+
+        with options.temporary(foo='c', bar=5):
+            self.assertEqual(options['foo'], 'c')
+            self.assertEqual(options['bar'], 5)
+            with options.temporary(foo='a'):
+                self.assertEqual(options['foo'], 'a')
+            self.assertEqual(options['foo'], 'c')
+            self.assertEqual(options['bar'], 5)
+
+        self.assertEqual(options['foo'], 'b')
+        self.assertAlmostEqual(options['bar'], 3.14)
+
+    def test_call(self):
+        options = OptionsDictionary()
+        options.declare('foo', values=['a', 'b', 'c'], default=None, allow_none=True)
+        options.declare('bar', types=(float, int))
+
+        options['foo'] = 'b'
+        options['bar'] = 3.14
+
+        self.assertEqual(options['foo'], 'b')
+        self.assertAlmostEqual(options['bar'], 3.14)
+        options.set(foo='c', bar=5)
+        self.assertEqual(options['foo'], 'c')
+        self.assertEqual(options['bar'], 5)
+
 
 if __name__ == "__main__":
     unittest.main()

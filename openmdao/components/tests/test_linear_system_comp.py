@@ -6,6 +6,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.testing_utils import force_check_partials
 
 
 class TestLinearSystemComp(unittest.TestCase):
@@ -166,13 +167,11 @@ class TestLinearSystemComp(unittest.TestCase):
         sol = d_residuals['lin.x']
         assert_near_equal(sol, x, .0001)
 
-        prob.model.lingrp.lin._no_check_partials = False  # override skipping of check_partials
-
         J = prob.compute_totals(['lin.x'], ['p1.A', 'p2.b', 'lin.x'], return_format='flat_dict')
         assert_near_equal(J['lin.x', 'p1.A'], dx_dA, .0001)
         assert_near_equal(J['lin.x', 'p2.b'], dx_db, .0001)
 
-        data = prob.check_partials(out_stream=None)
+        data = force_check_partials(prob, out_stream=None)
 
         abs_errors = data['lingrp.lin'][('x', 'x')]['abs error']
         self.assertTrue(len(abs_errors) > 0)
@@ -229,13 +228,11 @@ class TestLinearSystemComp(unittest.TestCase):
         sol = d_residuals['lin.x']
         assert_near_equal(sol, x, .0001)
 
-        prob.model.lingrp.lin._no_check_partials = False  # override skipping of check_partials
-
         J = prob.compute_totals(['lin.x'], ['p1.A', 'p2.b'], return_format='flat_dict')
         assert_near_equal(J['lin.x', 'p1.A'], dx_dA, .0001)
         assert_near_equal(J['lin.x', 'p2.b'], dx_db, .0001)
 
-        data = prob.check_partials(out_stream=None)
+        data = force_check_partials(prob, out_stream=None)
 
         abs_errors = data['lingrp.lin'][('x', 'x')]['abs error']
         self.assertTrue(len(abs_errors) > 0)
@@ -301,13 +298,11 @@ class TestLinearSystemComp(unittest.TestCase):
         sol = d_residuals['lin.x']
         assert_near_equal(sol, x, .0001)
 
-        prob.model.lingrp.lin._no_check_partials = False  # override skipping of check_partials
-
         J = prob.compute_totals(['lin.x'], ['p1.A', 'p2.b'], return_format='flat_dict')
         assert_near_equal(J['lin.x', 'p1.A'], dx_dA, .0001)
         assert_near_equal(J['lin.x', 'p2.b'], dx_db, .0001)
 
-        data = prob.check_partials(out_stream=None)
+        data = force_check_partials(prob, out_stream=None)
 
         abs_errors = data['lingrp.lin'][('x', 'x')]['abs error']
         self.assertTrue(len(abs_errors) > 0)

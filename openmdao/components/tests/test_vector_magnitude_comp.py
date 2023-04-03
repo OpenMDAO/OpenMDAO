@@ -3,8 +3,8 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.units import convert_units
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.testing_utils import force_check_partials
 
 
 class TestVectorMagnitudeCompNx3(unittest.TestCase):
@@ -43,7 +43,7 @@ class TestVectorMagnitudeCompNx3(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(compact_print=False, method='fd', step=1.0E-9, out_stream=None)
+        cpd = force_check_partials(self.p, compact_print=False, method='fd', step=1.0E-9, out_stream=None)
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:
@@ -87,7 +87,7 @@ class TestVectorMagnitudeCompNx4(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(compact_print=False, method='fd', step=1.0E-9, out_stream=None)
+        cpd = force_check_partials(self.p, compact_print=False, method='fd', step=1.0E-9, out_stream=None)
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:
@@ -132,7 +132,7 @@ class TestUnits(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(compact_print=True, out_stream=None)
+        cpd = force_check_partials(self.p, compact_print=True, out_stream=None)
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:
@@ -186,7 +186,7 @@ class TestMultipleUnits(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(compact_print=True, out_stream=None)
+        cpd = force_check_partials(self.p, compact_print=True, out_stream=None)
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:
@@ -237,7 +237,7 @@ class TestMultipleConfigure(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(compact_print=True, out_stream=None)
+        cpd = force_check_partials(self.p, compact_print=True, out_stream=None)
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:
