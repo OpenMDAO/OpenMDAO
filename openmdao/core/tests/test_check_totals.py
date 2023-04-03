@@ -71,7 +71,7 @@ class DistribParaboloid2D(om.ExplicitComponent):
         else:
             vshape = (2,2)
 
-        self.add_input('w', val=1., src_indices=np.array([0]), flat_src_indices=True, distributed=True) # this will connect to a non-distributed IVC
+        self.add_input('w', val=1., distributed=True) # this will connect to a non-distributed IVC
         self.add_input('x', shape=vshape, distributed=True) # this will connect to a distributed IVC
 
         self.add_output('y', distributed=True) # all-gathered output, duplicated on all procs
@@ -162,6 +162,8 @@ class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
                                     promotes=['*'])
         ivc.add_output('w', 2.0)
         p.model.add_subsystem('dp', DistribParaboloid2D(), promotes=['*'])
+        p.model.promotes('dp', inputs=['*'], outputs=['*'],
+                         src_indices=np.array([0]), flat_src_indices=True)
 
         p.model.add_design_var('x', lower=-100, upper=100)
         p.model.add_objective('y')
