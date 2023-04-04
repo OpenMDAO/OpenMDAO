@@ -2133,7 +2133,7 @@ class TestConnect(unittest.TestCase):
                 self.sub.connect('src.x', 'tgt.x', src_indices=[1.0])
 
         msg = "'sub' <class Group>: When connecting from 'src.x' to 'tgt.x': Can't create an index array using indices of non-integral type 'float64'."
-        self.assertEquals(str(cm.exception), msg)
+        self.assertEqual(str(cm.exception), msg)
 
     def test_src_indices_as_float_array(self):
         self.prob._name = 'src_indices_as_float_array'
@@ -2142,7 +2142,7 @@ class TestConnect(unittest.TestCase):
             self.prob.setup()
             self.prob.run_model()
 
-        self.assertEquals(str(cm.exception),
+        self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'src_indices_as_float_array':"
            "\n   'sub' <class Group>: When connecting from 'src.x' to 'tgt.x': Can't create an "
            "index array using indices of non-integral type 'float64'.")
@@ -2161,7 +2161,7 @@ class TestConnect(unittest.TestCase):
             with self.assertRaises(Exception) as cm:
                 self.sub.connect('cmp.x', 'tgt.x', src_indices=[1])
 
-        self.assertEquals(str(cm.exception), msg)
+        self.assertEqual(str(cm.exception), msg)
 
     def test_invalid_source(self):
         self.prob._name = 'invalid_source'

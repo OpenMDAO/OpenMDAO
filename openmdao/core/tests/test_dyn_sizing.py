@@ -223,7 +223,7 @@ class TestPassSizeDistributed(unittest.TestCase):
             prob.setup()
 
         msg = "\nCollected errors for problem 'serial_start':\n   <model> <class Group>: dynamic sizing of non-distributed input 'E.in' from distributed output 'D.out' is not supported.\n   <model> <class Group>: Can't connect distributed output 'D.out' to non-distributed input 'E.in' without specifying src_indices.\n   <model> <class Group>: The source indices slice(None, None, 1) do not specify a valid shape for the connection 'B.out' to 'C.in'. The target shape is (4,) but indices are shape (12,)."
-        self.assertEquals(str(cm.exception), msg)
+        self.assertEqual(str(cm.exception), msg)
 
     def test_distributed_start(self):
         """the size information starts in the distributed component C"""
@@ -254,7 +254,7 @@ class TestPassSizeDistributed(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.setup()
 
-        self.assertEquals(str(cm.exception),
+        self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'distributed_start':"
            "\n   <model> <class Group>: dynamic sizing of non-distributed output 'A.out' from "
            "distributed input 'B.in' is not supported because not all B.in ranks are the same size "
@@ -794,7 +794,7 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         p.model.connect('indeps.x', 'comp.x')
         with self.assertRaises(Exception) as cm:
             p.setup()
-        self.assertEquals(cm.exception.args[0],
+        self.assertEqual(cm.exception.args[0],
            "\nCollected errors for problem 'ser_unknown_dist_known_err':"
            "\n   <model> <class Group>: dynamic sizing of non-distributed output 'indeps.x' from "
            "distributed input 'comp.x' is not supported because not all comp.x ranks are the same "
@@ -811,7 +811,7 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         p.model.connect('indeps.x', 'comp.x')
         with self.assertRaises(Exception) as cm:
             p.setup()
-        self.assertEquals(cm.exception.args[0],
+        self.assertEqual(cm.exception.args[0],
             "\nCollected errors for problem 'dist_known_ser_unknown':"
             "\n   <model> <class Group>: dynamic sizing of non-distributed input 'comp.x' from "
             "distributed output 'indeps.x' is not supported."
@@ -826,7 +826,7 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         p.model.connect('indeps.x', 'comp.x')
         with self.assertRaises(Exception) as cm:
             p.setup()
-        self.assertEquals(cm.exception.args[0],
+        self.assertEqual(cm.exception.args[0],
             "\nCollected errors for problem 'dist_unknown_ser_known':"
             "\n   <model> <class Group>: Can't connect distributed output 'indeps.x' to "
             "non-distributed input 'comp.x' without specifying src_indices.")

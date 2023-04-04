@@ -194,7 +194,7 @@ class SerialDiamondFDTestCase(TestCase):
         try:
             setup_diamond_model(0, 10, 'fd', 'model')
         except Exception as err:
-            self.assertEquals(str(err), "Value (0) of option 'num_par_fd' is less than minimum allowed value of 1.")
+            self.assertEqual(str(err), "Value (0) of option 'num_par_fd' is less than minimum allowed value of 1.")
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
