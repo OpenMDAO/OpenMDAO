@@ -1496,8 +1496,6 @@ class System(object):
 
         self._top_level_post_sizes()
 
-        # The try/except can be removed when support for the
-        # "Component as a model" deprecation is removed
         try:
             self._problem_meta['relevant'] = self._init_relevance(mode)
         except RuntimeError:
