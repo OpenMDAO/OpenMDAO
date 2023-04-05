@@ -36,7 +36,7 @@ if 'win32' in sys.platform:
     # Windows specific event-loop policy & cmd
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
-my_loop = asyncio.get_event_loop()
+my_loop = asyncio.get_event_loop_policy().get_event_loop()
 
 """ A set of toolbar tests that runs on each model. """
 toolbar_script = [
@@ -718,7 +718,7 @@ n2_gui_test_scripts = {
             "test": "click",
             "selector": "#filter-target",
             "button": "left"
-        },   
+        },
     ]
 }
 
