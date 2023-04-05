@@ -290,6 +290,9 @@ def array_connection_compatible(shape1, shape2):
     else:
         fundamental_shape2 = np.ones((1,))
 
+    if len(fundamental_shape1) != len(fundamental_shape2):
+        return False
+
     return np.all(fundamental_shape1 == fundamental_shape2)
 
 
