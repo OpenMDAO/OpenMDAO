@@ -8,8 +8,7 @@ from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.impl_comp_simple import TestImplCompSimple
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
-from openmdao.utils.om_warnings import OMDeprecationWarning
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestExplicitComponent(unittest.TestCase):
@@ -17,18 +16,17 @@ class TestExplicitComponent(unittest.TestCase):
     def test___init___simple(self):
         """Test a simple explicit component."""
         comp = TestExplCompSimple()
-        prob = Problem(comp).setup()
 
+        prob = Problem()
+        prob.model.add_subsystem('comp', comp, promotes=['*'])
+        prob.setup()
         # check optional metadata (desc)
-        self.assertEqual(
-            comp._var_abs2meta['input']['length']['desc'],
-            'length of rectangle')
-        self.assertEqual(
-            comp._var_abs2meta['input']['width']['desc'],
-            'width of rectangle')
-        self.assertEqual(
-            comp._var_abs2meta['output']['area']['desc'],
-            'area of rectangle')
+        self.assertEqual(comp._var_abs2meta['input']['comp.length']['desc'],
+                         'length of rectangle')
+        self.assertEqual(comp._var_abs2meta['input']['comp.width']['desc'],
+                         'width of rectangle')
+        self.assertEqual(comp._var_abs2meta['output']['comp.area']['desc'],
+                         'area of rectangle')
 
         prob['length'] = 3.
         prob['width'] = 2.
@@ -38,7 +36,10 @@ class TestExplicitComponent(unittest.TestCase):
     def test___init___array(self):
         """Test an explicit component with array inputs/outputs."""
         comp = TestExplCompArray(thickness=1.)
-        prob = Problem(comp).setup()
+
+        prob = Problem()
+        prob.model.add_subsystem('comp', comp, promotes=['*'])
+        prob.setup()
 
         prob['lengths'] = 3.
         prob['widths'] = 2.
@@ -56,12 +57,6 @@ class TestExplicitComponent(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, msg):
             comp.add_input('arr', val=np.ones((2, 2)), shape=([2]))
-
-        with self.assertRaises(ValueError) as cm:
-            comp.add_input('arr', val=np.ones((2, 2)), src_indices=[0, 1], flat_src_indices=True)
-
-        msg = "Shape of indices (2,) does not match shape of (2, 2) for 'arr'."
-        self.assertEqual(str(cm.exception), msg)
 
         msg = ("The shape argument should be an int, tuple, or list "
                "but a '<(.*) 'numpy.ndarray'>' was given")
@@ -92,13 +87,6 @@ class TestExplicitComponent(unittest.TestCase):
 
         with self.assertRaisesRegex(TypeError, msg):
             comp.add_output('x', val=val)
-
-        msg = "When specifying src_indices for input 'x': Can't create an index array " \
-              "using indices of non-integral type 'object_'."
-        src = Component
-
-        with self.assertRaisesRegex(TypeError, msg):
-            comp.add_input('x', val=np.ones((2, 2)), src_indices=src)
 
         msg = 'The units argument should be a str or None'
         units = Component
@@ -305,7 +293,10 @@ class TestImplicitComponent(unittest.TestCase):
         a = np.abs(np.exp(0.5 * x) / x)
 
         comp = TestImplCompSimple()
-        prob = Problem(comp).setup()
+
+        prob = Problem()
+        prob.model.add_subsystem('comp', comp, promotes=['*'])
+        prob.setup()
 
         prob['a'] = a
         prob.run_model()
@@ -314,7 +305,10 @@ class TestImplicitComponent(unittest.TestCase):
     def test___init___array(self):
         """Test an implicit component with array inputs/outputs."""
         comp = TestImplCompArray()
-        prob = Problem(comp).setup()
+
+        prob = Problem()
+        prob.model.add_subsystem('comp', comp, promotes=['*'])
+        prob.setup()
 
         prob['rhs'] = np.ones(2)
         prob.run_model()
@@ -330,13 +324,8 @@ class TestRangePartials(unittest.TestCase):
                 self.size = size
 
             def setup(self):
-                # verify that both iterable and array types are valid
-                # for val and src_indices arguments to add_input
-                self.add_input('v1', val=range(self.size),
-                                     src_indices=range(self.size))
-
-                self.add_input('v2', val=2*np.ones(self.size),
-                                     src_indices=np.array(range(self.size)))
+                self.add_input('v1', shape=self.size)
+                self.add_input('v2', shape=self.size)
 
                 # verify that both iterable and array types are valid
                 # for val, upper and lower arguments to add_output
@@ -360,20 +349,27 @@ class TestRangePartials(unittest.TestCase):
                 outputs['vSum'] = inputs['v1'] + inputs['v2']
                 outputs['vProd'] = inputs['v1'] * inputs['v2']
 
-        comp = RangePartialsComp()
 
-        prob = Problem(model=comp)
+        size = 4
 
-        with assert_warning(OMDeprecationWarning,
-                            f"<model> <class RangePartialsComp>: Passing `src_indices` as an arg to `add_input('v1', ...` is"
-                            " deprecated and will become an error in a future release.  Add "
-                            "`src_indices` to a `promotes` or `connect` call instead."):
-            prob.setup()
+        prob = Problem()
 
+        indep = prob.model.add_subsystem('indep', IndepVarComp())
+        indep.add_output('v1', val=range(size))
+        indep.add_output('v2', val=2*np.ones(size))
+
+        prob.model.add_subsystem('comp', RangePartialsComp())
+
+        # verify that both iterable and array types are valid
+        # for val and src_indices arguments to connect
+        prob.model.connect('indep.v1', 'comp.v1', src_indices=range(size))
+        prob.model.connect('indep.v2', 'comp.v2', src_indices=np.array(range(size)))
+
+        prob.setup()
         prob.run_model()
 
-        assert_near_equal(prob['vSum'], np.array([2., 3., 4., 5.]), 0.00001)
-        assert_near_equal(prob['vProd'], np.array([0., 2., 4., 6.]), 0.00001)
+        assert_near_equal(prob['comp.vSum'], np.array([2., 3., 4., 5.]), 0.00001)
+        assert_near_equal(prob['comp.vProd'], np.array([0., 2., 4., 6.]), 0.00001)
 
 
 if __name__ == '__main__':

@@ -260,13 +260,15 @@ class TestUnitConversion(unittest.TestCase):
                 self.add_output('x', 0.0, units='junk')
 
         with self.assertRaises(Exception) as cm:
-            prob = om.Problem(model=Comp1())
+            prob = om.Problem()
+            prob.model.add_subsystem('comp', Comp1())
             prob.setup()
         expected_msg = "The units 'junk' are invalid"
         self.assertTrue(expected_msg in str(cm.exception))
 
         with self.assertRaises(Exception) as cm:
-            prob = om.Problem(model=Comp2())
+            prob = om.Problem()
+            prob.model.add_subsystem('comp', Comp2())
             prob.setup()
         expected_msg = "The units 'junk' are invalid"
         self.assertTrue(expected_msg in str(cm.exception))
@@ -925,6 +927,7 @@ class TestUnitConversion(unittest.TestCase):
            "named 'G1' to remove the ambiguity."
            "\n   <model> <class Group>: Output units of 'J/s**2' for '_auto_ivc.v0' are "
            "incompatible with input units of 'm/s**2' for 'G1.C2.x'.")
+
     def test_input_defaults_unit_compat(self):
         p = om.Problem()
 

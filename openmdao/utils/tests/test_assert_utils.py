@@ -35,7 +35,7 @@ class TestAssertUtils(unittest.TestCase):
                 J['y', 'x2'] = np.array([4.0])
 
         prob = om.Problem()
-        prob.model = MyComp()
+        prob.model.add_subsystem('comp', MyComp())
 
         prob.set_solver_print(level=0)
         prob.setup()
@@ -48,7 +48,7 @@ class TestAssertUtils(unittest.TestCase):
     def test_assert_check_partials_exception_expected(self):
 
         prob = om.Problem()
-        prob.model = BrokenDerivComp()
+        prob.model.add_subsystem('comp', BrokenDerivComp())
 
         prob.set_solver_print(level=0)
 
@@ -218,7 +218,7 @@ class TestAssertUtils(unittest.TestCase):
                 partials['y', 'x'] = np.nan
 
         prob = om.Problem()
-        prob.model = MyComp()
+        prob.model.add_subsystem('comp', MyComp())
 
         prob.set_solver_print(level=0)
 

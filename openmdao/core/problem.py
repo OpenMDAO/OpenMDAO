@@ -13,7 +13,7 @@ from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
 from itertools import product
 
-from io import StringIO
+from io import StringIO, TextIOBase
 
 import numpy as np
 import scipy.sparse as sparse
@@ -49,7 +49,7 @@ from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.array_utils import scatter_dist_to_local
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
     clear_reports, get_reports_dir, _load_report_plugins
-from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable, \
+from openmdao.utils.general_utils import ContainsAll, pad_name, LocalRangeIterable, \
     _find_dict_meta, env_truthy, add_border, match_includes_excludes, inconsistent_across_procs
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
@@ -883,10 +883,9 @@ class Problem(object):
                 warn_deprecation(msg)
 
         if not isinstance(self.model, Group):
-            warn_deprecation("The model for this Problem is of type "
-                             f"'{self.model.__class__.__name__}'. "
-                             "A future release will require that the model "
-                             "be a Group or a sub-class of Group.")
+            raise TypeError("The model for this Problem is of type "
+                            f"'{self.model.__class__.__name__}'. "
+                            "The model must be a Group or a sub-class of Group.")
 
         # A distributed vector type is required for MPI
         if comm.size > 1:
@@ -1117,7 +1116,7 @@ class Problem(object):
         excludes = [excludes] if isinstance(excludes, str) else excludes
 
         comps = []
-        under_CI = env_truthy('CI')
+        under_CI = env_truthy('OPENMDAO_CHECK_ALL_PARTIALS')
 
         for comp in model.system_iter(typ=Component, include_self=True):
             # if we're under CI, do all of the partials, ignoring _no_check_partials
@@ -1825,6 +1824,7 @@ class Problem(object):
                           desvar_opts=[],
                           cons_opts=[],
                           objs_opts=[],
+                          out_stream=_DEFAULT_OUT_STREAM
                           ):
         """
         Print all design variables and responses (objectives and constraints).
@@ -1858,6 +1858,15 @@ class Problem(object):
             Allowed values are:
             ['ref', 'ref0', 'indices', 'adder', 'scaler', 'units',
             'parallel_deriv_color', 'cache_linear_solution'].
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+
+        Returns
+        -------
+        dict
+            Name, size, val, and other requested parameters of design variables, constraints,
+            and objectives.
         """
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             raise RuntimeError(f"{self.msginfo}: Problem.list_problem_vars() cannot be called "
@@ -1873,10 +1882,17 @@ class Problem(object):
         def_desvar_opts = [opt for opt in ('indices',) if opt not in desvar_opts and
                            _find_dict_meta(desvars, opt)]
         col_names = default_col_names + def_desvar_opts + desvar_opts
-        self._write_var_info_table(header, col_names, desvars, vals,
-                                   show_promoted_name=show_promoted_name,
-                                   print_arrays=print_arrays,
-                                   col_spacing=2)
+        if out_stream:
+            self._write_var_info_table(header, col_names, desvars, vals,
+                                       show_promoted_name=show_promoted_name,
+                                       print_arrays=print_arrays,
+                                       col_spacing=2)
+
+        des_vars = [[i, j] for i, j in desvars.items()]
+        for d in des_vars:
+            d[1] = {i: j for i, j in d[1].items() if i in col_names}
+            d[1]['val'] = vals[d[0]]
+        des_vars = [tuple(d) for d in des_vars]
 
         # Constraints
         cons = self.driver._cons
@@ -1886,10 +1902,17 @@ class Problem(object):
         def_cons_opts = [opt for opt in ('indices', 'alias') if opt not in cons_opts and
                          _find_dict_meta(cons, opt)]
         col_names = default_col_names + def_cons_opts + cons_opts
-        self._write_var_info_table(header, col_names, cons, vals,
-                                   show_promoted_name=show_promoted_name,
-                                   print_arrays=print_arrays,
-                                   col_spacing=2)
+        if out_stream:
+            self._write_var_info_table(header, col_names, cons, vals,
+                                       show_promoted_name=show_promoted_name,
+                                       print_arrays=print_arrays,
+                                       col_spacing=2)
+
+        cons_vars = [[i, j] for i, j in cons.items()]
+        for c in cons_vars:
+            c[1] = {i: j for i, j in c[1].items() if i in col_names}
+            c[1]['val'] = vals[c[0]]
+        cons_vars = [tuple(c) for c in cons_vars]
 
         objs = self.driver._objs
         vals = self.driver.get_objective_values(driver_scaling=driver_scaling)
@@ -1897,13 +1920,27 @@ class Problem(object):
         def_obj_opts = [opt for opt in ('indices',) if opt not in objs_opts and
                         _find_dict_meta(objs, opt)]
         col_names = default_col_names + def_obj_opts + objs_opts
-        self._write_var_info_table(header, col_names, objs, vals,
-                                   show_promoted_name=show_promoted_name,
-                                   print_arrays=print_arrays,
-                                   col_spacing=2)
+        if out_stream:
+            self._write_var_info_table(header, col_names, objs, vals,
+                                       show_promoted_name=show_promoted_name,
+                                       print_arrays=print_arrays,
+                                       col_spacing=2)
+
+        obj_vars = [[i, j] for i, j in objs.items()]
+        for o in obj_vars:
+            o[1] = {i: j for i, j in o[1].items() if i in col_names}
+            o[1]['val'] = vals[o[0]]
+        obj_vars = [tuple(o) for o in obj_vars]
+
+        prob_vars = {'design_vars': des_vars,
+                     'constraints': cons_vars,
+                     'objectives': obj_vars}
+
+        return prob_vars
 
     def _write_var_info_table(self, header, col_names, meta, vals, print_arrays=False,
-                              show_promoted_name=True, col_spacing=1):
+                              show_promoted_name=True, col_spacing=1,
+                              out_stream=_DEFAULT_OUT_STREAM):
         """
         Write a table of information for the problem variable in meta and vals.
 
@@ -1927,7 +1964,17 @@ class Problem(object):
             If True, then show the promoted names of the variables.
         col_spacing : int
             Number of spaces between columns in the table.
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
         """
+        if out_stream is None:
+            return
+        elif out_stream is _DEFAULT_OUT_STREAM:
+            out_stream = sys.stdout
+        elif not isinstance(out_stream, TextIOBase):
+            raise TypeError("Invalid output stream specified for 'out_stream'")
+
         abs2prom = self.model._var_abs2prom
 
         # Gets the current numpy print options for consistent decimal place
@@ -1970,7 +2017,7 @@ class Problem(object):
             rows.append(row)
 
         col_space = ' ' * col_spacing
-        print(add_border(header, '-'))
+        print(add_border(header, '-'), file=out_stream)
 
         # loop through the rows finding the max widths
         max_width = {}
@@ -1992,8 +2039,8 @@ class Problem(object):
         for col_name in col_names:
             header_div += '-' * max_width[col_name] + col_space
             header_col_names += pad_name(col_name, max_width[col_name], quotes=False) + col_space
-        print(header_col_names)
-        print(header_div[:-1])
+        print(header_col_names, file=out_stream)
+        print(header_div[:-1], file=out_stream)
 
         # print rows with var info
         for row in rows:
@@ -2008,16 +2055,16 @@ class Problem(object):
                 else:
                     out = str(cell)
                 row_string += pad_name(out, max_width[col_name], quotes=False) + col_space
-            print(row_string)
+            print(row_string, file=out_stream)
 
             if print_arrays:
                 spaces = (max_width['name'] + col_spacing) * ' '
                 for col_name in have_array_values:
-                    print(f"{spaces}{col_name}:")
-                    print(textwrap.indent(pprint.pformat(row[col_name]), spaces))
-                    print()
+                    print(f"{spaces}{col_name}:", file=out_stream)
+                    print(textwrap.indent(pprint.pformat(row[col_name]), spaces), file=out_stream)
+                    print(file=out_stream)
 
-        print()
+        print(file=out_stream)
 
     def load_case(self, case):
         """
@@ -2139,6 +2186,90 @@ class Problem(object):
             pathlib.Path(reports_dirpath).mkdir(parents=True, exist_ok=True)
 
         return reports_dirpath
+
+    def list_indep_vars(self, include_design_vars=True, options=None,
+                        print_arrays=False, out_stream=_DEFAULT_OUT_STREAM):
+        """
+        Retrieve the independent variables in the Problem.
+
+        Returns a dictionary mapping the promoted names of indep_vars which the user is
+        expected to provide to the metadata for the associated independent variable.
+
+        A output is designated as an independent variable if it is tagged with
+        'openmdao:indep_var'. This includes IndepVarComp by default, and users are
+        able to apply this tag to their own component outputs if they wish
+        to provide components with IndepVarComp-like capability.
+
+        Parameters
+        ----------
+        include_design_vars : bool
+            If True, include design variables in the list of problem inputs.
+            The user may provide values for these but ultimately they will
+            be overwritten by the Driver.
+            Default is False.
+        options : list of str or None
+            List of optional columns to be displayed in the independent variable table.
+            Allowed values are:
+            ['name', 'units', 'shape', 'size', 'desc', 'ref', 'ref0', 'res_ref',
+            'distributed', 'lower', 'upper', 'tags', 'shape_by_conn', 'copy_shape',
+            'global_size', 'global_shape', 'value'].
+        print_arrays : bool, optional
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format is affected
+            by the values set with numpy.set_printoptions.
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+
+        Returns
+        -------
+        dict
+            A dictionary mapping the promoted names of all independent variables
+            in the model to their metadata.
+        """
+        model = self.model
+        if model._outputs is None:
+            raise RuntimeError("list_indep_vars requires that final_setup has been "
+                               "run for the Problem.")
+
+        connections = model._conn_global_abs_in2out
+        desvar_prom_names = model.get_design_vars(recurse=True,
+                                                  use_prom_ivc=True,
+                                                  get_sizes=False).keys()
+        problem_indep_vars = []
+
+        default_col_names = ['name', 'units', 'value']
+        col_names = default_col_names + ([] if options is None else options)
+
+        for target, meta in model._var_allprocs_abs2meta['input'].items():
+            src = connections[target]
+            smeta = model._var_allprocs_abs2meta['output'][src]
+            src_is_ivc = 'openmdao:indep_var' in smeta['tags']
+            input_name = model._var_allprocs_abs2prom['input'][target]
+
+            smeta = {key: val for key, val in smeta.items() if key in col_names}
+            smeta['value'] = self.get_val(input_name)
+
+            if src_is_ivc and (include_design_vars or input_name not in desvar_prom_names):
+                problem_indep_vars.append((input_name, smeta))
+
+        if out_stream is not None:
+            header = f'Problem {self._name} Independent Variables'
+            if problem_indep_vars:
+                meta = {key: meta for key, meta in problem_indep_vars}
+                vals = {key: self.get_val(key) for key in meta}
+                self._write_var_info_table(header, col_names, meta, vals, print_arrays=print_arrays,
+                                           show_promoted_name=True, col_spacing=1,
+                                           out_stream=out_stream)
+            else:
+                if out_stream is _DEFAULT_OUT_STREAM:
+                    out_stream = sys.stdout
+                hr = '-' * len(header)
+                print(f'{hr}\n{header}\n{hr}', file=out_stream)
+                print(f'None found', file=out_stream)
+
+        return problem_indep_vars
 
 
 _ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])

@@ -1345,7 +1345,8 @@ class TestSqliteCaseReader(unittest.TestCase):
                          [])
 
     def test_list_input_and_outputs_with_tags(self):
-        prob = om.Problem(RectangleCompWithTags())
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', RectangleCompWithTags(), promotes=['*'])
 
         recorder = om.SqliteRecorder("cases.sql")
         prob.model.add_recorder(recorder)
@@ -1361,11 +1362,11 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Inputs no tags
         inputs = case.list_inputs(out_stream=None)
-        self.assertEqual(sorted([inp[0] for inp in inputs]), ['length', 'width'])
+        self.assertEqual(sorted([inp[0] for inp in inputs]), ['comp.length', 'comp.width'])
 
         # Inputs with tag that matches
         inputs = case.list_inputs(out_stream=None, tags="tag2")
-        self.assertEqual([inp[0] for inp in inputs], ['width',])
+        self.assertEqual([inp[0] for inp in inputs], ['comp.width',])
 
         # Inputs with tag that does not match
         inputs = case.list_inputs(out_stream=None, tags="tag3")
@@ -1373,15 +1374,15 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Inputs with multiple tags
         inputs = case.list_inputs(out_stream=None, tags=["tag2", "tag3"])
-        self.assertEqual([inp[0] for inp in inputs], ['width',])
+        self.assertEqual([inp[0] for inp in inputs], ['comp.width',])
 
         # Outputs no tags
         outputs = case.list_outputs(out_stream=None)
-        self.assertEqual(sorted([outp[0] for outp in outputs]), ['area',])
+        self.assertEqual(sorted([outp[0] for outp in outputs]), ['comp.area',])
 
         # Outputs with tag that does match
         outputs = case.list_outputs(out_stream=None, tags="tag1")
-        self.assertEqual(sorted([outp[0] for outp in outputs]), ['area',])
+        self.assertEqual(sorted([outp[0] for outp in outputs]), ['comp.area',])
 
         # Outputs with tag that do not match any vars
         outputs = case.list_outputs(out_stream=None, tags="tag3")
@@ -1389,7 +1390,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Outputs with multiple tags
         outputs = case.list_outputs(out_stream=None, tags=["tag1", "tag3"])
-        self.assertEqual(sorted([outp[0] for outp in outputs]), ['area',])
+        self.assertEqual(sorted([outp[0] for outp in outputs]), ['comp.area',])
 
     def test_list_inputs_with_includes_excludes(self):
         prob = SellarProblem()
@@ -2284,7 +2285,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(cr._format_version, format_version)
 
-        self.assertEqual(set(cr.system_options.keys()),
+        self.assertEqual(set(cr._system_options.keys()),
                          set(['root'] + list(prob.model._subsystems_allprocs)))
 
         self.assertEqual(set(cr.problem_metadata.keys()), {
@@ -2312,7 +2313,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(cr._format_version, format_version)
 
-        self.assertEqual(set(cr.system_options.keys()),
+        self.assertEqual(set(cr._system_options.keys()),
                          set(['root'] + list(prob.model._subsystems_allprocs)))
 
         self.assertEqual(set(cr.problem_metadata.keys()), {
@@ -3115,33 +3116,6 @@ class TestSqliteCaseReader(unittest.TestCase):
             self.assertEqual(text.count('\n  y'), 1)
             num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
             self.assertEqual(num_non_empty_lines, 46)
-
-    def test_system_metadata_attribute_deprecated(self):
-        model = om.Group()
-        model.add_recorder(self.recorder)
-        prob = om.Problem(model)
-        prob.setup()
-        prob.run_model()
-        prob.cleanup()
-
-        cr = om.CaseReader(self.filename)
-        msg = "The BaseCaseReader.system_metadata attribute is deprecated. " \
-        "Use `list_model_options` instead."
-        with assert_warning(OMDeprecationWarning, msg):
-            options = cr.system_metadata
-
-    def test_system_options_attribute_deprecated(self):
-        model = om.Group()
-        model.add_recorder(self.recorder)
-        prob = om.Problem(model)
-        prob.setup()
-        prob.run_model()
-        prob.cleanup()
-
-        cr = om.CaseReader(self.filename)
-        msg = "The system_options attribute is deprecated. Use `list_model_options` instead."
-        with assert_warning(OMDeprecationWarning, msg):
-            options = cr.system_options
 
     def test_sqlite_reader_problem_derivatives(self):
 

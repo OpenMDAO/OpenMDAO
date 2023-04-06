@@ -709,13 +709,13 @@ class ExecComp(ExplicitComponent):
             for outs, vs, _ in self._exprs_info:
                 ins = sorted(set(vs).difference(outs))
                 for out in sorted(outs):
-                    out = '.'.join((self.pathname, out)) if self.pathname else out
+                    out = '.'.join((self.pathname, out))
                     for inp in ins:
-                        inp = '.'.join((self.pathname, inp)) if self.pathname else inp
+                        inp = '.'.join((self.pathname, inp))
                         if (out, inp) not in self._subjacs_info:
                             undeclared.append((out, inp))
             if undeclared:
-                idx = len(self.pathname) + 1 if self.pathname else 0
+                idx = len(self.pathname) + 1
                 undeclared = ', '.join([' wrt '.join((f"'{of[idx:]}'", f"'{wrt[idx:]}'"))
                                         for of, wrt in undeclared])
                 issue_warning(f"The following partial derivatives have not been "
@@ -987,7 +987,7 @@ class ExecComp(ExplicitComponent):
 
         # compute mapping of col index to wrt varname
         self._col_idx2name = idxnames = [None] * len(self._inputs)
-        plen = len(self.pathname) + 1 if self.pathname else 0
+        plen = len(self.pathname) + 1
         for name, slc in self._inputs.get_slice_dict().items():
             name = name[plen:]
             for i in range(slc.start, slc.stop):

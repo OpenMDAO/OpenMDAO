@@ -9,6 +9,7 @@ import numpy as np
 import openmdao.api as om
 from openmdao.components.tests.test_meta_model_structured_comp import SampleMap
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
+from openmdao.utils.testing_utils import force_check_partials
 
 
 # Data for example used in the docs.
@@ -179,7 +180,6 @@ class TestMetaModelSemiStructured(unittest.TestCase):
 
         comp = om.MetaModelSemiStructuredComp(method='slinear', extrapolate=True,
                                               training_data_gradients=True, vec_size=3)
-        comp._no_check_partials = False  # override skipping of check_partials
 
         # Convert to the flat table format.
         grid = np.array(list(itertools.product(*[params[0]['values'],
@@ -203,7 +203,7 @@ class TestMetaModelSemiStructured(unittest.TestCase):
 
         prob.run_model()
 
-        partials = prob.check_partials(method='cs', out_stream=None)
+        partials = force_check_partials(prob, method='cs', out_stream=None)
         assert_check_partials(partials, rtol=1e-10)
 
     def test_vectorized_lagrange2(self):
@@ -229,7 +229,6 @@ class TestMetaModelSemiStructured(unittest.TestCase):
 
         comp = om.MetaModelSemiStructuredComp(method='lagrange2', extrapolate=True,
                                               training_data_gradients=True, vec_size=3)
-        comp._no_check_partials = False  # override skipping of check_partials
 
         # Convert to the flat table format.
         grid = np.array(list(itertools.product(*[params[0]['values'],
@@ -253,7 +252,7 @@ class TestMetaModelSemiStructured(unittest.TestCase):
 
         prob.run_model()
 
-        partials = prob.check_partials(method='cs', out_stream=None)
+        partials = force_check_partials(prob, method='cs', out_stream=None)
         assert_check_partials(partials, rtol=1e-10)
 
     def test_vectorized_lagrange3(self):
@@ -279,7 +278,6 @@ class TestMetaModelSemiStructured(unittest.TestCase):
 
         comp = om.MetaModelSemiStructuredComp(method='lagrange3', extrapolate=True,
                                               training_data_gradients=True, vec_size=3)
-        comp._no_check_partials = False  # override skipping of check_partials
 
         # Convert to the flat table format.
         grid = np.array(list(itertools.product(*[params[0]['values'],
@@ -303,7 +301,7 @@ class TestMetaModelSemiStructured(unittest.TestCase):
 
         prob.run_model()
 
-        partials = prob.check_partials(method='cs', out_stream=None)
+        partials = force_check_partials(prob, method='cs', out_stream=None)
         assert_check_partials(partials, rtol=1e-10)
 
     def test_vectorized_akima(self):
@@ -329,7 +327,6 @@ class TestMetaModelSemiStructured(unittest.TestCase):
 
         comp = om.MetaModelSemiStructuredComp(method='akima', extrapolate=True,
                                               training_data_gradients=True, vec_size=3)
-        comp._no_check_partials = False  # override skipping of check_partials
 
         # Convert to the flat table format.
         grid = np.array(list(itertools.product(*[params[0]['values'],
@@ -353,7 +350,7 @@ class TestMetaModelSemiStructured(unittest.TestCase):
 
         prob.run_model()
 
-        partials = prob.check_partials(method='cs', out_stream=None)
+        partials = force_check_partials(prob, method='cs', out_stream=None)
         assert_check_partials(partials, rtol=1e-10)
 
     def test_error_dim(self):

@@ -33,35 +33,12 @@ There will be periodic changes to the API.
 User's are encouraged to pin their version of OpenMDAO to a recent release and
 update periodically.
 
-### OpenMDAO Versions
-
-**OpenMDAO 3.x.y** represents the current version and is no longer
-considered **[BETA][15]**.  It requires Python 3.8 or later and is
-maintained [here][4].
-To install the latest release, run `pip install --upgrade openmdao`.
-
-**OpenMDAO 2.10.x** is the last version to support Python2.x and will
-only receive critical bug fixes going forward.
-To install this older release, run `pip install "openmdao<3"`
-(the quotes around `openmdao<3` are required).
-
-> **PLEASE NOTE**: This repository was previously named **OpenMDAO/blue**.
-If you had cloned that repository, please update your repository name and
-remotes to reflect these changes. You can find instructions [here][8].
-
-The **OpenMDAO 1.7.4** code repository is now named **OpenMDAO1**, and has moved
-[here][5]. To install it, run: `pip install "openmdao<2"`
-(the quotes around `openmdao<2` are required).
-
-The legacy **OpenMDAO v0.x** (versions 0.13.0 and older) of the
-**OpenMDAO-Framework** are [here][6].
-
 ## Install OpenMDAO
 
 You have two options for installing **OpenMDAO**, (1) from the
 [Python Package Index (PyPI)][1], and (2) from the [GitHub repository][4].
 
-**OpenMDAO** includes several optional sets of dependencies:
+**OpenMDAO** includes several optional sets of dependencies including:
 `test` for installing the developer tools (e.g., testing, coverage),
 `docs` for building the documentation and
 `visualization` for some extra visualization tools.
@@ -85,8 +62,6 @@ This allows you to install **OpenMDAO** from a local copy of the source code.
     git clone http://github.com/OpenMDAO/OpenMDAO
     pip install OpenMDAO
 
-#### Install for Development
-
 If you would like to make changes to **OpenMDAO** it is recommended you
 install it in *[editable][16]* mode (i.e., development mode) by adding the `-e`
 flag when calling `pip`, this way any changes you make to the source code will
@@ -95,6 +70,26 @@ install the packages necessary for running **OpenMDAO**'s tests and documentatio
 generator.  You can install everything needed for development by running:
 
     pip install -e OpenMDAO[all]
+
+## OpenMDAO Versions
+
+**OpenMDAO 3.x.y** represents the current, supported version. It requires Python 3.7
+or later and is maintained [here][4]. To upgrade to the latest release, run:
+
+    pip install --upgrade openmdao
+
+**OpenMDAO 2.10.x** was the last version to support Python 2.x and is no longer supported.
+To install this older release, run:
+
+    pip install "openmdao<3"
+
+**OpenMDAO 1.7.4** was an earlier version of OpenMDAO and is also no longer supported.
+The code repository is now named **OpenMDAO1**, and has moved [here][5]. To install it, run:
+
+    pip install "openmdao<2"
+
+The legacy **OpenMDAO v0.x** (versions 0.13.0 and older) of the
+**OpenMDAO-Framework** are [here][6].
 
 ## Test OpenMDAO
 

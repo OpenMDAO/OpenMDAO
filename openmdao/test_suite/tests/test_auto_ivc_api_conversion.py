@@ -11,6 +11,7 @@ from openmdao.core.tests.test_distribcomp import DistribNoncontiguousComp
 from openmdao.test_suite.components.unit_conv import TgtCompC, TgtCompF, TgtCompK
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.array_utils import take_nth
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -149,8 +150,7 @@ class TestConversionGuideDoc(unittest.TestCase):
 
         class MyComp1(om.ExplicitComponent):
             def setup(self):
-                # this input will connect to entries 0, 1, and 2 of its source
-                self.add_input('x', np.ones(3), src_indices=[0, 1, 2])
+                self.add_input('x', np.ones(3))
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
@@ -158,8 +158,7 @@ class TestConversionGuideDoc(unittest.TestCase):
 
         class MyComp2(om.ExplicitComponent):
             def setup(self):
-                # this input will connect to entries 3 and 4 of its source
-                self.add_input('x', np.ones(2), src_indices=[3, 4])
+                self.add_input('x', np.ones(2))
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
@@ -170,8 +169,14 @@ class TestConversionGuideDoc(unittest.TestCase):
         # IndepVarComp is required to define the full size of the source vector.
         p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)),
                               promotes_outputs=['x'])
-        p.model.add_subsystem('C1', MyComp1(), promotes_inputs=['x'])
-        p.model.add_subsystem('C2', MyComp2(), promotes_inputs=['x'])
+        p.model.add_subsystem('C1', MyComp1())
+        p.model.add_subsystem('C2', MyComp2())
+
+        # this input will connect to entries 0, 1, and 2 of its source
+        p.model.promotes('C1', inputs=['x'], src_indices=[0, 1, 2])
+
+        # this input will connect to entries 3 and 4 of its source
+        p.model.promotes('C2', inputs=['x'], src_indices=[3, 4])
 
         p.model.add_design_var('x')
         p.setup()
@@ -194,14 +199,20 @@ class TestConversionGuideDocMPI(unittest.TestCase):
 
         prob = om.Problem()
 
+        comm = prob.comm
+        rank = comm.rank
+        idxs = list(take_nth(rank, comm.size, range(size)))
+
         # An IndepVarComp is required on all unconnected distributed inputs.
         ivc = om.IndepVarComp()
         ivc.add_output('invec', np.ones(size))
         prob.model.add_subsystem('P', ivc,
                                  promotes_outputs=['invec'])
 
-        prob.model.add_subsystem("C1", DistribNoncontiguousComp(arr_size=size),
-                                 promotes=['invec', 'outvec'])
+        prob.model.add_subsystem('C1', DistribNoncontiguousComp(size=len(idxs)),
+                                 promotes_outputs=['outvec'])
+
+        prob.model.promotes('C1', inputs=['invec'], src_indices=idxs)
 
         prob.setup()
 

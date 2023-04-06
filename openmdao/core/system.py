@@ -34,7 +34,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer
-from openmdao.utils.om_warnings import issue_warning, warn_deprecation, \
+from openmdao.utils.om_warnings import issue_warning, \
     DerivativesWarning, PromotionWarning, UnusedOptionWarning
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, \
@@ -1496,23 +1496,11 @@ class System(object):
 
         self._top_level_post_sizes()
 
-        # The try/except can be removed when support for the
-        # "Component as a model" deprecation is removed
         try:
             self._problem_meta['relevant'] = self._init_relevance(mode)
         except RuntimeError:
             type_exc, exc, tb = sys.exc_info()
-            from openmdao.core.group import Group
-            if not isinstance(self, Group) and "Output not found for design variable" in str(exc):
-                msg = f"The model is of type '{self.__class__.__name__}'. " \
-                      "Components must be placed in a Group in order for unconnected inputs " \
-                      "to be used as design variables. A future release will require that " \
-                      "the model be a Group or a sub-class of Group."
-                self._collect_error(str(exc), exc_type=type_exc, tback=tb)
-                self._collect_error(msg)
-                return
-            else:
-                self._collect_error(str(exc), exc_type=type_exc, tback=tb)
+            self._collect_error(str(exc), exc_type=type_exc, tback=tb)
 
         # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
@@ -4333,7 +4321,7 @@ class System(object):
         list of (name, metadata)
             List of input names and other optional information about those inputs.
         """
-        if self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
+        if (self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP) and val:
             issue_warning("Calling `list_inputs` before `final_setup` will only "
                           "display the default values of variables and will not show the result of "
                           "any `set_val` calls.")
@@ -6518,6 +6506,8 @@ class System(object):
 
         saved_errors = self._get_saved_errors()
 
+        # if saved_errors is None it means we have already finished setup and all errors should
+        # be raised as exceptions immediately.
         if saved_errors is None or env_truthy('OPENMDAO_FAIL_FAST'):
             raise exc_type(msg).with_traceback(tback)
 

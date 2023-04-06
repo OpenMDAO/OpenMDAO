@@ -7,6 +7,7 @@ from numpy.testing import assert_almost_equal
 import openmdao.api as om
 from openmdao.test_suite.components.sellar_feature import SellarIDF
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
+from openmdao.utils.testing_utils import force_check_partials
 
 
 class TestEQConstraintComp(unittest.TestCase):
@@ -22,7 +23,7 @@ class TestEQConstraintComp(unittest.TestCase):
 
         prob.run_model()
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -83,7 +84,7 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_almost_equal(prob['f.y'], 27.)
         assert_almost_equal(prob['g.y'], 27.)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -120,7 +121,7 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_almost_equal(prob['f.y'], 27.)
         assert_almost_equal(prob['g.y'], 27.)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -171,7 +172,7 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_almost_equal(prob['f.y'], 27.)
         assert_almost_equal(prob['g.y'], 27.)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -208,7 +209,7 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_almost_equal(prob['f.y'], np.ones(n)*27.)
         assert_almost_equal(prob['g.y'], np.ones(n)*27.)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -245,7 +246,7 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_almost_equal(prob['f.y'], np.ones(n)*27.)
         assert_almost_equal(prob['g.y'], np.ones(n)*27.)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -290,7 +291,7 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_almost_equal(prob['f.y'], np.ones(n)*27.)
         assert_almost_equal(prob['g.y'], np.ones(n)*27.)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -322,7 +323,7 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_near_equal(prob['indep.x'], 2., 1e-6)
         assert_near_equal(prob['f.y'], 4., 1e-6)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -352,7 +353,7 @@ class TestEQConstraintComp(unittest.TestCase):
 
         with warnings.catch_warnings():
             warnings.filterwarnings(action="error", category=np.ComplexWarning)
-            cpd = prob.check_partials(out_stream=None, method='cs')
+            cpd = force_check_partials(prob, out_stream=None, method='cs')
 
         assert_check_partials(cpd, atol=1e-10, rtol=1e-10)
 
@@ -388,7 +389,7 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_near_equal(prob['indep.x'], np.ones(n)*2., 1e-6)
         assert_near_equal(prob['f.y'], np.ones(n)*4., 1e-6)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -422,7 +423,7 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_near_equal(prob['indep.x'], np.ones(n)*2., 1e-6)
         assert_near_equal(prob['f.y'], np.ones(n)*4., 1e-6)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -450,7 +451,7 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_near_equal(prob['indep.x'], 2., 1e-6)
         assert_near_equal(prob['f.y'], 4., 1e-6)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -484,7 +485,7 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_near_equal(prob['indep.x'], np.ones(n)*2., 1e-6)
         assert_near_equal(prob['f.y'], np.ones(n)*4., 1e-6)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=2e-5, rtol=2e-5)
 
@@ -507,7 +508,7 @@ class TestEQConstraintComp(unittest.TestCase):
 
         assert_near_equal(prob['equal.y'], np.ones(shape) - rhs, 1e-6)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -542,7 +543,7 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_almost_equal(prob['f.y'], 27.)
         assert_almost_equal(prob['g.y'], 27.)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -619,7 +620,7 @@ class TestEQConstraintComp(unittest.TestCase):
         prob.set_val('eq_comp.k2', np.random.rand(n) * 10)
 
         prob.run_model()
-    
+
     def test_indices(self):
         prob = om.Problem()
         model = prob.model
@@ -628,7 +629,7 @@ class TestEQConstraintComp(unittest.TestCase):
 
         model.add_subsystem('indep', om.IndepVarComp('x', np.ones(n)))
         model.add_subsystem('f', om.ExecComp('y=x**2', x=np.ones(n), y=np.ones(n)))
-        model.add_subsystem('eq_comp', om.EQConstraintComp('y', val=np.ones(n), 
+        model.add_subsystem('eq_comp', om.EQConstraintComp('y', val=np.ones(n),
                             indices=[n-2,n-1],
                             flat_indices=True, add_constraint=True))
 

@@ -464,7 +464,6 @@ class Driver(object):
                          f'\n    lower: {lower}\n    upper: {upper}'
                 s += '\nSet the initial value of the design variable to a valid value or set ' \
                      'the driver option[\'invalid_desvar_behavior\'] to \'ignore\'.'
-                s += '\nThis warning will become an error by default in OpenMDAO version 3.25.'
                 if self.options['invalid_desvar_behavior'] == 'raise':
                     raise ValueError(s)
                 else:
