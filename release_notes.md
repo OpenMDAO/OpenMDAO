@@ -1,6 +1,97 @@
 ***********************************
 # Release Notes for OpenMDAO 3.25.0
 
+April 10, 2023
+
+The release of OpenMDAO 3.26.0 primarily removes a lengthy list of long-standing deprecations that we will no longer 
+be carrying forward. There's a reasonable chance that this release will break existing models, so find any deprecation
+warnings that may exist in your current case and address them. Highlights among these are
+- The ability to use a component as a problem's model is removed (OpenMDAO expects a Group so that an AutoIVC component can be added)
+- `assert_rel_error` removed in favor of `assert_near_equal`
+- OpenMDAO now expects the keyword `val` rather than `value` in many functions and methods.
+- Deprecated names for some interpolants (Akima1D and trilinear) are no longer supported.
+- src_indices may no longer be used as an argument to add_input (use it during connect or promotes instead).
+
+A few POEM's have been implemented. POEM 078 changes system methods `list_inputs` and `list_outputs` to now support
+keyword arguments `is_indep_var` and `is_design_var` to help users filter inputs.
+POEM 082 adds a similar method, `Problem.get_indep_vars` which will allow the user to find all variables in the problem
+that are provided by IndepVarComps (or systems that mimic them). Directional check_totals has been implmented to provide
+a faster way of derivative checking in very large models. POEM 076 implements a directional check_totals capability
+to allow for faster checking in large models.
+
+OptionsDictionary now supports a `set` method to allow users to set multiple options in a single line.
+
+
+## New Deprecations
+
+- None
+
+## Backwards Incompatible API Changes
+
+- Removed deprecation that allowed use of `value` in place of `val` [#2835](https://github.com/OpenMDAO/OpenMDAO/pull/2835)
+- Removed deprecated simple_warning() function [#2837](https://github.com/OpenMDAO/OpenMDAO/pull/2837)
+- Removed deprecated DemuxComp [#2841](https://github.com/OpenMDAO/OpenMDAO/pull/2841)
+- Removed deprecated 'factorial' support in ExecComp [#2842](https://github.com/OpenMDAO/OpenMDAO/pull/2842)
+- Changed step_calc 'rel' to act the same as 'rel_avg' and removed deprecation [#2846](https://github.com/OpenMDAO/OpenMDAO/pull/2846)
+- Removed deprecated OPENMDAO_REQUIRE_MPI check [#2848](https://github.com/OpenMDAO/OpenMDAO/pull/2848)
+- Removed deprecated assert_rel_error() function [#2849](https://github.com/OpenMDAO/OpenMDAO/pull/2849)
+- Removed deprecated get_conversion() utility function [#2850](https://github.com/OpenMDAO/OpenMDAO/pull/2850)
+- Removed deprecated CaseReader attributes [#2851](https://github.com/OpenMDAO/OpenMDAO/pull/2851)
+- Removed deprecated `indep_var` tag [#2854](https://github.com/OpenMDAO/OpenMDAO/pull/2854)
+- Removed deprecated names for Akima1D and trilinear interpolants [#2855](https://github.com/OpenMDAO/OpenMDAO/pull/2855)
+- Removed deprecated ability to specify src_indices as an argument to add_input() [#2864](https://github.com/OpenMDAO/OpenMDAO/pull/2864)
+- Removed ability to use a Component as Problem.model [#2869](https://github.com/OpenMDAO/OpenMDAO/pull/2869)
+
+## Backwards Incompatible Non-API Changes
+
+- None
+
+## New Features
+
+- Changed DOEDriver to record unscaled derivatives [#2811](https://github.com/OpenMDAO/OpenMDAO/pull/2811)
+- POEM 78: Add is_indep_var and is_design_var filters to list_inputs/list_outputs [#2813](https://github.com/OpenMDAO/OpenMDAO/pull/2813)
+- During CS derivatives check, display Jcs instead of Jfd to let the user know the method used. [#2812](https://github.com/OpenMDAO/OpenMDAO/pull/2812)
+- Added ability to show/hide the promotion tree for each promoted input/output in the connection viewer [#2826](https://github.com/OpenMDAO/OpenMDAO/pull/2826)
+- Added capability to `list_problem_vars` to return problem var data and suppress `out_stream` [#2834](https://github.com/OpenMDAO/OpenMDAO/pull/2834)
+- Refactor for complex step around Newton. [#2839](https://github.com/OpenMDAO/OpenMDAO/pull/2839)
+- Changed handling of _no_check_partials [#2860](https://github.com/OpenMDAO/OpenMDAO/pull/2860)
+- Changed 'class' member of model data tree to be the full class path. [#2861](https://github.com/OpenMDAO/OpenMDAO/pull/2861)- 
+- POEM 082: Implemented a way of getting all independent variables from a Problem (get_indep_vars). [#2871](https://github.com/OpenMDAO/OpenMDAO/pull/2871)
+- OptionsDictionary update: Added context manager for temporary options values and a set method for setting multiple values at once. [#2865](https://github.com/OpenMDAO/OpenMDAO/pull/2865)
+- POEM 076: Implemented directional check_totals [#2859](https://github.com/OpenMDAO/OpenMDAO/pull/2859)
+
+## Bug Fixes
+
+- Got rid of KeyError so that a better, previously collected error could be displayed. [#2797](https://github.com/OpenMDAO/OpenMDAO/pull/2797)
+- Fixed N2 cycle arrows for very large models [#2799](https://github.com/OpenMDAO/OpenMDAO/pull/2799)
+- Fixed a bug in the optimization report when an output had aliased constraints and a regular constraint. [#2801](https://github.com/OpenMDAO/OpenMDAO/pull/2801)
+- Removed broken checking for dynamic overrides of matrix free methods [#2802](https://github.com/OpenMDAO/OpenMDAO/pull/2802)
+- Fixed bug to display derivative method in _assemble_derivative_data() [#2803](https://github.com/OpenMDAO/OpenMDAO/pull/2803)
+- Prevented copy/deepcopy from making a copy of _ReprClass objects [#2810](https://github.com/OpenMDAO/OpenMDAO/pull/2810)
+- Fixed bug when encountering invalid file handles in use_proc_files() [#2825](https://github.com/OpenMDAO/OpenMDAO/pull/2825)
+- Fixed MPI bug when total jacobian is singular and model has dist vars [#2828](https://github.com/OpenMDAO/OpenMDAO/pull/2828)
+- Fixed an exception when non-uniformly distributed arrays appeared in an inputs report [#2832](https://github.com/OpenMDAO/OpenMDAO/pull/2832)
+- Fixed Out of Bounds Error in Serial Derivative Consistency Check [#2838](https://github.com/OpenMDAO/OpenMDAO/pull/2838)
+
+## Miscellaneous
+
+- Removed broken caching scheme for initial values [#2792](https://github.com/OpenMDAO/OpenMDAO/pull/2792)
+- Handle matplotlib cm deprecation in recent versions of matplotlib [#2800](https://github.com/OpenMDAO/OpenMDAO/pull/2800)
+- Added conditional to check os.environ to determine use of `use_tempdirs` [#2805](https://github.com/OpenMDAO/OpenMDAO/pull/2805)
+- Added GitHub workflow to test with latest/pre-release dependencies [#2806](https://github.com/OpenMDAO/OpenMDAO/pull/2806)
+- Updated doc build to work with jupyter-book==0.14 [#2831](https://github.com/OpenMDAO/OpenMDAO/pull/2831)
+- Addressed two new potential vulnerabilities as reported by bandit [#2844](https://github.com/OpenMDAO/OpenMDAO/pull/2844)
+- Updated GitHub workflow to install openssl=3.0 for uploading the docs [#2853](https://github.com/OpenMDAO/OpenMDAO/pull/2853)
+- Updated ExplicitFuncComp Docs to demonstrate `compute_partials` capability [#2866](https://github.com/OpenMDAO/OpenMDAO/pull/2866)
+- Show warning about list_inputs values situationally [#2862](https://github.com/OpenMDAO/OpenMDAO/pull/2862)
+- Made some minor updates to README.md [#2867](https://github.com/OpenMDAO/OpenMDAO/pull/2867)
+- Remove note that invalid_desvar_behavior will change to "raise". [#2870](https://github.com/OpenMDAO/OpenMDAO/pull/2870)
+- Removed dead code that handled a non-Group model [#2875](https://github.com/OpenMDAO/OpenMDAO/pull/2875)
+
+
+***********************************
+# Release Notes for OpenMDAO 3.25.0
+
 January 27, 2023
 
 OpenMDAO 3.25.0 includes only one change, which is the convention OpenMDAO uses when transferring data between distributed and non-distributed variables. The underlying principle is that serial variables and their derivatives must have consistent values across all ranks where those variables exist.
