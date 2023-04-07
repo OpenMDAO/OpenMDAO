@@ -9,7 +9,7 @@ from openmdao.core.constants import _SetupStatus
 from openmdao.utils.om_warnings import issue_warning
 
 
-def _get_model_vars(vars, model_vars):
+def _get_model_vars(varType, vars, model_vars):
     """
     Get the requested IO variable data from model's list of IO.
 
@@ -32,10 +32,14 @@ def _get_model_vars(vars, model_vars):
         Dict to update `self.options` with desired IO data in `SubmodelComp`.
     """
     var_dict = {}
+    tmp = {var: meta for var, meta in model_vars}
 
     # check for wildcards and append them to vars list
     patterns = [i for i in vars if isinstance(i, str)]
-    var_list = [meta['prom_name'] for _, meta in model_vars]
+    if varType == 'outputs':
+        var_list = [meta['prom_name'] for _, meta in model_vars]
+    else:
+        var_list = list(tmp.keys())
     for i in patterns:
         matches = find_matches(i, var_list)
         if len(matches) == 0:
@@ -61,7 +65,7 @@ def _get_model_vars(vars, model_vars):
             # check if meta['prom_name'] == var[0] -> var[0] is prom name and var[1] is alias
             # NOTE name[7:] is the path name with out the 'subsys.' group level
             tmp_dict = {var[1]: meta for name, meta in model_vars
-                        if name[7:] == var[0] or meta['prom_name'] == var[0]}
+                        if name[7:] == var[0] or (varType == 'outputs' and meta['prom_name'] == var[0])}
 
             # check if dict is empty (no vars added)
             if len(tmp_dict) == 0:
@@ -82,7 +86,7 @@ def _get_model_vars(vars, model_vars):
             # check if meta['prom_name'] == var -> given var is prom_name
             # NOTE name[7:] is the path name with out the 'subsys.' group level
             tmp_dict = {var: meta for name, meta in model_vars
-                        if name[7:] == var or meta['prom_name'] == var}
+                        if name[7:] == var or (varType == 'outputs' and meta['prom_name'] == var)}
 
             # check if provided variable appears more than once in model
             if len(tmp_dict) > 1:
@@ -220,7 +224,7 @@ class SubmodelComp(ExplicitComponent):
         if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
             raise Exception('Cannot call add_input after configure.')
 
-        self.options['inputs'].update(_get_model_vars([(path, name)], self.boundary_inputs))
+        self.options['inputs'].update(_get_model_vars('inputs', [(path, name)], self.boundary_inputs))
 
         meta = self.options['inputs'][name]
 
@@ -254,7 +258,7 @@ class SubmodelComp(ExplicitComponent):
         if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
             raise Exception('Cannot call add_output after configure.')
 
-        self.options['outputs'].update(_get_model_vars([(path, name)], self.all_outputs))
+        self.options['outputs'].update(_get_model_vars('outputs', [(path, name)], self.all_outputs))
 
         meta = self.options['outputs'][name]
 
@@ -292,25 +296,27 @@ class SubmodelComp(ExplicitComponent):
         
         # raise ValueError('stop')
 
-        self.boundary_inputs = p.model.list_inputs(out_stream=None, prom_name=True,
-                                                   units=True, shape=True, desc=True,
-                                                   is_indep_var=True)
-        # self.boundary_inputs = p.model.list_outputs(prom_name=True,
+        # self.boundary_inputs = p.model.list_inputs(out_stream=None, prom_name=True,
         #                                            units=True, shape=True, desc=True,
         #                                            is_indep_var=True)
-        # exit(0)
+        # # self.boundary_inputs = p.model.list_outputs(prom_name=True,
+        # #                                            units=True, shape=True, desc=True,
+        # #                                            is_indep_var=True)
+        # # exit(0)
         
-        self.boundary_inputs.extend(p.model.list_outputs(out_stream=None, prom_name=True,
-                                                         units=True, shape=True, desc=True,
-                                                         is_indep_var=True))
+        # self.boundary_inputs.extend(p.model.list_outputs(out_stream=None, prom_name=True,
+        #                                                  units=True, shape=True, desc=True,
+        #                                                  is_indep_var=True))
+        
+        self.boundary_inputs = p.list_indep_vars(out_stream=None)
         
         # want all outputs from the `SubmodelComp`, including ivcs/design vars
         self.all_outputs = p.model.list_outputs(out_stream=None, prom_name=True,
                                                 units=True, shape=True, desc=True,
                                                 is_indep_var=False)
 
-        self.options['inputs'].update(_get_model_vars(self.model_input_names, self.boundary_inputs))
-        self.options['outputs'].update(_get_model_vars(self.model_output_names, self.all_outputs))
+        self.options['inputs'].update(_get_model_vars('inputs', self.model_input_names, self.boundary_inputs))
+        self.options['outputs'].update(_get_model_vars('outputs', self.model_output_names, self.all_outputs))
 
         inputs = self.options['inputs']
         outputs = self.options['outputs']
@@ -368,21 +374,28 @@ class SubmodelComp(ExplicitComponent):
         else:
             p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'])
         p.final_setup()
-
+        
+        # change p.driver._designvars directlys
+        
+        for var in self.input_name_map.keys():
+            try:
+                self.input_name_map[var].update({'source': p.driver._designvars[self.input_name_map[var]['abs_name']]['source']})
+            except:
+                self.input_name_map[var].update({'source': p.driver._designvars[self.input_name_map[var]['prom_name']]['source']})
         # get coloring and change row and column names to be prom names for use later
         # TODO replace meta['prom_name'] with interface name
         self.coloring = p.driver._get_coloring(run_model=True)
-        if self.coloring is not None:
-            # self.coloring._row_vars = [interface_name for _, interface_name in self._output_names if ]
-            # self.coloring._row_vars = [outputs[interface_name]['prom_name'] for _, interface_name in self._output_names.items() if
-            #                            interface_name in self.coloring._row_vars]
-            # self.coloring._row_vars = [meta['prom_name'] for name, meta in self.all_outputs
-            #                            if name in self.coloring._row_vars]
-            # self.coloring._col_vars = [inputs[interface_name]['prom_name'] for _, interface_name in self._input_names.items()]
-            # self.coloring._col_vars = [meta['prom_name'] for _, meta in self.boundary_inputs]
-            # NOTE might need to revisit col_vars
-            self.coloring._row_vars = [interface_name for interface_name in self._output_names if self.output_name_map[interface_name]['abs_name'] in self.coloring._row_vars]
-            self.coloring._col_vars = [interface_name for interface_name in self._input_names if self.input_name_map[interface_name]['abs_name'] in self.coloring._col_vars]
+        # if self.coloring is not None:
+        #     # self.coloring._row_vars = [interface_name for _, interface_name in self._output_names if ]
+        #     # self.coloring._row_vars = [outputs[interface_name]['prom_name'] for _, interface_name in self._output_names.items() if
+        #     #                            interface_name in self.coloring._row_vars]
+        #     # self.coloring._row_vars = [meta['prom_name'] for name, meta in self.all_outputs
+        #     #                            if name in self.coloring._row_vars]
+        #     # self.coloring._col_vars = [inputs[interface_name]['prom_name'] for _, interface_name in self._input_names.items()]
+        #     # self.coloring._col_vars = [meta['prom_name'] for _, meta in self.boundary_inputs]
+        #     # NOTE might need to revisit col_vars
+        #     self.coloring._row_vars = [interface_name for interface_name in self._output_names if self.output_name_map[interface_name]['abs_name'] in self.coloring._row_vars]
+        #     self.coloring._col_vars = [interface_name for interface_name in self._input_names if self.input_name_map[interface_name]['source'] in self.coloring._col_vars]
 
         # if self.coloring is None:
         self.declare_partials(of='*', wrt='*')
@@ -435,8 +448,8 @@ class SubmodelComp(ExplicitComponent):
         for inp in self._input_names:
             p.set_val(self.options['inputs'][inp]['prom_name'], inputs[inp])
 
-        of = [self.output_name_map[out]['prom_name'] for out in self._output_names]
-        wrt = [self.input_name_map[inp]['prom_name'] for inp in self._input_names]
+        of = [self.output_name_map[out]['abs_name'] for out in self._output_names]
+        wrt = [self.input_name_map[inp]['source'] for inp in self._input_names]
 
         tots = p.driver._compute_totals(of=of,
                                         wrt=wrt,
