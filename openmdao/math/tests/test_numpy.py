@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-import openmdao.func as omfunc
+import openmdao.math as omfunc
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 
 import openmdao.api as om

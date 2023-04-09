@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-import openmdao.func.cs_safe as cs_safe
+import openmdao.math.cs_safe as cs_safe
 import openmdao.func_api as omf
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 

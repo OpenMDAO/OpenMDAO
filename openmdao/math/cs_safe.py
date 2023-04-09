@@ -30,10 +30,10 @@ def abs(x):
 
 def d_abs(x):
     """
-    The derivative of the absolute value function.
+    Compute derivative of the absolute value function.
 
-    Note this function is non-differentiable at x=0. This implementation returns zero for that value but stringly
-    speaking it is undefined.
+    Note this function is non-differentiable at x=0. This implementation
+    returns zero for that value but strictly speaking it is undefined.
 
     Parameters
     ----------
@@ -110,7 +110,7 @@ def d_arctanh(x):
 
 def d_arctan2(y, x):
     """
-    The derivative of the two-argument inverse tangent function.
+    Compute the derivative of the two-argument inverse tangent function.
 
     Parameters
     ----------
@@ -150,7 +150,7 @@ def norm(x, axis=None):
 
 def d_norm(x, axis=None):
     """
-    The derivative of the norm of an ndarray along a given axis.
+    Compute the derivative of the norm of an ndarray along a given axis.
 
     Parameters
     ----------

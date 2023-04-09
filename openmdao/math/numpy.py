@@ -1,3 +1,8 @@
+"""
+OpenMDAO-friendly interfaces to numpy functions and their derivatives.
+"""
+
+
 import numpy as np
 
 from numpy import arccos, arcsin, arccosh, arcsinh, arctan, cos, cosh, cumsum, exp, \
@@ -9,9 +14,25 @@ _2_div_sqrt_pi = 2. / np.sqrt(np.pi)
 
 
 def d_cumsum(x, axis=None):
+    """
+    Compute derivative of the cumulative sum function.
+
+    Parameters
+    ----------
+    x : np.ndarray
+        Array of inputs to the cumulative sum function.
+    axis : int or None
+        Axis along which the input should be summed.
+
+    Returns
+    -------
+    np.ndarray
+        The cumulative sum of x along the given axis.
+
+    """
     n = np.prod(x.shape, dtype=int)
     if axis is None or len(x.shape) == 1:
-        return np.tri(n)
+        J = np.tri(n)
     else:
         J = np.zeros(x.shape + x.shape)
         J_view = np.reshape(J, (n, n))
@@ -20,19 +41,19 @@ def d_cumsum(x, axis=None):
         kron = np.kron
         eye = np.eye
 
-        len_axes_before_axis = 1 if axis == 0 else np.prod([size for i, size in enumerate(x.shape) if i < axis],
-                                                           dtype=int)
-        len_axes_after_axis = 1 if axis == k else np.prod([size for i, size in enumerate(x.shape) if i > axis],
-                                                          dtype=int)
+        len_axes_before_axis = 1 if axis == 0 \
+            else np.prod([size for i, size in enumerate(x.shape) if i < axis], dtype=int)
+        len_axes_after_axis = 1 if axis == k \
+            else np.prod([size for i, size in enumerate(x.shape) if i > axis], dtype=int)
         pattern = kron(np.tri(x.shape[axis]), eye(len_axes_after_axis))
         J_view[...] = kron(eye(len_axes_before_axis), pattern)
 
-        return J
+    return J
 
 
 def d_arccos(x):
     """
-    The derivative of the inverse cosine function.
+    Compute derivative of the inverse cosine function.
 
     Parameters
     ----------
@@ -49,7 +70,7 @@ def d_arccos(x):
 
 def d_arccosh(x):
     """
-    The derivative of the inverse hyperbolic cosine function.
+    Compute derivative of the inverse hyperbolic cosine function.
 
     Parameters
     ----------
@@ -66,7 +87,7 @@ def d_arccosh(x):
 
 def d_arcsin(x):
     """
-    The derivative of the inverse sine function.
+    Compute derivative of the inverse sine function.
 
     Parameters
     ----------
@@ -83,7 +104,7 @@ def d_arcsin(x):
 
 def d_arcsinh(x):
     """
-    The derivative of the inverse hyperbolic sine function.
+    Compute derivative of the inverse hyperbolic sine function.
 
     Parameters
     ----------
@@ -100,7 +121,7 @@ def d_arcsinh(x):
 
 def d_arctan(x):
     """
-    The derivative of the inverse tangent function.
+    Compute derivative of the inverse tangent function.
 
     Parameters
     ----------
@@ -117,7 +138,7 @@ def d_arctan(x):
 
 def d_cos(x):
     """
-    The derivative of the cosine function.
+    Compute derivative of the cosine function.
 
     Parameters
     ----------
@@ -134,7 +155,7 @@ def d_cos(x):
 
 def d_cosh(x):
     """
-    The derivative of the hyperbolic cosine function.
+    Compute the derivative of the hyperbolic cosine function.
 
     Parameters
     ----------
@@ -151,7 +172,7 @@ def d_cosh(x):
 
 def dot(a, b):
     """
-    The dot product of two n x m vectors a and b.
+    Compute the dot product of two n x m vectors a and b.
 
     Parameters
     ----------
@@ -170,7 +191,7 @@ def dot(a, b):
 
 def d_dot(a, b):
     """
-    The dot product of two n x m vectors a and b.
+    Compute the dot product of two n x m vectors a and b.
 
     Parameters
     ----------
@@ -182,16 +203,16 @@ def d_dot(a, b):
     Returns
     -------
     d_da : ndarray
-        The derivative of the dot product of a and b along all but the first dimension wrt a.
+        Derivative of the dot product of a and b along all but the first dimension wrt a.
     d_db : ndarray
-        The derivative of the dot product of a and b along all but the first dimension wrt b.
+        Derivative of the dot product of a and b along all but the first dimension wrt b.
     """
     return b.ravel(), a.ravel()
 
 
 def d_erf(x):
     """
-    The derivative of the error function.
+    Compute the derivative of the error function.
 
     Parameters
     ----------
@@ -208,7 +229,7 @@ def d_erf(x):
 
 def d_erfc(x):
     """
-    The derivative of the complementary error function.
+    Compute the derivative of the complementary error function.
 
     Parameters
     ----------
@@ -225,7 +246,7 @@ def d_erfc(x):
 
 def d_exp(x):
     """
-    The derivative of the exponential function.
+    Compute the derivative of the exponential function.
 
     Parameters
     ----------
@@ -242,7 +263,7 @@ def d_exp(x):
 
 def d_log(x):
     """
-    The derivative of the natural logarithm function.
+    Compute the derivative of the natural logarithm function.
 
     Parameters
     ----------
@@ -259,7 +280,7 @@ def d_log(x):
 
 def d_log10(x):
     """
-    The derivative of the log-base-10 function.
+    Compute the derivative of the log-base-10 function.
 
     Parameters
     ----------
@@ -276,7 +297,7 @@ def d_log10(x):
 
 def d_sin(x):
     """
-    The derivative of the sine function.
+    Compute the derivative of the sine function.
 
     Parameters
     ----------
@@ -293,7 +314,7 @@ def d_sin(x):
 
 def d_sinh(x):
     """
-    The derivative of the hyperbolic sine function.
+    Compute the derivative of the hyperbolic sine function.
 
     Parameters
     ----------
@@ -310,7 +331,7 @@ def d_sinh(x):
 
 def sqrt(x):
     """
-    The square root function
+    Compute the square root of input x.
 
     Parameters
     ----------
@@ -327,7 +348,7 @@ def sqrt(x):
 
 def d_sqrt(x):
     """
-    The derivative of the square root function.
+    Compute the derivative of the square root function.
 
     Parameters
     ----------
@@ -344,7 +365,7 @@ def d_sqrt(x):
 
 def sum(x, axis=None):
     """
-    The sum of the elements over the given axis of x.
+    Sum of the elements over the given axis of x.
 
     Parameters
     ----------
@@ -363,7 +384,7 @@ def sum(x, axis=None):
 
 def d_sum(x, axis=None):
     """
-    The derivative of the sum of the elements in x along the given axis.
+    Compute the derivative of the sum of the elements in x along the given axis.
 
     Parameters
     ----------
@@ -385,8 +406,9 @@ def d_sum(x, axis=None):
     if axis is None or len(x.shape) == 1:
         return np.ones((1,) + x.shape)
     else:
-        # This builds up J to the shape of (total_output_size, total_input_size) and then reshapes it to
-        # the appropriate dimensions. There may be a more efficient way to do this.
+        # This builds up J to the shape of (total_output_size, total_input_size)
+        # and then reshapes it to the appropriate dimensions. There may be a
+        # more efficient way to do this.
         #
         # Build up a list of arguments for the kronecker products.
         #
@@ -420,7 +442,8 @@ def d_sum(x, axis=None):
 
 def d_tan(x):
     """
-    The derivative of the tangent function.
+    Compute the derivative of the tangent function.
+
     Parameters
     ----------
     x : ndarray
@@ -436,7 +459,8 @@ def d_tan(x):
 
 def d_tanh(x):
     """
-    The derivative of the hyperbolic tangent function.
+    Compute the derivative of the hyperbolic tangent function.
+
     Parameters
     ----------
     x : ndarray
@@ -448,4 +472,3 @@ def d_tanh(x):
         Derivative of tanh wrt x.
     """
     return 1 / (np.cosh(x) ** 2)
-
