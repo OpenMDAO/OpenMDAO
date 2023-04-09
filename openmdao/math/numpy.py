@@ -1,5 +1,13 @@
 """
 OpenMDAO-friendly interfaces to numpy functions and their derivatives.
+
+Unless otherwise noted, derivatives returned are for the nonzero values only.
+
+A function that accepts an array input of length n and returns an array
+output of length n will return the length n diagonal of the jacobian matrix.
+
+Functions that accept an array input of length n and return a scalar will return
+an array of length n that is the row vector jacobian matrix.
 """
 
 
@@ -16,6 +24,12 @@ _2_div_sqrt_pi = 2. / np.sqrt(np.pi)
 def d_cumsum(x, axis=None):
     """
     Compute derivative of the cumulative sum function.
+
+    When the axis is unspecified or x is a 1D array, the returned
+    Jacobian is a lower triangular matrix of ones.
+
+    When the axis is specified and the shape of x is more than 1D,
+    the returned Jacobian has the shape (x.shape + x.shape).
 
     Parameters
     ----------
@@ -63,7 +77,7 @@ def d_arccos(x):
     Returns
     -------
     ndarray
-        Derivative of arccos wrt x with the shape of x preserved.
+        Derivative of arccos wrt x.
     """
     return -1 / np.sqrt(1 - x**2)
 
@@ -80,7 +94,7 @@ def d_arccosh(x):
     Returns
     -------
     ndarray
-        Derivative of arccosh wrt x with the shape of x preserved.
+        Derivative of arccosh wrt x.
     """
     return 1 / (np.sqrt(x - 1) * np.sqrt(x + 1))
 
@@ -97,7 +111,7 @@ def d_arcsin(x):
     Returns
     -------
     ndarray
-        Derivative of arcsin wrt x with the shape of x preserved.
+        Derivative of arcsin wrt x.
     """
     return 1 / np.sqrt(1 - x**2)
 
@@ -114,7 +128,7 @@ def d_arcsinh(x):
     Returns
     -------
     ndarray
-        Derivative of arcsinh wrt x with the shape of x preserved.
+        Derivative of arcsinh wrt x.
     """
     return 1 / np.sqrt(x**2 + 1)
 
@@ -131,7 +145,7 @@ def d_arctan(x):
     Returns
     -------
     ndarray
-        Derivative of arctan wrt x with the shape of x preserved.
+        Derivative of arctan wrt x.
     """
     return 1 / (1 + x**2)
 
@@ -148,7 +162,7 @@ def d_cos(x):
     Returns
     -------
     ndarray
-        Derivative of cosine wrt x with the shape of x preserved.
+        Derivative of cosine wrt x.
     """
     return -np.sin(x)
 
@@ -165,7 +179,7 @@ def d_cosh(x):
     Returns
     -------
     ndarray
-        Derivative of cosh wrt x with the shape of x preserved.
+        Derivative of cosh wrt x.
     """
     return np.sinh(x)
 
@@ -222,7 +236,7 @@ def d_erf(x):
     Returns
     -------
     ndarray
-        Derivative of erf wrt x with the shape of x preserved.
+        Derivative of erf wrt x.
     """
     return _2_div_sqrt_pi * np.exp(-(x ** 2))
 
@@ -239,7 +253,7 @@ def d_erfc(x):
     Returns
     -------
     ndarray
-        Derivative of erfc wrt x with the shape of x preserved.
+        Derivative of erfc wrt x.
     """
     return -d_erf(x)
 
@@ -256,7 +270,7 @@ def d_exp(x):
     Returns
     -------
     ndarray
-        Derivative of exp wrt x with the shape of x preserved.
+        Derivative of exp wrt x.
     """
     return np.exp(x)
 
@@ -273,7 +287,7 @@ def d_log(x):
     Returns
     -------
     ndarray
-        Derivative of log wrt x with the shape of x preserved.
+        Derivative of log wrt x.
     """
     return 1. / x
 
@@ -290,7 +304,7 @@ def d_log10(x):
     Returns
     -------
     ndarray
-        Derivative of log10 wrt x with the shape of x preserved.
+        Derivative of log10 wrt x.
     """
     return 1. / (np.log(10) * x)
 
@@ -386,6 +400,9 @@ def d_sum(x, axis=None):
     """
     Compute the derivative of the sum of the elements in x along the given axis.
 
+    If the axis is None or x is one-dimensional, the shape of the returned value will by (1,) + x.shape.
+    Otherwise, the shape of the returned value will be determined by the shape of x and the axis chosen.
+
     Parameters
     ----------
     x : ndarray
@@ -429,7 +446,7 @@ def d_sum(x, axis=None):
         arg1 = kron_args.pop()
         jac = kron(arg1, arg2)
 
-        # Now proceed through the remaining ones, fromr right to left
+        # Now proceed through the remaining ones, from right to left
         while kron_args:
             arg1 = kron_args.pop()
             jac = kron(arg1, jac)

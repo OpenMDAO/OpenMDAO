@@ -34,8 +34,8 @@ class TestActTanh(unittest.TestCase):
                     return omath.act_tanh(x, mu, z, a, b)
 
                 def df_wrap(x, mu, z, a, b, J):
-                    df_dx, df_dmu, df_dz, df_da, df_db = omath.d_act_tanh(x, mu, z, a, b, sparse=False)
-                    J['f', 'x'] = df_dx
+                    df_dx, df_dmu, df_dz, df_da, df_db = omath.d_act_tanh(x, mu, z, a, b)
+                    J['f', 'x'] = np.diagflat(df_dx)
                     J['f', 'mu'] = df_dmu
                     J['f', 'z'] = df_dz
                     J['f', 'a'] = df_da
@@ -72,7 +72,7 @@ class TestActTanh(unittest.TestCase):
                     return omath.act_tanh(x, mu, z, a, b)
 
                 def df_wrap(x, mu, z, a, b, J):
-                    df_dx, df_dmu, df_dz, df_da, df_db = omath.d_act_tanh(x, mu, z, a, b, sparse=True)
+                    df_dx, df_dmu, df_dz, df_da, df_db = omath.d_act_tanh(x, mu, z, a, b)
                     J['f', 'x'] = df_dx
                     J['f', 'mu'] = df_dmu
                     J['f', 'z'] = df_dz
@@ -126,9 +126,9 @@ class TestSmoothMax(unittest.TestCase):
                     return omath.smooth_max(x, y, mu)
 
                 def df_wrap(x, y, mu, J):
-                    df_dx, df_dy, df_dmu = omath.d_smooth_max(x, y, mu, dx=True, dy=True, dmu=True, sparse=False)
-                    J['f', 'x'] = df_dx
-                    J['f', 'y'] = df_dy
+                    df_dx, df_dy, df_dmu = omath.d_smooth_max(x, y, mu, dx=True, dy=True, dmu=True)
+                    J['f', 'x'] = np.diagflat(df_dx)
+                    J['f', 'y'] = np.diagflat(df_dy)
                     J['f', 'mu'] = df_dmu
 
                 f = (omf.wrap(f_wrap).add_input('x', shape=X_SHAPE, val=1.0)
@@ -157,7 +157,7 @@ class TestSmoothMax(unittest.TestCase):
                 p = om.Problem()
 
                 def df_wrap(x, y, mu, J):
-                    df_dx, df_dy, df_dmu = omath.d_smooth_max(x, y, mu, dx=True, dy=True, dmu=True, sparse=True)
+                    df_dx, df_dy, df_dmu = omath.d_smooth_max(x, y, mu, dx=True, dy=True, dmu=True)
                     J['f', 'x'] = df_dx
                     J['f', 'y'] = df_dy
                     J['f', 'mu'] = df_dmu
@@ -210,9 +210,9 @@ class TestSmoothMin(unittest.TestCase):
                     return omath.smooth_min(x, y, mu)
 
                 def df_wrap(x, y, mu, J):
-                    df_dx, df_dy, df_dmu = omath.d_smooth_min(x, y, mu, dx=True, dy=True, dmu=True, sparse=False)
-                    J['f', 'x'] = df_dx
-                    J['f', 'y'] = df_dy
+                    df_dx, df_dy, df_dmu = omath.d_smooth_min(x, y, mu, dx=True, dy=True, dmu=True)
+                    J['f', 'x'] = np.diagflat(df_dx)
+                    J['f', 'y'] = np.diagflat(df_dy)
                     J['f', 'mu'] = df_dmu
 
                 f = (omf.wrap(f_wrap).add_input('x', shape=X_SHAPE, val=1.0)
@@ -241,7 +241,7 @@ class TestSmoothMin(unittest.TestCase):
                 p = om.Problem()
 
                 def df_wrap(x, y, mu, J):
-                    df_dx, df_dy, df_dmu = omath.d_smooth_min(x, y, mu, dx=True, dy=True, dmu=True, sparse=True)
+                    df_dx, df_dy, df_dmu = omath.d_smooth_min(x, y, mu, dx=True, dy=True, dmu=True)
                     J['f', 'x'] = df_dx
                     J['f', 'y'] = df_dy
                     J['f', 'mu'] = df_dmu

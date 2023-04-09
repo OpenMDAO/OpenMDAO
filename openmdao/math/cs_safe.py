@@ -4,7 +4,7 @@ collection of complex-step safe functions to replace standard numpy operations.
 
 import numpy as np
 
-from .numpy import sum as omfunc_sum, d_sum
+from .numpy import sum as om_sum, d_sum
 
 
 def abs(x):
@@ -34,6 +34,9 @@ def d_abs(x):
 
     Note this function is non-differentiable at x=0. This implementation
     returns zero for that value but strictly speaking it is undefined.
+
+    Users wanting a fully differentiable implementation should use openmdao.math.smooth_abs,
+    which sacrifices some accuracy near zero in exchange for being fully differentiable.
 
     Parameters
     ----------
@@ -145,7 +148,7 @@ def norm(x, axis=None):
     ndarray
         Matrix or vector norm.
     """
-    return np.sqrt(omfunc_sum(x**2, axis=axis))
+    return np.sqrt(om_sum(x ** 2, axis=axis))
 
 
 def d_norm(x, axis=None):
@@ -165,4 +168,4 @@ def d_norm(x, axis=None):
         Derivative of norm wrt x.
     """
     x_sq = (x ** 2)
-    return d_sum(x_sq, axis=axis) * (x / np.sqrt(omfunc_sum(x_sq, axis=axis)))
+    return d_sum(x_sq, axis=axis) * (x / np.sqrt(om_sum(x_sq, axis=axis)))

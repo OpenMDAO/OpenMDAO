@@ -71,10 +71,6 @@ def d_act_tanh(x, mu=1.0E-2, z=0.0, a=-1.0, b=1.0,
     db : bool
         True if the Compute the derivative of act_tanh wrt b should be calculated. Setting this
         to False can save time when the derivative is not needed.
-    sparse : bool
-        If True, return only the known nonzero elements of the derivative. These will
-        be flat arrays which correspond to the diagonal of d_dx and d_dz, and the
-        column vectors of d_mu, d_a, and d_b.
 
     Returns
     -------
@@ -102,20 +98,9 @@ def d_act_tanh(x, mu=1.0E-2, z=0.0, a=-1.0, b=1.0,
         cosh2 = np.cosh(xmz_d_mu[idxs_small]) ** 2
         oo_mu_cosh2[idxs_small] = 1. / (mu * cosh2)
 
-    d_dx = ((dy_d_2 * oo_mu_cosh2).ravel()
-            if sparse else np.diagflat(dy_d_2 * oo_mu_cosh2)) if dx else None
-
-    if dz:
-        if z.size == x.size:
-            d_dz = (-dy_d_2 * oo_mu_cosh2).ravel() \
-                if sparse else np.diagflat(-dy_d_2 * oo_mu_cosh2)
-        else:
-            d_dz = (-dy_d_2 * oo_mu_cosh2).ravel() \
-                if sparse else np.reshape(-dy_d_2 * oo_mu_cosh2, (x.size, 1))
-
-    return (d_dx,  # d_dx
+    return ((dy_d_2 * oo_mu_cosh2).ravel() if dx else None,  # d_dx
             -(dy_d_2 * xmz_d_mu) * oo_mu_cosh2 if dmu else None,  # d_dmu
-            d_dz if dz else None,  # d_dz
+            (-dy_d_2 * oo_mu_cosh2).ravel() if dz else None,  # d_dz
             0.5 * (1 - tanh_term) if da else None,  # d_da
             0.5 * (1 + tanh_term) if db else None)  # d_db
 
@@ -209,11 +194,9 @@ def d_smooth_max(x, y, mu=1.0E-2, dx=True, dy=True, dmu=True):
 
     if dx:
         d_dx = pxgreater_px.ravel() * _x + _xg + _y * pygreater_px.ravel()
-        d_dx = d_dx if sparse else np.diagflat(d_dx)
 
     if dy:
         d_dy = pxgreater_py.ravel() * _x + _y * pygreater_py.ravel() + _yg
-        d_dy = d_dy if sparse else np.diagflat(d_dy)
 
     if dmu:
         d_dmu = pxgreater_pmu.ravel() * _x + pygreater_pmu.ravel() * _y
@@ -311,10 +294,8 @@ def d_smooth_min(x, y, mu, dx=True, dy=True, dmu=True):
 
     if dx:
         d_dx = pxgreater_px.ravel() * _y + pygreater_px.ravel() * _x + _yg
-        d_dx = d_dx if sparse else np.diagflat(d_dx)
     if dy:
         d_dy = pxgreater_py.ravel() * _y + _xg + pygreater_py.ravel() * _x
-        d_dy = d_dy if sparse else np.diagflat(d_dy)
     if dmu:
         d_dmu = -pxgreater_pmu.ravel() * _x - pygreater_pmu.ravel() * _y
 
