@@ -471,4 +471,7 @@ def d_tanh(x):
     ndarray
         Derivative of tanh wrt x.
     """
-    return 1 / (np.cosh(x) ** 2)
+    idxs_small = np.where(np.abs(x) < 30)
+    d_dx = np.zeros_like(x)
+    d_dx[idxs_small] = 1 / (np.cosh(x[idxs_small]) ** 2)
+    return d_dx
