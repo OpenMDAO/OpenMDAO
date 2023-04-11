@@ -299,7 +299,7 @@ class ApproximationScheme(object):
                     vec_inds_directional[vec].extend(vec_idx[0])
                 else:
                     if self._totals_directions:
-                        direction = self._totals_directions['fwd'][slices[wrt]]
+                        direction = self._totals_directions['fwd'][start:end]
                     else:
                         direction = meta['vector']
                     self._approx_groups.append((wrt, data, in_idx, [(vec, vec_idx)], directional,
