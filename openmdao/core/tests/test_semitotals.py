@@ -21,7 +21,6 @@ class Mult(om.ExplicitComponent):
     def compute(self, inputs, outputs):
 
         outputs['z'] = inputs['x'] * inputs['y']
-        print(self.pathname, 'x', inputs['x'], 'y', inputs['y'], 'out', outputs['z'])
 
     def compute_partials(self, inputs, partials):
 
@@ -57,15 +56,13 @@ class TestSemiTotals(unittest.TestCase):
         prob.model.add_design_var("y")
         prob.model.add_objective("comp3.z", index=0)
 
-        # prob.model.approx_totals(step=step, step_calc="abs", method="fd", form="forward")
-
         prob.setup(force_alloc_complex=True, check=False)
         prob.set_val("y", 5.0 * np.ones(size))
 
         prob.run_model()
 
-        # Deriv should be 75. Analytic is wrong.
-        data = prob.check_totals(method="fd", form="forward", step=step, step_calc="abs")
+        # Deriv should be 75. Analytic was wrong before the fix.
+        data = prob.check_totals(method="fd", form="forward", step=step, step_calc="abs", out_stream=None)
         assert_check_totals(data, atol=1e-5, rtol=1e-6)
 
     def test_semi_totals_cs(self):
@@ -77,15 +74,13 @@ class TestSemiTotals(unittest.TestCase):
         prob.model.add_design_var("y")
         prob.model.add_objective("comp3.z", index=0)
 
-        # prob.model.approx_totals(step=step, step_calc="abs", method="fd", form="forward")
-
         prob.setup(force_alloc_complex=True, check=False)
         prob.set_val("y", 5.0 * np.ones(size))
 
         prob.run_model()
 
-        # Deriv should be 75. Analytic is wrong.
-        data = prob.check_totals(method="cs")
+        # Deriv should be 75. Analytic was wrong before the fix.
+        data = prob.check_totals(method="cs", out_stream=None)
 
         assert_check_totals(data, atol=1e-6, rtol=1e-6)
 
@@ -102,18 +97,13 @@ class TestSemiTotals(unittest.TestCase):
         prob.model.add_design_var("indeps.yy")
         prob.model.add_objective("comp3.z", index=0)
 
-        # prob.model.approx_totals(step=step, step_calc="abs", method="fd", form="forward")
-
         prob.setup(force_alloc_complex=True, check=False)
         prob.set_val("y", 5.0 * np.ones(size))
 
         prob.run_model()
 
-        #from openmdao.api import n2
-        #n2(prob)
-
-        # Deriv should be 75. Analytic is wrong.
-        data = prob.check_totals(method="cs")
+        # Deriv should be 75. Analytic was wrong before the fix.
+        data = prob.check_totals(method="cs", out_stream=None)
 
         assert_check_totals(data, atol=1e-6, rtol=1e-6)
 
@@ -142,27 +132,25 @@ class TestSemiTotals(unittest.TestCase):
         prob.setup(mode='fwd')
         prob.run_model()
 
-        #from openmdao.api import n2
-        #n2(prob)
+        assert_near_equal(prob['sub1.src.y'], 1.0, 1e-6)
+        assert_near_equal(prob['sub2.comp1.z'], 2.0, 1e-6)
+        assert_near_equal(prob['sub2.comp2.z'], 2.0, 1e-6)
+        assert_near_equal(prob['sub2.comp3.z'], 2.0, 1e-6)
 
-        #assert_near_equal(prob['sub1.src.y'], 100.0, 1e-6)
-        #assert_near_equal(prob['sub2.comp1.z'], 101.0, 1e-6)
-        #assert_near_equal(prob['sub2.comp2.z'], 201.0, 1e-6)
-        #assert_near_equal(prob['sub2.comp3.z'], 101.0, 1e-6)
-
-        #J = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
-
-        data = prob.check_totals(of=of, wrt=wrt, method="fd")
+        data = prob.check_totals(of=of, wrt=wrt, method="fd", out_stream=None)
         assert_check_totals(data, atol=1e-6, rtol=1e-6)
 
         # Check the total derivatives in reverse mode
-        #prob.setup(mode='rev')
-        #prob.run_model()
-        #J = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
+        prob.setup(mode='rev')
+        prob.run_model()
 
-        #assert_near_equal(J['sub2.comp1.y']['px1.x'][0][0], 1.0, 1e-6)
-        #assert_near_equal(J['sub2.comp2.y']['px1.x'][0][0], 1.0, 1e-6)
-        #assert_near_equal(J['sub2.comp3.y']['px1.x'][0][0], 1.0, 1e-6)
+        assert_near_equal(prob['sub1.src.y'], 1.0, 1e-6)
+        assert_near_equal(prob['sub2.comp1.z'], 2.0, 1e-6)
+        assert_near_equal(prob['sub2.comp2.z'], 2.0, 1e-6)
+        assert_near_equal(prob['sub2.comp3.z'], 2.0, 1e-6)
+
+        data = prob.check_totals(of=of, wrt=wrt, method="fd", out_stream=None)
+        assert_check_totals(data, atol=1e-6, rtol=1e-6)
 
     def test_multi_conn_inputs_promoted(self):
 
@@ -186,24 +174,22 @@ class TestSemiTotals(unittest.TestCase):
         prob.setup(mode='fwd')
         prob.run_model()
 
-        #from openmdao.api import n2
-        #n2(prob)
+        assert_near_equal(prob['y'], 1.0, 1e-6)
+        assert_near_equal(prob['sub2.comp1.z'], 2.0, 1e-6)
+        assert_near_equal(prob['sub2.comp2.z'], 2.0, 1e-6)
+        assert_near_equal(prob['sub2.comp3.z'], 2.0, 1e-6)
 
-        #assert_near_equal(prob['sub1.src.y'], 100.0, 1e-6)
-        #assert_near_equal(prob['sub2.comp1.z'], 101.0, 1e-6)
-        #assert_near_equal(prob['sub2.comp2.z'], 201.0, 1e-6)
-        #assert_near_equal(prob['sub2.comp3.z'], 101.0, 1e-6)
-
-        #J = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
-
-        data = prob.check_totals(of=of, wrt=wrt, method="fd")
+        data = prob.check_totals(of=of, wrt=wrt, method="fd", out_stream=None)
         assert_check_totals(data, atol=1e-6, rtol=1e-6)
 
         # Check the total derivatives in reverse mode
-        #prob.setup(mode='rev')
-        #prob.run_model()
-        #J = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
+        prob.setup(mode='rev')
+        prob.run_model()
 
-        #assert_near_equal(J['sub2.comp1.y']['px1.x'][0][0], 1.0, 1e-6)
-        #assert_near_equal(J['sub2.comp2.y']['px1.x'][0][0], 1.0, 1e-6)
-        #assert_near_equal(J['sub2.comp3.y']['px1.x'][0][0], 1.0, 1e-6)
+        assert_near_equal(prob['y'], 1.0, 1e-6)
+        assert_near_equal(prob['sub2.comp1.z'], 2.0, 1e-6)
+        assert_near_equal(prob['sub2.comp2.z'], 2.0, 1e-6)
+        assert_near_equal(prob['sub2.comp3.z'], 2.0, 1e-6)
+
+        data = prob.check_totals(of=of, wrt=wrt, method="fd", out_stream=None)
+        assert_check_totals(data, atol=1e-6, rtol=1e-6)
