@@ -2838,12 +2838,10 @@ class Group(System):
                     raise RuntimeError(msg.format(self.msginfo, iname))
 
     def _approx_subjac_keys_iter(self):
-        pro2abs = self._var_allprocs_prom2abs_list
-
         if self._owns_approx_wrt and not self.pathname:
             candidate_wrt = self._owns_approx_wrt
         else:
-            candidate_wrt = list(var[0] for var in pro2abs['input'].values())
+            candidate_wrt = self._var_allprocs_abs2meta['input']
 
         from openmdao.core.indepvarcomp import IndepVarComp
         wrt = set()
@@ -2868,7 +2866,7 @@ class Group(System):
         if self._owns_approx_of:
             of = set(self._owns_approx_of)
         else:
-            of = set(var[0] for var in pro2abs['output'].values())
+            of = set(self._var_allprocs_abs2meta['output'])
             # Skip indepvarcomp res wrt other srcs
             of -= ivc
 
