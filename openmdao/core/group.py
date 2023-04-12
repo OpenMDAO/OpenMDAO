@@ -2837,18 +2837,17 @@ class Group(System):
                     raise RuntimeError(msg.format(self.msginfo, iname))
 
     def _approx_subjac_keys_iter(self):
-        pro2abs = self._var_allprocs_prom2abs_list
-
         if self._owns_approx_wrt and not self.pathname:
             candidate_wrt = self._owns_approx_wrt
         else:
-            candidate_wrt = list(self._var_allprocs_abs2meta['input'])
+            candidate_wrt = self._var_allprocs_abs2meta['input']
 
-        from openmdao.core.indepvarcomp import IndepVarComp
         wrt = set()
         ivc = set()
         if self.pathname:  # get rid of any old stuff in here
             self._owns_approx_of = self._owns_approx_wrt = None
+
+        all_abs2meta_out = self._var_abs2meta['output']
 
         for var in candidate_wrt:
 
@@ -2856,9 +2855,8 @@ class Group(System):
             # indepvarcomp.
             if var in self._conn_abs_in2out:
                 src = self._conn_abs_in2out[var]
-                compname = src.rsplit('.', 1)[0]
-                comp = self._get_subsystem(compname)
-                if isinstance(comp, IndepVarComp):
+                meta = all_abs2meta_out[src]
+                if 'openmdao:indep_var' in meta['tags']:
                     wrt.add(src)
                     ivc.add(src)
             else:
@@ -2867,7 +2865,7 @@ class Group(System):
         if self._owns_approx_of:
             of = set(self._owns_approx_of)
         else:
-            of = set(var[0] for var in pro2abs['output'].values())
+            of = set(all_abs2meta_out)
             # Skip indepvarcomp res wrt other srcs
             of -= ivc
 
@@ -2981,17 +2979,19 @@ class Group(System):
 
             szname = 'global_size' if total else 'size'
 
+            seen = set()
             start = end = 0
             if self.pathname:  # doing semitotals, so include output columns
                 for of, _start, _end, _, dist_sizes in self._jac_of_iter():
                     if wrt_matches is None or of in wrt_matches:
+                        seen.add(of)
                         end += (_end - _start)
                         vec = self._outputs if of in local_outs else None
                         yield of, start, end, vec, _full_slice, dist_sizes
                         start = end
 
             for wrt in self._owns_approx_wrt:
-                if wrt_matches is None or wrt in wrt_matches:
+                if (wrt_matches is None or wrt in wrt_matches) and wrt not in seen:
                     io = 'input' if wrt in abs2meta['input'] else 'output'
                     meta = abs2meta[io][wrt]
                     if wrt in local_ins:
