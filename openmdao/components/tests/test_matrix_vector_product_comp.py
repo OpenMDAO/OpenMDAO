@@ -5,6 +5,7 @@ import numpy as np
 import openmdao.api as om
 from openmdao.utils.units import convert_units
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.testing_utils import force_check_partials
 
 
 class TestMatrixVectorProductComp3x3(unittest.TestCase):
@@ -47,7 +48,7 @@ class TestMatrixVectorProductComp3x3(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(out_stream=None, method='cs')
+        cpd = force_check_partials(self.p, out_stream=None, method='cs')
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:
@@ -96,7 +97,7 @@ class TestMatrixVectorProductComp6x4(unittest.TestCase):
             np.testing.assert_almost_equal(b_i, expected_i)
 
     def test_partials(self):
-        cpd = self.p.check_partials(out_stream=None, method='cs')
+        cpd = force_check_partials(self.p, out_stream=None, method='cs')
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:
@@ -142,7 +143,7 @@ class TestMatrixVectorProductCompNonVectorized(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(out_stream=None, method='cs')
+        cpd = force_check_partials(self.p, out_stream=None, method='cs')
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:
@@ -193,7 +194,7 @@ class TestUnits(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(out_stream=None, method='cs')
+        cpd = force_check_partials(self.p, out_stream=None, method='cs')
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:
@@ -266,7 +267,7 @@ class TestMultipleUnits(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(out_stream=None, method='cs')
+        cpd = force_check_partials(self.p, out_stream=None, method='cs')
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:
@@ -338,7 +339,7 @@ class TestMultipleConfigure(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(out_stream=None, method='cs')
+        cpd = force_check_partials(self.p, out_stream=None, method='cs')
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:
@@ -407,7 +408,7 @@ class TestMultipleCommonMatrix(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(out_stream=None, method='cs')
+        cpd = force_check_partials(self.p, out_stream=None, method='cs')
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:
@@ -474,7 +475,7 @@ class TestMultipleCommonVector(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(out_stream=None, method='cs')
+        cpd = force_check_partials(self.p, out_stream=None, method='cs')
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:

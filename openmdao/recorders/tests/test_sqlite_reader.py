@@ -1345,7 +1345,8 @@ class TestSqliteCaseReader(unittest.TestCase):
                          [])
 
     def test_list_input_and_outputs_with_tags(self):
-        prob = om.Problem(RectangleCompWithTags())
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', RectangleCompWithTags(), promotes=['*'])
 
         recorder = om.SqliteRecorder("cases.sql")
         prob.model.add_recorder(recorder)
@@ -1361,11 +1362,11 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Inputs no tags
         inputs = case.list_inputs(out_stream=None)
-        self.assertEqual(sorted([inp[0] for inp in inputs]), ['length', 'width'])
+        self.assertEqual(sorted([inp[0] for inp in inputs]), ['comp.length', 'comp.width'])
 
         # Inputs with tag that matches
         inputs = case.list_inputs(out_stream=None, tags="tag2")
-        self.assertEqual([inp[0] for inp in inputs], ['width',])
+        self.assertEqual([inp[0] for inp in inputs], ['comp.width',])
 
         # Inputs with tag that does not match
         inputs = case.list_inputs(out_stream=None, tags="tag3")
@@ -1373,15 +1374,15 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Inputs with multiple tags
         inputs = case.list_inputs(out_stream=None, tags=["tag2", "tag3"])
-        self.assertEqual([inp[0] for inp in inputs], ['width',])
+        self.assertEqual([inp[0] for inp in inputs], ['comp.width',])
 
         # Outputs no tags
         outputs = case.list_outputs(out_stream=None)
-        self.assertEqual(sorted([outp[0] for outp in outputs]), ['area',])
+        self.assertEqual(sorted([outp[0] for outp in outputs]), ['comp.area',])
 
         # Outputs with tag that does match
         outputs = case.list_outputs(out_stream=None, tags="tag1")
-        self.assertEqual(sorted([outp[0] for outp in outputs]), ['area',])
+        self.assertEqual(sorted([outp[0] for outp in outputs]), ['comp.area',])
 
         # Outputs with tag that do not match any vars
         outputs = case.list_outputs(out_stream=None, tags="tag3")
@@ -1389,7 +1390,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Outputs with multiple tags
         outputs = case.list_outputs(out_stream=None, tags=["tag1", "tag3"])
-        self.assertEqual(sorted([outp[0] for outp in outputs]), ['area',])
+        self.assertEqual(sorted([outp[0] for outp in outputs]), ['comp.area',])
 
     def test_list_inputs_with_includes_excludes(self):
         prob = SellarProblem()

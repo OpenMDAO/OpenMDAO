@@ -480,45 +480,6 @@ class TestMultiConns(unittest.TestCase):
            "\n   <model> <class Group>: Input 'c2.y' cannot be connected to 'indeps.x' "
                    "because it's already connected to 'c1.y'.")
 
-    def test_auto_ivc_ambiguous_with_src_indices_msg(self):
-
-        class TComp(om.ExplicitComponent):
-
-            def initialize(self):
-                self.options.declare('src_idx', [0, 1])
-
-            def setup(self):
-                src_inds = self.options['src_idx']
-                self.add_input('x', shape=2, src_indices=src_inds, val=-2038.0)
-                self.add_output('y', shape=2)
-                self.declare_partials('y', 'x')
-
-            def compute(self, inputs, outputs):
-                outputs['y'] = 2.0 * inputs['x']
-
-
-        prob = om.Problem(name='auto_ivc_ambiguous_with_src_indices_msg')
-        model = prob.model
-
-        prob.model.add_subsystem('c1', TComp(src_idx=[0, 1]), promotes_inputs=['x'])
-        prob.model.add_subsystem('c2', TComp(src_idx=[2, 3]), promotes_inputs=['x'])
-        prob.model.add_subsystem('d1', TComp(src_idx=[0, 1]), promotes_inputs=[('x', 'zz')])
-        prob.model.add_subsystem('d2', TComp(src_idx=[1, 2]), promotes_inputs=[('x', 'zz')])
-
-        with self.assertRaises(Exception) as context:
-            prob.setup()
-
-        self.assertEqual(str(context.exception),
-           "\nCollected errors for problem 'auto_ivc_ambiguous_with_src_indices_msg':"
-           "\n   <model> <class Group>: Attaching src_indices to inputs requires that the shape "
-           "of the source variable is known, but the source shape for inputs ['c1.x', 'c2.x'] is "
-           "unknown. You can specify the src shape for these inputs by setting 'val' or 'src_shape' "
-           "in a call to set_input_defaults, or by adding an IndepVarComp as the source."
-           "\n   <model> <class Group>: Attaching src_indices to inputs requires that the shape of "
-           "the source variable is known, but the source shape for inputs ['d1.x', 'd2.x'] is "
-           "unknown. You can specify the src shape for these inputs by setting 'val' or 'src_shape' "
-           "in a call to set_input_defaults, or by adding an IndepVarComp as the source.")
-
 
 class TestAutoIVCAllowableShapeMismatch(unittest.TestCase):
 
@@ -583,7 +544,7 @@ class TestConnectionsDistrib(unittest.TestCase):
         class TestComp(om.ExplicitComponent):
 
             def setup(self):
-                self.add_input('x', shape=2, src_indices=[1, 2], val=-2038.0)
+                self.add_input('x', shape=2, val=-2038.0)
                 self.add_output('y', shape=1)
                 self.declare_partials('y', 'x')
 
@@ -597,15 +558,15 @@ class TestConnectionsDistrib(unittest.TestCase):
         model = prob.model
         model.add_subsystem('p1', om.IndepVarComp('x', np.array([1.0, 3.0])))
         model.add_subsystem('c3', TestComp())
-        model.connect("p1.x", "c3.x")
+        model.connect("p1.x", "c3.x", src_indices=[1, 2])
 
         try:
             prob.setup()
         except Exception as err:
             self.assertEqual(str(err),
-               "\nCollected errors for problem 'serial_mpi_error':"
-               "\n   'c3' <class TestComp>: When accessing 'p1.x' with src_shape (2,) from 'c3.x' "
-               "using src_indices [1 2]: index 2 is out of bounds for source dimension of size 2.")
+                             "\nCollected errors for problem 'serial_mpi_error':" \
+                             "\n   <model> <class Group>: When connecting 'p1.x' to 'c3.x':" \
+                             " index 2 is out of bounds for source dimension of size 2.")
         else:
             self.fail('Exception expected.')
 
@@ -614,7 +575,7 @@ class TestConnectionsDistrib(unittest.TestCase):
         class TestComp(om.ExplicitComponent):
 
             def setup(self):
-                self.add_input('x', shape=2, src_indices=[1, 2], val=-2038.0, flat_src_indices=True)
+                self.add_input('x', shape=2, val=-2038.0)
                 self.add_output('y', shape=1)
                 self.declare_partials('y', 'x')
 
@@ -628,15 +589,15 @@ class TestConnectionsDistrib(unittest.TestCase):
         model = prob.model
         model.add_subsystem('p1', om.IndepVarComp('x', np.array([1.0, 3.0])))
         model.add_subsystem('c3', TestComp())
-        model.connect("p1.x", "c3.x")
+        model.connect("p1.x", "c3.x", src_indices=[1, 2], flat_src_indices=True)
 
         try:
             prob.setup()
         except Exception as err:
             self.assertEqual(str(err),
-               "\nCollected errors for problem 'serial_mpi_error_flat':"
-               "\n   'c3' <class TestComp>: When accessing 'p1.x' with src_shape (2,) from 'c3.x' "
-               "using src_indices [1 2]: index 2 is out of bounds for source dimension of size 2.")
+                             "\nCollected errors for problem 'serial_mpi_error_flat':" \
+                             "\n   <model> <class Group>: When connecting 'p1.x' to 'c3.x':" \
+                             " index 2 is out of bounds for source dimension of size 2.")
         else:
             self.fail('Exception expected.')
 
@@ -659,7 +620,7 @@ class TestConnectionsError(unittest.TestCase):
         class TestComp(om.ExplicitComponent):
 
             def setup(self):
-                self.add_input('x', shape=2, src_indices=[1, 2], val=-2038.0)
+                self.add_input('x', shape=2, val=-2038.0)
                 self.add_output('y', shape=2)
                 self.declare_partials('y', 'x')
 
@@ -682,15 +643,16 @@ class TestConnectionsError(unittest.TestCase):
         model.add_subsystem('p1', om.IndepVarComp('x', setval))
         model.add_subsystem('c3', TestComp())   # size 2 ---> size 2
         model.add_subsystem('c4', TestCompDist())  # size 2 ---> size 1
-        model.connect("p1.x", "c3.x")  # size 2 to size 2
+        model.connect("p1.x", "c3.x", src_indices=[1, 2])  # size 2 to size 2
         model.connect("c3.y", "c4.x")
 
         with self.assertRaises(Exception) as context:
             prob.setup(check=False, mode='fwd')
+
         self.assertEqual(str(context.exception),
             "\nCollected errors for problem 'incompatible_src_indices':"
-            "\n   'c3' <class TestComp>: When accessing 'p1.x' with src_shape (2,) from 'c3.x' "
-            "using src_indices [1 2]: index 2 is out of bounds for source dimension of size 2.")
+            "\n   <model> <class Group>: When connecting 'p1.x' to 'c3.x':"
+            " index 2 is out of bounds for source dimension of size 2.")
 
 
 @unittest.skipUnless(MPI, "MPI is required.")

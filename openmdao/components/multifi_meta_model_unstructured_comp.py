@@ -135,8 +135,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
 
         super()._setup_procs(pathname, comm, mode, prob_meta)
 
-    def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
-                  units=None, desc=''):
+    def add_input(self, name, val=1.0, shape=None, units=None, desc=''):
         """
         Add an input variable to the component.
 
@@ -148,26 +147,14 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
             The initial value of the variable being added in user-defined units.
             Default is 1.0.
         shape : int or tuple or list or None
-            Shape of this variable, only required if src_indices not provided and
-            val is not an array. Default is None.
-        src_indices : int or list of ints or tuple of ints or int ndarray or Iterable or None
-            The global indices of the source variable to transfer data from.
-            If val is given as an array_like object, the shapes of val and
-            src_indices must match. A value of None implies this input depends
-            on all entries of source. Default is None.
-        flat_src_indices : bool
-            If True, each entry of src_indices is assumed to be an index into the
-            flattened source.  Otherwise each entry must be a tuple or list of size equal
-            to the number of dimensions of the source.
+            Shape of this variable, only required if val is not an array. Default is None.
         units : str or None
             Units in which this input variable will be provided to the component
             during execution. Default is None, which means it is unitless.
         desc : str
             Description of the variable.
         """
-        metadata = super().add_input(name, val, shape=shape, src_indices=src_indices,
-                                     flat_src_indices=flat_src_indices, units=units,
-                                     desc=desc)
+        metadata = super().add_input(name, val, shape=shape, units=units, desc=desc)
         if self.options['vec_size'] > 1:
             input_size = metadata['val'][0].size
         else:

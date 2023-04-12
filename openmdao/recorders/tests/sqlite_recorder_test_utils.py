@@ -216,7 +216,7 @@ def assertDriverDerivDataRecorded(test, expected, tolerance, prefix=None):
 
             counter, global_counter, iteration_coordinate, timestamp, success, msg,\
                 totals_blob = row_actual
-            
+
             if row_abs2meta[0] is None:
                 abs2meta = None
             else:

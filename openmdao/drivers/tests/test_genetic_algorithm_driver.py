@@ -478,8 +478,7 @@ class TestSimpleGA(unittest.TestCase):
                         "\n    lower: 0.0"
                         "\n    upper: 15.0"
                         "\nSet the initial value of the design variable to a valid value or set "
-                        "the driver option['invalid_desvar_behavior'] to 'ignore'."
-                        "\nThis warning will become an error by default in OpenMDAO version 3.25.")
+                        "the driver option['invalid_desvar_behavior'] to 'ignore'.")
 
         for option in ['warn', 'raise', 'ignore']:
             with self.subTest(f'invalid_desvar_behavior = {option}'):
@@ -1235,18 +1234,7 @@ class MPITestSimpleGA(unittest.TestCase):
 
 class D1(om.ExplicitComponent):
     def setup(self):
-        comm = self.comm
-        rank = comm.rank
-
-        if rank == 1:
-            start = 1
-            end = 2
-        else:
-            start = 0
-            end = 1
-
-        self.add_input('y2', np.ones((1, ), float), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
+        self.add_input('y2', np.ones((1, ), float), distributed=True)
         self.add_input('x', np.ones((1, ), float), distributed=True)
 
         self.add_output('y1', np.ones((1, ), float), distributed=True)
@@ -1275,18 +1263,7 @@ class D1(om.ExplicitComponent):
 
 class D2(om.ExplicitComponent):
     def setup(self):
-        comm = self.comm
-        rank = comm.rank
-
-        if rank == 1:
-            start = 1
-            end = 2
-        else:
-            start = 0
-            end = 1
-
-        self.add_input('y1', np.ones((1, ), float), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
+        self.add_input('y1', np.ones((1, ), float), distributed=True)
 
         self.add_output('y2', np.ones((1, ), float), distributed=True)
 
@@ -1431,8 +1408,22 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
 
         model.add_subsystem('p', om.IndepVarComp('x', 3.0), promotes=['x'])
 
-        model.add_subsystem('d1', D1(), promotes=['*'])
-        model.add_subsystem('d2', D2(), promotes=['*'])
+        comm = prob.comm
+        rank = comm.rank
+
+        if rank == 1:
+            start = 1
+            end = 2
+        else:
+            start = 0
+            end = 1
+
+        model.add_subsystem('d1', D1(), promotes_outputs=['*'])
+        model.promotes('d1', inputs=['x'])
+        model.promotes('d1', inputs=['y2'], src_indices=np.arange(start, end, dtype=int))
+
+        model.add_subsystem('d2', D2(), promotes_outputs=['*'])
+        model.promotes('d2', inputs=['y1'], src_indices=np.arange(start, end, dtype=int))
 
         model.add_subsystem('obj_comp', Summer(), promotes_outputs=['*'])
         model.promotes('obj_comp', inputs=['*'], src_indices=om.slicer[:])

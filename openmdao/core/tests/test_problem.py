@@ -41,7 +41,8 @@ class TestProblem(unittest.TestCase):
             def compute_partials(self, inputs, J):
                 J['bar', 'foo'] = 1.
 
-        p = om.Problem(model=TestComp())
+        p = om.Problem()
+        p.model.add_subsystem('comp', TestComp(), promotes=['*'])
         p.setup()
 
         p.set_val('foo', 5, units='lbf')
@@ -991,46 +992,6 @@ class TestProblem(unittest.TestCase):
         # using absolute value will give us the value of the input C2.x, in its units of 'mm'
         assert_near_equal(prob.get_val('G1.C2.x'), 2000.0, 1e-6)
 
-    def test_feature_get_set_with_src_indices_diff(self):
-
-        prob = om.Problem()
-        G1 = prob.model.add_subsystem('G1', om.Group())
-        G1.add_subsystem('C1', om.ExecComp('y=x*2.',
-                                            x={'val': 1.0, 'units': 'cm', 'src_indices': [0], 'flat_src_indices': True},
-                                            y={'val': 0.0, 'units': 'cm'}),
-                         promotes=['x'])
-        G1.add_subsystem('C2', om.ExecComp('y=x*3.',
-                                            x={'val': np.ones(2), 'units': 'mm', 'src_indices': [1,2], 'flat_src_indices': True},
-                                            y={'val': np.zeros(2), 'units': 'mm'}),
-                         promotes=['x'])
-        G1.add_subsystem('C3', om.ExecComp('y=x*4.',
-                                            x={'val': np.ones(3), 'units': 'mm'},
-                                            y={'val': np.zeros(3), 'units': 'mm'}),
-                         promotes=['x'])
-
-        # units and value to use for the _auto_ivc output are ambiguous.  This fixes that.
-        G1.set_input_defaults('x', units='m', val=np.ones(3))
-
-        prob.setup()
-
-        # set G1.x to 2.0 m, based on the units we gave in the set_input_defaults call
-        prob['G1.x'] = np.ones(3) * 2.0
-
-        prob.run_model()
-
-        # we gave 'G1.x' units of 'm' in the set_input_defaults call
-        assert_near_equal(prob['G1.x'], np.ones(3) * 2.0, 1e-6)
-
-        # using absolute value will give us the value of the input C1.x, in its units of 'cm'
-        assert_near_equal(prob['G1.C1.x'], 200.0, 1e-6)
-
-        assert_near_equal(prob['G1.C1.y'], 400.0, 1e-6)
-
-        # using absolute value will give us the value of the input C2.x, in its units of 'mm'
-        assert_near_equal(prob['G1.C2.x'], np.ones(2) * 2000.0, 1e-6)
-
-        assert_near_equal(prob['G1.C2.y'], np.ones(2) * 6000.0, 1e-6)
-
     def test_feature_get_set_with_units_prom_plus_explicit(self):
 
         prob = om.Problem()
@@ -1856,7 +1817,7 @@ class TestProblem(unittest.TestCase):
         self.assertEquals(l['constraints'][1][1]['size'], 1)
         assert(all(l['constraints'][1][1]['val'] == prob.get_val('con2')))
         self.assertEquals(l['constraints'][1][1]['scaler'], None)
-        self.assertEquals(l['constraints'][1][1]['adder'], None)        
+        self.assertEquals(l['constraints'][1][1]['adder'], None)
 
         # objectives
         self.assertEquals(l['objectives'][0][1]['name'], 'obj')
@@ -2250,6 +2211,40 @@ class RelevanceTestCase(unittest.TestCase):
         p.model.add_constraint('C6.fxy', upper=1e22)
 
         self._finish_setup_and_check(p, ['C2', 'C3', 'C4', 'C5', 'C6'])
+
+    def test_list_indep_vars(self):
+        prob = om.Problem()
+        prob.model = SellarDerivatives()
+        prob.model.add_design_var('x')
+        prob.model.add_design_var('z')
+
+        prob.setup()
+        prob.final_setup()
+
+        strout = StringIO()
+        all_indep_var_names = [name for name, _ in prob.list_indep_vars(out_stream=strout)]
+
+        self.assertIn('x', all_indep_var_names)
+        self.assertIn('z', all_indep_var_names)
+
+        output = strout.getvalue()
+        self.assertRegex(output.split('\n')[1], r'Problem \w+ Independent Variables')
+        self.assertEqual(output.split('\n')[3].split(), ['name', 'units', 'value'])
+        self.assertRegex(output.split('\n')[5], r'\s*z\s+None\s+|[0-9.]+|')
+        self.assertRegex(output.split('\n')[6], r'\s*x\s+None\s+|[0-9.]+|')
+
+        strout = StringIO()
+        indep_var_names_no_desvars = [name for name, _ in
+                                      prob.list_indep_vars(include_design_vars=False,
+                                                           out_stream=strout)]
+
+        self.assertNotIn('x', indep_var_names_no_desvars)
+        self.assertNotIn('z', indep_var_names_no_desvars)
+
+        output = strout.getvalue()
+        self.assertRegex(output.split('\n')[1], r'Problem \w+ Independent Variables')
+        self.assertEqual(output.split('\n')[3].split(), ['None', 'found'])
+
 
 class NestedProblemTestCase(unittest.TestCase):
 
