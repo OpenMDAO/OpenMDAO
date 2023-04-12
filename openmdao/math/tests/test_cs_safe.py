@@ -54,17 +54,17 @@ class TestNorm(unittest.TestCase):
 class TestOthers(unittest.TestCase):
 
     def _test_func_derivs_cs(self, func_name, x, y=None, tol=1.0E-12):
-        f = getattr(cs_safe, f'd_{func_name}')
+        df = getattr(cs_safe, f'd_{func_name}')
         cs_f = getattr(cs_safe, func_name)
         if y is None:
-            deriv_f = f(x)
+            deriv_f = df(x)
             cs_deriv_f = cs_f(x + (0 + 1.0E-40j)).imag / 1.0E-40
-            assert_near_equal(deriv_f, cs_deriv_f, tolerance=tol)
+            assert_near_equal(np.asarray(deriv_f), np.asarray(cs_deriv_f), tolerance=tol)
         else:
-            deriv_f = f(x, y)
+            deriv_f = df(x, y)
             cs_deriv_f_x = cs_f(x + (0 + 1.0E-40j), y).imag / 1.0E-40
             cs_deriv_f_y = cs_f(x, y + (0 + 1.0E-40j)).imag / 1.0E-40
-            assert_near_equal(deriv_f[0], cs_deriv_f_x, tolerance=tol)
+            assert_near_equal(deriv_f[0], np.asarray(cs_deriv_f_x), tolerance=tol)
             assert_near_equal(deriv_f[1], cs_deriv_f_y, tolerance=tol)
 
     def test_scalar_derivs(self):

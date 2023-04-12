@@ -13,16 +13,16 @@ class TestActTanh(unittest.TestCase):
 
     def test_tanh_act(self):
         f = omath.act_tanh(6, mu=1.0E-5, z=6, a=-10, b=10)
-        assert_near_equal(f, 0.0)
+        assert_near_equal(np.asarray(f), 0.0)
 
         f = omath.act_tanh(6, mu=1.0E-5, z=6, a=-10, b=0)
-        assert_near_equal(f, -5.0)
+        assert_near_equal(np.asarray(f), -5.0)
 
         f = omath.act_tanh(-10, mu=1.0E-5, z=6, a=-10, b=0)
-        assert_near_equal(f, -10)
+        assert_near_equal(np.asarray(f), -10)
 
         f = omath.act_tanh(10, mu=1.0E-5, z=6, a=-10, b=20)
-        assert_near_equal(f, 20)
+        assert_near_equal(np.asarray(f), 20)
 
     def test_tanh_act_dense_derivs(self):
         """ Test sum and its partials for a variety of input shapes and axis options. """

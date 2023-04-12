@@ -1,8 +1,22 @@
 """
 collection of complex-step safe functions to replace standard numpy operations.
 """
+import os
+from ..utils.general_utils import is_truthy
 
-import numpy as np
+
+use_jax = os.environ.get('OPENMDAO_MATH_USE_JAX', 'False')
+
+
+if is_truthy(use_jax):
+    try:
+        import jax.numpy as np
+        from jax import config
+        config.update("jax_enable_x64", True)
+    except:
+        raise EnvironmentError('Environment variable OPENMDAO_MATH_USE_JAX is True but jax is not available.')
+else:
+    import numpy as np
 
 from .numpy import sum as om_sum, d_sum
 
@@ -21,11 +35,8 @@ def abs(x):
     ndarray
         Absolute value.
     """
-    if isinstance(x, np.ndarray):
-        return x * np.sign(x)
-    elif x.real < 0.0:
-        return -x
-    return x
+    _x = np.asarray(x)
+    return _x * np.sign(_x)
 
 
 def d_abs(x):

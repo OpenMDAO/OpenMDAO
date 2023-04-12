@@ -1,9 +1,22 @@
 """
 Smooth approximations to functions that do not have continuous derivatives.
 """
+import os
+from ..utils.general_utils import is_truthy
 
 
-import numpy as np
+use_jax = os.environ.get('OPENMDAO_MATH_USE_JAX', 'False')
+
+
+if is_truthy(use_jax):
+    try:
+        import jax.numpy as np
+        from jax import config
+        config.update("jax_enable_x64", True)
+    except:
+        raise EnvironmentError('Environment variable OPENMDAO_MATH_USE_JAX is True but jax is not available.')
+else:
+    import numpy as np
 
 
 def act_tanh(x, mu=1.0E-2, z=0., a=-1., b=1.):
