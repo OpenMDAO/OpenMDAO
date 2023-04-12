@@ -12,28 +12,27 @@ from difflib import get_close_matches
 import numpy as np
 import networkx as nx
 
-from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.core.system import System, collect_errors
 from openmdao.core.component import Component, _DictValues
+from openmdao.core.constants import _UNDEFINED, INT_DTYPE, _SetupStatus
 from openmdao.vectors.vector import _full_slice
-from openmdao.core.constants import _UNDEFINED, INT_DTYPE
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
 from openmdao.jacobians.jacobian import SUBJAC_META_DEFAULTS
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
-    shape_to_len
+    shape_to_len, _global2local_offsets
 from openmdao.utils.general_utils import common_subpath, \
     convert_src_inds, ContainsAll, shape2tuple, get_connection_owner
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
-    _is_unitless, simplify_unit
+    _is_unitless, simplify_unit, convert_units
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     PromotionWarning, MPIWarning
-from openmdao.core.constants import _SetupStatus
 
 # regex to check for valid names.
 import re
@@ -2838,10 +2837,13 @@ class Group(System):
                     raise RuntimeError(msg.format(self.msginfo, iname))
 
     def _approx_subjac_keys_iter(self):
+        pro2abs = self._var_allprocs_prom2abs_list
+
         if self._owns_approx_wrt and not self.pathname:
             candidate_wrt = self._owns_approx_wrt
         else:
-            candidate_wrt = self._var_allprocs_abs2meta['input']
+            #candidate_wrt = list(var[0] for var in pro2abs['input'].values())
+            candidate_wrt = list(self._var_allprocs_abs2meta['input'])
 
         from openmdao.core.indepvarcomp import IndepVarComp
         wrt = set()
@@ -2866,7 +2868,7 @@ class Group(System):
         if self._owns_approx_of:
             of = set(self._owns_approx_of)
         else:
-            of = set(self._var_allprocs_abs2meta['output'])
+            of = set(var[0] for var in pro2abs['output'].values())
             # Skip indepvarcomp res wrt other srcs
             of -= ivc
 
