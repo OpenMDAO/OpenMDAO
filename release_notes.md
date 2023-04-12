@@ -1,7 +1,7 @@
 ***********************************
-# Release Notes for OpenMDAO 3.25.0
+# Release Notes for OpenMDAO 3.26.0
 
-April 10, 2023
+April 14, 2023
 
 The release of OpenMDAO 3.26.0 primarily removes a lengthy list of long-standing deprecations that we will no longer 
 be carrying forward. There's a reasonable chance that this release will break existing models, so find any deprecation
@@ -15,9 +15,8 @@ warnings that may exist in your current case and address them. Highlights among 
 A few POEM's have been implemented. POEM 078 changes system methods `list_inputs` and `list_outputs` to now support
 keyword arguments `is_indep_var` and `is_design_var` to help users filter inputs.
 POEM 082 adds a similar method, `Problem.get_indep_vars` which will allow the user to find all variables in the problem
-that are provided by IndepVarComps (or systems that mimic them). Directional check_totals has been implmented to provide
-a faster way of derivative checking in very large models. POEM 076 implements a directional check_totals capability
-to allow for faster checking in large models.
+that are provided by IndepVarComps (or systems that mimic them). POEM 076 implements directional check_totals to provide
+a faster way of derivative checking in very large models.
 
 OptionsDictionary now supports a `set` method to allow users to set multiple options in a single line.
 
