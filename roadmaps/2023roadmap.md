@@ -22,7 +22,7 @@ It's fair to say that OpenMDAO has reached a level of maturity.
 The fundamental capability is sound, and through some iteration we've arrived at a stable API.
 With a strong, technically sound foundation much of our focus in the next year will be on continuing to increase the productivity of users by removing friction where we can.
 
-- Our goal of developing an interactive training course has produced a great series of [Practical MDO](https://www.youtube.com/@OpenMDAO/featured) videos and corresponding notebooks.
+- Our goal of developing an interactive training course has produced a great series of [Practical MDO](https://youtube.com/playlist?list=PLPusXFXT29sXfMEFH3Czj78SrjNeY4M4-Q) videos and corresponding notebooks.
 - Work on the [Mphys](https://github.com/OpenMDAO/mphys) package has pushed our capability in terms of large models involving parallel computing. This work resulted in a [significant API change](https://github.com/OpenMDAO/POEMs/blob/master/POEM_075.md) to make the use of distributed components more clear, with some more improvements on the way.
 - We continue to move away from reliance on feedback through the terminal and instead provide richer feedback through reports. We've received positive feedback on the standard set of reports we generate and will continue to improve upon these and develop new ones when warranted.
 - The push to bring 2nd-derivative information into the Modular Approach to Unified Derivatives (MAUD) theory upon which OpenMDAO is based remains an open goal but there is still interest in that area.
@@ -32,7 +32,7 @@ With a strong, technically sound foundation much of our focus in the next year w
 A broad goal for OpenMDAO is to make things simple for ~80% of our users who are doing typical analysis, while making things possible for the ~20% of our users who are advanced.
 
 In the past we've always said that there are ways for users to incorporate OpenMDAO into their workflows.
-In practice this means that users developing different tools somtimes come together and find that they need to rework their implementations so that their codes are compatible.
+In practice this means that users developing different tools sometimes come together and find that they need to rework their implementations so that their codes are compatible.
 OpenMDAO _should_ be providing ways of doing things that cover the most common use cases, while not prohibiting users from doing things in their own way.
   
 ## Training  
@@ -102,7 +102,7 @@ We want to continue to push this capability by providing a dictionary at the pro
 
 We may provide users with a standard file interface that allows them to provide model configuration in a flat file. This way, the code implementation would not need to be touched by the user in order to exercise the model.
 
-## Ease-of-Use: Common math functions
+## Ease-of-Use: Common math functions and easier use of jax
 
 Users often find themselves implementing common mathematics formulas in their models.
 When providing analytic derivatives, this usually involves some referencing of textbooks or online differentiation tools.
@@ -113,8 +113,10 @@ Rather than having the user go through this friction often, we will provide a se
 functions along with functions that provide their derivatives.
 This should make it significantly easier for users to put together their own derivatives in `compute_partials`.
 
-While we considered automatic differentiation tools, that involves bringing in some significant dependencies and in
-some cases the tools aren't capable.  For instance, `jax.grad` will only provide derivatives for scalar outputs.
+Experimentation with the `jax` package shows that, despite some shortcomings, its automatic differentiation capabilities
+can be competitive with the use of analytic derivatives.
+We should, at a minimum, provide more documentation that shows users how to effectively use `jax` to get deritives
+from their models.
 
 ## Hessian Information 
 
@@ -123,5 +125,9 @@ This one will remain a stretch goal for this year.
 ### Goal  
   
 Expand on the MAUD implementation to provide second derivatives.  
-This information can be used by modern optimizers to significantly improve performance, but would all but require AD on reasonably complex models.  
-As a goal for this year we should try to get an optimization model working where analytic partial second derivatives are developed for a simple system and have OpenMDAO compute the total second derivatives.
+This information can be used by modern optimizers to significantly improve performance, but would all but require AD on
+reasonably complex models.  
+As a goal for this year we should try to get an optimization model working where analytic partial second derivatives are
+developed for a simple system and have OpenMDAO compute the total second derivatives.
+The `jax` package may play a large role here since it makes it possible to get second derivatives through a calculation
+relatively easily.
