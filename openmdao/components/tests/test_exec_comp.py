@@ -1327,23 +1327,23 @@ class TestExecComp(unittest.TestCase):
                             x={'val' : 3.0, 'units' : 'cm'},
                             z={'shape' : (1, ), 'units' : 's'})
 
-        self.assertEquals(cm.exception.args[0],
-                          "Defaults for 'x' have already been defined in a previous "
-                          "expression.")
+        self.assertEqual(cm.exception.args[0],
+                         "Defaults for 'x' have already been defined in a previous "
+                         "expression.")
 
         with self.assertRaises(TypeError) as cm:
             excomp.add_expr(p)
 
-        self.assertEquals(cm.exception.args[0],
-                          "Argument 'expr' must be of type 'str', but type 'Problem' was found.")
+        self.assertEqual(cm.exception.args[0],
+                         "Argument 'expr' must be of type 'str', but type 'Problem' was found.")
 
         excomp.add_expr('y = 2.9*x')
         p.model.add_subsystem('zzz', excomp)
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
 
-        self.assertEquals(cm.exception.args[0],
-                          "'zzz' <class ExecComp>: The output 'y' has already been defined by an expression.")
+        self.assertEqual(cm.exception.args[0],
+                         "'zzz' <class ExecComp>: The output 'y' has already been defined by an expression.")
 
     def test_feature_add_expr(self):
 
@@ -1571,8 +1571,8 @@ class TestFunctionRegistration(unittest.TestCase):
 
             with self.assertRaises(Exception) as cm:
                 data = force_check_partials(p, out_stream=None)
-            self.assertEquals(cm.exception.args[0],
-                              "'comp' <class ExecComp>: expression contains functions ['area'] that are not complex safe. To fix this, call declare_partials('*', ['x'], method='fd') on this component prior to setup.")
+            self.assertEqual(cm.exception.args[0],
+                             "'comp' <class ExecComp>: expression contains functions ['area'] that are not complex safe. To fix this, call declare_partials('*', ['x'], method='fd') on this component prior to setup.")
 
     def test_register_check_partials_not_safe_mult_expr(self):
         with _temporary_expr_dict():
@@ -1625,8 +1625,8 @@ class TestFunctionRegistration(unittest.TestCase):
 
             with self.assertRaises(Exception) as cm:
                 data = force_check_partials(p, out_stream=None, step=1e-7)
-            self.assertEquals(cm.exception.args[0],
-                              "'comp' <class ExecComp>: expression contains functions ['unsafe'] that are not complex safe. To fix this, call declare_partials('*', ['z'], method='fd') on this component prior to setup.")
+            self.assertEqual(cm.exception.args[0],
+                             "'comp' <class ExecComp>: expression contains functions ['unsafe'] that are not complex safe. To fix this, call declare_partials('*', ['z'], method='fd') on this component prior to setup.")
 
     def test_register_check_partials_safe(self):
         with _temporary_expr_dict():
@@ -1775,20 +1775,20 @@ class TestFunctionRegistration(unittest.TestCase):
         with _temporary_expr_dict():
             with self.assertRaises(Exception) as cm:
                 om.ExecComp.register('shape', lambda x: x, complex_safe=True)
-            self.assertEquals(cm.exception.args[0], "ExecComp: cannot register name 'shape' because "
-                              "it's a reserved keyword.")
+            self.assertEqual(cm.exception.args[0], "ExecComp: cannot register name 'shape' because "
+                             "it's a reserved keyword.")
 
     def test_register_err_not_callable(self):
         with _temporary_expr_dict():
             with self.assertRaises(Exception) as cm:
                 om.ExecComp.register('foo', 99, complex_safe=True)
-            self.assertEquals(cm.exception.args[0], "ExecComp: 'foo' passed to register() of type 'int' is not callable.")
+            self.assertEqual(cm.exception.args[0], "ExecComp: 'foo' passed to register() of type 'int' is not callable.")
 
     def test_register_err_dup(self):
         with _temporary_expr_dict():
             with self.assertRaises(Exception) as cm:
                 om.ExecComp.register('exp', lambda x: x, complex_safe=True)
-            self.assertEquals(cm.exception.args[0], "ExecComp: 'exp' has already been registered.")
+            self.assertEqual(cm.exception.args[0], "ExecComp: 'exp' has already been registered.")
 
 
 _MASK = np.array(

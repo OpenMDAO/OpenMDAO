@@ -2072,7 +2072,7 @@ class TestDistribBugs(unittest.TestCase):
             assert_check_totals(data)
 
         msg = "During total derivative computation, the following partial derivatives resulted in serial inputs that were inconsistent across processes: ['D1.out_dist wrt D1.in_nd']."
-        self.assertEquals(str(cm.exception), msg)
+        self.assertEqual(str(cm.exception), msg)
 
     def test_check_partials_cs_old(self):
         prob = self.get_problem(Distrib_Derivs_Matfree_Old)

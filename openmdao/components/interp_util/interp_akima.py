@@ -386,7 +386,7 @@ class InterpAkima(InterpAlgorithm):
                 w31 = abs_complex(m2 - m1)
 
         # Special case to avoid divide by zero.
-        jj1 = np.where(w2 + w31 > eps)
+        jj1 = np.where(np.atleast_1d(w2 + w31) > eps)
         b = 0.5 * (m2 + m3)
         if compute_local_train:
             db_dv = 0.5 * (dm2_dv + dm3_dv)
@@ -437,7 +437,7 @@ class InterpAkima(InterpAlgorithm):
                 w4 = abs_complex(m3 - m2)
 
         # Special case to avoid divide by zero.
-        jj2 = np.where(w32 + w4 > eps)
+        jj2 = np.where(np.atleast_1d(w32 + w4) > eps)
         bp1 = 0.5 * (m3 + m4)
         if compute_local_train:
             dbp1_dv = 0.5 * (dm3_dv + dm4_dv)

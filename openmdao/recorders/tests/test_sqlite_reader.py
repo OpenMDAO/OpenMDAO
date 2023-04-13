@@ -794,7 +794,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                     mda_counter += 1
                 if source.startswith('root.'):     # count all cases for/under root solver
                     root_counter += 1
-                self.assertRegexpMatches(case, expected)
+                self.assertRegex(case, expected)
 
         self.assertEqual(counter, global_iterations)
 
@@ -1007,7 +1007,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                     mda_counter += 1
                 if source.startswith('root.'):     # count all cases for/under root solver
                     root_counter += 1
-                self.assertRegexpMatches(case.name, expected)
+                self.assertRegex(case.name, expected)
 
         self.assertEqual(counter, global_iterations)
 
@@ -1882,19 +1882,19 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as cm:
             case['a']
-        self.assertEquals(str(cm.exception), msg)
+        self.assertEqual(str(cm.exception), msg)
 
         with self.assertRaises(RuntimeError) as cm:
             case.get_val('a')
-        self.assertEquals(str(cm.exception), msg)
+        self.assertEqual(str(cm.exception), msg)
 
         with self.assertRaises(RuntimeError) as cm:
             case.get_val('a', units='m')
-        self.assertEquals(str(cm.exception), msg)
+        self.assertEqual(str(cm.exception), msg)
 
         with self.assertRaises(RuntimeError) as cm:
             case.get_val('a', units='ft')
-        self.assertEquals(str(cm.exception), msg)
+        self.assertEqual(str(cm.exception), msg)
 
         # 'a' is ambiguous.. which input's units do you want when accessing 'a'?
         # (test the underlying function, currently only called from inside get_val)
@@ -1904,7 +1904,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as cm:
             case._get_units('a')
-        self.assertEquals(str(cm.exception), msg)
+        self.assertEqual(str(cm.exception), msg)
 
     def test_get_vars(self):
         prob = SellarProblem(nonlinear_solver=om.NonlinearBlockGS,

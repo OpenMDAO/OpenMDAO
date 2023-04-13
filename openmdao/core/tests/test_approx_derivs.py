@@ -60,7 +60,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_near_equal(derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        self.assertEqual(np.sum(v.size for v in derivs.values()), 2)
+        self.assertEqual(np.sum(list(v.size for v in derivs.values())), 2)
 
     def test_fd_count(self):
         # Make sure we aren't doing extra FD steps.
@@ -986,7 +986,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        self.assertEqual(np.sum(v.size for v in derivs.values()), 2)
+        self.assertEqual(np.sum(list(v.size for v in derivs.values())), 2)
 
     def test_paraboloid_subbed(self):
 
