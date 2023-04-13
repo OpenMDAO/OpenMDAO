@@ -417,7 +417,7 @@ class SubmodelComp(ExplicitComponent):
             for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():
                 of = next(item[0] for item in self.output_name_map.items() if item[1]['abs_name'] == of)
                 wrt = next(item[0] for item in self.input_name_map.items() if item[1]['abs_name'] == wrt or item[1]['prom_name'] == wrt)
-                print(of, wrt, max(nzrows), max(nzcols))
+                # print(of, wrt, max(nzrows), max(nzcols))
                 self.declare_partials(of=of, wrt=wrt, rows=nzrows, cols=nzcols)
 
     def _set_complex_step_mode(self, active):
@@ -472,7 +472,8 @@ class SubmodelComp(ExplicitComponent):
 
         tots = p.driver._compute_totals(of=of,
                                         wrt=wrt,
-                                        use_abs_names=False)
+                                        use_abs_names=False,
+                                        driver_scaling=False)
 
         if self.coloring is None:
             for key, tot in tots.items():
