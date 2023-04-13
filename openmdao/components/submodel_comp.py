@@ -340,7 +340,7 @@ class SubmodelComp(ExplicitComponent):
             super().add_input(var, **meta)
             meta['prom_name'] = prom_name
             self._input_names.append(var)
-            
+
             prom2abs_mapping = {meta['prom_name']: name for name, meta in self.boundary_inputs}
             self.input_name_map[var] = {'prom_name': prom_name, 'abs_name': prom2abs_mapping[prom_name]}
 
@@ -349,7 +349,7 @@ class SubmodelComp(ExplicitComponent):
             super().add_output(var, **meta)
             meta['prom_name'] = prom_name
             self._output_names.append(var)
-            
+
             prom2abs_mapping = {meta['prom_name']: name for name, meta in self.all_outputs}
             self.output_name_map[var] = {'prom_name': prom_name, 'abs_name': prom2abs_mapping[prom_name]}
 
@@ -380,14 +380,20 @@ class SubmodelComp(ExplicitComponent):
         else:
             p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'])
         p.final_setup()
-        
+
         # change p.driver._designvars directlys
         
-        for var in self.input_name_map.keys():
+        for var in self._input_names:
             try:
                 self.input_name_map[var].update({'source': p.driver._designvars[self.input_name_map[var]['abs_name']]['source']})
             except:
                 self.input_name_map[var].update({'source': p.driver._designvars[self.input_name_map[var]['prom_name']]['source']})
+            
+            self.input_name_map[var].update({'outer_var_name': self._var_allprocs_prom2abs_list['input'][var][0]})
+        
+        for var in self._output_names:
+            self.output_name_map[var].update({'outer_var_name': self._var_allprocs_prom2abs_list['output'][var][0]})
+
         # get coloring and change row and column names to be prom names for use later
         # TODO replace meta['prom_name'] with interface name
         self.coloring = p.driver._get_coloring(run_model=True)
@@ -400,13 +406,17 @@ class SubmodelComp(ExplicitComponent):
         #     # self.coloring._col_vars = [inputs[interface_name]['prom_name'] for _, interface_name in self._input_names.items()]
         #     # self.coloring._col_vars = [meta['prom_name'] for _, meta in self.boundary_inputs]
         #     # NOTE might need to revisit col_vars
-            self.coloring._row_vars = [interface_name for interface_name in self._output_names if self.output_name_map[interface_name]['abs_name'] in self.coloring._row_vars]
-            self.coloring._col_vars = [interface_name for interface_name in self._input_names if self.input_name_map[interface_name]['source'] in self.coloring._col_vars]
+            self.coloring._col_vars = list(p.driver._designvars)
+            # self.coloring._col_vars = [tmp for tmp in [item[0] for item in self.input_name_map.items() if item[1]['abs_name'] in list(p.driver._designvars)]]
+            # self.coloring._row_vars = [interface_name for interface_name in self._output_names if self.output_name_map[interface_name]['abs_name'] in self.coloring._row_vars]
+            # self.coloring._col_vars = [interface_name for interface_name in self._input_names if self.input_name_map[interface_name]['source'] in self.coloring._col_vars]
 
         if self.coloring is None:
             self.declare_partials(of='*', wrt='*')
         else:
             for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():
+                of = next(item[0] for item in self.output_name_map.items() if item[1]['abs_name'] == of)
+                wrt = next(item[0] for item in self.input_name_map.items() if item[1]['abs_name'] == wrt or item[1]['prom_name'] == wrt)
                 print(of, wrt, max(nzrows), max(nzcols))
                 self.declare_partials(of=of, wrt=wrt, rows=nzrows, cols=nzcols)
 
@@ -454,8 +464,11 @@ class SubmodelComp(ExplicitComponent):
         for inp in self._input_names:
             p.set_val(self.options['inputs'][inp]['prom_name'], inputs[inp])
 
-        of = [self.output_name_map[out]['abs_name'] for out in self._output_names]
-        wrt = [self.input_name_map[inp]['source'] for inp in self._input_names]
+        # of = [self.output_name_map[out]['abs_name'] for out in self._output_names]
+        # wrt = [self.input_name_map[inp]['source'] for inp in self._input_names]
+        
+        of = self.coloring._row_vars
+        wrt = self.coloring._col_vars
 
         tots = p.driver._compute_totals(of=of,
                                         wrt=wrt,
@@ -469,4 +482,20 @@ class SubmodelComp(ExplicitComponent):
                 # of = self.output_name_map[of]['prom_name']
                 # wrt = self.input_name_map[wrt]['prom_name']
                 
-                partials[of, wrt] = tots[self.output_name_map[of]['abs_name'], self.input_name_map[wrt]['source']][nzrows, nzcols].ravel()
+                # of = self.output_name_map[of]['abs_name']
+                # wrt = self.input_name_map[wrt]['prom_name'] if wrt.startswith('parameters') else self.input_name_map[wrt]['source']
+                
+                p_of = next(item[0] for item in self.output_name_map.items() if item[1]['abs_name'] == of)
+                p_wrt = next(item[0] for item in self.input_name_map.items() if item[1]['abs_name'] == wrt or item[1]['prom_name'] == wrt)
+                
+                partials[p_of, p_wrt] = tots[of, wrt][nzrows, nzcols].ravel()
+                
+                # p_of = self.output_name_map[of]['outer_var_name']
+                # p_wrt = self.input_name_map[wrt]['outer_var_name']
+                # t_of = self.output_name_map[of]['abs_name']
+                # try:
+                #     t_wrt = self.input_name_map[wrt]['prom_name']
+                #     partials[p_of, p_wrt] = tots[t_of, t_wrt][nzrows, nzcols].ravel()
+                # except:
+                #     t_wrt = self.input_name_map[wrt]['source']
+                #     partials[p_of, p_wrt] = tots[t_of, t_wrt][nzrows, nzcols].ravel()
