@@ -15,8 +15,7 @@ warnings that may exist in your current case and address them. Highlights among 
 A few POEM's have been implemented. POEM 078 changes system methods `list_inputs` and `list_outputs` to now support
 keyword arguments `is_indep_var` and `is_design_var` to help users filter inputs.
 POEM 082 adds a similar method, `Problem.get_indep_vars` which will allow the user to find all variables in the problem
-that are provided by IndepVarComps (or systems that mimic them). POEM 076 implements directional check_totals to provide
-a faster way of derivative checking in very large models.
+that are provided by IndepVarComps (or systems that mimic them). 
 
 OptionsDictionary now supports a `set` method to allow users to set multiple options in a single line.
 
@@ -52,12 +51,10 @@ OptionsDictionary now supports a `set` method to allow users to set multiple opt
 - During CS derivatives check, display Jcs instead of Jfd to let the user know the method used. [#2812](https://github.com/OpenMDAO/OpenMDAO/pull/2812)
 - Added ability to show/hide the promotion tree for each promoted input/output in the connection viewer [#2826](https://github.com/OpenMDAO/OpenMDAO/pull/2826)
 - Added capability to `list_problem_vars` to return problem var data and suppress `out_stream` [#2834](https://github.com/OpenMDAO/OpenMDAO/pull/2834)
-- Refactor for complex step around Newton. [#2839](https://github.com/OpenMDAO/OpenMDAO/pull/2839)
-- Changed handling of _no_check_partials [#2860](https://github.com/OpenMDAO/OpenMDAO/pull/2860)
+- Refactored how complex-step was performed around a Newton solver to address an accuracy problem. [#2839](https://github.com/OpenMDAO/OpenMDAO/pull/2839)
 - Changed 'class' member of model data tree to be the full class path. [#2861](https://github.com/OpenMDAO/OpenMDAO/pull/2861)- 
 - POEM 082: Implemented a way of getting all independent variables from a Problem (get_indep_vars). [#2871](https://github.com/OpenMDAO/OpenMDAO/pull/2871)
 - OptionsDictionary update: Added context manager for temporary options values and a set method for setting multiple values at once. [#2865](https://github.com/OpenMDAO/OpenMDAO/pull/2865)
-- POEM 076: Implemented directional check_totals [#2859](https://github.com/OpenMDAO/OpenMDAO/pull/2859)
 
 ## Bug Fixes
 
@@ -71,6 +68,7 @@ OptionsDictionary now supports a `set` method to allow users to set multiple opt
 - Fixed MPI bug when total jacobian is singular and model has dist vars [#2828](https://github.com/OpenMDAO/OpenMDAO/pull/2828)
 - Fixed an exception when non-uniformly distributed arrays appeared in an inputs report [#2832](https://github.com/OpenMDAO/OpenMDAO/pull/2832)
 - Fixed Out of Bounds Error in Serial Derivative Consistency Check [#2838](https://github.com/OpenMDAO/OpenMDAO/pull/2838)
+- Fixed a bug in MetaModelUnStructuredComp where the derivatives were wrong when vec_size > 1 and using complex step. [#2860](https://github.com/OpenMDAO/OpenMDAO/pull/2860)
 
 ## Miscellaneous
 
@@ -81,11 +79,13 @@ OptionsDictionary now supports a `set` method to allow users to set multiple opt
 - Updated doc build to work with jupyter-book==0.14 [#2831](https://github.com/OpenMDAO/OpenMDAO/pull/2831)
 - Addressed two new potential vulnerabilities as reported by bandit [#2844](https://github.com/OpenMDAO/OpenMDAO/pull/2844)
 - Updated GitHub workflow to install openssl=3.0 for uploading the docs [#2853](https://github.com/OpenMDAO/OpenMDAO/pull/2853)
+- Changed the behavior of the flags and environment variables that are used to remove core openmdao components from "check_partials". [#2860](https://github.com/OpenMDAO/OpenMDAO/pull/2860)
 - Updated ExplicitFuncComp Docs to demonstrate `compute_partials` capability [#2866](https://github.com/OpenMDAO/OpenMDAO/pull/2866)
 - Show warning about list_inputs values situationally [#2862](https://github.com/OpenMDAO/OpenMDAO/pull/2862)
 - Made some minor updates to README.md [#2867](https://github.com/OpenMDAO/OpenMDAO/pull/2867)
 - Remove note that invalid_desvar_behavior will change to "raise". [#2870](https://github.com/OpenMDAO/OpenMDAO/pull/2870)
 - Removed dead code that handled a non-Group model [#2875](https://github.com/OpenMDAO/OpenMDAO/pull/2875)
+
 
 
 ***********************************
