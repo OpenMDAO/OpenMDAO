@@ -2840,32 +2840,46 @@ class Group(System):
         if self._owns_approx_wrt and not self.pathname:
             candidate_wrt = self._owns_approx_wrt
         else:
-            candidate_wrt = self._var_allprocs_abs2meta['input']
+            pro2abs = self._var_allprocs_prom2abs_list
+            candidate_wrt = []
+            for abs_inps in pro2abs['input'].values():
+                for inp in abs_inps:
+                    candidate_wrt.append(inp)
+                    # If connection is inside of this Group, perturbation of all implicitly
+                    # connected inputs will be handled properly via internal transfers. Otherwise,
+                    # we need to add all implicitly connected inputs separately.
+                    if inp in self._conn_abs_in2out:
+                        break
 
         wrt = set()
         ivc = set()
         if self.pathname:  # get rid of any old stuff in here
             self._owns_approx_of = self._owns_approx_wrt = None
+            totals = False
+        else:
+            totals = True
 
-        all_abs2meta_out = self._var_abs2meta['output']
+        all_abs2meta_out = self._var_allprocs_abs2meta['output']
 
+        # When computing totals, weed out inputs connected to anything inside our system unless
+        # the source is an indepvarcomp.
+        prefix = self.pathname + '.' if self.pathname else ''
         for var in candidate_wrt:
-
-            # Weed out inputs connected to anything inside our system unless the source is an
-            # indepvarcomp.
             if var in self._conn_abs_in2out:
-                src = self._conn_abs_in2out[var]
-                meta = all_abs2meta_out[src]
-                if 'openmdao:indep_var' in meta['tags']:
-                    wrt.add(src)
-                    ivc.add(src)
+                if totals:
+                    src = self._conn_abs_in2out[var]
+                    if src.startswith(prefix):
+                        meta = all_abs2meta_out[src]
+                        if 'openmdao:indep_var' in meta['tags']:
+                            wrt.add(src)
+                            ivc.add(src)
             else:
                 wrt.add(var)
 
         if self._owns_approx_of:
             of = set(self._owns_approx_of)
         else:
-            of = set(all_abs2meta_out)
+            of = set(self._var_allprocs_abs2meta['output'])
             # Skip indepvarcomp res wrt other srcs
             of -= ivc
 
@@ -2875,11 +2889,12 @@ class Group(System):
                 yield key  # get all combos if we're doing total derivs
                 continue
 
+            _of, _wrt = key
             # Skip explicit res wrt outputs
-            if key[1] in of and key[1] not in ivc:
+            if _wrt in of and _wrt not in ivc:
 
                 # Support for specifying a desvar as an obj/con.
-                if key[1] not in wrt or key[0] == key[1]:
+                if _wrt not in wrt or _of == _wrt:
                     continue
 
             yield key
