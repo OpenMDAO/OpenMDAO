@@ -3,7 +3,7 @@
 
 April 14, 2023
 
-The release of OpenMDAO 3.26.0 primarily removes a lengthy list of long-standing deprecations that we will no longer 
+The release of OpenMDAO 3.26.0 primarily removes a lengthy list of long-standing deprecations that we will no longer
 be carrying forward. There's a reasonable chance that this release will break existing models, so find any deprecation
 warnings that may exist in your current case and address them. Highlights among these are
 - The ability to use a component as a problem's model is removed (OpenMDAO expects a Group so that an AutoIVC component can be added)
@@ -15,7 +15,7 @@ warnings that may exist in your current case and address them. Highlights among 
 A few POEM's have been implemented. POEM 078 changes system methods `list_inputs` and `list_outputs` to now support
 keyword arguments `is_indep_var` and `is_design_var` to help users filter inputs.
 POEM 082 adds a similar method, `Problem.get_indep_vars` which will allow the user to find all variables in the problem
-that are provided by IndepVarComps (or systems that mimic them). 
+that are provided by IndepVarComps (or systems that mimic them).
 
 OptionsDictionary now supports a `set` method to allow users to set multiple options in a single line.
 
@@ -26,6 +26,7 @@ OptionsDictionary now supports a `set` method to allow users to set multiple opt
 
 ## Backwards Incompatible API Changes
 
+- Changed DOEDriver to record unscaled derivatives [#2811](https://github.com/OpenMDAO/OpenMDAO/pull/2811)
 - Removed deprecation that allowed use of `value` in place of `val` [#2835](https://github.com/OpenMDAO/OpenMDAO/pull/2835)
 - Removed deprecated simple_warning() function [#2837](https://github.com/OpenMDAO/OpenMDAO/pull/2837)
 - Removed deprecated DemuxComp [#2841](https://github.com/OpenMDAO/OpenMDAO/pull/2841)
@@ -46,13 +47,12 @@ OptionsDictionary now supports a `set` method to allow users to set multiple opt
 
 ## New Features
 
-- Changed DOEDriver to record unscaled derivatives [#2811](https://github.com/OpenMDAO/OpenMDAO/pull/2811)
 - POEM 78: Add is_indep_var and is_design_var filters to list_inputs/list_outputs [#2813](https://github.com/OpenMDAO/OpenMDAO/pull/2813)
 - During CS derivatives check, display Jcs instead of Jfd to let the user know the method used. [#2812](https://github.com/OpenMDAO/OpenMDAO/pull/2812)
 - Added ability to show/hide the promotion tree for each promoted input/output in the connection viewer [#2826](https://github.com/OpenMDAO/OpenMDAO/pull/2826)
 - Added capability to `list_problem_vars` to return problem var data and suppress `out_stream` [#2834](https://github.com/OpenMDAO/OpenMDAO/pull/2834)
 - Refactored how complex-step was performed around a Newton solver to address an accuracy problem. [#2839](https://github.com/OpenMDAO/OpenMDAO/pull/2839)
-- Changed 'class' member of model data tree to be the full class path. [#2861](https://github.com/OpenMDAO/OpenMDAO/pull/2861)- 
+- Changed 'class' member of model data tree to be the full class path. [#2861](https://github.com/OpenMDAO/OpenMDAO/pull/2861)
 - POEM 082: Implemented a way of getting all independent variables from a Problem (get_indep_vars). [#2871](https://github.com/OpenMDAO/OpenMDAO/pull/2871)
 - OptionsDictionary update: Added context manager for temporary options values and a set method for setting multiple values at once. [#2865](https://github.com/OpenMDAO/OpenMDAO/pull/2865)
 
