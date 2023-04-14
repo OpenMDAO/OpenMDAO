@@ -84,8 +84,9 @@ OptionsDictionary now supports a `set` method to allow users to set multiple opt
 - Show warning about list_inputs values situationally [#2862](https://github.com/OpenMDAO/OpenMDAO/pull/2862)
 - Made some minor updates to README.md [#2867](https://github.com/OpenMDAO/OpenMDAO/pull/2867)
 - Remove note that invalid_desvar_behavior will change to "raise". [#2870](https://github.com/OpenMDAO/OpenMDAO/pull/2870)
-- Removed dead code that handled a non-Group model [#2875](https://github.com/OpenMDAO/OpenMDAO/pull/2875)
-
+- Removed dead code that handled a non-Group model. [#2875](https://github.com/OpenMDAO/OpenMDAO/pull/2875)
+- Some cleanup of deprecations [#2877](https://github.com/OpenMDAO/OpenMDAO/pull/2877)
+- Updated PETSc install in audit workflow. [#2879](https://github.com/OpenMDAO/OpenMDAO/pull/2879)
 
 
 ***********************************
