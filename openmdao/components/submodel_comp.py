@@ -15,8 +15,6 @@ def _get_model_vars(vars, model_vars):
 
     Parameters
     ----------
-    varType : str
-        Specifies whether inputs or outputs are being extracted.
     vars : list of str or tuple
         List of provided var names in str or tuple form. If an element is a str,
         then it should be the absolute name or the promoted name in its group. If it is a tuple,
@@ -36,10 +34,7 @@ def _get_model_vars(vars, model_vars):
 
     # check for wildcards and append them to vars list
     patterns = [i for i in vars if isinstance(i, str)]
-    # if varType == 'outputs':
     var_list = [meta['prom_name'] for _, meta in model_vars]
-    # else:
-    #     var_list = list(tmp.keys())
     for i in patterns:
         matches = find_matches(i, var_list)
         if len(matches) == 0:
@@ -64,9 +59,6 @@ def _get_model_vars(vars, model_vars):
             # check if name[7:] == var[0] -> var[0] is abs name and var[1] is alias
             # check if meta['prom_name'] == var[0] -> var[0] is prom name and var[1] is alias
             # NOTE name[7:] is the path name with out the 'subsys.' group level
-            # tmp_dict = {var[1]: meta for name, meta in model_vars
-            #             if name == var[0] or name[7:] == var[0] or (varType == 'outputs' and meta['prom_name'] == var[0])}
-
             tmp_dict = {var[1]: meta for name, meta in model_vars
                         if name[7:] == var[0] or meta['prom_name'] == var[0]}
 
@@ -88,9 +80,6 @@ def _get_model_vars(vars, model_vars):
             # check if name[7:] == var -> given var is abs name
             # check if meta['prom_name'] == var -> given var is prom_name
             # NOTE name[7:] is the path name with out the 'subsys.' group level
-            # tmp_dict = {var: meta for name, meta in model_vars
-            #             if name == var or name[7:] == var or (varType == 'outputs' and meta['prom_name'] == var)}
-
             tmp_dict = {var[1]: meta for name, meta in model_vars
                         if name[7:] == var[0] or meta['prom_name'] == var[0]}
 
@@ -295,20 +284,9 @@ class SubmodelComp(ExplicitComponent):
             p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'])
         p.final_setup()
 
-        # boundary inputs are any inputs that externally come into `SubmodelComp`
-        # for sys in p.model.system_iter(include_self=True, recurse=True, typ=IndepVarComp):
-        #     print(sys.pathname)
-        #     sys.list_outputs(prom_name=True)
-        
-        # raise ValueError('stop')
-
         self.boundary_inputs = p.model.list_inputs(out_stream=None, prom_name=True,
                                                    units=True, shape=True, desc=True,
                                                    is_indep_var=True)
-        # self.boundary_inputs = p.model.list_outputs(prom_name=True,
-        #                                            units=True, shape=True, desc=True,
-        #                                            is_indep_var=True)
-        # exit(0)
         
         self.boundary_inputs.extend(p.model.list_outputs(out_stream=None, prom_name=True,
                                                          units=True, shape=True, desc=True,
@@ -380,8 +358,6 @@ class SubmodelComp(ExplicitComponent):
         else:
             p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'])
         p.final_setup()
-
-        # change p.driver._designvars directlys
         
         for var in self._input_names:
             try:
@@ -398,18 +374,7 @@ class SubmodelComp(ExplicitComponent):
         # TODO replace meta['prom_name'] with interface name
         self.coloring = p.driver._get_coloring(run_model=True)
         if self.coloring is not None:
-        #     # self.coloring._row_vars = [interface_name for _, interface_name in self._output_names if ]
-        #     # self.coloring._row_vars = [outputs[interface_name]['prom_name'] for _, interface_name in self._output_names.items() if
-        #     #                            interface_name in self.coloring._row_vars]
-        #     # self.coloring._row_vars = [meta['prom_name'] for name, meta in self.all_outputs
-        #     #                            if name in self.coloring._row_vars]
-        #     # self.coloring._col_vars = [inputs[interface_name]['prom_name'] for _, interface_name in self._input_names.items()]
-        #     # self.coloring._col_vars = [meta['prom_name'] for _, meta in self.boundary_inputs]
-        #     # NOTE might need to revisit col_vars
             self.coloring._col_vars = list(p.driver._designvars)
-            # self.coloring._col_vars = [tmp for tmp in [item[0] for item in self.input_name_map.items() if item[1]['abs_name'] in list(p.driver._designvars)]]
-            # self.coloring._row_vars = [interface_name for interface_name in self._output_names if self.output_name_map[interface_name]['abs_name'] in self.coloring._row_vars]
-            # self.coloring._col_vars = [interface_name for interface_name in self._input_names if self.input_name_map[interface_name]['source'] in self.coloring._col_vars]
 
         if self.coloring is None:
             self.declare_partials(of='*', wrt='*')
@@ -463,9 +428,6 @@ class SubmodelComp(ExplicitComponent):
         p = self._subprob
         for inp in self._input_names:
             p.set_val(self.options['inputs'][inp]['prom_name'], inputs[inp])
-
-        # of = [self.output_name_map[out]['abs_name'] for out in self._output_names]
-        # wrt = [self.input_name_map[inp]['source'] for inp in self._input_names]
         
         of = self.coloring._row_vars
         wrt = self.coloring._col_vars
@@ -479,24 +441,10 @@ class SubmodelComp(ExplicitComponent):
             for key, tot in tots.items():
                 partials[key] = tot
         else:
-            for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():
-                # of = self.output_name_map[of]['prom_name']
-                # wrt = self.input_name_map[wrt]['prom_name']
-                
-                # of = self.output_name_map[of]['abs_name']
-                # wrt = self.input_name_map[wrt]['prom_name'] if wrt.startswith('parameters') else self.input_name_map[wrt]['source']
-                
-                p_of = next(item[0] for item in self.output_name_map.items() if item[1]['abs_name'] == of)
-                p_wrt = next(item[0] for item in self.input_name_map.items() if item[1]['abs_name'] == wrt or item[1]['prom_name'] == wrt)
+            for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():             
+                p_of = next(item[0] for item in self.output_name_map.items()
+                            if item[1]['abs_name'] == of)
+                p_wrt = next(item[0] for item in self.input_name_map.items()
+                             if item[1]['abs_name'] == wrt or item[1]['prom_name'] == wrt)
                 
                 partials[p_of, p_wrt] = tots[of, wrt][nzrows, nzcols].ravel()
-                
-                # p_of = self.output_name_map[of]['outer_var_name']
-                # p_wrt = self.input_name_map[wrt]['outer_var_name']
-                # t_of = self.output_name_map[of]['abs_name']
-                # try:
-                #     t_wrt = self.input_name_map[wrt]['prom_name']
-                #     partials[p_of, p_wrt] = tots[t_of, t_wrt][nzrows, nzcols].ravel()
-                # except:
-                #     t_wrt = self.input_name_map[wrt]['source']
-                #     partials[p_of, p_wrt] = tots[t_of, t_wrt][nzrows, nzcols].ravel()
