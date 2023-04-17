@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
 
 step = 1e-6
 size = 3
@@ -193,3 +193,120 @@ class TestSemiTotals(unittest.TestCase):
 
         data = prob.check_totals(of=of, wrt=wrt, method="fd", out_stream=None)
         assert_check_totals(data, atol=1e-6, rtol=1e-6)
+
+
+class FakeGeomComp(om.ExplicitComponent):
+
+    def initialize(self):
+        self.options.declare("n", types=int)
+
+    def setup(self):
+        n = self.options["n"]
+        self.add_input("x0", val=np.zeros(n), units="m")
+        self.add_input("feather", val=0.0, units="deg")
+        self.add_output("x", val=np.zeros(n), units="m")
+
+        self.declare_partials("*", "*", method="fd")
+
+        self._counter = 0
+
+    def compute(self, inputs, outputs):
+        self._counter += 1
+        feather_rad = inputs["feather"][0]*np.pi/180
+        x0 = inputs["x0"]
+
+        outputs["x"][:] = 3*np.sin(feather_rad + 0.2)*x0 + 3*feather_rad**2
+
+
+class FakeAeroComp(om.ExplicitComponent):
+
+    def initialize(self):
+        self.options.declare("n", types=int)
+
+    def setup(self):
+        n = self.options["n"]
+
+        self.add_input("x", val=np.arange(n), units="m")
+        self.add_input("omega", val=7000*2*np.pi/60, units="rad/s")
+
+        self.add_output("CT", val=0.5)
+        self.add_output("CP", val=0.5)
+
+        self.declare_partials("*", "*", method="fd")
+
+        self._counter = 0
+
+    def compute(self, inputs, outputs):
+        self._counter += 1
+        omega = inputs["omega"][0]
+        x = inputs["x"]
+
+        outputs["CT"][0] = 0.8*omega**2 + np.sum(x)
+        outputs["CP"][0] = 0.1*omega**3 + np.sum(x**2)
+
+
+class GeometryAndAero2(om.Group):
+
+    def initialize(self):
+        self.options.declare("n", types=int)
+        self.options.declare("rho", types=float)
+        self.options.declare("vinf", types=float)
+
+    def setup(self):
+        n = self.options["n"]
+
+        comp = self.add_subsystem("init_geom", om.IndepVarComp(), promotes_outputs=["x0"])
+        comp.add_output("x0", val=np.arange(n) + 1.0, units="m")
+
+        self.add_subsystem("geom", FakeGeomComp(n=n), promotes_inputs=["x0", "feather"], promotes_outputs=["x"])
+        self.add_subsystem("aero", FakeAeroComp(n=n), promotes_inputs=["x", "omega"], promotes_outputs=["CT", "CP"])
+
+    def reset_count(self):
+        self.geom._counter = 0
+        self.aero._counter = 0
+
+
+class TestSemiTotalsNumCalls(unittest.TestCase):
+
+    def test_call_counts(self):
+        size = 10
+        rho = 1.17573
+        minf = 0.111078231621482
+        speedofsound = 344.5760217432
+        vinf = minf*speedofsound
+
+        prob = om.Problem()
+
+        omega = 7199.759242*2*np.pi/60
+        ivc = prob.model.add_subsystem("ivc", om.IndepVarComp(), promotes_outputs=["*"])
+        ivc.add_output("feather", val=0.0, units="deg")
+        ivc.add_output("omega", val=omega, units="rad/s")
+
+        geom_and_aero = prob.model.add_subsystem('geom_and_aero',
+                                                GeometryAndAero2(n=size, rho=rho, vinf=vinf),
+                                                promotes_inputs=["feather", "omega"],
+                                                promotes_outputs=["CT", "CP"])
+        geom_and_aero.approx_totals(step=step, step_calc="abs", method="fd", form="forward")
+
+        prob.model.add_design_var("feather", lower=-5.0, upper=25.0, units="deg", ref=1.0)
+        prob.model.add_design_var("omega", lower=3000*2*np.pi/60, upper=7500*2*np.pi/60, units="rad/s", ref=1.0)
+        prob.model.add_objective("CP", ref=1e0)
+
+        prob.setup(force_alloc_complex=False)
+
+        omega = (6245.096992023524*2*np.pi/60) + step
+        feather = 0.6362159381168669
+        prob.set_val("omega", omega, units="rad/s")
+        prob.set_val("feather", feather, units="deg")
+        prob.run_model()
+        geom_and_aero.reset_count()
+        prob.compute_totals(of=["CT"], wrt=["feather", "omega"])
+
+        self.assertEqual(geom_and_aero.geom._counter, 2)
+        self.assertEqual(geom_and_aero.aero._counter, 2)
+
+        geom_and_aero.reset_count()
+        data = prob.check_totals(method="fd", form="forward", step=step, step_calc="abs", out_stream=None)
+        assert_check_totals(data, atol=1e-6, rtol=1e-6)
+
+        self.assertEqual(geom_and_aero.geom._counter, 4)
