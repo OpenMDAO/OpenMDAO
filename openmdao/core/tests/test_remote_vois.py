@@ -73,6 +73,7 @@ class RemoteVOITestCase(unittest.TestCase):
 
     def test_check_totals_matfree_w_remote(self):
         # this test used to hang before the fix for issue # 2884
+        # See https://github.com/OpenMDAO/OpenMDAO/issues/2883#issue-1660920684 for details.
         class DummyComp(om.ExplicitComponent):
             def initialize(self):
                 self.options.declare('a',default=0.)
