@@ -6424,7 +6424,7 @@ class System(object):
                     owner = myrank
                 else:
                     owner = owns[name]
-                    has_dist_data = nranks > 1
+                    has_dist_data |= nranks > 1
 
                 voff = global_offsets[owner, vind]
                 if jinds is _full_slice:
@@ -6435,7 +6435,7 @@ class System(object):
                 tinds.append(range(tstart + toffset, tend + toffset))
                 assert len(sinds[-1]) == len(tinds[-1])
             else:  # 'name' refers to a distributed variable
-                has_dist_data = nranks > 1
+                has_dist_data |= nranks > 1
                 dtstart = dtend = tstart
                 dsstart = dsend = 0
                 for rnk, sz in enumerate(dist_sizes):
@@ -6459,6 +6459,10 @@ class System(object):
 
         sarr = np.array(list(chain(*sinds)), dtype=INT_DTYPE)
         tarr = np.array(list(chain(*tinds)), dtype=INT_DTYPE)
+
+        if nranks > 1:
+            # do an allreduce to see if any procs have distrib/remote vars
+            has_dist_data = bool(self.comm.allreduce(int(has_dist_data)))
 
         if not has_dist_data:
             # convert global indices back to local so we can use them to transfer between two
