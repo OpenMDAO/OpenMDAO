@@ -1616,6 +1616,25 @@ class TestGroupPromotes(unittest.TestCase):
 
         self.assertEqual(top['bb'], 4.0)
 
+    def test_promotes_star1(self):
+        class SubGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.ExecComp('x=2.0*a+3.0*b', a=3.0, b=4.0))
+
+            def configure(self):
+                self.promotes('comp1', inputs=['b*'])
+
+        class TopGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('sub', SubGroup())
+
+            def configure(self):
+                self.sub.promotes('comp1', inputs=['*'])
+
+        top = om.Problem(model=TopGroup())
+        with assert_no_warning(PromotionWarning):
+            top.setup()
+
     def test_promotes_alias_from_parent(self):
         class SubGroup(om.Group):
             def setup(self):
