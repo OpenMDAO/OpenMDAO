@@ -3,6 +3,10 @@ This package contains various functions that may be useful in component compute 
 along with implementations of their derivatives to make it easier for users to write
 their corresponding compute partials methods.
 
+These functions can either be implemented using numpy for jax.numpy for the underlying calculations.
+To enable the use of jax, set the environment variable `OPENMDAO_MATH_USE_JAX = true`.
+This will allow these functions to be used in a way that supports jax's automatic diffeentiation methods.
+
 Functions
 ---------
 
@@ -47,8 +51,3 @@ from .smooth import act_tanh, d_act_tanh, smooth_max, d_smooth_max, smooth_min, 
     smooth_abs, d_smooth_abs
 
 from .cs_safe import abs, d_abs, arctanh, d_arctanh, arctan2, d_arctan2, norm, d_norm
-
-from .numpy import arcsin, d_arcsin, arccos, d_arccos, arccosh, d_arccosh, \
-    arcsinh, d_arcsinh, arctan, d_arctan, cos, d_cos, cosh, d_cosh, cumsum, d_cumsum, dot, d_dot, \
-    erf, d_erf, erfc, d_erfc, exp, d_exp, log, d_log, log10, d_log10, sin, d_sin, sinh, d_sinh, \
-    sqrt, d_sqrt, sum, d_sum, tan, d_tan, tanh, d_tanh
