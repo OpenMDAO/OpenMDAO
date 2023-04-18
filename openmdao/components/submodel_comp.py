@@ -429,8 +429,12 @@ class SubmodelComp(ExplicitComponent):
         for inp in self._input_names:
             p.set_val(self.options['inputs'][inp]['prom_name'], inputs[inp])
         
-        of = self.coloring._row_vars
-        wrt = self.coloring._col_vars
+        if self.coloring is not None:
+            of = self.coloring._row_vars
+            wrt = self.coloring._col_vars
+        else:
+            of = [meta['abs_name'] for _, meta in self.output_name_map.items()]
+            wrt = [meta['source'] for _, meta in self.input_name_map.items()]
 
         tots = p.driver._compute_totals(of=of,
                                         wrt=wrt,
@@ -439,7 +443,9 @@ class SubmodelComp(ExplicitComponent):
 
         if self.coloring is None:
             for key, tot in tots.items():
-                partials[key] = tot
+                p_of = next(item[0] for item in self.output_name_map.items() if item[1]['abs_name'] == key[0])
+                p_wrt = next(item[0] for item in self.input_name_map.items() if item[1]['source'] == key[1] or item[1]['abs_name'] == key[1])
+                partials[p_of, p_wrt] = tot
         else:
             for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():             
                 p_of = next(item[0] for item in self.output_name_map.items()
