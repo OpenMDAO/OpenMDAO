@@ -462,9 +462,9 @@ class SubmodelComp(ExplicitComponent):
         input_iface_name = {model_name: interface_name for model_name, interface_name in self.model_input_names}
 
         if self.coloring is None:
-            for k in tots.keys():
-                print(k)
-            print()
+            # for k in tots.keys():
+            #     print(k)
+            # print()
             # exit(0)
             for (model_output_name, model_input_name), tot in tots.items():
                 # print(key)
@@ -472,7 +472,7 @@ class SubmodelComp(ExplicitComponent):
                 # p_wrt = next(item[0] for item in self.input_name_map.items() if item[1]['source'] == key[1] or item[1]['abs_name'] == key[1])
                 # print(p_of, p_wrt)
                 partials[output_iface_name[model_output_name], input_iface_name[model_input_name]] = tot
-            print('DONE')
+            # print('DONE')
         else:
             for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():             
                 p_of = next(item[0] for item in self.output_name_map.items()
