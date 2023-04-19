@@ -13,8 +13,9 @@ if is_truthy(use_jax):
         import jax.numpy as np
         from jax import config
         config.update("jax_enable_x64", True)
-    except:
-        raise EnvironmentError('Environment variable OPENMDAO_MATH_USE_JAX is True but jax is not available.')
+    except ImportError:
+        raise EnvironmentError('Environment variable OPENMDAO_MATH_USE_JAX is '
+                               'True but jax is not available.')
 else:
     import numpy as np
 
@@ -23,14 +24,15 @@ def d_sum(x, axis=None):
     """
     Compute the derivative of the sum of the elements in x along the given axis.
 
-    If the axis is None or x is one-dimensional, the shape of the returned value will by (1,) + x.shape.
-    Otherwise, the shape of the returned value will be determined by the shape of x and the axis chosen.
+    If the axis is None or x is one-dimensional, the shape of the returned value
+    will by (1,) + x.shape. Otherwise, the shape of the returned value will be
+    determined by the shape of x and the axis chosen.
 
     Parameters
     ----------
     x : ndarray
         Array value argument.
-    axis : int or None.
+    axis : int or None
         The axis along which the sum is computed, or None if the sum is computed over all elements.
 
     Returns
@@ -153,7 +155,7 @@ def arctanh(x):
     Parameters
     ----------
     x : ndarray
-        The value of x at which arctanh is evaluated
+        The value of x at which arctanh is evaluated.
 
     Returns
     -------
@@ -170,7 +172,7 @@ def d_arctanh(x):
     Parameters
     ----------
     x : ndarray
-        The value of x at which arctanh is evaluated
+        The value of x at which arctanh is evaluated.
 
     Returns
     -------
@@ -228,7 +230,7 @@ def d_norm(x, axis=None):
     ----------
     x : ndarray
         Array value argument.
-    axis : int or None.
+    axis : int or None
         The axis along which the norm is computed, or None if the sum is computed over all elements.
 
     Returns
@@ -237,4 +239,5 @@ def d_norm(x, axis=None):
         Derivative of norm wrt x.
     """
     x_sq = (x ** 2)
-    return d_sum(x_sq, axis=axis) * (x / np.sqrt(np.sum(x_sq, axis=axis, keepdims=axis is not None)))
+    return d_sum(x_sq, axis=axis) * \
+        (x / np.sqrt(np.sum(x_sq, axis=axis, keepdims=axis is not None)))

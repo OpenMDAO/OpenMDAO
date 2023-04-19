@@ -13,8 +13,9 @@ if is_truthy(use_jax):
         import jax.numpy as np
         from jax import config
         config.update("jax_enable_x64", True)
-    except:
-        raise EnvironmentError('Environment variable OPENMDAO_MATH_USE_JAX is True but jax is not available.')
+    except ImportError:
+        raise EnvironmentError('Environment variable OPENMDAO_MATH_USE_JAX '
+                               'is True but jax is not available.')
 else:
     import numpy as np
 
@@ -44,6 +45,7 @@ def act_tanh(x, mu=1.0E-2, z=0., a=-1., b=1.):
 
     Returns
     -------
+    float or np.array
         The value of the activation response at the given input.
     """
     dy = b - a

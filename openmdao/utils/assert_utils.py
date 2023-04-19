@@ -13,7 +13,7 @@ import numpy as np
 
 try:
     from jaxlib.xla_extension import ArrayImpl
-except:
+except ImportError:
     ArrayImpl = None
 
 from openmdao.core.component import Component
@@ -21,8 +21,6 @@ from openmdao.core.group import Group
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.general_utils import pad_name
 from openmdao.utils.om_warnings import reset_warning_registry
-
-
 
 
 @contextmanager
@@ -449,7 +447,7 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
         desired = dict(desired)
 
     if type(actual) != type(desired):
-        raise ValueError('actual %s, desired %s have different types' % (type(actual), type(desired)))
+        raise ValueError(f'actual {type(actual)}, desired {type(desired)} have different types')
 
     if isinstance(actual, type) and isinstance(desired, type):
         if actual != desired:
