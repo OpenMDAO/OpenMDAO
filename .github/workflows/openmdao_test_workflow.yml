@@ -160,6 +160,7 @@ jobs:
           echo "Install jax"
           echo "============================================================="
           python -m pip install jaxlib=='${{ matrix.JAX }}' jax=='${{ matrix.JAX }}'
+          echo "export OPENMDAO_MATH_USE_JAX=1" >> $GITHUB_ENV
 
       - name: Install PETSc
         if: matrix.PETSc
@@ -291,6 +292,7 @@ jobs:
         env:
           OPENMDAO_CHECK_ALL_PARTIALS: true
         run: |
+          export OPENMDAO_MATH_USE_JAX=
           echo "============================================================="
           echo "Run tests with coverage (from directory other than repo root)"
           echo "============================================================="

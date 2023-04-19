@@ -19,7 +19,7 @@ def abs(x):
     ndarray
         Absolute value.
     """
-    warn_deprecation('openmdao.utils.cs_safe.abs is deprecated. Use openmdao.func.abs instead.')
+    warn_deprecation('openmdao.utils.cs_safe.abs is deprecated. Use openmdao.math.abs instead.')
     return cs_abs(x)
 
 
@@ -39,7 +39,7 @@ def norm(x, axis=None):
     ndarray
         Matrix or vector norm.
     """
-    warn_deprecation('openmdao.utils.cs_safe.norm is deprecated. Use openmdao.func.norm instead.')
+    warn_deprecation('openmdao.utils.cs_safe.norm is deprecated. Use openmdao.math.norm instead.')
     return cs_norm(x, axis=axis)
 
 
@@ -60,5 +60,5 @@ def arctan2(y, x):
         The angle whose opposite side has length y and whose adjacent side has length x.
     """
     warn_deprecation('openmdao.utils.cs_safe.arctan2 is deprecated. '
-                     'Use openmdao.func.arctan2 instead.')
+                     'Use openmdao.math.arctan2 instead.')
     return cs_arctan2(y, x)

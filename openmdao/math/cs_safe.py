@@ -18,7 +18,65 @@ if is_truthy(use_jax):
 else:
     import numpy as np
 
-from .numpy import sum as om_sum, d_sum
+
+def d_sum(x, axis=None):
+    """
+    Compute the derivative of the sum of the elements in x along the given axis.
+
+    If the axis is None or x is one-dimensional, the shape of the returned value will by (1,) + x.shape.
+    Otherwise, the shape of the returned value will be determined by the shape of x and the axis chosen.
+
+    Parameters
+    ----------
+    x : ndarray
+        Array value argument.
+    axis : int or None.
+        The axis along which the sum is computed, or None if the sum is computed over all elements.
+
+    Returns
+    -------
+    ndarray
+        Derivative of sum wrt x along the specified axis. The shape of the jacobian is the
+        shape of output of sum (which keeps dimensions when axis is specified) concatenated
+        with the shape of the input.
+    """
+    kron = np.kron
+    eye = np.eye
+
+    if axis is None or len(x.shape) == 1:
+        return np.ones((1,) + x.shape)
+    else:
+        # This builds up J to the shape of (total_output_size, total_input_size)
+        # and then reshapes it to the appropriate dimensions. There may be a
+        # more efficient way to do this.
+        #
+        # Build up a list of arguments for the kronecker products.
+        #
+        # If the axis of x is the summation axis, it appears in the kronecker products
+        # as a row of ones of its given dimension.
+        #
+        # Otherwise, the axis appears in the kronecker products as an identity matrix
+        # of its given dimension.
+        kron_args = []
+        for i in range(len(x.shape)):
+            if i == axis:
+                kron_args.append(np.atleast_2d(np.ones(x.shape[i])))
+            else:
+                kron_args.append(eye(x.shape[i]))
+
+        # Start with the kronecker product of the last two arguments
+        arg2 = kron_args.pop()
+        arg1 = kron_args.pop()
+        jac = kron(arg1, arg2)
+
+        # Now proceed through the remaining ones, from right to left
+        while kron_args:
+            arg1 = kron_args.pop()
+            jac = kron(arg1, jac)
+
+        ax0 = np.prod(np.asarray([ax_size for i, ax_size in enumerate(x.shape) if i != axis]))
+        jac = np.reshape(jac, (ax0,) + x.shape)
+        return jac
 
 
 def abs(x):
@@ -159,7 +217,7 @@ def norm(x, axis=None):
     ndarray
         Matrix or vector norm.
     """
-    return np.sqrt(om_sum(x ** 2, axis=axis))
+    return np.sqrt(np.sum(x ** 2, axis=axis, keepdims=axis is not None))
 
 
 def d_norm(x, axis=None):
@@ -179,4 +237,4 @@ def d_norm(x, axis=None):
         Derivative of norm wrt x.
     """
     x_sq = (x ** 2)
-    return d_sum(x_sq, axis=axis) * (x / np.sqrt(om_sum(x_sq, axis=axis)))
+    return d_sum(x_sq, axis=axis) * (x / np.sqrt(np.sum(x_sq, axis=axis, keepdims=axis is not None)))
