@@ -284,15 +284,17 @@ class SubmodelComp(ExplicitComponent):
             p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'])
         p.final_setup()
 
-        self.boundary_inputs = p.model.list_inputs(out_stream=None, prom_name=True,
-                                                   units=True, shape=True, desc=True,
-                                                   is_indep_var=True)
+        # self.boundary_inputs = p.model.list_inputs(out_stream=None, prom_name=True,
+        #                                            units=True, shape=True, desc=True,
+        #                                            is_indep_var=True)
+        #
+        # self.boundary_inputs.extend(p.model.list_outputs(out_stream=None, prom_name=True,
+        #                                                  units=True, shape=True, desc=True,
+        #                                                  is_indep_var=True))
         
-        self.boundary_inputs.extend(p.model.list_outputs(out_stream=None, prom_name=True,
-                                                         units=True, shape=True, desc=True,
-                                                         is_indep_var=True))
-        
-        # self.boundary_inputs = p.list_indep_vars(out_stream=None, options=['name'])
+        self.boundary_inputs = p.list_indep_vars(out_stream=None, options=['name'])
+        for name, meta in self.boundary_inputs:
+            meta['prom_name'] = name
         
         # want all outputs from the `SubmodelComp`, including ivcs/design vars
         self.all_outputs = p.model.list_outputs(out_stream=None, prom_name=True,
@@ -318,6 +320,11 @@ class SubmodelComp(ExplicitComponent):
             super().add_input(var, **meta)
             meta['prom_name'] = prom_name
             self._input_names.append(var)
+            #
+            # print(self.boundary_inputs)
+            # print(self._subprob.model._var_allprocs_prom2abs_list['input'])
+            # print(self._subprob.model._var_allprocs_abs2prom['input'])
+            # exit(0)
 
             prom2abs_mapping = {meta['prom_name']: name for name, meta in self.boundary_inputs}
             self.input_name_map[var] = {'prom_name': prom_name, 'abs_name': prom2abs_mapping[prom_name]}
@@ -360,10 +367,10 @@ class SubmodelComp(ExplicitComponent):
         p.final_setup()
         
         for var in self._input_names:
-            try:
-                self.input_name_map[var].update({'source': p.driver._designvars[self.input_name_map[var]['abs_name']]['source']})
-            except:
-                self.input_name_map[var].update({'source': p.driver._designvars[self.input_name_map[var]['prom_name']]['source']})
+            # try:
+            #     self.input_name_map[var].update({'source': p.driver._designvars[self.input_name_map[var]['abs_name']]['source']})
+            # except:
+            #     self.input_name_map[var].update({'source': p.driver._designvars[self.input_name_map[var]['prom_name']]['source']})
             
             self.input_name_map[var].update({'outer_var_name': self._var_allprocs_prom2abs_list['input'][var][0]})
         
@@ -429,23 +436,43 @@ class SubmodelComp(ExplicitComponent):
         for inp in self._input_names:
             p.set_val(self.options['inputs'][inp]['prom_name'], inputs[inp])
         
-        if self.coloring is not None:
-            of = self.coloring._row_vars
-            wrt = self.coloring._col_vars
-        else:
-            of = [meta['abs_name'] for _, meta in self.output_name_map.items()]
-            wrt = [meta['source'] for _, meta in self.input_name_map.items()]
+        # if self.coloring is not None:
+        #     of = self.coloring._row_vars
+        #     wrt = self.coloring._col_vars
+        # else:
+        #     of = [meta['abs_name'] for _, meta in self.output_name_map.items()]
+        #     wrt = [meta['source'] for _, meta in self.input_name_map.items()]
 
-        tots = p.driver._compute_totals(of=of,
-                                        wrt=wrt,
-                                        use_abs_names=False,
-                                        driver_scaling=False)
+
+
+        # d_control_d_ti = p.driver._compute_totals(wrt='t_initial', of=['timeseries.controls:theta'],
+        #                                           use_abs_names=False, driver_scaling=False)
+
+
+        # works with no coloring
+        # tots = p.driver._compute_totals(wrt=[input_name for input_name, _ in self.model_input_names],
+        #                                 of=[output_name for output_name, _ in self.model_output_names],
+        #                                 use_abs_names=False, driver_scaling=False)
+
+        tots = p.compute_totals(wrt=[input_name for input_name, _ in self.model_input_names],
+                                of=[output_name for output_name, _ in self.model_output_names],
+                                use_abs_names=False, driver_scaling=False)
+
+        output_iface_name = {model_name: interface_name for model_name, interface_name in self.model_output_names}
+        input_iface_name = {model_name: interface_name for model_name, interface_name in self.model_input_names}
 
         if self.coloring is None:
-            for key, tot in tots.items():
-                p_of = next(item[0] for item in self.output_name_map.items() if item[1]['abs_name'] == key[0])
-                p_wrt = next(item[0] for item in self.input_name_map.items() if item[1]['source'] == key[1] or item[1]['abs_name'] == key[1])
-                partials[p_of, p_wrt] = tot
+            for k in tots.keys():
+                print(k)
+            print()
+            # exit(0)
+            for (model_output_name, model_input_name), tot in tots.items():
+                # print(key)
+                # p_of = next(item[0] for item in self.output_name_map.items() if item[1]['abs_name'] == key[0])
+                # p_wrt = next(item[0] for item in self.input_name_map.items() if item[1]['source'] == key[1] or item[1]['abs_name'] == key[1])
+                # print(p_of, p_wrt)
+                partials[output_iface_name[model_output_name], input_iface_name[model_input_name]] = tot
+            print('DONE')
         else:
             for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():             
                 p_of = next(item[0] for item in self.output_name_map.items()
