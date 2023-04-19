@@ -14,7 +14,7 @@ p.driver = om.pyOptSparseDriver()
 p.driver.options['optimizer'] = 'SNOPT'
 p.driver.opt_settings['iSumm'] = 6
 p.driver.opt_settings['Verify level'] = 3
-p.driver.declare_coloring()
+# p.driver.declare_coloring()
 
 #
 # Create a trajectory and add a phase to it
@@ -26,7 +26,7 @@ p.driver.declare_coloring()
 #                                 transcription=dm.GaussLobatto(num_segments=10)))
 
 phase = dm.Phase(ode_class=BrachistochroneODE,
-                 transcription=dm.GaussLobatto(num_segments=10, solve_segments='forward'))
+                 transcription=dm.GaussLobatto(num_segments=200, solve_segments='forward'))
 
 #
 # Set the variables
@@ -39,7 +39,7 @@ phase.add_state('y', input_initial=True)
 
 phase.add_state('v', input_initial=True)
 
-phase.add_control('theta', continuity=True, rate_continuity=False,
+phase.add_polynomial_control('theta', order=1, #continuity=True, rate_continuity=False,
                   units='deg', lower=0.01, upper=179.9)
 
 phase.add_parameter('g', units='m/s**2', val=9.80665)
@@ -49,7 +49,9 @@ phase.add_parameter('g', units='m/s**2', val=9.80665)
 #
 phase.add_objective('time', loc='final', scaler=10)
 
+
 submodel_phase = om.SubmodelComp(model=phase)
+
 
 submodel_phase.add_input('t_initial')
 submodel_phase.add_input('t_duration')
@@ -59,12 +61,12 @@ submodel_phase.add_input('initial_states:v')
 # submodel_phase.add_input('states:x')
 # submodel_phase.add_input('states:y')
 # submodel_phase.add_input('states:v')
-submodel_phase.add_input('controls:theta')
+submodel_phase.add_input('polynomial_controls:theta')
 submodel_phase.add_input('parameters:g')
 
 submodel_phase.add_output('timeseries.time', name='timeseries:time')
 submodel_phase.add_output('timeseries.time_phase', name='timeseries:time_phase')
-submodel_phase.add_output('timeseries.controls:theta', name='timeseries:controls:theta')
+submodel_phase.add_output('timeseries.polynomial_controls:theta', name='timeseries:polynomial_controls:theta')
 # submodel_phase.add_output('timeseries.control_rates:theta_rate', name='timeseries:control_rates:theta_rate')
 # submodel_phase.add_output('timeseries.control_rates:theta_rate2', name='timeseries:control_rates:theta_rate2')
 submodel_phase.add_output('parameter_vals:g', name='parameter_vals:g')
@@ -89,7 +91,7 @@ p.model.add_design_var('phase0.t_duration')
 # p.model.add_design_var('phase0.states:x', indices=om.slicer[1:-1])
 # p.model.add_design_var('phase0.states:y', indices=om.slicer[1:-1])
 # p.model.add_design_var('phase0.states:v', indices=om.slicer[1:])
-p.model.add_design_var('phase0.controls:theta')
+p.model.add_design_var('phase0.polynomial_controls:theta')
 
 # NOTE boundary and path constraints should already be taken care of
 # p.model.add_constraint('phase0.collocation_constraint:defects:x', equals=0.0)
@@ -101,6 +103,7 @@ p.model.add_constraint('phase0.timeseries:states:x', indices=-1, equals=0.0)
 p.model.add_constraint('phase0.timeseries:states:y', indices=-1, equals=10.0)
 
 p.model.linear_solver = om.DirectSolver()
+
 
 #
 # Setup the Problem
@@ -116,7 +119,7 @@ p['phase0.t_duration'] = 2.0
 p.set_val('phase0.initial_states:x', 0.0)#, phase.interp('x', ys=[0, 10]))
 p.set_val('phase0.initial_states:y', 10.0)#, phase.interp('y', ys=[10, 5]))
 p.set_val('phase0.initial_states:v', 0.0)#, phase.interp('v', ys=[0, 9.9]))
-p.set_val('phase0.controls:theta', phase.interp('theta', ys=[5, 100.5]))
+p.set_val('phase0.polynomial_controls:theta', phase.interp('theta', ys=[5, 100.5]))
 
 #
 # Solve for the optimal trajectory

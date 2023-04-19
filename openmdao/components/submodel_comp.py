@@ -357,9 +357,10 @@ class SubmodelComp(ExplicitComponent):
             # self.add_constraint(interior_name)
             p.model.add_constraint(outputs[out]['prom_name'])
 
-        p.driver.declare_coloring()
+        # p.driver.declare_coloring()
 
         # setup again to compute coloring
+        p.set_solver_print(-1)
         if self._problem_meta is None:
             p.setup(force_alloc_complex=False)
         else:
