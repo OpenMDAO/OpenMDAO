@@ -178,7 +178,7 @@ def _get_used_before_calc_subs(group, input_srcs):
             hierarchy_check = True if oparts[glen + 1] == iparts[glen + 1] else False
 
             if (src_sys in parallel_solver and tgt_sys in parallel_solver and
-                    (parallel_solver[src_sys] not in ["NL: NLBJ", "NL: Newton", "BROYDEN"]) and
+                    (parallel_solver[src_sys] not in ["NL: NLBJ", "NL: Newton", "NL: BROYDEN"]) and
                     src_sys == tgt_sys and
                     not hierarchy_check):
                 msg = f"Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver " \
