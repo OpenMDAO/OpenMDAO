@@ -10,7 +10,6 @@ import functools
 from types import FunctionType, MethodType, BuiltinMethodType
 
 from openmdao.core.analysis_error import AnalysisError
-from openmdao.utils.om_warnings import warn_deprecation
 from openmdao.utils.notebook_utils import notebook
 from openmdao.utils.general_utils import env_truthy
 

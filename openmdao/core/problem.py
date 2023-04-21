@@ -512,7 +512,7 @@ class Problem(object):
         """
         self.set_val(name, value)
 
-    def set_val(self, name, val=None, units=None, indices=None, value=None):
+    def set_val(self, name, val=None, units=None, indices=None):
         """
         Set an output/input variable.
 
@@ -528,16 +528,7 @@ class Problem(object):
             Units that value is defined in.
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to set to specified value.
-        value : object
-            Deprecated `value` arg.  Use `val` instead.
         """
-        if value is not None:
-            val = value
-            if not self._warned:
-                self._warned = True
-                warn_deprecation(f"{self.msginfo} 'value' will be deprecated in 4.0. Please use "
-                                 "'val' in the future.")
-
         if self._metadata is None:
             raise RuntimeError(f"{self.msginfo}: '{name}' Cannot call set_val before setup.")
 
