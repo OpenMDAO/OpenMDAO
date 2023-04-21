@@ -328,7 +328,7 @@ class Driver(object):
                 raise RuntimeError(msg)
 
         # Now determine if later we'll need to allgather cons, objs, or desvars.
-        if model.comm.size > 1 and model._subsystems_allprocs:
+        if model.comm.size > 1:
             loc_vars = set(model._outputs._abs_iter())
             # some of these lists could have duplicate src names if aliases are used. We'll
             # fix that when we convert to sets after the allgather.
