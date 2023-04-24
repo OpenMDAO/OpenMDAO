@@ -1568,8 +1568,9 @@ class Group(System):
             dup_info = [(n, srcs) for n, srcs in dup_info.items() if len(srcs) > 1]
             if dup_info:
                 dup = ["%s from %s" % (tgt, sorted(srcs)) for tgt, srcs in dup_info]
+                dupstr = ', '.join(dup)
                 self._collect_error(f"{self.msginfo}: The following inputs have multiple "
-                                    f"connections: {', '.join(dup)}.")
+                                    f"connections: {dupstr}.", ident=dupstr)
 
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             # If running in parallel, allgather
