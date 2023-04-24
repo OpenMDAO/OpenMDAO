@@ -10,6 +10,7 @@ import numpy as np
 
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import INT_DTYPE, _SetupStatus
+from openmdao.vectors.vector import _full_slice, _flat_full_indexer
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.hooks import _setup_hooks
@@ -19,10 +20,10 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import sizes2offsets
-from openmdao.vectors.vector import _full_slice, _flat_full_indexer
 from openmdao.utils.indexer import indexer, slicer
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, DriverWarning
 import openmdao.utils.coloring as c_mod
+from openmdao.utils.graph_utils import get_sccs_topo
 
 
 class Driver(object):
@@ -194,6 +195,10 @@ class Driver(object):
             'deriv_calls': 0,
             'exit_status': 'NOT_RUN'
         }
+
+        self._pre_opt_subsystems = None
+        self._opt_subsystems = None
+        self._post_opt_subsystems = None
 
         # Want to allow the setting of hooks on Drivers
         _setup_hooks(self)
@@ -407,6 +412,9 @@ class Driver(object):
         self._remote_responses = self._remote_cons.copy()
         self._remote_responses.update(self._remote_objs)
 
+        if self.supports['optimization']:
+            self._setup_opt_system_iters(problem)
+
         # set up simultaneous deriv coloring
         if coloring_mod._use_total_sparsity:
             # reset the coloring
@@ -420,6 +428,96 @@ class Driver(object):
                 else:
                     coloring._check_config_total(self)
                 self._setup_simul_coloring()
+
+    def _setup_opt_system_iters(self, problem):
+        """
+        Set up the iterables for the pre, opt, and post subsets of systems.
+        """
+        graph = problem.model.compute_sys_graph()
+
+        dvs = problem.model.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
+        dvs = [meta['source'] for meta in dvs.values()]
+        dvsystems = set([name.partition('.')[0] for name in dvs])
+
+        responses = problem.model.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
+        responses = [meta['source'] for meta in responses.values()]
+        responsesystems = set([name.partition('.')[0] for name in responses])
+
+        if not dvs or not responses:
+            return
+
+        # the opt system iterables are used to iterate over the systems that depend on the
+        # design variables that the response variables also depend on.  One way to do this is
+        # by adding edges between the response variable systems and the design variable systems
+        # and then finding the strongly connected components of the graph.  get_sccs_topo returns
+        # the strongly connected components in topological order, so we can use it to give us pre,
+        # opt, and post subsets of the systems.
+
+        # add edges between response systems and design variable systems
+        for respsys in responsesystems:
+            for dvsys in dvsystems:
+                graph.add_edge(respsys, dvsys)
+
+        sccs = get_sccs_topo(graph)
+        pre = addto = set()
+        post = set()
+        opt = None
+        for strong_con in sccs:
+            if dvsystems.intersection(strong_con):
+                opt = strong_con  # strong_con is already a set
+                addto = post
+            else:
+                addto.update(strong_con)
+
+        # check that our groupings of systems are not out-of-order with the existing system ordering
+        order = {sname: i for i, sname in enumerate(problem.model._subsystems_allprocs)}
+        pre_order = [order[s] for s in pre]
+        opt_order = [order[s] for s in opt]
+        post_order = [order[s] for s in post]
+        if pre_order and opt_order and max(pre_order) > min(opt_order):
+            issue_warning(f"The pre-optimization systems {sorted(pre)} are out of order with "
+                          f"respect to the optimization systems {sorted(opt)}.  To avoid changing "
+                          "the pre-existing ordering, all systems will be included in the "
+                          "optimization loop.")
+            self._pre_opt_subsystems = self._post_opt_subsystems = []
+            self._opt_subsystems = self._subsystems_myproc
+            return
+
+        if post_order and opt_order and min(post_order) < max(opt_order):
+            issue_warning(f"The post-optimization systems {sorted(post)} are out of order "
+                          f"with respect to the optimization systems {sorted(opt)}. To avoid "
+                          "changing the pre-existing ordering, all systems will be included in the "
+                          "optimization loop.")
+            self._pre_opt_subsystems = self._post_opt_subsystems = []
+            self._opt_subsystems = self._subsystems_myproc
+            return
+
+        self._pre_opt_subsystems = [s for s in self._subsystems_myproc if s.name in pre]
+        self._opt_subsystems = [s for s in self._subsystems_myproc if s.name in opt]
+        self._post_opt_subsystems = [s for s in self._subsystems_myproc if s.name in post]
+
+    def _optimization_iter(self, pre=False, opt=False, post=False):
+        """
+        Return an iterator over the pre, opt, and post subsystems.
+
+        Parameters
+        ----------
+        pre : bool
+            If True, include the pre-optimization subsystems.
+        opt : bool
+            If True, include the optimization subsystems.
+        post : bool
+            If True, include the post-optimization subsystems.
+        """
+        if pre:
+            for s in self._pre_opt_subsystems:
+                yield s
+        if opt:
+            for s in self._opt_subsystems:
+                yield s
+        if post:
+            for s in self._post_opt_subsystems:
+                yield s
 
     def _check_for_missing_objective(self):
         """
