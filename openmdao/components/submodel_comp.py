@@ -188,13 +188,13 @@ class SubmodelComp(ExplicitComponent):
         self.prob_args.update(prob_options)
 
         self.model = model
-        self.model_input_names = inputs if inputs is not None else []
-        self.model_output_names = outputs if outputs is not None else []
+        self.submodel_inputs = inputs if inputs is not None else []
+        self.submodel_outputs = outputs if outputs is not None else []
         self.is_set_up = False
 
         # map used for interface name, prom name, and abs path name
-        self.input_name_map = {}
-        self.output_name_map = {}
+        # self.input_name_map = {}
+        # self.output_name_map = {}
 
     # TODO make path as name the default behavior
     def add_input(self, path, name=None):
@@ -213,23 +213,25 @@ class SubmodelComp(ExplicitComponent):
             name = path.split('.')[-1]
 
         if not self.is_set_up:
-            self.model_input_names.append((path, name))
+            self.submodel_inputs.append((path, name))
             return
 
         if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
             raise Exception('Cannot call add_input after configure.')
 
-        self.options['inputs'].update(_get_model_vars([(path, name)], self.boundary_inputs))
+        # self.options['inputs'].update(_get_model_vars([(path, name)], self.boundary_inputs))
 
-        meta = self.options['inputs'][name]
+        model_inputs = _get_model_vars([(path, name)], self.boundary_inputs)
+
+        meta = model_inputs[name]
 
         prom_name = meta.pop('prom_name')
         super().add_input(name, **meta)
-        meta['prom_name'] = prom_name
-        self._input_names.append(name)
+        # meta['prom_name'] = prom_name
+        # self._input_names.append(name)
         
-        prom2abs_mapping = {meta['prom_name']: inp for inp, meta in self.boundary_inputs}
-        self.input_name_map[name] = {'prom_name': prom_name, 'abs_name': prom2abs_mapping[prom_name]}
+        # prom2abs_mapping = {meta['prom_name']: inp for inp, meta in self.boundary_inputs}
+        # self.input_name_map[name] = {'prom_name': prom_name, 'abs_name': prom2abs_mapping[prom_name]}
 
     def add_output(self, path, name=None):
         """
@@ -247,23 +249,25 @@ class SubmodelComp(ExplicitComponent):
             name = path.split('.')[-1]
 
         if not self.is_set_up:
-            self.model_output_names.append((path, name))
+            self.submodel_outputs.append((path, name))
             return
 
         if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
             raise Exception('Cannot call add_output after configure.')
 
-        self.options['outputs'].update(_get_model_vars([(path, name)], self.all_outputs))
+        # self.options['outputs'].update(_get_model_vars([(path, name)], self.all_outputs))
 
-        meta = self.options['outputs'][name]
+        model_outputs = _get_model_vars([(path, name)], self.all_outputs)
+
+        meta = model_outputs[name]
 
         prom_name = meta.pop('prom_name')
         super().add_output(name, **meta)
-        meta['prom_name'] = prom_name
-        self._output_names.append(name)
+        # meta['prom_name'] = prom_name
+        # self._output_names.append(name)
         
-        prom2abs_mapping = {meta['prom_name']: out for out, meta in self.all_outputs}
-        self.output_name_map[name] = {'prom_name': prom_name, 'abs_name': prom2abs_mapping[prom_name]}
+        # prom2abs_mapping = {meta['prom_name']: out for out, meta in self.all_outputs}
+        # self.output_name_map[name] = {'prom_name': prom_name, 'abs_name': prom2abs_mapping[prom_name]}
 
     def setup(self):
         """
@@ -301,61 +305,74 @@ class SubmodelComp(ExplicitComponent):
                                                 units=True, shape=True, desc=True,
                                                 is_indep_var=False)
 
-        self.options['inputs'].update(_get_model_vars(self.model_input_names, self.boundary_inputs))
-        self.options['outputs'].update(_get_model_vars(self.model_output_names, self.all_outputs))
+        # self.options['inputs'].update(_get_model_vars(self.submodel_inputs, self.boundary_inputs))
+        # self.options['outputs'].update(_get_model_vars(self.submodel_outputs, self.all_outputs))
 
-        inputs = self.options['inputs']
-        outputs = self.options['outputs']
+        # inputs = self.options['inputs']
+        # outputs = self.options['outputs']
 
-        self._input_names = []
-        self._output_names = []
+        # self._input_names = []
+        # self._output_names = []
 
         # NOTE interface name -> what SubmodelComp refers to the var as
         # NOTE interior name -> what the user refers to the var as
-        # TODO maybe don't need this here ^^^
-        # TODO move prom2abs_map to outside of loop
-        for var, meta in inputs.items():
+        for var in self.submodel_inputs:
             # interface_name = var.replace('.', ':')
-            prom_name = meta.pop('prom_name')
-            super().add_input(var, **meta)
+            if isinstance(var, tuple):
+                i_name = var[1]
+                prom_name = var[0]
+            else:
+                i_name = prom_name = var
+            meta = next(data for _, data in self.boundary_inputs if data['prom_name'] == prom_name)
+            meta.pop('prom_name')
+            super().add_input(i_name, **meta)
             meta['prom_name'] = prom_name
-            self._input_names.append(var)
+            # self._input_names.append(var)
             #
             # print(self.boundary_inputs)
             # print(self._subprob.model._var_allprocs_prom2abs_list['input'])
             # print(self._subprob.model._var_allprocs_abs2prom['input'])
             # exit(0)
 
-            prom2abs_mapping = {meta['prom_name']: name for name, meta in self.boundary_inputs}
-            self.input_name_map[var] = {'prom_name': prom_name, 'abs_name': prom2abs_mapping[prom_name]}
+            # prom2abs_mapping = {meta['prom_name']: name for name, meta in self.boundary_inputs}
+            # self.input_name_map[var] = {'prom_name': prom_name, 'abs_name': prom2abs_mapping[prom_name]}
 
-        for var, meta in outputs.items():
-            prom_name = meta.pop('prom_name')
-            super().add_output(var, **meta)
+        for var in self.submodel_outputs:
+            # meta = self.all_outputs[var]
+            if isinstance(var, tuple):
+                i_name = var[1]
+                prom_name = var[0]
+            else:
+                i_name = prom_name = var
+            meta = next(data for _, data in self.all_outputs if data['prom_name'] == prom_name)
+            meta.pop('prom_name')
+            super().add_output(i_name, **meta)
             meta['prom_name'] = prom_name
-            self._output_names.append(var)
+            # self._output_names.append(var)
 
-            prom2abs_mapping = {meta['prom_name']: name for name, meta in self.all_outputs}
-            self.output_name_map[var] = {'prom_name': prom_name, 'abs_name': prom2abs_mapping[prom_name]}
+            # prom2abs_mapping = {meta['prom_name']: name for name, meta in self.all_outputs}
+            # self.output_name_map[var] = {'prom_name': prom_name, 'abs_name': prom2abs_mapping[prom_name]}
 
     def _setup_var_data(self):
         super()._setup_var_data()
 
         p = self._subprob
-        inputs = self.options['inputs']
-        outputs = self.options['outputs']
+        # inputs = self.options['inputs']
+        # outputs = self.options['outputs']
+        inputs = self._var_rel_names['input']
+        outputs = self._var_rel_names['output']
 
         # can't have coloring if there are no io declared
         if len(inputs) == 0 or len(outputs) == 0:
             return
 
-        for inp in self._input_names:
+        for prom_name, _ in self.submodel_inputs:
             # self.add_design_var(interior_name)
-            p.model.add_design_var(inputs[inp]['prom_name'])
+            p.model.add_design_var(prom_name)
 
-        for out in self._output_names:
+        for prom_name, _ in self.submodel_outputs:
             # self.add_constraint(interior_name)
-            p.model.add_constraint(outputs[out]['prom_name'])
+            p.model.add_constraint(prom_name)
 
         # p.driver.declare_coloring()
 
@@ -366,17 +383,17 @@ class SubmodelComp(ExplicitComponent):
         else:
             p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'])
         p.final_setup()
-        
-        for var in self._input_names:
+
+        # for var in self._input_names:
             # try:
             #     self.input_name_map[var].update({'source': p.driver._designvars[self.input_name_map[var]['abs_name']]['source']})
             # except:
             #     self.input_name_map[var].update({'source': p.driver._designvars[self.input_name_map[var]['prom_name']]['source']})
             
-            self.input_name_map[var].update({'outer_var_name': self._var_allprocs_prom2abs_list['input'][var][0]})
+            # self.input_name_map[var].update({'outer_var_name': self._var_allprocs_prom2abs_list['input'][var][0]})
         
-        for var in self._output_names:
-            self.output_name_map[var].update({'outer_var_name': self._var_allprocs_prom2abs_list['output'][var][0]})
+        # for var in self._output_names:
+        #     self.output_name_map[var].update({'outer_var_name': self._var_allprocs_prom2abs_list['output'][var][0]})
 
         # get coloring and change row and column names to be prom names for use later
         # TODO replace meta['prom_name'] with interface name
@@ -388,8 +405,10 @@ class SubmodelComp(ExplicitComponent):
             self.declare_partials(of='*', wrt='*')
         else:
             for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():
-                of = next(item[0] for item in self.output_name_map.items() if item[1]['abs_name'] == of)
-                wrt = next(item[0] for item in self.input_name_map.items() if item[1]['abs_name'] == wrt or item[1]['prom_name'] == wrt)
+                # TODO ADD OF AND WRT FROM _DESIGNVARS AND _RESPONSES HERE
+                
+                # of = next(item[0] for item in self.output_name_map.items() if item[1]['abs_name'] == of)
+                # wrt = next(item[0] for item in self.input_name_map.items() if item[1]['abs_name'] == wrt or item[1]['prom_name'] == wrt)
                 # print(of, wrt, max(nzrows), max(nzcols))
                 self.declare_partials(of=of, wrt=wrt, rows=nzrows, cols=nzcols)
 
@@ -409,14 +428,16 @@ class SubmodelComp(ExplicitComponent):
             Unscaled, dimensional output variables read via outputs[key].
         """
         p = self._subprob
+        # inputs = self._var_rel_names['input']
+        # outputs = self._var_rel_names['output']
 
-        for inp in self._input_names:
-            p.set_val(self.options['inputs'][inp]['prom_name'], inputs[inp])
+        for prom_name, iface_name in self.submodel_inputs:
+            p.set_val(prom_name, inputs[iface_name])
 
         p.driver.run()
 
-        for op in self._output_names:
-            outputs[op] = p.get_val(self.options['outputs'][op]['prom_name'])
+        for prom_name, iface_name in self.submodel_outputs:
+            outputs[iface_name] = p.get_val(prom_name)
 
     def compute_partials(self, inputs, partials):
         """
@@ -434,8 +455,11 @@ class SubmodelComp(ExplicitComponent):
             Sub-jac components written to partials[output_name, input_name].
         """
         p = self._subprob
-        for inp in self._input_names:
-            p.set_val(self.options['inputs'][inp]['prom_name'], inputs[inp])
+        inputs = self._var_rel_names['input']
+        outputs = self._var_rel_names['output']
+
+        for inp in inputs:
+            p.set_val(inp, self._var_rel2meta[inp]['val'])
         
         # if self.coloring is not None:
         #     of = self.coloring._row_vars
@@ -451,16 +475,16 @@ class SubmodelComp(ExplicitComponent):
 
 
         # works with no coloring
-        # tots = p.driver._compute_totals(wrt=[input_name for input_name, _ in self.model_input_names],
-        #                                 of=[output_name for output_name, _ in self.model_output_names],
+        # tots = p.driver._compute_totals(wrt=[input_name for input_name, _ in self.submodel_inputs],
+        #                                 of=[output_name for output_name, _ in self.submodel_outputs],
         #                                 use_abs_names=False, driver_scaling=False)
 
-        tots = p.compute_totals(wrt=[input_name for input_name, _ in self.model_input_names],
-                                of=[output_name for output_name, _ in self.model_output_names],
+        tots = p.compute_totals(wrt=[input_name for input_name, _ in self.submodel_inputs],
+                                of=[output_name for output_name, _ in self.submodel_outputs],
                                 use_abs_names=False, driver_scaling=False)
 
-        output_iface_name = {model_name: interface_name for model_name, interface_name in self.model_output_names}
-        input_iface_name = {model_name: interface_name for model_name, interface_name in self.model_input_names}
+        output_iface_name = {model_name: interface_name for model_name, interface_name in self.submodel_outputs}
+        input_iface_name = {model_name: interface_name for model_name, interface_name in self.submodel_inputs}
 
         if self.coloring is None:
             # for k in tots.keys():
@@ -476,9 +500,10 @@ class SubmodelComp(ExplicitComponent):
             # print('DONE')
         else:
             for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():             
-                p_of = next(item[0] for item in self.output_name_map.items()
-                            if item[1]['abs_name'] == of)
-                p_wrt = next(item[0] for item in self.input_name_map.items()
-                             if item[1]['abs_name'] == wrt or item[1]['prom_name'] == wrt)
+                # TODO WANT TO USE _DESIGNVARS AND _RESPONSES HERE
+                # p_of = next(item[0] for item in self.output_name_map.items()
+                #             if item[1]['abs_name'] == of)
+                # p_wrt = next(item[0] for item in self.input_name_map.items()
+                #              if item[1]['abs_name'] == wrt or item[1]['prom_name'] == wrt)
                 
-                partials[p_of, p_wrt] = tots[of, wrt][nzrows, nzcols].ravel()
+                partials[of, wrt] = tots[of, wrt][nzrows, nzcols].ravel()
