@@ -1415,11 +1415,7 @@ class Group(System):
         abs_in2out = {}
         new_conns = {}
 
-        if pathname:
-            path_len = len(pathname) + 1
-            nparts = len(pathname.split('.'))
-        else:
-            path_len = nparts = 0
+        nparts = len(pathname.split('.')) if pathname else 0
 
         if conns is not None:
             for abs_in, abs_out in conns.items():
@@ -1438,13 +1434,10 @@ class Group(System):
 
         # Add implicit connections (only ones owned by this group)
         for prom_name in allprocs_prom2abs_list_out:
-            if prom_name in allprocs_prom2abs_list_in:
+            if prom_name in allprocs_prom2abs_list_in:  # names match ==> a connection
                 abs_out = allprocs_prom2abs_list_out[prom_name][0]
-                out_subsys = abs_out.rpartition('.')[0]
                 for abs_in in allprocs_prom2abs_list_in[prom_name]:
-                    in_subsys = abs_in.rpartition('.')[0]
-                    if out_subsys != in_subsys:
-                        abs_in2out[abs_in] = abs_out
+                    abs_in2out[abs_in] = abs_out
 
         src_ind_inputs = set()
         abs2meta = self._var_abs2meta['input']
