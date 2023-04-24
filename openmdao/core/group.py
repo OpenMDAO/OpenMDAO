@@ -1440,9 +1440,9 @@ class Group(System):
         for prom_name in allprocs_prom2abs_list_out:
             if prom_name in allprocs_prom2abs_list_in:
                 abs_out = allprocs_prom2abs_list_out[prom_name][0]
-                out_subsys = abs_out[path_len:].split('.', 1)[0]
+                out_subsys = abs_out.rpartition('.')[0]
                 for abs_in in allprocs_prom2abs_list_in[prom_name]:
-                    in_subsys = abs_in[path_len:].split('.', 1)[0]
+                    in_subsys = abs_in.rpartition('.')[0]
                     if out_subsys != in_subsys:
                         abs_in2out[abs_in] = abs_out
 
