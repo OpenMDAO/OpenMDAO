@@ -174,7 +174,7 @@ class SubmodelComp(ExplicitComponent):
         self.boundary_inputs = p.list_indep_vars(out_stream=None, options=['name'])
         for name, meta in self.boundary_inputs:
             meta['prom_name'] = name
-        
+
         # want all outputs from the `SubmodelComp`, including ivcs/design vars
         self.all_outputs = p.model.list_outputs(out_stream=None, prom_name=True,
                                                 units=True, shape=True, desc=True,
@@ -293,7 +293,9 @@ class SubmodelComp(ExplicitComponent):
         for prom_name, iface_name in self.submodel_inputs:
             p.set_val(prom_name, inputs[iface_name])
 
-        p.driver.run()
+        # p.driver.run()
+        # p.run_model()
+        p.run_driver()
 
         for prom_name, iface_name in self.submodel_outputs:
             outputs[iface_name] = p.get_val(prom_name)
@@ -318,9 +320,20 @@ class SubmodelComp(ExplicitComponent):
         for prom_name, iface_name in self.submodel_inputs:
             p.set_val(prom_name, inputs[iface_name])
 
-        tots = p.compute_totals(wrt=[input_name for input_name, _ in self.submodel_inputs],
-                                of=[output_name for output_name, _ in self.submodel_outputs],
-                                use_abs_names=False, driver_scaling=False)
+        # tots = p.compute_totals(wrt=[input_name for input_name, _ in self.submodel_inputs],
+        #                         of=[output_name for output_name, _ in self.submodel_outputs],
+        #                         use_abs_names=False, driver_scaling=False)
+        
+        wrt = [input_name for input_name, _ in self.submodel_inputs]
+        of = [output_name for output_name, _ in self.submodel_outputs]
+        # wrt = list(self._var_allprocs_abs2prom['input'].keys())
+        # of = list(self._var_allprocs_abs2prom['output'].keys())
+        
+        tots = p.driver._compute_totals(wrt=wrt,
+                                        of=of,
+                                        use_abs_names=False, driver_scaling=False)
+
+        # tots = p.compute_totals(use_abs_names=False, driver_scaling=False)
 
         if self.coloring is None:
             for (tot_output, tot_input), tot in tots.items():
