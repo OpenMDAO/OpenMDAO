@@ -168,8 +168,42 @@ class SubmodelComp(ExplicitComponent):
 
         self.model = model
         self._subprob = problem
-        self.submodel_inputs = inputs if inputs is not None else []
-        self.submodel_outputs = outputs if outputs is not None else []
+        
+        # need to make submodel_inputs/outputs be lists of tuples
+        # so, if a str is provided, that becomes the iface_name and
+        # the prom_name
+        self.submodel_inputs = []
+        self.submodel_outputs = []
+        
+        if inputs is not None:
+            for inp in inputs:
+                if isinstance(inp, str):
+                    if '*' in inp:
+                        # TODO account for other wildcard chars like '?'
+                        # NOTE special case... will take care of when we get boundary inputs
+                        self.submodel_inputs.append(inp)
+                    else:
+                        self.submodel_inputs.append((inp, inp))
+                elif isinstance(inp, tuple):
+                    # TODO add check for if tuple len > 2 or < 2
+                    self.submodel_inputs.append(inp)
+                else:
+                    raise Exception(f'Expected input of type str or tuple, got {type(inp)}.')
+        
+        if outputs is not None:
+            for out in outputs:
+                if isinstance(out, str):
+                    if '*' in out:
+                        # NOTE special case... will take care of when we get all outputs
+                        self.submodel_outputs.append(out)
+                    else:
+                        self.submodel_outputs.append((out, out))
+                elif isinstance(out, tuple):
+                    # TODO add check for if tuple len > 2 or < 2
+                    self.submodel_outputs.append(out)
+                else:
+                    raise Exception(f'Expected output of type str or tuple, got {type(out)}.')
+
         self.is_set_up = False
 
     # TODO make path as name the default behavior
@@ -188,8 +222,9 @@ class SubmodelComp(ExplicitComponent):
         if name is None:
             name = path.split('.')[-1]
 
+        self.submodel_inputs.append((path, name))
+
         if not self.is_set_up:
-            self.submodel_inputs.append((path, name))
             return
 
         if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
@@ -215,8 +250,9 @@ class SubmodelComp(ExplicitComponent):
         if name == None:
             name = path.split('.')[-1]
 
+        self.submodel_outputs.append((path, name))
+
         if not self.is_set_up:
-            self.submodel_outputs.append((path, name))
             return
 
         if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
@@ -255,26 +291,48 @@ class SubmodelComp(ExplicitComponent):
                                                 units=True, shape=True, desc=True,
                                                 is_indep_var=False)
 
+        boundary_input_prom_names = [meta['prom_name'] for _, meta in self.boundary_inputs]
+        all_outputs_prom_names = [meta['prom_name'] for _, meta in self.all_outputs]
+
+        wildcard_inputs = [var for var in self.submodel_inputs if isinstance(var, str) and '*' in var]
+        wildcard_outputs = [var for var in self.submodel_outputs if isinstance(var, str) and '*' in var]
+
+        for inp in wildcard_inputs:
+            matches = find_matches(inp, boundary_input_prom_names)
+            if len(matches) == 0:
+                raise Exception(f'Pattern {inp} not found in model')
+            for match in matches:
+                self.submodel_inputs.append((match, match))
+            self.submodel_inputs.remove(inp)
+        
+        for out in wildcard_outputs:
+            matches = find_matches(out, all_outputs_prom_names)
+            if len(matches) == 0:
+                raise Exception(f'Pattern {out} not found in model')
+            for match in matches:
+                self.submodel_outputs.append((match, match))
+            self.submodel_outputs.remove(out)
+
         # NOTE interface name -> what SubmodelComp refers to the var as
         # NOTE interior name -> what the user refers to the var as
         for var in self.submodel_inputs:
-            if isinstance(var, tuple):
-                iface_name = var[1]
-                prom_name = var[0]
-            else:
-                iface_name = prom_name = var
-            meta = next(data for _, data in self.boundary_inputs if data['prom_name'] == prom_name)
+            iface_name = var[1]
+            prom_name = var[0]
+            try:
+                meta = next(data for _, data in self.boundary_inputs if data['prom_name'] == prom_name)
+            except:
+                raise Exception(f'Variable {prom_name} not found in model')
             meta.pop('prom_name')
             super().add_input(iface_name, **meta)
             meta['prom_name'] = prom_name
 
         for var in self.submodel_outputs:
-            if isinstance(var, tuple):
-                iface_name = var[1]
-                prom_name = var[0]
-            else:
-                iface_name = prom_name = var
-            meta = next(data for _, data in self.all_outputs if data['prom_name'] == prom_name)
+            iface_name = var[1]
+            prom_name = var[0]
+            try:
+                meta = next(data for _, data in self.all_outputs if data['prom_name'] == prom_name)
+            except:
+                raise Exception(f'Variable {prom_name} not found in model')
             meta.pop('prom_name')
             super().add_output(iface_name, **meta)
             meta['prom_name'] = prom_name
@@ -294,9 +352,16 @@ class SubmodelComp(ExplicitComponent):
             return
 
         for prom_name, _ in self.submodel_inputs:
+            # changed this for consistency
+            if prom_name in [meta['name'] for _, meta in p.driver._designvars.items()]:
+                continue
             p.model.add_design_var(prom_name)
 
         for prom_name, _ in self.submodel_outputs:
+            # got abs name back for self._cons key for some reasons in `test_multiple_setups`
+            # TODO look into this
+            if prom_name in [meta['name'] for _, meta in p.driver._cons.items()]:
+                continue
             p.model.add_constraint(prom_name)
 
         # p.driver.declare_coloring()
