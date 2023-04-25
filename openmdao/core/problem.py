@@ -1752,7 +1752,7 @@ class Problem(object):
                     # check directional rev against fd (different seeds)
                     dhat = total_info.J[Jcalc_slices['of'][of].start, :]  # first row of 'of' var
                     d = total_info.seeds['fwd']  # used as direction for fd
-                    mhat = fd_tot_info.J[Jcalc_slices['of'][of], 0]
+                    mhat = fd_tot_info.J[Jfd_slices['of'][of], 0]
                     m = total_info.seeds['rev'][Jcalc_slices['of'][of]]
 
                     dhat_dot_d = dhat.dot(d)

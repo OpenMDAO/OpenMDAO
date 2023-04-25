@@ -1975,13 +1975,15 @@ class _TotalJacInfo(object):
         slices = {'of': {}, 'wrt': {}}
         ofstart = ofend = 0
         for i, (of, wrtdict) in enumerate(Jdict.items()):
-            if i == 0:
-                wrtstart = wrtend = 0
-                for wrt, sjac in wrtdict.items():
+            wrtstart = wrtend = 0
+            for wrt, sjac in wrtdict.items():
+                if i == 0:
                     wrtend += sjac.shape[1]
                     wrtsizes[wrt] = sjac.shape[1]
                     slices['wrt'][wrt] = slice(wrtstart, wrtend)
                     wrtstart = wrtend
+                else:
+                    break
 
             ofend += sjac.shape[0]
             ofsizes[of] = sjac.shape[0]

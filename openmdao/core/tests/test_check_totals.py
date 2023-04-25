@@ -1466,6 +1466,286 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_near_equal(np.linalg.norm(data[(('comp.out1', 'comp.out2'), 'comp.in1')]['directional_fd_fwd']), 0., tolerance=2e-15)
         assert_near_equal(np.linalg.norm(data[(('comp.out1', 'comp.out2'), 'comp.in2')]['directional_fd_fwd']), 0., tolerance=2e-15)
 
+    def test_directional_dymosish(self):
+        class CollocationComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare(
+                    'state_options', types=dict,
+                    desc='Dictionary of state names/options for the phase')
+
+            def configure_io(self):
+                num_col_nodes = 4
+                state_options = self.options['state_options']
+
+                self.var_names = var_names = {}
+                for state_name in state_options:
+                    var_names[state_name] = {
+                        'f_approx': f'f_approx:{state_name}',
+                        'defect': f'defects:{state_name}',
+                    }
+
+                for state_name, options in state_options.items():
+                    shape = options['shape']
+                    var_names = self.var_names[state_name]
+
+                    self.add_input(
+                        name=var_names['f_approx'],
+                        shape=(num_col_nodes,) + shape,
+                        desc=f'Estimated derivative of state {state_name} at the collocation nodes')
+
+                    self.add_output(
+                        name=var_names['defect'],
+                        shape=(num_col_nodes,) + shape,
+                        desc=f'Interior defects of state {state_name}')
+
+                    self.add_constraint(name=var_names['defect'],
+                                        equals=0.0)
+
+                # Setup partials
+                num_col_nodes = 4
+                state_options = self.options['state_options']
+
+                for state_name, options in state_options.items():
+                    shape = options['shape']
+                    size = np.prod(shape)
+
+                    r = np.arange(num_col_nodes * size)
+
+                    var_names = self.var_names[state_name]
+
+                    self.declare_partials(of=var_names['defect'],
+                                        wrt=var_names['f_approx'],
+                                        rows=r, cols=r)
+
+            def compute(self, inputs, outputs):
+                state_options = self.options['state_options']
+
+                for state_name in state_options:
+                    var_names = self.var_names[state_name]
+
+                    f_approx = inputs[var_names['f_approx']]
+
+                    outputs[var_names['defect']] = f_approx
+
+            def compute_partials(self, inputs, partials):
+                for state_name, options in self.options['state_options'].items():
+                    size = np.prod(options['shape'])
+                    var_names = self.var_names[state_name]
+
+                    k = np.repeat(1.0, size)
+
+                    partials[var_names['defect'], var_names['f_approx']] = k
+
+        class StateInterpComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare(
+                    'state_options', types=dict,
+                    desc='Dictionary of state names/options for the phase')
+
+            def configure_io(self):
+                num_disc_nodes = 8
+                num_col_nodes = 4
+
+                state_options = self.options['state_options']
+
+                self.xd_str = {}
+                self.xdotc_str = {}
+
+                for state_name, options in state_options.items():
+                    shape = options['shape']
+
+                    self.add_input(
+                        name=f'state_disc:{state_name}',
+                        shape=(num_disc_nodes,) + shape,
+                        desc=f'Values of state {state_name} at discretization nodes')
+
+                    self.add_output(
+                        name=f'staterate_col:{state_name}',
+                        shape=(num_col_nodes,) + shape,
+                        desc=f'Interpolated rate of state {state_name} at collocation nodes')
+
+                    self.xd_str[state_name] = f'state_disc:{state_name}'
+                    self.xdotc_str[state_name] = f'staterate_col:{state_name}'
+
+                Ad = self.Ad = np.zeros((num_col_nodes, num_disc_nodes))
+                Ad[0, 0] = -0.75
+                Ad[0, 1] = -0.75
+                Ad[1, 2] = -0.75
+                Ad[1, 3] = -0.75
+                Ad[2, 4] = -0.75
+                Ad[2, 5] = -0.75
+                Ad[3, 6] = -0.75
+                Ad[3, 7] = -0.75
+
+                for name, options in state_options.items():
+                    self.declare_partials(of=self.xdotc_str[name], wrt=self.xd_str[name],
+                                        val=Ad)
+
+            def compute(self, inputs, outputs):
+                state_options = self.options['state_options']
+                Ad = self.Ad
+
+                for name in state_options:
+                    xdotc_str = self.xdotc_str[name]
+                    xd_str = self.xd_str[name]
+
+                    outputs[xdotc_str] = np.dot(Ad, inputs[xd_str])
+
+        class TimeComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('num_nodes', types=int,
+                                    desc='The total number of points at which times are required in the'
+                                        'phase.')
+
+            def configure_io(self):
+                num_nodes = self.options['num_nodes']
+                self.add_output('t_phase', val=np.ones(num_nodes))
+
+        class PseudospectralBase:
+
+            def setup_time(self, phase):
+
+                time_comp = TimeComp(num_nodes=2)
+
+                phase.add_subsystem('time', time_comp, promotes_inputs=['*'], promotes_outputs=['*'])
+
+            def configure_time(self, phase):
+                phase.time.configure_io()
+
+            def setup_states(self, phase):
+                indep = om.IndepVarComp()
+
+                phase.add_subsystem('indep_states', indep,
+                                    promotes_outputs=['*'])
+
+            def configure_states(self, phase):
+                num_state_input_nodes = 8
+                indep = phase.indep_states
+
+                for name, options in phase.state_options.items():
+                    shape = options['shape']
+                    default_val = np.zeros((num_state_input_nodes, 1))
+                    indep.add_output(name=f'states:{name}',
+                                    shape=(num_state_input_nodes,) + shape,
+                                    val=default_val)
+
+                    phase.add_design_var(name=f'states:{name}',
+                                        indices=np.arange(num_state_input_nodes),
+                                        flat_indices=True)
+
+            def setup_ode(self, phase):
+                phase.add_subsystem('state_interp',
+                                    subsys=StateInterpComp(state_options=phase.state_options))
+
+            def configure_ode(self, phase):
+                map_input_indices_to_disc = np.arange(8)
+
+                phase.state_interp.configure_io()
+
+                for name in phase.state_options:
+                    phase.connect(f'states:{name}',
+                                f'state_interp.state_disc:{name}',
+                                src_indices=om.slicer[map_input_indices_to_disc, ...])
+
+            def setup_defects(self, phase):
+                phase.add_subsystem('collocation_constraint',
+                                    CollocationComp(state_options=phase.state_options))
+
+            def configure_defects(self, phase):
+                phase.collocation_constraint.configure_io()
+
+                for name in phase.state_options:
+                    phase.connect(f'state_interp.staterate_col:{name}',
+                                f'collocation_constraint.f_approx:{name}')
+
+            def configure_objective(self, phase):
+                for name, options in phase._objectives.items():
+                    index = options['index']
+
+                    shape = (1, )
+                    obj_path = 't_phase'
+
+                    size = int(np.prod(shape))
+
+                    idx = 0 if index is None else index
+                    obj_index = -size + idx
+
+                    super(Phase, phase).add_objective(obj_path, index=obj_index, flat_indices=True)
+
+        class Phase(om.Group):
+
+            def __init__(self, **kwargs):
+                _kwargs = kwargs.copy()
+
+                self.state_options = state_options = {}
+                self._objectives = {}
+
+                state_options['y'] = {}
+                state_options['y']['targets'] = []
+                state_options['y']['shape'] = (1, )
+                state_options['y']['rate_source'] = 'ydot'
+                state_options['y']['val'] = 0.0
+
+                state_options['v'] = {}
+                state_options['v']['targets'] = ['v']
+                state_options['v']['shape'] = (1, )
+                state_options['v']['rate_source'] = 'vdot'
+                state_options['v']['val'] = 0.0
+
+                self.time_options = {}
+                self.time_options['initial_val'] = 0.0
+                self.time_options['duration_val'] = 1.0
+                self.time_options['input_initial'] = False
+                self.time_options['input_duration'] = False
+
+                super(Phase, self).__init__(**_kwargs)
+
+            def initialize(self):
+                self.options.declare('transcription')
+
+            def add_objective(self, name, loc='final', index=None, shape=(1, )):
+
+                obj_dict = {'name': name,
+                            'loc': loc,
+                            'index': index,
+                            'shape': shape}
+                self._objectives[name] = obj_dict
+
+            def setup(self):
+                transcription = self.options['transcription']
+                transcription.setup_time(self)
+
+                transcription.setup_states(self)
+                transcription.setup_ode(self)
+
+                transcription.setup_defects(self)
+
+            def configure(self):
+                transcription = self.options['transcription']
+
+                transcription.configure_time(self)
+                transcription.configure_states(self)
+
+                transcription.configure_ode(self)
+
+                transcription.configure_defects(self)
+                transcription.configure_objective(self)
+
+        p = om.Problem()
+
+        phase = p.model.add_subsystem('Z', Phase(transcription=PseudospectralBase()))
+        phase.add_objective('time_phase', loc='final')
+
+        p.setup(force_alloc_complex=True, mode='rev')
+
+        p.run_model()
+
+        data = p.check_totals(method='cs', directional=True)
+        assert_check_totals(data, atol=1e-6, rtol=1e-6)
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestProblemCheckTotalsMPI(unittest.TestCase):
