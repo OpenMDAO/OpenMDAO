@@ -1371,7 +1371,7 @@ class ListFeatureTestCase(unittest.TestCase):
 
     def test_list_return_value(self):
         # list inputs
-        inputs = prob.model.list_inputs(out_stream=None, prom_name=False)
+        inputs = prob.model.list_inputs(out_stream=None, prom_name=False, return_format='list')
         self.assertEqual(sorted(inputs), [
             ('sub.comp1.a', {'val': [1.]}),
             ('sub.comp1.b', {'val': [-4.]}),
@@ -1389,6 +1389,19 @@ class ListFeatureTestCase(unittest.TestCase):
             'sub.comp2.a': {'val': [1.]},
             'sub.comp2.b': {'val': [-4.]},
             'sub.comp2.c': {'val': [3.]}
+        })
+
+        # list outputs
+        outputs = prob.model.list_outputs(out_stream=None, prom_name=False, return_format='list')
+        self.assertEqual(sorted(outputs), [
+            ('sub.comp1.x', {'val': [3.]}),
+            ('sub.comp2.x', {'val': [3.]})
+        ])
+
+        outputs = prob.model.list_outputs(out_stream=None, prom_name=False, return_format='dict')
+        self.assertEqual(outputs, {
+            'sub.comp1.x': {'val': [3.]},
+            'sub.comp2.x': {'val': [3.]}
         })
 
     def test_list_no_values(self):
