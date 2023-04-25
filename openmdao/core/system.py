@@ -2239,7 +2239,7 @@ class System(object):
                     loc_meta[io][abs_name]['global_shape'] = mymeta['global_shape']
                     loc_meta[io][abs_name]['global_size'] = mymeta['global_size']
 
-    def _setup_global_connections(self, conns=None):
+    def _setup_global_connections(self, parent_conns=None):
         """
         Compute dict of all connections between this system's inputs and outputs.
 

@@ -479,9 +479,10 @@ class TestMultiConns(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup()
 
-        self.assertEqual(str(context.exception), """
-Collected errors for problem 'mult_conns':
-   <model> <class Group>: Input 'sub.c2.y' cannot be connected to 'indeps.y' because it's already connected to 'sub.c1.y'.""")
+        self.assertEqual(str(context.exception),
+           "\nCollected errors for problem 'mult_conns':"
+           "\n   <model> <class Group>: The following inputs have multiple connections: "
+                   "sub.c2.y from ['indeps.y', 'sub.c1.y'].")
 
     def test_mixed_conns_same_level(self):
 
