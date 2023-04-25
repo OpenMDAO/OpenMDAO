@@ -162,7 +162,7 @@ def _get_used_before_calc_subs(group, input_srcs):
     """
     parallel_solver = {}
     allsubs = group._subsystems_allprocs
-    for sub, i in allsubs.values():
+    for sub, _ in allsubs.values():
         if hasattr(sub, '_mpi_proc_allocator') and sub._mpi_proc_allocator.parallel:
             parallel_solver[sub.name] = sub.nonlinear_solver.SOLVER
 

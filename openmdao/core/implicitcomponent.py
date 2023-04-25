@@ -455,26 +455,6 @@ class ImplicitComponent(Component):
 
         return meta
 
-    def _compute_root_scale_factors(self):
-        """
-        Compute scale factors for all variables.
-
-        Returns
-        -------
-        dict
-            Mapping of each absoute var name to its corresponding scaling factor tuple.
-        """
-        if self._has_resid_scaling:
-            scale_factors = super()._compute_root_scale_factors()
-            prefix = self.pathname + '.'
-            for resid, meta in self._declared_residuals.items():
-                ref = meta['ref']
-                if ref is not None:
-                    scale_factors[prefix + resid]['residual'] = (0.0, ref)
-            return scale_factors
-        else:
-            return super()._compute_root_scale_factors()
-
     def _setup_procs(self, pathname, comm, mode, prob_meta):
         """
         Execute first phase of the setup process.
