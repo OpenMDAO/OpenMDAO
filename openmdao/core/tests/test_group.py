@@ -2406,10 +2406,10 @@ class TestConnect(unittest.TestCase):
         assert_near_equal(prob['G1.par1.c4.y'], 8.0)
 
     def test_bad_shapes(self):
-        p = self.setup_problem('bad_shapes')
+        p = self.setup_problem('bad_shapes2')
         p.model.sub.connect('src.s', 'arr.x')
 
-        msg = "\nCollected errors for problem 'bad_shapes':" + \
+        msg = "\nCollected errors for problem 'bad_shapes2':" + \
               "\n   'sub' <class Group>: The source and target shapes do not match or are ambiguous " + \
               "for the connection 'sub.src.s' to 'sub.arr.x'. The source shape is (1,) " + \
               "but the target shape is (2,)."
