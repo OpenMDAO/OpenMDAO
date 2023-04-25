@@ -17,6 +17,8 @@ class SubmodelComp(ExplicitComponent):
     ----------
     model : <System>
         The system-level <System>.
+    problem : object
+        Instantiated problem to use for the model
     inputs : list of str or tuple or None
         List of provided input names in str or tuple form. If an element is a str,
         then it should be the absolute name or the promoted name in its group. If it is a tuple,
@@ -29,32 +31,17 @@ class SubmodelComp(ExplicitComponent):
         then the first element should be the absolute name or group's promoted name, and the
         second element should be the var name you wish to refer to it within the subproblem
         [e.g. (path.to.var, desired_name)].
-    comm : MPI.Comm or <FakeComm> or None
-        The global communicator.
-    name : str or None
-        Problem name. Can be used to specify a Problem instance when multiple Problems
-        exist.
-    reports : str, bool, None, _UNDEFINED
-        If _UNDEFINED, the OPENMDAO_REPORTS variable is used. Defaults to _UNDEFINED.
-        If given, reports overrides OPENMDAO_REPORTS. If boolean, enable/disable all reports.
-        Since none is acceptable in the environment variable, a value of reports=None
-        is equivalent to reports=False. Otherwise, reports may be a sequence of
-        strings giving the names of the reports to run.
-    prob_options : dict or None
-        Remaining named args for problem that are converted to options.
     **kwargs : named args
         All remaining named args that become options for `SubmodelComp`.
 
     Attributes
     ----------
-    prob_args : dict
-        Extra arguments to be passed to the problem instantiation.
     model : <System>
         The system being analyzed in subproblem.
-    submodel_inputs : list of str or tuple
+    submodel_inputs : list of tuple
         List of inputs requested by user to be used as inputs in the
         subproblem's system.
-    submodel_outputs : list of str or tuple
+    submodel_outputs : list of tuple
         List of outputs requested by user to be used as outputs in the
         subproblem's system.
     is_set_up : bool
@@ -62,9 +49,7 @@ class SubmodelComp(ExplicitComponent):
         determine how to add the io.
     """
 
-    def __init__(self, model, problem, inputs=None, outputs=None, # comm=None, name=None,
-                 #reports=_UNDEFINED, prob_options=None, **kwargs):
-                 **kwargs):
+    def __init__(self, model, problem, inputs=None, outputs=None, **kwargs):
         """
         Initialize all attributes.
         """
