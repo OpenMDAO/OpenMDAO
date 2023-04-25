@@ -9,100 +9,6 @@ from openmdao.core.constants import _SetupStatus
 from openmdao.utils.om_warnings import issue_warning
 
 
-# def _get_model_vars(vars, model_vars):
-#     """
-#     Get the requested IO variable data from model's list of IO.
-
-#     Parameters
-#     ----------
-#     vars : list of str or tuple
-#         List of provided var names in str or tuple form. If an element is a str,
-#         then it should be the absolute name or the promoted name in its group. If it is a tuple,
-#         then the first element should be the absolute name or group's promoted name, and the
-#         second element should be the var name you wish to refer to it within the subproblem
-#         [e.g. (path.to.var, desired_name)].
-#     model_vars : list of tuples
-#         List of model variable absolute names and meta data.
-
-#     Returns
-#     -------
-#     dict
-#         Dict to update `self.options` with desired IO data in `SubmodelComp`.
-#     """
-#     var_dict = {}
-#     tmp = {var: meta for var, meta in model_vars}
-
-#     # check for wildcards and append them to vars list
-#     patterns = [i for i in vars if isinstance(i, str)]
-#     var_list = [meta['prom_name'] for _, meta in model_vars]
-#     for i in patterns:
-#         matches = find_matches(i, var_list)
-#         if len(matches) == 0:
-#             continue
-#         vars.extend(matches)
-#         vars.remove(i)
-
-#     for var in vars:
-#         if isinstance(var, tuple):
-#             # check if user tries to use wildcard in tuple
-#             if '*' in var[0] or '*' in var[1]:
-#                 raise Exception('Cannot use \'*\' in tuple variable.')
-
-#             # check if variable already exists in var_dict[varType]
-#             # i.e. no repeated variable names
-#             if var[1] in var_dict:
-#                 continue
-#                 # raise Exception(f'Variable {var[1]} already exists. Rename variable'
-#                 #                 ' or delete copy.')
-
-#             # make dict with given var name as key and meta data from model_vars
-#             # check if name[7:] == var[0] -> var[0] is abs name and var[1] is alias
-#             # check if meta['prom_name'] == var[0] -> var[0] is prom name and var[1] is alias
-#             # NOTE name[7:] is the path name with out the 'subsys.' group level
-#             tmp_dict = {var[1]: meta for name, meta in model_vars
-#                         if name[7:] == var[0] or meta['prom_name'] == var[0]}
-
-#             # check if dict is empty (no vars added)
-#             if len(tmp_dict) == 0:
-#                 raise Exception(f'Path name {var[0]} does not'
-#                                 ' exist in model.')
-
-#             var_dict.update(tmp_dict)
-
-#         elif isinstance(var, str):
-#             # if variable already exists in dict, it is connected so continue
-#             if var in var_dict:
-#                 continue
-#                 # raise Exception(f'Variable {var} already exists. Rename variable'
-#                 #                 ' or delete copy.')
-
-#             # make dict with given var name as key and meta data from model_vars
-#             # check if name[7:] == var -> given var is abs name
-#             # check if meta['prom_name'] == var -> given var is prom_name
-#             # NOTE name[7:] is the path name with out the 'subsys.' group level
-#             tmp_dict = {var[1]: meta for name, meta in model_vars
-#                         if name[7:] == var[0] or meta['prom_name'] == var[0]}
-
-#             # check if provided variable appears more than once in model
-#             if len(tmp_dict) > 1:
-#                 raise Exception(f'Ambiguous variable {var}. To'
-#                                 ' specify which one is desired, use a tuple'
-#                                 ' with the promoted name and variable name'
-#                                 ' instead [e.g. (prom_name, var_name)].')
-
-#             # checks if provided variable doesn't exist in model
-#             elif len(tmp_dict) == 0:
-#                 raise Exception(f'Variable {var} does not exist in model.')
-
-#             var_dict.update(tmp_dict)
-
-#         else:
-#             raise Exception(f'Type {type(var)} is invalid. Must be'
-#                             ' string or tuple.')
-
-#     return var_dict
-
-
 class SubmodelComp(ExplicitComponent):
     """
     System level container for systems.
@@ -155,7 +61,6 @@ class SubmodelComp(ExplicitComponent):
         Flag to determne if subproblem is set up. Used for add_input/add_output to
         determine how to add the io.
     """
-    # TODO change doc string for _input_names and _output_names
 
     def __init__(self, model, problem, inputs=None, outputs=None, # comm=None, name=None,
                  #reports=_UNDEFINED, prob_options=None, **kwargs):
@@ -206,7 +111,6 @@ class SubmodelComp(ExplicitComponent):
 
         self.is_set_up = False
 
-    # TODO make path as name the default behavior
     def add_input(self, path, name=None):
         """
         Add input to model before or after setup.
@@ -267,7 +171,7 @@ class SubmodelComp(ExplicitComponent):
         """
         Perform some final setup and checks.
         """
-        p = self._subprob # = Problem(**self.prob_args)
+        p = self._subprob
 
         # need to make sure multiple subsystems aren't added if setup more than once
         if not self.is_set_up:
