@@ -1065,8 +1065,8 @@ class TestScaling(unittest.TestCase):
         problem.run_model()
 
         totals = problem.check_totals(out_stream=None)
-        assert_near_equal(totals['comp_2.c', 'a1']['abs error'][0], 0.0, tolerance=1e-7)
-        assert_near_equal(totals['comp_2.c', 'a2']['abs error'][0], 0.0, tolerance=1e-7)
+        assert_near_equal(totals['comp_2.c', 'a1']['abs error'].reverse, 0.0, tolerance=1e-7)
+        assert_near_equal(totals['comp_2.c', 'a2']['abs error'].reverse, 0.0, tolerance=1e-7)
 
         # Now, include unit conversion
 
@@ -1093,8 +1093,8 @@ class TestScaling(unittest.TestCase):
         problem.run_model()
 
         totals = problem.check_totals(out_stream=None)
-        assert_near_equal(totals['comp_2.c', 'a1']['abs error'][0], 0.0, tolerance=1e-7)
-        assert_near_equal(totals['comp_2.c', 'a2']['abs error'][0], 0.0, tolerance=1e-7)
+        assert_near_equal(totals['comp_2.c', 'a1']['abs error'].reverse, 0.0, tolerance=1e-7)
+        assert_near_equal(totals['comp_2.c', 'a2']['abs error'].reverse, 0.0, tolerance=1e-7)
 
     def test_totals_with_solver_scaling_part2(self):
         # Covers the part that the previous test missed, namely when the ref is in a different
@@ -1191,8 +1191,8 @@ class TestScaling(unittest.TestCase):
         problem.run_model()
 
         totals = problem.check_totals(compact_print=True)
-        assert_near_equal(totals['comp_2.c', 'a1']['abs error'][0], 0.0, tolerance=3e-7)
-        assert_near_equal(totals['comp_2.c', 'a2']['abs error'][0], 0.0, tolerance=3e-7)
+        assert_near_equal(totals['comp_2.c', 'a1']['abs error'].reverse, 0.0, tolerance=3e-7)
+        assert_near_equal(totals['comp_2.c', 'a2']['abs error'].reverse, 0.0, tolerance=3e-7)
 
 
 class MyComp(om.ExplicitComponent):

@@ -137,9 +137,9 @@ class TestCase(unittest.TestCase):
         prob.run_model()
 
         derivs = prob.check_totals(method='cs', out_stream=None)
-        assert_near_equal(derivs[('compliance_comp.compliance', 'h')]['rel error'][0],
+        assert_near_equal(derivs[('compliance_comp.compliance', 'h')]['rel error'].reverse,
                          0.0, 1e-8)
-        assert_near_equal(derivs[('volume_comp.volume', 'h')]['rel error'][0],
+        assert_near_equal(derivs[('volume_comp.volume', 'h')]['rel error'].reverse,
                          0.0, 1e-8)
 
         derivs = prob.check_partials(method='cs', out_stream=None)
@@ -171,9 +171,9 @@ class TestCase(unittest.TestCase):
         prob.run_model()
 
         derivs = prob.check_totals(method='cs', out_stream=None)
-        assert_near_equal(derivs[('obj_sum.obj', 'interp.h_cp')]['rel error'][0],
+        assert_near_equal(derivs[('obj_sum.obj', 'interp.h_cp')]['rel error'].reverse,
                          0.0, 1e-8)
-        assert_near_equal(derivs[('volume_comp.volume', 'interp.h_cp')]['rel error'][0],
+        assert_near_equal(derivs[('volume_comp.volume', 'interp.h_cp')]['rel error'].reverse,
                          0.0, 1e-8)
 
         derivs = prob.check_partials(method='cs', out_stream=None)

@@ -15,7 +15,7 @@ from collections.abc import Iterable
 import numpy as np
 
 from openmdao.core.constants import INF_BOUND
-from openmdao.utils.om_warnings import issue_warning, warn_deprecation
+from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.array_utils import shape_to_len
 
 
@@ -387,7 +387,7 @@ def _find_dict_meta(dct, key):
     return False
 
 
-def pad_name(name, pad_num=10, quotes=False):
+def pad_name(name, width=10, quotes=False):
     """
     Pad a string so that they all line up when stacked.
 
@@ -395,7 +395,7 @@ def pad_name(name, pad_num=10, quotes=False):
     ----------
     name : str
         The string to pad.
-    pad_num : int
+    width : int
         The number of total spaces the string should take up.
     quotes : bool
         If name should be quoted.
@@ -405,11 +405,11 @@ def pad_name(name, pad_num=10, quotes=False):
     str
         Padded string.
     """
-    name = f"'{name}'" if quotes else name
-    if pad_num > len(name):
-        return f"{name:<{pad_num}}"
+    name = f"'{name}'" if quotes else str(name)
+    if width > len(name):
+        return f"{name:<{width}}"
     else:
-        return f'{name}'
+        return f"{name}"
 
 
 def add_border(msg, borderstr='=', vpad=0):
@@ -435,7 +435,8 @@ def add_border(msg, borderstr='=', vpad=0):
     border = len(msg) * borderstr
     # handle borderstr of more than 1 char
     border = border[:len(msg)]
-    return f"{border}\n{msg}\n{border}"
+    padding = '\n' * (vpad + 1)
+    return f"{border}{padding}{msg}{padding}{border}"
 
 
 def run_model(prob, ignore_exception=False):

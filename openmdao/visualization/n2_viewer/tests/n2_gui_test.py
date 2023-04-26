@@ -8,11 +8,6 @@ import sys
 
 from openmdao.utils.gui_testing_utils import _GuiTestCase
 
-try:
-    from parameterized import parameterized
-except ImportError:
-    from openmdao.utils.assert_utils import SkipParameterized as parameterized
-
 # set DEBUG to True if you want to view the generated HTML file
 GUI_TEST_SUBDIR = 'gui_test_models'
 GUI_N2_SUFFIX = '_N2_TEST.html'
@@ -36,7 +31,7 @@ if 'win32' in sys.platform:
     # Windows specific event-loop policy & cmd
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
-my_loop = asyncio.get_event_loop()
+my_loop = asyncio.get_event_loop_policy().get_event_loop()
 
 """ A set of toolbar tests that runs on each model. """
 toolbar_script = [
@@ -718,7 +713,7 @@ n2_gui_test_scripts = {
             "test": "click",
             "selector": "#filter-target",
             "button": "left"
-        },   
+        },
     ]
 }
 
@@ -1033,27 +1028,28 @@ class n2_gui_test_case(_GuiTestCase):
             print(msg)
             self.fail(msg)
 
-    @parameterized.expand(n2_gui_test_models)
     @async_test(loop=my_loop)
-    async def test_n2_gui(self, basename):
-        if (basename[:2] == "__"):
-            return
+    async def test_n2_gui(self):
+        for model in n2_gui_test_models:
+            with self.subTest(model=model):
+                if (model[:2] == "__"):
+                    return
 
-        print("\n" + LINE_STR + "\n" + basename + "\n" + LINE_STR)
+                print("\n" + LINE_STR + "\n" + model + "\n" + LINE_STR)
 
-        self.current_test_desc = ''
-        self.current_model = basename
+                self.current_test_desc = ''
+                self.current_model = model
 
-        self.generate_n2_file()
+                self.generate_n2_file()
 
-        async with async_playwright() as playwright:
-            await self.run_gui_tests(playwright)
+                async with async_playwright() as playwright:
+                    await self.run_gui_tests(playwright)
 
-        if not DEBUG:
-            try:
-                for n2html in self.n2files:
-                    os.remove(self.n2files[n2html])
-            except OSError:
-                # Don't want the test to fail if the test file is
-                # already removed
-                pass
+                if not DEBUG:
+                    try:
+                        for n2html in self.n2files:
+                            os.remove(self.n2files[n2html])
+                    except OSError:
+                        # Don't want the test to fail if the test file is
+                        # already removed
+                        pass

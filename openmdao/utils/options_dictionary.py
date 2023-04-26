@@ -1,5 +1,5 @@
 """Define the OptionsDictionary class."""
-
+import contextlib
 import re
 
 from openmdao.utils.om_warnings import warn_deprecation
@@ -62,6 +62,9 @@ class OptionsDictionary(object):
         If True, no options can be set after declaration.
     _all_recordable : bool
         Flag to determine if all options in UserOptions are recordable.
+    _context_cache : dict
+        A dictionary to store cached option/value pairs when using the
+        OptionsDictionary as a context manager.
     """
 
     def __init__(self, parent_name=None, read_only=False):
@@ -72,6 +75,7 @@ class OptionsDictionary(object):
         self._parent_name = parent_name
         self._read_only = read_only
         self._all_recordable = True
+        self._context_cache = {}
 
     def __getstate__(self):
         """
@@ -305,6 +309,41 @@ class OptionsDictionary(object):
         # General function test
         if meta['check_valid'] is not None:
             meta['check_valid'](name, value)
+
+    def set(self, **kwargs):
+        """
+        Set one or more options in the options dictionary simultaneously.
+
+        Parameters
+        ----------
+        **kwargs
+            Keyword arguments where the option names in the OptionsDictionary are the keywords
+            and the associated values are the values for those options.
+        """
+        for option, val in kwargs.items():
+            self[option] = val
+
+    @contextlib.contextmanager
+    def temporary(self, **kwargs):
+        """
+        Provide a context manager for temporary option values within the context.
+
+        Parameters
+        ----------
+        **kwargs
+            Keyword arguments where the option names in the OptionsDictionary are the keywords
+            and the associated values are the temporary values for those options.
+        """
+        for option, val in kwargs.items():
+            if option not in self._context_cache:
+                self._context_cache[option] = []
+            self._context_cache[option].append(self[option])
+            self[option] = val
+        yield
+        for option, val in kwargs.items():
+            self[option] = self._context_cache[option].pop()
+            if len(self._context_cache[option]) == 0:
+                self._context_cache.pop(option)
 
     def declare(self, name, default=_UNDEFINED, values=None, types=None, desc='',
                 upper=None, lower=None, check_valid=None, allow_none=False, recordable=True,

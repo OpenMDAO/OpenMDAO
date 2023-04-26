@@ -162,7 +162,7 @@ class TestImplicitFuncComp(unittest.TestCase):
 
         p_opt = om.Problem()
 
-        p_opt.model = om.ImplicitFuncComp(f, linearize=linearize,)
+        p_opt.model.add_subsystem('comp', om.ImplicitFuncComp(f, linearize=linearize,), promotes=['*'])
 
         p_opt.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, iprint=0)
         p_opt.model.linear_solver = om.DirectSolver(assemble_jac=True)

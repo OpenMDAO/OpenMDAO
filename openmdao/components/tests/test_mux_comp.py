@@ -4,6 +4,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
+from openmdao.utils.testing_utils import force_check_partials
 
 
 class TestMuxCompOptions(unittest.TestCase):
@@ -100,7 +101,7 @@ class TestMuxCompScalar(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(compact_print=False, method='cs', out_stream=None)
+        cpd = force_check_partials(self.p, compact_print=False, method='cs', out_stream=None)
         assert_check_partials(cpd, atol=1.0E-8, rtol=1.0E-8)
 
 
@@ -153,7 +154,7 @@ class TestMuxComp1D(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(compact_print=False, method='cs', out_stream=None)
+        cpd = force_check_partials(self.p, compact_print=False, method='cs', out_stream=None)
         assert_check_partials(cpd, atol=1.0E-8, rtol=1.0E-8)
 
 
@@ -213,7 +214,7 @@ class TestMuxComp2D(unittest.TestCase):
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
-        cpd = self.p.check_partials(compact_print=False, method='cs', out_stream=None)
+        cpd = force_check_partials(self.p, compact_print=False, method='cs', out_stream=None)
         assert_check_partials(cpd, atol=1.0E-8, rtol=1.0E-8)
 
 

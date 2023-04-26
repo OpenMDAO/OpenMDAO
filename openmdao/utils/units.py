@@ -16,7 +16,6 @@ import os.path
 from collections import OrderedDict
 
 from configparser import RawConfigParser as ConfigParser
-from openmdao.utils.om_warnings import warn_deprecation
 
 # pylint: disable=E0611, F0401
 from math import floor, pi
@@ -1017,28 +1016,6 @@ def unit_conversion(old_units, new_units):
         Conversion factor and offset.
     """
     return _find_unit(old_units, error=True).conversion_tuple_to(_find_unit(new_units, error=True))
-
-
-def get_conversion(old_units, new_units):
-    """
-    Return conversion factor and offset between old and new units (deprecated).
-
-    Parameters
-    ----------
-    old_units : str
-        Original units as a string.
-    new_units : str
-        New units to return the value in.
-
-    Returns
-    -------
-    (float, float)
-        Conversion factor and offset.
-    """
-    warn_deprecation("'get_conversion' has been deprecated. Use "
-                     "'unit_conversion' instead.")
-
-    return unit_conversion(old_units, new_units)
 
 
 def convert_units(val, old_units, new_units=None):

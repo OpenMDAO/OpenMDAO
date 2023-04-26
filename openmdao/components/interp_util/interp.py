@@ -18,7 +18,6 @@ from openmdao.components.interp_util.interp_slinear import InterpLinear, Interp3
     Interp1DSlinear, Interp2DSlinear
 
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
-from openmdao.utils.om_warnings import warn_deprecation
 from openmdao.utils.array_utils import shape_to_len
 
 
@@ -41,14 +40,11 @@ INTERP_METHODS = {
     '1D-lagrange3': Interp1DLagrange3,
     '2D-lagrange3': Interp2DLagrange3,
     '3D-lagrange3': Interp3DLagrange3,
-    '1D-akima': Interp1DAkima,
-    'trilinear': Interp3DSlinear,  # Deprecated
-    'akima1D': Interp1DAkima,  # Deprecated
+    '1D-akima': Interp1DAkima
 }
 
 TABLE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima',
                  'scipy_cubic', 'scipy_slinear', 'scipy_quintic',
-                 'trilinear', 'akima1D',  # These two are Deprecated
                  '3D-slinear', '2D-slinear', '1D-slinear',
                  '1D-akima',
                  '3D-lagrange2', '2D-lagrange2', '1D-lagrange2',
@@ -144,10 +140,6 @@ class InterpND(object):
             all_m = ', '.join(['"' + m + '"' for m in INTERP_METHODS])
             raise ValueError('Interpolation method "%s" is not defined. Valid methods are '
                              '%s.' % (method, all_m))
-        elif method == 'akima1D':
-            warn_deprecation("The 'akima1D' method has been renamed to '1D-akima'.")
-        elif method == 'trilinear':
-            warn_deprecation("The 'trilinear' method has been renamed to '3D-slinear'.")
 
         self.extrapolate = extrapolate
 

@@ -221,16 +221,16 @@ class ScipyKrylov(LinearSolver):
         if solver is gmres:
             if Version(scipy.__version__) < Version("1.1"):
                 x, info = solver(linop, b_vec.asarray(True), M=M, restart=restart,
-                                 x0=x_vec_combined, maxiter=maxiter, tol=atol,
-                                 callback=self._monitor)
+                                 x0=x_vec_combined, maxiter=maxiter, tol=atol, atol='legacy',
+                                 callback=self._monitor, callback_type='legacy')
             else:
                 x, info = solver(linop, b_vec.asarray(True), M=M, restart=restart,
                                  x0=x_vec_combined, maxiter=maxiter, tol=atol, atol='legacy',
-                                 callback=self._monitor)
+                                 callback=self._monitor, callback_type='legacy')
         else:
             x, info = solver(linop, b_vec.asarray(True), M=M,
-                             x0=x_vec_combined, maxiter=maxiter, tol=atol,
-                             callback=self._monitor)
+                             x0=x_vec_combined, maxiter=maxiter, tol=atol, atol='legacy',
+                             callback=self._monitor, callback_type='legacy')
 
         fail |= (info != 0)
         x_vec.set_val(x)
