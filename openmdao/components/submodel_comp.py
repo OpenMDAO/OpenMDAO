@@ -14,7 +14,7 @@ class SubmodelComp(ExplicitComponent):
     model : <System>
         The system-level <System>.
     problem : object
-        Instantiated problem to use for the model
+        Instantiated problem to use for the model.
     inputs : list of str or tuple or None
         List of provided input names in str or tuple form. If an element is a str,
         then it should be the promoted name in its group. If it is a tuple,
