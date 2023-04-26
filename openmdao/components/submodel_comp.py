@@ -14,7 +14,7 @@ class SubmodelComp(ExplicitComponent):
     model : <System>
         The system-level <System>.
     problem : object
-        Instantiated problem to use for the model
+        Instantiated problem to use for the model.
     inputs : list of str or tuple or None
         List of provided input names in str or tuple form. If an element is a str,
         then it should be the promoted name in its group. If it is a tuple,
@@ -220,7 +220,7 @@ class SubmodelComp(ExplicitComponent):
             prom_name = var[0]
             try:
                 meta = next(data for _, data in self.all_outputs if data['prom_name'] == prom_name)
-            except Exceptions:
+            except Exception:
                 raise Exception(f'Variable {prom_name} not found in model')
             meta.pop('prom_name')
             super().add_output(iface_name, **meta)
