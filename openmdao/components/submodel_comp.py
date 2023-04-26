@@ -1,12 +1,8 @@
 """Define the SubmodelComp class for evaluating OpenMDAO systems within components."""
 
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.core.problem import Problem
-from openmdao.core.indepvarcomp import IndepVarComp
-from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.general_utils import find_matches
 from openmdao.core.constants import _SetupStatus
-from openmdao.utils.om_warnings import issue_warning
 
 
 class SubmodelComp(ExplicitComponent):
@@ -21,14 +17,14 @@ class SubmodelComp(ExplicitComponent):
         Instantiated problem to use for the model
     inputs : list of str or tuple or None
         List of provided input names in str or tuple form. If an element is a str,
-        then it should be the absolute name or the promoted name in its group. If it is a tuple,
-        then the first element should be the absolute name or group's promoted name, and the
+        then it should be the promoted name in its group. If it is a tuple,
+        then the first element should be the group's promoted name, and the
         second element should be the var name you wish to refer to it within the subproblem
         [e.g. (path.to.var, desired_name)].
     outputs : list of str or tuple or None
         List of provided output names in str or tuple form. If an element is a str,
-        then it should be the absolute name or the promoted name in its group. If it is a tuple,
-        then the first element should be the absolute name or group's promoted name, and the
+        then it should be the promoted name in its group. If it is a tuple,
+        then the first element should be the group's promoted name, and the
         second element should be the var name you wish to refer to it within the subproblem
         [e.g. (path.to.var, desired_name)].
     **kwargs : named args
@@ -38,6 +34,8 @@ class SubmodelComp(ExplicitComponent):
     ----------
     model : <System>
         The system being analyzed in subproblem.
+    _subprob : object
+        Instantiated problem used to run the model.
     submodel_inputs : list of tuple
         List of inputs requested by user to be used as inputs in the
         subproblem's system.
@@ -58,13 +56,13 @@ class SubmodelComp(ExplicitComponent):
 
         self.model = model
         self._subprob = problem
-        
+
         # need to make submodel_inputs/outputs be lists of tuples
         # so, if a str is provided, that becomes the iface_name and
         # the prom_name
         self.submodel_inputs = []
         self.submodel_outputs = []
-        
+
         if inputs is not None:
             for inp in inputs:
                 if isinstance(inp, str):
@@ -75,11 +73,10 @@ class SubmodelComp(ExplicitComponent):
                     else:
                         self.submodel_inputs.append((inp, inp))
                 elif isinstance(inp, tuple):
-                    # TODO add check for if tuple len > 2 or < 2
                     self.submodel_inputs.append(inp)
                 else:
                     raise Exception(f'Expected input of type str or tuple, got {type(inp)}.')
-        
+
         if outputs is not None:
             for out in outputs:
                 if isinstance(out, str):
@@ -89,7 +86,6 @@ class SubmodelComp(ExplicitComponent):
                     else:
                         self.submodel_outputs.append((out, out))
                 elif isinstance(out, tuple):
-                    # TODO add check for if tuple len > 2 or < 2
                     self.submodel_outputs.append(out)
                 else:
                     raise Exception(f'Expected output of type str or tuple, got {type(out)}.')
@@ -136,7 +132,7 @@ class SubmodelComp(ExplicitComponent):
             Name of output to be added. If none, it will default to the var name after
             the last '.'.
         """
-        if name == None:
+        if name is None:
             name = path.split('.')[-1]
 
         self.submodel_outputs.append((path, name))
@@ -162,7 +158,6 @@ class SubmodelComp(ExplicitComponent):
         if not self.is_set_up:
             p.model.add_subsystem('subsys', self.model, promotes=['*'])
 
-        # perform first setup to be able to get inputs and outputs
         # if subprob.setup is called before the top problem setup, we can't rely
         # on using the problem meta data, so default to False
         if self._problem_meta is None:
@@ -170,7 +165,7 @@ class SubmodelComp(ExplicitComponent):
         else:
             p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'])
         p.final_setup()
-        
+
         self.boundary_inputs = p.list_indep_vars(out_stream=None, options=['name'])
         for name, meta in self.boundary_inputs:
             meta['prom_name'] = name
@@ -180,11 +175,14 @@ class SubmodelComp(ExplicitComponent):
                                                 units=True, shape=True, desc=True,
                                                 is_indep_var=False)
 
+        # add vars that follow patterns to io
         boundary_input_prom_names = [meta['prom_name'] for _, meta in self.boundary_inputs]
         all_outputs_prom_names = [meta['prom_name'] for _, meta in self.all_outputs]
 
-        wildcard_inputs = [var for var in self.submodel_inputs if isinstance(var, str) and '*' in var]
-        wildcard_outputs = [var for var in self.submodel_outputs if isinstance(var, str) and '*' in var]
+        wildcard_inputs = [var for var in self.submodel_inputs
+                           if isinstance(var, str) and '*' in var]
+        wildcard_outputs = [var for var in self.submodel_outputs
+                            if isinstance(var, str) and '*' in var]
 
         for inp in wildcard_inputs:
             matches = find_matches(inp, boundary_input_prom_names)
@@ -193,7 +191,7 @@ class SubmodelComp(ExplicitComponent):
             for match in matches:
                 self.submodel_inputs.append((match, match))
             self.submodel_inputs.remove(inp)
-        
+
         for out in wildcard_outputs:
             matches = find_matches(out, all_outputs_prom_names)
             if len(matches) == 0:
@@ -202,14 +200,16 @@ class SubmodelComp(ExplicitComponent):
                 self.submodel_outputs.append((match, match))
             self.submodel_outputs.remove(out)
 
-        # NOTE interface name -> what SubmodelComp refers to the var as
-        # NOTE interior name -> what the user refers to the var as
+        # NOTE iface_name is what user refers to var as
+        # iface_name is different from prom_name because sometimes prom_name
+        # can have illegal chars in it like '.'
         for var in self.submodel_inputs:
             iface_name = var[1]
             prom_name = var[0]
             try:
-                meta = next(data for _, data in self.boundary_inputs if data['prom_name'] == prom_name)
-            except:
+                meta = next(data for _, data in self.boundary_inputs
+                            if data['prom_name'] == prom_name)
+            except Exception:
                 raise Exception(f'Variable {prom_name} not found in model')
             meta.pop('prom_name')
             super().add_input(iface_name, **meta)
@@ -220,7 +220,7 @@ class SubmodelComp(ExplicitComponent):
             prom_name = var[0]
             try:
                 meta = next(data for _, data in self.all_outputs if data['prom_name'] == prom_name)
-            except:
+            except Exceptions:
                 raise Exception(f'Variable {prom_name} not found in model')
             meta.pop('prom_name')
             super().add_output(iface_name, **meta)
@@ -236,7 +236,6 @@ class SubmodelComp(ExplicitComponent):
         inputs = self._var_rel_names['input']
         outputs = self._var_rel_names['output']
 
-        # can't have coloring if there are no io declared
         if len(inputs) == 0 or len(outputs) == 0:
             return
 
@@ -247,13 +246,11 @@ class SubmodelComp(ExplicitComponent):
             p.model.add_design_var(prom_name)
 
         for prom_name, _ in self.submodel_outputs:
-            # got abs name back for self._cons key for some reasons in `test_multiple_setups`
+            # got abs name back for self._cons key for some reason in `test_multiple_setups`
             # TODO look into this
             if prom_name in [meta['name'] for _, meta in p.driver._cons.items()]:
                 continue
             p.model.add_constraint(prom_name)
-
-        # p.driver.declare_coloring()
 
         # setup again to compute coloring
         p.set_solver_print(-1)
@@ -270,7 +267,6 @@ class SubmodelComp(ExplicitComponent):
             self.declare_partials(of='*', wrt='*')
         else:
             for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():
-                # TODO ADD OF AND WRT FROM _DESIGNVARS AND _RESPONSES HERE
                 self.declare_partials(of=of, wrt=wrt, rows=nzrows, cols=nzcols)
 
     def _set_complex_step_mode(self, active):
@@ -293,8 +289,8 @@ class SubmodelComp(ExplicitComponent):
         for prom_name, iface_name in self.submodel_inputs:
             p.set_val(prom_name, inputs[iface_name])
 
+        # TODO figure out naming issues when using `p.driver.run()`
         # p.driver.run()
-        # p.run_model()
         p.run_driver()
 
         for prom_name, iface_name in self.submodel_outputs:
@@ -320,27 +316,20 @@ class SubmodelComp(ExplicitComponent):
         for prom_name, iface_name in self.submodel_inputs:
             p.set_val(prom_name, inputs[iface_name])
 
-        # tots = p.compute_totals(wrt=[input_name for input_name, _ in self.submodel_inputs],
-        #                         of=[output_name for output_name, _ in self.submodel_outputs],
-        #                         use_abs_names=False, driver_scaling=False)
-        
         wrt = [input_name for input_name, _ in self.submodel_inputs]
         of = [output_name for output_name, _ in self.submodel_outputs]
-        # wrt = list(self._var_allprocs_abs2prom['input'].keys())
-        # of = list(self._var_allprocs_abs2prom['output'].keys())
-        
+
         tots = p.driver._compute_totals(wrt=wrt,
                                         of=of,
                                         use_abs_names=False, driver_scaling=False)
 
-        # tots = p.compute_totals(use_abs_names=False, driver_scaling=False)
-
         if self.coloring is None:
             for (tot_output, tot_input), tot in tots.items():
-                input_iface_name = next(iface_name for prom_name, iface_name in self.submodel_inputs if prom_name == tot_input)
-                output_iface_name = next(iface_name for prom_name, iface_name in self.submodel_outputs if prom_name == tot_output)
+                input_iface_name = next(iface_name for prom_name, iface_name
+                                        in self.submodel_inputs if prom_name == tot_input)
+                output_iface_name = next(iface_name for prom_name, iface_name
+                                         in self.submodel_outputs if prom_name == tot_output)
                 partials[output_iface_name, input_iface_name] = tot
         else:
-            for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():             
-                # TODO WANT TO USE _DESIGNVARS AND _RESPONSES HERE
+            for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():
                 partials[of, wrt] = tots[of, wrt][nzrows, nzcols].ravel()
