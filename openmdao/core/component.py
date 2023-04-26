@@ -265,7 +265,6 @@ class Component(System):
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
         abs2prom = self._var_allprocs_abs2prom = self._var_abs2prom
-        abs_in2prom_info = self._problem_meta['abs_in2prom_info']
 
         # Compute the prefix for turning rel/prom names into abs names
         prefix = self.pathname + '.'

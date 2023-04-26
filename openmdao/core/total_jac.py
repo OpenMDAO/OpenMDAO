@@ -1393,13 +1393,9 @@ class _TotalJacInfo(object):
         try:
             ln_solver = model._linear_solver
             with model._scaled_context_all():
-                if len(model._subsystems_allprocs) > 0:
-                    model._linearize(model._assembled_jac,
-                                     sub_do_ln=ln_solver._linearize_children(),
-                                     rel_systems=self.total_relevant_systems)
-                else:
-                    model._linearize(model._assembled_jac,
-                                     sub_do_ln=ln_solver._linearize_children())
+                model._linearize(model._assembled_jac,
+                                 sub_do_ln=ln_solver._linearize_children(),
+                                 rel_systems=self.total_relevant_systems)
             if ln_solver._assembled_jac is not None and \
                     ln_solver._assembled_jac._under_complex_step:
                 model.linear_solver._assembled_jac._update(model)
@@ -1526,13 +1522,9 @@ class _TotalJacInfo(object):
                     model._update_wrt_matches(model._coloring_info)
 
             # Linearize Model
-            if len(model._subsystems_allprocs) > 0:
-                model._linearize(model._assembled_jac,
-                                 sub_do_ln=model._linear_solver._linearize_children(),
-                                 rel_systems=self.total_relevant_systems)
-            else:
-                model._linearize(model._assembled_jac,
-                                 sub_do_ln=model._linear_solver._linearize_children())
+            model._linearize(model._assembled_jac,
+                             sub_do_ln=model._linear_solver._linearize_children(),
+                             rel_systems=self.total_relevant_systems)
 
         finally:
             model._tot_jac = None
