@@ -1061,7 +1061,7 @@ class System(object):
             responses = self._responses
 
         # Look through responses to see if there are multiple responses with that name
-        aliases = [resp['alias'] for key, resp in responses.items() if resp['name'] == name]
+        aliases = [resp['alias'] for resp in responses.values() if resp['name'] == name]
         if len(aliases) > 1 and alias is _UNDEFINED:
             msg = "{}: set_constraint_options called with constraint variable '{}' that has " \
                   "multiple aliases: {}. Call set_objective_options with the 'alias' argument " \
@@ -2086,8 +2086,8 @@ class System(object):
         for name, meta in resp.items():
 
             units = meta['units']
-            resp[name]['total_scaler'] = resp[name]['scaler']
-            resp[name]['total_adder'] = resp[name]['adder']
+            meta['total_scaler'] = meta['scaler']
+            meta['total_adder'] = meta['adder']
 
             if units is not None:
                 # If derivatives are not being calculated, then you reach here before source
@@ -2097,30 +2097,30 @@ class System(object):
                 except KeyError:
                     units_src = self.get_source(name)
 
-                var_units = abs2meta[units_src]['units']
+                src_units = abs2meta[units_src]['units']
 
-                if var_units == units:
+                if src_units == units:
                     continue
 
-                if var_units is None:
+                if src_units is None:
                     msg = "{}: Target for {} {} has no units, but '{}' units " + \
                           "were specified."
                     raise RuntimeError(msg.format(self.msginfo, type_dict[meta['type']],
                                                   name, units))
 
-                if not is_compatible(var_units, units):
+                if not is_compatible(src_units, units):
                     msg = "{}: Target for {} {} has '{}' units, but '{}' units " + \
                           "were specified."
                     raise RuntimeError(msg.format(self.msginfo, type_dict[meta['type']],
-                                                  name, var_units, units))
+                                                  name, src_units, units))
 
-                factor, offset = unit_conversion(var_units, units)
+                factor, offset = unit_conversion(src_units, units)
                 base_adder, base_scaler = determine_adder_scaler(None, None,
-                                                                 resp[name]['adder'],
-                                                                 resp[name]['scaler'])
+                                                                 meta['adder'],
+                                                                 meta['scaler'])
 
-                resp[name]['total_scaler'] = base_scaler * factor
-                resp[name]['total_adder'] = offset + base_adder / factor
+                meta['total_scaler'] = base_scaler * factor
+                meta['total_adder'] = offset + base_adder / factor
 
         for s in self._subsystems_myproc:
             s._setup_driver_units(abs2meta)
@@ -2870,7 +2870,7 @@ class System(object):
         Parameters
         ----------
         name : str
-            Name of the design variable in the system.
+            Promoted name of the design variable in the system.
         lower : float or ndarray, optional
             Lower boundary for the input.
         upper : upper or ndarray, optional
@@ -3006,7 +3006,7 @@ class System(object):
         Parameters
         ----------
         name : str
-            Name of the response variable in the system.
+            Promoted name of the response variable in the system.
         type_ : str
             The type of response. Supported values are 'con' and 'obj'.
         lower : float or ndarray, optional
@@ -3046,9 +3046,9 @@ class System(object):
             solution from the previous linear solve.
         flat_indices : bool
             If True, interpret specified indices as being indices into a flat source array.
-        alias : str
+        alias : str or None
             Alias for this response. Necessary when adding multiple responses on different
-            indices or slices of a single variable.
+            indices of the same variable.
         """
         # Name must be a string
         if not isinstance(name, str):
@@ -3379,28 +3379,28 @@ class System(object):
         # Human readable error message during Driver setup.
         out = {}
         try:
-            for name, data in self._design_vars.items():
+            for prom_name, data in self._design_vars.items():
                 if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
                     self._problem_meta['using_par_deriv_color'] = True
 
-                if name in pro2abs_out:
+                if prom_name in pro2abs_out:
 
                     # This is an output name, most likely a manual indepvarcomp.
-                    abs_name = pro2abs_out[name][0]
+                    abs_name = pro2abs_out[prom_name][0]
                     out[abs_name] = data
                     data['source'] = abs_name
-                    data['orig'] = (name, None)
+                    data['orig'] = (prom_name, None)
                     dist = abs_name in abs2meta_out and abs2meta_out[abs_name]['distributed']
 
                 else:  # assume an input name else KeyError
 
-                    # Design variable on an auto_ivc input, so use connected output name.
-                    in_abs = pro2abs_in[name][0]
+                    # Design variable on an input connected to an ivc, so use abs ivc name.
+                    in_abs = pro2abs_in[prom_name][0]
                     data['source'] = source = conns[in_abs]
-                    data['orig'] = (None, name)
+                    data['orig'] = (None, prom_name)
                     dist = source in abs2meta_out and abs2meta_out[source]['distributed']
                     if use_prom_ivc:
-                        out[name] = data
+                        out[prom_name] = data
                     else:
                         out[source] = data
 
@@ -3526,47 +3526,48 @@ class System(object):
         try:
             out = {}
             # keys of self._responses are the alias or the promoted name
-            for name, data in self._responses.items():
+            for prom_or_alias, data in self._responses.items():
                 if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
                     self._problem_meta['using_par_deriv_color'] = True
 
                 alias = data['alias']  # may be None
                 prom = data['name']  # always a promoted var name
-                if name in prom2abs_out:
-                    # Constraint alias should never be the same as any openmdao output.
+
+                if alias in prom2abs_out or alias in prom2abs_in:
+                    # Constraint alias should never be the same as any openmdao variable.
                     if alias is not None:
                         path = prom2abs_out[prom][0] if prom in prom2abs_out else prom
                         raise RuntimeError(f"Constraint alias '{alias}' on '{path}' "
                                            "is the same name as an existing variable.")
-                    abs_name = prom2abs_out[name][0]
+
+                if prom_or_alias in prom2abs_out:
+                    abs_out = prom2abs_out[prom_or_alias][0]
                     # for outputs, the dict key is always the absolute name of the output
-                    out[abs_name] = data
-                    data['source'] = abs_name
+                    out[abs_out] = data
+                    data['source'] = abs_out
                     data['distributed'] = \
-                        abs_name in abs2meta_out and abs2meta_out[abs_name]['distributed']
+                        abs_out in abs2meta_out and abs2meta_out[abs_out]['distributed']
 
                 else:
-                    if alias is None:
-                        # A constraint can be on an input, so use connected output name.
-                        key = in_abs = prom2abs_in[name][0]
-                        src_path = conns[in_abs]
-                    else:  # name is an alias
-                        key = alias
-                        if prom in prom2abs_out:
-                            src_path = prom2abs_out[prom][0]
-                        else:
-                            src_path = conns[prom2abs_in[prom][0]]
+                    if prom in prom2abs_out:
+                        src_path = prom2abs_out[prom][0]
+                    else:
+                        src_path = conns[prom2abs_in[prom][0]]
 
                     distrib = src_path in abs2meta_out and abs2meta_out[src_path]['distributed']
                     data['source'] = src_path
                     data['distributed'] = distrib
 
                     if use_prom_ivc:
-                        # dict key is either an alias or the promoted name
-                        out[name] = data
+                        # dict key is either an alias or the promoted input name
+                        out[prom_or_alias] = data
                     else:
-                        # dict key is either an alias or the absolute name of the input
-                        out[key] = data
+                        # dict key is either an alias or the absolute src name
+                        if alias is None:
+                            # A constraint can be on an input, so use connected output name.
+                            out[src_path] = data
+                        else:  # name is an alias
+                            out[alias] = data
 
         except KeyError as err:
             msg = "{}: Output not found for response {}."
@@ -3858,9 +3859,10 @@ class System(object):
                                 out_meta = disc_metadict['output'][src_name]
 
                         src_tags = out_meta['tags'] if 'tags' in out_meta else {}
-                        if is_indep_var is True and 'openmdao:indep_var' not in src_tags:
-                            continue
-                        elif is_indep_var is False and 'openmdao:indep_var' in src_tags:
+                        if is_indep_var:
+                            if 'openmdao:indep_var' not in src_tags:
+                                continue
+                        elif 'openmdao:indep_var' in src_tags:
                             continue
 
                     # handle is_design_var
