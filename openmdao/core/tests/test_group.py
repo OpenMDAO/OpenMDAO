@@ -1531,9 +1531,7 @@ class TestGroup(unittest.TestCase):
 
         p = om.Problem()
 
-        p.model.add_subsystem('comp1', MyComp1(), promotes_inputs=['x'], src_indices=[0, 1, 2])
-        p.model.add_subsystem('comp2', MyComp2(), promotes_inputs=['x'], src_indices=[3, 4])
-
+        # Note: src_shape is different that the shape of either target
         p.model.set_input_defaults('x', src_shape=(5,), val=1.)
         p.model.add_subsystem('G1', MyGroup(), promotes_inputs=['x'])
 
