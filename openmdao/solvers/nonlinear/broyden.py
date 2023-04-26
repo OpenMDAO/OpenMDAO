@@ -152,9 +152,7 @@ class BroydenSolver(NonlinearSolver):
         super()._setup_solvers(system, depth)
         self._recompute_jacobian = True
         self._computed_jacobians = 0
-        iproc = system.comm.rank
 
-        rank = MPI.COMM_WORLD.rank if MPI is not None else 0
         self._disallow_discrete_outputs()
 
         if self.linear_solver is not None:

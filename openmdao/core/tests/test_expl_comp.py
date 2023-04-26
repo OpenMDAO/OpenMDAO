@@ -88,7 +88,8 @@ class RectangleGroup(om.Group):
 class ExplCompTestCase(unittest.TestCase):
 
     def test_simple(self):
-        prob = om.Problem(RectangleComp())
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', RectangleComp(), promotes=['*'])
         prob.setup()
         prob.run_model()
 
@@ -869,32 +870,33 @@ class ExplCompTestCase(unittest.TestCase):
             self.assertEqual(line.strip(), expected_text[i].strip())
 
     def test_simple_var_tags(self):
-        prob = om.Problem(RectangleCompWithTags())
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', RectangleCompWithTags())
         prob.setup(check=False)
         prob.run_model()
 
         # Inputs no tags
         inputs = prob.model.list_inputs(out_stream=None)
         self.assertEqual(sorted(inputs), [
-            ('length', {'val': [1.]}),
-            ('width', {'val': [1.]}),
+            ('comp.length', {'val': [1.]}),
+            ('comp.width', {'val': [1.]}),
         ])
 
         # Inputs with tags
         inputs = prob.model.list_inputs(out_stream=None, tags="tag1")
         self.assertEqual(sorted(inputs), [
-            ('length', {'val': [1.]}),
+            ('comp.length', {'val': [1.]}),
         ])
 
         # Inputs with multiple tags
         inputs = prob.model.list_inputs(out_stream=None, tags=["tag1", "tag3"])
         self.assertEqual(sorted(inputs), [
-            ('length', {'val': [1.]}),
+            ('comp.length', {'val': [1.]}),
         ])
         inputs = prob.model.list_inputs(out_stream=None, tags=["tag1", "tag2"])
         self.assertEqual(sorted(inputs), [
-            ('length', {'val': [1.]}),
-            ('width', {'val': [1.]}),
+            ('comp.length', {'val': [1.]}),
+            ('comp.width', {'val': [1.]}),
         ])
 
         # Inputs with tag that does not match
@@ -904,19 +906,19 @@ class ExplCompTestCase(unittest.TestCase):
         # Outputs no tags
         outputs = prob.model.list_outputs(out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('area', {'val': [1.]}),
+            ('comp.area', {'val': [1.]}),
         ])
 
         # Outputs with tags
         outputs = prob.model.list_outputs(out_stream=None, tags="tag1")
         self.assertEqual(sorted(outputs), [
-            ('area', {'val': [1.]}),
+            ('comp.area', {'val': [1.]}),
         ])
 
         # Outputs with multiple tags
         outputs = prob.model.list_outputs(out_stream=None, tags=["tag1", "tag3"])
         self.assertEqual(sorted(outputs), [
-            ('area', {'val': [1.]}),
+            ('comp.area', {'val': [1.]}),
         ])
 
         # Outputs with tag that does not match
@@ -951,89 +953,21 @@ class ExplCompTestCase(unittest.TestCase):
         msg = "The tags argument should be a str or list"
         self.assertEqual(str(cm.exception), msg)
 
-    def test_feature_simple_var_tags(self):
-        from openmdao.api import Problem, ExplicitComponent
-
-        class RectangleCompWithTags(ExplicitComponent):
-            """
-            A simple Explicit Component that also has input and output with tags.
-            """
-
-            def setup(self):
-                self.add_input('length', val=1., tags=["tag1", "tag2"])
-                self.add_input('width', val=1., tags=["tag2"])
-                self.add_output('area', val=1., tags="tag1")
-
-            def setup_partials(self):
-                self.declare_partials('*', '*')
-
-            def compute(self, inputs, outputs):
-                outputs['area'] = inputs['length'] * inputs['width']
-
-        prob = Problem(RectangleCompWithTags())
-        prob.setup(check=False)
-        prob.run_model()
-
-        # Inputs no tags
-        inputs = prob.model.list_inputs(val=False, out_stream=None)
-        self.assertEqual(sorted(inputs), [
-            ('length', {}),
-            ('width', {}),
-        ])
-
-        # Inputs with tags
-        inputs = prob.model.list_inputs(val=False, out_stream=None, tags="tag1")
-        self.assertEqual(sorted(inputs), [
-            ('length', {}),
-        ])
-
-        # Inputs with multiple tags
-        inputs = prob.model.list_inputs(val=False, out_stream=None, tags=["tag1", "tag2"])
-        self.assertEqual(sorted(inputs), [
-            ('length', {}),
-            ('width', {}),
-        ])
-
-        # Inputs with tag that does not match
-        inputs = prob.model.list_inputs(val=False, out_stream=None, tags="tag3")
-        self.assertEqual(sorted(inputs), [])
-
-        # Outputs no tags
-        outputs = prob.model.list_outputs(val=False, out_stream=None)
-        self.assertEqual(sorted(outputs), [
-            ('area', {}),
-        ])
-
-        # Outputs with tags
-        outputs = prob.model.list_outputs(val=False, out_stream=None, tags="tag1")
-        self.assertEqual(sorted(outputs), [
-            ('area', {}),
-        ])
-
-        # Outputs with multiple tags
-        outputs = prob.model.list_outputs(val=False, out_stream=None, tags=["tag1", "tag3"])
-        self.assertEqual(sorted(outputs), [
-            ('area', {}),
-        ])
-
-        # Outputs with tag that does not match
-        outputs = prob.model.list_outputs(val=False, out_stream=None, tags="tag3")
-        self.assertEqual(sorted(outputs), [])
-
     def test_compute_inputs_read_only(self):
         class BadComp(TestExplCompSimple):
             def compute(self, inputs, outputs):
                 super().compute(inputs, outputs)
                 inputs['length'] = 0.  # should not be allowed
 
-        prob = om.Problem(BadComp())
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', BadComp(), promotes=['*'])
         prob.setup()
 
         with self.assertRaises(ValueError) as cm:
             prob.run_model()
 
         self.assertEqual(str(cm.exception),
-                         "<model> <class BadComp>: Attempt to set value of 'length' in input vector when it is read only.")
+                         "'comp' <class BadComp>: Attempt to set value of 'length' in input vector when it is read only.")
 
     def test_compute_inputs_read_only_reset(self):
         class BadComp(TestExplCompSimple):
@@ -1041,8 +975,10 @@ class ExplCompTestCase(unittest.TestCase):
                 super().compute(inputs, outputs)
                 raise om.AnalysisError("It's just a scratch.")
 
-        prob = om.Problem(BadComp())
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', BadComp(), promotes=['*'])
         prob.setup()
+
         with self.assertRaises(om.AnalysisError):
             prob.run_model()
 
@@ -1055,15 +991,17 @@ class ExplCompTestCase(unittest.TestCase):
                 super().compute_partials(inputs, partials)
                 inputs['length'] = 0.  # should not be allowed
 
-        prob = om.Problem(BadComp())
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', BadComp(), promotes=['*'])
         prob.setup()
+
         prob.run_model()
 
         with self.assertRaises(ValueError) as cm:
             prob.check_partials()
 
         self.assertEqual(str(cm.exception),
-                         "<model> <class BadComp>: Attempt to set value of 'length' in input vector "
+                         "'comp' <class BadComp>: Attempt to set value of 'length' in input vector "
                          "when it is read only.")
 
     def test_compute_partials_inputs_read_only_reset(self):
@@ -1072,8 +1010,10 @@ class ExplCompTestCase(unittest.TestCase):
                 super().compute_partials(inputs, partials)
                 raise om.AnalysisError("It's just a scratch.")
 
-        prob = om.Problem(BadComp())
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', BadComp(), promotes=['*'])
         prob.setup()
+
         prob.run_model()
 
         with self.assertRaises(om.AnalysisError):
@@ -1088,15 +1028,17 @@ class ExplCompTestCase(unittest.TestCase):
                 super().compute_jacvec_product(inputs, d_inputs, d_outputs, mode)
                 inputs['length'] = 0.  # should not be allowed
 
-        prob = om.Problem(BadComp())
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', BadComp(), promotes=['*'])
         prob.setup()
+
         prob.run_model()
 
         with self.assertRaises(ValueError) as cm:
             prob.check_partials()
 
         self.assertEqual(str(cm.exception),
-                         "<model> <class BadComp>: Attempt to set value of 'length' in input vector "
+                         "'comp' <class BadComp>: Attempt to set value of 'length' in input vector "
                          "when it is read only.")
 
     def test_compute_jacvec_product_inputs_read_only_reset(self):
@@ -1105,8 +1047,10 @@ class ExplCompTestCase(unittest.TestCase):
                 super().compute_jacvec_product(inputs, d_inputs, d_outputs, mode)
                 raise om.AnalysisError("It's just a scratch.")
 
-        prob = om.Problem(BadComp())
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', BadComp(), promotes=['*'])
         prob.setup()
+
         prob.run_model()
 
         with self.assertRaises(om.AnalysisError):

@@ -15,7 +15,7 @@ from openmdao.core.component import Component
 from openmdao.core.group import Group
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.general_utils import pad_name
-from openmdao.utils.om_warnings import warn_deprecation, reset_warning_registry
+from openmdao.utils.om_warnings import reset_warning_registry
 
 
 @contextmanager
@@ -282,8 +282,9 @@ def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6):
         if 'inconsistent_keys' in dct:
             incon_keys = dct['inconsistent_keys']
 
+        Jname = 'J_fwd' if 'J_fwd' in dct else 'J_rev'
         try:
-            dct['J_fwd']
+            dct[Jname]
             dct['J_fd']
         except Exception as err:
             raise err.__class__(f"For key {key}: {err}")
@@ -299,14 +300,14 @@ def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6):
                         raise ValueError(f"abs tolerance of {eabs} > allowed abs tolerance "
                                          f"of {atol}.")
         except ValueError as err:
-            fails.append((key, dct, err))
+            fails.append((key, dct, err, Jname))
 
     fail_list = []
 
     if fails:
         fail_list.extend(
-            [f"Totals differ for {key}:\nAnalytic:\n{dct['J_fwd']}\nFD:\n{dct['J_fd']}\n{err}"
-             for key, dct, err in fails])
+            [f"Totals differ for {key}:\nAnalytic:\n{dct[Jname]}\nFD:\n{dct['J_fd']}\n{err}"
+             for key, dct, err, Jname in fails])
 
     if incon_keys:
         ders = [f"{sof} wrt {swrt}" for sof, swrt in sorted(incon_keys)]
@@ -389,95 +390,6 @@ def assert_no_dict_jacobians(system, include_self=True, recurse=True):
             parts.append('    ' + s.pathname)
     if len(parts) > 1:
         raise AssertionError('\n'.join(parts))
-
-
-def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
-    """
-    Check relative error.
-
-    Determine that the relative error between `actual` and `desired`
-    is within `tolerance`. If `desired` is zero, then use absolute error.
-
-    Parameters
-    ----------
-    test_case : class:`unittest.TestCase`
-        TestCase instance used for assertions.
-    actual : float, array-like, dict
-        The value from the test.
-    desired : float, array-like, dict
-        The value expected.
-    tolerance : float
-        Maximum relative error ``(actual - desired) / desired``.
-
-    Returns
-    -------
-    float
-        The error.
-    """
-    warn_deprecation("'assert_rel_error' has been deprecated. Use "
-                     "'assert_near_equal' instead.")
-
-    if isinstance(actual, dict) and isinstance(desired, dict):
-
-        actual_keys = set(actual.keys())
-        desired_keys = set(desired.keys())
-
-        if actual_keys.symmetric_difference(desired_keys):
-            msg = 'Actual and desired keys differ. Actual extra keys: {}, Desired extra keys: {}'
-            actual_extra = actual_keys.difference(desired_keys)
-            desired_extra = desired_keys.difference(actual_keys)
-            test_case.fail(msg.format(actual_extra, desired_extra))
-
-        error = 0.
-
-        for key in actual_keys:
-            try:
-                new_error = assert_rel_error(test_case, actual[key], desired[key], tolerance)
-                error = max(error, new_error)
-            except test_case.failureException as exception:
-                msg = '{}: '.format(key) + str(exception)
-                raise test_case.failureException(msg) from None
-
-    elif isinstance(actual, float) and isinstance(desired, float):
-        if isnan(actual) and not isnan(desired):
-            test_case.fail('actual nan, desired %s' % desired)
-        if desired != 0:
-            error = (actual - desired) / desired
-        else:
-            error = actual
-        if abs(error) > tolerance:
-            test_case.fail('actual %s, desired %s, rel error %s, tolerance %s'
-                           % (actual, desired, error, tolerance))
-
-    # array values
-    else:
-        actual = np.atleast_1d(actual)
-        desired = np.atleast_1d(desired)
-        if actual.shape != desired.shape:
-            test_case.fail(
-                'actual and desired have differing shapes.'
-                ' actual {}, desired {}'.format(actual.shape, desired.shape))
-        if not np.all(np.isnan(actual) == np.isnan(desired)):
-            if actual.size == 1 and desired.size == 1:
-                test_case.fail('actual %s, desired %s' % (actual, desired))
-            else:
-                test_case.fail('actual and desired values have non-matching nan'
-                               ' values')
-
-        if np.linalg.norm(desired) == 0:
-            error = np.linalg.norm(actual)
-        else:
-            error = np.linalg.norm(actual - desired) / np.linalg.norm(desired)
-
-        if abs(error) > tolerance:
-            if actual.size < 10 and desired.size < 10:
-                test_case.fail('actual %s, desired %s, rel error %s, tolerance %s'
-                               % (actual, desired, error, tolerance))
-            else:
-                test_case.fail('arrays do not match, rel error %.3e > tol (%.3e)' %
-                               (error, tolerance))
-
-    return error
 
 
 def assert_near_equal(actual, desired, tolerance=1e-15):

@@ -4,7 +4,6 @@ from collections import namedtuple
 import numpy as np
 
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, _is_group
-from openmdao.utils.om_warnings import warn_deprecation
 
 
 DEFAULT_ORDER = {

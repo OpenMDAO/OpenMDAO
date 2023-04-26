@@ -215,7 +215,7 @@ class TestParallelGroups(unittest.TestCase):
 
         assert_near_equal(J['C1.y', 'x'], expected, 1e-6)
         assert_near_equal(prob.get_val('C1.y', get_remote=True),
-                         np.array([2.5,2.5,3.5], dtype=float), 1e-6)
+                          np.array([2.5,2.5,3.5], dtype=float), 1e-6)
 
     @parameterized.expand(itertools.product(['fwd', 'rev']),
                           name_func=_test_func_name)
@@ -257,7 +257,6 @@ class TestParallelGroups(unittest.TestCase):
         model = prob.model
         size = 3
 
-        rank = prob.comm.rank
         if not auto:
             model.add_subsystem('indep', om.IndepVarComp('x', np.ones(size)), promotes=['x'])
         model.add_subsystem('C1', DistribExecComp(['y=2.5*x', 'y=3.5*x'], arr_size=size), promotes=['x'])

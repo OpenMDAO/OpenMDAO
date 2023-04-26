@@ -21,6 +21,7 @@ import openmdao.api as om
 from openmdao.components.exec_comp import _expr_dict, _temporary_expr_dict
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_warning
 from openmdao.utils.general_utils import env_truthy
+from openmdao.utils.testing_utils import force_check_partials
 from openmdao.utils.om_warnings import OMDeprecationWarning, SetupWarning
 
 _ufunc_test_data = {
@@ -684,7 +685,7 @@ class TestExecComp(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        data = prob.check_partials(out_stream=None)
+        data = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(data, atol=1e-5, rtol=1e-5)
 
@@ -698,7 +699,7 @@ class TestExecComp(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        data = prob.check_partials(out_stream=None)
+        data = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(data, atol=1e-5, rtol=1e-5)
 
@@ -1326,23 +1327,23 @@ class TestExecComp(unittest.TestCase):
                             x={'val' : 3.0, 'units' : 'cm'},
                             z={'shape' : (1, ), 'units' : 's'})
 
-        self.assertEquals(cm.exception.args[0],
-                          "Defaults for 'x' have already been defined in a previous "
-                          "expression.")
+        self.assertEqual(cm.exception.args[0],
+                         "Defaults for 'x' have already been defined in a previous "
+                         "expression.")
 
         with self.assertRaises(TypeError) as cm:
             excomp.add_expr(p)
 
-        self.assertEquals(cm.exception.args[0],
-                          "Argument 'expr' must be of type 'str', but type 'Problem' was found.")
+        self.assertEqual(cm.exception.args[0],
+                         "Argument 'expr' must be of type 'str', but type 'Problem' was found.")
 
         excomp.add_expr('y = 2.9*x')
         p.model.add_subsystem('zzz', excomp)
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
 
-        self.assertEquals(cm.exception.args[0],
-                          "'zzz' <class ExecComp>: The output 'y' has already been defined by an expression.")
+        self.assertEqual(cm.exception.args[0],
+                         "'zzz' <class ExecComp>: The output 'y' has already been defined by an expression.")
 
     def test_feature_add_expr(self):
 
@@ -1553,7 +1554,7 @@ class TestFunctionRegistration(unittest.TestCase):
             p.run_model()
             assert_near_equal(p['comp.area_square'], np.ones(size) * 9., 1e-6)
 
-            data = p.check_partials(out_stream=None, step=1e-7)
+            data = force_check_partials(p, out_stream=None, step=1e-7)
             self.assertEqual(list(data), ['comp'])
 
     def test_register_check_partials_not_safe_err(self):
@@ -1569,9 +1570,9 @@ class TestFunctionRegistration(unittest.TestCase):
             assert_near_equal(p['comp.area_square'], np.ones(size) * 9., 1e-6)
 
             with self.assertRaises(Exception) as cm:
-                data = p.check_partials(out_stream=None)
-            self.assertEquals(cm.exception.args[0],
-                              "'comp' <class ExecComp>: expression contains functions ['area'] that are not complex safe. To fix this, call declare_partials('*', ['x'], method='fd') on this component prior to setup.")
+                data = force_check_partials(p, out_stream=None)
+            self.assertEqual(cm.exception.args[0],
+                             "'comp' <class ExecComp>: expression contains functions ['area'] that are not complex safe. To fix this, call declare_partials('*', ['x'], method='fd') on this component prior to setup.")
 
     def test_register_check_partials_not_safe_mult_expr(self):
         with _temporary_expr_dict():
@@ -1602,7 +1603,7 @@ class TestFunctionRegistration(unittest.TestCase):
             assert_near_equal(J['comp.out2', 'comp.y'], np.eye(size) * 2. * y, 1e-11)
             assert_near_equal(J['comp.out2', 'comp.z'], np.eye(size), 1e-6)
 
-            data = p.check_partials(out_stream=None, step=1e-7)
+            data = force_check_partials(p, out_stream=None, step=1e-7)
             self.assertEqual(list(data), ['comp'])
 
     def test_register_check_partials_not_safe_mult_expr_err(self):
@@ -1623,9 +1624,9 @@ class TestFunctionRegistration(unittest.TestCase):
             assert_near_equal(p['comp.out2'], np.ones(size) * 21., 1e-6)
 
             with self.assertRaises(Exception) as cm:
-                data = p.check_partials(out_stream=None, step=1e-7)
-            self.assertEquals(cm.exception.args[0],
-                              "'comp' <class ExecComp>: expression contains functions ['unsafe'] that are not complex safe. To fix this, call declare_partials('*', ['z'], method='fd') on this component prior to setup.")
+                data = force_check_partials(p, out_stream=None, step=1e-7)
+            self.assertEqual(cm.exception.args[0],
+                             "'comp' <class ExecComp>: expression contains functions ['unsafe'] that are not complex safe. To fix this, call declare_partials('*', ['z'], method='fd') on this component prior to setup.")
 
     def test_register_check_partials_safe(self):
         with _temporary_expr_dict():
@@ -1638,11 +1639,8 @@ class TestFunctionRegistration(unittest.TestCase):
             p.run_model()
             assert_near_equal(p['comp.area_square'], np.ones(size) * 9., 1e-11)
 
-            data = p.check_partials(out_stream=None)
-            if env_truthy('CI'):
-                self.assertEqual(list(data), ['comp'])
-            else:
-                self.assertEqual(list(data), [])
+            data = force_check_partials(p, out_stream=None)
+            self.assertEqual(list(data), ['comp'])
 
     def test_register_simple_arr_manual_partials_cs(self):
         with _temporary_expr_dict():
@@ -1777,20 +1775,20 @@ class TestFunctionRegistration(unittest.TestCase):
         with _temporary_expr_dict():
             with self.assertRaises(Exception) as cm:
                 om.ExecComp.register('shape', lambda x: x, complex_safe=True)
-            self.assertEquals(cm.exception.args[0], "ExecComp: cannot register name 'shape' because "
-                              "it's a reserved keyword.")
+            self.assertEqual(cm.exception.args[0], "ExecComp: cannot register name 'shape' because "
+                             "it's a reserved keyword.")
 
     def test_register_err_not_callable(self):
         with _temporary_expr_dict():
             with self.assertRaises(Exception) as cm:
                 om.ExecComp.register('foo', 99, complex_safe=True)
-            self.assertEquals(cm.exception.args[0], "ExecComp: 'foo' passed to register() of type 'int' is not callable.")
+            self.assertEqual(cm.exception.args[0], "ExecComp: 'foo' passed to register() of type 'int' is not callable.")
 
     def test_register_err_dup(self):
         with _temporary_expr_dict():
             with self.assertRaises(Exception) as cm:
                 om.ExecComp.register('exp', lambda x: x, complex_safe=True)
-            self.assertEquals(cm.exception.args[0], "ExecComp: 'exp' has already been registered.")
+            self.assertEqual(cm.exception.args[0], "ExecComp: 'exp' has already been registered.")
 
 
 _MASK = np.array(
@@ -1937,7 +1935,7 @@ class TestExecCompParameterized(unittest.TestCase):
 
         if 'check_val' not in test_data:
             try:
-                prob.check_partials(out_stream=None)
+                force_check_partials(prob, out_stream=None)
             except TypeError as e:
                 print(f, 'does not support complex-step differentiation')
 
@@ -1977,7 +1975,7 @@ class TestExecCompParameterized(unittest.TestCase):
             prob.run_model()
 
         if 'check_val' not in test_data:
-            cpd = prob.check_partials(out_stream=None)
+            cpd = force_check_partials(prob, out_stream=None)
 
             for comp in cpd:
                 for (var, wrt) in cpd[comp]:

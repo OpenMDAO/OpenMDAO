@@ -12,19 +12,20 @@ from difflib import get_close_matches
 import numpy as np
 import networkx as nx
 
-from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
+from openmdao.core.configinfo import _ConfigInfo
 from openmdao.core.system import System, collect_errors
 from openmdao.core.component import Component, _DictValues
+from openmdao.core.constants import _UNDEFINED, INT_DTYPE, _SetupStatus
 from openmdao.vectors.vector import _full_slice
-from openmdao.core.constants import _UNDEFINED, INT_DTYPE
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
 from openmdao.jacobians.jacobian import SUBJAC_META_DEFAULTS
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len
-from openmdao.utils.general_utils import common_subpath, \
+from openmdao.utils.general_utils import common_subpath, all_ancestors, \
     convert_src_inds, ContainsAll, shape2tuple, get_connection_owner
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
@@ -33,7 +34,6 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     PromotionWarning, MPIWarning
-from openmdao.core.constants import _SetupStatus
 
 # regex to check for valid names.
 import re
@@ -373,8 +373,20 @@ class Group(System):
         dict
             Mapping of each absolute var name to its corresponding scaling factor tuple.
         """
-        # The output and residual vectors are handled in system.py.
-        scale_factors = super()._compute_root_scale_factors()
+        # make this a defaultdict to handle the case of access using unconnected inputs
+        scale_factors = defaultdict(lambda: {
+            'input': (0.0, 1.0),
+        })
+
+        for abs_name, meta in self._var_allprocs_abs2meta['output'].items():
+            ref0 = meta['ref0']
+            res_ref = meta['res_ref']
+            a0 = ref0
+            a1 = meta['ref'] - ref0
+            scale_factors[abs_name] = {
+                'output': (a0, a1),
+                'residual': (0.0, 1.0 if res_ref is None else res_ref),
+            }
 
         # Input scaling for connected inputs is added here.
         # This is a combined scale factor that includes the scaling of the connected source
@@ -657,6 +669,623 @@ class Group(System):
             return sorted(all_states)
         else:
             return self._list_states()
+
+    def _setup(self, comm, mode, prob_meta):
+        """
+        Perform setup for this system and its descendant systems.
+
+        This is only called on the top-level model.
+
+        Parameters
+        ----------
+        comm : MPI.Comm or <FakeComm> or None
+            The global communicator.
+        mode : str
+            Derivative direction, either 'fwd', or 'rev', or 'auto'
+        prob_meta : dict
+            Problem level metadata dictionary.
+        """
+        # save a ref to the problem level options.
+        self._problem_meta = prob_meta
+        self._initial_condition_cache = {}
+
+        # reset any coloring if a Coloring object was not set explicitly
+        if self._coloring_info['dynamic'] or self._coloring_info['static'] is not None:
+            self._coloring_info['coloring'] = None
+
+        self.pathname = ''
+        self.comm = comm
+        self._mode = mode
+
+        # Besides setting up the processors, this method also builds the model hierarchy.
+        self._setup_procs(self.pathname, comm, mode, self._problem_meta)
+
+        prob_meta['config_info'] = _ConfigInfo()
+
+        try:
+            # Recurse model from the bottom to the top for configuring.
+            self._configure()
+        finally:
+            prob_meta['config_info'] = None
+            prob_meta['setup_status'] = _SetupStatus.POST_CONFIGURE
+
+        self._configure_check()
+
+        self._setup_var_data()
+
+        # have to do this again because we are passed the point in
+        # _setup_var_data when this happens
+        self._has_output_scaling = False
+        self._has_output_adder = False
+        self._has_resid_scaling = False
+        self._has_bounds = False
+
+        for subsys in self.system_iter(include_self=True, recurse=True):
+            subsys._apply_output_solver_options()
+
+            self._has_output_scaling |= subsys._has_output_scaling
+            self._has_output_adder |= subsys._has_output_adder
+            self._has_resid_scaling |= subsys._has_resid_scaling
+            self._has_bounds |= subsys._has_bounds
+
+        # promoted names must be known to determine implicit connections so this must be
+        # called after _setup_var_data, and _setup_var_data will have to be partially redone
+        # after auto_ivcs have been added, but auto_ivcs can't be added until after we know all of
+        # the connections.
+        self._setup_global_connections()
+        self._setup_dynamic_shapes()
+
+        self._top_level_post_connections(mode)
+
+        self._setup_var_sizes()
+
+        self._top_level_post_sizes()
+
+        try:
+            self._problem_meta['relevant'] = self._init_relevance(mode)
+        except RuntimeError:
+            type_exc, exc, tb = sys.exc_info()
+            self._collect_error(str(exc), exc_type=type_exc, tback=tb)
+
+        # determine which connections are managed by which group, and check validity of connections
+        self._setup_connections()
+
+    def _init_relevance(self, mode):
+        """
+        Create the relevance dictionary.
+
+        This is only called on the top level System.
+
+        Parameters
+        ----------
+        mode : str
+            Derivative direction, either 'fwd' or 'rev'.
+
+        Returns
+        -------
+        dict
+            The relevance dictionary.
+        """
+        if self._use_derivatives:
+            desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
+            responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
+
+            responses = self._check_alias_overlaps(responses)
+
+            return self.get_relevant_vars(desvars, responses, mode)
+
+        return {'@all': ({'input': ContainsAll(), 'output': ContainsAll()}, ContainsAll())}
+
+    def get_relevant_vars(self, desvars, responses, mode):
+        """
+        Find all relevant vars between desvars and responses.
+
+        Both vars are assumed to be outputs (either design vars or responses).
+
+        Parameters
+        ----------
+        desvars : dict
+            Dictionary of design variable metadata.
+        responses : dict
+            Dictionary of response variable metadata.
+        mode : str
+            Direction of derivatives, either 'fwd' or 'rev'.
+
+        Returns
+        -------
+        dict
+            Dict of ({'outputs': dep_outputs, 'inputs': dep_inputs}, dep_systems)
+            keyed by design vars and responses.
+        """
+        conns = self._conn_global_abs_in2out
+
+        # Create a hybrid graph with components and all connected vars.  If a var is connected,
+        # also connect it to its corresponding component.  This results in a smaller graph
+        # (fewer edges) than would be the case for a pure variable graph where all inputs
+        # to a particular component would have to be connected to all outputs from that component.
+        graph = nx.DiGraph()
+        for tgt, src in conns.items():
+            if src not in graph:
+                graph.add_node(src, type_='out')
+
+            graph.add_node(tgt, type_='in')
+
+            src_sys, _, _ = src.rpartition('.')
+            graph.add_edge(src_sys, src)
+
+            tgt_sys, _, _ = tgt.rpartition('.')
+            graph.add_edge(tgt, tgt_sys)
+
+            graph.add_edge(src, tgt)
+
+        for dv in desvars:
+            if dv not in graph:
+                graph.add_node(dv, type_='out')
+                graph.add_edge(dv.rpartition('.')[0], dv)
+
+        for res in responses:
+            if res not in graph:
+                graph.add_node(res, type_='out')
+                graph.add_edge(res.rpartition('.')[0], res)
+
+        nodes = graph.nodes
+        grev = graph.reverse(copy=False)
+        rescache = {}
+        pd_dv_locs = {}  # local nodes dependent on a par deriv desvar
+        pd_res_locs = {}  # local nodes dependent on a par deriv response
+        pd_common = defaultdict(dict)
+        # for each par deriv color, keep list of all local dep nodes for each var
+        pd_err_chk = defaultdict(dict)
+
+        relevant = defaultdict(dict)
+
+        for desvar, dvmeta in desvars.items():
+            dvset = set(self.all_connected_nodes(graph, desvar))
+            parallel_deriv_color = dvmeta['parallel_deriv_color']
+            if parallel_deriv_color:
+                pd_dv_locs[desvar] = set(self.all_connected_nodes(graph, desvar, local=True))
+                pd_err_chk[parallel_deriv_color][desvar] = pd_dv_locs[desvar]
+
+            for response, resmeta in responses.items():
+                if response not in rescache:
+                    rescache[response] = set(self.all_connected_nodes(grev, response))
+                    parallel_deriv_color = resmeta['parallel_deriv_color']
+                    if parallel_deriv_color:
+                        pd_res_locs[response] = set(self.all_connected_nodes(grev, response,
+                                                                             local=True))
+                        pd_err_chk[parallel_deriv_color][response] = pd_res_locs[response]
+
+                common = dvset.intersection(rescache[response])
+
+                if common:
+                    dv = conns[desvar] if desvar in conns else desvar
+                    r = conns[response] if response in conns else response
+                    if desvar in pd_dv_locs and pd_dv_locs[desvar]:
+                        pd_common[dv][r] = pd_dv_locs[desvar].intersection(rescache[response])
+                    elif response in pd_res_locs and pd_res_locs[response]:
+                        pd_common[r][dv] = pd_res_locs[response].intersection(dvset)
+
+                    input_deps = set()
+                    output_deps = set()
+                    sys_deps = set()
+                    for node in common:
+                        if 'type_' in nodes[node]:
+                            typ = nodes[node]['type_']
+                            system = node.rpartition('.')[0]
+                            if typ == 'in':  # input var
+                                input_deps.add(node)
+                                if system not in sys_deps:
+                                    sys_deps.update(all_ancestors(system))
+                            else:  # output var
+                                output_deps.add(node)
+                                if system not in sys_deps:
+                                    sys_deps.update(all_ancestors(system))
+
+                elif desvar == response:
+                    input_deps = set()
+                    output_deps = set([response])
+                    sys_deps = set(all_ancestors(desvar.rpartition('.')[0]))
+
+                if common or desvar == response:
+                    desvar = conns[desvar] if desvar in conns else desvar
+                    response = conns[response] if response in conns else response
+                    if mode != 'rev':  # fwd or auto
+                        relevant[desvar][response] = ({'input': input_deps,
+                                                       'output': output_deps}, sys_deps)
+                    if mode != 'fwd':  # rev or auto
+                        relevant[response][desvar] = ({'input': input_deps,
+                                                       'output': output_deps}, sys_deps)
+
+                    sys_deps.add('')  # top level Group is always relevant
+
+        rescache = None
+
+        if pd_dv_locs or pd_res_locs:
+            # check to make sure we don't have any overlapping dependencies between vars of the
+            # same color
+            vtype = 'design variable' if mode == 'fwd' else 'response'
+            err = (None, None)
+            for pdcolor, dct in pd_err_chk.items():
+                seen = set()
+                for vname, nodes in dct.items():
+                    if seen.intersection(nodes):
+                        err = (vname, pdcolor)
+                        break
+                    seen.update(nodes)
+
+            all_errs = self.comm.allgather(err)
+            for n, color in all_errs:
+                if n is not None:
+                    raise RuntimeError(f"{self.msginfo}: {vtype} '{n}' has overlapping dependencies"
+                                       f" on the same rank with other {vtype}s in "
+                                       f"parallel_deriv_color '{color}'.")
+
+            # we have some parallel deriv colors, so update relevance entries to throw out
+            # any dependencies that aren't on the same rank.
+            if pd_common:
+                for inp, sub in relevant.items():
+                    for out, tup in sub.items():
+                        meta = tup[0]
+                        if inp in pd_common:
+                            meta['input'] = meta['input'].intersection(pd_common[inp][out])
+                            meta['output'] = meta['output'].intersection(pd_common[inp][out])
+                            if out not in meta['output']:
+                                meta['input'] = set()
+                                meta['output'] = set()
+
+        voi_lists = []
+        if mode != 'rev':
+            voi_lists.append((desvars, responses))
+        if mode != 'fwd':
+            voi_lists.append((responses, desvars))
+
+        # now calculate dependencies between each VOI and all other VOIs of the
+        # other type, e.g for each input VOI wrt all output VOIs.  This is only
+        # done for design vars in fwd mode or responses in rev mode. In auto mode,
+        # we combine the results for fwd and rev modes.
+        for inputs, outputs in voi_lists:
+            for inp in inputs:
+                if inp in conns:
+                    inp = conns[inp]
+                relinp = relevant[inp]
+                if relinp:
+                    if '@all' in relinp:
+                        dct, total_systems = relinp['@all']
+                        total_inps = dct['input']
+                        total_outs = dct['output']
+                    else:
+                        total_inps = set()
+                        total_outs = set()
+                        total_systems = set()
+
+                    for out in outputs:
+                        if out in relinp:
+                            dct, systems = relinp[out]
+                            total_inps.update(dct['input'])
+                            total_outs.update(dct['output'])
+                            total_systems.update(systems)
+
+                    relinp['@all'] = ({'input': total_inps, 'output': total_outs},
+                                      total_systems)
+                else:
+                    relinp['@all'] = ({'input': set(), 'output': set()}, set())
+
+        return relevant
+
+    def all_connected_nodes(self, graph, start, local=False):
+        """
+        Yield all downstream nodes starting at the given node.
+
+        Parameters
+        ----------
+        graph : network.DiGraph
+            Graph being traversed.
+        start : hashable object
+            Identifier of the starting node.
+        local : bool
+            If True and a non-local node is encountered in the traversal, the traversal
+            ends on that branch.
+
+        Yields
+        ------
+        str
+            Each node found when traversal starts at start.
+        """
+        if local:
+            abs2meta_in = self._var_abs2meta['input']
+            abs2meta_out = self._var_abs2meta['output']
+            all_abs2meta_in = self._var_allprocs_abs2meta['input']
+            all_abs2meta_out = self._var_allprocs_abs2meta['output']
+
+            def is_local(name):
+                return (name in abs2meta_in or name in abs2meta_out or
+                        (name not in all_abs2meta_in and name not in all_abs2meta_out))
+
+        if not local or is_local(start):
+            stack = [start]
+            visited = set(stack)
+            yield start
+        else:
+            return
+
+        while stack:
+            src = stack.pop()
+            for tgt in graph[src]:
+                if not local or is_local(tgt):
+                    yield tgt
+                else:
+                    continue
+                if tgt not in visited:
+                    visited.add(tgt)
+                    stack.append(tgt)
+
+    def _check_alias_overlaps(self, responses):
+        # If you have response aliases, check for overlapping indices.  Also adds aliased
+        # sources to responses if they're not already there so relevance will work properly.
+        aliases = set()
+        aliased_srcs = {}
+        to_add = {}
+        discrete = self._var_allprocs_discrete
+
+        # group all aliases by source so we can compute overlaps for each source individually
+        for name, meta in responses.items():
+            if meta['alias'] and not (name in discrete['input'] or name in discrete['output']):
+                aliases.add(name)  # name is the same as meta['alias'] here
+                src = meta['source']
+                if src in aliased_srcs:
+                    aliased_srcs[src].append(meta)
+                else:
+                    aliased_srcs[src] = [meta]
+
+                    if src in responses:
+                        # source itself is also a constraint, so need to know indices
+                        aliased_srcs[src].append(responses[src])
+                    else:
+                        # If an alias is in responses, but the src isn't, then we need to
+                        # make sure the src is present for the relevance calculation.
+                        # This is allowed here because this responses dict is not used beyond
+                        # the relevance calculation.
+                        to_add[src] = meta
+
+        for src, metalist in aliased_srcs.items():
+            if len(metalist) == 1:
+                continue
+
+            size = self._var_allprocs_abs2meta['output'][src]['global_size']
+            shape = self._var_allprocs_abs2meta['output'][src]['global_shape']
+            mat = np.zeros(size, dtype=np.ushort)
+
+            for meta in metalist:
+                indices = meta['indices']
+                if indices is None:
+                    mat[:] += 1
+                else:
+                    indices.set_src_shape(shape)
+                    mat[indices.flat()] += 1
+
+            if np.any(mat > 1):
+                matching_aliases = sorted(m['alias'] for m in metalist if m['alias'])
+                raise RuntimeError(f"{self.msginfo}: Indices for aliases {matching_aliases} are "
+                                   f"overlapping constraint/objective '{src}'.")
+
+        if aliases:
+            # now remove alias entries from the response dict because we don't need them in the
+            # relevance calculation. This response dict is used only for relevance and is *not*
+            # used by the driver.
+            responses.update(to_add)
+            responses = {r: meta for r, meta in responses.items() if r not in aliases}
+
+        return responses
+
+    def _get_var_offsets(self):
+        """
+        Compute global offsets for variables.
+
+        Returns
+        -------
+        dict
+            Arrays of global offsets keyed by vec_name and deriv direction.
+        """
+        if self._var_offsets is None:
+            offsets = self._var_offsets = {}
+            for type_ in ['input', 'output']:
+                vsizes = self._var_sizes[type_]
+                if vsizes.size > 0:
+                    csum = np.empty(vsizes.size, dtype=INT_DTYPE)
+                    csum[0] = 0
+                    csum[1:] = np.cumsum(vsizes)[:-1]
+                    offsets[type_] = csum.reshape(vsizes.shape)
+                else:
+                    offsets[type_] = np.zeros(0, dtype=INT_DTYPE).reshape((1, 0))
+
+        return self._var_offsets
+
+    def _get_jac_col_scatter(self):
+        """
+        Return source and target indices for a scatter from the output vector to a jacobian column.
+
+        If the transfer involves remote or distributed variables, the indices will be global.
+        Otherwise they will be converted to local.
+
+        Returns
+        -------
+        ndarray
+            Source indices.
+        ndarray
+            Target indices.
+        int
+            Size of jacobian column.
+        bool
+            True if remote or distributed vars are present.
+        """
+        myrank = self.comm.rank
+        nranks = self.comm.size
+        owns = self._owning_rank
+        abs2idx = self._var_allprocs_abs2idx
+        abs2meta = self._var_abs2meta['output']
+        sizes = self._var_sizes['output']
+        global_offsets = self._get_var_offsets()['output']
+        oflist = list(self._jac_of_iter())
+        tsize = oflist[-1][2]
+        toffset = myrank * tsize
+        has_dist_data = False
+
+        sinds = []
+        tinds = []
+
+        for name, tstart, tend, jinds, dist_sizes in oflist:
+            vind = abs2idx[name]
+            if dist_sizes is None:
+                if name in abs2meta:
+                    owner = myrank
+                else:
+                    owner = owns[name]
+                    has_dist_data |= nranks > 1
+
+                voff = global_offsets[owner, vind]
+                if jinds is _full_slice:
+                    vsize = sizes[owner, vind]
+                    sinds.append(range(voff, voff + vsize))
+                else:
+                    sinds.append(jinds + voff)
+                tinds.append(range(tstart + toffset, tend + toffset))
+                assert len(sinds[-1]) == len(tinds[-1])
+            else:  # 'name' refers to a distributed variable
+                has_dist_data |= nranks > 1
+                dtstart = dtend = tstart
+                dsstart = dsend = 0
+                for rnk, sz in enumerate(dist_sizes):
+                    dsend += sz
+                    if sz > 0:
+                        voff = global_offsets[rnk, vind]
+                        if jinds is _full_slice:
+                            dtend += sz
+                            sinds.append(range(voff, voff + sz))
+                            tinds.append(range(toffset + dtstart, toffset + dtend))
+                        elif jinds.size > 0:  # jinds is a flat array
+                            subinds = jinds[jinds >= dsstart]
+                            subinds = subinds[subinds < dsend]
+                            if subinds.size > 0:
+                                dtend += subinds.size
+                                sinds.append(subinds + (voff - dsstart))
+                                tinds.append(range(toffset + dtstart, toffset + dtend))
+                        dtstart = dtend
+                    dsstart = dsend
+                assert (len(sinds) == 0 and len(tinds) == 0) or len(sinds[-1]) == len(tinds[-1])
+
+        sarr = np.array(list(chain(*sinds)), dtype=INT_DTYPE)
+        tarr = np.array(list(chain(*tinds)), dtype=INT_DTYPE)
+
+        if nranks > 1:
+            # do an allreduce to see if any procs have distrib/remote vars
+            has_dist_data = bool(self.comm.allreduce(int(has_dist_data)))
+
+        if not has_dist_data:
+            # convert global indices back to local so we can use them to transfer between two
+            # local arrays
+            sysoffset = np.sum(sizes[:myrank, :])
+            sarr -= sysoffset
+            tarr -= toffset
+
+        return sarr, tarr, tsize, has_dist_data
+
+    def _final_setup(self, comm):
+        """
+        Perform final setup for this system and its descendant systems.
+
+        This part of setup is called automatically at the start of run_model or run_driver.
+
+        Parameters
+        ----------
+        comm : MPI.Comm or <FakeComm> or None
+            The global communicator.
+        """
+        if self._use_derivatives:
+            # must call this before vector setup because it determines if we need to alloc commplex
+            self._setup_partials()
+
+        self._setup_vectors(self._get_root_vectors())
+
+        # Transfers do not require recursion, but they have to be set up after the vector setup.
+        self._setup_transfers()
+
+        # Same situation with solvers, partials, and Jacobians.
+        # If we're updating, we just need to re-run setup on these, but no recursion necessary.
+        self._setup_solvers()
+        self._setup_solver_print()
+        if self._use_derivatives:
+            self._setup_jacobians()
+
+        self._setup_recording()
+
+        self.set_initial_values()
+
+    def set_initial_values(self):
+        """
+        Set all input and output variables to their declared initial values.
+        """
+        for abs_name, meta in self._var_abs2meta['input'].items():
+            self._inputs.set_var(abs_name, meta['val'])
+
+        for abs_name, meta in self._var_abs2meta['output'].items():
+            self._outputs.set_var(abs_name, meta['val'])
+
+    def _get_root_vectors(self):
+        """
+        Get the root vectors for the nonlinear and linear vectors for the model.
+
+        Returns
+        -------
+        dict of dict of Vector
+            Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        """
+        # save root vecs as an attribute so that we can reuse the nonlinear scaling vecs in the
+        # linear root vec
+        self._root_vecs = root_vectors = {'input': {}, 'output': {}, 'residual': {}}
+
+        force_alloc_complex = self._problem_meta['force_alloc_complex']
+
+        # Check for complex step to set vectors up appropriately.
+        # If any subsystem needs complex step, then we need to allocate it everywhere.
+        nl_alloc_complex = force_alloc_complex
+        if not nl_alloc_complex:
+            for sub in self.system_iter(include_self=True, recurse=True):
+                nl_alloc_complex |= 'cs' in sub._approx_schemes
+                if nl_alloc_complex:
+                    break
+
+        # Linear vectors allocated complex only if subsolvers require derivatives.
+        if nl_alloc_complex and self._use_derivatives:
+            from openmdao.error_checking.check_config import check_allocate_complex_ln
+            ln_alloc_complex = check_allocate_complex_ln(self, force_alloc_complex)
+        else:
+            ln_alloc_complex = False
+
+        if self._has_input_scaling or self._has_output_scaling or self._has_resid_scaling:
+            self._scale_factors = self._compute_root_scale_factors()
+        else:
+            self._scale_factors = None
+
+        if self._vector_class is None:
+            self._vector_class = self._local_vector_class
+
+        vectypes = ('nonlinear', 'linear') if self._use_derivatives else ('nonlinear',)
+
+        for vec_name in vectypes:
+            if vec_name == 'nonlinear':
+                alloc_complex = nl_alloc_complex
+            else:
+                alloc_complex = ln_alloc_complex
+
+            for key in ['input', 'output', 'residual']:
+                root_vectors[key][vec_name] = self._vector_class(vec_name, key, self,
+                                                                 alloc_complex=alloc_complex)
+
+        if self._use_derivatives:
+            root_vectors['input']['linear']._scaling_nl_vec = \
+                root_vectors['input']['nonlinear']._scaling
+
+        return root_vectors
 
     def _get_all_promotes(self):
         """
@@ -1524,12 +2153,6 @@ class Group(System):
                                 continue
 
                         meta = abs2meta[abs_in]
-                        if meta['src_indices'] is not None:
-                            self._collect_error(
-                                f"{self.msginfo}: src_indices has been defined in both "
-                                f"connect('{prom_out}', '{prom_in}') and "
-                                f"add_input('{prom_in}', ...).")
-
                         meta['manual_connection'] = True
                         meta['src_indices'] = src_indices
                         meta['flat_src_indices'] = flat
@@ -2844,37 +3467,49 @@ class Group(System):
                     raise RuntimeError(msg.format(self.msginfo, iname))
 
     def _approx_subjac_keys_iter(self):
-        pro2abs = self._var_allprocs_prom2abs_list
-
         if self._owns_approx_wrt and not self.pathname:
             candidate_wrt = self._owns_approx_wrt
         else:
-            candidate_wrt = list(var[0] for var in pro2abs['input'].values())
+            pro2abs = self._var_allprocs_prom2abs_list
+            candidate_wrt = []
+            for abs_inps in pro2abs['input'].values():
+                for inp in abs_inps:
+                    candidate_wrt.append(inp)
+                    # If connection is inside of this Group, perturbation of all implicitly
+                    # connected inputs will be handled properly via internal transfers. Otherwise,
+                    # we need to add all implicitly connected inputs separately.
+                    if inp in self._conn_abs_in2out:
+                        break
 
-        from openmdao.core.indepvarcomp import IndepVarComp
         wrt = set()
         ivc = set()
         if self.pathname:  # get rid of any old stuff in here
             self._owns_approx_of = self._owns_approx_wrt = None
+            totals = False
+        else:
+            totals = True
 
+        all_abs2meta_out = self._var_allprocs_abs2meta['output']
+
+        # When computing totals, weed out inputs connected to anything inside our system unless
+        # the source is an indepvarcomp.
+        prefix = self.pathname + '.' if self.pathname else ''
         for var in candidate_wrt:
-
-            # Weed out inputs connected to anything inside our system unless the source is an
-            # indepvarcomp.
             if var in self._conn_abs_in2out:
-                src = self._conn_abs_in2out[var]
-                compname = src.rsplit('.', 1)[0]
-                comp = self._get_subsystem(compname)
-                if isinstance(comp, IndepVarComp):
-                    wrt.add(src)
-                    ivc.add(src)
+                if totals:
+                    src = self._conn_abs_in2out[var]
+                    if src.startswith(prefix):
+                        meta = all_abs2meta_out[src]
+                        if 'openmdao:indep_var' in meta['tags']:
+                            wrt.add(src)
+                            ivc.add(src)
             else:
                 wrt.add(var)
 
         if self._owns_approx_of:
             of = set(self._owns_approx_of)
         else:
-            of = set(var[0] for var in pro2abs['output'].values())
+            of = set(self._var_allprocs_abs2meta['output'])
             # Skip indepvarcomp res wrt other srcs
             of -= ivc
 
@@ -2884,11 +3519,12 @@ class Group(System):
                 yield key  # get all combos if we're doing total derivs
                 continue
 
+            _of, _wrt = key
             # Skip explicit res wrt outputs
-            if key[1] in of and key[1] not in ivc:
+            if _wrt in of and _wrt not in ivc:
 
                 # Support for specifying a desvar as an obj/con.
-                if key[1] not in wrt or key[0] == key[1]:
+                if _wrt not in wrt or _of == _wrt:
                     continue
 
             yield key
@@ -2988,17 +3624,19 @@ class Group(System):
 
             szname = 'global_size' if total else 'size'
 
+            seen = set()
             start = end = 0
             if self.pathname:  # doing semitotals, so include output columns
                 for of, _start, _end, _, dist_sizes in self._jac_of_iter():
                     if wrt_matches is None or of in wrt_matches:
+                        seen.add(of)
                         end += (_end - _start)
                         vec = self._outputs if of in local_outs else None
                         yield of, start, end, vec, _full_slice, dist_sizes
                         start = end
 
             for wrt in self._owns_approx_wrt:
-                if wrt_matches is None or wrt in wrt_matches:
+                if (wrt_matches is None or wrt in wrt_matches) and wrt not in seen:
                     io = 'input' if wrt in abs2meta['input'] else 'output'
                     meta = abs2meta[io][wrt]
                     if wrt in local_ins:
@@ -3326,8 +3964,6 @@ class Group(System):
                         newshape = src_indices.indexed_src_shape
 
             if src_indices is None:
-                # for an auto_ivc connection, src_indices here, if they exist, must be coming from
-                # an add_input call (this is a deprecated feature and will be removed eventually)
                 src_indices = meta['src_indices']
 
             if src_indices is not None:
@@ -3692,22 +4328,8 @@ class Group(System):
         For components within ParallelGroups, true execution order is unknown so components
         will be ordered by rank within a ParallelGroup.
         """
-        if self._mpi_proc_allocator.parallel and self.comm.size > 1:
-            names = []
-            for s in self._subsystems_myproc:
-                if isinstance(s, Group):
-                    names.extend(s._ordered_comp_name_iter())
-                else:
-                    names.append(s.pathname)
-            seen = set()
-            for ranknames in self.comm.allgather(names):
-                for name in ranknames:
-                    if name not in seen:
-                        yield name
-                        seen.add(name)
-        else:
-            for s in self._subsystems_myproc:
-                if isinstance(s, Group):
-                    yield from s._ordered_comp_name_iter()
-                else:
-                    yield s.pathname
+        for s in self._subsystems_myproc:
+            if isinstance(s, Group):
+                yield from s._ordered_comp_name_iter()
+            else:
+                yield s.pathname

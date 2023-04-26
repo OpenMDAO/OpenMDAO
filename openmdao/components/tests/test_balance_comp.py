@@ -9,7 +9,7 @@ from numpy.testing import assert_almost_equal
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_no_warning, assert_check_partials
-from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.utils.testing_utils import use_tempdirs, force_check_partials
 
 
 @use_tempdirs
@@ -42,7 +42,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.run_model()
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=2e-5, rtol=2e-5)
 
@@ -56,7 +56,7 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -114,7 +114,7 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -171,7 +171,7 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(1.5), decimal=7)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -211,7 +211,7 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], 2.0, decimal=7)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=2e-5, rtol=2e-5)
 
@@ -251,7 +251,7 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(1.7), decimal=7)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -295,7 +295,7 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -337,7 +337,7 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -409,7 +409,7 @@ class TestBalanceComp(unittest.TestCase):
 
         with warnings.catch_warnings():
             warnings.filterwarnings(action="error", category=np.ComplexWarning)
-            cpd = prob.check_partials(out_stream=None, method='cs')
+            cpd = force_check_partials(prob, out_stream=None, method='cs')
 
         assert_check_partials(cpd, atol=1e-10, rtol=1e-10)
 
@@ -449,7 +449,7 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], 2.0, decimal=7)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -490,7 +490,7 @@ class TestBalanceComp(unittest.TestCase):
         # should converge with no iteration due to the guess function
         self.assertEqual(model.nonlinear_solver._iter_count, 1)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
     def test_scalar_with_guess_func_additional_input(self):
@@ -640,7 +640,7 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], 2.0, decimal=7)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -684,7 +684,7 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -728,7 +728,7 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
@@ -833,7 +833,7 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
-        cpd = prob.check_partials(out_stream=None)
+        cpd = force_check_partials(prob, out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 

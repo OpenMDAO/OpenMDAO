@@ -1,6 +1,4 @@
 
-
-import time
 import itertools
 import numpy as np
 import unittest
@@ -9,7 +7,6 @@ TestCase = unittest.TestCase
 import openmdao.api as om
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
-from openmdao.test_suite.parametric_suite import parametric_suite
 from openmdao.test_suite.components.matmultcomp import MatMultComp
 
 try:
@@ -197,7 +194,7 @@ class SerialDiamondFDTestCase(TestCase):
         try:
             setup_diamond_model(0, 10, 'fd', 'model')
         except Exception as err:
-            self.assertEquals(str(err), "Value (0) of option 'num_par_fd' is less than minimum allowed value of 1.")
+            self.assertEqual(str(err), "Value (0) of option 'num_par_fd' is less than minimum allowed value of 1.")
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -554,4 +551,3 @@ class ParFDFeatureTestCase(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-

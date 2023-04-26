@@ -130,7 +130,7 @@ class ProbRemoteTestCase(unittest.TestCase):
                 rank = self.comm.rank
                 sizes, offsets = evenly_distrib_idxs(self.comm.size, N)
 
-                self.add_input('x', shape=1, src_indices=[0], distributed=True)
+                self.add_input('x', shape=1, distributed=True)
                 self.add_output('y', shape=sizes[rank], distributed=True)
 
             def compute(self, inputs, outputs):
@@ -144,23 +144,27 @@ class ProbRemoteTestCase(unittest.TestCase):
         class MyModel(om.Group):
 
             def setup(self):
-                self.add_subsystem('ivc', om.IndepVarComp('x', 0.), promotes_outputs=['*'])
-                self.add_subsystem('dst', DistribComp(), promotes_inputs=['*'])
+                self.add_subsystem('ivc', om.IndepVarComp('x', 0.))
+                self.add_subsystem('dst', DistribComp())
                 self.add_subsystem('sum', om.ExecComp('z = sum(y)', y=np.zeros((N,)), z=0.0))
+
+                self.connect('ivc.x', 'dst.x', src_indices=[0])
                 self.connect('dst.y', 'sum.y', src_indices=om.slicer[:])
 
-                self.add_subsystem('par', om.ParallelGroup(), promotes_inputs=['*'])
+                self.add_subsystem('par', om.ParallelGroup())
                 self.par.add_subsystem('c1', om.ExecComp(['y=2.0*x']), promotes_inputs=['*'])
                 self.par.add_subsystem('c2', om.ExecComp(['y=5.0*x']), promotes_inputs=['*'])
+
+                self.connect('ivc.x', 'par.x')
 
         prob = om.Problem(model=MyModel())
         prob.setup(mode='fwd')
 
-        prob['x'] = 7.0
+        prob['ivc.x'] = 7.0
         prob.run_model()
 
         # get_remote=True
-        assert_near_equal(prob.get_val('x', get_remote=True), [7.])
+        assert_near_equal(prob.get_val('ivc.x', get_remote=True), [7.])
         assert_near_equal(prob.get_val('dst.x', get_remote=True), [7., 7.])  # ???????
         assert_near_equal(prob.get_val('dst.y', get_remote=True), [2., 7., 7.])
         assert_near_equal(prob.get_val('par.c1.x', get_remote=True), [7.])
