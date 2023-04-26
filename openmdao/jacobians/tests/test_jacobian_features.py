@@ -227,7 +227,7 @@ class TestJacobianFeatures(unittest.TestCase):
         with self.assertRaises(ValueError) as ex:
             problem.setup()
             problem.run_model()
-        self.assertRegexpMatches(str(ex.exception), error_msg)
+        self.assertRegex(str(ex.exception), error_msg)
 
     @parameterized.expand([
         ({'of': 'q', 'wrt': 'z'}, "'simple' <class SimpleCompKwarg>: " + 'No matches were found for of="q"'),
@@ -243,7 +243,7 @@ class TestJacobianFeatures(unittest.TestCase):
         problem.setup()
         with self.assertRaises(ValueError) as ex:
             problem.run_model()
-        self.assertEquals(str(ex.exception), error_msg)
+        self.assertEqual(str(ex.exception), error_msg)
 
     def test_const_jacobian(self):
         model = om.Group()

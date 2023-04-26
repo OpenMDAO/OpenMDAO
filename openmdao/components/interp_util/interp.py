@@ -18,7 +18,6 @@ from openmdao.components.interp_util.interp_slinear import InterpLinear, Interp3
     Interp1DSlinear, Interp2DSlinear
 
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
-from openmdao.utils.om_warnings import warn_deprecation
 from openmdao.utils.array_utils import shape_to_len
 
 

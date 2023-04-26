@@ -720,10 +720,10 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         prob.setup(mode='rev', force_alloc_complex=True)
         prob.run_model()
         data = prob.check_totals(method='cs', out_stream=None)
-        assert_near_equal(data[('pg.dc1.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc2.y2', 'iv.x')]['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc2.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc3.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(data[('pg.dc1.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('pg.dc2.y2', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('pg.dc2.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('pg.dc3.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
 
         comm = MPI.COMM_WORLD
         # should only need one jacvec product per linear solve
@@ -750,10 +750,10 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         prob.setup(mode='rev', force_alloc_complex=True)
         prob.run_model()
         data = prob.check_totals(method='cs', out_stream=None)
-        assert_near_equal(data[('pg.dc1.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc2.y2', 'iv.x')]['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc2.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
-        assert_near_equal(data[('pg.dc3.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(data[('pg.dc1.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('pg.dc2.y2', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('pg.dc2.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
+        assert_near_equal(data[('pg.dc3.y', 'iv.x')]['abs error'].reverse, 0.0, 1e-6)
 
         # should only need one jacvec product per linear solve
         comm = MPI.COMM_WORLD

@@ -339,7 +339,7 @@ class TestViewModelData(unittest.TestCase):
         with self.assertRaises(TypeError) as cm:
             _get_viewer_data(None)
 
-        self.assertEquals(str(cm.exception), msg)
+        self.assertEqual(str(cm.exception), msg)
 
     def test_handle_ndarray_system_option(self):
         class SystemWithNdArrayOption(om.ExplicitComponent):

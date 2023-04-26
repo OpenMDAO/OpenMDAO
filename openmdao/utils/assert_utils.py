@@ -15,7 +15,7 @@ from openmdao.core.component import Component
 from openmdao.core.group import Group
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.general_utils import pad_name
-from openmdao.utils.om_warnings import warn_deprecation, reset_warning_registry
+from openmdao.utils.om_warnings import reset_warning_registry
 
 
 @contextmanager
@@ -282,8 +282,9 @@ def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6):
         if 'inconsistent_keys' in dct:
             incon_keys = dct['inconsistent_keys']
 
+        Jname = 'J_fwd' if 'J_fwd' in dct else 'J_rev'
         try:
-            dct['J_fwd']
+            dct[Jname]
             dct['J_fd']
         except Exception as err:
             raise err.__class__(f"For key {key}: {err}")
@@ -299,14 +300,14 @@ def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6):
                         raise ValueError(f"abs tolerance of {eabs} > allowed abs tolerance "
                                          f"of {atol}.")
         except ValueError as err:
-            fails.append((key, dct, err))
+            fails.append((key, dct, err, Jname))
 
     fail_list = []
 
     if fails:
         fail_list.extend(
-            [f"Totals differ for {key}:\nAnalytic:\n{dct['J_fwd']}\nFD:\n{dct['J_fd']}\n{err}"
-             for key, dct, err in fails])
+            [f"Totals differ for {key}:\nAnalytic:\n{dct[Jname]}\nFD:\n{dct['J_fd']}\n{err}"
+             for key, dct, err, Jname in fails])
 
     if incon_keys:
         ders = [f"{sof} wrt {swrt}" for sof, swrt in sorted(incon_keys)]
