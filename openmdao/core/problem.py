@@ -2271,7 +2271,7 @@ class Problem(object):
         problem_indep_vars = []
         indep_var_names = set()
 
-        default_col_names = ['name', 'units', 'value']
+        default_col_names = ['name', 'units', 'val']
         col_names = default_col_names + ([] if options is None else options)
 
         for target, meta in model._var_allprocs_abs2meta['input'].items():
@@ -2281,7 +2281,7 @@ class Problem(object):
             input_name = model._var_allprocs_abs2prom['input'][target]
 
             smeta = {key: val for key, val in smeta.items() if key in col_names}
-            smeta['value'] = self.get_val(input_name)
+            smeta['val'] = self.get_val(input_name)
 
             if src_is_ivc \
                     and (include_design_vars or input_name not in desvar_prom_names) \
