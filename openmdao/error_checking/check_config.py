@@ -162,7 +162,7 @@ def _get_used_before_calc_subs(group, input_srcs):
     """
     parallel_solver = {}
     allsubs = group._subsystems_allprocs
-    for sub, i in allsubs.values():
+    for sub, _ in allsubs.values():
         if hasattr(sub, '_mpi_proc_allocator') and sub._mpi_proc_allocator.parallel:
             parallel_solver[sub.name] = sub.nonlinear_solver.SOLVER
 
@@ -178,7 +178,7 @@ def _get_used_before_calc_subs(group, input_srcs):
             hierarchy_check = True if oparts[glen + 1] == iparts[glen + 1] else False
 
             if (src_sys in parallel_solver and tgt_sys in parallel_solver and
-                    (parallel_solver[src_sys] not in ["NL: NLBJ", "NL: Newton", "BROYDEN"]) and
+                    (parallel_solver[src_sys] not in ["NL: NLBJ", "NL: Newton", "NL: BROYDEN"]) and
                     src_sys == tgt_sys and
                     not hierarchy_check):
                 msg = f"Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver " \

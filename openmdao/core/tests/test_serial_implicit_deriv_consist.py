@@ -77,8 +77,7 @@ class SerialImplicitDerivConsist(unittest.TestCase):
         prob.run_model()
         totals = prob.check_totals(of="total", wrt="s0")
         for var, err in totals.items():
-            rel_err = err["rel error"]
-            assert_near_equal(rel_err.forward, 0.0, 5e-3)
+            assert_near_equal(err["rel error"].reverse, 0.0, 5e-3)
 
 
 if __name__ == "__main__":

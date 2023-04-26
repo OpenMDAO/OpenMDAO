@@ -79,7 +79,6 @@ else:
             vectors = group._vectors
             offsets = group._get_var_offsets()
             mypathlen = len(group.pathname) + 1 if group.pathname else 0
-            allsubs = group._subsystems_allprocs
 
             # Initialize empty lists for the transfer indices
             xfer_in = []

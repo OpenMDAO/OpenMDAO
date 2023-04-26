@@ -1714,11 +1714,11 @@ class TestProblem(unittest.TestCase):
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
-        self.assertEquals(output[1], r'Design Variables')
+        self.assertEqual(output[1], r'Design Variables')
         self.assertRegex(output[5], r'^z +\|[0-9. e+-]+\| +2')
-        self.assertEquals(output[9], r'Constraints')
+        self.assertEqual(output[9], r'Constraints')
         self.assertRegex(output[14], r'^con2 +\[[0-9. e+-]+\] +1')
-        self.assertEquals(output[17], r'Objectives')
+        self.assertEqual(output[17], r'Objectives')
         self.assertRegex(output[21], r'^obj +\[[0-9. e+-]+\] +1')
 
         # With show_promoted_name=False
@@ -1794,37 +1794,37 @@ class TestProblem(unittest.TestCase):
         self.assertRegex(output[13], r'^\s+array+\(+\[[0-9., e+-]+\]+\)')
 
         # design vars
-        self.assertEquals(l['design_vars'][0][1]['name'], 'z')
-        self.assertEquals(l['design_vars'][0][1]['size'], 2)
+        self.assertEqual(l['design_vars'][0][1]['name'], 'z')
+        self.assertEqual(l['design_vars'][0][1]['size'], 2)
         assert(all(l['design_vars'][0][1]['val'] == prob.get_val('z')))
-        self.assertEquals(l['design_vars'][0][1]['scaler'], None)
-        self.assertEquals(l['design_vars'][0][1]['adder'], None)
+        self.assertEqual(l['design_vars'][0][1]['scaler'], None)
+        self.assertEqual(l['design_vars'][0][1]['adder'], None)
 
-        self.assertEquals(l['design_vars'][1][1]['name'], 'x')
-        self.assertEquals(l['design_vars'][1][1]['size'], 1)
+        self.assertEqual(l['design_vars'][1][1]['name'], 'x')
+        self.assertEqual(l['design_vars'][1][1]['size'], 1)
         assert(all(l['design_vars'][1][1]['val'] == prob.get_val('x')))
-        self.assertEquals(l['design_vars'][1][1]['scaler'], None)
-        self.assertEquals(l['design_vars'][1][1]['adder'], None)
+        self.assertEqual(l['design_vars'][1][1]['scaler'], None)
+        self.assertEqual(l['design_vars'][1][1]['adder'], None)
 
         # constraints
-        self.assertEquals(l['constraints'][0][1]['name'], 'con1')
-        self.assertEquals(l['constraints'][0][1]['size'], 1)
+        self.assertEqual(l['constraints'][0][1]['name'], 'con1')
+        self.assertEqual(l['constraints'][0][1]['size'], 1)
         assert(all(l['constraints'][0][1]['val'] == prob.get_val('con1')))
-        self.assertEquals(l['constraints'][0][1]['scaler'], None)
-        self.assertEquals(l['constraints'][0][1]['adder'], None)
+        self.assertEqual(l['constraints'][0][1]['scaler'], None)
+        self.assertEqual(l['constraints'][0][1]['adder'], None)
 
-        self.assertEquals(l['constraints'][1][1]['name'], 'con2')
-        self.assertEquals(l['constraints'][1][1]['size'], 1)
+        self.assertEqual(l['constraints'][1][1]['name'], 'con2')
+        self.assertEqual(l['constraints'][1][1]['size'], 1)
         assert(all(l['constraints'][1][1]['val'] == prob.get_val('con2')))
-        self.assertEquals(l['constraints'][1][1]['scaler'], None)
-        self.assertEquals(l['constraints'][1][1]['adder'], None)
+        self.assertEqual(l['constraints'][1][1]['scaler'], None)
+        self.assertEqual(l['constraints'][1][1]['adder'], None)
 
         # objectives
-        self.assertEquals(l['objectives'][0][1]['name'], 'obj')
-        self.assertEquals(l['objectives'][0][1]['size'], 1)
+        self.assertEqual(l['objectives'][0][1]['name'], 'obj')
+        self.assertEqual(l['objectives'][0][1]['size'], 1)
         assert(all(l['objectives'][0][1]['val'] == prob.get_val('obj')))
-        self.assertEquals(l['objectives'][0][1]['scaler'], None)
-        self.assertEquals(l['objectives'][0][1]['adder'], None)
+        self.assertEqual(l['objectives'][0][1]['scaler'], None)
+        self.assertEqual(l['objectives'][0][1]['adder'], None)
 
     def test_list_problem_vars_before_final_setup(self):
         prob = om.Problem()
