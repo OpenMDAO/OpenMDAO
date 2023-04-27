@@ -26,7 +26,7 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len
 from openmdao.utils.general_utils import common_subpath, all_ancestors, \
-    convert_src_inds, ContainsAll, shape2tuple, get_connection_owner
+    convert_src_inds, ContainsAll, shape2tuple, get_connection_owner, ensure_compatible
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
@@ -277,15 +277,15 @@ class Group(System):
         if val is _UNDEFINED:
             src_shape = shape2tuple(src_shape)
         else:
-            meta['val'] = val
             if src_shape is not None:
-                issue_warning("value was set in set_input_defaults, so ignoring "
-                              f"value {src_shape} of src_shape.", prefix=self.msginfo,
-                              category=PromotionWarning)
-            if isinstance(val, np.ndarray):
+                # make sure value and src_shape are compatible
+                val, src_shape = ensure_compatible(name, val, src_shape)
+            elif isinstance(val, np.ndarray):
                 src_shape = val.shape
             elif isinstance(val, Number):
                 src_shape = (1,)
+            meta['val'] = val
+
         if units is not None:
             if not isinstance(units, str):
                 raise TypeError('%s: The units argument should be a str or None' % self.msginfo)
