@@ -2264,6 +2264,25 @@ class RelevanceTestCase(unittest.TestCase):
 
         self.assertEqual(len(indep_vars), 1)
 
+    def test_list_indep_vars_no_auto_ivc(self):
+        prob = om.Problem()
+
+        prob.model.add_subsystem('indep_theta', om.IndepVarComp('theta'))
+        prob.model.add_subsystem('indep_r', om.IndepVarComp('r'))
+
+        prob.model.add_subsystem('xComp', om.ExecComp('x = r1*cos(theta1)'))
+        prob.model.add_subsystem('yComp', om.ExecComp('y = r2*sin(theta2)'))
+
+        prob.model.connect('indep_theta.theta', ['xComp.theta1', 'yComp.theta2'])
+        prob.model.connect('indep_r.r', ['xComp.r1', 'yComp.r2'])
+
+        prob.setup()
+        prob.final_setup()
+
+        indep_vars = prob.list_indep_vars()
+        self.assertEqual(len(indep_vars), 2)
+
+
 class NestedProblemTestCase(unittest.TestCase):
 
     def test_nested_prob(self):
