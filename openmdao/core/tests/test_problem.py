@@ -2280,7 +2280,8 @@ class RelevanceTestCase(unittest.TestCase):
         prob.final_setup()
 
         indep_vars = prob.list_indep_vars()
-        self.assertEqual(len(indep_vars), 2)
+        self.assertEqual(indep_vars[0][0], 'indep_r.r')
+        self.assertEqual(indep_vars[1][0], 'indep_theta.theta')
 
 
 class NestedProblemTestCase(unittest.TestCase):
