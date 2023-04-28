@@ -732,7 +732,7 @@ class pyOptSparseDriver(Driver):
                                                  return_format=self._total_jac_format)
 
                 # First time through, check for zero row/col.
-                if self._check_jac:
+                if self._check_jac and self._total_jac is not None:
                     raise_error = self.options['singular_jac_behavior'] == 'error'
                     self._total_jac.check_total_jac(raise_error=raise_error,
                                                     tol=self.options['singular_jac_tol'])

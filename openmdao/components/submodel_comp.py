@@ -3,6 +3,7 @@
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.general_utils import find_matches
 from openmdao.core.constants import _SetupStatus
+import openmdao.visualization.scaling_viewer.scaling_report
 
 
 class SubmodelComp(ExplicitComponent):
@@ -91,6 +92,7 @@ class SubmodelComp(ExplicitComponent):
                     raise Exception(f'Expected output of type str or tuple, got {type(out)}.')
 
         self.is_set_up = False
+        # self.is_final_set_up = False
 
     def add_input(self, path, name=None):
         """
@@ -166,7 +168,7 @@ class SubmodelComp(ExplicitComponent):
             p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'])
         p.final_setup()
 
-        self.boundary_inputs = p.list_indep_vars(out_stream=None, options=['name'])
+        self.boundary_inputs = p.list_indep_vars(out_stream=None)#, options=['name'])
         for name, meta in self.boundary_inputs:
             meta['prom_name'] = name
 
@@ -268,7 +270,6 @@ class SubmodelComp(ExplicitComponent):
         else:
             for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():
                 self.declare_partials(of=of, wrt=wrt, rows=nzrows, cols=nzcols)
-
     def _set_complex_step_mode(self, active):
         super()._set_complex_step_mode(active)
         self._subprob.set_complex_step_mode(active)
@@ -290,8 +291,12 @@ class SubmodelComp(ExplicitComponent):
             p.set_val(prom_name, inputs[iface_name])
 
         # TODO figure out naming issues when using `p.driver.run()`
-        # p.driver.run()
-        p.run_driver()
+        # if not self.is_final_set_up:
+        #     p.final_setup()
+        #     self.is_final_set_up = True
+        # p.final_setup()
+        p.driver.run()
+        # p.run_driver()
 
         for prom_name, iface_name in self.submodel_outputs:
             outputs[iface_name] = p.get_val(prom_name)
