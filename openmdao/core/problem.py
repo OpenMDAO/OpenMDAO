@@ -2281,7 +2281,7 @@ class Problem(object):
                     if 'openmdao:indep_var' in abs2meta[model.get_source(prom)]['tags']}
 
         for prom, src in prom2src.items():
-            name = prom if src.startswith('_auto_ivc') else src
+            name = prom if src.startswith('_auto_ivc.') else src
             meta = abs2meta[src]
             meta = {key: val for key, val in meta.items() if key in col_names}
             meta['val'] = self.get_val(prom)
