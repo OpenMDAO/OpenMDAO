@@ -554,7 +554,7 @@ def _get_viewer_data(data_source, case_id=None):
         'opt_settings': driver_opt_settings
     }
     data_dict['design_vars'] = root_group.get_design_vars(use_prom_ivc=False)
-    data_dict['responses'] = root_group.get_responses()
+    data_dict['responses'] = root_group.get_responses(use_prom_ivc=False)
 
     data_dict['declare_partials_list'] = _get_declare_partials(root_group)
 

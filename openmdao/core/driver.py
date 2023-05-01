@@ -357,7 +357,7 @@ class Driver(object):
 
             # Loop over all VOIs.
             for vname, voimeta in chain(self._responses.items(), self._designvars.items()):
-                # vname may be a source or an alias
+                # vname may be a abs output, promoted input, or an alias
 
                 indices = voimeta['indices']
                 vsrc = voimeta['source']

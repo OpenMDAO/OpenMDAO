@@ -2225,9 +2225,7 @@ class Problem(object):
                                "run for the Problem.")
 
         connections = model._conn_global_abs_in2out
-        desvar_prom_names = model.get_design_vars(recurse=True,
-                                                  use_prom_ivc=True,
-                                                  get_sizes=False).keys()
+        desvar_proms = model.get_design_vars(recurse=True, use_prom_ivc=True, get_sizes=False)
         problem_indep_vars = []
 
         default_col_names = ['name', 'units', 'value']
@@ -2242,7 +2240,7 @@ class Problem(object):
             smeta = {key: val for key, val in smeta.items() if key in col_names}
             smeta['value'] = self.get_val(input_name)
 
-            if src_is_ivc and (include_design_vars or input_name not in desvar_prom_names):
+            if src_is_ivc and (include_design_vars or input_name not in desvar_proms):
                 problem_indep_vars.append((input_name, smeta))
 
         if out_stream is not None:

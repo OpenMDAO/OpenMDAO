@@ -3508,7 +3508,7 @@ class System(object):
         get_sizes : bool, optional
             If True, compute the size of each response.
         use_prom_ivc : bool
-            Translate auto_ivc_names to their promoted input names.
+            Translate ivc names to their promoted input names.
 
         Returns
         -------
@@ -3533,12 +3533,13 @@ class System(object):
                 alias = data['alias']  # may be None
                 prom = data['name']  # always a promoted var name
 
-                if alias in prom2abs_out or alias in prom2abs_in:
-                    # Constraint alias should never be the same as any openmdao variable.
-                    if alias is not None:
+                if alias is not None:
+                    if alias in prom2abs_out or alias in prom2abs_in:
+                        # Constraint alias should never be the same as any openmdao variable.
                         path = prom2abs_out[prom][0] if prom in prom2abs_out else prom
-                        raise RuntimeError(f"Constraint alias '{alias}' on '{path}' "
-                                           "is the same name as an existing variable.")
+                        raise RuntimeError(f"Constraint alias '{alias}' on '{path}' is the same "
+                                           "name as an existing variable.")
+                    data['alias_path'] = self.pathname
 
                 if prom_or_alias in prom2abs_out:
                     abs_out = prom2abs_out[prom_or_alias][0]
@@ -3562,12 +3563,9 @@ class System(object):
                         # dict key is either an alias or the promoted input name
                         out[prom_or_alias] = data
                     else:
-                        # dict key is either an alias or the absolute src name
-                        if alias is None:
-                            # A constraint can be on an input, so use connected output name.
-                            out[src_path] = data
-                        else:  # name is an alias
-                            out[alias] = data
+                        # dict key is either an alias or the absolute src name since constraints
+                        # can be specified on inputs.
+                        out[src_path if alias is None else alias] = data
 
         except KeyError as err:
             msg = "{}: Output not found for response {}."
@@ -3616,7 +3614,19 @@ class System(object):
                         else:
                             out[dv] = meta
                 else:
-                    out.update(resps)
+                    for rkey, rmeta in resps.items():
+                        if rkey in out:
+                            tdict = {'con': 'constraint', 'obj': 'objective'}
+                            rpath = rmeta['alias_path']
+                            rname = '.'.join((rpath, rmeta['name'])) if rpath else rkey
+                            rtype = tdict[rmeta['type']]
+                            ometa = out[rkey]
+                            opath = ometa['alias_path']
+                            oname = '.'.join((opath, ometa['name'])) if opath else ometa['name']
+                            otype = tdict[ometa['type']]
+                            raise NameError(f"The same response alias, '{rkey}' was declared for "
+                                            f"{rtype} '{rname}' and {otype} '{oname}'.")
+                        out[rkey] = rmeta
 
             if (self.comm.size > 1 and self._subsystems_allprocs and
                     self._mpi_proc_allocator.parallel):
@@ -3627,7 +3637,7 @@ class System(object):
 
         return out
 
-    def get_constraints(self, recurse=True):
+    def get_constraints(self, recurse=True, get_sizes=True, use_prom_ivc=False):
         """
         Get the Constraint settings from this system.
 
@@ -3639,16 +3649,24 @@ class System(object):
         recurse : bool, optional
             If True, recurse through the subsystems and return the path of
             all constraints relative to the this system.
+        get_sizes : bool, optional
+            If True, compute the size of each constraint.
+        use_prom_ivc : bool
+            Translate ivc names to their promoted input names.
 
         Returns
         -------
         dict
             The constraints defined in the current system.
         """
-        return {key: response for key, response in self.get_responses(recurse=recurse).items()
-                if response['type'] == 'con'}
+        return {
+            key: response for key, response in self.get_responses(recurse=recurse,
+                                                                  get_sizes=get_sizes,
+                                                                  use_prom_ivc=use_prom_ivc).items()
+            if response['type'] == 'con'
+        }
 
-    def get_objectives(self, recurse=True):
+    def get_objectives(self, recurse=True, get_sizes=True, use_prom_ivc=False):
         """
         Get the Objective settings from this system.
 
@@ -3660,14 +3678,22 @@ class System(object):
         recurse : bool, optional
             If True, recurse through the subsystems and return the path of
             all objective relative to the this system.
+        get_sizes : bool, optional
+            If True, compute the size of each objective.
+        use_prom_ivc : bool
+            Translate ivc names to their promoted input names.
 
         Returns
         -------
         dict
             The objectives defined in the current system.
         """
-        return {key: response for key, response in self.get_responses(recurse=recurse).items()
-                if response['type'] == 'obj'}
+        return {
+            key: response for key, response in self.get_responses(recurse=recurse,
+                                                                  get_sizes=get_sizes,
+                                                                  use_prom_ivc=use_prom_ivc).items()
+            if response['type'] == 'obj'
+        }
 
     def run_apply_nonlinear(self):
         """
@@ -3871,9 +3897,10 @@ class System(object):
                             out_name = abs_name
                         else:
                             out_name = self.get_source(abs_name)
-                        if is_design_var is True and out_name not in des_vars:
-                            continue
-                        elif is_design_var is False and out_name in des_vars:
+                        if is_design_var:
+                            if out_name not in des_vars:
+                                continue
+                        elif out_name in des_vars:
                             continue
 
                     # handle tags

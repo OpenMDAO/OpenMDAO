@@ -3789,8 +3789,35 @@ class TestProblemCheckTotals(unittest.TestCase):
         totals = prob.check_totals(out_stream=None)
         assert_check_totals(totals)
 
-    def test_exceed_tol_show_only_incorrect(self):
+    def test_alias_constraints_nested2(self):
+        # Tests a bug the same alias is used at multiple system tree levels.
+        p = om.Problem()
+        p.driver = om.ScipyOptimizeDriver()
+        model = p.model
+        model.add_subsystem('ivc', om.IndepVarComp('x', np.ones(2)))
+        model.add_subsystem('comp', om.ExecComp('y=x*2.0', x=np.ones(2), y=np.ones(2)))
+        model.add_subsystem('comp2', om.ExecComp('y=x*2.0', x=np.ones(2), y=np.ones(2)))
+        G1 = model.add_subsystem('G1', om.Group())
+        G1.add_subsystem('comp3', om.ExecComp('y=x*2.0', x=np.ones(2), y=np.ones(2)))
+        G1.add_subsystem('comp4', om.ExecComp('y=x*2.0', x=np.ones(2), y=np.ones(2)))
 
+        model.connect('ivc.x', ['comp.x', 'G1.comp3.x'])
+        model.connect('comp.y', 'comp2.x')
+        G1.connect('comp3.y', 'comp4.x')
+
+        model.add_design_var('ivc.x')
+        model.add_constraint('comp2.x', lower=0.0, indices=[1], flat_indices=True, alias='a2')
+        model.add_objective('comp2.y', index=0)
+
+        G1.add_constraint('comp4.x', lower=0.0, indices=[0], flat_indices=True, alias='a2')
+
+        with self.assertRaises(NameError) as cm:
+            p.setup()
+
+        msg = ""
+        self.assertEqual(cm.exception.args[0], "The same response alias, 'a2' was declared for constraint 'G1.comp4.x' and constraint 'comp2.x'.")
+
+    def test_exceed_tol_show_only_incorrect(self):
         prob = om.Problem()
         top = prob.model
         top.add_subsystem('goodcomp', MyCompGoodPartials())
