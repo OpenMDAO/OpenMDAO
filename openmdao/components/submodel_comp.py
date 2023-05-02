@@ -161,6 +161,14 @@ class SubmodelComp(ExplicitComponent):
         super().add_output(name, **meta)
         meta['prom_name'] = path
         meta['abs_name'] = abs_name
+    
+    def _reset_driver_vars(self):
+        p = self._subprob
+
+        p.driver._designvars = {}
+        p.driver._cons = {}
+        p.driver._objs = {}
+        p.driver._responses = {}
 
     def setup(self):
         """
@@ -278,11 +286,13 @@ class SubmodelComp(ExplicitComponent):
                                                       'scaler', 'units', 'parallel_deriv_color',
                                                       'cache_linear_solution'])
 
-        dvs = driver_vars['design_vars']
-        cons = driver_vars['constraints']
-        objs = driver_vars['objectives']
+        self.driver_dvs = driver_vars['design_vars']
+        self.driver_cons = driver_vars['constraints']
+        self.driver_objs = driver_vars['objectives']
 
-        for name, dv_meta in dvs:
+        # self._reset_driver_vars()
+
+        for name, dv_meta in self.driver_dvs:
             prom_name = dv_meta['name']
             # vvv do I need this for multiple setups? vvv
             # if prom_name in self._design_vars:
@@ -298,10 +308,10 @@ class SubmodelComp(ExplicitComponent):
             
             dv_meta.pop('size')
             dv_meta.pop('val')
-            dv_meta['indices'] = dv_meta['indices'].as_array()
+            dv_meta['indices'] = dv_meta['indices'].as_array() if dv_meta['indices'] is not None else None
             self.add_design_var(**dv_meta)
 
-        for name, con_meta in cons:
+        for name, con_meta in self.driver_cons:
             prom_name = con_meta['name']
             iface_name = prom_name.replace('.', ':')
             self.submodel_outputs[prom_name] = iface_name
@@ -317,7 +327,7 @@ class SubmodelComp(ExplicitComponent):
             con_meta['indices'] = con_meta['indices'].as_array()
             self.add_constraint(**con_meta)
 
-        for name, obj_meta in objs:
+        for name, obj_meta in self.driver_objs:
             prom_name = obj_meta['name']
             iface_name = prom_name.replace('.', ':')
             self.submodel_outputs[prom_name] = iface_name
@@ -348,15 +358,15 @@ class SubmodelComp(ExplicitComponent):
 
         for prom_name in self.submodel_inputs.keys():
             # changed this for consistency
-            if prom_name in [meta['name'] for _, meta in p.driver._designvars.items()]:
-                continue
+            # if prom_name in [meta['name'] for _, meta in p.driver._designvars.items()]:
+            #     continue
             p.model.add_design_var(prom_name)
 
         for prom_name in self.submodel_outputs.keys():
             # got abs name back for self._cons key for some reason in `test_multiple_setups`
             # TODO look into this
-            if prom_name in [meta['name'] for _, meta in p.driver._cons.items()]:
-                continue
+            # if prom_name in [meta['name'] for _, meta in p.driver._cons.items()]:
+            #     continue
             p.model.add_constraint(prom_name)
 
         # setup again to compute coloring
@@ -366,6 +376,7 @@ class SubmodelComp(ExplicitComponent):
         else:
             p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'])
         p.final_setup()
+        # self._reset_driver_vars()
 
         self.coloring = p.driver._get_coloring(run_model=True)
         if self.coloring is not None:
