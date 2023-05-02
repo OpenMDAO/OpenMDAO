@@ -2768,14 +2768,13 @@ class TestSqliteRecorder(unittest.TestCase):
         p.model.connect('arctan_yox.g', 'delta_theta_con.even', src_indices=EVEN_IND)
         p.model.connect('arctan_yox.g', 'delta_theta_con.odd', src_indices=ODD_IND)
 
-        p.driver = om.pyOptSparseDriver()
-        p.driver.options['optimizer'] = 'IPOPT'
-        p.driver.opt_settings['print_level'] = 5
+        p.driver = om.pyOptSparseDriver(optimizer='IPOPT', print_results=False)
+        p.driver.opt_settings['print_level'] = 0
 
         p.driver.add_recorder(om.SqliteRecorder('driver_iterations.sql'))
 
         # set up dynamic total coloring here
-        p.driver.declare_coloring()
+        p.driver.declare_coloring(show_summary=False)
 
         p.model.add_design_var('x')
         p.model.add_design_var('y')

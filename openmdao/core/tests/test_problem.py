@@ -1524,13 +1524,13 @@ class TestProblem(unittest.TestCase):
             p.setup()
             p.run_model()
 
-            inputs = p.model.list_inputs(out_stream=None)
+            inputs = p.model.list_inputs(out_stream=None, prom_name=False)
             self.assertEqual(sorted(inputs), [
                 ('comp3.a', {'val': [2.]}),
                 ('comp3.b', {'val': [3.]})
             ], "Inputs don't match when added in %s." % where)
 
-            outputs = p.model.list_outputs(out_stream=None)
+            outputs = p.model.list_outputs(out_stream=None, prom_name=False)
             self.assertEqual(sorted(outputs), [
                 ('comp1.a',   {'val': [2.]}),
                 ('comp1.foo', {'val': [1.]}),
@@ -1580,13 +1580,13 @@ class TestProblem(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        inputs = p.model.list_inputs(out_stream=None)
+        inputs = p.model.list_inputs(out_stream=None, prom_name=False)
         self.assertEqual(sorted(inputs), [
             ('mcomp.a',     {'val': [2.]}),
             ('sub.mcomp.a', {'val': [2.]}),
         ])
 
-        outputs = p.model.list_outputs(out_stream=None)
+        outputs = p.model.list_outputs(out_stream=None, prom_name=False)
         self.assertEqual(sorted(outputs), [
             ('indep.a',      {'val': [2.]}),
             ('mcomp.a2',     {'val': [4.]}),
@@ -1598,7 +1598,7 @@ class TestProblem(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        inputs = p.model.list_inputs(out_stream=None)
+        inputs = p.model.list_inputs(out_stream=None, prom_name=False)
         self.assertEqual(sorted(inputs), [
             ('mcomp.a',     {'val': [2.]}),
             ('mcomp.b',     {'val': [3.]}),
@@ -1606,7 +1606,7 @@ class TestProblem(unittest.TestCase):
             ('sub.mcomp.b', {'val': [3.]}),
         ])
 
-        outputs= p.model.list_outputs(out_stream=None)
+        outputs= p.model.list_outputs(out_stream=None, prom_name=False)
         self.assertEqual(sorted(outputs), [
             ('indep.a',      {'val': [2.]}),
             ('indep.b',      {'val': [3.]}),

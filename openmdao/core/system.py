@@ -3890,7 +3890,7 @@ class System(object):
 
     def list_inputs(self,
                     val=True,
-                    prom_name=False,
+                    prom_name=True,
                     units=False,
                     shape=False,
                     global_shape=False,
@@ -3905,7 +3905,8 @@ class System(object):
                     all_procs=False,
                     out_stream=_DEFAULT_OUT_STREAM,
                     print_min=False,
-                    print_max=False):
+                    print_max=False,
+                    return_format='list'):
         """
         Write a list of input names and other optional information to a specified stream.
 
@@ -3915,7 +3916,7 @@ class System(object):
             When True, display/return input values. Default is True.
         prom_name : bool, optional
             When True, display/return the promoted name of the variable.
-            Default is False.
+            Default is True.
         units : bool, optional
             When True, display/return units. Default is False.
         shape : bool, optional
@@ -3959,11 +3960,15 @@ class System(object):
             When true, if the input value is an array, print its smallest value.
         print_max : bool
             When true, if the input value is an array, print its largest value.
+        return_format : str
+            Indicates the desired format of the return value. Can have value of 'list' or 'dict'.
+            If 'list', the return value is a list of (name, metadata) tuples.
+            if 'dict', the return value is a dictionary mapping {name: metadata}.
 
         Returns
         -------
-        list of (name, metadata)
-            List of input names and other optional information about those inputs.
+        list of (name, metadata) or dict of {name: metadata}
+            List or dict of input names and other optional information about those inputs.
         """
         if (self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP) and val:
             issue_warning("Calling `list_inputs` before `final_setup` will only "
@@ -4021,12 +4026,15 @@ class System(object):
         else:
             inputs = list(inputs.items())
 
-        return inputs
+        if return_format == 'dict':
+            return dict(inputs)
+        else:
+            return inputs
 
     def list_outputs(self,
                      explicit=True, implicit=True,
                      val=True,
-                     prom_name=False,
+                     prom_name=True,
                      residuals=False,
                      residuals_tol=None,
                      units=False,
@@ -4046,7 +4054,8 @@ class System(object):
                      list_autoivcs=False,
                      out_stream=_DEFAULT_OUT_STREAM,
                      print_min=False,
-                     print_max=False):
+                     print_max=False,
+                     return_format='list'):
         """
         Write a list of output names and other optional information to a specified stream.
 
@@ -4060,7 +4069,7 @@ class System(object):
             When True, display output values. Default is True.
         prom_name : bool, optional
             When True, display the promoted name of the variable.
-            Default is False.
+            Default is True.
         residuals : bool, optional
             When True, display residual values. Default is False.
         residuals_tol : float, optional
@@ -4115,11 +4124,15 @@ class System(object):
             When true, if the output value is an array, print its smallest value.
         print_max : bool
             When true, if the output value is an array, print its largest value.
+        return_format : str
+            Indicates the desired format of the return value. Can have value of 'list' or 'dict'.
+            If 'list', the return value is a list of (name, metadata) tuples.
+            if 'dict', the return value is a dictionary mapping {name: metadata}.
 
         Returns
         -------
-        list of (name, metadata)
-            List of output names and other optional information about those outputs.
+        list of (name, metadata) or dict of {name: metadata}
+            List or dict of output names and other optional information about those outputs.
         """
         keynames = ['val', 'units', 'shape', 'global_shape', 'desc', 'tags']
         keyflags = [val, units, shape, global_shape, desc, tags]
@@ -4221,15 +4234,19 @@ class System(object):
             else:
                 impl_outputs = list(impl_outputs.items())
 
-        if explicit:
-            if implicit:
-                return expl_outputs + impl_outputs
-            return expl_outputs
+        if explicit and implicit:
+            outputs = expl_outputs + impl_outputs
+        elif explicit:
+            outputs = expl_outputs
         elif implicit:
-            return impl_outputs
+            outputs = impl_outputs
         else:
-            raise RuntimeError(self.msginfo +
-                               ': You have excluded both Explicit and Implicit components.')
+            raise RuntimeError('You have excluded both Explicit and Implicit components.')
+
+        if return_format == 'dict':
+            return dict(outputs)
+        else:
+            return outputs
 
     def _write_table(self, var_type, var_data, hierarchical, print_arrays, all_procs, out_stream):
         """

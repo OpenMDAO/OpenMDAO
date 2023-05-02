@@ -89,7 +89,7 @@ class DistributedListVarsTest(unittest.TestCase):
 
         stream = StringIO()
         with multi_proc_exception_check(prob.comm):
-            inputs = sorted(prob.model.list_inputs(val=True, print_arrays=True, out_stream=stream))
+            inputs = sorted(prob.model.list_inputs(val=True, prom_name=False, print_arrays=True, out_stream=stream))
             if prob.comm.rank:
                 self.assertEqual(inputs, [])
             else:
@@ -120,6 +120,7 @@ class DistributedListVarsTest(unittest.TestCase):
                                                      residuals=True,
                                                      scaling=True,
                                                      hierarchical=True,
+                                                     prom_name=False,
                                                      print_arrays=True,
                                                      out_stream=stream))
             if prob.comm.rank:
@@ -194,7 +195,7 @@ class DistributedListVarsTest(unittest.TestCase):
 
         stream = StringIO()
         with multi_proc_exception_check(prob.comm):
-            inputs = sorted(prob.model.list_inputs(val=True, print_arrays=True, out_stream=stream))
+            inputs = sorted(prob.model.list_inputs(val=True, prom_name=False, print_arrays=True, out_stream=stream))
             if prob.comm.rank:
                 self.assertEqual(inputs, [])
             else:
@@ -227,6 +228,7 @@ class DistributedListVarsTest(unittest.TestCase):
                                                      residuals=True,
                                                      scaling=True,
                                                      hierarchical=True,
+                                                     prom_name=False,
                                                      print_arrays=True,
                                                      out_stream=stream))
             onames = [t[0] for t in outputs]
@@ -276,7 +278,7 @@ class DistributedListVarsTest(unittest.TestCase):
         #
         stream = StringIO()
         with printoptions(**print_opts):
-            prob.model.list_inputs(val=True, hierarchical=False, out_stream=stream)
+            prob.model.list_inputs(val=True, prom_name=False, hierarchical=False, out_stream=stream)
 
         with multi_proc_exception_check(prob.comm):
             if prob.comm.rank == 0:  # Only rank 0 prints
@@ -305,7 +307,7 @@ class DistributedListVarsTest(unittest.TestCase):
         #
         stream = StringIO()
         with printoptions(**print_opts):
-            prob.model.list_inputs(val=True, hierarchical=True, out_stream=stream)
+            prob.model.list_inputs(val=True, prom_name=False, hierarchical=True, out_stream=stream)
 
         with multi_proc_exception_check(prob.comm):
             if prob.comm.rank == 0:
@@ -341,7 +343,7 @@ class DistributedListVarsTest(unittest.TestCase):
         #
         stream = StringIO()
         with printoptions(**print_opts):
-            prob.model.list_outputs(val=True, residuals=True, hierarchical=False, out_stream=stream)
+            prob.model.list_outputs(val=True, prom_name=False, residuals=True, hierarchical=False, out_stream=stream)
 
         with multi_proc_exception_check(prob.comm):
             if prob.comm.rank == 0:
@@ -374,7 +376,7 @@ class DistributedListVarsTest(unittest.TestCase):
         #
         stream = StringIO()
         with printoptions(**print_opts):
-            prob.model.list_outputs(val=True, residuals=True, hierarchical=True, out_stream=stream)
+            prob.model.list_outputs(val=True, prom_name=False, residuals=True, hierarchical=True, out_stream=stream)
 
         with multi_proc_exception_check(prob.comm):
             if prob.comm.rank == 0:
@@ -434,7 +436,7 @@ class DistributedListVarsTest(unittest.TestCase):
         stream = StringIO()
         with printoptions(**print_opts):
             model.C2.list_inputs(hierarchical=False, shape=True, global_shape=True,
-                                 print_arrays=True, out_stream=stream)
+                                 print_arrays=True, prom_name=False, out_stream=stream)
 
         if prob.comm.rank == 0:
             text = stream.getvalue().split('\n')
@@ -457,7 +459,7 @@ class DistributedListVarsTest(unittest.TestCase):
         stream = StringIO()
         with printoptions(**print_opts):
             model.C2.list_outputs(hierarchical=False, shape=True, global_shape=True,
-                                  print_arrays=True, out_stream=stream)
+                                  print_arrays=True, prom_name=False, out_stream=stream)
 
         if prob.comm.rank == 0:
             text = stream.getvalue().split('\n')
@@ -486,7 +488,7 @@ class DistributedListVarsTest(unittest.TestCase):
         stream = StringIO()
         with printoptions(**print_opts):
             model.C2.list_inputs(hierarchical=False, shape=True, global_shape=True,
-                                 print_arrays=True, out_stream=stream)
+                                 print_arrays=True, prom_name=False, out_stream=stream)
 
         if prob.comm.rank == 0:
             text = stream.getvalue().split('\n')
@@ -508,7 +510,7 @@ class DistributedListVarsTest(unittest.TestCase):
         stream = StringIO()
         with printoptions(**print_opts):
             model.C2.list_outputs(hierarchical=False, shape=True, global_shape=True,
-                                  print_arrays=True, out_stream=stream)
+                                  print_arrays=True, prom_name=False, out_stream=stream)
 
         if prob.comm.rank == 0:
             text = stream.getvalue().split('\n')
@@ -530,7 +532,7 @@ class DistributedListVarsTest(unittest.TestCase):
         stream = StringIO()
         with printoptions(**print_opts):
             model.C3.list_inputs(hierarchical=False, shape=True, global_shape=True, all_procs=True,
-                                 print_arrays=True, out_stream=stream)
+                                 print_arrays=True, prom_name=False, out_stream=stream)
 
         text = stream.getvalue().split('\n')
 

@@ -946,10 +946,9 @@ class TestExecComp(unittest.TestCase):
     def test_tags(self):
         prob = om.Problem(model=om.Group())
         C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x+z+1.',
-                                                     x={'val': 1.0, 'units': 'm', 'tags': 'tagx'},
-                                                     y={'units': 'm', 'tags': ['tagy','tagq']},
-                                                     z={'val': 2.0, 'tags': 'tagz'},
-                                                     ))
+                                                        x={'val': 1.0, 'units': 'm', 'tags': 'tagx'},
+                                                        y={'units': 'm', 'tags': ['tagy','tagq']},
+                                                        z={'val': 2.0, 'tags': 'tagz'}))
 
         prob.setup(check=False)
 
@@ -957,49 +956,49 @@ class TestExecComp(unittest.TestCase):
         prob.run_model()
 
         # Inputs no tags
-        inputs = prob.model.list_inputs(val=False, out_stream=None)
+        inputs = prob.model.list_inputs(val=False, prom_name=False, out_stream=None)
         self.assertEqual(sorted(inputs), [
             ('C1.x', {}),
             ('C1.z', {}),
         ])
 
         # Inputs with tags
-        inputs = prob.model.list_inputs(val=False, out_stream=None, tags="tagx")
+        inputs = prob.model.list_inputs(val=False, prom_name=False, out_stream=None, tags="tagx")
         self.assertEqual(sorted(inputs), [
             ('C1.x', {}),
         ])
 
         # Inputs with multiple tags
-        inputs = prob.model.list_inputs(val=False, out_stream=None, tags=["tagx", "tagz"])
+        inputs = prob.model.list_inputs(val=False, prom_name=False, out_stream=None, tags=["tagx", "tagz"])
         self.assertEqual(sorted(inputs), [
             ('C1.x', {}),
             ('C1.z', {}),
         ])
 
         # Inputs with tag that does not match
-        inputs = prob.model.list_inputs(val=False, out_stream=None, tags="tag_wrong")
+        inputs = prob.model.list_inputs(val=False, prom_name=False, out_stream=None, tags="tag_wrong")
         self.assertEqual(sorted(inputs), [])
 
         # Outputs no tags
-        outputs = prob.model.list_outputs(val=False, out_stream=None)
+        outputs = prob.model.list_outputs(val=False, prom_name=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
             ('C1.y', {}),
         ])
 
         # Outputs with tags
-        outputs = prob.model.list_outputs(val=False, out_stream=None, tags="tagy")
+        outputs = prob.model.list_outputs(val=False, prom_name=False, out_stream=None, tags="tagy")
         self.assertEqual(sorted(outputs), [
             ('C1.y', {}),
         ])
 
         # Outputs with multiple tags
-        outputs = prob.model.list_outputs(val=False, out_stream=None, tags=["tagy", "tagx"])
+        outputs = prob.model.list_outputs(val=False, prom_name=False, out_stream=None, tags=["tagy", "tagx"])
         self.assertEqual(sorted(outputs), [
             ('C1.y', {}),
         ])
 
         # Outputs with tag that does not match
-        outputs = prob.model.list_outputs(val=False, out_stream=None, tags="tag_wrong")
+        outputs = prob.model.list_outputs(val=False, prom_name=False, out_stream=None, tags="tag_wrong")
         self.assertEqual(sorted(outputs), [])
 
     def test_feature_has_diag_partials(self):

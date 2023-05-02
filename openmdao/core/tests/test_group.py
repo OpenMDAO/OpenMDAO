@@ -1372,7 +1372,11 @@ class TestGroup(unittest.TestCase):
             p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "\nCollected errors for problem 'promote_units_and_none':\n   <model> <class Group>: The following inputs, ['c1.x', 'c2.x'], promoted to 'x', are connected but their metadata entries ['units', 'val'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the model to remove the ambiguity.")
+                         "\nCollected errors for problem 'promote_units_and_none':\n   "
+                         "<model> <class Group>: The following inputs, ['c1.x', 'c2.x'], promoted to 'x', "
+                         "are connected but their metadata entries ['units', 'val'] differ. "
+                         "Call <group>.set_input_defaults('x', units=?, val=?), "
+                         "where <group> is the model to remove the ambiguity.")
 
     def test_double_set_input_defaults(self):
         problem = om.Problem()
@@ -1437,6 +1441,104 @@ class TestGroup(unittest.TestCase):
         msg = ("\nCollected errors for problem 'set_input_def_key_error':\n"
                "   <model> <class Group>: The following group inputs, passed to set_input_defaults(), could not be found: ['bad_name'].")
         self.assertEqual(cm.exception.args[0], msg)
+
+    def test_set_input_defaults_compatible_val_and_src_shape(self):
+        class Paraboloid(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', val=0.0, shape=(2,))
+                self.add_input('y', val=0.0)
+
+                self.add_output('f_xy', val=0.0)
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                y = inputs['y']
+                outputs['f_xy'] = (x[0] - 3.0)**2 + x[0] * y + (y + 4.0)**2 - 3.0
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        model.add_design_var('x', lower=-10, upper=10)
+        model.add_design_var('y', lower=-10, upper=10)
+        model.add_objective('f_xy')
+
+        with assert_no_warning(category=PromotionWarning):
+            model.set_input_defaults('x', val=[1.0, 1.0], src_shape=(2,))
+
+        prob.setup()
+
+        np.testing.assert_array_equal(prob['x'], np.ones(2))
+
+    def test_set_input_defaults_scalar_val_with_src_shape(self):
+        class Paraboloid(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', val=0.0, shape=(2,))
+                self.add_input('y', val=0.0)
+
+                self.add_output('f_xy', val=0.0)
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                y = inputs['y']
+                outputs['f_xy'] = (x[0] - 3.0)**2 + x[0] * y + (y + 4.0)**2 - 3.0
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        model.add_design_var('x', lower=-10, upper=10)
+        model.add_design_var('y', lower=-10, upper=10)
+        model.add_objective('f_xy')
+
+        model.set_input_defaults('x', val=1.0, src_shape=(2,))
+
+        prob.setup()
+
+        np.testing.assert_array_equal(prob['x'], np.ones(2))
+
+    def test_set_input_defaults_val_shape_src_indices(self):
+
+        class MyComp1(om.ExplicitComponent):
+            """ multiplies input array by 2. """
+            def setup(self):
+                self.add_input('x', np.ones(3))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])*2.0
+
+        class MyComp2(om.ExplicitComponent):
+            """ multiplies input array by 4. """
+            def setup(self):
+                self.add_input('x', np.ones(2))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])*4.0
+
+        class MyGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', MyComp1())
+                self.add_subsystem('comp2', MyComp2())
+
+            def configure(self):
+                # splits input via promotes using src_indices
+                self.promotes('comp1', inputs=['x'], src_indices=[0, 1, 2])
+                self.promotes('comp2', inputs=['x'], src_indices=[3, 4])
+
+        p = om.Problem()
+
+        # Note: src_shape is different that the shape of either target
+        p.model.set_input_defaults('x', src_shape=(5,), val=1.)
+        p.model.add_subsystem('G1', MyGroup(), promotes_inputs=['x'])
+
+        p.setup()
+
+        np.testing.assert_array_equal(p['x'], np.ones(5))
+
 
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestGroupMPISlice(unittest.TestCase):
@@ -1532,6 +1634,7 @@ class TestGroupMPISlice(unittest.TestCase):
         p.run_model()
 
         assert_near_equal(p.get_val('C1.x', get_remote=False), np.array([4, 4, 4, 4]))
+
 
 class TestGroupPromotes(unittest.TestCase):
 
@@ -2200,8 +2303,8 @@ class TestConnect(unittest.TestCase):
            "\nCollected errors for problem 'invalid_source':"
            "\n   'sub' <class Group>: Attempted to connect from 'src.z' to 'tgt.x', but 'src.z' "
            "doesn't exist. Perhaps you meant to connect to one of the following outputs: "
-           "['src.x', 'src.s', 'cmp.z']."
-)
+           "['src.x', 'src.s', 'cmp.z'].")
+
     def test_connect_to_output(self):
         p = self.setup_problem('connect_to_output')
         msg = "\nCollected errors for problem 'connect_to_output':\n   'sub' <class Group>: " + \
