@@ -3,6 +3,8 @@
 import sys
 import traceback
 import numpy as np
+from collections.abc import Sequence
+
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.constants import INT_DTYPE
@@ -25,9 +27,9 @@ except Exception:
     jax = None
 
 
-class ExplicitFuncComp(ExplicitComponent):
+class ExplicitJaxComp(ExplicitComponent):
     """
-    A component that wraps a python function.
+    A component that wraps a function defined using composable jax elements.
 
     Parameters
     ----------
@@ -50,49 +52,27 @@ class ExplicitFuncComp(ExplicitComponent):
         Tuple of parts of the tangent matrix cached for jax derivative computation.
     """
 
-    def __init__(self, compute, compute_partials=None, **kwargs):
+    def __init__(self, f, static_argnums=None, **kwargs):
         """
         Initialize attributes.
         """
         super().__init__(**kwargs)
-        self._compute = omf.wrap(compute)
-        # in case we're doing jit, force setup of wrapped func because we compute output shapes
-        # during setup and that won't work on a jit compiled function
-        if self._compute._call_setup:
-            self._compute._setup()
-
-        if self._compute._use_jax:
-            self.options['use_jax'] = True
-
-        if self.options['use_jax']:
-            if jax is None:
-                raise RuntimeError(f"{self.msginfo}: jax is not installed. Try 'pip install jax'.")
-            self._compute_jax = omf.jax_decorate(self._compute._f)
-
+        self._compute = f
         self._tangents = None
+        self._compute_partials = None
 
-        self._compute_partials = compute_partials
-        if self.options['use_jax'] and self.options['use_jit']:
-            static_argnums = [i for i, m in enumerate(self._compute._inputs.values())
-                              if 'is_option' in m]
-            try:
-                self._compute_jax = jit(self._compute_jax, static_argnums=static_argnums)
-            except Exception as err:
-                raise RuntimeError(f"{self.msginfo}: failed jit compile of compute function: {err}")
 
-    def _declare_options(self):
-        """
-        Declare options before kwargs are processed in the init method.
-        """
-        super()._declare_options()
-        _add_options(self)
+    def initialize(self):
+        self.options.declare('static_argnums', default=None, types=(int, Sequence))
 
     def setup(self):
         """
         Define out inputs and outputs.
         """
-        optignore = {'is_option'}
-        use_jax = self.options['use_jax'] and jax is not None
+        from inspect import getargspec
+
+        args = getargspec(self._compute)
+        print(args)
 
         for name, meta in self._compute.get_input_meta():
             _check_var_name(self, name)
@@ -334,3 +314,12 @@ class ExplicitFuncComp(ExplicitComponent):
         ret = super()._compute_coloring(recurse, **overrides)
         self._tangents = None  # reset to compute new colored tangents later
         return ret
+
+
+if __name__ == '__main__':
+    import openmdao.api as om
+    from openmdao.math import act_tanh
+
+    p = om.Problem()
+    p.model.add_subsystem('act_comp', ExplicitJaxComp(f=act_tanh))
+    p.setup()
