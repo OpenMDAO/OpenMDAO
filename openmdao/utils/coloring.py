@@ -2073,7 +2073,6 @@ def _total_coloring_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    from openmdao.core.problem import Problem
     from openmdao.devtools.debug import profiling
     from openmdao.utils.general_utils import do_nothing_context
 
