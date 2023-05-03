@@ -330,6 +330,7 @@ class SubmodelComp(ExplicitComponent):
             dv_meta.pop('size')
             dv_meta.pop('val')
             dv_meta['indices'] = dv_meta['indices'].as_array() if dv_meta['indices'] is not None else None
+            dv_meta['name'] = prom_name
             self.add_design_var(**dv_meta)
 
         for name, con_meta in self.driver_cons:
@@ -348,6 +349,7 @@ class SubmodelComp(ExplicitComponent):
             con_meta['indices'] = con_meta['indices'].as_array() if con_meta['indices'] is not None else None
             con_meta['lower'] = None if con_meta['lower'] == -INF_BOUND else con_meta['lower']
             con_meta['upper'] = None if con_meta['upper'] == INF_BOUND else con_meta['upper']
+            con_meta['name'] = prom_name
             self.add_constraint(**con_meta)
 
         for name, obj_meta in self.driver_objs: #.items():
@@ -364,6 +366,7 @@ class SubmodelComp(ExplicitComponent):
             obj_meta.pop('size')
             obj_meta.pop('val')
             obj_meta['index'] = int(obj_meta.pop('indices').as_array()[0]) if obj_meta['indices'] is not None else None
+            obj_meta['name'] = prom_name
             self.add_objective(**obj_meta)
 
         if not self.is_set_up:
@@ -403,7 +406,8 @@ class SubmodelComp(ExplicitComponent):
         else:
             p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'])
         p.final_setup()
-        self._reset_driver_vars()
+        
+        # self._reset_driver_vars()
 
         self.coloring = p.driver._get_coloring(run_model=True)
         if self.coloring is not None:
