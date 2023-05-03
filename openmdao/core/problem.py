@@ -2264,30 +2264,32 @@ class Problem(object):
             raise RuntimeError("list_indep_vars requires that final_setup has been "
                                "run for the Problem.")
 
-        connections = model._conn_global_abs_in2out
         desvar_prom_names = model.get_design_vars(recurse=True,
                                                   use_prom_ivc=True,
                                                   get_sizes=False).keys()
+
         problem_indep_vars = []
         indep_var_names = set()
 
         default_col_names = ['name', 'units', 'val']
         col_names = default_col_names + ([] if options is None else options)
 
-        for target, meta in model._var_allprocs_abs2meta['input'].items():
-            src = connections[target]
-            smeta = model._var_allprocs_abs2meta['output'][src]
-            src_is_ivc = 'openmdao:indep_var' in smeta['tags']
-            input_name = model._var_allprocs_abs2prom['input'][target]
+        abs2meta = model._var_allprocs_abs2meta['output']
+        prom2abs = self.model._var_allprocs_prom2abs_list['input']
 
-            smeta = {key: val for key, val in smeta.items() if key in col_names}
-            smeta['val'] = self.get_val(input_name)
+        prom2src = {prom: model.get_source(prom) for prom in prom2abs.keys()
+                    if 'openmdao:indep_var' in abs2meta[model.get_source(prom)]['tags']}
 
-            if src_is_ivc \
-                    and (include_design_vars or input_name not in desvar_prom_names) \
-                    and input_name not in indep_var_names:
-                problem_indep_vars.append((input_name, smeta))
-                indep_var_names.add(input_name)
+        for prom, src in prom2src.items():
+            name = prom if src.startswith('_auto_ivc.') else src
+            meta = abs2meta[src]
+            meta = {key: val for key, val in meta.items() if key in col_names}
+            meta['val'] = self.get_val(prom)
+
+            if (include_design_vars or name not in desvar_prom_names) \
+                    and name not in indep_var_names:
+                problem_indep_vars.append((name, meta))
+                indep_var_names.add(name)
 
         if out_stream is not None:
             header = f'Problem {self._name} Independent Variables'
