@@ -3,6 +3,7 @@
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.general_utils import find_matches
 from openmdao.core.constants import _SetupStatus
+# from openmdao.utils.indexer import slicer
 
 
 class SubmodelComp(ExplicitComponent):
@@ -289,8 +290,9 @@ class SubmodelComp(ExplicitComponent):
         self.driver_dvs = driver_vars['design_vars']
         self.driver_cons = driver_vars['constraints']
         self.driver_objs = driver_vars['objectives']
+        # self.driver_objs = {meta['name']: meta for _, meta in driver_vars['objectives']}
 
-        # self._reset_driver_vars()
+        self._reset_driver_vars()
 
         for name, dv_meta in self.driver_dvs:
             prom_name = dv_meta['name']
@@ -327,7 +329,7 @@ class SubmodelComp(ExplicitComponent):
             con_meta['indices'] = con_meta['indices'].as_array()
             self.add_constraint(**con_meta)
 
-        for name, obj_meta in self.driver_objs:
+        for name, obj_meta in self.driver_objs: #.items():
             prom_name = obj_meta['name']
             iface_name = prom_name.replace('.', ':')
             self.submodel_outputs[prom_name] = iface_name
@@ -367,7 +369,11 @@ class SubmodelComp(ExplicitComponent):
             # TODO look into this
             # if prom_name in [meta['name'] for _, meta in p.driver._cons.items()]:
             #     continue
-            p.model.add_constraint(prom_name)
+            # alias = prom_name+'_con' if prom_name in self.driver_objs else None
+            # indices = slicer[:-1] if prom_name in self.driver_objs else None
+            # alias = None
+            # indices = None
+            p.model.add_constraint(prom_name)#, alias=alias, indices=indices)
 
         # setup again to compute coloring
         p.set_solver_print(-1)
@@ -376,7 +382,7 @@ class SubmodelComp(ExplicitComponent):
         else:
             p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'])
         p.final_setup()
-        # self._reset_driver_vars()
+        self._reset_driver_vars()
 
         self.coloring = p.driver._get_coloring(run_model=True)
         if self.coloring is not None:
