@@ -2,7 +2,7 @@
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.general_utils import find_matches
-from openmdao.core.constants import _SetupStatus
+from openmdao.core.constants import _SetupStatus, INF_BOUND
 # from openmdao.utils.indexer import slicer
 
 
@@ -111,7 +111,8 @@ class SubmodelComp(ExplicitComponent):
             the last '.'.
         """
         if name is None:
-            name = path.split('.')[-1]
+            # name = path.split('.')[-1]
+            name = path.replace('.', ':')
 
         # self.submodel_inputs.append((path, name))
         self.submodel_inputs[path] = name
@@ -143,7 +144,8 @@ class SubmodelComp(ExplicitComponent):
             the last '.'.
         """
         if name is None:
-            name = path.split('.')[-1]
+            # name = path.split('.')[-1]
+            name = path.replace('.', ':')
 
         # self.submodel_outputs.append((path, name))
         self.submodel_outputs[path] = name
@@ -193,8 +195,22 @@ class SubmodelComp(ExplicitComponent):
         self.boundary_inputs = {}
         indep_vars = p.list_indep_vars(out_stream=None)
         for name, meta in indep_vars:
+            if name in p.model._var_abs2prom['input']:
+                meta['prom_name'] = p.model._var_abs2prom['input'][name]
+            elif name in p.model._var_abs2prom['output']:
+                meta['prom_name'] = p.model._var_abs2prom['output'][name]
+            elif p.model.get_source(name).startswith('_auto_ivc.'):
+                meta['prom_name'] = name
+                # self.boundary_inputs[p.model.get_source(name)] = meta
+                # continue
+                # indep_vars.pop(name)
+                # indep_vars.append((p.model.get_source(name), meta))
+                # indep_vars[p.model.get_source(name)] = meta
+            else:
+                raise Exception(f'var {name} not in meta data')
+            # self.boundary_inputs[meta['prom_name']] = meta
             self.boundary_inputs[name] = meta
-            meta['prom_name'] = name
+            # meta['prom_name'] = name
             # meta['abs_name'] = name
 
         # self.boundary_inputs = {name: meta for name, meta in p.list_indep_vars(out_stream=None)}#, options=['name'])
@@ -203,10 +219,11 @@ class SubmodelComp(ExplicitComponent):
 
         self.all_outputs = {}
         outputs = p.model.list_outputs(out_stream=None, prom_name=True,
-                                       units=True, shape=True, desc=True,
-                                       is_indep_var=False)
+                                       units=True, shape=True, desc=True)#,
+                                    #    is_indep_var=False)
         for name, meta in outputs:
-            self.all_outputs[meta['prom_name']] = meta
+            # self.all_outputs[meta['prom_name']] = meta
+            self.all_outputs[name] = meta
             # meta['abs_name'] = name
         # want all outputs from the `SubmodelComp`, including ivcs/design vars
         # self.all_outputs = {name: meta for name, meta in 
@@ -249,7 +266,9 @@ class SubmodelComp(ExplicitComponent):
             try:
                 # meta = next(data for _, data in self.boundary_inputs
                 #             if data['prom_name'] == prom_name)
-                meta = self.boundary_inputs[prom_name]
+                meta = self.boundary_inputs[p.model.get_source(prom_name)] \
+                                if not p.model.get_source(prom_name).startswith('_auto_ivc.') \
+                                else self.boundary_inputs[prom_name]
             except Exception:
                 raise Exception(f'Variable {prom_name} not found in model')
             meta.pop('prom_name')
@@ -263,7 +282,7 @@ class SubmodelComp(ExplicitComponent):
             prom_name = var[0]
             try:
                 # meta = next(data for _, data in self.all_outputs if data['prom_name'] == prom_name)
-                meta = self.all_outputs[prom_name]
+                meta = self.all_outputs[p.model.get_source(prom_name)]
             except Exception:
                 raise Exception(f'Variable {prom_name} not found in model')
             meta.pop('prom_name')
@@ -295,14 +314,14 @@ class SubmodelComp(ExplicitComponent):
         self._reset_driver_vars()
 
         for name, dv_meta in self.driver_dvs:
-            prom_name = dv_meta['name']
+            prom_name = self.boundary_inputs[name]['prom_name']
             # vvv do I need this for multiple setups? vvv
             # if prom_name in self._design_vars:
             #     continue
             iface_name = prom_name.replace('.', ':')
             self.submodel_inputs[prom_name] = iface_name
 
-            meta = self.boundary_inputs[prom_name]
+            meta = self.boundary_inputs[name]
             meta.pop('prom_name')
             super().add_input(iface_name, **meta)
             meta['prom_name'] = prom_name
@@ -314,11 +333,11 @@ class SubmodelComp(ExplicitComponent):
             self.add_design_var(**dv_meta)
 
         for name, con_meta in self.driver_cons:
-            prom_name = con_meta['name']
+            prom_name = self.all_outputs[name]['prom_name']
             iface_name = prom_name.replace('.', ':')
             self.submodel_outputs[prom_name] = iface_name
             
-            meta = self.all_outputs[prom_name]
+            meta = self.all_outputs[name]
             meta.pop('prom_name')
             super().add_output(iface_name, **meta)
             meta['prom_name'] = prom_name
@@ -326,15 +345,17 @@ class SubmodelComp(ExplicitComponent):
             
             con_meta.pop('size')
             con_meta.pop('val')
-            con_meta['indices'] = con_meta['indices'].as_array()
+            con_meta['indices'] = con_meta['indices'].as_array() if con_meta['indices'] is not None else None
+            con_meta['lower'] = None if con_meta['lower'] == -INF_BOUND else con_meta['lower']
+            con_meta['upper'] = None if con_meta['upper'] == INF_BOUND else con_meta['upper']
             self.add_constraint(**con_meta)
 
         for name, obj_meta in self.driver_objs: #.items():
-            prom_name = obj_meta['name']
+            prom_name = self.all_outputs[name]['prom_name']
             iface_name = prom_name.replace('.', ':')
             self.submodel_outputs[prom_name] = iface_name
             
-            meta = self.all_outputs[prom_name]
+            meta = self.all_outputs[name]
             meta.pop('prom_name')
             super().add_output(iface_name, **meta)
             meta['prom_name'] = prom_name
@@ -342,7 +363,7 @@ class SubmodelComp(ExplicitComponent):
             
             obj_meta.pop('size')
             obj_meta.pop('val')
-            obj_meta['index'] = int(obj_meta.pop('indices').as_array()[0])
+            obj_meta['index'] = int(obj_meta.pop('indices').as_array()[0]) if obj_meta['indices'] is not None else None
             self.add_objective(**obj_meta)
 
         if not self.is_set_up:
