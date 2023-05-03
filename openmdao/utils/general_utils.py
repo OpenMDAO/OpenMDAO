@@ -1001,7 +1001,7 @@ def _src_or_alias_name(meta):
 
 def _src_or_alias_item_iter(proms):
     """
-    Yield items from proms with promoted input names converted to source or alias names.
+    Yield items from proms dict with promoted input names converted to source or alias names.
 
     Parameters
     ----------
