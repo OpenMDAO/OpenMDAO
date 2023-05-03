@@ -1056,7 +1056,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                                     residuals=True, residuals_tol=None,
                                     units=True, shape=True, bounds=True, desc=True,
                                     scaling=True, hierarchical=True, print_arrays=True,
-                                    out_stream=None)
+                                    out_stream=None, return_format='dict')
 
         expected_outputs = {
             'd1.y1': {
@@ -1071,10 +1071,9 @@ class TestSqliteCaseReader(unittest.TestCase):
         }
 
         self.assertEqual(len(outputs), 1)
-        [name, vals] = outputs[0]
-        self.assertEqual(name, 'd1.y1')
+        vals = outputs['d1.y1']
 
-        expected = expected_outputs[name]
+        expected = expected_outputs['d1.y1']
         self.assertEqual(vals['lower'], expected['lower'])
         self.assertEqual(vals['ref'], expected['ref'])
         self.assertEqual(vals['shape'], expected['shape'])
@@ -1156,20 +1155,20 @@ class TestSqliteCaseReader(unittest.TestCase):
         expected_text = [
             "1 Explicit Output(s) in 'model'",
             "",
-            "varname  val   resids",
-            "-------  ----  ------",
+            "varname  val   resids  prom_name",
+            "-------  ----  ------  ---------",
             "ec",
-            "  y      [2.]  [0.]  ",
+            "  y      [2.]  [0.]    y        ",
             "",
             "",
             "3 Implicit Output(s) in 'model'",
             "",
-            "varname  val   resids",
-            "-------  ----  ------",
+            "varname  val   resids  prom_name",
+            "-------  ----  ------  ---------",
             "ic",
-            "  z1     [4.]  [0.]  ",
-            "  z2     [1.]  [-3.] ",
-            "  z3     [1.]  [3.]  ",
+            "  z1     [4.]  [0.]    z1       ",
+            "  z2     [1.]  [-3.]   z2       ",
+            "  z3     [1.]  [3.]    z3       ",
             "",
             "",
             "",
@@ -1196,11 +1195,11 @@ class TestSqliteCaseReader(unittest.TestCase):
             "",
             "2 Implicit Output(s) in 'model'",
             "",
-            "varname  val   resids",
-            "-------  ----  ------",
+            "varname  val   resids  prom_name",
+            "-------  ----  ------  ---------",
             "ic",
-              "z2     [1.]  [-3.]",
-              "z3     [1.]  [3.]",
+            "  z2     [1.]  [-3.]   z2       ",
+            "  z3     [1.]  [3.]    z3       ",
             "",
             "",
             "",
@@ -1236,9 +1235,9 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         case = cr.get_case(system_cases[-1])
 
-        inputs = case.list_inputs(val=True, desc=True, out_stream=None)
+        inputs = case.list_inputs(val=True, desc=True, out_stream=None, return_format='dict')
 
-        for name, meta in inputs:
+        for name, meta in inputs.items():
             expected = expected_inputs_case[name]
             np.testing.assert_almost_equal(meta['val'], expected['val'])
             self.assertEqual(meta['desc'], expected['desc'])
@@ -1500,10 +1499,17 @@ class TestSqliteCaseReader(unittest.TestCase):
         expected = [
             "2 Explicit Output(s) in 'model'",
             "",
-            "varname  val    resids      ",
-            "-------  -----  ------------",
-            "expl.b   [20.]  [0.]        ",
-            "expl.y   2      Not Recorded",
+            "varname  val    resids        prom_name",
+            "-------  -----  ------------  ---------",
+            "expl.b   [20.]  [0.]          expl.b   ",
+            "expl.y   2      Not Recorded  expl.y   ",
+            "",
+            "",
+            "1 Implicit Output(s) in 'model'",
+            "",
+            "varname  val  resids        prom_name",
+            "-------  ---  ------------  ---------",
+            "impl.y   2    Not Recorded  impl.y   ",
         ]
 
         stream = StringIO()
@@ -1562,10 +1568,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         expected = [
             "2 Input(s) in 'sub'",
             "",
-            "varname     val",
-            "----------  -----",
-            "expl.a  [10.]",
-            "expl.x  11   ",
+            "varname  val    prom_name",
+            "-------  -----  ---------",
+            "expl.a   [10.]  expl.a   ",
+            "expl.x   11     expl.x   ",
             # sub.impl.x is not recorded (excluded)
         ]
 
@@ -1583,19 +1589,18 @@ class TestSqliteCaseReader(unittest.TestCase):
         expected = [
             "1 Explicit Output(s) in 'sub'",
             "",
-            "varname   val",
-            "--------  -----",
+            "varname  val    prom_name",
+            "-------  -----  ---------",
             "expl",
-            "  b   [20.]",
-            #      y is not recorded (excluded)
+            "  b      [20.]  expl.b   ",
             "",
             "",
             "1 Implicit Output(s) in 'sub'",
             "",
-            "varname   val",
-            "-------   -----",
+            "varname  val  prom_name",
+            "-------  ---  ---------",
             "impl",
-            "  y   2    ",
+            "  y      2    impl.y   ",
         ]
 
         stream = StringIO()

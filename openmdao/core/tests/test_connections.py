@@ -229,6 +229,35 @@ class TestConnectionsPromoted(unittest.TestCase):
         self.assertEqual(C3._inputs['x'], 999.)
         self.assertEqual(C4._inputs['x'], 999.)
 
+    def test_multi_promote_aliases(self):
+        class Sub1(om.Group):
+            def setup(self):
+
+                c1 = om.ExecComp('y = 0.9 * x', x=1, y=1)
+                self.add_subsystem('comp1',c1,
+                                promotes_inputs=[('x', 'x1')],
+                                promotes_outputs=[('y', 'y1')])
+
+                c2 = om.ExecComp('xx = 0.9 * yy', xx=1, yy=1)
+                self.add_subsystem('comp2',c2,
+                                promotes_inputs=[('yy', 'yy1')],
+                                promotes_outputs=[('xx', 'xx1')])
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('sub1', Sub1(),
+                            promotes_inputs=[('x1', 'x'), ('yy1', 'y')],
+                            promotes_outputs=[('y1', 'y'), ('xx1', 'x')])
+
+        prob.setup()
+        prob.run_model()
+
+        conns = prob.model._conn_global_abs_in2out
+        self.assertEqual(conns['sub1.comp2.yy'], 'sub1.comp1.y')
+        self.assertEqual(conns['sub1.comp1.x'], 'sub1.comp2.xx')
+
+
     def test_overlapping_system_names(self):
         # This ensures that _setup_connections does not think g1 and g1a are the same system
         prob = om.Problem()

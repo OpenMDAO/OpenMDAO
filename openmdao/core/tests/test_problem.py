@@ -1524,13 +1524,13 @@ class TestProblem(unittest.TestCase):
             p.setup()
             p.run_model()
 
-            inputs = p.model.list_inputs(out_stream=None)
+            inputs = p.model.list_inputs(out_stream=None, prom_name=False)
             self.assertEqual(sorted(inputs), [
                 ('comp3.a', {'val': [2.]}),
                 ('comp3.b', {'val': [3.]})
             ], "Inputs don't match when added in %s." % where)
 
-            outputs = p.model.list_outputs(out_stream=None)
+            outputs = p.model.list_outputs(out_stream=None, prom_name=False)
             self.assertEqual(sorted(outputs), [
                 ('comp1.a',   {'val': [2.]}),
                 ('comp1.foo', {'val': [1.]}),
@@ -1580,13 +1580,13 @@ class TestProblem(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        inputs = p.model.list_inputs(out_stream=None)
+        inputs = p.model.list_inputs(out_stream=None, prom_name=False)
         self.assertEqual(sorted(inputs), [
             ('mcomp.a',     {'val': [2.]}),
             ('sub.mcomp.a', {'val': [2.]}),
         ])
 
-        outputs = p.model.list_outputs(out_stream=None)
+        outputs = p.model.list_outputs(out_stream=None, prom_name=False)
         self.assertEqual(sorted(outputs), [
             ('indep.a',      {'val': [2.]}),
             ('mcomp.a2',     {'val': [4.]}),
@@ -1598,7 +1598,7 @@ class TestProblem(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        inputs = p.model.list_inputs(out_stream=None)
+        inputs = p.model.list_inputs(out_stream=None, prom_name=False)
         self.assertEqual(sorted(inputs), [
             ('mcomp.a',     {'val': [2.]}),
             ('mcomp.b',     {'val': [3.]}),
@@ -1606,7 +1606,7 @@ class TestProblem(unittest.TestCase):
             ('sub.mcomp.b', {'val': [3.]}),
         ])
 
-        outputs= p.model.list_outputs(out_stream=None)
+        outputs= p.model.list_outputs(out_stream=None, prom_name=False)
         self.assertEqual(sorted(outputs), [
             ('indep.a',      {'val': [2.]}),
             ('indep.b',      {'val': [3.]}),
@@ -2229,7 +2229,7 @@ class RelevanceTestCase(unittest.TestCase):
 
         output = strout.getvalue()
         self.assertRegex(output.split('\n')[1], r'Problem \w+ Independent Variables')
-        self.assertEqual(output.split('\n')[3].split(), ['name', 'units', 'value'])
+        self.assertEqual(output.split('\n')[3].split(), ['name', 'units', 'val'])
         self.assertRegex(output.split('\n')[5], r'\s*z\s+None\s+|[0-9.]+|')
         self.assertRegex(output.split('\n')[6], r'\s*x\s+None\s+|[0-9.]+|')
 
@@ -2244,6 +2244,44 @@ class RelevanceTestCase(unittest.TestCase):
         output = strout.getvalue()
         self.assertRegex(output.split('\n')[1], r'Problem \w+ Independent Variables')
         self.assertEqual(output.split('\n')[3].split(), ['None', 'found'])
+
+    def test_list_indep_vars_duplicate_inputs(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('a', om.ExecComp('y = x**2'),
+                                 promotes_inputs=['x'], promotes_outputs=['y'])
+
+        prob.model.add_subsystem('b', om.ExecComp('z = x**3'),
+                                 promotes_inputs=['x'], promotes_outputs=['z'])
+
+        prob.model.add_design_var('x', lower=-1, upper=1)
+        prob.model.add_objective('y')
+
+        prob.setup()
+
+        prob.final_setup()
+
+        indep_vars = prob.list_indep_vars()
+
+        self.assertEqual(len(indep_vars), 1)
+
+    def test_list_indep_vars_no_auto_ivc(self):
+        prob = om.Problem()
+
+        prob.model.add_subsystem('indep_theta', om.IndepVarComp('theta'))
+        prob.model.add_subsystem('indep_r', om.IndepVarComp('r'))
+
+        prob.model.add_subsystem('xComp', om.ExecComp('x = r1*cos(theta1)'))
+        prob.model.add_subsystem('yComp', om.ExecComp('y = r2*sin(theta2)'))
+
+        prob.model.connect('indep_theta.theta', ['xComp.theta1', 'yComp.theta2'])
+        prob.model.connect('indep_r.r', ['xComp.r1', 'yComp.r2'])
+
+        prob.setup()
+        prob.final_setup()
+
+        indep_vars = prob.list_indep_vars()
+        self.assertEqual(indep_vars[0][0], 'indep_r.r')
+        self.assertEqual(indep_vars[1][0], 'indep_theta.theta')
 
 
 class NestedProblemTestCase(unittest.TestCase):

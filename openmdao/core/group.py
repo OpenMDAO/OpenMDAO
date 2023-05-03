@@ -26,7 +26,7 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len
 from openmdao.utils.general_utils import common_subpath, all_ancestors, \
-    convert_src_inds, ContainsAll, shape2tuple, get_connection_owner
+    convert_src_inds, ContainsAll, shape2tuple, get_connection_owner, ensure_compatible
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
@@ -277,15 +277,15 @@ class Group(System):
         if val is _UNDEFINED:
             src_shape = shape2tuple(src_shape)
         else:
-            meta['val'] = val
             if src_shape is not None:
-                issue_warning("value was set in set_input_defaults, so ignoring "
-                              f"value {src_shape} of src_shape.", prefix=self.msginfo,
-                              category=PromotionWarning)
-            if isinstance(val, np.ndarray):
+                # make sure value and src_shape are compatible
+                val, src_shape = ensure_compatible(name, val, src_shape)
+            elif isinstance(val, np.ndarray):
                 src_shape = val.shape
             elif isinstance(val, Number):
                 src_shape = (1,)
+            meta['val'] = val
+
         if units is not None:
             if not isinstance(units, str):
                 raise TypeError('%s: The units argument should be a str or None' % self.msginfo)
@@ -2021,13 +2021,13 @@ class Group(System):
         else:
             self._owned_sizes = self._var_sizes['output']
 
-    def _setup_global_connections(self, conns=None):
+    def _setup_global_connections(self, parent_conns=None):
         """
         Compute dict of all connections between this system's inputs and outputs.
 
         Parameters
         ----------
-        conns : dict
+        parent_conns : dict
             Dictionary of connections passed down from parent group.
         """
         global_abs_in2out = self._conn_global_abs_in2out = {}
@@ -2045,35 +2045,34 @@ class Group(System):
         abs_in2out = {}
         new_conns = {}
 
-        if pathname:
-            path_len = len(pathname) + 1
-            nparts = len(pathname.split('.'))
-        else:
-            path_len = nparts = 0
+        prefix = pathname + '.' if pathname else ''
+        path_len = len(prefix)
 
-        if conns is not None:
-            for abs_in, abs_out in conns.items():
-                inparts = abs_in.split('.')
-                outparts = abs_out.split('.')
-
-                if inparts[:nparts] == outparts[:nparts]:
+        if parent_conns is not None:
+            for abs_in, abs_out in parent_conns.items():
+                if abs_in.startswith(prefix) and abs_out.startswith(prefix):
                     global_abs_in2out[abs_in] = abs_out
+
+                    in_subsys, _, _ = abs_in[path_len:].partition('.')
+                    out_subsys, _, _ = abs_out[path_len:].partition('.')
 
                     # if connection is contained in a subgroup, add to conns
                     # to pass down to subsystems.
-                    if inparts[nparts] == outparts[nparts]:
-                        if inparts[nparts] not in new_conns:
-                            new_conns[inparts[nparts]] = {}
-                        new_conns[inparts[nparts]][abs_in] = abs_out
+                    if in_subsys == out_subsys:
+                        if in_subsys not in new_conns:
+                            new_conns[in_subsys] = {abs_in: abs_out}
+                        else:
+                            new_conns[in_subsys][abs_in] = abs_out
 
         # Add implicit connections (only ones owned by this group)
-        for prom_name in allprocs_prom2abs_list_out:
-            if prom_name in allprocs_prom2abs_list_in:
-                abs_out = allprocs_prom2abs_list_out[prom_name][0]
-                out_subsys = abs_out[path_len:].split('.', 1)[0]
+        for prom_name, out_list in allprocs_prom2abs_list_out.items():
+            if prom_name in allprocs_prom2abs_list_in:  # names match ==> a connection
+                abs_out = out_list[0]
+                out_subsys, _, _ = abs_out[path_len:].partition('.')
                 for abs_in in allprocs_prom2abs_list_in[prom_name]:
-                    in_subsys = abs_in[path_len:].split('.', 1)[0]
-                    if out_subsys != in_subsys:
+                    in_subsys, _, _ = abs_in[path_len:].partition('.')
+                    global_abs_in2out[abs_in] = abs_out
+                    if out_subsys != in_subsys:  # this group will handle the transfer
                         abs_in2out[abs_in] = abs_out
 
         src_ind_inputs = set()
@@ -2117,13 +2116,12 @@ class Group(System):
             # (not traceable to a connect statement, so provide context)
             # and check if src_indices is defined in both connect and add_input.
             abs_out = allprocs_prom2abs_list_out[prom_out][0]
-            outparts = abs_out.split('.')
-            out_subsys = outparts[:-1]
+            out_comp, _, _ = abs_out.rpartition('.')
+            out_subsys, _, _ = abs_out[path_len:].partition('.')
 
             for abs_in in allprocs_prom2abs_list_in[prom_in]:
-                inparts = abs_in.split('.')
-                in_subsys = inparts[:-1]
-                if out_subsys == in_subsys:
+                in_comp, _, _ = abs_in.rpartition('.')
+                if out_comp == in_comp:
                     self._collect_error(
                         f"{self.msginfo}: Output and input are in the same System for connection "
                         f"from '{prom_out}' to '{prom_in}'.")
@@ -2169,10 +2167,11 @@ class Group(System):
                 abs_in2out[abs_in] = abs_out
 
                 # if connection is contained in a subgroup, add to conns to pass down to subsystems.
-                if inparts[:nparts + 1] == outparts[:nparts + 1]:
-                    if inparts[nparts] not in new_conns:
-                        new_conns[inparts[nparts]] = {}
-                    new_conns[inparts[nparts]][abs_in] = abs_out
+                if abs_in[path_len:].partition('.')[0] == out_subsys:
+                    if out_subsys not in new_conns:
+                        new_conns[out_subsys] = {abs_in: abs_out}
+                    else:
+                        new_conns[out_subsys][abs_in] = abs_out
 
         # Compute global_abs_in2out by first adding this group's contributions,
         # then adding contributions from systems above/below, then allgathering.
@@ -2182,7 +2181,7 @@ class Group(System):
 
         for subgroup in self._subgroups_myproc:
             if subgroup.name in new_conns:
-                subgroup._setup_global_connections(conns=new_conns[subgroup.name])
+                subgroup._setup_global_connections(parent_conns=new_conns[subgroup.name])
             else:
                 subgroup._setup_global_connections()
             global_abs_in2out.update(subgroup._conn_global_abs_in2out)
@@ -2198,8 +2197,9 @@ class Group(System):
             dup_info = [(n, srcs) for n, srcs in dup_info.items() if len(srcs) > 1]
             if dup_info:
                 dup = ["%s from %s" % (tgt, sorted(srcs)) for tgt, srcs in dup_info]
+                dupstr = ', '.join(dup)
                 self._collect_error(f"{self.msginfo}: The following inputs have multiple "
-                                    f"connections: {', '.join(dup)}.")
+                                    f"connections: {dupstr}.", ident=dupstr)
 
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             # If running in parallel, allgather

@@ -246,28 +246,27 @@ class DiscreteTestCase(unittest.TestCase):
         #
         # list vars before model has been run (relative names)
         #
-        # expl_inputs = prob.model.expl.list_inputs(values=True, out_stream=None)
-        expl_inputs = prob.model.expl.list_inputs(out_stream=None)
+        expl_inputs = prob.model.expl.list_inputs(out_stream=None, prom_name=False)
         expected = {
             'a': {'val': [10.]},
             'x': {'val': 10}
         }
         self.assertEqual(dict(expl_inputs), expected)
 
-        impl_inputs = prob.model.impl.list_inputs(out_stream=None)
+        impl_inputs = prob.model.impl.list_inputs(out_stream=None, prom_name=False)
         expected = {
             'x': {'val': 10}
         }
         self.assertEqual(dict(impl_inputs), expected)
 
-        expl_outputs = prob.model.expl.list_outputs(out_stream=None)
+        expl_outputs = prob.model.expl.list_outputs(out_stream=None, prom_name=False)
         expected = {
             'b': {'val': [0.]},
             'y': {'val': 0}
         }
         self.assertEqual(dict(expl_outputs), expected)
 
-        impl_outputs = prob.model.impl.list_outputs(out_stream=None)
+        impl_outputs = prob.model.impl.list_outputs(out_stream=None, prom_name=False)
         expected = {
             'y': {'val': 0}
         }
@@ -417,7 +416,7 @@ class DiscreteTestCase(unittest.TestCase):
         prob.run_model()
 
         # list inputs, no tags
-        inputs = prob.model.list_inputs(val=False, out_stream=None)
+        inputs = prob.model.list_inputs(val=False, out_stream=None, prom_name=False)
         self.assertEqual(sorted(inputs), [
             ('expl.a', {}),
             ('expl.x', {}),
@@ -425,14 +424,14 @@ class DiscreteTestCase(unittest.TestCase):
         ])
 
         # list inputs, with tags
-        inputs = prob.model.list_inputs(val=False, out_stream=None, tags='tagx')
+        inputs = prob.model.list_inputs(val=False, out_stream=None, tags='tagx', prom_name=False)
         self.assertEqual(sorted(inputs), [
             ('expl.x', {}),
             ('impl.x', {}),
         ])
 
         # list outputs, no tags
-        outputs = prob.model.list_outputs(val=False, out_stream=None)
+        outputs = prob.model.list_outputs(val=False, out_stream=None, prom_name=False)
         self.assertEqual(sorted(outputs), [
             ('expl.b', {}),
             ('expl.y', {}),
@@ -441,7 +440,7 @@ class DiscreteTestCase(unittest.TestCase):
         ])
 
         # list outputs, with tags
-        outputs = prob.model.list_outputs(val=False, out_stream=None, tags='tagy')
+        outputs = prob.model.list_outputs(val=False, out_stream=None, tags='tagy', prom_name=False)
         self.assertEqual(sorted(outputs), [
             ('expl.y', {}),
             ('impl.y', {}),
