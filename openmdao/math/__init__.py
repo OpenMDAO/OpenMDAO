@@ -47,6 +47,6 @@ da_dx, da_dy, da_dz, db_dx, db_dy, db_dz = d_foo(x, y, z=1.0, d_z=False)
 Now, da_dz and db_dz will both be None.
 """
 
-from .smooth import act_tanh, smooth_max, smooth_min, smooth_abs
+from .smooth import act_tanh, ks_max, ks_min, smooth_max, smooth_min, smooth_abs
 
 from .cs_safe import abs, arctanh, arctan2, norm
