@@ -33,8 +33,6 @@ class SubmodelComp(ExplicitComponent):
 
     Attributes
     ----------
-    model : <System>
-        The system being analyzed in subproblem.
     _subprob : object
         Instantiated problem used to run the model.
     submodel_inputs : list of tuple
@@ -48,14 +46,14 @@ class SubmodelComp(ExplicitComponent):
         determine how to add the io.
     """
 
-    def __init__(self, model, problem, inputs=None, outputs=None, **kwargs):
+    def __init__(self, problem, inputs=None, outputs=None, **kwargs):
         """
         Initialize all attributes.
         """
         # call base class to set kwargs
         super().__init__(**kwargs)
 
-        self.model = model
+        # self.model = model
         self._subprob = problem
 
         # need to make submodel_inputs/outputs be lists of tuples
@@ -180,8 +178,8 @@ class SubmodelComp(ExplicitComponent):
         p = self._subprob
 
         # need to make sure multiple subsystems aren't added if setup more than once
-        if not self.is_set_up:
-            p.model.add_subsystem('subsys', self.model, promotes=['*'])
+        # if not self.is_set_up:
+        #     p.model.add_subsystem('subsys', self.model, promotes=['*'])
 
         # if subprob.setup is called before the top problem setup, we can't rely
         # on using the problem meta data, so default to False
@@ -320,7 +318,9 @@ class SubmodelComp(ExplicitComponent):
             # if prom_name in self._design_vars:
             #     continue
             iface_name = prom_name.replace('.', ':')
+            # iface_name = dv_meta['name']
             self.submodel_inputs[prom_name] = iface_name
+            # p.model._var_allprocs_prom2abs_list[iface_name] = name
 
             meta = self.boundary_inputs[name]
             meta.pop('prom_name')
@@ -340,7 +340,9 @@ class SubmodelComp(ExplicitComponent):
             prom_name = self.all_outputs[name]['prom_name']
             # prom_name = name
             iface_name = prom_name.replace('.', ':')
+            # iface_name = con_meta['name']
             self.submodel_outputs[prom_name] = iface_name
+            # p.model._var_allprocs_prom2abs_list[iface_name] = name
             
             meta = self.all_outputs[name]
             meta.pop('prom_name')
@@ -362,7 +364,9 @@ class SubmodelComp(ExplicitComponent):
             prom_name = self.all_outputs[name]['prom_name']
             # prom_name = name
             iface_name = prom_name.replace('.', ':')
+            # iface_name = obj_meta['name']
             self.submodel_outputs[prom_name] = iface_name
+            # p.model._var_allprocs_prom2abs_list[iface_name] = name
             
             meta = self.all_outputs[name]
             meta.pop('prom_name')
@@ -430,19 +434,24 @@ class SubmodelComp(ExplicitComponent):
         # responses = self.driver_cons + self.driver_objs
         # p.driver._responses = {name: meta for name, meta in responses}
 
-        p.model._responses = {meta['name']: meta for _, meta in p.driver._responses.items()}
-        p.model._design_vars = {meta['name']: meta for _, meta in p.driver._designvars.items()}
+        # p.model._responses = {meta['name']: meta for _, meta in p.driver._responses.items()}
+        # p.model._design_vars = {meta['name']: meta for _, meta in p.driver._designvars.items()}
 
+        # self._reset_driver_vars()
 
         self.coloring = p.driver._get_coloring(run_model=True)
         if self.coloring is not None:
             self.coloring._col_vars = list(p.driver._designvars)
+
+        self._reset_driver_vars()
 
         if self.coloring is None:
             self.declare_partials(of='*', wrt='*')
         else:
             for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():
                 self.declare_partials(of=of, wrt=wrt, rows=nzrows, cols=nzcols)
+        
+        print()
 
     def _set_complex_step_mode(self, active):
         super()._set_complex_step_mode(active)
