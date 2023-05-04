@@ -211,10 +211,6 @@ class SubmodelComp(ExplicitComponent):
             # meta['prom_name'] = name
             # meta['abs_name'] = name
 
-        # self.boundary_inputs = {name: meta for name, meta in p.list_indep_vars(out_stream=None)}#, options=['name'])
-        # for name, meta in self.boundary_inputs.items():
-        #     meta['prom_name'] = name
-
         self.all_outputs = {}
         outputs = p.model.list_outputs(out_stream=None, prom_name=True,
                                        units=True, shape=True, desc=True)#,
