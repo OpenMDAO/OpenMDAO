@@ -49,8 +49,6 @@ class NonlinearBlockGS(NonlinearSolver):
         """
         super()._setup_solvers(system, depth)
 
-        rank = MPI.COMM_WORLD.rank if MPI is not None else 0
-
         if len(system._subsystems_allprocs) != len(system._subsystems_myproc):
             raise RuntimeError('{}: Nonlinear Gauss-Seidel cannot be used on a '
                                'parallel group.'.format(self.msginfo))

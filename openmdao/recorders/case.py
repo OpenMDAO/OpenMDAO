@@ -95,7 +95,7 @@ class Case(object):
     """
 
     def __init__(self, source, data, prom2abs, abs2prom, abs2meta, conns, auto_ivc_map, var_info,
-                 data_format=None):
+                 data_format=-1):
         """
         Initialize.
         """
@@ -394,7 +394,7 @@ class Case(object):
 
     def list_inputs(self,
                     val=True,
-                    prom_name=False,
+                    prom_name=True,
                     units=False,
                     shape=False,
                     desc=False,
@@ -407,7 +407,8 @@ class Case(object):
                     is_design_var=None,
                     out_stream=_DEFAULT_OUT_STREAM,
                     print_min=False,
-                    print_max=False):
+                    print_max=False,
+                    return_format='list'):
         """
         Return and optionally log a list of input names and other optional information.
 
@@ -417,7 +418,7 @@ class Case(object):
             When True, display/return input values. Default is True.
         prom_name : bool, optional
             When True, display/return the promoted name of the variable.
-            Default is False.
+            Default is True.
         units : bool, optional
             When True, display/return units. Default is False.
         shape : bool, optional
@@ -457,11 +458,15 @@ class Case(object):
             When true, if the input value is an array, print its smallest value.
         print_max : bool, optional
             When true, if the input value is an array, print its largest value.
+        return_format : str
+            Indicates the desired format of the return value. Can have value of 'list' or 'dict'.
+            If 'list', the return value is a list of (name, metadata) tuples.
+            if 'dict', the return value is a dictionary mapping {name: metadata}.
 
         Returns
         -------
-        list
-            List of input names and other optional information about those inputs.
+        list of (name, metadata) or dict of {name: metadata}
+            List or dict of input names and other optional information about those inputs.
         """
         abs2meta = self._abs2meta
         inputs = []
@@ -549,12 +554,15 @@ class Case(object):
                 ostream.write('WARNING: Inputs not recorded. Make sure your recording ' +
                               'settings have record_inputs set to True\n')
 
-        return inputs
+        if return_format == 'dict':
+            return dict(inputs)
+        else:
+            return inputs
 
     def list_outputs(self,
                      explicit=True, implicit=True,
                      val=True,
-                     prom_name=False,
+                     prom_name=True,
                      residuals=False,
                      residuals_tol=None,
                      units=False,
@@ -572,7 +580,8 @@ class Case(object):
                      list_autoivcs=False,
                      out_stream=_DEFAULT_OUT_STREAM,
                      print_min=False,
-                     print_max=False):
+                     print_max=False,
+                     return_format='list'):
         """
         Return and optionally log a list of output names and other optional information.
 
@@ -638,11 +647,15 @@ class Case(object):
             When true, if the output value is an array, print its smallest value.
         print_max : bool, optional
             When true, if the output value is an array, print its largest value.
+        return_format : str
+            Indicates the desired format of the return value. Can have value of 'list' or 'dict'.
+            If 'list', the return value is a list of (name, metadata) tuples.
+            if 'dict', the return value is a dictionary mapping {name: metadata}.
 
         Returns
         -------
-        list
-            List of output names and other optional information about those outputs.
+        list of (name, metadata) or dict of {name: metadata}
+            List or dict of output names and other optional information about those outputs.
         """
         abs2meta = self._abs2meta
         expl_outputs = []
@@ -750,13 +763,18 @@ class Case(object):
                 self._write_table('implicit', impl_outputs, hierarchical, print_arrays, out_stream)
 
         if explicit and implicit:
-            return expl_outputs + impl_outputs
+            outputs = expl_outputs + impl_outputs
         elif explicit:
-            return expl_outputs
+            outputs = expl_outputs
         elif implicit:
-            return impl_outputs
+            outputs = impl_outputs
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
+
+        if return_format == 'dict':
+            return dict(outputs)
+        else:
+            return outputs
 
     def _write_table(self, var_type, var_data, hierarchical, print_arrays, out_stream):
         """

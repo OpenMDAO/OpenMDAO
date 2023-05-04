@@ -7,6 +7,7 @@ from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.visualization.inputs_report.inputs_report import inputs_report
+
 from openmdao.utils.mpi import MPI
 
 try:
@@ -90,6 +91,7 @@ class TestInputsReport(unittest.TestCase):
         with open('temp_inputs_report.md') as f:
             report_content = f.read()
         self.assertEqual(expected, report_content)
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 @use_tempdirs
