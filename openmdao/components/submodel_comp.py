@@ -228,10 +228,10 @@ class SubmodelComp(ExplicitComponent):
         # boundary_input_prom_names = [meta['prom_name'] for _, meta in self.boundary_inputs.items()]
         # all_outputs_prom_names = [meta['prom_name'] for _, meta in self.all_outputs.items()]
 
-        wildcard_inputs = [var for var in self.submodel_inputs.items()
-                           if isinstance(var, str) and '*' in var]
-        wildcard_outputs = [var for var in self.submodel_outputs.items()
-                            if isinstance(var, str) and '*' in var]
+        wildcard_inputs = [var for var, _ in self.submodel_inputs.items()
+                           if '*' in var]
+        wildcard_outputs = [var for var, _ in self.submodel_outputs.items()
+                            if '*' in var]
 
         for inp in wildcard_inputs:
             matches = find_matches(inp, list(self.boundary_inputs.keys()))
@@ -248,7 +248,7 @@ class SubmodelComp(ExplicitComponent):
             if len(matches) == 0:
                 raise Exception(f'Pattern {out} not found in model')
             for match in matches:
-                self.submodel_outputs.append((match, match))
+                self.submodel_outputs[match] = match.replace('.', ':')
             self.submodel_outputs.pop(out)
 
         # NOTE iface_name is what user refers to var as
