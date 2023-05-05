@@ -356,25 +356,29 @@ if __name__ == '__main__':
             partials['h', 'x'] = dx
             partials['h', 'z'] = dz
 
-    # for N in [10, 20, 50, 100, 150, 200, 300, 400, 500]:
-    #     p = om.Problem()
-    #     h_comp = p.model.add_subsystem('h_comp', ActTanhComp(vec_size=N))
-    #     p.setup(force_alloc_complex=True)
-    #
-    #     p.set_val('h_comp.x', np.linspace(0, 1, h_comp.options['vec_size']))
-    #     p.set_val('h_comp.z', 0.5)
-    #
-    #     p.run_model()
-    #
-    #     # call compute totals once to do the jit compilation before we run timings
-    #     p.compute_totals(of=['h_comp.h'], wrt=['h_comp.x', 'h_comp.z'])
-    #
-    #     import timeit
-    #
-    #     t = timeit.timeit("p.compute_totals(of=['h_comp.h'], wrt=['h_comp.x', 'h_comp.z'])",
-    #                       globals=globals(),
-    #                       number=100)
-    #     print(N, t/100)
+    for N in [10, 20, 50, 100, 150, 200, 300, 400, 500]:
+        p = om.Problem()
+        h_comp = p.model.add_subsystem('h_comp', ActTanhComp(vec_size=N))
+        p.setup(force_alloc_complex=True)
+
+        p.set_val('h_comp.x', np.linspace(0, 1, h_comp.options['vec_size']))
+        p.set_val('h_comp.z', 0.5)
+
+        p.run_model()
+
+        # call compute totals once to do the jit compilation before we run timings
+        jac = p.compute_totals(of=['h_comp.h'], wrt=['h_comp.x', 'h_comp.z'])
+
+        print(jac)
+        # import timeit
+        #
+        # t = timeit.timeit("p.compute_totals(of=['h_comp.h'], wrt=['h_comp.x', 'h_comp.z'])",
+        #                   globals=globals(),
+        #                   number=100)
+        # print(N, t/100)
+        break
+
+    exit(0)
 
 
     jacrev_results = [
@@ -435,7 +439,7 @@ if __name__ == '__main__':
 
     plt.legend()
     plt.grid()
-    
+
     plt.xlabel('Vector size of act_tanh')
     plt.ylabel('compute_totals time vs. analytic (s)')
 
