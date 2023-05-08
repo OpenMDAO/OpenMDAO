@@ -124,10 +124,10 @@ class SubmodelComp(ExplicitComponent):
         # meta = next(data for _, data in self.boundary_inputs if data['prom_name'] == path)
         meta = self.boundary_inputs[path]
         meta.pop('prom_name')
-        abs_name = meta.pop('abs_name')
+        # abs_name = meta.pop('abs_name')
         super().add_input(name, **meta)
         meta['prom_name'] = path
-        meta['abs_name'] = abs_name
+        # meta['abs_name'] = abs_name
 
     def add_output(self, path, name=None):
         """
@@ -158,10 +158,10 @@ class SubmodelComp(ExplicitComponent):
         meta = self.all_outputs[path]
 
         meta.pop('prom_name')
-        abs_name = meta.pop('abs_name')
+        # abs_name = meta.pop('abs_name')
         super().add_output(name, **meta)
         meta['prom_name'] = path
-        meta['abs_name'] = abs_name
+        # meta['abs_name'] = abs_name
     
     def _reset_driver_vars(self):
         p = self._subprob
@@ -256,6 +256,8 @@ class SubmodelComp(ExplicitComponent):
         # can have illegal chars in it like '.'
         for var in self.submodel_inputs.items():
             iface_name = var[1]
+            if self.is_set_up and iface_name in self._var_allprocs_prom2abs_list['input']:
+                continue
             prom_name = var[0]
             try:
                 # meta = next(data for _, data in self.boundary_inputs
@@ -273,6 +275,8 @@ class SubmodelComp(ExplicitComponent):
 
         for var in self.submodel_outputs.items():
             iface_name = var[1]
+            if self.is_set_up and iface_name in self._var_allprocs_prom2abs_list['output']:
+                continue
             prom_name = var[0]
             try:
                 # meta = next(data for _, data in self.all_outputs if data['prom_name'] == prom_name)
@@ -314,6 +318,8 @@ class SubmodelComp(ExplicitComponent):
             # if prom_name in self._design_vars:
             #     continue
             iface_name = prom_name.replace('.', ':')
+            if self.is_set_up and iface_name in self._var_allprocs_prom2abs_list['input']:
+                continue
             # iface_name = dv_meta['name']
             self.submodel_inputs[prom_name] = iface_name
             # p.model._var_allprocs_prom2abs_list[iface_name] = name
@@ -336,6 +342,8 @@ class SubmodelComp(ExplicitComponent):
             prom_name = self.all_outputs[name]['prom_name']
             # prom_name = name
             iface_name = prom_name.replace('.', ':')
+            if self.is_set_up and iface_name in self._var_allprocs_prom2abs_list['output']:
+                continue
             # iface_name = con_meta['name']
             self.submodel_outputs[prom_name] = iface_name
             # p.model._var_allprocs_prom2abs_list[iface_name] = name
@@ -360,6 +368,8 @@ class SubmodelComp(ExplicitComponent):
             prom_name = self.all_outputs[name]['prom_name']
             # prom_name = name
             iface_name = prom_name.replace('.', ':')
+            if self.is_set_up and iface_name in self._var_allprocs_prom2abs_list['output']:
+                continue
             # iface_name = obj_meta['name']
             self.submodel_outputs[prom_name] = iface_name
             # p.model._var_allprocs_prom2abs_list[iface_name] = name
@@ -398,6 +408,8 @@ class SubmodelComp(ExplicitComponent):
             # changed this for consistency
             # if prom_name in [meta['name'] for _, meta in p.driver._designvars.items()]:
             #     continue
+            if prom_name in p.model._static_design_vars or prom_name in p.model._design_vars:
+                continue
             p.model.add_design_var(prom_name)
 
         for prom_name in self.submodel_outputs.keys():
@@ -405,6 +417,8 @@ class SubmodelComp(ExplicitComponent):
             # TODO look into this
             # if prom_name in [meta['name'] for _, meta in p.driver._cons.items()]:
             #     continue
+            if prom_name in p.model._responses:
+                continue
             # alias = prom_name+'_con' if prom_name in self.driver_objs else None
             # indices = slicer[:-1] if prom_name in self.driver_objs else None
             # alias = None
