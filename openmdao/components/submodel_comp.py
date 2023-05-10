@@ -11,8 +11,6 @@ class SubmodelComp(ExplicitComponent):
 
     Parameters
     ----------
-    model : <Group>
-        The system-level <Group>.
     problem : <Problem>
         Instantiated problem to use for the model.
     inputs : list of str or tuple or None
