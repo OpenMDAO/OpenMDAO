@@ -5,19 +5,19 @@ A class to keep track of which systems are modified during configure().
 from openmdao.utils.general_utils import all_ancestors
 
 
-def _descendents(mysystem, sysiter):
+def _descendents(system, sysiter):
     """
-    Filter given iterator of system paths to include only mysystem's descendants.
+    Filter given iterator of system paths to include only system's descendants.
 
-    All pathnames are ancestors of my descendents so a simple tree depth comparison
+    All pathnames are ancestors of system's descendents so a simple tree depth comparison
     is sufficient to determine if a given path is a descendent.
 
     Parameters
     ----------
-    mysystem : <System>
+    system : <System>
         Starting system. We return only descendents of this system.
     sysiter : iter of str
-        Iterator of pathnames of ancestors of mysystem's descendents.
+        Iterator of pathnames of ancestors of system's descendents.
 
     Yields
     ------
@@ -26,9 +26,9 @@ def _descendents(mysystem, sysiter):
     int
         Number of system names in each pathname.
     """
-    mylen = len(mysystem.pathname.split('.')) if mysystem.pathname else 0
+    mylen = system.pathname.count('.') + 1 if system.pathname else 0
     for path in sysiter:
-        plen = len(path.split('.'))
+        plen = path.count('.') + 1 if path else 0
         if plen > mylen:
             yield (path, plen)
 
@@ -45,17 +45,20 @@ class _ConfigInfo(object):
         # this information needs to be known on all procs so that local parallel groups can
         # be marked as modified if they have any modified descendants, even remote ones.
         if group.comm.size > 1 and group._contains_parallel_group:
-            prefix = group.pathname + '.' if group.pathname else ''
-            our_pars = [p for p in group._problem_meta['parallel_groups']
-                        if p.startswith(prefix)]
             mod_pars = set()
-            for par in our_pars:
-                pre = par + '.'
-                for spath in self._modified_systems:
-                    if spath.startswith(pre):
-                        mod_pars.add(par)
-                        break
+            if self._modified_systems:
+                prefix = group.pathname + '.' if group.pathname else ''
+                our_pars = [p for p in group._problem_meta['parallel_groups']
+                            if p.startswith(prefix)]
+                for par in our_pars:
+                    pre = par + '.'
+                    for spath in self._modified_systems:
+                        if spath.startswith(pre):
+                            mod_pars.add(par)
+                            break
+
             all_mods = group.comm.allgather(mod_pars)
+
             for mods in all_mods:
                 for mod in mods:
                     self._modified_systems.update(all_ancestors(mod))
@@ -63,11 +66,11 @@ class _ConfigInfo(object):
     def _var_added(self, comp_path, vname):
         self._modified_systems.update(all_ancestors(comp_path))
 
-    def _prom_added(self, group_path, any=None, inputs=None, outputs=None):
+    def _prom_added(self, group_path):
         # don't update for top level group because we always call _setup_var_data on the
         # top level group after configure
         if group_path:
-            self._modified_systems.add(group_path)
+            self._modified_systems.update(all_ancestors(group_path))
 
     def _modified_system_iter(self, group):
         """
