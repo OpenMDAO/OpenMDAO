@@ -13,7 +13,7 @@ class SubmodelComp(ExplicitComponent):
     ----------
     model : <Group>
         The system-level <Group>.
-    problem : object
+    problem : <Problem>
         Instantiated problem to use for the model.
     inputs : list of str or tuple or None
         List of provided input names in str or tuple form. If an element is a str,
@@ -35,7 +35,7 @@ class SubmodelComp(ExplicitComponent):
 
     Attributes
     ----------
-    _subprob : object
+    _subprob : <Problem>
         Instantiated problem used to run the model.
     submodel_inputs : list of tuple
         List of inputs requested by user to be used as inputs in the
@@ -55,7 +55,7 @@ class SubmodelComp(ExplicitComponent):
         super().__init__(**kwargs)
 
         problem._reports = [] if not reports else problem._reports
-        # promote ever var in subsystems automatically
+        # promote every var in subsystems automatically
         for subsys in problem.model._static_subsystems_allprocs.keys():
             problem.model.promotes(subsys, any=['*'])
         self._subprob = problem
