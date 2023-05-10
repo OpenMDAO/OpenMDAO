@@ -792,16 +792,29 @@ class NonlinearSolver(Solver):
         Perform a Gauss-Seidel iteration over this Solver's subsystems.
         """
         system = self._system()
-        for subsys, _ in system._subsystems_allprocs.values():
-            system._transfer('nonlinear', 'fwd', subsys.name)
+        for subsys in system._solver_subsystem_iter(local_only=False):
+            self._update_inputs_and_solve(system, subsys)
 
-            if subsys._is_local:
-                try:
-                    subsys._solve_nonlinear()
-                except AnalysisError as err:
-                    if 'reraise_child_analysiserror' not in self.options or \
-                            self.options['reraise_child_analysiserror']:
-                        raise err
+    def _update_inputs_and_solve(self, group, subsys):
+        """
+        Update the inputs of the given subsystem and solve it.
+
+        Parameters
+        ----------
+        group : <Group>
+            Group that owns the given subsystem.
+        subsys : <System>
+            Subsystem to be solved.
+        """
+        group._transfer('nonlinear', 'fwd', subsys.name)
+
+        if subsys._is_local:
+            try:
+                subsys._solve_nonlinear()
+            except AnalysisError as err:
+                if 'reraise_child_analysiserror' not in self.options or \
+                        self.options['reraise_child_analysiserror']:
+                    raise err
 
     def _solve_with_cache_check(self):
         """

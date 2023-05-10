@@ -22,15 +22,13 @@ from openmdao.core.constants import _SetupStatus
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver, record_iteration, SaveOptResult
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.core.group import Group
-from openmdao.core.system import System
+from openmdao.core.group import Group, _OptStatus
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.solvers.solver import SolverInfo
-from openmdao.vectors.vector import _full_slice
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.error_checking.check_config import _default_checks, _all_checks, \
     _all_non_redundant_checks
@@ -44,7 +42,6 @@ from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import abs_key2rel_key
 from openmdao.utils.logger_utils import get_logger, TestLogger
 from openmdao.utils.hooks import _setup_hooks, _reset_all_hooks
-from openmdao.utils.indexer import indexer
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.array_utils import scatter_dist_to_local
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
@@ -246,11 +243,15 @@ class Problem(object):
 
         if model is None:
             self.model = Group()
-        elif isinstance(model, System):
+        elif isinstance(model, Group):
+            from openmdao.core.parallel_group import ParallelGroup
+            if isinstance(model, ParallelGroup):
+                raise TypeError(f"{self.msginfo}: The value provided for 'model' "
+                                "cannot be a ParallelGroup.")
             self.model = model
         else:
             raise TypeError(self.msginfo +
-                            ": The value provided for 'model' is not a valid System.")
+                            ": The value provided for 'model' is not a Group.")
 
         if driver is None:
             driver = Driver()
@@ -276,6 +277,11 @@ class Problem(object):
         self.options.declare('coloring_dir', types=str,
                              default=os.path.join(os.getcwd(), 'coloring_files'),
                              desc='Directory containing coloring files (if any) for this Problem.')
+        self.options.declare('group_by_pre_post_opt', types=bool,
+                             default=True,
+                             desc="If True, group subsystems into pre-optimization, optimization, "
+                             "and post-optimization, and only iterate over the optimization "
+                             "subsystems during optimization.")
         self.options.update(options)
 
         # Case recording options
@@ -668,10 +674,27 @@ class Problem(object):
 
             self.model._clear_iprint()
 
-            with SaveOptResult(self.driver):
-                return self.driver.run()
+            if self.options['group_by_pre_post_opt'] and self.driver.supports['optimization']:
+                if self.model._pre_iterated_subsystems:
+                    self.model._set_opt_status(_OptStatus.PRE)
+                    self.model.run_solve_nonlinear()
+
+                with SaveOptResult(self.driver):
+                    self.model._set_opt_status(_OptStatus.OPTIMIZING)
+                    result = self.driver.run()
+
+                if self.model._post_iterated_subsystems:
+                    self.model._set_opt_status(_OptStatus.POST)
+                    self.model.run_solve_nonlinear()
+
+                return result
+            else:
+                with SaveOptResult(self.driver):
+                    return self.driver.run()
+
         finally:
             self._recording_iter.prefix = old_prefix
+            self.model._set_opt_status(None)
 
     def compute_jacvec_product(self, of, wrt, mode, seed):
         """
@@ -982,6 +1005,8 @@ class Problem(object):
             self.model._setup_solver_print()
 
         driver._setup_driver(self)
+
+        self.model._setup_iteration_lists(driver.supports['optimization'])
 
         info = driver._coloring_info
         coloring = info['coloring']

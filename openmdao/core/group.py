@@ -2,6 +2,7 @@
 import sys
 from collections import Counter, defaultdict
 from collections.abc import Iterable
+from enum import IntEnum
 
 from itertools import product, chain
 from numbers import Number
@@ -29,6 +30,7 @@ from openmdao.utils.general_utils import common_subpath, all_ancestors, \
     convert_src_inds, ContainsAll, shape2tuple, get_connection_owner, ensure_compatible
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
+from openmdao.utils.graph_utils import get_sccs_topo
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
@@ -38,6 +40,25 @@ from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOption
 # regex to check for valid names.
 import re
 namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
+
+
+class _OptStatus(IntEnum):
+    """
+    Class used to define different states of the top level Group during the optimization process.
+
+    Attributes
+    ----------
+    PRE : int
+        Before the optimization.
+    OPTIMIZING : int
+        During the optimization.
+    POST : int
+        After the optimization.
+    """
+
+    PRE = 0
+    OPTIMIZING = 1
+    POST = 2
 
 
 # use a class with slots instead of a namedtuple so that we can
@@ -181,6 +202,20 @@ class Group(System):
         Dynamic shape dependency graph, or None.
     _shape_knowns : set
         Set of shape dependency graph nodes with known (non-dynamic) shapes.
+    _pre_iterated_subsystems : list or None
+        List of subsystems that will run before the optimization iteration loop (top level only).
+    _post_iterated_subsystems : list or None
+        List of subsystems that will run after the optimization iteration loop (top level only).
+    _iterated_subsystems : list or None
+        List of subsystems that will run during the optimization iteration loop (top level only).
+    _iteration_input_range : slice or None
+        Slice of the input vector that is updated during the optimization iteration loop
+        (top level only).
+    _iteration_output_range : slice or None
+        Slice of the output vector that is updated during the optimization iteration loop
+        (top level only).
+    _opt_status : int or None
+        Optimization status flag (top level only).
     """
 
     def __init__(self, **kwargs):
@@ -207,6 +242,12 @@ class Group(System):
         self._order_set = False
         self._shapes_graph = None
         self._shape_knowns = None
+        self._pre_iterated_subsystems = None
+        self._iterated_subsystems = None
+        self._post_iterated_subsystems = None
+        self._opt_status = None
+        self._iteration_input_range = None
+        self._iteration_output_range = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -3146,7 +3187,7 @@ class Group(System):
         """
         self._transfer('nonlinear', 'fwd')
         # Apply recursion
-        for subsys in self._subsystems_myproc:
+        for subsys in self._solver_subsystem_iter(local_only=True):
             subsys._apply_nonlinear()
 
         self.iter_count_apply += 1
@@ -3168,8 +3209,8 @@ class Group(System):
         """
         # let any lower level systems do their guessing first
         if self._has_guess:
-            for sname, sinfo in self._subsystems_allprocs.items():
-                sub = sinfo.system
+            for sub in self._solver_subsystem_iter(local_only=False):
+                sname = sub.name
                 # TODO: could gather 'has_guess' information during setup and be able to
                 # skip transfer for subs that don't have guesses...
                 self._transfer('nonlinear', 'fwd', sname)
@@ -3271,19 +3312,19 @@ class Group(System):
             if mode == 'fwd':
                 self._transfer('linear', mode)
                 if rel_systems is not None:
-                    for s in self._subsystems_myproc:
+                    for s in self._solver_subsystem_iter(local_only=True):
                         if s.pathname not in rel_systems:
                             # zero out dvecs of irrelevant subsystems
                             s._dresiduals.set_val(0.0)
 
-            for subsys in self._subsystems_myproc:
+            for subsys in self._solver_subsystem_iter(local_only=True):
                 if rel_systems is None or subsys.pathname in rel_systems:
                     subsys._apply_linear(jac, rel_systems, mode, scope_out, scope_in)
 
             if mode == 'rev':
                 self._transfer('linear', mode)
                 if rel_systems is not None:
-                    for s in self._subsystems_myproc:
+                    for s in self._solver_subsystem_iter(local_only=True):
                         if s.pathname not in rel_systems:
                             # zero out dvecs of irrelevant subsystems
                             s._doutputs.set_val(0.0)
@@ -3371,7 +3412,7 @@ class Group(System):
                 jac = self._assembled_jac
 
             # Only linearize subsystems if we aren't approximating the derivs at this level.
-            for subsys in self._subsystems_myproc:
+            for subsys in self._solver_subsystem_iter(local_only=True):
                 if subsys.pathname in rel_systems:
                     do_ln = sub_do_ln and (subsys._linear_solver is not None and
                                            subsys._linear_solver._linearize_children())
@@ -3385,7 +3426,7 @@ class Group(System):
                 self._assembled_jac._update(self)
 
             if sub_do_ln:
-                for subsys in self._subsystems_myproc:
+                for subsys in self._solver_subsystem_iter(local_only=True):
                     if subsys._linear_solver is not None and subsys.pathname in rel_systems:
                         subsys._linear_solver._linearize()
 
@@ -4333,3 +4374,235 @@ class Group(System):
                 yield from s._ordered_comp_name_iter()
             else:
                 yield s.pathname
+
+    def _solver_subsystem_iter(self, local_only=False):
+        """
+        Iterate over subsystems that are being optimized.
+
+        If called on the top level Group when the Group is under an optimizer, this will
+        iterate over only the subsystems required to obtain the desired objectives and constraints.
+
+        Parameters
+        ----------
+        local_only : bool
+            If True, only iterate over local subsystems.
+
+        Yields
+        ------
+        System
+            A subsystem.
+        """
+        if self._opt_status is None:
+            # this is not a top level group under an optimizer
+            if local_only:
+                yield from self._subsystems_myproc
+            else:
+                for s, _ in self._subsystems_allprocs.values():
+                    yield s
+        else:
+            if self._opt_status == _OptStatus.PRE:
+                it = self._pre_iterated_subsystems
+            elif self._opt_status == _OptStatus.POST:
+                it = self._post_iterated_subsystems
+            else:
+                it = self._iterated_subsystems
+
+            if local_only:
+                for s in it:
+                    if s._is_local:
+                        yield s
+            else:
+                yield from it
+
+    def _setup_iteration_lists(self, in_optimization):
+        """
+        Set up the lists containing the pre, iterated, and post subsets of systems.
+
+        This should only be called on the top level Group.
+
+        Parameters
+        ----------
+        in_optimization : bool
+            If True, this is a top-level group that is under an optimization driver.
+        """
+        assert self.pathname == '', "call setup_iteration_lists on the top level Group only!"
+
+        self._pre_iterated_subsystems = []
+        self._post_iterated_subsystems = []
+
+        if not in_optimization:
+            self._iterated_subsystems = [s for s, _ in self._subsystems_allprocs.values()]
+            return
+
+        graph = self.compute_sys_graph()
+
+        dvs = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
+        dvs = [meta['source'] for meta in dvs.values()]
+        dvsystems = set([name.partition('.')[0] for name in dvs])
+
+        responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
+        responses = [meta['source'] for meta in responses.values()]
+        responsesystems = set([name.partition('.')[0] for name in responses])
+
+        if not dvs or not responses:
+            self._iterated_subsystems = [s for s, _ in self._subsystems_allprocs.values()]
+            return
+
+        # _iterated_subsystems is used to iterate over the systems that depend on the
+        # design variables that the response variables also depend on.  One way to do this is
+        # by adding edges from the response variable systems to the design variable systems
+        # (there are already edges, directly or indirectly, from the design variable systems to the
+        # response variable systems) and then finding the strongly connected components of the
+        # graph.  get_sccs_topo returns the strongly connected components in topological order, so
+        # we can use it to give us pre, iterated, and post subsets of the systems.
+
+        # add edges between response systems and design variable systems
+        for respsys in responsesystems:
+            for dvsys in dvsystems:
+                graph.add_edge(respsys, dvsys)
+
+        sccs = get_sccs_topo(graph)
+        pre = addto = set()
+        post = set()
+        iterated = None
+        for strong_con in sccs:
+            if dvsystems.intersection(strong_con):
+                iterated = strong_con  # strong_con is already a set
+                addto = post
+            else:
+                addto.update(strong_con)
+
+        # check that our groupings of systems are not out-of-order with the existing system ordering
+        order = {sname: i for i, sname in enumerate(self._subsystems_allprocs)}
+        pre_order = [order[s] for s in pre]
+        iterated_order = [order[s] for s in iterated]
+        post_order = [order[s] for s in post]
+        self._iteration_output_range = (0, len(self._outputs))
+        self._iteration_input_range = (0, len(self._inputs))
+
+        if pre_order and iterated_order and max(pre_order) > min(iterated_order):
+            issue_warning(f"The pre-iterated systems {sorted(pre)} are out of order with "
+                          f"respect to the iterated systems {sorted(iterated)}.  To avoid changing "
+                          "the pre-existing ordering, all systems will be included in the "
+                          "iterated set. This could impact performance.")
+            self._iterated_subsystems = [s for s, _ in self._subsystems_allprocs.values()]
+            return
+
+        if post_order and iterated_order and min(post_order) < max(iterated_order):
+            issue_warning(f"The post-iterated systems {sorted(post)} are out of order "
+                          f"with respect to the iterated systems {sorted(iterated)}. To avoid "
+                          "changing the pre-existing ordering, all systems will be included in the "
+                          "iterated set. This could impact performance.")
+            self._iterated_subsystems = [s for s, _ in self._subsystems_allprocs.values()]
+            return
+
+        self._pre_iterated_subsystems = [s for s in self._subsystems_myproc if s.name in pre]
+        self._iterated_subsystems = [s for s in self._subsystems_myproc if s.name in iterated]
+        self._post_iterated_subsystems = [s for s in self._subsystems_myproc if s.name in post]
+
+        pre_out_size = np.sum([len(s._outputs) for s in self._pre_iterated_subsystems])
+        pre_in_size = np.sum([len(s._inputs) for s in self._pre_iterated_subsystems])
+
+        opt_out_size = np.sum([len(s._outputs) for s in self._iterated_subsystems])
+        opt_in_size = np.sum([len(s._inputs) for s in self._iterated_subsystems])
+
+        self._iteration_output_range = (pre_out_size, pre_out_size + opt_out_size)
+        self._iteration_input_range = (pre_in_size, pre_in_size + opt_in_size)
+
+    def _get_solver_ranges(self):
+        """
+        Return the slice of the full input and output vectors that the solver is responsible for.
+        """
+        if self._opt_status is None:
+            return _full_slice, _full_slice
+        elif self._opt_status == _OptStatus.OPTIMIZING:
+            return self._iteration_input_range, self._iteration_output_range
+        elif self._opt_status == _OptStatus.PRE:
+            return ((0, self._iteration_input_range[0]), (0, self._iteration_output_range[0]))
+        else:  # POST
+            return ((self._iteration_input_range[1], len(self._inputs)),
+                    (self._iteration_output_range[1], len(self._outputs)))
+
+    def _set_opt_status(self, status):
+        self._opt_status = status
+        # in_range, out_range = self._get_solver_ranges()
+
+        # # unwrap the vectors if they're already wrapped
+        # if isinstance(self._outputs, _VecSubWrapper):
+        #     self._outputs = self._outputs._vec
+        #     self._residuals = self._residuals._vec
+        #     self._vectors['output']['nonlinear'] = self._vectors['output']['nonlinear']._vec
+        #     self._vectors['output']['linear'] = self._vectors['output']['linear']._vec
+        #     self._vectors['residual']['nonlinear'] = self._vectors['residual']['nonlinear']._vec
+        #     self._vectors['residual']['linear'] = self._vectors['residual']['linear']._vec
+
+        # if isinstance(self._inputs, _VecSubWrapper):
+        #     self._inputs = self._inputs._vec
+        #     self._vectors['input']['nonlinear'] = self._vectors['input']['nonlinear']._vec
+        #     self._vectors['input']['linear'] = self._vectors['input']['linear']._vec
+
+        # # wrap them if needed
+        # if out_range is not _full_slice and (out_range[1] - out_range[0]) != len(self._outputs):
+        #     self._outputs = _VecSubWrapper(self._outputs, out_range)
+        #     self._residuals = _VecSubWrapper(self._residuals, out_range)
+        #     self._vectors['output']['nonlinear'] = \
+        #         _VecSubWrapper(self._vectors['output']['nonlinear'], out_range)
+        #     self._vectors['output']['linear'] = \
+        #         _VecSubWrapper(self._vectors['output']['linear'], out_range)
+        #     self._vectors['residual']['nonlinear'] = \
+        #         _VecSubWrapper(self._vectors['residual']['nonlinear'], out_range)
+        #     self._vectors['residual']['linear'] = \
+        #         _VecSubWrapper(self._vectors['residual']['linear'], out_range)
+
+        # if in_range is not _full_slice and (in_range[1] - in_range[0]) != len(self._inputs):
+        #     self._inputs = _VecSubWrapper(self._inputs, in_range)
+        #     self._vectors['input']['nonlinear'] = \
+        #         _VecSubWrapper(self._vectors['input']['nonlinear'], in_range)
+        #     self._vectors['input']['linear'] = \
+        #         _VecSubWrapper(self._vectors['input']['linear'], in_range)
+
+
+# class _VecSubWrapper(object):
+#     """
+#     A Vector wrapper that only sees a subset of the variables.
+
+#     Attributes
+#     ----------
+#     _vec : <Vector>
+#         The wrapped Vector.
+#     _slice : slice
+#         The slice of the full vector that this wrapper sees.
+
+#     Parameters
+#     ----------
+#     vec : <Vector>
+#         The wrapped Vector.
+#     rng : tuple
+#         The part of the full vector that this wrapper sees, in the form (start, end).
+#     """
+
+#     def __init__(self, vec, rng):
+#         self._vec = vec
+#         self._slice = slice(*rng)
+
+#     def __getattr__(self, name):
+#         return getattr(self._vec, name)
+
+#     def asarray(self, copy=False):
+#         return self._vec.asarray(copy)[self._slice]
+
+#     def set_val(self, val, idxs=_full_slice):
+#         """
+#         Set the data array of this vector to a value, with optional indexing.
+
+#         Parameters
+#         ----------
+#         val : float or ndarray
+#             Scalar or array to set data array to.
+#         idxs : int or slice or tuple of ints and/or slices
+#             The locations where the data array should be updated.
+#         """
+#         if idxs is not _full_slice:
+#             self._vec.set_val(val, idxs=idxs)
+#         else:
+#             self._vec.set_val(val, idxs=self._slice)

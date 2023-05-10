@@ -438,7 +438,7 @@ class DirectSolver(LinearSolver):
 
         # AssembledJacobians are unscaled.
         if self._assembled_jac is not None:
-            full_b = tmp = b_vec
+            full_b = b_vec
 
             with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
                 if isinstance(self._assembled_jac._int_mtx, DenseMatrix):

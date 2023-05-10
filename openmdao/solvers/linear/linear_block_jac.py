@@ -21,7 +21,7 @@ class LinearBlockJac(BlockLinearSolver):
         system = self._system()
         mode = self._mode
 
-        subs = [s for s in system._subsystems_myproc
+        subs = [s for s in system._solver_subsystem_iter(local_only=True)
                 if self._rel_systems is None or s.pathname in self._rel_systems]
         scopelist = [None] * len(subs)
 

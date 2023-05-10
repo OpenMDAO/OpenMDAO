@@ -100,7 +100,7 @@ class LinearBlockGS(BlockLinearSolver):
         if mode == 'fwd':
             parent_offset = system._dresiduals._root_offset
 
-            for subsys, _ in system._subsystems_allprocs.values():
+            for subsys in system._solver_subsystem_iter(local_only=False):
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
                     continue
                 # must always do the transfer on all procs even if subsys not local

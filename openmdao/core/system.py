@@ -2824,6 +2824,22 @@ class System(object):
                 for sub in s.system_iter(recurse=True, typ=typ):
                     yield sub
 
+    def _solver_subsystem_iter(self, local_only=True):
+        """
+        Do nothing.
+
+        Parameters
+        ----------
+        local_only : bool
+            If True, only iterate over local subsystems.
+
+        Returns
+        -------
+        tuple
+            An empty tuple.
+        """
+        return ()
+
     def _create_indexer(self, indices, typename, vname, flat_src=False):
         """
         Return an Indexer instance and it's size if possible.
