@@ -398,7 +398,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
             totals = driver._total_jac.J  # .J is always an array even if return format != 'array'
             driver._total_jac = None
         else:
-            totals = driver._total_jac.J # .J is always an array even if return format != 'array'
+            totals = driver._total_jac.J  # .J is always an array even if return format != 'array'
 
         data['linear'] = lindata = {}
         lindata['oflabels'] = [n for n, meta in driver._cons.items() if meta['linear']]

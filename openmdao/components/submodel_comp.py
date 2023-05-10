@@ -3,7 +3,6 @@
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.general_utils import find_matches
 from openmdao.core.constants import _SetupStatus, INF_BOUND
-# from openmdao.utils.indexer import slicer
 
 
 class SubmodelComp(ExplicitComponent):
@@ -28,6 +27,9 @@ class SubmodelComp(ExplicitComponent):
         then the first element should be the group's promoted name, and the
         second element should be the var name you wish to refer to it within the subproblem
         [e.g. (path.to.var, desired_name)].
+    reports : bool
+        Determines if reports should be include in subproblem. Default is False because
+        submodelcomp runs faster without reports.
     **kwargs : named args
         All remaining named args that become options for `SubmodelComp`.
 
@@ -46,19 +48,18 @@ class SubmodelComp(ExplicitComponent):
         determine how to add the io.
     """
 
-    def __init__(self, problem, inputs=None, outputs=None, **kwargs):
+    def __init__(self, problem, inputs=None, outputs=None, reports=False, **kwargs):
         """
         Initialize all attributes.
         """
-        # call base class to set kwargs
         super().__init__(**kwargs)
 
-        # self.model = model
+        problem._reports = [] if not reports else problem._reports
+        # promote ever var in subsystems automatically
+        for subsys in problem.model._static_subsystems_allprocs.keys():
+            problem.model.promotes(subsys, any=['*'])
         self._subprob = problem
 
-        # need to make submodel_inputs/outputs be lists of tuples
-        # so, if a str is provided, that becomes the iface_name and
-        # the prom_name
         self.submodel_inputs = {}
         self.submodel_outputs = {}
 
@@ -66,14 +67,7 @@ class SubmodelComp(ExplicitComponent):
             for inp in inputs:
                 if isinstance(inp, str):
                     self.submodel_inputs[inp] = inp
-                    # if '*' in inp:
-                    #     # TODO account for other wildcard chars like '?'
-                    #     # NOTE special case... will take care of when we get boundary inputs
-                    #     self.submodel_inputs.append(inp)
-                    # else:
-                    #     self.submodel_inputs.append((inp, inp))
                 elif isinstance(inp, tuple):
-                    # self.submodel_inputs.append(inp)
                     self.submodel_inputs[inp[0]] = inp[1]
                 else:
                     raise Exception(f'Expected input of type str or tuple, got {type(inp)}.')
@@ -82,19 +76,12 @@ class SubmodelComp(ExplicitComponent):
             for out in outputs:
                 if isinstance(out, str):
                     self.submodel_outputs[out] = out
-                    # if '*' in out:
-                    #     # NOTE special case... will take care of when we get all outputs
-                    #     self.submodel_outputs.append(out)
-                    # else:
-                    #     self.submodel_outputs.append((out, out))
                 elif isinstance(out, tuple):
-                    # self.submodel_outputs.append(out)
                     self.submodel_outputs[out[0]] = out[1]
                 else:
                     raise Exception(f'Expected output of type str or tuple, got {type(out)}.')
 
         self.is_set_up = False
-        # self.is_final_set_up = False
 
     def add_input(self, path, name=None):
         """
@@ -109,10 +96,8 @@ class SubmodelComp(ExplicitComponent):
             the last '.'.
         """
         if name is None:
-            # name = path.split('.')[-1]
             name = path.replace('.', ':')
 
-        # self.submodel_inputs.append((path, name))
         self.submodel_inputs[path] = name
 
         if not self.is_set_up:
@@ -121,13 +106,10 @@ class SubmodelComp(ExplicitComponent):
         if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
             raise Exception('Cannot call add_input after configure.')
 
-        # meta = next(data for _, data in self.boundary_inputs if data['prom_name'] == path)
         meta = self.boundary_inputs[path]
         meta.pop('prom_name')
-        # abs_name = meta.pop('abs_name')
         super().add_input(name, **meta)
         meta['prom_name'] = path
-        # meta['abs_name'] = abs_name
 
     def add_output(self, path, name=None):
         """
@@ -142,10 +124,8 @@ class SubmodelComp(ExplicitComponent):
             the last '.'.
         """
         if name is None:
-            # name = path.split('.')[-1]
             name = path.replace('.', ':')
 
-        # self.submodel_outputs.append((path, name))
         self.submodel_outputs[path] = name
 
         if not self.is_set_up:
@@ -154,16 +134,17 @@ class SubmodelComp(ExplicitComponent):
         if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
             raise Exception('Cannot call add_output after configure.')
 
-        # meta = next(data for _, data in self.all_outputs if data['prom_name'] == path)
         meta = self.all_outputs[path]
 
         meta.pop('prom_name')
-        # abs_name = meta.pop('abs_name')
         super().add_output(name, **meta)
         meta['prom_name'] = path
-        # meta['abs_name'] = abs_name
-    
+
     def _reset_driver_vars(self):
+        # NOTE driver var names can be different from those in model
+        # this causes some problems, so this function is used to
+        # reset the driver vars so the inner problem only uses
+        # the model vars
         p = self._subprob
 
         p.driver._designvars = {}
@@ -177,10 +158,6 @@ class SubmodelComp(ExplicitComponent):
         """
         p = self._subprob
 
-        # need to make sure multiple subsystems aren't added if setup more than once
-        # if not self.is_set_up:
-        #     p.model.add_subsystem('subsys', self.model, promotes=['*'])
-
         # if subprob.setup is called before the top problem setup, we can't rely
         # on using the problem meta data, so default to False
         if self._problem_meta is None:
@@ -189,7 +166,9 @@ class SubmodelComp(ExplicitComponent):
             p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'])
         p.final_setup()
 
-        # store boundary_inputs as dict so lookup is quicker and make keys prom_names
+        # store prom name differently based on if the var is an input, output, or auto_ivc
+        # because list_indep_vars doesn't have prom_name as part of its meta data
+        # TODO some of this might not be necessary... need to revisit
         self.boundary_inputs = {}
         indep_vars = p.list_indep_vars(out_stream=None)
         for name, meta in indep_vars:
@@ -199,34 +178,17 @@ class SubmodelComp(ExplicitComponent):
                 meta['prom_name'] = p.model._var_abs2prom['output'][name]
             elif p.model.get_source(name).startswith('_auto_ivc.'):
                 meta['prom_name'] = name
-                # self.boundary_inputs[p.model.get_source(name)] = meta
-                # continue
-                # indep_vars.pop(name)
-                # indep_vars.append((p.model.get_source(name), meta))
-                # indep_vars[p.model.get_source(name)] = meta
             else:
                 raise Exception(f'var {name} not in meta data')
-            # self.boundary_inputs[meta['prom_name']] = meta
             self.boundary_inputs[name] = meta
-            # meta['prom_name'] = name
-            # meta['abs_name'] = name
 
         self.all_outputs = {}
         outputs = p.model.list_outputs(out_stream=None, prom_name=True,
-                                       units=True, shape=True, desc=True)#,
-                                    #    is_indep_var=False)
-        for name, meta in outputs:
-            # self.all_outputs[meta['prom_name']] = meta
-            self.all_outputs[name] = meta
-            # meta['abs_name'] = name
-        # want all outputs from the `SubmodelComp`, including ivcs/design vars
-        # self.all_outputs = {name: meta for name, meta in 
-        #                     p.model.list_outputs(out_stream=None, prom_name=True,
-        #                                          units=True, shape=True, desc=True,
-        #                                          is_indep_var=False)}
-        # add vars that follow patterns to io
-        # boundary_input_prom_names = [meta['prom_name'] for _, meta in self.boundary_inputs.items()]
-        # all_outputs_prom_names = [meta['prom_name'] for _, meta in self.all_outputs.items()]
+                                       units=True, shape=True, desc=True)
+
+        # turn outputs into dict
+        for _, meta in outputs:
+            self.all_outputs[meta['prom_name']] = meta
 
         wildcard_inputs = [var for var, _ in self.submodel_inputs.items()
                            if '*' in var]
@@ -238,11 +200,10 @@ class SubmodelComp(ExplicitComponent):
             if len(matches) == 0:
                 raise Exception(f'Pattern {inp} not found in model')
             for match in matches:
-                # self.submodel_inputs.append((match, match))
                 self.submodel_inputs[match] = match.replace('.', ':')
-            # self.submodel_inputs.remove(inp)
             self.submodel_inputs.pop(inp)
 
+        # output_prom_names = [meta['prom_name'] for _, meta in self.all_outputs.items()]
         for out in wildcard_outputs:
             matches = find_matches(out, list(self.all_outputs.keys()))
             if len(matches) == 0:
@@ -251,145 +212,129 @@ class SubmodelComp(ExplicitComponent):
                 self.submodel_outputs[match] = match.replace('.', ':')
             self.submodel_outputs.pop(out)
 
-        # NOTE iface_name is what user refers to var as
-        # iface_name is different from prom_name because sometimes prom_name
-        # can have illegal chars in it like '.'
+        # NOTE iface_name is what the outer problem knows the variable to be
+        # it can't be the same name as the prom name in the inner variable because
+        # component var names can't include '.'
         for var in self.submodel_inputs.items():
             iface_name = var[1]
-            if self.is_set_up and iface_name in self._var_allprocs_prom2abs_list['input']:
-                continue
             prom_name = var[0]
             try:
-                # meta = next(data for _, data in self.boundary_inputs
-                #             if data['prom_name'] == prom_name)
                 meta = self.boundary_inputs[p.model.get_source(prom_name)] \
-                                if not p.model.get_source(prom_name).startswith('_auto_ivc.') \
-                                else self.boundary_inputs[prom_name]
+                    if not p.model.get_source(prom_name).startswith('_auto_ivc.') \
+                    else self.boundary_inputs[prom_name]
             except Exception:
                 raise Exception(f'Variable {prom_name} not found in model')
             meta.pop('prom_name')
-            # abs_name = meta.pop('abs_name')
             super().add_input(iface_name, **meta)
             meta['prom_name'] = prom_name
-            # meta['abs_name'] = abs_name
 
         for var in self.submodel_outputs.items():
             iface_name = var[1]
-            if self.is_set_up and iface_name in self._var_allprocs_prom2abs_list['output']:
-                continue
             prom_name = var[0]
             try:
-                # meta = next(data for _, data in self.all_outputs if data['prom_name'] == prom_name)
-                meta = self.all_outputs[p.model.get_source(prom_name)]
+                meta = self.all_outputs[prom_name]
             except Exception:
                 raise Exception(f'Variable {prom_name} not found in model')
             meta.pop('prom_name')
-            # abs_name = meta.pop('abs_name')
             super().add_output(iface_name, **meta)
             meta['prom_name'] = prom_name
-            # meta['abs_name'] = abs_name
 
-        driver_vars = p.list_problem_vars(out_stream=None,
-                                          desvar_opts = ['lower', 'upper', 'ref', 'ref0',
-                                                         'indices', 'adder', 'scaler',
-                                                         'parallel_deriv_color',
-                                                         'cache_linear_solution', 'units',
-                                                         'min', 'max'],
-                                          cons_opts = ['lower', 'upper', 'equals', 'ref',
-                                                       'ref0', 'indices', 'adder', 'scaler',
-                                                       'linear', 'parallel_deriv_color',
-                                                       'cache_linear_solution', 'units',
-                                                       'min', 'max'],
-                                          objs_opts = ['ref', 'ref0', 'indices', 'adder',
-                                                      'scaler', 'units', 'parallel_deriv_color',
-                                                      'cache_linear_solution'])
-
-        self.driver_dvs = driver_vars['design_vars']
-        self.driver_cons = driver_vars['constraints']
-        self.driver_objs = driver_vars['objectives']
-        # self.driver_objs = {meta['name']: meta for _, meta in driver_vars['objectives']}
-
-        # self._reset_driver_vars()
-
-        for name, dv_meta in self.driver_dvs:
-            prom_name = self.boundary_inputs[name]['prom_name']
-            # prom_name = name
-            # vvv do I need this for multiple setups? vvv
-            # if prom_name in self._design_vars:
-            #     continue
-            iface_name = prom_name.replace('.', ':')
-            if self.is_set_up and iface_name in self._var_allprocs_prom2abs_list['input']:
-                continue
-            # iface_name = dv_meta['name']
-            self.submodel_inputs[prom_name] = iface_name
-            # p.model._var_allprocs_prom2abs_list[iface_name] = name
-
-            meta = self.boundary_inputs[name]
-            meta.pop('prom_name')
-            super().add_input(iface_name, **meta)
-            meta['prom_name'] = prom_name
-            meta['abs_name'] = name
-            
-            size = dv_meta.pop('size')
-            val = dv_meta.pop('val')
-            dv_meta['indices'] = dv_meta['indices'].as_array() if dv_meta['indices'] is not None else None
-            dv_meta['name'] = prom_name
-            self.add_design_var(**dv_meta)
-            dv_meta['size'] = size
-            dv_meta['val'] = val
-
-        for name, con_meta in self.driver_cons:
-            prom_name = self.all_outputs[name]['prom_name']
-            # prom_name = name
-            iface_name = prom_name.replace('.', ':')
-            if self.is_set_up and iface_name in self._var_allprocs_prom2abs_list['output']:
-                continue
-            # iface_name = con_meta['name']
-            self.submodel_outputs[prom_name] = iface_name
-            # p.model._var_allprocs_prom2abs_list[iface_name] = name
-            
-            meta = self.all_outputs[name]
-            meta.pop('prom_name')
-            super().add_output(iface_name, **meta)
-            meta['prom_name'] = prom_name
-            meta['abs_name'] = name
-            
-            size = con_meta.pop('size')
-            val = con_meta.pop('val')
-            con_meta['indices'] = con_meta['indices'].as_array() if con_meta['indices'] is not None else None
-            con_meta['lower'] = None if con_meta['lower'] == -INF_BOUND else con_meta['lower']
-            con_meta['upper'] = None if con_meta['upper'] == INF_BOUND else con_meta['upper']
-            con_meta['name'] = prom_name
-            self.add_constraint(**con_meta)
-            con_meta['size'] = size
-            con_meta['val'] = val
-
-        for name, obj_meta in self.driver_objs: #.items():
-            prom_name = self.all_outputs[name]['prom_name']
-            # prom_name = name
-            iface_name = prom_name.replace('.', ':')
-            if self.is_set_up and iface_name in self._var_allprocs_prom2abs_list['output']:
-                continue
-            # iface_name = obj_meta['name']
-            self.submodel_outputs[prom_name] = iface_name
-            # p.model._var_allprocs_prom2abs_list[iface_name] = name
-            
-            meta = self.all_outputs[name]
-            meta.pop('prom_name')
-            super().add_output(iface_name, **meta)
-            meta['prom_name'] = prom_name
-            meta['abs_name'] = name
-            
-            size = obj_meta.pop('size')
-            val = obj_meta.pop('val')
-            indices = obj_meta.pop('indices')
-            obj_meta['index'] = int(indices.as_array()[0]) if indices is not None else None
-            obj_meta['name'] = prom_name
-            self.add_objective(**obj_meta)
-            obj_meta['size'] = size
-            obj_meta['val'] = val
-            obj_meta['indices'] = indices
-            obj_meta.pop('index')
+        # NOTE to be looked at later. Trying to get variables from subsystems has been causing
+        # issues and is a goal for a future version
+        #
+        # driver_vars = p.list_problem_vars(out_stream=None,
+        #                                   desvar_opts = ['lower', 'upper', 'ref', 'ref0',
+        #                                                  'indices', 'adder', 'scaler',
+        #                                                  'parallel_deriv_color',
+        #                                                  'cache_linear_solution', 'units',
+        #                                                  'min', 'max'],
+        #                                   cons_opts = ['lower', 'upper', 'equals', 'ref',
+        #                                                'ref0', 'indices', 'adder', 'scaler',
+        #                                                'linear', 'parallel_deriv_color',
+        #                                                'cache_linear_solution', 'units',
+        #                                                'min', 'max'],
+        #                                   objs_opts = ['ref', 'ref0', 'indices', 'adder',
+        #                                               'scaler', 'units', 'parallel_deriv_color',
+        #                                               'cache_linear_solution'])
+        #
+        # self.driver_dvs = driver_vars['design_vars']
+        # self.driver_cons = driver_vars['constraints']
+        # self.driver_objs = driver_vars['objectives']
+        #
+        # for name, dv_meta in self.driver_dvs:
+        #     prom_name = self.boundary_inputs[name]['prom_name']
+        #     iface_name = prom_name.replace('.', ':')
+        #     if self.is_set_up and iface_name in self._var_allprocs_prom2abs_list['input']:
+        #         continue
+        #     self.submodel_inputs[prom_name] = iface_name
+        #     # p.model._var_allprocs_prom2abs_list[iface_name] = name
+        #
+        #     meta = self.boundary_inputs[name]
+        #     meta.pop('prom_name')
+        #     super().add_input(iface_name, **meta)
+        #     meta['prom_name'] = prom_name
+        #     meta['abs_name'] = name
+        #
+        #     size = dv_meta.pop('size')
+        #     val = dv_meta.pop('val')
+        #     dv_meta['indices'] = dv_meta['indices'].as_array() \
+        #                              if dv_meta['indices'] is not None else None
+        #     dv_meta['name'] = prom_name
+        #     self.add_design_var(**dv_meta)
+        #     dv_meta['size'] = size
+        #     dv_meta['val'] = val
+        #
+        # for name, con_meta in self.driver_cons:
+        #     prom_name = self.all_outputs[name]['prom_name']
+        #     # prom_name = con_meta['name']
+        #     iface_name = prom_name.replace('.', ':')
+        #     if self.is_set_up and iface_name in self._var_allprocs_prom2abs_list['output']:
+        #         continue
+        #     self.submodel_outputs[prom_name] = iface_name
+        #     # p.model._var_allprocs_prom2abs_list[iface_name] = name
+        #
+        #     meta = self.all_outputs[name]
+        #     meta.pop('prom_name')
+        #     super().add_output(iface_name, **meta)
+        #     meta['prom_name'] = prom_name
+        #     meta['abs_name'] = name
+        #
+        #     size = con_meta.pop('size')
+        #     val = con_meta.pop('val')
+        #     con_meta['indices'] = con_meta['indices'].as_array() \
+        #                               if con_meta['indices'] is not None else None
+        #     con_meta['lower'] = None if con_meta['lower'] == -INF_BOUND else con_meta['lower']
+        #     con_meta['upper'] = None if con_meta['upper'] == INF_BOUND else con_meta['upper']
+        #     con_meta['name'] = prom_name
+        #     self.add_constraint(**con_meta)
+        #     con_meta['size'] = size
+        #     con_meta['val'] = val
+        #
+        # for name, obj_meta in self.driver_objs: #.items():
+        #     prom_name = self.all_outputs[name]['prom_name']
+        #     # prom_name = obj_meta['name']
+        #     iface_name = prom_name.replace('.', ':')
+        #     if self.is_set_up and iface_name in self._var_allprocs_prom2abs_list['output']:
+        #         continue
+        #     self.submodel_outputs[prom_name] = iface_name
+        #     # p.model._var_allprocs_prom2abs_list[iface_name] = name
+        #
+        #     meta = self.all_outputs[name]
+        #     meta.pop('prom_name')
+        #     super().add_output(iface_name, **meta)
+        #     meta['prom_name'] = prom_name
+        #     meta['abs_name'] = name
+        #
+        #     size = obj_meta.pop('size')
+        #     val = obj_meta.pop('val')
+        #     indices = obj_meta.pop('indices')
+        #     obj_meta['index'] = int(indices.as_array()[0]) if indices is not None else None
+        #     obj_meta['name'] = prom_name
+        #     self.add_objective(**obj_meta)
+        #     obj_meta['size'] = size
+        #     obj_meta['val'] = val
+        #     obj_meta['indices'] = indices
+        #     obj_meta.pop('index')
 
         if not self.is_set_up:
             self.is_set_up = True
@@ -405,9 +350,6 @@ class SubmodelComp(ExplicitComponent):
             return
 
         for prom_name in self.submodel_inputs.keys():
-            # changed this for consistency
-            # if prom_name in [meta['name'] for _, meta in p.driver._designvars.items()]:
-            #     continue
             if prom_name in p.model._static_design_vars or prom_name in p.model._design_vars:
                 continue
             p.model.add_design_var(prom_name)
@@ -415,15 +357,9 @@ class SubmodelComp(ExplicitComponent):
         for prom_name in self.submodel_outputs.keys():
             # got abs name back for self._cons key for some reason in `test_multiple_setups`
             # TODO look into this
-            # if prom_name in [meta['name'] for _, meta in p.driver._cons.items()]:
-            #     continue
             if prom_name in p.model._responses:
                 continue
-            # alias = prom_name+'_con' if prom_name in self.driver_objs else None
-            # indices = slicer[:-1] if prom_name in self.driver_objs else None
-            # alias = None
-            # indices = None
-            p.model.add_constraint(prom_name)#, alias=alias, indices=indices)
+            p.model.add_constraint(prom_name)
 
         # setup again to compute coloring
         p.set_solver_print(-1)
@@ -433,35 +369,17 @@ class SubmodelComp(ExplicitComponent):
             p.setup(force_alloc_complex=self._problem_meta['force_alloc_complex'])
         p.final_setup()
 
-        # NOTE for some reason, prom names in driver don't match prom names in model
-        # need to ensure they match before getting coloring
-        # for _, d_meta in p.driver._responses.items():
-        #     for _, m_meta in p.model._responses.items():
-        #         if d_meta['source'] == m_meta['source']:
-        #             d_meta['name'] = m_meta['name']
-
-        # self._reset_driver_vars()
-        # responses = self.driver_cons + self.driver_objs
-        # p.driver._responses = {name: meta for name, meta in responses}
-
-        # p.model._responses = {meta['name']: meta for _, meta in p.driver._responses.items()}
-        # p.model._design_vars = {meta['name']: meta for _, meta in p.driver._designvars.items()}
-
-        # self._reset_driver_vars()
-
         self.coloring = p.driver._get_coloring(run_model=True)
         if self.coloring is not None:
             self.coloring._col_vars = list(p.driver._designvars)
 
-        self._reset_driver_vars()
+        # self._reset_driver_vars()
 
         if self.coloring is None:
             self.declare_partials(of='*', wrt='*')
         else:
             for of, wrt, nzrows, nzcols, _, _, _, _ in self.coloring._subjac_sparsity_iter():
                 self.declare_partials(of=of, wrt=wrt, rows=nzrows, cols=nzcols)
-        
-        print()
 
     def _set_complex_step_mode(self, active):
         super()._set_complex_step_mode(active)
@@ -483,13 +401,11 @@ class SubmodelComp(ExplicitComponent):
         for prom_name, iface_name in self.submodel_inputs.items():
             p.set_val(prom_name, inputs[iface_name])
 
-        # TODO figure out naming issues when using `p.driver.run()`
-        # if not self.is_final_set_up:
-        #     p.final_setup()
-        #     self.is_final_set_up = True
-        # p.final_setup()
+        # set initial output vals
+        for prom_name, iface_name in self.submodel_outputs.items():
+            p.set_val(prom_name, outputs[iface_name])
+
         p.driver.run()
-        # p.run_driver()
 
         for prom_name, iface_name in self.submodel_outputs.items():
             outputs[iface_name] = p.get_val(prom_name)
@@ -514,8 +430,6 @@ class SubmodelComp(ExplicitComponent):
         for prom_name, iface_name in self.submodel_inputs.items():
             p.set_val(prom_name, inputs[iface_name])
 
-        # wrt = [input_name for input_name, _ in self.submodel_inputs]
-        # of = [output_name for output_name, _ in self.submodel_outputs]
         wrt = list(self.submodel_inputs.keys())
         of = list(self.submodel_outputs.keys())
 
@@ -525,10 +439,6 @@ class SubmodelComp(ExplicitComponent):
 
         if self.coloring is None:
             for (tot_output, tot_input), tot in tots.items():
-                # input_iface_name = next(iface_name for prom_name, iface_name
-                #                         in self.submodel_inputs if prom_name == tot_input)
-                # output_iface_name = next(iface_name for prom_name, iface_name
-                #                          in self.submodel_outputs if prom_name == tot_output)
                 input_iface_name = self.submodel_inputs[tot_input]
                 output_iface_name = self.submodel_outputs[tot_output]
                 partials[output_iface_name, input_iface_name] = tot

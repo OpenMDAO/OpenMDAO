@@ -32,14 +32,19 @@ class TestSubmodelComp(unittest.TestCase):
                                 promotes_inputs=['r', 'theta'],
                                 promotes_outputs=['y'])
 
-        subprob1 = om.SubmodelComp(model=submodel1, problem=om.Problem(),
+        subprob1 = om.Problem()
+        subprob1.model.add_subsystem('submodel1', submodel1)
+        subprob2 = om.Problem()
+        subprob2.model.add_subsystem('submodel2', submodel2)
+
+        subcomp1 = om.SubmodelComp(problem=subprob1,
                                    inputs=['r', 'theta'], outputs=['x'])
-        subprob2 = om.SubmodelComp(model=submodel2, problem=om.Problem(),
+        subcomp2 = om.SubmodelComp(problem=subprob2,
                                    inputs=['r', 'theta'], outputs=['y'])
 
-        p.model.add_subsystem('sub1', subprob1, promotes_inputs=['r','theta'],
+        p.model.add_subsystem('sub1', subcomp1, promotes_inputs=['r','theta'],
                                     promotes_outputs=['x'])
-        p.model.add_subsystem('sub2', subprob2, promotes_inputs=['r','theta'],
+        p.model.add_subsystem('sub2', subcomp2, promotes_inputs=['r','theta'],
                                     promotes_outputs=['y'])
         p.model.add_subsystem('supModel', model, promotes_inputs=['x','y'],
                                     promotes_outputs=['z'])
@@ -79,12 +84,17 @@ class TestSubmodelComp(unittest.TestCase):
         submodel2.add_subsystem('subComp2', om.ExecComp('y = r*sin(theta)'),
                                 promotes_inputs=['r', 'theta'],
                                 promotes_outputs=['y'])
+        
+        subprob1 = om.Problem()
+        subprob1.model.add_subsystem('submodel1', submodel1)
+        subprob2 = om.Problem()
+        subprob2.model.add_subsystem('submodel2', submodel2)
 
-        subprob1 = om.SubmodelComp(model=submodel1, problem=om.Problem())
-        subprob2 = om.SubmodelComp(model=submodel2, problem=om.Problem())
+        subcomp1 = om.SubmodelComp(problem=subprob1)
+        subcomp2 = om.SubmodelComp(problem=subprob2)
 
-        p.model.add_subsystem('sub1', subprob1)
-        p.model.add_subsystem('sub2', subprob2)
+        p.model.add_subsystem('sub1', subcomp1)
+        p.model.add_subsystem('sub2', subcomp2)
         p.model.add_subsystem('supModel', model, promotes_inputs=['x','y'],
                                     promotes_outputs=['z'])
 
@@ -104,11 +114,13 @@ class TestSubmodelComp(unittest.TestCase):
         model = om.Group()
 
         model.add_subsystem('subsys', om.ExecComp('z = x**2 + y**2'))
-        subprob = om.SubmodelComp(model=model, problem=om.Problem(),
+        subprob = om.Problem()
+        subprob.model.add_subsystem('submodel', model)
+        subcomp = om.SubmodelComp(problem=subprob,
                                   inputs=[('subsys.x', 'a'), ('subsys.y', 'b')],
                                   outputs=[('subsys.z', 'c')])
 
-        p.model.add_subsystem('subprob', subprob, promotes_inputs=['a', 'b'], promotes_outputs=['c'])
+        p.model.add_subsystem('subcomp', subcomp, promotes_inputs=['a', 'b'], promotes_outputs=['c'])
         p.setup()
 
         p.set_val('a', 1)
@@ -116,8 +128,8 @@ class TestSubmodelComp(unittest.TestCase):
 
         p.run_model()
 
-        inputs = p.model.subprob.list_inputs()
-        outputs = p.model.subprob.list_outputs()
+        inputs = p.model.subcomp.list_inputs()
+        outputs = p.model.subcomp.list_outputs()
 
         inputs = {inputs[i][0]: inputs[i][1]['val'] for i in range(len(inputs))}
         outputs = {outputs[i][0]: outputs[i][1]['val'] for i in range(len(outputs))}
@@ -137,21 +149,24 @@ class TestSubmodelComp(unittest.TestCase):
         model.connect('x2Comp.x2', 'model.x2')
         model.add_subsystem('model', om.ExecComp('z = x1**2 + x2**2'))
 
-        subprob = om.SubmodelComp(model=model, problem=om.Problem(), 
-                                  inputs=[('x1Comp.x', 'x'), ('x2Comp.x', 'y')],
-                                  outputs=[('model.z', 'z')])
+        subprob = om.Problem()
+        subprob.model.add_subsystem('submodel', model)
 
-        p.model.add_subsystem('subprob', subprob)
+        comp = om.SubmodelComp(problem=subprob, 
+                               inputs=[('x1Comp.x', 'x'), ('x2Comp.x', 'y')],
+                               outputs=[('model.z', 'z')])
 
-        p.model.set_input_defaults('subprob.x', 1)
-        p.model.set_input_defaults('subprob.y', 2)
+        p.model.add_subsystem('comp', comp)
+
+        p.model.set_input_defaults('comp.x', 1)
+        p.model.set_input_defaults('comp.y', 2)
 
         p.setup()
 
         p.run_model()
 
-        inputs = p.model.subprob.list_inputs()
-        outputs = p.model.subprob.list_outputs()
+        inputs = p.model.comp.list_inputs()
+        outputs = p.model.comp.list_outputs()
 
         inputs = {inputs[i][0]: inputs[i][1]['val'] for i in range(len(inputs))}
         outputs = {outputs[i][0]: outputs[i][1]['val'] for i in range(len(outputs))}
@@ -165,9 +180,11 @@ class TestSubmodelComp(unittest.TestCase):
         model = om.Group()
 
         model.add_subsystem('sub', om.ExecComp('z = x1**2 + x2**2 + x3**2'), promotes=['*'])
-        subprob = om.SubmodelComp(model=model, problem=om.Problem(), inputs=['x*'], outputs=['*'])
+        subprob = om.Problem()
+        subprob.model.add_subsystem('submodel', model)
+        comp = om.SubmodelComp(problem=subprob, inputs=['x*'], outputs=['*'])
 
-        p.model.add_subsystem('prob', subprob, promotes_inputs=['*'], promotes_outputs=['*'])
+        p.model.add_subsystem('comp', comp, promotes_inputs=['*'], promotes_outputs=['*'])
         p.setup()
 
         p.set_val('x1', 1)
@@ -176,8 +193,8 @@ class TestSubmodelComp(unittest.TestCase):
 
         p.run_model()
 
-        inputs = p.model.prob.list_inputs()
-        outputs = p.model.prob.list_outputs()
+        inputs = p.model.comp.list_inputs()
+        outputs = p.model.comp.list_outputs()
 
         inputs = {inputs[i][0]: inputs[i][1]['val'] for i in range(len(inputs))}
         outputs = {outputs[i][0]: outputs[i][1]['val'] for i in range(len(outputs))}
@@ -209,20 +226,25 @@ class TestSubmodelComp(unittest.TestCase):
                                 promotes_outputs=['theta'])
         submodel2.add_subsystem('subComp2', om.ExecComp('y = r*sin(theta)'))
 
-        subprob1 = om.SubmodelComp(model=submodel1, problem=om.Problem())
-        subprob2 = om.SubmodelComp(model=submodel2, problem=om.Problem())
-        
-        subprob1.add_input('subComp1.r')
-        subprob1.add_input('subComp1.theta')
-        subprob2.add_input('subComp2.r')
-        subprob2.add_input('subComp2.theta')
-        
-        subprob1.add_output('subComp1.x')
-        subprob2.add_output('subComp2.y')
+        subprob1 = om.Problem()
+        subprob1.model.add_subsystem('submodel1', submodel1)
+        subprob2 = om.Problem()
+        subprob2.model.add_subsystem('submodel2', submodel2)
 
-        p.model.add_subsystem('sub1', subprob1, promotes_inputs=['r','theta'],
+        comp1 = om.SubmodelComp(problem=subprob1)
+        comp2 = om.SubmodelComp(problem=subprob2)
+
+        comp1.add_input('subComp1.r', name='r')
+        comp1.add_input('subComp1.theta', name='theta')
+        comp2.add_input('subComp2.r', name='r')
+        comp2.add_input('subComp2.theta', name='theta')
+
+        comp1.add_output('subComp1.x', name='x')
+        comp2.add_output('subComp2.y', name='y')
+
+        p.model.add_subsystem('sub1', comp1, promotes_inputs=['r','theta'],
                                     promotes_outputs=['x'])
-        p.model.add_subsystem('sub2', subprob2, promotes_inputs=['r','theta'],
+        p.model.add_subsystem('sub2', comp2, promotes_inputs=['r','theta'],
                                     promotes_outputs=['y'])
         p.model.add_subsystem('supModel', model, promotes_inputs=['x','y'],
                                     promotes_outputs=['z'])
@@ -244,14 +266,15 @@ class TestSubmodelComp(unittest.TestCase):
                 comp = om.ExecComp('x = r*cos(theta)')
                 model.add_subsystem('comp', comp, promotes_inputs=['r', 'theta'],
                                     promotes_outputs=['x'])
-                self.add_subsystem('subprob1', om.SubmodelComp(model=model, problem=om.Problem()))
+                subprob = om.Problem(); subprob.model.add_subsystem('model', model)
+                self.add_subsystem('submodel1', om.SubmodelComp(problem=subprob))
 
             def configure(self):
-                self._get_subsystem('subprob1').add_input('r')
-                self._get_subsystem('subprob1').add_input('theta')
-                self._get_subsystem('subprob1').add_output('x')
+                self._get_subsystem('submodel1').add_input('r')
+                self._get_subsystem('submodel1').add_input('theta')
+                self._get_subsystem('submodel1').add_output('x')
 
-                self.promotes('subprob1', ['r', 'theta', 'x'])
+                self.promotes('submodel1', ['r', 'theta', 'x'])
 
         class Subsys2(om.Group):
             def setup(self):
@@ -259,14 +282,15 @@ class TestSubmodelComp(unittest.TestCase):
                 comp = om.ExecComp('y = r*sin(theta)')
                 model.add_subsystem('comp', comp, promotes_inputs=['r', 'theta'],
                                     promotes_outputs=['y'])
-                self.add_subsystem('subprob2', om.SubmodelComp(model=model, problem=om.Problem()))
+                subprob = om.Problem(); subprob.model.add_subsystem('model', model)
+                self.add_subsystem('submodel2', om.SubmodelComp(problem=subprob))
 
             def configure(self):
-                self._get_subsystem('subprob2').add_input('r')
-                self._get_subsystem('subprob2').add_input('theta')
-                self._get_subsystem('subprob2').add_output('y')
+                self._get_subsystem('submodel2').add_input('r')
+                self._get_subsystem('submodel2').add_input('theta')
+                self._get_subsystem('submodel2').add_output('y')
 
-                self.promotes('subprob2', ['r', 'theta', 'y'])
+                self.promotes('submodel2', ['r', 'theta', 'y'])
 
         p = om.Problem()
 
@@ -318,13 +342,18 @@ class TestSubmodelComp(unittest.TestCase):
                                 promotes_inputs=['r', 'theta'],
                                 promotes_outputs=['y'])
 
-        subprob1 = om.SubmodelComp(model=submodel1, problem=om.Problem())
-        subprob2 = om.SubmodelComp(model=submodel2, problem=om.Problem())
+        subprob1 = om.Problem()
+        subprob1.model.add_subsystem('submodel1', submodel1)
+        subprob2 = om.Problem()
+        subprob2.model.add_subsystem('submodel2', submodel2)
 
-        subprob1.add_input('psi')
+        comp1 = om.SubmodelComp(problem=subprob1)
+        comp2 = om.SubmodelComp(problem=subprob2)
 
-        p.model.add_subsystem('sub1', subprob1)
-        p.model.add_subsystem('sub2', subprob2)
+        comp1.add_input('psi')
+
+        p.model.add_subsystem('sub1', comp1)
+        p.model.add_subsystem('sub2', comp2)
         p.model.add_subsystem('supModel', model, promotes_inputs=['x','y'],
                               promotes_outputs=['z'])
 
@@ -345,13 +374,16 @@ class TestSubmodelComp(unittest.TestCase):
         submodel.add_subsystem('subComp', om.ExecComp('x = 6*z + 3'),
                                promotes_inputs=['z'], promotes_outputs=['x'])
 
-        subprob = om.SubmodelComp(model=submodel, problem=om.Problem())
-        subprob.add_input('z')
-        subprob.add_output('x')
+        subprob = om.Problem()
+        subprob.model.add_subsystem('submodel', submodel)
 
-        p.model.add_subsystem('subprob', subprob, promotes_inputs=['z'],
+        comp = om.SubmodelComp(problem=subprob)
+        comp.add_input('z')
+        comp.add_output('x')
+
+        p.model.add_subsystem('sub', comp, promotes_inputs=['z'],
                               promotes_outputs=['x'])
-        p.model.add_subsystem('comp', model, promotes_inputs=['x'],
+        p.model.add_subsystem('sup', model, promotes_inputs=['x'],
                               promotes_outputs=['y'])
 
         p.setup(force_alloc_complex=False)
