@@ -53,9 +53,6 @@ class SubmodelComp(ExplicitComponent):
         super().__init__(**kwargs)
 
         problem._reports = [] if not reports else problem._reports
-        # promote every var in subsystems automatically
-        for subsys in problem.model._static_subsystems_allprocs.keys():
-            problem.model.promotes(subsys, any=['*'])
         self._subprob = problem
 
         self.submodel_inputs = {}
@@ -201,7 +198,6 @@ class SubmodelComp(ExplicitComponent):
                 self.submodel_inputs[match] = match.replace('.', ':')
             self.submodel_inputs.pop(inp)
 
-        # output_prom_names = [meta['prom_name'] for _, meta in self.all_outputs.items()]
         for out in wildcard_outputs:
             matches = find_matches(out, list(self.all_outputs.keys()))
             if len(matches) == 0:
