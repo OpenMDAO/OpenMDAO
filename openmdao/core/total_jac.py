@@ -275,12 +275,13 @@ class _TotalJacInfo(object):
                     ok = True
                     if prom_wrt != driver_wrt:
                         ok = False
-                    # TODO: there's some weirdness here where sometimes the
-                    # of vars are absolute and sometimes they're not...
-                    for pof, aof, dof in zip(prom_of, of, driver_of):
-                        if pof != dof and aof != dof:
-                            ok = False
-                            break
+                    else:
+                        # TODO: there's some weirdness here where sometimes the
+                        # of vars are absolute and sometimes they're not...
+                        for pof, aof, dof in zip(prom_of, of, driver_of):
+                            if pof != dof and aof != dof:
+                                ok = False
+                                break
                     if not ok:
                         msg = ("compute_totals called using a different list of design vars and/or "
                                "responses than those used to define coloring, so coloring will "
