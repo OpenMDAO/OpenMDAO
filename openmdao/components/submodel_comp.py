@@ -1,8 +1,9 @@
 """Define the SubmodelComp class for evaluating OpenMDAO systems within components."""
 
+from openmdao.core.constants import _SetupStatus, INF_BOUND
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.general_utils import find_matches
-from openmdao.core.constants import _SetupStatus, INF_BOUND
+from openmdao.utils.reports_system import clear_reports
 
 
 class SubmodelComp(ExplicitComponent):
@@ -52,7 +53,8 @@ class SubmodelComp(ExplicitComponent):
         """
         super().__init__(**kwargs)
 
-        problem._reports = [] if not reports else problem._reports
+        if not reports:
+            clear_reports(problem)
         self._subprob = problem
 
         self.submodel_inputs = {}
