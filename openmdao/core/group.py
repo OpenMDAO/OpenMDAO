@@ -2065,15 +2065,26 @@ class Group(System):
                             new_conns[in_subsys][abs_in] = abs_out
 
         # Add implicit connections (only ones owned by this group)
-        for prom_name, out_list in allprocs_prom2abs_list_out.items():
-            if prom_name in allprocs_prom2abs_list_in:  # names match ==> a connection
-                abs_out = out_list[0]
-                out_subsys, _, _ = abs_out[path_len:].partition('.')
-                for abs_in in allprocs_prom2abs_list_in[prom_name]:
-                    in_subsys, _, _ = abs_in[path_len:].partition('.')
-                    global_abs_in2out[abs_in] = abs_out
-                    if out_subsys != in_subsys:  # this group will handle the transfer
-                        abs_in2out[abs_in] = abs_out
+        if self.pathname == '':  # do only at the top level
+            for prom_name, out_list in allprocs_prom2abs_list_out.items():
+                if prom_name in allprocs_prom2abs_list_in:  # names match ==> a connection
+                    abs_out = out_list[0]
+                    out_subsys, _, _ = abs_out[path_len:].partition('.')
+                    for abs_in in allprocs_prom2abs_list_in[prom_name]:
+                        in_subsys, _, _ = abs_in[path_len:].partition('.')
+                        global_abs_in2out[abs_in] = abs_out
+                        if out_subsys == in_subsys:
+                            in_subsys, _, _ = abs_in[path_len:].partition('.')
+                            out_subsys, _, _ = abs_out[path_len:].partition('.')
+                            # if connection is contained in a subgroup, add to conns
+                            # to pass down to subsystems.
+                            if in_subsys == out_subsys:
+                                if in_subsys not in new_conns:
+                                    new_conns[in_subsys] = {abs_in: abs_out}
+                                else:
+                                    new_conns[in_subsys][abs_in] = abs_out
+                        else:  # this group will handle the transfer
+                            abs_in2out[abs_in] = abs_out
 
         src_ind_inputs = set()
         abs2meta = self._var_abs2meta['input']
@@ -2860,9 +2871,8 @@ class Group(System):
                     continue
 
         # if this was called during configure(), mark this group as modified
-        if self._problem_meta is not None:
-            if self._problem_meta['config_info'] is not None:
-                self._problem_meta['config_info']._prom_added(self.pathname)
+        if self._problem_meta is not None and self._problem_meta['config_info'] is not None:
+            self._problem_meta['config_info']._prom_added(self.pathname)
 
     def add_subsystem(self, name, subsys, promotes=None,
                       promotes_inputs=None, promotes_outputs=None,
