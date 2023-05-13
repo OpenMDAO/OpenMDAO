@@ -18,6 +18,11 @@ def register_jax_component(comp_class):
     Note that this decorator is not necessary if the given class does not reference
     `self` in any methods to which `jax.jit` is applied.
 
+    Parameters
+    ----------
+    comp_class
+        The decorated component class.
+
     Returns
     -------
     object

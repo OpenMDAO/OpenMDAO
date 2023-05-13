@@ -26,8 +26,8 @@ class TestCSSafeFuctions(unittest.TestCase):
         test_data = np.array([[1, 2, 3, -4],[5, 6, 7, -8]], dtype='complex')
 
         assert_near_equal(cs_safe.norm(test_data,axis=None), np.linalg.norm(test_data,axis=None))
-        assert_near_equal(cs_safe.norm(test_data,axis=0), np.linalg.norm(test_data,axis=0, keepdims=True))
-        assert_near_equal(cs_safe.norm(test_data,axis=1), np.linalg.norm(test_data,axis=1, keepdims=True))
+        assert_near_equal(cs_safe.norm(test_data, axis=0), np.linalg.norm(test_data,axis=0, keepdims=True).ravel())
+        assert_near_equal(cs_safe.norm(test_data, axis=1), np.linalg.norm(test_data,axis=1, keepdims=True).ravel())
 
         deriv_test_data = test_data.copy()
         deriv_test_data[0,0] += complex(0, 1e-50)
