@@ -2,6 +2,11 @@
 Smooth approximations to functions that do not have continuous derivatives.
 """
 
+import jax
+import jax.numpy as jnp
+jax.config.update("jax_enable_x64", True)
+
+
 CITATIONS = """
 @conference {Martins:2005:SOU,
         title = {On Structural Optimization Using Constraint Aggregation},
@@ -13,14 +18,6 @@ CITATIONS = """
         author = {Joaquim R. R. A. Martins and Nicholas M. K. Poon}
 }
 """
-
-try:
-    import jax
-    import jax.numpy as jnp
-    jax.config.update("jax_enable_x64", True)
-except ImportError as e:
-    raise ImportError('jax is not available, but is necessary for `openmdao.math`.\n'
-                      'Try using `pip install jax jaxlib` to use this capability.') from e
 
 
 @jax.jit

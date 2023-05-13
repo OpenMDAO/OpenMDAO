@@ -1,7 +1,6 @@
 import unittest
 
 import numpy as np
-
 from openmdao.utils.assert_utils import assert_near_equal
 
 try:
@@ -13,7 +12,7 @@ if jax is not None:
     from openmdao.math import act_tanh, smooth_abs, smooth_max, smooth_min, ks_max, ks_min
 
 
-class TestSmooth(unittest.TestCase):
+class TestJaxFunctions(unittest.TestCase):
 
     @unittest.skipIf(jax is None, 'jax is not available.')
     def test_tanh_act(self):
