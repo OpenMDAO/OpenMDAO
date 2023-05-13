@@ -18,9 +18,9 @@ try:
     import jax
     import jax.numpy as jnp
     jax.config.update("jax_enable_x64", True)
-except ImportError:
+except ImportError as e:
     raise ImportError('jax is not available, but is necessary for `openmdao.math`.\n'
-                      'Try using `pip install jax jaxlib` to use this capability.')
+                      'Try using `pip install jax jaxlib` to use this capability.') from e
 
 
 @jax.jit

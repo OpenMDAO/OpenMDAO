@@ -9,6 +9,6 @@ try:
     import jax
 except ImportError as e:
     raise ImportError('jax is not available, but is necessary for `openmdao.math`.\n'
-                      'Try using `pip install jax jaxlib` to use this capability.')
+                      'Try using `pip install jax jaxlib` to use this capability.') from e
 
 from .jax_functions import act_tanh, ks_max, ks_min, smooth_max, smooth_min, smooth_abs
