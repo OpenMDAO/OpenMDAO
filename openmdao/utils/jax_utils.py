@@ -1,0 +1,41 @@
+try:
+    import jax
+except ImportError:
+    jax = None
+
+
+def register_jax_component(comp_class):
+    """
+    A class decorator that registers the given class as a pytree_node.
+
+    This allows jax to use jit compilation on the methods of this class if they
+    reference attributes of the class itself, such as `self.options`.
+
+    Note that this decorator is not necessary if the given class does not reference
+    `self` in any methods to which `jax.jit` is applied.
+
+    Returns
+    -------
+    object
+        The component class given.
+
+    Raises
+    ------
+    NotImplementedError
+        If this class does not define the `_tree_flatten` and _tree_unflatten` methods.
+    """
+    if jax is None:
+        raise RuntimeError('jax is not available. Try `pip install jax jaxlib`')
+
+    if not hasattr(comp_class, '_tree_flatten'):
+        raise NotImplementedError(f'class {comp_class} does not implement method _tree_flatten.'
+                                  f'\nCannot register {comp_class} as a jax-jittable component.')
+
+    if not hasattr(comp_class, '_tree_unflatten'):
+        raise NotImplementedError(f'class {comp_class} does not implement method _tree_unflatten.'
+                                  f'\nCannot register class {comp_class} as a jax-jittable component.')
+
+    jax.tree_util.register_pytree_node(comp_class,
+                                       comp_class._tree_flatten,
+                                       comp_class._tree_unflatten)
+    return comp_class
