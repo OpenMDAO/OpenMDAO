@@ -291,7 +291,6 @@ jobs:
         env:
           OPENMDAO_CHECK_ALL_PARTIALS: true
         run: |
-          export OPENMDAO_MATH_USE_JAX=
           echo "============================================================="
           echo "Run tests with coverage (from directory other than repo root)"
           echo "============================================================="
