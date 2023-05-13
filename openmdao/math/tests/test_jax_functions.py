@@ -7,7 +7,7 @@ from openmdao.utils.assert_utils import assert_near_equal
 
 try:
     import jax
-except ModuleNotFoundError:
+except (ImportError, ModuleNotFoundError):
     jax = None
 
 

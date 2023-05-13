@@ -21,8 +21,8 @@ optional_dependencies = {
         'jupyter-book==0.14',
         'sphinx-sitemap',
         'ipyparallel',
-        'jax>=0.4.6',
-        'jaxlib>=0.4.4'
+        'jax',
+        'jaxlib'
     ],
     'doe': [
         'pyDOE2'
