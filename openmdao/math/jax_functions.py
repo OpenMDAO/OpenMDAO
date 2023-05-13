@@ -164,7 +164,6 @@ def ks_max(x, rho=100.0):
     -------
     float
         A conservative approximation to the minimum value in x.
-
     """
     x_max = jnp.max(x)
     x_diff = x - x_max

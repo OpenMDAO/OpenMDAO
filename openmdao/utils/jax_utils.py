@@ -20,7 +20,7 @@ def register_jax_component(comp_class):
 
     Parameters
     ----------
-    comp_class
+    comp_class : class
         The decorated component class.
 
     Returns

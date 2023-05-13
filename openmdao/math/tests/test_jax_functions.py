@@ -2,7 +2,6 @@ import unittest
 
 import numpy as np
 
-import openmdao.math as omath
 from openmdao.utils.assert_utils import assert_near_equal
 
 try:
@@ -10,21 +9,24 @@ try:
 except (ImportError, ModuleNotFoundError):
     jax = None
 
+if jax is not None:
+    from openmdao.math import act_tanh, smooth_abs, smooth_max, smooth_min, ks_max, ks_min
+
 
 class TestSmooth(unittest.TestCase):
 
     @unittest.skipIf(jax is None, 'jax is not available.')
     def test_tanh_act(self):
-        f = omath.act_tanh(6, mu=1.0E-5, z=6, a=-10, b=10)
+        f = act_tanh(6, mu=1.0E-5, z=6, a=-10, b=10)
         assert_near_equal(np.asarray(f), 0.0)
 
-        f = omath.act_tanh(6, mu=1.0E-5, z=6, a=-10, b=0)
+        f = act_tanh(6, mu=1.0E-5, z=6, a=-10, b=0)
         assert_near_equal(np.asarray(f), -5.0)
 
-        f = omath.act_tanh(-10, mu=1.0E-5, z=6, a=-10, b=0)
+        f = act_tanh(-10, mu=1.0E-5, z=6, a=-10, b=0)
         assert_near_equal(np.asarray(f), -10)
 
-        f = omath.act_tanh(10, mu=1.0E-5, z=6, a=-10, b=20)
+        f = act_tanh(10, mu=1.0E-5, z=6, a=-10, b=20)
         assert_near_equal(np.asarray(f), 20)
 
     @unittest.skipIf(jax is None, 'jax is not available.')
@@ -33,7 +35,7 @@ class TestSmooth(unittest.TestCase):
         sin = np.sin(x)
         cos = np.cos(x)
 
-        smax = omath.smooth_max(sin, cos, mu=1.0E-6)
+        smax = smooth_max(sin, cos, mu=1.0E-6)
 
         idxs_sgt = np.where(sin > cos)
         idxs_cgt = np.where(sin < cos)
@@ -47,7 +49,7 @@ class TestSmooth(unittest.TestCase):
         sin = np.sin(x)
         cos = np.cos(x)
 
-        smin = omath.smooth_min(sin, cos, mu=1.0E-6)
+        smin = smooth_min(sin, cos, mu=1.0E-6)
 
         idxs_sgt = np.where(sin > cos)
         idxs_cgt = np.where(sin < cos)
@@ -59,7 +61,7 @@ class TestSmooth(unittest.TestCase):
     def test_smooth_abs(self):
         x = np.linspace(-0.5, 0.5, 1000)
 
-        sabs = omath.smooth_abs(x)
+        sabs = smooth_abs(x)
         abs = np.abs(x)
 
         idxs_compare = np.where(abs > 0.1)
@@ -69,7 +71,7 @@ class TestSmooth(unittest.TestCase):
     def test_ks_max(self):
         x = np.random.random(1000)
 
-        ksmax = omath.ks_max(x, rho=1.E6)
+        ksmax = ks_max(x, rho=1.E6)
         npmax = np.max(x)
 
         assert_near_equal(ksmax, npmax, tolerance=1.0E-6)
@@ -78,7 +80,7 @@ class TestSmooth(unittest.TestCase):
     def test_ks_min(self):
         x = np.random.random(1000)
 
-        ksmin = omath.ks_min(x, rho=1.E6)
+        ksmin = ks_min(x, rho=1.E6)
         npmin = np.min(x)
 
         assert_near_equal(ksmin, npmin, tolerance=1.0E-6)
