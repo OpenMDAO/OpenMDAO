@@ -160,7 +160,6 @@ jobs:
           echo "Install jax"
           echo "============================================================="
           python -m pip install jaxlib=='${{ matrix.JAX }}' jax=='${{ matrix.JAX }}'
-          echo "export OPENMDAO_MATH_USE_JAX=1" >> $GITHUB_ENV
 
       - name: Install PETSc
         if: matrix.PETSc
