@@ -26,15 +26,16 @@ except ImportError:
 @jax.jit
 def act_tanh(x, mu=1.0E-2, z=0., a=-1., b=1.):
     """
-    Differentiable activation function based on the hyperbolic tangent.
+    Compute a differentiable activation function based on the hyperbolic tangent.
 
     act_tanh can be used to approximate a step function from `a` to `b`, occurring at x=z.
-    Smaller values of parameter `mu` more accurately represent a step function but the "sharpness" of the corners in the
-    response may be more difficult for gradient-based approaches to resolve.
+    Smaller values of parameter `mu` more accurately represent a step functionbut the
+    "sharpness" of the corners in the response may be more difficult for gradient-based
+    approaches to resolve.
 
     Parameters
     ----------
-    x : float or jnp.array
+    x : float or array
         The input at which the value of the activation function
         is to be computed.
     mu : float
@@ -64,7 +65,7 @@ def act_tanh(x, mu=1.0E-2, z=0., a=-1., b=1.):
 @jax.jit
 def smooth_max(x, y, mu=1.0E-2):
     """
-    Differentiable maximum between two arrays of the same shape.
+    Compute a differentiable maximum between two arrays of the same shape.
 
     Parameters
     ----------
@@ -93,7 +94,7 @@ def smooth_max(x, y, mu=1.0E-2):
 @jax.jit
 def smooth_min(x, y, mu=1.0E-2):
     """
-    Differentiable minimum between two arrays of the same shape.
+    Compute a differentiable minimum between two arrays of the same shape.
 
     Parameters
     ----------
@@ -122,7 +123,7 @@ def smooth_min(x, y, mu=1.0E-2):
 @jax.jit
 def smooth_abs(x, mu=1.0E-2):
     """
-    Differentiable approximation to the absolute value function.
+    Compute a differentiable approximation to the absolute value function.
 
     Parameters
     ----------
@@ -147,6 +148,8 @@ def smooth_abs(x, mu=1.0E-2):
 @jax.jit
 def ks_max(x, rho=100.0):
     """
+    Compute a differentiable maximum value in an array.
+
     Given some array of values `x`, compute a differentiable, _conservative_ maximum using the
     Kreisselmeier-Steinhauser function.
 
@@ -173,8 +176,10 @@ def ks_max(x, rho=100.0):
 @jax.jit
 def ks_min(x, rho=100.0):
     """
-    Given some array of values `x`, compute a differentiable, _conservative_ minimum using the
-    Kreisselmeier-Steinhauser function.
+    Compute a differentiable minimum value in an array.
+
+    Given some array of values `x`, compute a differentiable,
+    _conservative_ minimum using the Kreisselmeier-Steinhauser function.
 
     Parameters
     ----------
