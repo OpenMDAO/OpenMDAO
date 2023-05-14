@@ -1,6 +1,7 @@
 """
 Utilities for the use of jax in combination with OpenMDAO.
 """
+from collections.abc import Callable
 
 try:
     import jax
@@ -11,6 +12,16 @@ except ImportError:
 def jit_stub(f):
     """
     Provide a dummy jit decorator for use if jax is not available.
+
+    Parameters
+    ----------
+    f : Callable
+        The function or method to be wrapped.
+
+    Returns
+    -------
+    Callable
+        The decorated function.
     """
     return f
 
