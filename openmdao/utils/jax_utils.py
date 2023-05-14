@@ -8,6 +8,13 @@ except ImportError:
     jax = None
 
 
+def jit_stub(f):
+    """
+    Provide a dummy jit decorator for use if jax is not available.
+    """
+    return f
+
+
 def register_jax_component(comp_class):
     """
     Provide a class decorator that registers the given class as a pytree_node.

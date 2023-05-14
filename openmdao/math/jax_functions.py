@@ -2,10 +2,14 @@
 Smooth approximations to functions that do not have continuous derivatives.
 """
 
-import jax
-import jax.numpy as jnp
-jax.config.update("jax_enable_x64", True)
-
+try:
+    import jax
+    from jax import jit
+    import jax.numpy as jnp
+    jax.config.update("jax_enable_x64", True)
+except (ImportError, ModuleNotFoundError):
+    jax = None
+    from ..utils.jax_utils import jit_stub as jit
 
 CITATIONS = """
 @conference {Martins:2005:SOU,
@@ -20,7 +24,7 @@ CITATIONS = """
 """
 
 
-@jax.jit
+@jit
 def act_tanh(x, mu=1.0E-2, z=0., a=-1., b=1.):
     """
     Compute a differentiable activation function based on the hyperbolic tangent.
@@ -59,7 +63,7 @@ def act_tanh(x, mu=1.0E-2, z=0., a=-1., b=1.):
     return 0.5 * dy * (1 + tanh_term) + a
 
 
-@jax.jit
+@jit
 def smooth_max(x, y, mu=1.0E-2):
     """
     Compute a differentiable maximum between two arrays of the same shape.
@@ -88,7 +92,7 @@ def smooth_max(x, y, mu=1.0E-2):
     return x_greater * x + y_greater * y
 
 
-@jax.jit
+@jit
 def smooth_min(x, y, mu=1.0E-2):
     """
     Compute a differentiable minimum between two arrays of the same shape.
@@ -117,7 +121,7 @@ def smooth_min(x, y, mu=1.0E-2):
     return x_greater * y + y_greater * x
 
 
-@jax.jit
+@jit
 def smooth_abs(x, mu=1.0E-2):
     """
     Compute a differentiable approximation to the absolute value function.
@@ -142,7 +146,7 @@ def smooth_abs(x, mu=1.0E-2):
     return x * act
 
 
-@jax.jit
+@jit
 def ks_max(x, rho=100.0):
     """
     Compute a differentiable maximum value in an array.
@@ -169,7 +173,7 @@ def ks_max(x, rho=100.0):
     return x_max + 1.0 / rho * jnp.log(summation)
 
 
-@jax.jit
+@jit
 def ks_min(x, rho=100.0):
     """
     Compute a differentiable minimum value in an array.
