@@ -561,7 +561,7 @@ def _get_viewer_data(data_source, case_id=None):
     return data_dict
 
 
-def n2(data_source, outfile=_default_n2_filename, case_id=None, show_browser=True, embeddable=False,
+def n2(data_source, outfile=_default_n2_filename, path=None, case_id=None, show_browser=True, embeddable=False,
        title=None, display_in_notebook=True):
     """
     Generate an HTML file containing a tree viewer.
@@ -574,6 +574,9 @@ def n2(data_source, outfile=_default_n2_filename, case_id=None, show_browser=Tru
         The Problem or case recorder database containing the model or model data.
     outfile : str, optional
         The name of the final output file.
+    path : str, optional
+        If specified, the n2 viewer will begin in a state that is zoomed in on the selected path.
+        This path should be the absolute path of a system in the model.
     case_id : int, str, or None
         Case name or index of case in SQL file if data_source is a database.
     show_browser : bool, optional
@@ -617,7 +620,8 @@ def n2(data_source, outfile=_default_n2_filename, case_id=None, show_browser=Tru
         'title': title,
         'embeddable': "embedded-diagram" if embeddable else "non-embedded-diagram",
         'openmdao_version': openmdao_version,
-        'model_data': model_data
+        'model_data': model_data,
+        'initial_path': path
     }
 
     if err_msg:

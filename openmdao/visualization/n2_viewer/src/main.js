@@ -19,6 +19,13 @@ function n2main() {
     n2MouseFuncs = n2Diag.getMouseFuncs();
 
     n2Diag.update(false);
+
+    if (initialPath) {
+        node = n2Diag.layout.model.root.findNode(initialPath);
+        if (node != undefined) {
+            n2Diag.ui._setupLeftClick(node)
+        }
+    };
 }
 
 // wintest();
