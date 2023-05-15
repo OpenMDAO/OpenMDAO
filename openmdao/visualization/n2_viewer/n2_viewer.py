@@ -561,8 +561,8 @@ def _get_viewer_data(data_source, case_id=None):
     return data_dict
 
 
-def n2(data_source, outfile=_default_n2_filename, path=None, case_id=None, show_browser=True, embeddable=False,
-       title=None, display_in_notebook=True):
+def n2(data_source, outfile=_default_n2_filename, path=None, case_id=None,
+       show_browser=True, embeddable=False, title=None, display_in_notebook=True):
     """
     Generate an HTML file containing a tree viewer.
 
