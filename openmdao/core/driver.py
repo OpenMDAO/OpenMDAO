@@ -1346,24 +1346,20 @@ class Driver(object):
         """
         if c_mod._use_total_sparsity:
             coloring = None
-            try:
-                saved_status = self._problem().model._opt_status
-                if self._coloring_info['coloring'] is None and self._coloring_info['dynamic']:
-                    coloring = c_mod.dynamic_total_coloring(self, run_model=run_model,
-                                                            fname=self._get_total_coloring_fname())
+            if self._coloring_info['coloring'] is None and self._coloring_info['dynamic']:
+                coloring = c_mod.dynamic_total_coloring(self, run_model=run_model,
+                                                        fname=self._get_total_coloring_fname())
 
-                if coloring is not None:
-                    # if the improvement wasn't large enough, don't use coloring
-                    pct = coloring._solves_info()[-1]
-                    info = self._coloring_info
-                    if info['min_improve_pct'] > pct:
-                        info['coloring'] = info['static'] = None
-                        msg = f"Coloring was deactivated.  Improvement of {pct:.1f}% was less " \
-                              f"than min allowed ({info['min_improve_pct']:.1f}%)."
-                        issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
-                        self._coloring_info['coloring'] = coloring = None
-            finally:
-                self._problem().model._set_opt_status(saved_status)
+            if coloring is not None:
+                # if the improvement wasn't large enough, don't use coloring
+                pct = coloring._solves_info()[-1]
+                info = self._coloring_info
+                if info['min_improve_pct'] > pct:
+                    info['coloring'] = info['static'] = None
+                    msg = f"Coloring was deactivated.  Improvement of {pct:.1f}% was less " \
+                          f"than min allowed ({info['min_improve_pct']:.1f}%)."
+                    issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
+                    self._coloring_info['coloring'] = coloring = None
 
             return coloring
 

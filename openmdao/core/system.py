@@ -194,7 +194,7 @@ class System(object):
     iter_count_apply : int
         Counts the number of times the system has called _apply_nonlinear. For ExplicitComponent,
         calls to apply_nonlinear also call compute, so number of executions can be found by adding
-        this and iter_count together. Recorders do no record calls to apply_nonlinear.
+        this and iter_count together. Recorders do not record calls to apply_nonlinear.
     iter_count_without_approx : int
         Counts the number of times the system has iterated but excludes any that occur during
         approximation of derivatives.
