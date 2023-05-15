@@ -42,9 +42,6 @@ class SubmodelComp(ExplicitComponent):
     submodel_outputs : list of tuple
         List of outputs requested by user to be used as outputs in the
         subproblem's system.
-    is_set_up : bool
-        Flag to determne if subproblem is set up. Used for add_input/add_output to
-        determine how to add the io.
     """
 
     def __init__(self, problem, inputs=None, outputs=None, reports=False, **kwargs):
@@ -63,7 +60,7 @@ class SubmodelComp(ExplicitComponent):
         if inputs is not None:
             for inp in inputs:
                 if isinstance(inp, str):
-                    self.submodel_inputs[inp] = inp
+                    self.submodel_inputs[inp] = inp.replace('.', ':')
                 elif isinstance(inp, tuple):
                     self.submodel_inputs[inp[0]] = inp[1]
                 else:
@@ -72,13 +69,11 @@ class SubmodelComp(ExplicitComponent):
         if outputs is not None:
             for out in outputs:
                 if isinstance(out, str):
-                    self.submodel_outputs[out] = out
+                    self.submodel_outputs[out] = out.replace('.', ':')
                 elif isinstance(out, tuple):
                     self.submodel_outputs[out[0]] = out[1]
                 else:
                     raise Exception(f'Expected output of type str or tuple, got {type(out)}.')
-
-        self.is_set_up = False
 
     def add_input(self, path, name=None):
         """
@@ -97,7 +92,9 @@ class SubmodelComp(ExplicitComponent):
 
         self.submodel_inputs[path] = name
 
-        if not self.is_set_up:
+        # if the submodel is not set up fully, then self._problem_meta will be None
+        # in which case we only want to add inputs to self.submodel_inputs
+        if not self._problem_meta:
             return
 
         if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
@@ -125,7 +122,9 @@ class SubmodelComp(ExplicitComponent):
 
         self.submodel_outputs[path] = name
 
-        if not self.is_set_up:
+        # if the submodel is not set up fully, then self._problem_meta will be None
+        # in which case we only want to add outputs to self.submodel_outputs
+        if not self._problem_meta:
             return
 
         if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
@@ -213,6 +212,8 @@ class SubmodelComp(ExplicitComponent):
         # component var names can't include '.'
         for var in self.submodel_inputs.items():
             iface_name = var[1]
+            if iface_name in self._static_var_rel2meta or iface_name in self._var_rel2meta:
+                continue
             prom_name = var[0]
             try:
                 meta = self.boundary_inputs[p.model.get_source(prom_name)] \
@@ -226,6 +227,8 @@ class SubmodelComp(ExplicitComponent):
 
         for var in self.submodel_outputs.items():
             iface_name = var[1]
+            if iface_name in self._static_var_rel2meta or iface_name in self._var_rel2meta:
+                continue
             prom_name = var[0]
             try:
                 meta = self.all_outputs[prom_name]
@@ -331,9 +334,6 @@ class SubmodelComp(ExplicitComponent):
         #     obj_meta['val'] = val
         #     obj_meta['indices'] = indices
         #     obj_meta.pop('index')
-
-        if not self.is_set_up:
-            self.is_set_up = True
 
     def _setup_var_data(self):
         super()._setup_var_data()

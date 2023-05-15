@@ -402,3 +402,22 @@ class TestSubmodelComp(unittest.TestCase):
         assert_near_equal(p.get_val('z'), 1)
         assert_near_equal(p.get_val('x'), 9)
         assert_near_equal(p.get_val('y'), 31)
+
+    def test_multiple_submodel_setups(self):
+        model = om.Group()
+        model.add_subsystem('supComp', om.ExecComp('y = 3*x + 4'),
+                            promotes_inputs=['x'], promotes_outputs=['y'])
+
+        submodel = om.Group()
+        submodel.add_subsystem('subComp', om.ExecComp('x = 6*z + 3'),
+                               promotes_inputs=['z'], promotes_outputs=['x'])
+
+        subprob = om.Problem()
+        subprob.model.add_subsystem('submodel', submodel, promotes=['*'])
+
+        comp = om.SubmodelComp(problem=subprob)
+        comp.add_input('z')
+        comp.add_output('x')
+
+        comp.setup()
+        comp.setup()
