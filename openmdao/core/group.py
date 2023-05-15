@@ -4431,7 +4431,8 @@ class Group(System):
             if do_separation:
                 issue_warning("The 'group_by_pre_post_opt' option is True, but the top level "
                               "nonlinear solver is not NonlinearRunOnce, so the option will be "
-                              "ignored.")
+                              "ignored.  If an iterative solver is needed, move the iterated "
+                              "subsystems into a subgroup and set the nonlinear solver on that.")
             return
 
         graph = self.compute_sys_graph()
