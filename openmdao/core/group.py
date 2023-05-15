@@ -4406,7 +4406,7 @@ class Group(System):
             else:
                 yield from it
 
-    def _setup_iteration_lists(self, in_optimization):
+    def _setup_iteration_lists(self, do_separation):
         """
         Set up the lists containing the pre, iterated, and post subsets of systems.
 
@@ -4414,8 +4414,8 @@ class Group(System):
 
         Parameters
         ----------
-        in_optimization : bool
-            If True, this is a top-level group that is under an optimization driver.
+        do_separation : bool
+            If True, arrange subsystems into pre_opt, opt, and post_opt lists.
         """
         assert self.pathname == '', "call setup_iteration_lists on the top level Group only!"
 
@@ -4425,9 +4425,13 @@ class Group(System):
         self._pre_iterated_subsystems = []
         self._post_iterated_subsystems = []
 
-        if not in_optimization or not isinstance(self._nonlinear_solver, NonlinearRunOnce):
+        if not do_separation or not isinstance(self._nonlinear_solver, NonlinearRunOnce):
             # skip any system separation and just do it the old way
             self._iterated_subsystems = [s for s, _ in self._subsystems_allprocs.values()]
+            if do_separation:
+                issue_warning("The 'group_by_pre_post_opt' option is True, but the top level "
+                              "nonlinear solver is not NonlinearRunOnce, so the option will be "
+                              "ignored.")
             return
 
         graph = self.compute_sys_graph()
@@ -4480,20 +4484,28 @@ class Group(System):
         if pre_order and iterated_order and max(pre_order) > miniter:
             # determine which ones are out of order
             bad = [s for s in pre if order[s] > miniter]
+            for idx, s in zip(iterated_order, iterated):
+                if idx == miniter:
+                    first = s
+                    break
             issue_warning(f"The pre-iterated systems {sorted(bad)} are out of order with "
-                          f"respect to the iterated systems {sorted(iterated)}.  To avoid changing "
-                          "the pre-existing ordering, all systems will be included in the "
-                          "iterated set. This could impact performance.")
+                          f"respect to the iterated systems (first iterated system is '{first}'). "
+                          "To avoid changing the pre-existing ordering, all systems will be "
+                          "included in the iterated set. This could impact performance.")
             self._iterated_subsystems = [s for s, _ in self._subsystems_allprocs.values()]
             return
 
         if post_order and iterated_order and min(post_order) < maxiter:
             # determine which ones are out of order
             bad = [s for s in post if order[s] < maxiter]
+            for idx, s in zip(iterated_order, iterated):
+                if idx == maxiter:
+                    last = s
+                    break
             issue_warning(f"The post-iterated systems {sorted(bad)} are out of order "
-                          f"with respect to the iterated systems {sorted(iterated)}. To avoid "
-                          "changing the pre-existing ordering, all systems will be included in the "
-                          "iterated set. This could impact performance.")
+                          "with respect to the iterated systems (last iterated system is "
+                          f"'{last}'). To avoid changing the pre-existing ordering, all systems "
+                          "will be included in the iterated set. This could impact performance.")
             self._iterated_subsystems = [s for s, _ in self._subsystems_allprocs.values()]
             return
 

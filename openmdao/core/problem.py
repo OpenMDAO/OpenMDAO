@@ -278,7 +278,7 @@ class Problem(object):
                              default=os.path.join(os.getcwd(), 'coloring_files'),
                              desc='Directory containing coloring files (if any) for this Problem.')
         self.options.declare('group_by_pre_post_opt', types=bool,
-                             default=True,
+                             default=False,
                              desc="If True, group subsystems of the top level model into "
                              "pre-optimization, optimization, and post-optimization, and only "
                              "iterate over the optimization subsystems during optimization.  This "
@@ -1008,7 +1008,8 @@ class Problem(object):
 
         driver._setup_driver(self)
 
-        self.model._setup_iteration_lists(driver.supports['optimization'])
+        do_seps = self.options['group_by_pre_post_opt'] and driver.supports['optimization']
+        self.model._setup_iteration_lists(do_seps)
 
         info = driver._coloring_info
         coloring = info['coloring']
