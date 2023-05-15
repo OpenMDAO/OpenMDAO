@@ -1348,8 +1348,6 @@ class Driver(object):
             coloring = None
             try:
                 saved_status = self._problem().model._opt_status
-                # temporarily turn off pre/opt/post separation
-                self._problem().model._set_opt_status(None)
                 if self._coloring_info['coloring'] is None and self._coloring_info['dynamic']:
                     coloring = c_mod.dynamic_total_coloring(self, run_model=run_model,
                                                             fname=self._get_total_coloring_fname())

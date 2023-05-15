@@ -279,9 +279,11 @@ class Problem(object):
                              desc='Directory containing coloring files (if any) for this Problem.')
         self.options.declare('group_by_pre_post_opt', types=bool,
                              default=True,
-                             desc="If True, group subsystems into pre-optimization, optimization, "
-                             "and post-optimization, and only iterate over the optimization "
-                             "subsystems during optimization.")
+                             desc="If True, group subsystems of the top level model into "
+                             "pre-optimization, optimization, and post-optimization, and only "
+                             "iterate over the optimization subsystems during optimization.  This "
+                             "applies only when the top level nonlinear solver is of type"
+                             "NonlinearRunOnce.")
         self.options.update(options)
 
         # Case recording options

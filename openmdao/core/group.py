@@ -208,12 +208,6 @@ class Group(System):
         List of subsystems that will run after the optimization iteration loop (top level only).
     _iterated_subsystems : list or None
         List of subsystems that will run during the optimization iteration loop (top level only).
-    _iteration_input_range : slice or None
-        Slice of the input vector that is updated during the optimization iteration loop
-        (top level only).
-    _iteration_output_range : slice or None
-        Slice of the output vector that is updated during the optimization iteration loop
-        (top level only).
     _opt_status : int or None
         Optimization status flag (top level only).
     """
@@ -246,8 +240,6 @@ class Group(System):
         self._iterated_subsystems = None
         self._post_iterated_subsystems = None
         self._opt_status = None
-        self._iteration_input_range = None
-        self._iteration_output_range = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -4427,10 +4419,14 @@ class Group(System):
         """
         assert self.pathname == '', "call setup_iteration_lists on the top level Group only!"
 
+        from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
+        from openmdao.core.indepvarcomp import IndepVarComp
+
         self._pre_iterated_subsystems = []
         self._post_iterated_subsystems = []
 
-        if not in_optimization:
+        if not in_optimization or not isinstance(self._nonlinear_solver, NonlinearRunOnce):
+            # skip any system separation and just do it the old way
             self._iterated_subsystems = [s for s, _ in self._subsystems_allprocs.values()]
             return
 
@@ -4449,12 +4445,13 @@ class Group(System):
             return
 
         # _iterated_subsystems is used to iterate over the systems that depend on the
-        # design variables that the response variables also depend on.  One way to do this is
-        # by adding edges from the response variable systems to the design variable systems
-        # (there are already edges, directly or indirectly, from the design variable systems to the
-        # response variable systems) and then finding the strongly connected components of the
-        # graph.  get_sccs_topo returns the strongly connected components in topological order, so
-        # we can use it to give us pre, iterated, and post subsets of the systems.
+        # design variables that the response variables also depend on.  One way to determine the
+        # contents of _iterated_subsystems is to add edges from the response variable systems to
+        # the design variable systems (there are already edges, directly or indirectly, from the
+        # design variable systems to the response variable systems) and then find the strongly
+        # connected components of the resulting graph.  get_sccs_topo returns the strongly
+        # connected components in topological order, so we can use it to give us pre, iterated,
+        # and post subsets of the systems.
 
         # add edges between response systems and design variable systems
         for respsys in responsesystems:
@@ -4477,132 +4474,40 @@ class Group(System):
         pre_order = [order[s] for s in pre]
         iterated_order = [order[s] for s in iterated]
         post_order = [order[s] for s in post]
-        self._iteration_output_range = (0, len(self._outputs))
-        self._iteration_input_range = (0, len(self._inputs))
+        miniter = min(iterated_order)
+        maxiter = max(iterated_order)
 
-        if pre_order and iterated_order and max(pre_order) > min(iterated_order):
-            issue_warning(f"The pre-iterated systems {sorted(pre)} are out of order with "
+        if pre_order and iterated_order and max(pre_order) > miniter:
+            # determine which ones are out of order
+            bad = [s for s in pre if order[s] > miniter]
+            issue_warning(f"The pre-iterated systems {sorted(bad)} are out of order with "
                           f"respect to the iterated systems {sorted(iterated)}.  To avoid changing "
                           "the pre-existing ordering, all systems will be included in the "
                           "iterated set. This could impact performance.")
             self._iterated_subsystems = [s for s, _ in self._subsystems_allprocs.values()]
             return
 
-        if post_order and iterated_order and min(post_order) < max(iterated_order):
-            issue_warning(f"The post-iterated systems {sorted(post)} are out of order "
+        if post_order and iterated_order and min(post_order) < maxiter:
+            # determine which ones are out of order
+            bad = [s for s in post if order[s] < maxiter]
+            issue_warning(f"The post-iterated systems {sorted(bad)} are out of order "
                           f"with respect to the iterated systems {sorted(iterated)}. To avoid "
                           "changing the pre-existing ordering, all systems will be included in the "
                           "iterated set. This could impact performance.")
             self._iterated_subsystems = [s for s, _ in self._subsystems_allprocs.values()]
             return
 
+        # populate iteration lists in same order as user specified
         self._pre_iterated_subsystems = [s for s in self._subsystems_myproc if s.name in pre]
+
+        # if all 'pre' systems are IndepVarComps, don't bother to separate them from the main
+        # iteration because it just introduces unnecessary overhead.
+        ivcs = [s for s in self._pre_iterated_subsystems if isinstance(s, IndepVarComp)]
+        if len(ivcs) == len(self._pre_iterated_subsystems):
+            self._pre_iterated_subsystems = []
+            iterated.update(pre)
         self._iterated_subsystems = [s for s in self._subsystems_myproc if s.name in iterated]
         self._post_iterated_subsystems = [s for s in self._subsystems_myproc if s.name in post]
 
-        pre_out_size = np.sum([len(s._outputs) for s in self._pre_iterated_subsystems])
-        pre_in_size = np.sum([len(s._inputs) for s in self._pre_iterated_subsystems])
-
-        opt_out_size = np.sum([len(s._outputs) for s in self._iterated_subsystems])
-        opt_in_size = np.sum([len(s._inputs) for s in self._iterated_subsystems])
-
-        self._iteration_output_range = (pre_out_size, pre_out_size + opt_out_size)
-        self._iteration_input_range = (pre_in_size, pre_in_size + opt_in_size)
-
-    def _get_solver_ranges(self):
-        """
-        Return the slice of the full input and output vectors that the solver is responsible for.
-        """
-        if self._opt_status is None:
-            return _full_slice, _full_slice
-        elif self._opt_status == _OptStatus.OPTIMIZING:
-            return self._iteration_input_range, self._iteration_output_range
-        elif self._opt_status == _OptStatus.PRE:
-            return ((0, self._iteration_input_range[0]), (0, self._iteration_output_range[0]))
-        else:  # POST
-            return ((self._iteration_input_range[1], len(self._inputs)),
-                    (self._iteration_output_range[1], len(self._outputs)))
-
     def _set_opt_status(self, status):
         self._opt_status = status
-        # in_range, out_range = self._get_solver_ranges()
-
-        # # unwrap the vectors if they're already wrapped
-        # if isinstance(self._outputs, _VecSubWrapper):
-        #     self._outputs = self._outputs._vec
-        #     self._residuals = self._residuals._vec
-        #     self._vectors['output']['nonlinear'] = self._vectors['output']['nonlinear']._vec
-        #     self._vectors['output']['linear'] = self._vectors['output']['linear']._vec
-        #     self._vectors['residual']['nonlinear'] = self._vectors['residual']['nonlinear']._vec
-        #     self._vectors['residual']['linear'] = self._vectors['residual']['linear']._vec
-
-        # if isinstance(self._inputs, _VecSubWrapper):
-        #     self._inputs = self._inputs._vec
-        #     self._vectors['input']['nonlinear'] = self._vectors['input']['nonlinear']._vec
-        #     self._vectors['input']['linear'] = self._vectors['input']['linear']._vec
-
-        # # wrap them if needed
-        # if out_range is not _full_slice and (out_range[1] - out_range[0]) != len(self._outputs):
-        #     self._outputs = _VecSubWrapper(self._outputs, out_range)
-        #     self._residuals = _VecSubWrapper(self._residuals, out_range)
-        #     self._vectors['output']['nonlinear'] = \
-        #         _VecSubWrapper(self._vectors['output']['nonlinear'], out_range)
-        #     self._vectors['output']['linear'] = \
-        #         _VecSubWrapper(self._vectors['output']['linear'], out_range)
-        #     self._vectors['residual']['nonlinear'] = \
-        #         _VecSubWrapper(self._vectors['residual']['nonlinear'], out_range)
-        #     self._vectors['residual']['linear'] = \
-        #         _VecSubWrapper(self._vectors['residual']['linear'], out_range)
-
-        # if in_range is not _full_slice and (in_range[1] - in_range[0]) != len(self._inputs):
-        #     self._inputs = _VecSubWrapper(self._inputs, in_range)
-        #     self._vectors['input']['nonlinear'] = \
-        #         _VecSubWrapper(self._vectors['input']['nonlinear'], in_range)
-        #     self._vectors['input']['linear'] = \
-        #         _VecSubWrapper(self._vectors['input']['linear'], in_range)
-
-
-# class _VecSubWrapper(object):
-#     """
-#     A Vector wrapper that only sees a subset of the variables.
-
-#     Attributes
-#     ----------
-#     _vec : <Vector>
-#         The wrapped Vector.
-#     _slice : slice
-#         The slice of the full vector that this wrapper sees.
-
-#     Parameters
-#     ----------
-#     vec : <Vector>
-#         The wrapped Vector.
-#     rng : tuple
-#         The part of the full vector that this wrapper sees, in the form (start, end).
-#     """
-
-#     def __init__(self, vec, rng):
-#         self._vec = vec
-#         self._slice = slice(*rng)
-
-#     def __getattr__(self, name):
-#         return getattr(self._vec, name)
-
-#     def asarray(self, copy=False):
-#         return self._vec.asarray(copy)[self._slice]
-
-#     def set_val(self, val, idxs=_full_slice):
-#         """
-#         Set the data array of this vector to a value, with optional indexing.
-
-#         Parameters
-#         ----------
-#         val : float or ndarray
-#             Scalar or array to set data array to.
-#         idxs : int or slice or tuple of ints and/or slices
-#             The locations where the data array should be updated.
-#         """
-#         if idxs is not _full_slice:
-#             self._vec.set_val(val, idxs=idxs)
-#         else:
-#             self._vec.set_val(val, idxs=self._slice)

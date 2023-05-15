@@ -5,6 +5,7 @@ import numpy as np
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.general_utils import make_set, ensure_compatible
+from openmdao.recorders.recording_iteration_stack import Recording
 
 
 class IndepVarComp(ExplicitComponent):
@@ -195,8 +196,24 @@ class IndepVarComp(ExplicitComponent):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        # define this as empty for IndepVarComp to avoid overhead of ExplicitComponent._linearize.
+        # define this for IndepVarComp to avoid overhead of ExplicitComponent._linearize.
         pass
+
+    def _apply_nonlinear(self):
+        """
+        Compute residuals. The model is assumed to be in a scaled state.
+        """
+        # define this for IndepVarComp to avoid overhead of
+        # ExplicitComponent._apply_nonlinear.
+        self.iter_count_apply += 1
+
+    def _solve_nonlinear(self):
+        """
+        Compute outputs. The model is assumed to be in a scaled state.
+        """
+        # define this for IndepVarComp to avoid overhead of ExplicitComponent._solve_nonlinear.
+        with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
+            pass
 
 
 class _AutoIndepVarComp(IndepVarComp):
