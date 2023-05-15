@@ -80,6 +80,27 @@ class TestPrePostIter(unittest.TestCase):
         data = prob.check_totals(out_stream=None)
         assert_check_totals(data)
 
+    def test_pre_post_iter_approx(self):
+        prob = self.setup_problem(do_pre_post_opt=True)
+        prob.model.approx_totals()
+        
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_driver()
+
+        self.assertEqual(prob.model.pre1.num_nl_solves, 1)
+        self.assertEqual(prob.model.pre2.num_nl_solves, 1)
+
+        self.assertEqual(prob.model.iter1.num_nl_solves, 5)
+        self.assertEqual(prob.model.iter2.num_nl_solves, 5)
+        self.assertEqual(prob.model.iter3.num_nl_solves, 5)
+        self.assertEqual(prob.model.iter4.num_nl_solves, 5)
+
+        self.assertEqual(prob.model.post1.num_nl_solves, 1)
+        self.assertEqual(prob.model.post2.num_nl_solves, 1)
+
+        data = prob.check_totals(method='cs', out_stream=None)
+        assert_check_totals(data)
+
 
 if __name__ == "__main__":
     unittest.main()
