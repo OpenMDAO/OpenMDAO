@@ -277,7 +277,7 @@ class Problem(object):
         self.options.declare('coloring_dir', types=str,
                              default=os.path.join(os.getcwd(), 'coloring_files'),
                              desc='Directory containing coloring files (if any) for this Problem.')
-        self.options.declare('group_by_pre_post_opt', types=bool,
+        self.options.declare('group_by_pre_opt_post', types=bool,
                              default=False,
                              desc="If True, group subsystems of the top level model into "
                              "pre-optimization, optimization, and post-optimization, and only "
@@ -676,7 +676,7 @@ class Problem(object):
 
             self.model._clear_iprint()
 
-            if self.options['group_by_pre_post_opt'] and self.driver.supports['optimization']:
+            if self.options['group_by_pre_opt_post'] and self.driver.supports['optimization']:
                 if self.model._pre_iterated_subsystems:
                     self.model._set_opt_status(_OptStatus.PRE)
                     self.model.run_solve_nonlinear()
@@ -1008,7 +1008,7 @@ class Problem(object):
 
         driver._setup_driver(self)
 
-        do_seps = self.options['group_by_pre_post_opt'] and driver.supports['optimization']
+        do_seps = self.options['group_by_pre_opt_post'] and driver.supports['optimization']
         self.model._setup_iteration_lists(do_seps)
 
         info = driver._coloring_info

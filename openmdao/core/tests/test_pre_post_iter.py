@@ -9,7 +9,7 @@ class TestPrePostIter(unittest.TestCase):
 
     def setup_problem(self, do_pre_post_opt):
         prob = om.Problem()
-        prob.options['group_by_pre_post_opt'] = do_pre_post_opt
+        prob.options['group_by_pre_opt_post'] = do_pre_post_opt
 
         prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False)
         prob.set_solver_print(level=0)
@@ -83,7 +83,7 @@ class TestPrePostIter(unittest.TestCase):
     def test_pre_post_iter_approx(self):
         prob = self.setup_problem(do_pre_post_opt=True)
         prob.model.approx_totals()
-        
+
         prob.setup(mode='fwd', force_alloc_complex=True)
         prob.run_driver()
 
