@@ -2850,7 +2850,11 @@ class Group(System):
                                     ident=(self.pathname, tuple(lst)))
                 return
 
-        subsys = getattr(self, subsys_name)
+        try:
+            subsys = getattr(self, subsys_name)
+        except AttributeError:
+            raise AttributeError(f"{self.msginfo}: subsystem '{subsys_name}' does not exist.")
+
         if any:
             subsys._var_promotes['any'].extend((a, prominfo) for a in any)
         if inputs:
