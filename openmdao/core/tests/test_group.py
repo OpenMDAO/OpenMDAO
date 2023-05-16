@@ -4062,8 +4062,11 @@ class TestFeatureGuessNonlinear(unittest.TestCase):
                 self.linear_solver = om.DirectSolver()
 
             def guess_nonlinear(self, inputs, outputs, residuals):
-                # Check residuals
-                if np.abs(residuals['x']) > 1.0E-2:
+                # Update the residuals based on the inputs
+                self.run_apply_nonlinear()
+
+                # Check residuals so that we don't reset x if we're nearly converged.
+                if np.any(np.abs(residuals.asarray()) > 1.0E-2):
                     # inputs are addressed using full path name, regardless of promotion
                     external_input = inputs['comp1.external_input']
 
