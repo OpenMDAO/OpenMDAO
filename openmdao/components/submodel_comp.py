@@ -87,7 +87,7 @@ class SubmodelComp(ExplicitComponent):
             Name of input to be added. If none, it will default to the var name after
             the last '.'.
         **kwargs : named args
-            All remaining named args that can become options for `add_input`
+            All remaining named args that can become options for `add_input`.
         """
         if name is None:
             name = path.replace('.', ':')
@@ -124,7 +124,7 @@ class SubmodelComp(ExplicitComponent):
             Name of output to be added. If none, it will default to the var name after
             the last '.'.
         **kwargs : named args
-            All remaining named args that can become options for `add_output`
+            All remaining named args that can become options for `add_output`.
         """
         if name is None:
             name = path.replace('.', ':')
