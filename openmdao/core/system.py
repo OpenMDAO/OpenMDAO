@@ -5284,7 +5284,7 @@ class System(object):
             scope = scope_sys
             while n:
                 if n in scope._var_prom2inds:
-                    src_shape, inds, _ = scope._var_prom2inds[n]
+                    _, inds, _ = scope._var_prom2inds[n]
                     if inds is None:
                         if is_prom:  # using a promoted lookup
                             src_indices = None
@@ -5297,12 +5297,13 @@ class System(object):
                         if is_prom:
                             vshape = shp
                     break
-                parts = n.split('.', 1)
-                n = n[len(parts[0]) + 1:]
-                if len(parts) > 1:
-                    s = scope._get_subsystem(parts[0])
+
+                parent, _, child = n.partition('.')
+                if child:
+                    s = scope._get_subsystem(parent)
                     if s is not None:
                         scope = s
+                n = child
 
         if self.comm.size > 1 and get_remote:
             if self.comm.rank == self._owning_rank[abs_name]:
@@ -5718,23 +5719,21 @@ class System(object):
         data = []
 
         # Model Hierarchy.
-        for sys_name in self.system_iter(include_self=True, recurse=True):
+        for system in self.system_iter(include_self=True, recurse=True):
 
             # System name and depth.
-            pathname = sys_name.pathname
+            pathname = system.pathname
             if pathname:
                 name_parts = pathname.split('.')
-                depth = len(name_parts)
-
-                data.append((name_parts[-1], depth))
+                data.append((name_parts[-1], len(name_parts)))
 
             else:
                 data.append(('model', 0))
 
             # Local (relative) names for Component inputs and outputs.
             try:
-                data.append(sorted(sys_name._var_rel_names['input']))
-                data.append(sorted(sys_name._var_rel_names['output']))
+                data.append(sorted(system._var_rel_names['input']))
+                data.append(sorted(system._var_rel_names['output']))
             except AttributeError:
                 continue
 

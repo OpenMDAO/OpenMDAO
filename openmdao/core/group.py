@@ -1574,7 +1574,7 @@ class Group(System):
 
     def _resolve_src_inds(self):
         abs2prom = self._var_abs2prom['input']
-        tree_level = len(self.pathname.split('.')) if self.pathname else 0
+        tree_level = self.pathname.count('.') + 1 if self.pathname else 0
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
         seen = set()
 
@@ -1650,12 +1650,12 @@ class Group(System):
                             pinfo = pinfo.copy()
                             pinfo.promoted_from = subsys.pathname
                             pinfo.prom = sub_prom
-                            tree_level = len(subsys.pathname.split('.'))
+                            tree_level = subsys.pathname.count('.') + 1
                             for abs_in in sub_abs:
                                 if abs_in not in abs_in2prom_info:
-                                    # need a level for each system including '', so we don't
-                                    # subtract 1 from abs_in.split('.') which includes the var name
-                                    abs_in2prom_info[abs_in] = [None for s in abs_in.split('.')]
+                                    # need a level for each system including '', so we still
+                                    # add 1 to abs_in.count('.') which includes the var name
+                                    abs_in2prom_info[abs_in] = [None] * (abs_in.count('.') + 1)
                                 abs_in2prom_info[abs_in][tree_level] = pinfo
                     else:
                         prom_name = sub_prefix + sub_prom
@@ -1869,7 +1869,7 @@ class Group(System):
             # update all metadata dicts with any missing metadata that was filled in elsewhere
             # and update src_shape and use_tgt in abs_in2prom_info
             for meta in metalist:
-                tree_level = len(meta['path'].split('.')) if meta['path'] else 0
+                tree_level = meta['path'].count('.') + 1 if meta['path'] else 0
                 prefix = meta['path'] + '.' if meta['path'] else ''
                 src_shape = None
                 if 'val' in meta:
@@ -2072,7 +2072,17 @@ class Group(System):
                 for abs_in in allprocs_prom2abs_list_in[prom_name]:
                     in_subsys, _, _ = abs_in[path_len:].partition('.')
                     global_abs_in2out[abs_in] = abs_out
-                    if out_subsys != in_subsys:  # this group will handle the transfer
+                    if out_subsys == in_subsys:
+                        in_subsys, _, _ = abs_in[path_len:].partition('.')
+                        out_subsys, _, _ = abs_out[path_len:].partition('.')
+                        # if connection is contained in a subgroup, add to conns
+                        # to pass down to subsystems.
+                        if in_subsys == out_subsys:
+                            if in_subsys not in new_conns:
+                                new_conns[in_subsys] = {abs_in: abs_out}
+                            else:
+                                new_conns[in_subsys][abs_in] = abs_out
+                    else:  # this group will handle the transfer
                         abs_in2out[abs_in] = abs_out
 
         src_ind_inputs = set()
@@ -2137,7 +2147,7 @@ class Group(System):
 
                     if abs_in in abs2meta:
                         if abs_in not in abs_in2prom_info:
-                            abs_in2prom_info[abs_in] = [None for s in abs_in.split('.')]
+                            abs_in2prom_info[abs_in] = [None] * (abs_in.count('.') + 1)
                         # place a _PromotesInfo at the top level to handle the src_indices
                         if abs_in2prom_info[abs_in][0] is None:
                             try:
@@ -2490,8 +2500,8 @@ class Group(System):
         # ref or ref0 are defined for the output.
         for abs_in, abs_out in global_abs_in2out.items():
             # Check that they are in different subsystems of this system.
-            out_subsys = abs_out[path_len:].split('.', 1)[0]
-            in_subsys = abs_in[path_len:].split('.', 1)[0]
+            out_subsys = abs_out[path_len:].partition('.')[0]
+            in_subsys = abs_in[path_len:].partition('.')[0]
             if out_subsys != in_subsys:
                 if abs_in in allprocs_discrete_in:
                     self._conn_discrete_in2out[abs_in] = abs_out
@@ -2840,7 +2850,11 @@ class Group(System):
                                     ident=(self.pathname, tuple(lst)))
                 return
 
-        subsys = getattr(self, subsys_name)
+        try:
+            subsys = getattr(self, subsys_name)
+        except AttributeError:
+            raise AttributeError(f"{self.msginfo}: subsystem '{subsys_name}' does not exist.")
+
         if any:
             subsys._var_promotes['any'].extend((a, prominfo) for a in any)
         if inputs:
@@ -2860,10 +2874,8 @@ class Group(System):
                     continue
 
         # if this was called during configure(), mark this group as modified
-        if self._problem_meta is not None:
-            if self._problem_meta['config_info'] is not None:
-                self._problem_meta['config_info']._prom_added(self.pathname, any=any,
-                                                              inputs=inputs, outputs=outputs)
+        if self._problem_meta is not None and self._problem_meta['config_info'] is not None:
+            self._problem_meta['config_info']._prom_added(self.pathname)
 
     def add_subsystem(self, name, subsys, promotes=None,
                       promotes_inputs=None, promotes_outputs=None,
@@ -3831,7 +3843,7 @@ class Group(System):
             A directed graph containing names of subsystems and their connections.
         """
         input_srcs = self._conn_global_abs_in2out
-        glen = len(self.pathname.split('.')) if self.pathname else 0
+        glen = self.pathname.count('.') + 1 if self.pathname else 0
         graph = nx.DiGraph()
 
         # add all systems as nodes in the graph so they'll be there even if
@@ -3853,8 +3865,8 @@ class Group(System):
         for in_abs, src_abs in input_srcs.items():
             if src_abs is not None:
                 if comps_only:
-                    src = src_abs.rsplit('.', 1)[0]
-                    tgt = in_abs.rsplit('.', 1)[0]
+                    src = src_abs.rpartition('.')[0]
+                    tgt = in_abs.rpartition('.')[0]
                 else:
                     src = src_abs.split('.')[glen]
                     tgt = in_abs.split('.')[glen]
