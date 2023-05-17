@@ -421,3 +421,22 @@ class TestSubmodelComp(unittest.TestCase):
 
         comp.setup()
         comp.setup()
+
+    def test_add_io_meta_override(self):
+        p = om.Problem()
+        subprob = om.Problem()        
+        subprob.model.add_subsystem('comp', om.ExecComp('x = r*cos(theta)'), promotes=['*'])
+        submodel = om.SubmodelComp(problem=subprob)
+
+        submodel.add_input('r', name='new_r', val=20)
+        submodel.add_input('theta', name='new_theta', val=0.5)
+        submodel.add_output('x', name='new_x', val=100)
+
+        p.model.add_subsystem('submodel', submodel, promotes=['*'])
+
+        p.setup()
+        p.final_setup()
+
+        self.assertEquals(p.get_val('new_r'), 20)
+        self.assertEquals(p.get_val('new_theta'), 0.5)
+        self.assertEquals(p.get_val('new_x'), 100)
