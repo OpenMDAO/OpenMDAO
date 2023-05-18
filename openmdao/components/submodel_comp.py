@@ -133,7 +133,7 @@ class SubmodelComp(ExplicitComponent):
 
         # if the submodel is not set up fully, then self._problem_meta will be None
         # in which case we only want to add outputs to self.submodel_outputs
-        if not self._problem_meta:
+        if self._problem_meta is None:
             return
 
         if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
