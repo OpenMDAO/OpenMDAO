@@ -27,7 +27,7 @@ class TestJaxUtils(unittest.TestCase):
             import jax.numpy as np
             from jax import jit
             import jaxlib
-        except:
+        except ImportError:
             self.skipTest('jax is not available but required for this test.')
 
         class TestClass(object):
@@ -43,8 +43,10 @@ class TestJaxUtils(unittest.TestCase):
 
     def test_register_jax_component(self):
         """Test that the registration of jax-compatible components works."""
-        import jax
-        jax.config.update("jax_enable_x64", True)
+        try:
+            import jax
+        except ImportError:
+            self.skipTest('jax is not available but required for this test.')
         import numpy as np
 
         @om.register_jax_component
