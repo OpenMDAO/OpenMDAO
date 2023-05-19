@@ -17,6 +17,10 @@ def jit_stub(f, *args, **kwargs):
     ----------
     f : Callable
         The function or method to be wrapped.
+    *args : list
+        Positional arguments.
+    **kwargs : dict
+        Keyword arguments.
 
     Returns
     -------
