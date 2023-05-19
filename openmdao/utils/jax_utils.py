@@ -9,7 +9,7 @@ except ImportError:
     jax = None
 
 
-def jit_stub(f):
+def jit_stub(f, *args, **kwargs):
     """
     Provide a dummy jit decorator for use if jax is not available.
 
@@ -50,6 +50,8 @@ def register_jax_component(comp_class):
     ------
     NotImplementedError
         If this class does not define the `_tree_flatten` and _tree_unflatten` methods.
+    RuntimeError
+        If jax is not available.
     """
     if jax is None:
         raise RuntimeError('jax is not available. Try `pip install jax jaxlib`')
