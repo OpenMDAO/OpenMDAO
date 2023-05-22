@@ -552,13 +552,15 @@ class pyOptSparseDriver(Driver):
                           storeHistory=self.hist_file, hotStart=self.hotstart_file)
 
         except Exception as c:
-            if not self._exc_info:
+            if self._exc_info is None:
                 raise
 
-        if self._exc_info:
-            if self._exc_info[2] is None:
-                raise self._exc_info[1]
-            raise self._exc_info[1].with_traceback(self._exc_info[2])
+        if self._exc_info is not None:
+            exc_info = self._exc_info
+            self._exc_info = None
+            if exc_info[2] is None:
+                raise exc_info[1]
+            raise exc_info[1].with_traceback(exc_info[2])
 
         # Print results
         if self.options['print_results']:
@@ -668,22 +670,22 @@ class pyOptSparseDriver(Driver):
                     model._clear_iprint()
                     fail = 2
 
-                func_dict = self.get_objective_values()
-                func_dict.update(self.get_constraint_values(lintype='nonlinear'))
-
-                if fail > 0 and self._fill_NANs:
-                    for name in func_dict:
-                        func_dict[name].fill(np.NAN)
-
                 # Record after getting obj and constraint to assure they have
                 # been gathered in MPI.
                 rec.abs = 0.0
                 rec.rel = 0.0
 
         except Exception:
-            self._exc_info = sys.exc_info()
+            if self._exc_info is None:  # avoid overwriting an earlier exception
+                self._exc_info = sys.exc_info()
             fail = 1
-            func_dict = {}
+
+        func_dict = self.get_objective_values()
+        func_dict.update(self.get_constraint_values(lintype='nonlinear'))
+
+        if fail > 0 and self._fill_NANs:
+            for name in func_dict:
+                func_dict[name].fill(np.NAN)
 
         # print("Functions calculated")
         # print(dv_dict)
@@ -718,6 +720,7 @@ class pyOptSparseDriver(Driver):
         """
         prob = self._problem()
         fail = 0
+        sens_dict = {}
 
         try:
 
@@ -768,24 +771,24 @@ class pyOptSparseDriver(Driver):
                             newdv[ikey] = sens_dict[okey][ikey]
                 sens_dict = new_sens
 
-            if fail > 0:
-                # We need to cobble together a sens_dict of the correct size.
-                # Best we can do is return zeros.
+        except Exception:
+            if self._exc_info is None:  # avoid overwriting an earlier exception
+                self._exc_info = sys.exc_info()
+            fail = 1
 
-                sens_dict = {}
-                for okey, oval in func_dict.items():
+        if fail > 0:
+            # We need to cobble together a sens_dict of the correct size.
+            # Best we can do is return zeros or NaNs.
+            for okey, oval in func_dict.items():
+                if okey not in sens_dict:
                     sens_dict[okey] = {}
-                    osize = len(oval)
-                    for ikey, ival in dv_dict.items():
-                        isize = len(ival)
+                osize = len(oval)
+                for ikey, ival in dv_dict.items():
+                    isize = len(ival)
+                    if ikey not in sens_dict[okey] or self._fill_NANs:
                         sens_dict[okey][ikey] = np.zeros((osize, isize))
                         if self._fill_NANs:
                             sens_dict[okey][ikey].fill(np.NAN)
-
-        except Exception:
-            self._exc_info = sys.exc_info()
-            fail = 1
-            sens_dict = {}
 
         # print("Derivatives calculated")
         # print(dv_dict)

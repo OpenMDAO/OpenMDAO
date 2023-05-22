@@ -562,8 +562,8 @@ def _get_viewer_data(data_source, case_id=None):
     return data_dict
 
 
-def n2(data_source, outfile=_default_n2_filename, case_id=None, show_browser=True, embeddable=False,
-       title=None, display_in_notebook=True):
+def n2(data_source, outfile=_default_n2_filename, path=None, case_id=None,
+       show_browser=True, embeddable=False, title=None, display_in_notebook=True):
     """
     Generate an HTML file containing a tree viewer.
 
@@ -575,6 +575,9 @@ def n2(data_source, outfile=_default_n2_filename, case_id=None, show_browser=Tru
         The Problem or case recorder database containing the model or model data.
     outfile : str, optional
         The name of the final output file.
+    path : str, optional
+        If specified, the n2 viewer will begin in a state that is zoomed in on the selected path.
+        This path should be the absolute path of a system in the model.
     case_id : int, str, or None
         Case name or index of case in SQL file if data_source is a database.
     show_browser : bool, optional
@@ -618,7 +621,8 @@ def n2(data_source, outfile=_default_n2_filename, case_id=None, show_browser=Tru
         'title': title,
         'embeddable': "embedded-diagram" if embeddable else "non-embedded-diagram",
         'openmdao_version': openmdao_version,
-        'model_data': model_data
+        'model_data': model_data,
+        'initial_path': path
     }
 
     if err_msg:
@@ -700,6 +704,8 @@ def _n2_setup_parser(parser):
                         help="create embeddable version.")
     parser.add_argument('--title', default=None,
                         action='store', dest='title', help='diagram title.')
+    parser.add_argument('--path', default=None,
+                        action='store', dest='path', help='initial path to zoom into.')
 
 
 def _n2_cmd(options, user_args):
@@ -722,12 +728,12 @@ def _n2_cmd(options, user_args):
                 # only run the n2 here if we've had setup errors. Normally we'd wait until
                 # after final_setup in order to have correct values for all of the I/O variables.
                 n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
-                   title=options.title, embeddable=options.embeddable)
+                   title=options.title, path=options.path, embeddable=options.embeddable)
                 # errors will result in exit at the end of the _check_collected_errors method
 
         def _view_model_no_errors(prob):
             n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
-               title=options.title, embeddable=options.embeddable)
+               title=options.title, path=options.path, embeddable=options.embeddable)
 
         hooks._register_hook('_check_collected_errors', 'Problem', pre=_view_model_w_errors)
         hooks._register_hook('final_setup', 'Problem', post=_view_model_no_errors, exit=True)
@@ -739,5 +745,5 @@ def _n2_cmd(options, user_args):
         _load_and_exec(options.file[0], user_args)
     else:
         # assume the file is a recording, run standalone
-        n2(filename, outfile=options.outfile, title=options.title,
+        n2(filename, outfile=options.outfile, title=options.title, path=options.path,
            show_browser=not options.no_browser, embeddable=options.embeddable)
