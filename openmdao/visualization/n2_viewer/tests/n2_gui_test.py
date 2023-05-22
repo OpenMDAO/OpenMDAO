@@ -195,6 +195,41 @@ n2_gui_test_scripts = {
             "searchString": "V_out",
             "n2ElementCount": 11
         },
+        {
+            "desc": "Turn on Node Info mode",
+            "test": "click",
+            "selector": "#info-button",
+            "button": "left"
+        },
+        {
+            "desc": "Hover to bring up Node Info window",
+            "test": "hover",
+            "selector": "#circuit_R1_V_out",
+        },
+        {
+            "desc": "Click variable to make Node Info window persistent",
+            "test": "click",
+            "selector": "#circuit_R1_V_out",
+            "button": "left"
+        },
+        {
+            "desc": "Check for Description label in Node Info window",
+            "test": "click",
+            "selector": 'tr:has-text("Description")',
+            "button": "left"
+        },
+        {
+            "desc": "Check for Description value in Node Info window",
+            "test": "click",
+            "selector": 'tr:has-text("Voltage out")',
+            "button": "left"
+        },
+        {
+            "desc": "Close Node Info window",
+            "test": "click",
+            "selector": '[id^="persistentNodeInfo"] span.window-close-button',
+            "button": "left",
+        },
         {"test": "root"},
         {
             "desc": "Check that home button works after search",

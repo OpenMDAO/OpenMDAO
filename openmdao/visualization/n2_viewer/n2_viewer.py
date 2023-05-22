@@ -125,6 +125,7 @@ def _get_var_dict(system, typ, name, is_parallel, is_implicit):
             'is_discrete': False,
             'distributed': is_dist,
             'shape': str(meta['shape']),
+            'desc': meta['desc']
         }
 
         if typ == 'output':
