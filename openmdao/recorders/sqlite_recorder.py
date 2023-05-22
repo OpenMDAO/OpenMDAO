@@ -354,7 +354,7 @@ class SqliteRecorder(CaseRecorder):
 
             if driver is None:
                 desvars = system.get_design_vars(True, get_sizes=False, use_prom_ivc=False)
-                responses = system.get_responses(True, get_sizes=False)
+                responses = system.get_responses(True, get_sizes=False, use_prom_ivc=False)
                 constraints = {}
                 objectives = {}
                 for name, data in responses.items():

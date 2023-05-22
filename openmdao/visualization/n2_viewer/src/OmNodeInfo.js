@@ -23,6 +23,7 @@ class OmNodeInfo extends NodeInfo {
             new InfoPropDefault('surrogate_name', 'Surrogate'),
             this.propList[2], // type
             new InfoPropDefault('dtype', 'DType'),
+            new InfoPropDefault('desc', 'Description'),
 
             new InfoPropDefault('units', 'Units'),
             new InfoPropDefault('shape', 'Shape'),
