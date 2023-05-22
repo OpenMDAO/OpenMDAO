@@ -124,7 +124,7 @@ class TreeNode {
     isFilter() { return (this.type == 'filter'); }
 
     /** True if this node can use filters (always false for base class) */
-    canFilter() { return false; } 
+    canFilter() { return false; }
 
     /** Not connectable if this is an input group or parents are minimized. */
     isConnectable() {
@@ -199,6 +199,24 @@ class TreeNode {
         if (this.hasParent(compareNode, parentLimit)) return true;
 
         return this.hasNodeInChildren(compareNode);
+    }
+
+    /**
+     * Look for a node with the given path in the lineage of this one.
+     * @param {string} path The path of the node to find.
+     * @returns {TreeNode} The node with the given path.
+     */
+    findNode(path) {
+        if (this.path == path)
+            return this;
+        else if (this.hasChildren()) {
+            for (let child of this.children) {
+                let node = child.findNode(path);
+                if (node != undefined)
+                    return node;
+            }
+        }
+        return undefined;
     }
 
     /**
@@ -344,7 +362,7 @@ class FilterNode extends TreeNode {
         node.doFilter(this);
         this.show();
     }
-    
+
     /**
      * Update the node's state and remove it from our children. If nothing is left in
      * the children array, delete it and hide ourselves.
@@ -393,7 +411,7 @@ class FilterNode extends TreeNode {
 
     /** Return the length of the children array or 0 if it doesn't exist. */
     get count() { return (this.hasChildren()? this.children.length : 0); }
-    
+
     /** Don't expand, always stay minimized. */
     expand() { return this; }
 
