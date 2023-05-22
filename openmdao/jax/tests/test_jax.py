@@ -9,10 +9,10 @@ except (ImportError, ModuleNotFoundError):
     jax = None
 
 if jax is not None:
-    from openmdao.math import act_tanh, smooth_abs, smooth_max, smooth_min, ks_max, ks_min
+    from openmdao.jax import act_tanh, smooth_abs, smooth_max, smooth_min, ks_max, ks_min
 
 
-class TestJaxFunctions(unittest.TestCase):
+class TestJax(unittest.TestCase):
 
     @unittest.skipIf(jax is None, 'jax is not available.')
     def test_tanh_act(self):
