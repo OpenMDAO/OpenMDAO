@@ -36,7 +36,7 @@ def _val2str(val):
 def view_connections(root, outfile='connections.html', show_browser=True,
                      show_values=True, precision=6, title=None):
     """
-    Generate a self-contained html file containing a detailed connection viewer.
+    Generate a self-contained html (or csv) file containing a detailed connection viewer.
 
     Optionally pops up a web browser to view the file.
 
@@ -46,7 +46,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         The root for the desired tree.
 
     outfile : str, optional
-        The name of the output html file.  Defaults to 'connections.html'.
+        The name of the output file.  Defaults to 'connections.html'.
 
     show_browser : bool, optional
         If True, pop up a browser to view the generated html file.
@@ -206,41 +206,53 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         'show_values': show_values,
     }
 
-    viewer = 'connect_table.html'
+    if '.html' in outfile:
+        viewer = 'connect_table.html'
 
-    code_dir = os.path.dirname(os.path.abspath(__file__))
-    libs_dir = os.path.join(os.path.dirname(code_dir), 'common', 'libs')
-    style_dir = os.path.join(os.path.dirname(code_dir), 'common', 'style')
+        code_dir = os.path.dirname(os.path.abspath(__file__))
+        libs_dir = os.path.join(os.path.dirname(code_dir), 'common', 'libs')
+        style_dir = os.path.join(os.path.dirname(code_dir), 'common', 'style')
 
-    with open(os.path.join(code_dir, viewer), "r", encoding='utf-8') as f:
-        template = f.read()
+        with open(os.path.join(code_dir, viewer), "r", encoding='utf-8') as f:
+            template = f.read()
 
-    with open(os.path.join(libs_dir, 'tabulator.5.4.4.min.js'), "r", encoding='utf-8') as f:
-        tabulator_src = f.read()
+        with open(os.path.join(libs_dir, 'tabulator.5.4.4.min.js'), "r", encoding='utf-8') as f:
+            tabulator_src = f.read()
 
-    with open(os.path.join(style_dir, 'tabulator.5.4.4.min.css'), "r", encoding='utf-8') as f:
-        tabulator_style = f.read()
+        with open(os.path.join(style_dir, 'tabulator.5.4.4.min.css'), "r", encoding='utf-8') as f:
+            tabulator_style = f.read()
 
-    jsontxt = json.dumps(data)
+        jsontxt = json.dumps(data)
 
-    with open(outfile, 'w', encoding='utf-8') as f:
-        s = template.replace("<connection_data>", jsontxt)
-        s = s.replace("<tabulator_src>", tabulator_src)
-        s = s.replace("<tabulator_style>", tabulator_style)
-        f.write(s)
+        with open(outfile, 'w', encoding='utf-8') as f:
+            s = template.replace("<connection_data>", jsontxt)
+            s = s.replace("<tabulator_src>", tabulator_src)
+            s = s.replace("<tabulator_style>", tabulator_style)
+            f.write(s)
 
-    if notebook:
-        # display in Jupyter Notebook
-        if not colab:
-            display(IFrame(src=outfile, width=1000, height=1000))
-        else:
-            display(HTML(outfile))
+        if notebook:
+            # display in Jupyter Notebook
+            if not colab:
+                display(IFrame(src=outfile, width=1000, height=1000))
+            else:
+                display(HTML(outfile))
 
-    elif show_browser:
-        # open it up in the browser
-        from openmdao.utils.webview import webview
-        webview(outfile)
+        elif show_browser:
+            # open it up in the browser
+            from openmdao.utils.webview import webview
+            webview(outfile)
+            
+    elif '.csv' in outfile:
+        import csv
+        column_headings = list(table[0].keys())
 
+        # open the file in the write mode
+        with open(outfile, 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(column_headings)
+            for var_dict in table:
+                row = var_dict.values()
+                writer.writerow(row)
 
 # connections report definition
 def _run_connections_report(prob, report_filename='connections.html'):
