@@ -172,6 +172,8 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
             var, wrt = key
             for error_type, tolerance in [('abs error', atol), ('rel error', rtol), ]:
                 actuals = pair_data[error_type]
+                if not isinstance(actuals, list):
+                    actuals = [actuals]
                 incon = pair_data.get('rank_inconsistent')
                 if incon:
                     inconsistent_derivs.add(key)

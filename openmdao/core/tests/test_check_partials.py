@@ -2282,11 +2282,11 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         data = prob.check_partials()
 
-        x1_error = data['comp']['y', 'x1']['abs error'][0]
+        x1_error = data['comp']['y', 'x1']['abs error']
 
         assert_near_equal(x1_error.forward, 1., 1e-8)
 
-        x2_error = data['comp']['y', 'x2']['rel error'][0]
+        x2_error = data['comp']['y', 'x2']['rel error']
 
         assert_near_equal(x2_error.forward, 9., 1e-8)
 

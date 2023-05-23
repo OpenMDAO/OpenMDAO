@@ -1427,6 +1427,8 @@ class Problem(object):
         else:
             steps = step
 
+        do_steps = len(steps) > 1
+
         alloc_complex = model._outputs._alloc_complex
         all_fd_options = {}
         comps_could_not_cs = set()
@@ -1443,7 +1445,7 @@ class Problem(object):
             for i, step in enumerate(steps):
                 approximations = {'fd': FiniteDifference(),
                                 'cs': ComplexStep()}
-                
+
                 added_wrts = set()
 
                 # Load up approximation objects with the requested settings.
@@ -1457,7 +1459,7 @@ class Problem(object):
                                                             step, form, step_calc, alloc_complex,
                                                             minimum_step)
                     actual_steps.append(fd_options['step'])
-                    
+
                     if could_not_cs:
                         comps_could_not_cs.add(c_name)
 
@@ -1493,7 +1495,9 @@ class Problem(object):
 
                     if 'J_fd' not in deriv:
                         deriv['J_fd'] = []
-                    deriv['J_fd'].append((partial, actual_steps[i]))
+                        deriv['steps'] = []
+                    deriv['J_fd'].append(partial)
+                    deriv['steps'].append(actual_steps[i])
 
                     # If this is a directional derivative, convert the analytic to a directional one.
                     if wrt in local_opts and local_opts[wrt]['directional']:
@@ -1532,6 +1536,9 @@ class Problem(object):
                                   compact_print, comps, all_fd_options, indep_key=indep_key,
                                   print_reverse=print_reverse,
                                   show_only_incorrect=show_only_incorrect)
+
+        if not do_steps:
+            _fix_check_data(partials_data)
 
         return partials_data
 
@@ -1759,17 +1766,17 @@ class Problem(object):
         # Assemble and Return all metrics.
         data = {'': {}}
         resp = self.driver._responses
+        do_steps = len(Jfds) > 1
 
         for Jfd, step in Jfds:
             for key, val in Jcalc.items():
                 if key not in data['']:
                     data[''][key] = {}
                 meta = data[''][key]
-                if 'steps' not in meta:
-                    meta['steps'] = []
-                meta['steps'].append(step)
                 if 'J_fd' not in meta:
                     meta['J_fd'] = []
+                    meta['steps'] = []
+                meta['steps'].append(step)
                 if directional:
                     if self._mode == 'fwd':
                         if 'directional_fd_fwd' not in meta:
@@ -1780,7 +1787,7 @@ class Problem(object):
                             Jfd[:, Jcalc_slices['wrt'][wrt].start]
                         meta['directional_fd_fwd'].append(directional_fd_fwd)
                         meta['J_fwd'] = total_info.J[:, Jcalc_slices['wrt'][wrt].start]
-                        meta['J_fd'].append((Jfd[:, Jcalc_slices['wrt'][wrt].start], step))
+                        meta['J_fd'].append(Jfd[:, Jcalc_slices['wrt'][wrt].start])
                     else:  # rev
                         if 'directional_fd_rev' not in meta:
                             meta['directional_fd_rev'] = []
@@ -1797,10 +1804,10 @@ class Problem(object):
                         # Dot product test for adjoint validity.
                         meta['directional_fd_rev'].append(dhat_dot_d - mhat_dot_m)
                         meta['J_rev'] = dhat_dot_d
-                        meta['J_fd'].append((mhat_dot_m, step))
+                        meta['J_fd'].append(mhat_dot_m)
                 else:
                     meta[Jcalc_name] = val
-                    meta['J_fd'].append((Jfd[key], step))
+                    meta['J_fd'].append(Jfd[key])
 
                 # Display whether indices were declared when response was added.
                 of = key[0]
@@ -1813,6 +1820,10 @@ class Problem(object):
         _assemble_derivative_data(data, rel_err_tol, abs_err_tol, out_stream, compact_print,
                                   [model], {'': fd_args}, totals=total_info, lcons=lcons,
                                   show_only_incorrect=show_only_incorrect)
+
+        if not do_steps:
+            _fix_check_data(data)
+
         return data['']
 
     def compute_totals(self, of=None, wrt=None, return_format='flat_dict', debug_print=False,
@@ -2400,9 +2411,11 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
 
     try:
         fdinfo = derivative_info['J_fd']
+        steps = derivative_info['steps']
     except KeyError:
         # this can happen when a partial is not declared, which means it should be zero
-        fdinfo = ((np.zeros(1), None),)
+        fdinfo = (np.zeros(1),)
+        steps = (None,)
 
     if matrix_free:
         if directional:
@@ -2416,7 +2429,8 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
     derivative_info['steps'] = []
     fdnorms = []
 
-    for i, (fd, step) in enumerate(fdinfo):
+    for i, fd in enumerate(fdinfo):
+        step = steps[i]
         fd_norm = safe_norm(fd)
         fdnorms.append(fd_norm)
 
@@ -2581,6 +2595,26 @@ def _iter_derivs(derivatives, sys_name, show_only_incorrect, global_options, tot
         yield key, fd_norm, fd_opts, directional, above_abs, above_rel, inconsistent
 
 
+def _fix_check_data(data):
+    """
+    Modify the data dict to match the old format if there is only one fd step size.
+
+    Parameters
+    ----------
+    data : dict
+        Dictionary containing derivative information keyed by system name.
+    """
+    names = ['J_fd', 'abs error', 'rel error', 'magnitude']
+
+    for sname, sdata in data.items():
+        for key, dct in sdata.items():
+            for name in names:
+                if name in dct:
+                    dct[name] = dct[name][0]
+            if 'steps' in dct:
+                del dct['steps']
+
+
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
                               compact_print, system_list, global_options, totals=False,
                               indep_key=None, print_reverse=False,
@@ -2631,7 +2665,13 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
     incon_keys = ()
 
     for system in system_list:
-        sys_type = type(system).__name__
+        # Match header to appropriate type.
+        if isinstance(system, Component):
+            sys_type = 'Component'
+        elif isinstance(system, Group):
+            sys_type = 'Group'
+        else:
+            raise RuntimeError(f"Object type {type(system).__name__} is not a Component or Group.")
 
         sys_name = system.pathname
         sys_class_name = type(system).__name__
@@ -2699,18 +2739,17 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             magnitudes = derivative_info['magnitude']
             steps = derivative_info['steps']
 
+            if len(steps) > 1:
+                stepstrs = [f", step={step}" for step in steps]
+            else:
+                stepstrs = [""]
+
             if magnitudes[0].reverse is not None:
-                calc_mag = magnitudes[0].reverse
-                calc_abs = abs_errs[0].reverse
-                calc_rel = rel_errs[0].reverse
                 Jname = 'J_rev'
                 Jrev = J = derivative_info[Jname]
 
             # use forward even if both fwd and rev are defined
             if magnitudes[0].forward is not None:
-                calc_mag = magnitudes[0].forward
-                calc_abs = abs_errs[0].forward
-                calc_rel = rel_errs[0].forward
                 Jname = 'J_fwd'
                 Jfor = J = derivative_info[Jname]
 
@@ -2734,17 +2773,37 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
                 for i in range(len(magnitudes)):
                     if totals:
-                        table_data.append([of, wrt, steps[i], Jname, i, magnitudes[i].forward,
-                                           abs_errs[i].forward, rel_errs[i].forward, err_desc])
+                        if len(steps) > 1:
+                            table_data.append([of, wrt, steps[i], Jname, i, magnitudes[i].forward,
+                                               abs_errs[i].forward, rel_errs[i].forward, err_desc])
+                        else:
+                            table_data.append([of, wrt, Jname, i, magnitudes[i].forward,
+                                            abs_errs[i].forward, rel_errs[i].forward, err_desc])
                     else:
                         if print_reverse:
-                            table_data.append([of, wrt, steps[i], magnitudes[i].forward, magnitudes[i].reverse,
-                                               magnitudes[i].fd, abs_errs[i].forward, abs_errs[i].reverse,
-                                               abs_errs[i].forward_reverse, rel_errs[i].forward,
-                                               rel_errs[i].reverse, rel_errs[i].forward_reverse, err_desc])
+                            if len(steps) > 1:
+                                table_data.append([of, wrt, steps[i], magnitudes[i].forward,
+                                                   magnitudes[i].reverse, magnitudes[i].fd,
+                                                   abs_errs[i].forward, abs_errs[i].reverse,
+                                                   abs_errs[i].forward_reverse, rel_errs[i].forward,
+                                                   rel_errs[i].reverse, rel_errs[i].forward_reverse,
+                                                   err_desc])
+                            else:
+                                table_data.append([of, wrt, magnitudes[i].forward,
+                                                   magnitudes[i].reverse, magnitudes[i].fd,
+                                                   abs_errs[i].forward, abs_errs[i].reverse,
+                                                   abs_errs[i].forward_reverse, rel_errs[i].forward,
+                                                   rel_errs[i].reverse, rel_errs[i].forward_reverse,
+                                                   err_desc])
                         else:
-                            table_data.append([of, wrt, steps[i], magnitudes[i].forward, magnitudes[i].fd,
-                                               abs_errs[i].forward, rel_errs[i].forward, err_desc])
+                            if len(steps) > 1:
+                                table_data.append([of, wrt, steps[i], magnitudes[i].forward,
+                                                   magnitudes[i].fd, abs_errs[i].forward,
+                                                   rel_errs[i].forward, err_desc])
+                            else:
+                                table_data.append([of, wrt, magnitudes[i].forward, magnitudes[i].fd,
+                                                   abs_errs[i].forward, rel_errs[i].forward,
+                                                   err_desc])
                             assert abs_errs[i].forward_reverse is None
                             assert rel_errs[i].forward_reverse is None
                             assert abs_errs[i].reverse is None
@@ -2781,7 +2840,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     out_buffer.write(f'     Reverse Magnitude: {magnitudes[0].reverse:.6e}\n')
 
                 fd_desc = f"{fd_opts['method']}:{fd_opts['form']}"
-                out_buffer.write(f'          Fd Magnitude: {magnitudes[0].fd:.6e} ({fd_desc}, step={steps[0]})\n')
+                out_buffer.write(f'          Fd Magnitude: {magnitudes[0].fd:.6e} '
+                                 f'({fd_desc}{stepstrs[0]})\n')
 
                 for i in range(len(magnitudes)):
                     # Absolute Errors
@@ -2841,7 +2901,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                 out_buffer.write(f'    Relative Error (Jrev - Jfd) / {divname} : '
                                                  f'{err}\n')
 
-
                 if out_stream:
                     if directional:
                         if rel_errs[0].forward_reverse is not None:
@@ -2889,16 +2948,17 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
                 for i in range(len(magnitudes)):
                     fd = fds[i]
-                    step = steps[i]
-                    
+
                     if directional:
                         if totals and magnitudes[i].reverse is not None:
                             out_buffer.write(f'    Directional {fdtype} Derivative (Jfd) '
-                                            f'Dot Product, step = {step}\n    {fd}\n')
+                                            f'Dot Product{stepstrs[i]}\n    {fd}\n')
                         else:
-                            out_buffer.write(f"    Directional {fdtype} Derivative (Jfd), step = {step}\n    {fd}\n")
+                            out_buffer.write(f"    Directional {fdtype} Derivative (Jfd)"
+                                             f"{stepstrs[i]}\n    {fd}\n")
                     else:
-                        out_buffer.write(f"    Raw {fdtype} Derivative (Jfd), step = {step}\n    {fd}\n")
+                        out_buffer.write(f"    Raw {fdtype} Derivative (Jfd){stepstrs[i]}"
+                                         f"\n    {fd}\n")
 
                     out_buffer.write(' -' * 30 + '\n')
 
@@ -2907,7 +2967,9 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
         if not suppress_output:
             if compact_print and table_data:
-                headers = ["of '<variable>'", "wrt '<variable>'", "step"]
+                headers = ["of '<variable>'", "wrt '<variable>'"]
+                if len(steps) > 1:
+                    headers.append('step')
                 column_meta = [{}, {}]
 
                 if print_reverse:
