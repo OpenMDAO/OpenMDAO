@@ -2185,6 +2185,16 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         prob.run_model()
         prob.check_totals(step=1e-7)
 
+        # Scenario 18a:
+        #    Compute totals: approx on totals using defaults
+        #    Check totals: fd, non default steps
+        #    Expected result: No error
+        prob, parab = create_problem()
+        prob.model.approx_totals()
+        prob.setup()
+        prob.run_model()
+        prob.check_totals(step=[1e-7, 1e-8])
+
         # Scenario 19:
         #    Compute totals: approx on totals using defaults
         #    Check totals: fd, non default form

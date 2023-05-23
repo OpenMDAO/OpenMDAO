@@ -171,41 +171,42 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
         for key, pair_data in data[comp].items():
             var, wrt = key
             for error_type, tolerance in [('abs error', atol), ('rel error', rtol), ]:
-                actual = pair_data[error_type]
+                actuals = pair_data[error_type]
                 incon = pair_data.get('rank_inconsistent')
                 if incon:
                     inconsistent_derivs.add(key)
 
-                for error_val, mode in zip(actual, norm_types):
-                    in_error = False
-
-                    if error_val is None:
-                        # Reverse derivatives only computed on matrix free comps.
-                        continue
-
-                    if not np.isnan(error_val):
-                        if not np.allclose(error_val, 0.0, atol=tolerance):
-
-                            if error_type == 'rel error' and mode == 'fwd-fd' and \
-                                    np.allclose(pair_data['J_fwd'], 0.0, atol=atol) and \
-                                    np.allclose(pair_data['J_fd'], 0.0, atol=atol):
-                                # Special case: both fd and fwd are really tiny, so we want to
-                                # ignore the rather large relative errors.
-                                in_error = False
-                            else:
-                                # This is a bona-fide error.
-                                in_error = True
-
-                    elif error_type == 'abs error' and mode == 'fwd-fd':
-                        # Either analytic or approximated derivatives contain a NaN.
-                        in_error = True
-
-                    if in_error:
-                        wrt_string = f'{var} wrt {wrt}'
-                        norm_string = str(error_val)
-                        bad_derivs.append((wrt_string, norm_string, error_type, mode))
-                        len_wrt_width = max(len_wrt_width, len(wrt_string))
-                        len_norm_width = max(len_norm_width, len(norm_string))
+                for actual in actuals:
+                    for error_val, mode in zip(actual, norm_types):
+                        in_error = False
+    
+                        if error_val is None:
+                            # Reverse derivatives only computed on matrix free comps.
+                            continue
+    
+                        if not np.isnan(error_val):
+                            if not np.allclose(error_val, 0.0, atol=tolerance):
+    
+                                if error_type == 'rel error' and mode == 'fwd-fd' and \
+                                        np.allclose(pair_data['J_fwd'], 0.0, atol=atol) and \
+                                        np.allclose(pair_data['J_fd'], 0.0, atol=atol):
+                                    # Special case: both fd and fwd are really tiny, so we want to
+                                    # ignore the rather large relative errors.
+                                    in_error = False
+                                else:
+                                    # This is a bona-fide error.
+                                    in_error = True
+    
+                        elif error_type == 'abs error' and mode == 'fwd-fd':
+                            # Either analytic or approximated derivatives contain a NaN.
+                            in_error = True
+    
+                        if in_error:
+                            wrt_string = f'{var} wrt {wrt}'
+                            norm_string = str(error_val)
+                            bad_derivs.append((wrt_string, norm_string, error_type, mode))
+                            len_wrt_width = max(len_wrt_width, len(wrt_string))
+                            len_norm_width = max(len_norm_width, len(norm_string))
 
         if bad_derivs or inconsistent_derivs:
             comp_error_string = ''
