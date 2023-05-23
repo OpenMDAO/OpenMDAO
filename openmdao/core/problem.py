@@ -1491,6 +1491,10 @@ class Problem(object):
                     deriv = partials_data[c_name][rel_key]
                     of, wrt = rel_key
 
+                    if 'J_fd' not in deriv:
+                        deriv['J_fd'] = []
+                    deriv['J_fd'].append((partial, actual_steps[i]))
+
                     # If this is a directional derivative, convert the analytic to a directional one.
                     if wrt in local_opts and local_opts[wrt]['directional']:
                         if i == 0:  # only do this on the first iteration
@@ -1509,10 +1513,6 @@ class Problem(object):
                             if 'directional_fd_rev' not in deriv:
                                 deriv['directional_fd_rev'] = []
                             deriv['directional_fd_rev'].append(dhat.dot(d) - mhat.dot(m))
-                    else:  # not directional
-                        if 'J_fd' not in deriv:
-                            deriv['J_fd'] = []
-                        deriv['J_fd'].append((partial, actual_steps[i]))
 
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(data) for comp_name, data in partials_data.items()}
@@ -2734,7 +2734,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
                 for i in range(len(magnitudes)):
                     if totals:
-                        table_data.append([of, wrt, Jname, i, magnitudes[i].forward,
+                        table_data.append([of, wrt, steps[i], Jname, i, magnitudes[i].forward,
                                            abs_errs[i].forward, rel_errs[i].forward, err_desc])
                     else:
                         if print_reverse:
@@ -2907,7 +2907,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
         if not suppress_output:
             if compact_print and table_data:
-                headers = ["of '<variable>'", "wrt '<variable>', step"]
+                headers = ["of '<variable>'", "wrt '<variable>'", "step"]
                 column_meta = [{}, {}]
 
                 if print_reverse:
