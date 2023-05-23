@@ -3562,15 +3562,15 @@ class Group(System):
         ndarray or None
             Distributed sizes if var is distributed else None
         """
-        total = self.pathname == ''
-
-        abs2meta = self._var_allprocs_abs2meta['output']
-        abs2idx = self._var_allprocs_abs2idx
-        sizes = self._var_sizes['output']
-        approx_of_idx = self._owns_approx_of_idx
-        responses = self.get_responses(recurse=True)
-
         if self._owns_approx_of:
+            total = self.pathname == ''
+
+            abs2meta = self._var_allprocs_abs2meta['output']
+            abs2idx = self._var_allprocs_abs2idx
+            sizes = self._var_sizes['output']
+            approx_of_idx = self._owns_approx_of_idx
+            responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
+
             szname = 'global_size' if total else 'size'
             # we're computing totals/semi-totals (vars may not be local)
             start = end = 0
@@ -3720,7 +3720,7 @@ class Group(System):
 
         abs2meta = self._var_allprocs_abs2meta
         info = self._coloring_info
-        responses = self.get_responses(recurse=True)
+        responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
 
         if info['coloring'] is not None and (self._owns_approx_of is None or
                                              self._owns_approx_wrt is None):

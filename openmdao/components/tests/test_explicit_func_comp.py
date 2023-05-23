@@ -893,7 +893,7 @@ class TestFuncCompUserPartials(unittest.TestCase):
 
         assert_check_partials(p.check_partials(includes=['comp'], out_stream=None))
 
-        coloring = compute_total_coloring(p, mode='fwd', of=['comp.y1', 'comp.y2'], wrt=['comp.x1', 'comp.x2'], use_abs_names=True)
+        coloring = compute_total_coloring(p, mode='fwd', of=['comp.y1', 'comp.y2'], wrt=['comp.x1', 'comp.x2'])
 
         self.assertEqual(coloring.total_solves(), 1)  # verify that sparsity had an effect
 

@@ -84,7 +84,7 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
                            "final_setup has not been called.")
 
     # get absolute src names of design vars
-    desvars = model.get_design_vars(recurse=True, use_prom_ivc=False)
+    desvars = model.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
 
     headers = ['Absolute Name', 'Input Name', 'Source Name', 'Source is IVC', 'Source is DV',
                'Units', 'Shape', 'Tags', 'Val', 'Min Val', 'Max Val', 'Absolute Source', ]

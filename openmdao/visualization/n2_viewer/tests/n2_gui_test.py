@@ -108,6 +108,13 @@ n2_gui_test_scripts = {
             "arrowCount": 4
         },
         {
+            "desc": "Check number of cells indicating diagram is zoomed on R2",
+            "test": "count",
+            "selector": "g#n2elements > g.n2cell",
+            "count": 5
+        },
+        {"test": "root"},
+        {
             "desc": "Hover on an N2 cell with cycle arrows and count",
             "test": "hoverArrow",
             "selector": "#cellShape_conn_33_to_13",
@@ -187,6 +194,41 @@ n2_gui_test_scripts = {
             "test": "search",
             "searchString": "V_out",
             "n2ElementCount": 11
+        },
+        {
+            "desc": "Turn on Node Info mode",
+            "test": "click",
+            "selector": "#info-button",
+            "button": "left"
+        },
+        {
+            "desc": "Hover to bring up Node Info window",
+            "test": "hover",
+            "selector": "#circuit_R1_V_out",
+        },
+        {
+            "desc": "Click variable to make Node Info window persistent",
+            "test": "click",
+            "selector": "#circuit_R1_V_out",
+            "button": "left"
+        },
+        {
+            "desc": "Check for Description label in Node Info window",
+            "test": "click",
+            "selector": 'tr:has-text("Description")',
+            "button": "left"
+        },
+        {
+            "desc": "Check for Description value in Node Info window",
+            "test": "click",
+            "selector": 'tr:has-text("Voltage out")',
+            "button": "left"
+        },
+        {
+            "desc": "Close Node Info window",
+            "test": "click",
+            "selector": '[id^="persistentNodeInfo"] span.window-close-button',
+            "button": "left",
         },
         {"test": "root"},
         {
@@ -719,6 +761,9 @@ n2_gui_test_scripts = {
 
 n2_gui_test_models = n2_gui_test_scripts.keys()
 
+n2_gui_test_cmd_args = {
+    "circuit": ["--path", "circuit.R2"],
+}
 
 class n2_gui_test_case(_GuiTestCase):
 
@@ -729,7 +774,7 @@ class n2_gui_test_case(_GuiTestCase):
         print("  Test {:04}".format(current_test) + ": " + msg)
         current_test += 1
 
-    def generate_n2_file(self):
+    def generate_n2_file(self, args=None):
         """ Generate N2 HTML files from all models in GUI_TEST_SUBDIR. """
         self.parentDir = os.path.dirname(os.path.realpath(__file__))
         self.modelDir = os.path.join(self.parentDir, GUI_TEST_SUBDIR)
@@ -743,7 +788,9 @@ class n2_gui_test_case(_GuiTestCase):
         self.n2files[self.current_model] = n2file
         print("Creating " + n2file)
 
-        cmd = ['openmdao', 'n2', '-o', n2file,  '--no_browser', pyfile]
+        cmd = ['openmdao', 'n2', '-o', n2file, '--no_browser', pyfile]
+        if args:
+            cmd.extend(args)
         subprocess.run(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE)  # nosec: trusted input
 
     async def load_test_page(self):
@@ -1040,7 +1087,7 @@ class n2_gui_test_case(_GuiTestCase):
                 self.current_test_desc = ''
                 self.current_model = model
 
-                self.generate_n2_file()
+                self.generate_n2_file(n2_gui_test_cmd_args.get(model))
 
                 async with async_playwright() as playwright:
                     await self.run_gui_tests(playwright)
