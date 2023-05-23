@@ -36,7 +36,7 @@ def _val2str(val):
 def view_connections(root, outfile='connections.html', show_browser=True,
                      show_values=True, precision=6, title=None):
     """
-    Generate a self-contained html (or csv) file containing a detailed connection viewer.
+    Generate an html or csv file containing a detailed connection viewer.
 
     Optionally pops up a web browser to view the file.
 
@@ -47,6 +47,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     outfile : str, optional
         The name of the output file.  Defaults to 'connections.html'.
+        The extension specified in the file name will determine the output file format
 
     show_browser : bool, optional
         If True, pop up a browser to view the generated html file.
@@ -206,7 +207,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         'show_values': show_values,
     }
 
-    if '.html' in outfile:
+    if outfile.endswith('.html'):
         viewer = 'connect_table.html'
 
         code_dir = os.path.dirname(os.path.abspath(__file__))
@@ -242,7 +243,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
             from openmdao.utils.webview import webview
             webview(outfile)
             
-    elif '.csv' in outfile:
+    elif outfile.endswith('.csv'):
         import csv
         column_headings = list(table[0].keys())
 
@@ -253,6 +254,9 @@ def view_connections(root, outfile='connections.html', show_browser=True,
             for var_dict in table:
                 row = var_dict.values()
                 writer.writerow(row)
+    
+    else:
+        raise RuntimeError("Invalid file extension for output file, should be '.html' or '.csv'")
 
 # connections report definition
 def _run_connections_report(prob, report_filename='connections.html'):
