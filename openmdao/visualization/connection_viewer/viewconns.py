@@ -47,7 +47,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     outfile : str, optional
         The name of the output file.  Defaults to 'connections.html'.
-        The extension specified in the file name will determine the output file format
+        The extension specified in the file name will determine the output file format.
 
     show_browser : bool, optional
         If True, pop up a browser to view the generated html file.
@@ -242,7 +242,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
             # open it up in the browser
             from openmdao.utils.webview import webview
             webview(outfile)
-            
+
     elif outfile.endswith('.csv'):
         import csv
         column_headings = list(table[0].keys())
@@ -254,9 +254,10 @@ def view_connections(root, outfile='connections.html', show_browser=True,
             for var_dict in table:
                 row = var_dict.values()
                 writer.writerow(row)
-    
+
     else:
         raise RuntimeError("Invalid file extension for output file, should be '.html' or '.csv'")
+
 
 # connections report definition
 def _run_connections_report(prob, report_filename='connections.html'):
