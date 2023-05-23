@@ -2604,10 +2604,11 @@ def _fix_check_data(data):
     data : dict
         Dictionary containing derivative information keyed by system name.
     """
-    names = ['J_fd', 'abs error', 'rel error', 'magnitude']
+    names = ['J_fd', 'abs error', 'rel error', 'magnitude', 'directional_fd_fwd',
+             'directional_fd_rev']
 
-    for sname, sdata in data.items():
-        for key, dct in sdata.items():
+    for sdata in data.values():
+        for dct in sdata.values():
             for name in names:
                 if name in dct:
                     dct[name] = dct[name][0]
@@ -2774,10 +2775,10 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 for i in range(len(magnitudes)):
                     if totals:
                         if len(steps) > 1:
-                            table_data.append([of, wrt, steps[i], Jname, i, magnitudes[i].forward,
+                            table_data.append([of, wrt, steps[i], i, magnitudes[i].forward,
                                                abs_errs[i].forward, rel_errs[i].forward, err_desc])
                         else:
-                            table_data.append([of, wrt, Jname, i, magnitudes[i].forward,
+                            table_data.append([of, wrt, i, magnitudes[i].forward,
                                             abs_errs[i].forward, rel_errs[i].forward, err_desc])
                     else:
                         if print_reverse:
