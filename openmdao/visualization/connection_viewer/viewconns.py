@@ -189,7 +189,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
             r['outpromto'] = outpromto
             children.append(r)
 
-        if children:
+        if children and outfile.endswith('.html'):
             row['_children'] = children
 
         table.append(row)
@@ -248,7 +248,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         column_headings = list(table[0].keys())
 
         # open the file in the write mode
-        with open(outfile, 'w') as f:
+        with open(outfile, 'w', encoding='utf-8') as f:
             writer = csv.writer(f)
             writer.writerow(column_headings)
             for var_dict in table:
