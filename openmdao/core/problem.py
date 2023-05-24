@@ -2869,24 +2869,27 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     out_buffer.write('\n')
 
                     for i in range(len(magnitudes)):
-                    # Absolute Errors
+                        # Absolute Errors
                         if directional:
                             if totals and abs_errs[i].forward is not None:
                                 err = _format_error(abs_errs[i].forward, abs_error_tol)
-                                out_buffer.write(f'    Absolute Error (Jfor - Jfd){stepstrs[i]} : {err}\n')
+                                out_buffer.write(f'    Absolute Error (Jfor - Jfd){stepstrs[i]} : '
+                                                 f'{err}\n')
 
                             if abs_errs[i].reverse is not None:
                                 err = _format_error(abs_errs[i].reverse, abs_error_tol)
-                                out_buffer.write(f'    Absolute Error ([rev, fd] Dot Product Test){stepstrs[i]} :'
-                                                 f' {err}\n')
+                                out_buffer.write(f'    Absolute Error ([rev, fd] Dot Product Test)'
+                                                 f'{stepstrs[i]} : {err}\n')
                         else:
                             if abs_errs[i].forward is not None:
                                 err = _format_error(abs_errs[i].forward, abs_error_tol)
-                                out_buffer.write(f'    Absolute Error (Jfor - Jfd){stepstrs[i]} : {err}\n')
+                                out_buffer.write(f'    Absolute Error (Jfor - Jfd){stepstrs[i]} : '
+                                                 f'{err}\n')
 
                             if abs_errs[i].reverse is not None:
                                 err = _format_error(abs_errs[i].reverse, abs_error_tol)
-                                out_buffer.write(f'    Absolute Error (Jrev - Jfd){stepstrs[i]} : {err}\n')
+                                out_buffer.write(f'    Absolute Error (Jrev - Jfd){stepstrs[i]} : '
+                                                 f'{err}\n')
 
                     if directional:
                         if abs_errs[0].forward_reverse is not None:
@@ -2906,8 +2909,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         if directional:
                             if totals and rel_errs[i].forward is not None:
                                 err = _format_error(rel_errs[i].forward, rel_error_tol)
-                                out_buffer.write(f'    Relative Error (Jfor - Jfd) / {divname}{stepstrs[i]} : '
-                                                 f'{err}\n')
+                                out_buffer.write(f'    Relative Error (Jfor - Jfd) / {divname}'
+                                                 f'{stepstrs[i]} : {err}\n')
 
                             if rel_errs[i].reverse is not None:
                                 err = _format_error(rel_errs[i].reverse, rel_error_tol)
@@ -2916,13 +2919,13 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         else:
                             if rel_errs[i].forward is not None:
                                 err = _format_error(rel_errs[i].forward, rel_error_tol)
-                                out_buffer.write(f'    Relative Error (Jfor - Jfd) / {divname}{stepstrs[i]} : '
-                                                 f'{err}\n')
+                                out_buffer.write(f'    Relative Error (Jfor - Jfd) / {divname}'
+                                                 f'{stepstrs[i]} : {err}\n')
 
                             if rel_errs[i].reverse is not None:
                                 err = _format_error(rel_errs[i].reverse, rel_error_tol)
-                                out_buffer.write(f'    Relative Error (Jrev - Jfd) / {divname}{stepstrs[i]} : '
-                                                 f'{err}\n')
+                                out_buffer.write(f'    Relative Error (Jrev - Jfd) / {divname}'
+                                                 f'{stepstrs[i]} : {err}\n')
 
                 if out_stream:
                     if directional:

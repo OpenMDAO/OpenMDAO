@@ -196,14 +196,14 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         y_wrt_x1_line = lines.index("  comp: 'y' wrt 'x1'")
 
-        self.assertTrue(lines[y_wrt_x1_line+3].endswith('*'),
+        self.assertTrue(lines[y_wrt_x1_line+4].endswith('*'),
                         msg='Error flag expected in output but not displayed')
-        self.assertTrue(lines[y_wrt_x1_line+5].endswith('*'),
+        self.assertTrue(lines[y_wrt_x1_line+6].endswith('*'),
                         msg='Error flag expected in output but not displayed')
         y_wrt_x2_line = lines.index("  comp: 'y' wrt 'x2'")
-        self.assertTrue(lines[y_wrt_x2_line+3].endswith('*'),
+        self.assertTrue(lines[y_wrt_x2_line+4].endswith('*'),
                         msg='Error flag not expected in output but displayed')
-        self.assertTrue(lines[y_wrt_x2_line+5].endswith('*'),
+        self.assertTrue(lines[y_wrt_x2_line+6].endswith('*'),
                         msg='Error flag not expected in output but displayed')
 
     def test_component_has_no_outputs(self):
@@ -1004,7 +1004,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         lines = stream.getvalue().splitlines()
         self.assertTrue('cs' in lines[6],
                         msg='Did you change the format for printing check derivs?')
-        self.assertTrue('fd' in lines[20],
+        self.assertTrue('fd' in lines[21],
                         msg='Did you change the format for printing check derivs?')
 
     def test_set_check_partial_options_invalid(self):
@@ -1839,7 +1839,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         data = prob.check_partials(out_stream=stream)
         lines = stream.getvalue().splitlines()
 
-        self.assertTrue("Relative Error (Jfor - Jfd) / Jfor : 1." in lines[9])
+        self.assertTrue("Relative Error (Jfor - Jfd) / Jfor : 1." in lines[10])
 
     def test_directional_bug_implicit(self):
         # Test for bug in directional derivative direction for implicit var and matrix-free.
