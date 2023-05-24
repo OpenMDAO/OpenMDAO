@@ -2671,13 +2671,15 @@ class TestCheckPartialsDistrib(unittest.TestCase):
 
 
 class TestCheckPartialsMultipleSteps(unittest.TestCase):
-    def setup_model(self):
+    def setup_model(self, directional=False):
         class CompGoodPartials(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x1', 3.0)
                 self.add_input('x2', 5.0)
                 self.add_output('y', 5.5)
                 self.declare_partials(of='*', wrt='*')
+                if directional:
+                    self.set_check_partial_options(wrt='*', directional=True)
 
             def compute(self, inputs, outputs):
                 outputs['y'] = 3.0 * inputs['x1'] + 4.0 * inputs['x2']
@@ -2694,6 +2696,8 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
                 self.add_input('y2', 5.0)
                 self.add_output('z', 5.5)
                 self.declare_partials(of='*', wrt='*')
+                if directional:
+                    self.set_check_partial_options(wrt='*', directional=True)
 
             def compute(self, inputs, outputs):
                 outputs['z'] = 3.0 * inputs['y1'] + 4.0 * inputs['y2']
@@ -2714,7 +2718,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         prob.run_model()
 
         return prob
-    
+
     def get_tables(self, content):
         tables = []
         lines = content.splitlines()
@@ -2733,7 +2737,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
                 tables.append(tlines)
                 tlines = []
         return tables
-                
+
     def test_single_fd_step_fwd(self):
         p = self.setup_model()
         stream = StringIO()
@@ -2844,6 +2848,25 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         self.assertEqual(tables[1][0].count('+'), 9)
         self.assertEqual(tables[2][0].count('+'), 8)
 
+    def test_multi_fd_steps_compact_directional(self):
+        p = self.setup_model(directional=True)
+        stream = StringIO()
+        J = p.check_partials(step=[1e-6, 1e-7], compact_print=True, out_stream=stream)
+        contents = stream.getvalue()
+        self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
+        self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count("Sub Jacobian with Largest Relative Error: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count(">ABS_TOL >REL_TOL"), 4)
+        self.assertEqual(contents.count("step"), 3)
+        tables = self.get_tables(contents)
+        self.assertEqual(len(tables), 3)
+        self.assertEqual(len(tables[0]), 11)
+        self.assertEqual(len(tables[1]), 11)
+        self.assertEqual(len(tables[2]), 5)
+        # check cols
+        self.assertEqual(tables[0][0].count('+'), 9)
+        self.assertEqual(tables[1][0].count('+'), 9)
+        self.assertEqual(tables[2][0].count('+'), 8)
 
 
 if __name__ == "__main__":

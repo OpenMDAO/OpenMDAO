@@ -1844,6 +1844,19 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         self.assertEqual(contents.count("Relative Error (Jfor - Jfd) / Jf"), nsubjacs * 2)
         self.assertEqual(contents.count("Raw FD Derivative (Jfd), step="), nsubjacs * 2)
 
+    def test_multi_fd_steps_fwd_directional(self):
+        p = om.Problem(model=CircleOpt(), driver=om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False))
+        p.setup(mode='fwd')
+        p.run_model()
+        stream = StringIO()
+        J = p.check_totals(step=[1e-6, 1e-7], directional=True, out_stream=stream)
+        contents = stream.getvalue()
+        self.assertEqual(contents.count("Full Model:"), 3)
+        self.assertEqual(contents.count("Fd Magnitude:"), 6)
+        self.assertEqual(contents.count("Absolute Error (Jfor - Jfd), step="), 6)
+        self.assertEqual(contents.count("Relative Error (Jfor - Jfd) / Jf"), 6)
+        self.assertEqual(contents.count("Directional FD Derivative (Jfd), step="), 6)
+
     def test_multi_fd_steps_rev(self):
         p = om.Problem(model=CircleOpt(), driver=om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False))
         p.setup(mode='rev')
@@ -1857,6 +1870,19 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         self.assertEqual(contents.count("Absolute Error (Jrev - Jfd), step="), nsubjacs * 2)
         self.assertEqual(contents.count("Relative Error (Jrev - Jfd) / J"), nsubjacs * 2)
         self.assertEqual(contents.count("Raw FD Derivative (Jfd), step="), nsubjacs * 2)
+
+    def test_multi_fd_steps_rev_directional(self):
+        p = om.Problem(model=CircleOpt(), driver=om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False))
+        p.setup(mode='rev')
+        p.run_model()
+        stream = StringIO()
+        J = p.check_totals(step=[1e-6, 1e-7], directional=True, out_stream=stream)
+        contents = stream.getvalue()
+        self.assertEqual(contents.count("Full Model:"), 6)
+        self.assertEqual(contents.count("Fd Magnitude:"), 12)
+        self.assertEqual(contents.count("Absolute Error ([rev, fd] Dot Product Test), step="), 12)
+        self.assertEqual(contents.count("Relative Error ([rev, fd] Dot Product Test) / Jfd, step="), 12)
+        self.assertEqual(contents.count("Directional FD Derivative (Jfd) Dot Product, step="), 12)
 
     def test_multi_fd_steps_compact(self):
         for mode in ('fwd', 'rev'):
@@ -1885,7 +1911,26 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 self.assertEqual(contents.count("step"), 1)
                 # check number of rows/cols
                 self.assertEqual(contents.count("+-------------------------------+------------------+-------------+-------------+-------------+-------------+-------------+------------+"), (nsubjacs*2) + 1)
+
+    def test_multi_fd_steps_compact_directional(self):
+        expected_divs = {
+            'fwd': ('+----------------------------------------------------------------------------------------+------------------+-------------+-------------+-------------+-------------+-------------+------------+', 7),
+            'rev': ('+-------------------------------+-----------------------------------------+-------------+-------------+-------------+-------------+-------------+------------+', 13), 
+        }
+        for mode in ('fwd', 'rev'):
+            with self.subTest(f"{mode} derivatives"):
+                p = om.Problem(model=CircleOpt(), driver=om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False))
+                p.setup(mode=mode)
+                p.run_model()
+                stream = StringIO()
+                J = p.check_totals(step=[1e-6, 1e-7], compact_print=True, directional=True, out_stream=stream)
+                contents = stream.getvalue()
+                self.assertEqual(contents.count("step"), 1)
+                # check number of rows/cols
+                s, times = expected_divs[mode]
+                self.assertEqual(contents.count(s), times)
             
+
 
 if __name__ == "__main__":
     unittest.main()

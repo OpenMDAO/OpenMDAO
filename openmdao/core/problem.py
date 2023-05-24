@@ -1723,6 +1723,7 @@ class Problem(object):
         old_schemes = model._approx_schemes
 
         Jfds = []
+        # prevent form from showing as None in check_totals output
         if form is None and method == 'fd':
             form = FiniteDifference.DEFAULT_OPTIONS['form']
 
@@ -1730,7 +1731,6 @@ class Problem(object):
             # Approximate FD
             fd_args = {
                 'step': step,
-                # prevent form from showing as None in check_totals output
                 'form': form,
                 'step_calc': step_calc,
                 'method': method,
@@ -2453,7 +2453,7 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
         if forward:
             fwd_error = safe_norm(Jforward - fd)
 
-        if matrix_free and directional:
+        if directional:
             if reverse:
                 rev_error = safe_norm(derivative_info['directional_fd_rev'][i])
                 if not totals:
@@ -2852,7 +2852,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 if out_stream:
                     # Magnitudes
                     out_buffer.write(f"  {sys_name}: {of} wrt {wrt}")
-                    if lcons and of.strip("'") in lcons:
+                    if not isinstance(of, tuple) and lcons and of.strip("'") in lcons:
                         out_buffer.write(" (Linear constraint)")
 
                     out_buffer.write('\n')
@@ -2977,10 +2977,10 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     if directional:
                         if totals and magnitudes[i].reverse is not None:
                             out_buffer.write(f'    Directional {fdtype} Derivative (Jfd) '
-                                             f'Dot Product{stepstrs[i]}\n    {fd}\n')
+                                             f'Dot Product{stepstrs[i]}\n    {fd}\n\n')
                         else:
                             out_buffer.write(f"    Directional {fdtype} Derivative (Jfd)"
-                                             f"{stepstrs[i]}\n    {fd}\n")
+                                             f"{stepstrs[i]}\n    {fd}\n\n")
                     else:
                         out_buffer.write(f"    Raw {fdtype} Derivative (Jfd){stepstrs[i]}"
                                          f"\n    {fd}\n\n")
