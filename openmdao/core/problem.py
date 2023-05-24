@@ -1440,7 +1440,7 @@ class Problem(object):
 
             of, wrt = comp._get_partials_varlists()
 
-            actual_steps = []
+            actual_steps = defaultdict(list)
 
             for i, step in enumerate(steps):
                 approximations = {'fd': FiniteDifference(),
@@ -1458,7 +1458,8 @@ class Problem(object):
                     fd_options, could_not_cs = _get_fd_options(local_wrt, requested_method,
                                                                local_opts, step, form, step_calc,
                                                                alloc_complex, minimum_step)
-                    actual_steps.append(fd_options['step'])
+
+                    actual_steps[rel_key].append(fd_options['step'])
 
                     if could_not_cs:
                         comps_could_not_cs.add(c_name)
@@ -1492,17 +1493,17 @@ class Problem(object):
                 for abs_key, partial in approx_jac.items():
                     rel_key = abs_key2rel_key(comp, abs_key)
                     deriv = partials_data[c_name][rel_key]
-                    of, wrt = rel_key
+                    _of, _wrt = rel_key
 
                     if 'J_fd' not in deriv:
                         deriv['J_fd'] = []
                         deriv['steps'] = []
                     deriv['J_fd'].append(partial)
-                    deriv['steps'].append(actual_steps[i])
+                    deriv['steps'] = actual_steps[rel_key]
 
                     # If this is a directional derivative, convert the analytic to a directional
                     # one.
-                    if wrt in local_opts and local_opts[wrt]['directional']:
+                    if _wrt in local_opts and local_opts[_wrt]['directional']:
                         if i == 0:  # only do this on the first iteration
                             deriv[f'J_fwd'] = np.atleast_2d(np.sum(deriv['J_fwd'], axis=1)).T
 
@@ -1511,8 +1512,8 @@ class Problem(object):
                                 deriv['J_rev'] = np.atleast_2d(np.sum(deriv['J_rev'], axis=0)).T
 
                             # Dot product test for adjoint validity.
-                            m = mfree_directions[c_name][of].flatten()
-                            d = mfree_directions[c_name][wrt].flatten()
+                            m = mfree_directions[c_name][_of].flatten()
+                            d = mfree_directions[c_name][_wrt].flatten()
                             mhat = partial.flatten()
                             dhat = deriv['J_rev'].flatten()
 
@@ -1722,11 +1723,14 @@ class Problem(object):
         old_schemes = model._approx_schemes
 
         Jfds = []
+        if form is None and method == 'fd':
+            form = FiniteDifference.DEFAULT_OPTIONS['form']
 
         for step in steps:
             # Approximate FD
             fd_args = {
                 'step': step,
+                # prevent form from showing as None in check_totals output
                 'form': form,
                 'step_calc': step_calc,
                 'method': method,
@@ -2845,44 +2849,45 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 else:
                     divname = 'Jfd'
 
-                # Magnitudes
-                out_buffer.write(f"  {sys_name}: {of} wrt {wrt}")
-                if lcons and of.strip("'") in lcons:
-                    out_buffer.write(" (Linear constraint)")
+                if out_stream:
+                    # Magnitudes
+                    out_buffer.write(f"  {sys_name}: {of} wrt {wrt}")
+                    if lcons and of.strip("'") in lcons:
+                        out_buffer.write(" (Linear constraint)")
 
-                out_buffer.write('\n')
-                if magnitudes[0].forward is not None:
-                    out_buffer.write(f'     Forward Magnitude: {magnitudes[0].forward:.6e}\n')
+                    out_buffer.write('\n')
+                    if magnitudes[0].forward is not None:
+                        out_buffer.write(f'     Forward Magnitude: {magnitudes[0].forward:.6e}\n')
 
-                if magnitudes[0].reverse is not None:
-                    out_buffer.write(f'     Reverse Magnitude: {magnitudes[0].reverse:.6e}\n')
+                    if magnitudes[0].reverse is not None:
+                        out_buffer.write(f'     Reverse Magnitude: {magnitudes[0].reverse:.6e}\n')
 
-                fd_desc = f"{fd_opts['method']}:{fd_opts['form']}"
-                out_buffer.write(f'          Fd Magnitude: {magnitudes[0].fd:.6e} '
-                                 f'({fd_desc}{stepstrs[0]})\n')
+                    fd_desc = f"{fd_opts['method']}:{fd_opts['form']}"
+                    for i in range(len(magnitudes)):
+                        out_buffer.write(f'          Fd Magnitude: '
+                                         f'{magnitudes[i].fd:.6e} ({fd_desc}{stepstrs[i]})\n')
+                    out_buffer.write('\n')
 
-                for i in range(len(magnitudes)):
+                    for i in range(len(magnitudes)):
                     # Absolute Errors
-                    if out_stream:
                         if directional:
                             if totals and abs_errs[i].forward is not None:
                                 err = _format_error(abs_errs[i].forward, abs_error_tol)
-                                out_buffer.write(f'    Absolute Error (Jfor - Jfd) : {err}\n')
+                                out_buffer.write(f'    Absolute Error (Jfor - Jfd){stepstrs[i]} : {err}\n')
 
                             if abs_errs[i].reverse is not None:
                                 err = _format_error(abs_errs[i].reverse, abs_error_tol)
-                                out_buffer.write('    Absolute Error ([rev, fd] Dot Product Test) :'
+                                out_buffer.write(f'    Absolute Error ([rev, fd] Dot Product Test){stepstrs[i]} :'
                                                  f' {err}\n')
                         else:
                             if abs_errs[i].forward is not None:
                                 err = _format_error(abs_errs[i].forward, abs_error_tol)
-                                out_buffer.write(f'    Absolute Error (Jfor - Jfd) : {err}\n')
+                                out_buffer.write(f'    Absolute Error (Jfor - Jfd){stepstrs[i]} : {err}\n')
 
                             if abs_errs[i].reverse is not None:
                                 err = _format_error(abs_errs[i].reverse, abs_error_tol)
-                                out_buffer.write(f'    Absolute Error (Jrev - Jfd) : {err}\n')
+                                out_buffer.write(f'    Absolute Error (Jrev - Jfd){stepstrs[i]} : {err}\n')
 
-                if out_stream:
                     if directional:
                         if abs_errs[0].forward_reverse is not None:
                             err = _format_error(abs_errs[0].forward_reverse, abs_error_tol)
@@ -2901,22 +2906,22 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         if directional:
                             if totals and rel_errs[i].forward is not None:
                                 err = _format_error(rel_errs[i].forward, rel_error_tol)
-                                out_buffer.write(f'    Relative Error (Jfor - Jfd) / {divname} : '
+                                out_buffer.write(f'    Relative Error (Jfor - Jfd) / {divname}{stepstrs[i]} : '
                                                  f'{err}\n')
 
                             if rel_errs[i].reverse is not None:
                                 err = _format_error(rel_errs[i].reverse, rel_error_tol)
                                 out_buffer.write(f'    Relative Error ([rev, fd] Dot Product Test) '
-                                                 f'/ {divname} : {err}\n')
+                                                 f'/ {divname}{stepstrs[i]} : {err}\n')
                         else:
                             if rel_errs[i].forward is not None:
                                 err = _format_error(rel_errs[i].forward, rel_error_tol)
-                                out_buffer.write(f'    Relative Error (Jfor - Jfd) / {divname} : '
+                                out_buffer.write(f'    Relative Error (Jfor - Jfd) / {divname}{stepstrs[i]} : '
                                                  f'{err}\n')
 
                             if rel_errs[i].reverse is not None:
                                 err = _format_error(rel_errs[i].reverse, rel_error_tol)
-                                out_buffer.write(f'    Relative Error (Jrev - Jfd) / {divname} : '
+                                out_buffer.write(f'    Relative Error (Jrev - Jfd) / {divname}{stepstrs[i]} : '
                                                  f'{err}\n')
 
                 if out_stream:
@@ -2975,9 +2980,9 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                              f"{stepstrs[i]}\n    {fd}\n")
                     else:
                         out_buffer.write(f"    Raw {fdtype} Derivative (Jfd){stepstrs[i]}"
-                                         f"\n    {fd}\n")
+                                         f"\n    {fd}\n\n")
 
-                    out_buffer.write(' -' * 30 + '\n')
+                out_buffer.write(' -' * 30 + '\n')
 
             # End of if compact print if/else
         # End of for of, wrt in sorted_keys
@@ -3103,14 +3108,16 @@ def _get_fd_options(var, global_method, local_opts, global_step, global_form, gl
                   'method': method}
 
     if method == 'cs':
-        defaults = ComplexStep.DEFAULT_OPTIONS
+        fd_options = ComplexStep.DEFAULT_OPTIONS.copy()
+        fd_options['method'] = 'cs'
 
         fd_options['form'] = None
         fd_options['step_calc'] = None
         fd_options['minimum_step'] = None
 
     elif method == 'fd':
-        defaults = FiniteDifference.DEFAULT_OPTIONS
+        fd_options = FiniteDifference.DEFAULT_OPTIONS.copy()
+        fd_options['method'] = 'fd'
 
         fd_options['form'] = global_form
         fd_options['step_calc'] = global_step_calc
@@ -3118,10 +3125,8 @@ def _get_fd_options(var, global_method, local_opts, global_step, global_form, gl
 
     if global_step and global_method == method:
         fd_options['step'] = global_step
-    else:
-        fd_options['step'] = defaults['step']
 
-    fd_options['directional'] = defaults['directional']
+    fd_options['directional'] = False
 
     # Precedence: component options > global options > defaults
     if local_wrt in local_opts:
