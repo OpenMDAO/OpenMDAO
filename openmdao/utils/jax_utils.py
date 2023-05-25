@@ -43,12 +43,12 @@ def register_jax_component(comp_class):
     Parameters
     ----------
     comp_class : class
-        The decorated component class.
+        The decorated class.
 
     Returns
     -------
     object
-        The component class given.
+        The same class given as an argument.
 
     Raises
     ------

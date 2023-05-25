@@ -18,7 +18,7 @@ def act_tanh(x, mu=1.0E-2, z=0., a=-1., b=1.):
     Compute a differentiable activation function based on the hyperbolic tangent.
 
     act_tanh can be used to approximate a step function from `a` to `b`, occurring at x=z.
-    Smaller values of parameter `mu` more accurately represent a step functionbut the
+    Smaller values of parameter `mu` more accurately represent a step function but the
     "sharpness" of the corners in the response may be more difficult for gradient-based
     approaches to resolve.
 
