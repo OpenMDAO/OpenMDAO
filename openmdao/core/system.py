@@ -1988,6 +1988,7 @@ class System(object):
         self._responses = {}
         self._design_vars.update(self._static_design_vars)
         self._responses.update(self._static_responses)
+        self._load_model_options()
 
     def _setup_var_data(self):
         """
@@ -4524,6 +4525,17 @@ class System(object):
             List of all states.
         """
         return []
+
+    def _load_model_options(self):
+        """
+        Load the relevant model options from `Problem._metadata['model_options'].
+        """
+        model_options = self._problem_meta['model_options']
+        for path_filter, path_options in model_options.items():
+            if fnmatchcase(self.pathname, path_filter):
+                for option, val in path_options.items():
+                    if option in self.options:
+                        self.options[option] = val
 
     def add_recorder(self, recorder, recurse=False):
         """

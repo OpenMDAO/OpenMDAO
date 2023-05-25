@@ -171,6 +171,12 @@ class Problem(object):
         publishing work that uses this class.
     options : <OptionsDictionary>
         Dictionary with general options for the problem.
+    model_options : dict
+        A  dictionary of options to be passed to subsystems in the problem's model.
+        This dictionary is keyed by a path pattern string, and the associated value for each path
+        pattern is a dictionary of {option_name: option_val}. Those subsystems within the
+        hierarchy which match the path pattern and that have an option of the given name, will
+        have the value of that option overridden by value given in the dictionary.
     recording_options : <OptionsDictionary>
         Dictionary with problem recording options.
     _rec_mgr : <RecordingManager>
@@ -277,6 +283,9 @@ class Problem(object):
                              default=os.path.join(os.getcwd(), 'coloring_files'),
                              desc='Directory containing coloring files (if any) for this Problem.')
         self.options.update(options)
+
+        # Options passed to models
+        self.model_options = {}
 
         # Case recording options
         self.recording_options = OptionsDictionary(parent_name=type(self).__name__)
@@ -935,6 +944,7 @@ class Problem(object):
             'reports_dir': self.get_reports_dir(),  # directory where reports will be written
             'saved_errors': [],  # store setup errors here until after final_setup
             'checking': False,  # True if check_totals or check_partials is running
+            'model_options': self.model_options  # A dict of options passed to all systems in tree
         }
         model._setup(model_comm, mode, self._metadata)
 
