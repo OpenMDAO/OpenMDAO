@@ -923,7 +923,7 @@ def common_subpath(pathnames):
 
     Parameters
     ----------
-    pathnames : iter of str
+    pathnames : list or tuple of str
         Dotted pathnames of systems.
 
     Returns
@@ -937,8 +937,7 @@ def common_subpath(pathnames):
     if pathnames:
         npaths = len(pathnames)
         splits = [p.split('.') for p in pathnames]
-        minlen = np.min([len(s) for s in splits])
-        for common_loc in range(minlen):
+        for common_loc in range(np.min([len(s) for s in splits])):
             p0 = splits[0][common_loc]
             for i in range(1, npaths):
                 if p0 != splits[i][common_loc]:
@@ -1002,7 +1001,7 @@ def _src_or_alias_name(meta):
 
 def _src_or_alias_item_iter(proms):
     """
-    Yield items from proms with promoted input names converted to source or alias names.
+    Yield items from proms dict with promoted input names converted to source or alias names.
 
     Parameters
     ----------

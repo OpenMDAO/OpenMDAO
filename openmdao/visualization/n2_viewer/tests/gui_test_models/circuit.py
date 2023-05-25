@@ -9,9 +9,9 @@ class Resistor(om.ExplicitComponent):
         self.options.declare('R', default=1., desc='Resistance in Ohms')
 
     def setup(self):
-        self.add_input('V_in', units='V')
-        self.add_input('V_out', units='V')
-        self.add_output('I', units='A')
+        self.add_input('V_in', units='V', desc='Voltage in')
+        self.add_input('V_out', units='V', desc='Voltage out')
+        self.add_output('I', units='A', desc='Current')
 
     def setup_partials(self):
         # partial derivs are constant, so we can assign their values in setup
@@ -31,9 +31,9 @@ class Diode(om.ExplicitComponent):
         self.options.declare('Vt', default=.025875, desc='Thermal voltage in Volts')
 
     def setup(self):
-        self.add_input('V_in', units='V')
-        self.add_input('V_out', units='V')
-        self.add_output('I', units='A')
+        self.add_input('V_in', units='V', desc='Voltage in')
+        self.add_input('V_out', units='V', desc='Voltage out')
+        self.add_output('I', units='A', desc='Current')
 
     def setup_partials(self):
         # non-linear component, so we'll declare the partials here but compute them in compute_partials
@@ -63,16 +63,16 @@ class Node(om.ImplicitComponent):
         self.options.declare('n_out', default=1, types=int, desc='number of current connections + assumed out')
 
     def setup(self):
-        self.add_output('V', val=5., units='V')
+        self.add_output('V', val=5., units='V', desc='Voltage')
 
         for i in range(self.options['n_in']):
             i_name = 'I_in:{}'.format(i)
-            self.add_input(i_name, units='A')
+            self.add_input(i_name, units='A', desc='Incoming current')
             self.declare_partials('V', i_name, val=1)
 
         for i in range(self.options['n_out']):
             i_name = 'I_out:{}'.format(i)
-            self.add_input(i_name, units='A')
+            self.add_input(i_name, units='A', desc='Outgoing current')
             self.declare_partials('V', i_name, val=-1)
 
             # note: we don't declare any partials wrt `V` here,

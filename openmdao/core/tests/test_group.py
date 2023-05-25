@@ -405,6 +405,33 @@ class TestGroup(unittest.TestCase):
                          "'d1' <class SellarDis2>: 'promotes_outputs' failed to find any matches for "
                          "the following names or patterns: ['foo'].")
 
+    def test_group_promotes_modified_systems(self):
+        # before the fix, this test raised an exception saying multiple outputs were promoted
+        # to the same name.
+        class MyComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_output('x', val=0)
+
+        class SubSubGroup(om.Group):
+            def setup(self):
+                self.add_subsystem("comp", MyComp(), promotes_outputs=["*"])
+
+        class SubGroup(om.Group):
+            def setup(self):
+                self.add_subsystem("sub", SubSubGroup(), promotes_outputs=["*"])
+
+        class ConfigGroup(om.Group):
+            def setup(self):
+                self.add_subsystem("G1", SubGroup(), promotes_outputs=["*"])
+                self.add_subsystem('G2', SubGroup(), promotes_outputs=['*'])
+
+            def configure(self):
+                self.G1.sub.promotes('comp', outputs=[('x', 'OVERRIDE:x')])
+
+        prob = om.Problem()
+        prob.model.add_subsystem('static_analysis', ConfigGroup(), promotes_outputs=['*'])
+        prob.setup()
+
     def test_group_nested_conn(self):
         """Example of adding subsystems and issuing connections with nested groups."""
         g1 = om.Group()

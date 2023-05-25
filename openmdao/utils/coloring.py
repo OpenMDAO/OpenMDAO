@@ -1715,7 +1715,7 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
     return coo_matrix((np.ones(nzrows.size, dtype=bool), (nzrows, nzcols)), shape=shape), info
 
 
-def _get_desvar_info(driver, names=None, use_abs_names=True):
+def _get_desvar_info(driver, names=None):
     if names is None:
         vnames = []
         sizes = []
@@ -1724,31 +1724,27 @@ def _get_desvar_info(driver, names=None, use_abs_names=True):
             sizes.append(meta['size'])
         return vnames, sizes
 
+    namesdict = {n: None for n in names}
+
     model = driver._problem().model
     abs2meta_out = model._var_allprocs_abs2meta['output']
 
-    if use_abs_names:
-        vnames = names
-    else:
-        prom2abs = model._var_allprocs_prom2abs_list['output']
-        vnames = [prom2abs[n][0] for n in names]
+    for dv, meta in driver._designvars.items():
+        if dv in namesdict:
+            namesdict[dv] = meta['size']
+        elif meta['name'] in namesdict:
+            namesdict[meta['name']] = meta['size']
+        elif meta['source'] in namesdict:
+            namesdict[meta['source']] = meta['size']
 
-    desvars = _src_or_alias_dict(driver._designvars)
+    for n, size in namesdict.items():
+        if size is None:
+            namesdict[n] = abs2meta_out[model.get_source(n)]['global_size']
 
-    # if a variable happens to be a design var, use that size
-    sizes = []
-    for n in vnames:
-        if n in desvars:
-            sizes.append(desvars[n]['size'])
-        elif n in abs2meta_out:
-            sizes.append(abs2meta_out[n]['global_size'])
-        else:  # it's an input name w/o corresponding design var
-            sizes.append(abs2meta_out[model.get_source(n)]['global_size'])
-
-    return vnames, sizes
+    return names, list(namesdict.values())
 
 
-def _get_response_info(driver, names=None, use_abs_names=True):
+def _get_response_info(driver, names=None):
     responses = driver._responses
     if names is None:
         vnames = driver._get_ordered_nl_responses()
@@ -1757,21 +1753,23 @@ def _get_response_info(driver, names=None, use_abs_names=True):
     model = driver._problem().model
     abs2meta_out = model._var_allprocs_abs2meta['output']
 
-    if use_abs_names:  # assume given names are absolute
-        vnames = names
-    else:
-        prom2abs = model._var_allprocs_prom2abs_list['output']
-        vnames = [prom2abs[n][0] if n in prom2abs else n for n in names]
+    namesdict = {n: None for n in names}
 
-    # if a variable happens to be a response var, use that size
-    sizes = []
-    for n in vnames:
-        if n in responses:
-            sizes.append(responses[n]['size'])
-        else:
-            sizes.append(abs2meta_out[n]['global_size'])
+    for res, meta in responses.items():
+        if res in namesdict:
+            namesdict[res] = meta['size']
+        elif meta['name'] in namesdict:
+            namesdict[meta['name']] = meta['size']
+        elif meta['source'] in namesdict:
+            namesdict[meta['source']] = meta['size']
 
-    return vnames, sizes
+    prom2abs = model._var_allprocs_prom2abs_list['output']
+
+    for n, size in namesdict.items():
+        if size is None:
+            namesdict[n] = abs2meta_out[prom2abs[n][0]]['global_size']
+
+    return names, list(namesdict.values())
 
 
 def _compute_coloring(J, mode):
@@ -1864,7 +1862,7 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
                            num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
                            tol=_DEF_COMP_SPARSITY_ARGS['tol'],
                            orders=_DEF_COMP_SPARSITY_ARGS['orders'],
-                           setup=False, run_model=False, fname=None, use_abs_names=False):
+                           setup=False, run_model=False, fname=None):
     """
     Compute simultaneous derivative colorings for the total jacobian of the given problem.
 
@@ -1890,8 +1888,6 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
         If True, run run_model before calling compute_totals.
     fname : filename or None
         File where output coloring info will be written. If None, no info will be written.
-    use_abs_names : bool
-        If True, use absolute naming for of and wrt variables unless they are aliases.
 
     Returns
     -------
@@ -1903,8 +1899,8 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
     # if of and wrt are None, which is True in the case of dynamic coloring, ofs will be the
     # 'driver' names of the responses (promoted or alias), and wrts will be the abs names of
     # the wrt sources.  In this case, use_abs_names is not used.
-    ofs, of_sizes = _get_response_info(driver, of, use_abs_names)
-    wrts, wrt_sizes = _get_desvar_info(driver, wrt, use_abs_names)
+    ofs, of_sizes = _get_response_info(driver, of)
+    wrts, wrt_sizes = _get_desvar_info(driver, wrt)
 
     model = problem.model
 
@@ -2000,8 +1996,7 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
     orders = driver._coloring_info.get('orders', _DEF_COMP_SPARSITY_ARGS['orders'])
 
     coloring = compute_total_coloring(problem, num_full_jacs=num_full_jacs, tol=tol, orders=orders,
-                                      setup=False, run_model=run_model, fname=fname,
-                                      use_abs_names=False)
+                                      setup=False, run_model=run_model, fname=fname)
 
     if coloring is not None:
         if driver._coloring_info['show_sparsity']:
@@ -2073,7 +2068,6 @@ def _total_coloring_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    from openmdao.core.problem import Problem
     from openmdao.devtools.debug import profiling
     from openmdao.utils.general_utils import do_nothing_context
 
@@ -2102,8 +2096,7 @@ def _total_coloring_cmd(options, user_args):
                                                   num_full_jacs=options.num_jacs,
                                                   tol=options.tolerance,
                                                   orders=options.orders,
-                                                  setup=False, run_model=True, fname=outfile,
-                                                  use_abs_names=True)
+                                                  setup=False, run_model=True, fname=outfile)
 
             if coloring is not None:
                 if options.show_sparsity_text:
