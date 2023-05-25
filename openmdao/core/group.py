@@ -4450,7 +4450,7 @@ class Group(System):
         graph = self.compute_sys_graph()
 
         dvs = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
-        dvs = [meta['source'] for meta in dvs.values()]
+        dvs = set([meta['source'] for meta in dvs.values()])
         dvsystems = set([name.partition('.')[0] for name in dvs])
 
         responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
@@ -4470,6 +4470,27 @@ class Group(System):
         # connected components in topological order, so we can use it to give us pre, iterated,
         # and post subsets of the systems.
 
+        # we don't want _auto_ivc dependency to force all subsystems to be iterated, so split
+        # the _auto_ivc node into two nodes, one for design vars and one for everything else.
+        if '_auto_ivc' in graph:
+            graph.remove_node('_auto_ivc')
+            graph.add_node('_auto_ivc_dvs')
+            graph.add_node('_auto_ivc_other')
+
+            for tgt, src in self._conn_global_abs_in2out.items():
+                srcsys = src.partition('.')[0]
+                if srcsys == '_auto_ivc':
+                    tgtsys = tgt.partition('.')[0]
+                    if src in dvs:
+                        graph.add_edge('_auto_ivc_dvs', tgtsys)
+                    else:
+                        graph.add_edge('_auto_ivc_other', tgtsys)
+
+        dvsystems.discard('_auto_ivc')
+        if '_auto_ivc_dvs' in graph:
+            if len(list(graph.edges('_auto_ivc_dvs'))):
+                dvsystems.add('_auto_ivc_dvs')
+
         # add edges between response systems and design variable systems
         for respsys in responsesystems:
             for dvsys in dvsystems:
@@ -4486,11 +4507,30 @@ class Group(System):
             else:
                 addto.update(strong_con)
 
+        # change _auto_ivc_dvs and _auto_ivc_other back to _auto_ivc.
+        # Note that this could cause _auto_ivc to be in multiple places, but that's ok.
+        for iterset in (pre, iterated, post):
+            for name in ('_auto_ivc_other', '_auto_ivc_dvs'):
+                if name in iterset:
+                    iterset.remove(name)
+            if iterset:
+                iterset.add('_auto_ivc')
+
+        # remove _auto_ivc from pre and post if it's in iterated
+        if '_auto_ivc' in iterated:
+            pre.discard('_auto_ivc')
+            post.discard('_auto_ivc')
+        elif '_auto_ivc' in pre:
+            post.discard('_auto_ivc')
+
         # check that our groupings of systems are not out-of-order with the existing system ordering
         order = {sname: i for i, sname in enumerate(self._subsystems_allprocs)}
-        pre_order = [order[s] for s in pre]
-        iterated_order = [order[s] for s in iterated]
-        post_order = [order[s] for s in post]
+
+        # remove _auto_ivc from the ordering since it may appear out of order (and that's ok)
+        pre_order = [order[s] for s in pre if s != '_auto_ivc']
+        iterated_order = [order[s] for s in iterated if s != '_auto_ivc']
+        post_order = [order[s] for s in post if s != '_auto_ivc']
+
         miniter = min(iterated_order)
         maxiter = max(iterated_order)
 
