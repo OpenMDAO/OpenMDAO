@@ -216,6 +216,9 @@ class Group(System):
         if not self._linear_solver:
             self._linear_solver = LinearRunOnce()
 
+        self.options.declare('auto_order', types=bool, default=False,
+                             desc='If True the order of subsystems is determined automatically')
+
     def setup(self):
         """
         Build this group.
