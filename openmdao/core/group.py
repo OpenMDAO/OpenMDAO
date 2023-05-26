@@ -181,6 +181,8 @@ class Group(System):
         Dynamic shape dependency graph, or None.
     _shape_knowns : set
         Set of shape dependency graph nodes with known (non-dynamic) shapes.
+    _subsys_graph : nx.DiGraph
+        Graph of subsystem dependencies.
     """
 
     def __init__(self, **kwargs):
@@ -216,8 +218,10 @@ class Group(System):
         if not self._linear_solver:
             self._linear_solver = LinearRunOnce()
 
-        self.options.declare('auto_order', types=bool, default=False,
-                             desc='If True the order of subsystems is determined automatically')
+        self._subsys_graph = None
+
+        # self.options.declare('auto_order', types=bool, default=False,
+        #                      desc='If True the order of subsystems is determined automatically')
 
     def setup(self):
         """
@@ -522,6 +526,7 @@ class Group(System):
         """
         super()._setup_procs(pathname, comm, mode, prob_meta)
         self._setup_procs_finished = False
+        self._subsys_graph = None
 
         nproc = comm.size
 
@@ -568,7 +573,7 @@ class Group(System):
 
             # Call the load balancing algorithm
             try:
-                sub_inds, sub_comm, sub_proc_range = self._mpi_proc_allocator(
+                sub_inds, sub_comm = self._mpi_proc_allocator(
                     proc_info, len(allsubs), comm)
             except ProcAllocationError as err:
                 if err.sub_inds is None:
@@ -606,7 +611,6 @@ class Group(System):
             s.pathname = '.'.join((self.pathname, s.name)) if self.pathname else s.name
 
         # Perform recursion
-        allsubs = self._subsystems_allprocs
         for subsys in self._subsystems_myproc:
             subsys._setup_procs(subsys.pathname, sub_comm, mode, prob_meta)
 
@@ -2381,7 +2385,7 @@ class Group(System):
                 if meta['copy_shape']:
                     # variable whose shape is being copied must be on the same component, and
                     # name stored in 'copy_shape' entry must be the relative name.
-                    abs_from = name.rsplit('.', 1)[0] + '.' + meta['copy_shape']
+                    abs_from = name.rpartition('.')[0] + '.' + meta['copy_shape']
                     if abs_from in all_abs2prom_in or abs_from in all_abs2prom_out:
                         graph.add_edge(name, abs_from)
                         # this is unlikely, but a user *could* do it, so we'll check
@@ -3830,7 +3834,7 @@ class Group(System):
         Compute a dependency graph for subsystems in this group.
 
         Variable connection information is stored in each edge of
-        the system graph.
+        the system graph if comps_only is True.
 
         Parameters
         ----------
@@ -3845,43 +3849,44 @@ class Group(System):
         DiGraph
             A directed graph containing names of subsystems and their connections.
         """
-        input_srcs = self._conn_global_abs_in2out
-        glen = self.pathname.count('.') + 1 if self.pathname else 0
-        graph = nx.DiGraph()
-
-        # add all systems as nodes in the graph so they'll be there even if
-        # unconnected.
+        # add all systems as nodes in the graph so they'll be there even if unconnected.
         if comps_only:
-            systems = [s for s in self._ordered_comp_name_iter()]
-        else:
-            systems = [s.name for s in self._subsystems_myproc]
+            graph = nx.DiGraph()
+            graph.add_nodes_from(self._ordered_comp_name_iter())
 
-        if not comps_only and self.comm.size > 1 and self._mpi_proc_allocator.parallel:
-            systems = set()
-            for slist in self.comm.allgather(systems):
-                systems.update(slist)
+            edge_data = defaultdict(lambda: defaultdict(list))
 
-        graph.add_nodes_from(systems)
-
-        edge_data = defaultdict(lambda: defaultdict(list))
-
-        for in_abs, src_abs in input_srcs.items():
-            if src_abs is not None:
-                if comps_only:
-                    src = src_abs.rpartition('.')[0]
-                    tgt = in_abs.rpartition('.')[0]
-                else:
-                    src = src_abs.split('.')[glen]
-                    tgt = in_abs.split('.')[glen]
+            for in_abs, src_abs in self._conn_global_abs_in2out.items():
+                src_sys = src_abs.rpartition('.')[0]
+                tgt_sys = in_abs.rpartition('.')[0]
 
                 # store var connection data in each system to system edge for later
                 # use in relevance calculation.
-                edge_data[(src, tgt)][src_abs].append(in_abs)
+                edge_data[(src_sys, tgt_sys)][src_abs].append(in_abs)
 
-        for key in edge_data:
-            src_sys, tgt_sys = key
-            if comps_only or src_sys != tgt_sys:
-                graph.add_edge(src_sys, tgt_sys, conns=edge_data[key])
+            for key in edge_data:
+                src_sys, tgt_sys = key
+                if comps_only or src_sys != tgt_sys:
+                    graph.add_edge(src_sys, tgt_sys, conns=edge_data[key])
+        else:
+            if self._subsys_graph is not None:
+                return self._subsys_graph
+
+            systems = [s.name for s in self._subsystems_myproc]
+
+            if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
+                systems = set()
+                for slist in self.comm.allgather(systems):
+                    systems.update(slist)
+
+            graph = nx.DiGraph()
+            graph.add_nodes_from(systems)
+            glen = len(self.pathname) + 1 if self.pathname else 0
+
+            for in_abs, src_abs in self._conn_abs_in2out.items():
+                graph.add_edge(src_abs[glen:].partition('.')[0], in_abs[glen:].partition('.')[0])
+
+            self._subsys_graph = graph
 
         return graph
 
