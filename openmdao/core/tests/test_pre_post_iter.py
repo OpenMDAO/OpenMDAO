@@ -8,7 +8,7 @@ from openmdao.test_suite.components.exec_comp_for_test import ExecComp4Test
 
 class TestPrePostIter(unittest.TestCase):
 
-    def setup_problem(self, do_pre_post_opt, use_ivc=False, coloring=False, size=5):
+    def setup_problem(self, do_pre_post_opt, use_ivc=False, coloring=False, size=3):
         prob = om.Problem()
         prob.options['group_by_pre_opt_post'] = do_pre_post_opt
 
@@ -218,10 +218,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.iter1.num_nl_solves, 5)
-        self.assertEqual(prob.model.iter2.num_nl_solves, 5)
-        self.assertEqual(prob.model.iter3.num_nl_solves, 5)
-        self.assertEqual(prob.model.iter4.num_nl_solves, 5)
+        self.assertEqual(prob.model.iter1.num_nl_solves, 9)
+        self.assertEqual(prob.model.iter2.num_nl_solves, 9)
+        self.assertEqual(prob.model.iter3.num_nl_solves, 9)
+        self.assertEqual(prob.model.iter4.num_nl_solves, 9)
 
         self.assertEqual(prob.model.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.post2.num_nl_solves, 1)
@@ -239,10 +239,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.iter1.num_nl_solves, 5)
-        self.assertEqual(prob.model.iter2.num_nl_solves, 5)
-        self.assertEqual(prob.model.iter3.num_nl_solves, 5)
-        self.assertEqual(prob.model.iter4.num_nl_solves, 5)
+        self.assertEqual(prob.model.iter1.num_nl_solves, 16)
+        self.assertEqual(prob.model.iter2.num_nl_solves, 16)
+        self.assertEqual(prob.model.iter3.num_nl_solves, 16)
+        self.assertEqual(prob.model.iter4.num_nl_solves, 16)
 
         self.assertEqual(prob.model.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.post2.num_nl_solves, 1)
@@ -260,10 +260,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.iter1.num_nl_solves, 5)
-        self.assertEqual(prob.model.iter2.num_nl_solves, 5)
-        self.assertEqual(prob.model.iter3.num_nl_solves, 5)
-        self.assertEqual(prob.model.iter4.num_nl_solves, 5)
+        self.assertEqual(prob.model.iter1.num_nl_solves, 9)
+        self.assertEqual(prob.model.iter2.num_nl_solves, 9)
+        self.assertEqual(prob.model.iter3.num_nl_solves, 9)
+        self.assertEqual(prob.model.iter4.num_nl_solves, 9)
 
         self.assertEqual(prob.model.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.post2.num_nl_solves, 1)
@@ -281,10 +281,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.iter1.num_nl_solves, 5)
-        self.assertEqual(prob.model.iter2.num_nl_solves, 5)
-        self.assertEqual(prob.model.iter3.num_nl_solves, 5)
-        self.assertEqual(prob.model.iter4.num_nl_solves, 5)
+        self.assertEqual(prob.model.iter1.num_nl_solves, 16)
+        self.assertEqual(prob.model.iter2.num_nl_solves, 16)
+        self.assertEqual(prob.model.iter3.num_nl_solves, 16)
+        self.assertEqual(prob.model.iter4.num_nl_solves, 16)
 
         self.assertEqual(prob.model.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.post2.num_nl_solves, 1)
