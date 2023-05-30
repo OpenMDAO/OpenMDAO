@@ -22,7 +22,8 @@ from openmdao.core.constants import _SetupStatus
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver, record_iteration, SaveOptResult
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.core.group import Group, _OptStatus
+from openmdao.core.system import _OptStatus
+from openmdao.core.group import Group
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
@@ -630,6 +631,9 @@ class Problem(object):
         finally:
             self._recording_iter.prefix = old_prefix
 
+    def _set_opt_status(self, status):
+        self._metadata['opt_status'] = status
+
     def run_driver(self, case_prefix=None, reset_iter_counts=True):
         """
         Run the driver on the model.
@@ -677,17 +681,15 @@ class Problem(object):
             self.model._clear_iprint()
 
             if self.options['group_by_pre_opt_post'] and self.driver.supports['optimization']:
-                if self.model._pre_iterated_subsystems:
-                    self.model._set_opt_status(_OptStatus.PRE)
-                    self.model.run_solve_nonlinear()
+                self._set_opt_status(_OptStatus.PRE)
+                self.model.run_solve_nonlinear()
 
                 with SaveOptResult(self.driver):
-                    self.model._set_opt_status(_OptStatus.OPTIMIZING)
+                    self._set_opt_status(_OptStatus.OPTIMIZING)
                     result = self.driver.run()
 
-                if self.model._post_iterated_subsystems:
-                    self.model._set_opt_status(_OptStatus.POST)
-                    self.model.run_solve_nonlinear()
+                self._set_opt_status(_OptStatus.POST)
+                self.model.run_solve_nonlinear()
 
                 return result
             else:
@@ -696,7 +698,7 @@ class Problem(object):
 
         finally:
             self._recording_iter.prefix = old_prefix
-            self.model._set_opt_status(None)
+            self._set_opt_status(None)
 
     def compute_jacvec_product(self, of, wrt, mode, seed):
         """
@@ -960,6 +962,10 @@ class Problem(object):
             'reports_dir': self.get_reports_dir(),  # directory where reports will be written
             'saved_errors': [],  # store setup errors here until after final_setup
             'checking': False,  # True if check_totals or check_partials is running
+            'opt_status': None,  # Tells Systems if they are in an optimization loop
+            'pre_opt_systems': None,  # set of systems to run before optimization loop
+            'opt_systems': None,  # set of systems to run during optimization loop
+            'post_opt_systems': None,  # set of systems to run after optimization loop
         }
         model._setup(model_comm, mode, self._metadata)
 

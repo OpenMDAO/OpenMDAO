@@ -119,6 +119,25 @@ class _MatchType(IntEnum):
     PATTERN = 2
 
 
+class _OptStatus(IntEnum):
+    """
+    Class used to define different states during the optimization process.
+
+    Attributes
+    ----------
+    PRE : int
+        Before the optimization.
+    OPTIMIZING : int
+        During the optimization.
+    POST : int
+        After the optimization.
+    """
+
+    PRE = 0
+    OPTIMIZING = 1
+    POST = 2
+
+
 def collect_errors(method):
     """
     Decorate a method so that it will collect any exceptions for later display.
@@ -384,6 +403,9 @@ class System(object):
     _promotion_tree : dict
         Mapping of system path to promotion info indicating all subsystems where variables
         were promoted.
+    _run_on_opt: _OptStatus
+        Indicates whether this system should run before, during, or after the optimization process
+        (if there is an optimization process at all).
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -529,6 +551,7 @@ class System(object):
 
         self._output_solver_options = {}
         self._promotion_tree = None
+        self._run_on_opt = _OptStatus.OPTIMIZING
 
     @property
     def under_approx(self):

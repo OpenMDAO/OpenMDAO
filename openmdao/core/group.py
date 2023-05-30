@@ -14,7 +14,7 @@ import numpy as np
 import networkx as nx
 
 from openmdao.core.configinfo import _ConfigInfo
-from openmdao.core.system import System, collect_errors
+from openmdao.core.system import System, collect_errors, _OptStatus
 from openmdao.core.component import Component, _DictValues
 from openmdao.core.constants import _UNDEFINED, INT_DTYPE, _SetupStatus
 from openmdao.vectors.vector import _full_slice
@@ -40,25 +40,6 @@ from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOption
 # regex to check for valid names.
 import re
 namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
-
-
-class _OptStatus(IntEnum):
-    """
-    Class used to define different states of the top level Group during the optimization process.
-
-    Attributes
-    ----------
-    PRE : int
-        Before the optimization.
-    OPTIMIZING : int
-        During the optimization.
-    POST : int
-        After the optimization.
-    """
-
-    PRE = 0
-    OPTIMIZING = 1
-    POST = 2
 
 
 # use a class with slots instead of a namedtuple so that we can
@@ -203,13 +184,11 @@ class Group(System):
     _shape_knowns : set
         Set of shape dependency graph nodes with known (non-dynamic) shapes.
     _pre_iterated_subsystems : list or None
-        List of subsystems that will run before the optimization iteration loop (top level only).
+        List of subsystems that will run before the optimization iteration loop.
     _post_iterated_subsystems : list or None
-        List of subsystems that will run after the optimization iteration loop (top level only).
+        List of subsystems that will run after the optimization iteration loop.
     _iterated_subsystems : list or None
-        List of subsystems that will run during the optimization iteration loop (top level only).
-    _opt_status : int or None
-        Optimization status flag (top level only).
+        List of subsystems that will run during the optimization iteration loop.
     """
 
     def __init__(self, **kwargs):
@@ -239,7 +218,6 @@ class Group(System):
         self._pre_iterated_subsystems = None
         self._iterated_subsystems = None
         self._post_iterated_subsystems = None
-        self._opt_status = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -3855,12 +3833,12 @@ class Group(System):
             if name in info:
                 meta[name] = info[name]
 
-    def compute_sys_graph(self, comps_only=False):
+    def compute_sys_graph(self, comps_only=False, add_edge_info=True):
         """
         Compute a dependency graph for subsystems in this group.
 
         Variable connection information is stored in each edge of
-        the system graph.
+        the system graph if comps_only is True and add_edge_info is True.
 
         Parameters
         ----------
@@ -3869,49 +3847,56 @@ class Group(System):
             or any of its descendants. No sub-groups will be included. Otherwise,
             a graph containing only direct children (both Components and Groups)
             of this group will be returned.
+        add_edge_info : bool (True)
+            If True and comps_only is also True, store variable connection information in each
+            edge of the system graph.
 
         Returns
         -------
         DiGraph
             A directed graph containing names of subsystems and their connections.
         """
-        input_srcs = self._conn_global_abs_in2out
-        glen = self.pathname.count('.') + 1 if self.pathname else 0
         graph = nx.DiGraph()
 
-        # add all systems as nodes in the graph so they'll be there even if
-        # unconnected.
         if comps_only:
-            systems = [s for s in self._ordered_comp_name_iter()]
+            # add all systems as nodes in the graph so they'll be there even if
+            # unconnected.
+            graph.add_nodes_from(self._ordered_comp_name_iter())
+
+            edge_data = defaultdict(lambda: defaultdict(list))
+            for in_abs, src_abs in self._conn_global_abs_in2out.items():
+                src_sys = src_abs.rpartition('.')[0]
+                tgt_sys = in_abs.rpartition('.')[0]
+
+                # store var connection data in each system to system edge.
+                if add_edge_info:
+                    edge_data[(src_sys, tgt_sys)][src_abs].append(in_abs)
+                else:
+                    graph.add_edge(src_sys, tgt_sys)
+
+            if add_edge_info:
+                for (src_sys, tgt_sys), data in edge_data.items():
+                    graph.add_edge(src_sys, tgt_sys, conns=data)
         else:
             systems = [s.name for s in self._subsystems_myproc]
 
-        if not comps_only and self.comm.size > 1 and self._mpi_proc_allocator.parallel:
-            systems = set()
-            for slist in self.comm.allgather(systems):
-                systems.update(slist)
+            if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
+                newsys = set()
+                for slist in self.comm.allgather(systems):
+                    newsys.update(slist)
+                systems = newsys
 
-        graph.add_nodes_from(systems)
+            # add all systems as nodes in the graph so they'll be there even if
+            # unconnected.
+            graph.add_nodes_from(systems)
 
-        edge_data = defaultdict(lambda: defaultdict(list))
-
-        for in_abs, src_abs in input_srcs.items():
-            if src_abs is not None:
-                if comps_only:
-                    src = src_abs.rpartition('.')[0]
-                    tgt = in_abs.rpartition('.')[0]
-                else:
-                    src = src_abs.split('.')[glen]
-                    tgt = in_abs.split('.')[glen]
-
-                # store var connection data in each system to system edge for later
-                # use in relevance calculation.
-                edge_data[(src, tgt)][src_abs].append(in_abs)
-
-        for key in edge_data:
-            src_sys, tgt_sys = key
-            if comps_only or src_sys != tgt_sys:
-                graph.add_edge(src_sys, tgt_sys, conns=edge_data[key])
+            glen = self.pathname.count('.') + 1 if self.pathname else 0
+            for in_abs, src_abs in self._conn_global_abs_in2out.items():
+                if src_abs is not None:
+                    src_sys = src_abs.split('.')[glen]
+                    tgt_sys = in_abs.split('.')[glen]
+                    if src_sys != tgt_sys:
+                        graph.add_edge(src_sys, tgt_sys)
 
         return graph
 
@@ -4396,27 +4381,34 @@ class Group(System):
         System
             A subsystem.
         """
-        if self._opt_status is None:
-            # this is not a top level group under an optimizer
+        opt_status = self._problem_meta['opt_status']
+
+        if opt_status is None:
+            # we're not under an optimizer loop, so return all subsystems
             if local_only:
                 yield from self._subsystems_myproc
             else:
                 for s, _ in self._subsystems_allprocs.values():
                     yield s
         else:
-            if self._opt_status == _OptStatus.PRE:
-                it = self._pre_iterated_subsystems
-            elif self._opt_status == _OptStatus.POST:
-                it = self._post_iterated_subsystems
-            else:
-                it = self._iterated_subsystems
+            # if opt_status == _OptStatus.PRE:
+            #     it = self._pre_iterated_subsystems
+            # elif opt_status == _OptStatus.POST:
+            #     it = self._post_iterated_subsystems
+            # else:
+            #     it = self._iterated_subsystems
 
-            if local_only:
-                for s in it:
-                    if s._is_local:
+            # if local_only:
+            #     for s in it:
+            #         if s._is_local:
+            #             yield s
+            # else:
+            #     yield from it
+
+            for s, _ in self._subsystems_allprocs.values():
+                if not local_only or s._is_local:
+                    if s._run_on_opt == opt_status:
                         yield s
-            else:
-                yield from it
 
     def _setup_iteration_lists(self, do_separation):
         """
@@ -4449,17 +4441,17 @@ class Group(System):
 
         dvs = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
         dvs = set([meta['source'] for meta in dvs.values()])
-        dvsystems = set([name.partition('.')[0] for name in dvs])
+        dvsystems = set([name.rpartition('.')[0] for name in dvs])
 
         responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
         responses = [meta['source'] for meta in responses.values()]
-        responsesystems = set([name.partition('.')[0] for name in responses])
+        responsesystems = set([name.rpartition('.')[0] for name in responses])
 
         if not dvs or not responses:
             self._iterated_subsystems = [s for s, _ in self._subsystems_allprocs.values()]
             return
 
-        graph = self.compute_sys_graph()
+        graph = self.compute_sys_graph(comps_only=True, add_edge_info=False)
 
         # _iterated_subsystems is used to iterate over the systems that depend on the
         # design variables that the response variables also depend on.  One way to determine the
@@ -4474,45 +4466,45 @@ class Group(System):
         # the _auto_ivc node into two nodes, one for design vars and one for everything else.
         if '_auto_ivc' in graph:
             graph.remove_node('_auto_ivc')
-            graph.add_node('_auto_ivc_dvs')
+            graph.add_node('_auto_ivc_vois')
             graph.add_node('_auto_ivc_other')
 
             for tgt, src in self._conn_global_abs_in2out.items():
-                srcsys = src.partition('.')[0]
-                if srcsys == '_auto_ivc':
-                    tgtsys = tgt.partition('.')[0]
+                if src.startswith('_auto_ivc.'):
                     if src in dvs:
-                        graph.add_edge('_auto_ivc_dvs', tgtsys)
+                        graph.add_edge('_auto_ivc_vois', tgt.rpartition('.')[0])
                     else:
-                        graph.add_edge('_auto_ivc_other', tgtsys)
+                        graph.add_edge('_auto_ivc_other', tgt.rpartition('.')[0])
 
         dvsystems.discard('_auto_ivc')
-        if '_auto_ivc_dvs' in graph:
-            if len(list(graph.edges('_auto_ivc_dvs'))):
-                dvsystems.add('_auto_ivc_dvs')
+        if '_auto_ivc_vois' in graph:
+            if len(list(graph.edges('_auto_ivc_vois'))):
+                dvsystems.add('_auto_ivc_vois')
 
         # add edges between response systems and design variable systems
         for respsys in responsesystems:
             for dvsys in dvsystems:
                 if respsys != dvsys:
                     graph.add_edge(respsys, dvsys)
-                    graph.add_edge(dvsys, respsys)
+                    # graph.add_edge(dvsys, respsys)
 
         sccs = get_sccs_topo(graph)
         pre = addto = set()
         post = set()
-        iterated = None
+        iterated = set()
         for strong_con in sccs:
             if dvsystems.intersection(strong_con):
-                iterated = strong_con  # strong_con is already a set
+                for s in strong_con:
+                    iterated.update(all_ancestors(s))
                 addto = post
             else:
-                addto.update(strong_con)
+                for s in strong_con:
+                    addto.update(all_ancestors(s))
 
-        # change _auto_ivc_dvs and _auto_ivc_other back to _auto_ivc.
+        # change _auto_ivc_vois and _auto_ivc_other back to _auto_ivc.
         # Note that this could cause _auto_ivc to be in multiple places, but that's ok.
         for iterset in (pre, iterated, post):
-            for name in ('_auto_ivc_other', '_auto_ivc_dvs'):
+            for name in ('_auto_ivc_other', '_auto_ivc_vois'):
                 if name in iterset:
                     iterset.remove(name)
             if iterset:
@@ -4525,56 +4517,64 @@ class Group(System):
         elif '_auto_ivc' in pre:
             post.discard('_auto_ivc')
 
-        # check that our groupings of systems are not out-of-order with the existing system ordering
-        order = {sname: i for i, sname in enumerate(self._subsystems_allprocs)}
+        # # check that our groupings of systems are not out-of-order with the existing system ordering
+        # order = {sname: i for i, sname in enumerate(self._subsystems_allprocs)}
 
-        # remove _auto_ivc from the ordering since it may appear out of order (and that's ok)
-        pre_order = [order[s] for s in pre if s != '_auto_ivc']
-        iterated_order = [order[s] for s in iterated if s != '_auto_ivc']
-        post_order = [order[s] for s in post if s != '_auto_ivc']
+        # # remove _auto_ivc from the ordering since it may appear out of order (and that's ok)
+        # pre_order = [order[s] for s in pre if s != '_auto_ivc']
+        # iterated_order = [order[s] for s in iterated if s != '_auto_ivc']
+        # post_order = [order[s] for s in post if s != '_auto_ivc']
 
-        miniter = min(iterated_order)
-        maxiter = max(iterated_order)
+        # miniter = min(iterated_order)
+        # maxiter = max(iterated_order)
 
-        if pre_order and iterated_order and max(pre_order) > miniter:
-            # determine which ones are out of order
-            bad = [s for s in pre if order[s] > miniter]
-            for idx, s in zip(iterated_order, iterated):
-                if idx == miniter:
-                    first = s
-                    break
-            issue_warning(f"The pre-iterated systems {sorted(bad)} are out of order with "
-                          f"respect to the iterated systems (first iterated system is '{first}'). "
-                          "To avoid changing the pre-existing ordering, all systems will be "
-                          "included in the iterated set. This could impact performance.")
-            self._iterated_subsystems = [s for s, _ in self._subsystems_allprocs.values()]
-            return
+        # if pre_order and iterated_order and max(pre_order) > miniter:
+        #     # determine which ones are out of order
+        #     bad = [s for s in pre if order[s] > miniter]
+        #     for idx, s in zip(iterated_order, iterated):
+        #         if idx == miniter:
+        #             first = s
+        #             break
+        #     issue_warning(f"The pre-iterated systems {sorted(bad)} are out of order with "
+        #                   f"respect to the iterated systems (first iterated system is '{first}'). "
+        #                   "To avoid changing the pre-existing ordering, all systems will be "
+        #                   "included in the iterated set. This could impact performance.")
+        #     self._iterated_subsystems = [s for s, _ in self._subsystems_allprocs.values()]
+        #     return
 
-        if post_order and iterated_order and min(post_order) < maxiter:
-            # determine which ones are out of order
-            bad = [s for s in post if order[s] < maxiter]
-            for idx, s in zip(iterated_order, iterated):
-                if idx == maxiter:
-                    last = s
-                    break
-            issue_warning(f"The post-iterated systems {sorted(bad)} are out of order "
-                          "with respect to the iterated systems (last iterated system is "
-                          f"'{last}'). To avoid changing the pre-existing ordering, all systems "
-                          "will be included in the iterated set. This could impact performance.")
-            self._iterated_subsystems = [s for s, _ in self._subsystems_allprocs.values()]
-            return
+        # if post_order and iterated_order and min(post_order) < maxiter:
+        #     # determine which ones are out of order
+        #     bad = [s for s in post if order[s] < maxiter]
+        #     for idx, s in zip(iterated_order, iterated):
+        #         if idx == maxiter:
+        #             last = s
+        #             break
+        #     issue_warning(f"The post-iterated systems {sorted(bad)} are out of order "
+        #                   "with respect to the iterated systems (last iterated system is "
+        #                   f"'{last}'). To avoid changing the pre-existing ordering, all systems "
+        #                   "will be included in the iterated set. This could impact performance.")
+        #     self._iterated_subsystems = [s for s, _ in self._subsystems_allprocs.values()]
+        #     return
 
-        # populate iteration lists in same order as user specified
-        self._pre_iterated_subsystems = [s for s in self._subsystems_myproc if s.name in pre]
+        # # populate iteration lists in same order as user specified
+        # self._pre_iterated_subsystems = [s for s in self._subsystems_myproc if s.name in pre]
 
-        # if all 'pre' systems are IndepVarComps, don't bother to separate them from the main
-        # iteration because it just introduces unnecessary overhead.
-        ivcs = [s for s in self._pre_iterated_subsystems if isinstance(s, IndepVarComp)]
-        if len(ivcs) == len(self._pre_iterated_subsystems):
-            self._pre_iterated_subsystems = []
-            iterated.update(pre)
-        self._iterated_subsystems = [s for s in self._subsystems_myproc if s.name in iterated]
-        self._post_iterated_subsystems = [s for s in self._subsystems_myproc if s.name in post]
+        # # if all 'pre' systems are IndepVarComps, don't bother to separate them from the main
+        # # iteration because it just introduces unnecessary overhead.
+        # ivcs = [s for s in self._pre_iterated_subsystems if isinstance(s, IndepVarComp)]
+        # if len(ivcs) == len(self._pre_iterated_subsystems):
+        #     self._pre_iterated_subsystems = []
+        #     iterated.update(pre)
+        # self._iterated_subsystems = [s for s in self._subsystems_myproc if s.name in iterated]
+        # self._post_iterated_subsystems = [s for s in self._subsystems_myproc if s.name in post]
 
-    def _set_opt_status(self, status):
-        self._opt_status = status
+        for s in self.system_iter(recurse=True):
+            if s.pathname in iterated:
+                s._run_on_opt = _OptStatus.OPTIMIZING
+            elif s.pathname in pre:
+                s._run_on_opt = _OptStatus.PRE
+            elif s.pathname in post:
+                s._run_on_opt = _OptStatus.POST
+            else:
+                raise RuntimeError(f"{self.msginfo}: Can't find system '{s.pathname}' in "
+                                   "pre, iterated, or post lists. This should never happen.")
