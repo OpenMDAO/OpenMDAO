@@ -4391,20 +4391,6 @@ class Group(System):
                 for s, _ in self._subsystems_allprocs.values():
                     yield s
         else:
-            # if opt_status == _OptStatus.PRE:
-            #     it = self._pre_iterated_subsystems
-            # elif opt_status == _OptStatus.POST:
-            #     it = self._post_iterated_subsystems
-            # else:
-            #     it = self._iterated_subsystems
-
-            # if local_only:
-            #     for s in it:
-            #         if s._is_local:
-            #             yield s
-            # else:
-            #     yield from it
-
             for s, _ in self._subsystems_allprocs.values():
                 if not local_only or s._is_local:
                     if s._run_on_opt == opt_status:
@@ -4486,7 +4472,6 @@ class Group(System):
             for dvsys in dvsystems:
                 if respsys != dvsys:
                     graph.add_edge(respsys, dvsys)
-                    # graph.add_edge(dvsys, respsys)
 
         sccs = get_sccs_topo(graph)
         pre = addto = set()
@@ -4517,64 +4502,19 @@ class Group(System):
         elif '_auto_ivc' in pre:
             post.discard('_auto_ivc')
 
-        # # check that our groupings of systems are not out-of-order with the existing system ordering
-        # order = {sname: i for i, sname in enumerate(self._subsystems_allprocs)}
-
-        # # remove _auto_ivc from the ordering since it may appear out of order (and that's ok)
-        # pre_order = [order[s] for s in pre if s != '_auto_ivc']
-        # iterated_order = [order[s] for s in iterated if s != '_auto_ivc']
-        # post_order = [order[s] for s in post if s != '_auto_ivc']
-
-        # miniter = min(iterated_order)
-        # maxiter = max(iterated_order)
-
-        # if pre_order and iterated_order and max(pre_order) > miniter:
-        #     # determine which ones are out of order
-        #     bad = [s for s in pre if order[s] > miniter]
-        #     for idx, s in zip(iterated_order, iterated):
-        #         if idx == miniter:
-        #             first = s
-        #             break
-        #     issue_warning(f"The pre-iterated systems {sorted(bad)} are out of order with "
-        #                   f"respect to the iterated systems (first iterated system is '{first}'). "
-        #                   "To avoid changing the pre-existing ordering, all systems will be "
-        #                   "included in the iterated set. This could impact performance.")
-        #     self._iterated_subsystems = [s for s, _ in self._subsystems_allprocs.values()]
-        #     return
-
-        # if post_order and iterated_order and min(post_order) < maxiter:
-        #     # determine which ones are out of order
-        #     bad = [s for s in post if order[s] < maxiter]
-        #     for idx, s in zip(iterated_order, iterated):
-        #         if idx == maxiter:
-        #             last = s
-        #             break
-        #     issue_warning(f"The post-iterated systems {sorted(bad)} are out of order "
-        #                   "with respect to the iterated systems (last iterated system is "
-        #                   f"'{last}'). To avoid changing the pre-existing ordering, all systems "
-        #                   "will be included in the iterated set. This could impact performance.")
-        #     self._iterated_subsystems = [s for s, _ in self._subsystems_allprocs.values()]
-        #     return
-
-        # # populate iteration lists in same order as user specified
-        # self._pre_iterated_subsystems = [s for s in self._subsystems_myproc if s.name in pre]
-
-        # # if all 'pre' systems are IndepVarComps, don't bother to separate them from the main
-        # # iteration because it just introduces unnecessary overhead.
-        # ivcs = [s for s in self._pre_iterated_subsystems if isinstance(s, IndepVarComp)]
-        # if len(ivcs) == len(self._pre_iterated_subsystems):
-        #     self._pre_iterated_subsystems = []
-        #     iterated.update(pre)
-        # self._iterated_subsystems = [s for s in self._subsystems_myproc if s.name in iterated]
-        # self._post_iterated_subsystems = [s for s in self._subsystems_myproc if s.name in post]
-
-        for s in self.system_iter(recurse=True):
-            if s.pathname in iterated:
-                s._run_on_opt = _OptStatus.OPTIMIZING
-            elif s.pathname in pre:
-                s._run_on_opt = _OptStatus.PRE
-            elif s.pathname in post:
-                s._run_on_opt = _OptStatus.POST
-            else:
-                raise RuntimeError(f"{self.msginfo}: Can't find system '{s.pathname}' in "
-                                   "pre, iterated, or post lists. This should never happen.")
+        if pre or post:
+            for s in self.system_iter(recurse=True):
+                if s.pathname in iterated:
+                    s._run_on_opt = _OptStatus.OPTIMIZING
+                elif s.pathname in pre:
+                    s._run_on_opt = _OptStatus.PRE
+                elif s.pathname in post:
+                    s._run_on_opt = _OptStatus.POST
+                else:
+                    raise RuntimeError(f"{self.msginfo}: Can't find system '{s.pathname}' in "
+                                       "pre, iterated, or post lists. This should never happen.")
+        else:
+            # all systems by default have _run_on_opt == _OptStatus.OPTIMIZING.
+            # Use _run_on_opt = None for the top level Group to indicate that all subsystems
+            # should be run as normal without bothering to run pre or post.
+            self._run_on_opt = None
