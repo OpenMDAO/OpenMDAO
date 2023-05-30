@@ -4447,8 +4447,6 @@ class Group(System):
                               "subsystems into a subgroup and set the nonlinear solver on that.")
             return
 
-        graph = self.compute_sys_graph()
-
         dvs = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
         dvs = set([meta['source'] for meta in dvs.values()])
         dvsystems = set([name.partition('.')[0] for name in dvs])
@@ -4460,6 +4458,8 @@ class Group(System):
         if not dvs or not responses:
             self._iterated_subsystems = [s for s, _ in self._subsystems_allprocs.values()]
             return
+
+        graph = self.compute_sys_graph()
 
         # _iterated_subsystems is used to iterate over the systems that depend on the
         # design variables that the response variables also depend on.  One way to determine the
@@ -4494,7 +4494,9 @@ class Group(System):
         # add edges between response systems and design variable systems
         for respsys in responsesystems:
             for dvsys in dvsystems:
-                graph.add_edge(respsys, dvsys)
+                if respsys != dvsys:
+                    graph.add_edge(respsys, dvsys)
+                    graph.add_edge(dvsys, respsys)
 
         sccs = get_sccs_topo(graph)
         pre = addto = set()
