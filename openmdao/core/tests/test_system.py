@@ -429,6 +429,125 @@ class TestSystem(unittest.TestCase):
                                          'units': None}
                             })
 
+    def test_model_options_set_all(self):
+        import openmdao.api as om
+
+        def declare_options(system):
+            system.options.declare('foo', types=(int,))
+            system.options.declare('bar', types=(float,))
+            system.options.declare('baz', types=(str,))
+
+        p = om.Problem()
+
+        G0 = p.model.add_subsystem('G0', om.Group())
+        G1 = G0.add_subsystem('G1', om.Group())
+        C1 = G0.add_subsystem('C1', om.ExecComp('y1 = a * x + b'))
+        G2 = G1.add_subsystem('G2', om.Group())
+        C2 = G1.add_subsystem('C2', om.ExecComp('y2 = y1**2'))
+        G3 = G2.add_subsystem('G3', om.Group())
+        C3 = G2.add_subsystem('C3', om.ExecComp('y3 = y2**3'))
+
+        for system in (G0, G1, C1, G2, C2, G3, C3):
+            declare_options(system)
+
+        G0.connect('C1.y1', 'G1.C2.y1')
+        G0.connect('G1.C2.y2', 'G1.G2.C3.y2')
+
+        p.model_options['*'] = {'foo': -1, 'bar': np.pi, 'baz': 'fizz'}
+
+        p.setup()
+
+        for system in (G0, G1, C1, G2, C2, G3, C3):
+            self.assertEqual(system.options['foo'], -1)
+            assert_near_equal(system.options['bar'], np.pi, tolerance=1.0E-9)
+            self.assertEqual(system.options['baz'], 'fizz')
+
+    def test_model_options_with_filter(self):
+        import openmdao.api as om
+
+        def declare_options(system):
+            system.options.declare('foo', types=(int,))
+            system.options.declare('bar', types=(float,))
+            system.options.declare('baz', types=(str,))
+
+        p = om.Problem()
+
+        G0 = p.model.add_subsystem('G0', om.Group())
+        G1 = G0.add_subsystem('G1', om.Group())
+        C1 = G0.add_subsystem('C1', om.ExecComp('y1 = a * x + b'))
+        G2 = G1.add_subsystem('G2', om.Group())
+        C2 = G1.add_subsystem('C2', om.ExecComp('y2 = y1**2'))
+        G3 = G2.add_subsystem('G3', om.Group())
+        C3 = G2.add_subsystem('C3', om.ExecComp('y3 = y2**3'))
+
+        for system in (G0, G1, C1, G2, C2, G3, C3):
+            declare_options(system)
+
+        G0.connect('C1.y1', 'G1.C2.y1')
+        G0.connect('G1.C2.y2', 'G1.G2.C3.y2')
+
+        p.model_options['*G[0123]'] = {'foo': -1, 'bar': np.pi, 'baz': 'im_a_group'}
+        p.model_options['*.C[123]'] = {'foo': 1, 'bar': -np.pi, 'baz': 'im_a_component'}
+
+        p.setup()
+
+        for system in (G0, G1, C1, G2, C2, G3, C3):
+            if isinstance(system, om.Group):
+                self.assertEqual(system.options['foo'], -1)
+                assert_near_equal(system.options['bar'], np.pi, tolerance=1.0E-9)
+                self.assertEqual(system.options['baz'], 'im_a_group')
+            elif isinstance(system, om.ExplicitComponent):
+                self.assertEqual(system.options['foo'], 1)
+                assert_near_equal(system.options['bar'], -np.pi, tolerance=1.0E-9)
+                self.assertEqual(system.options['baz'], 'im_a_component')
+
+    def test_model_options_override(self):
+        import openmdao.api as om
+
+        def declare_options(system):
+            system.options.declare('foo', types=(int,), default=0)
+            system.options.declare('bar', types=(float,), default=0.0)
+            system.options.declare('baz', types=(str,), default='')
+
+        p = om.Problem()
+
+        G0 = p.model.add_subsystem('G0', om.Group())
+        G1 = G0.add_subsystem('G1', om.Group())
+        C1 = G0.add_subsystem('C1', om.ExecComp('y1 = a * x + b'))
+        G2 = G1.add_subsystem('G2', om.Group())
+        C2 = G1.add_subsystem('C2', om.ExecComp('y2 = y1**2'))
+        G3 = G2.add_subsystem('G3', om.Group())
+        C3 = G2.add_subsystem('C3', om.ExecComp('y3 = y2**3'))
+
+        for system in (G0, G1, C1, G2, C2, G3, C3):
+            declare_options(system)
+
+        G0.connect('C1.y1', 'G1.C2.y1')
+        G0.connect('G1.C2.y2', 'G1.G2.C3.y2')
+
+        # Match all groups
+        p.model_options['*G?'] = {'foo': -1, 'bar': np.pi, 'baz': 'im_a_group'}
+        # Match all components except for C3
+        p.model_options['*.C[!3]'] = {'foo': 1, 'bar': -np.pi, 'baz': 'im_C1_or_C2'}
+
+        p.setup()
+
+        for system in (G0, G1, C1, G2, C2, G3, C3):
+            if isinstance(system, om.Group):
+                self.assertEqual(system.options['foo'], -1)
+                assert_near_equal(system.options['bar'], np.pi, tolerance=1.0E-9)
+                self.assertEqual(system.options['baz'], 'im_a_group')
+            elif isinstance(system, om.ExplicitComponent):
+                if system.pathname.endswith('C3'):
+                    # Check that the default values stuck for C3.
+                    self.assertEqual(0, system.options['foo'])
+                    assert_near_equal(system.options['bar'], 0.0, tolerance=1.0E-9)
+                    self.assertEqual('', system.options['baz'])
+                else:
+                    self.assertEqual(system.options['foo'], 1)
+                    assert_near_equal(system.options['bar'], -np.pi, tolerance=1.0E-9)
+                    self.assertEqual(system.options['baz'], 'im_C1_or_C2')
+
 
 if __name__ == "__main__":
     unittest.main()

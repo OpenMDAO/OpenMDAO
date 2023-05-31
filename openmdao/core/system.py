@@ -1988,7 +1988,7 @@ class System(object):
         self._responses = {}
         self._design_vars.update(self._static_design_vars)
         self._responses.update(self._static_responses)
-        self._load_model_options()
+        self.load_model_options()
 
     def _setup_var_data(self):
         """
@@ -4526,9 +4526,14 @@ class System(object):
         """
         return []
 
-    def _load_model_options(self):
+    def load_model_options(self):
         """
         Load the relevant model options from `Problem._metadata['model_options'].
+
+        This method examines each path filter and corresponding options in
+        self._problem_meta['model_options']. If this System's pathname matches
+        the given path filter, it will assume the value for each given option
+        which it possesses.
         """
         model_options = self._problem_meta['model_options']
         for path_filter, path_options in model_options.items():
