@@ -43,7 +43,7 @@ def act_tanh(x, mu=1.0E-2, z=0., a=-1., b=1.):
 
     Returns
     -------
-    float or jnp.array
+    float or array
         The value of the activation response at the given input.
     """
     dy = b - a
@@ -58,9 +58,9 @@ def smooth_max(x, y, mu=1.0E-2):
 
     Parameters
     ----------
-    x : float or jnp.array
+    x : float or array
         The first value or array of values for comparison.
-    y : float or jnp.array
+    y : float or array
         The second value or array of values for comparison.
     mu : float
         A shaping parameter which impacts the "abruptness" of the activation function.
@@ -68,7 +68,7 @@ def smooth_max(x, y, mu=1.0E-2):
 
     Returns
     -------
-    float or jnp.array
+    float or array
         For each element in x or y, the greater of the values of x or y at that point.
         This function is smoothed, so near the point where x and y have equal values
         this will be approximate. The accuracy of this approximation can be adjusted
@@ -97,7 +97,7 @@ def smooth_min(x, y, mu=1.0E-2):
 
     Returns
     -------
-    float or jnp.array
+    float or array
         For each element in x or y, the greater of the values of x or y at that point. This
         function is smoothed, so near the point where x and y have equal values this will
         be approximate. The accuracy of this approximation can be adjusted by changing the
