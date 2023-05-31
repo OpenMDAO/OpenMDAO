@@ -133,14 +133,11 @@ class LinearBlockGS(BlockLinearSolver):
                 subsys._solve_linear(mode, self._rel_systems, scope_out, scope_in)
 
         else:  # rev
-            if sys.version_info >= (3, 8):
-                subsystems = reversed(system._subsystems_allprocs.values())
-            else:
-                subsystems = list(system._subsystems_allprocs.values())
-                subsystems.reverse()
+            subsystems = list(system._solver_subsystem_iter(local_only=False))
+            subsystems.reverse()
             parent_offset = system._doutputs._root_offset
 
-            for subsys, _ in subsystems:
+            for subsys in subsystems:
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
                     continue
 

@@ -681,7 +681,7 @@ class Problem(object):
             self.model._clear_iprint()
 
             if self.options['group_by_pre_opt_post'] and self.driver.supports['optimization']:
-                if self.model._run_on_opt is not None:
+                if self.model._run_on_opt[_OptStatus.PRE]:
                     self._set_opt_status(_OptStatus.PRE)
                     self.model.run_solve_nonlinear()
 
@@ -689,7 +689,7 @@ class Problem(object):
                     self._set_opt_status(_OptStatus.OPTIMIZING)
                     result = self.driver.run()
 
-                if self.model._run_on_opt is not None:
+                if self.model._run_on_opt[_OptStatus.POST]:
                     self._set_opt_status(_OptStatus.POST)
                     self.model.run_solve_nonlinear()
 
@@ -2343,6 +2343,47 @@ class Problem(object):
                 print(f'None found', file=out_stream)
 
         return problem_indep_vars
+
+    def iter_count_iter(self, include_driver=True, include_solvers=True, include_systems=False):
+        """
+        Yield iteration counts for driver, solvers and/or systems.
+
+        Parameters
+        ----------
+        include_driver : bool
+            If True, include the driver in the iteration counts.
+        include_solvers : bool
+            If True, include solvers in the iteration counts.
+        include_systems : bool
+            If True, include systems in the iteration counts.
+
+        Yields
+        ------
+        str
+            Name of the object.
+        str
+            Name of the counter.
+        int
+            Value of the counter.
+        """
+        if include_driver:
+            yield ('Driver', 'iter_count', self.driver.iter_count)
+        if include_solvers or include_systems:
+            for s in self.model.system_iter(include_self=True, recurse=True):
+                if include_systems:
+                    for it in ('iter_count', 'iter_count_apply'):
+                        val = getattr(s, it)
+                        if val > 0:
+                            yield (s.pathname, it, val)
+
+                if include_solvers:
+                    prefix = s.pathname + '.' if s.pathname else ''
+                    if s.nonlinear_solver is not None and s.nonlinear_solver._iter_count > 0:
+                        yield (prefix + 'nonlinear_solver', '_iter_count',
+                               s.nonlinear_solver._iter_count)
+                    if s.linear_solver is not None and s.linear_solver._iter_count > 0:
+                        yield (prefix + 'linear_solver', '_iter_count',
+                               s.linear_solver._iter_count)
 
 
 _ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])

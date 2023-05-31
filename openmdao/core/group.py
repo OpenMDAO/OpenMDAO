@@ -4393,7 +4393,7 @@ class Group(System):
         else:
             for s, _ in self._subsystems_allprocs.values():
                 if not local_only or s._is_local:
-                    if s._run_on_opt == opt_status:
+                    if s._run_on_opt[opt_status]:
                         yield s
 
     def _setup_iteration_lists(self, do_separation):
@@ -4502,19 +4502,19 @@ class Group(System):
         elif '_auto_ivc' in pre:
             post.discard('_auto_ivc')
 
-        if pre or post:
-            for s in self.system_iter(recurse=True):
-                if s.pathname in iterated:
-                    s._run_on_opt = _OptStatus.OPTIMIZING
-                elif s.pathname in pre:
-                    s._run_on_opt = _OptStatus.PRE
-                elif s.pathname in post:
-                    s._run_on_opt = _OptStatus.POST
-                else:
-                    raise RuntimeError(f"{self.msginfo}: Can't find system '{s.pathname}' in "
-                                       "pre, iterated, or post lists. This should never happen.")
-        else:
-            # all systems by default have _run_on_opt == _OptStatus.OPTIMIZING.
-            # Use _run_on_opt = None for the top level Group to indicate that all subsystems
-            # should be run as normal without bothering to run pre or post.
-            self._run_on_opt = None
+        if pre:
+            self._run_on_opt[_OptStatus.PRE] = True
+        if post:
+            self._run_on_opt[_OptStatus.POST] = True
+
+        for s in self.system_iter(recurse=True):
+            if s.pathname in iterated:
+                s._run_on_opt[_OptStatus.OPTIMIZING] = True
+            else:
+                # set OPTIMIZING to False because its default value is True
+                s._run_on_opt[_OptStatus.OPTIMIZING] = False
+
+            if s.pathname in pre:
+                s._run_on_opt[_OptStatus.PRE] = True
+            elif s.pathname in post:
+                s._run_on_opt[_OptStatus.POST] = True

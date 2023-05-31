@@ -8,7 +8,7 @@ from openmdao.test_suite.components.exec_comp_for_test import ExecComp4Test
 
 class TestPrePostIter(unittest.TestCase):
 
-    def setup_problem(self, do_pre_post_opt, use_ivc=False, coloring=False, size=3):
+    def setup_problem(self, do_pre_post_opt, use_ivc=False, coloring=False, size=3, group=False):
         prob = om.Problem()
         prob.options['group_by_pre_opt_post'] = do_pre_post_opt
 
@@ -17,20 +17,28 @@ class TestPrePostIter(unittest.TestCase):
 
         model = prob.model
 
-        model.add_subsystem('pre1', ExecComp4Test('y=2.*x', x=np.ones(size), y=np.zeros(size)))
-        model.add_subsystem('pre2', ExecComp4Test('y=3.*x', x=np.ones(size), y=np.zeros(size)))
-
         if use_ivc:
             model.add_subsystem('ivc', om.IndepVarComp('x', np.ones(size)))
-        model.add_subsystem('iter1', ExecComp4Test('y=x1 + x2*4. + x3',
+
+        if group:
+            G1 = model.add_subsystem('G1', om.Group(), promotes=['*'])
+            G2 = model.add_subsystem('G2', om.Group(), promotes=['*'])
+        else:
+            G1 = model
+            G2 = model
+
+        G1.add_subsystem('pre1', ExecComp4Test('y=2.*x', x=np.ones(size), y=np.zeros(size)))
+        G1.add_subsystem('pre2', ExecComp4Test('y=3.*x', x=np.ones(size), y=np.zeros(size)))
+
+        G1.add_subsystem('iter1', ExecComp4Test('y=x1 + x2*4. + x3',
                                                    x1=np.ones(size), x2=np.ones(size),
                                                    x3=np.ones(size), y=np.zeros(size)))
-        model.add_subsystem('iter2', ExecComp4Test('y=.5*x', x=np.ones(size), y=np.zeros(size)))
-        model.add_subsystem('iter4', ExecComp4Test('y=7.*x', x=np.ones(size), y=np.zeros(size)))
-        model.add_subsystem('iter3', ExecComp4Test('y=6.*x', x=np.ones(size), y=np.zeros(size)))
+        G1.add_subsystem('iter2', ExecComp4Test('y=.5*x', x=np.ones(size), y=np.zeros(size)))
+        G2.add_subsystem('iter4', ExecComp4Test('y=7.*x', x=np.ones(size), y=np.zeros(size)))
+        G2.add_subsystem('iter3', ExecComp4Test('y=6.*x', x=np.ones(size), y=np.zeros(size)))
 
-        model.add_subsystem('post1', ExecComp4Test('y=8.*x', x=np.ones(size), y=np.zeros(size)))
-        model.add_subsystem('post2', ExecComp4Test('y=x1*9. + x2*5', x1=np.ones(size),
+        G2.add_subsystem('post1', ExecComp4Test('y=8.*x', x=np.ones(size), y=np.zeros(size)))
+        G2.add_subsystem('post2', ExecComp4Test('y=x1*9. + x2*5', x1=np.ones(size),
                                                    x2=np.ones(size), y=np.zeros(size)))
 
         # we don't want ExecComps to be colored because it makes the iter counting more complicated
@@ -40,6 +48,7 @@ class TestPrePostIter(unittest.TestCase):
 
         if use_ivc:
             model.connect('ivc.x', 'iter1.x3')
+
         model.connect('pre1.y', ['iter1.x1', 'post2.x1'])
         model.connect('pre2.y', 'iter1.x2')
         model.connect('iter1.y', ['iter2.x', 'iter4.x'])
@@ -75,6 +84,25 @@ class TestPrePostIter(unittest.TestCase):
         data = prob.check_totals(out_stream=None)
         assert_check_totals(data)
 
+    def test_pre_post_iter_rev_grouped(self):
+        prob = self.setup_problem(do_pre_post_opt=True, group=True)
+        prob.setup(mode='rev')
+        prob.run_driver()
+
+        self.assertEqual(prob.model.G1.pre1.num_nl_solves, 1)
+        self.assertEqual(prob.model.G1.pre2.num_nl_solves, 1)
+
+        self.assertEqual(prob.model.G1.iter1.num_nl_solves, 3)
+        self.assertEqual(prob.model.G1.iter2.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter3.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter4.num_nl_solves, 3)
+
+        self.assertEqual(prob.model.G2.post1.num_nl_solves, 1)
+        self.assertEqual(prob.model.G2.post2.num_nl_solves, 1)
+
+        data = prob.check_totals(out_stream=None)
+        assert_check_totals(data)
+
     def test_pre_post_iter_rev_coloring(self):
         prob = self.setup_problem(do_pre_post_opt=True, coloring=True)
         prob.setup(mode='rev')
@@ -94,6 +122,25 @@ class TestPrePostIter(unittest.TestCase):
         data = prob.check_totals(out_stream=None)
         assert_check_totals(data)
 
+    def test_pre_post_iter_rev_coloring_grouped(self):
+        prob = self.setup_problem(do_pre_post_opt=True, coloring=True, group=True)
+        prob.setup(mode='rev')
+        prob.run_driver()
+
+        self.assertEqual(prob.model.G1.pre1.num_nl_solves, 1)
+        self.assertEqual(prob.model.G1.pre2.num_nl_solves, 1)
+
+        self.assertEqual(prob.model.G1.iter1.num_nl_solves, 3)
+        self.assertEqual(prob.model.G1.iter2.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter3.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter4.num_nl_solves, 3)
+
+        self.assertEqual(prob.model.G2.post1.num_nl_solves, 1)
+        self.assertEqual(prob.model.G2.post2.num_nl_solves, 1)
+
+        data = prob.check_totals(out_stream=None)
+        assert_check_totals(data)
+
     def test_pre_post_iter_rev_ivc(self):
         prob = self.setup_problem(do_pre_post_opt=True, use_ivc=True)
         prob.setup(mode='rev')
@@ -109,6 +156,25 @@ class TestPrePostIter(unittest.TestCase):
 
         self.assertEqual(prob.model.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.post2.num_nl_solves, 1)
+
+        data = prob.check_totals(out_stream=None)
+        assert_check_totals(data)
+
+    def test_pre_post_iter_rev_ivc_grouped(self):
+        prob = self.setup_problem(do_pre_post_opt=True, use_ivc=True, group=True)
+        prob.setup(mode='rev')
+        prob.run_driver()
+
+        self.assertEqual(prob.model.G1.pre1.num_nl_solves, 1)
+        self.assertEqual(prob.model.G1.pre2.num_nl_solves, 1)
+
+        self.assertEqual(prob.model.G1.iter1.num_nl_solves, 3)
+        self.assertEqual(prob.model.G1.iter2.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter3.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter4.num_nl_solves, 3)
+
+        self.assertEqual(prob.model.G2.post1.num_nl_solves, 1)
+        self.assertEqual(prob.model.G2.post2.num_nl_solves, 1)
 
         data = prob.check_totals(out_stream=None)
         assert_check_totals(data)
@@ -151,6 +217,25 @@ class TestPrePostIter(unittest.TestCase):
         data = prob.check_totals(out_stream=None)
         assert_check_totals(data)
 
+    def test_pre_post_iter_fwd_grouped(self):
+        prob = self.setup_problem(do_pre_post_opt=True, group=True)
+        prob.setup(mode='fwd')
+        prob.run_driver()
+
+        self.assertEqual(prob.model.G1.pre1.num_nl_solves, 1)
+        self.assertEqual(prob.model.G1.pre2.num_nl_solves, 1)
+
+        self.assertEqual(prob.model.G1.iter1.num_nl_solves, 3)
+        self.assertEqual(prob.model.G1.iter2.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter3.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter4.num_nl_solves, 3)
+
+        self.assertEqual(prob.model.G2.post1.num_nl_solves, 1)
+        self.assertEqual(prob.model.G2.post2.num_nl_solves, 1)
+
+        data = prob.check_totals(out_stream=None)
+        assert_check_totals(data)
+
     def test_pre_post_iter_fwd_coloring(self):
         prob = self.setup_problem(do_pre_post_opt=True, coloring=True)
         prob.setup(mode='fwd')
@@ -166,6 +251,25 @@ class TestPrePostIter(unittest.TestCase):
 
         self.assertEqual(prob.model.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.post2.num_nl_solves, 1)
+
+        data = prob.check_totals(out_stream=None)
+        assert_check_totals(data)
+
+    def test_pre_post_iter_fwd_coloring_grouped(self):
+        prob = self.setup_problem(do_pre_post_opt=True, coloring=True, group=True)
+        prob.setup(mode='fwd')
+        prob.run_driver()
+
+        self.assertEqual(prob.model.G1.pre1.num_nl_solves, 1)
+        self.assertEqual(prob.model.G1.pre2.num_nl_solves, 1)
+
+        self.assertEqual(prob.model.G1.iter1.num_nl_solves, 3)
+        self.assertEqual(prob.model.G1.iter2.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter3.num_nl_solves, 3)
+        self.assertEqual(prob.model.G2.iter4.num_nl_solves, 3)
+
+        self.assertEqual(prob.model.G2.post1.num_nl_solves, 1)
+        self.assertEqual(prob.model.G2.post2.num_nl_solves, 1)
 
         data = prob.check_totals(out_stream=None)
         assert_check_totals(data)
@@ -225,6 +329,27 @@ class TestPrePostIter(unittest.TestCase):
 
         self.assertEqual(prob.model.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.post2.num_nl_solves, 1)
+
+        data = prob.check_totals(method='cs', out_stream=None)
+        assert_check_totals(data)
+
+    def test_pre_post_iter_approx_grouped(self):
+        prob = self.setup_problem(do_pre_post_opt=True, group=True)
+        prob.model.approx_totals()
+
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.run_driver()
+
+        self.assertEqual(prob.model.G1.pre1.num_nl_solves, 1)
+        self.assertEqual(prob.model.G1.pre2.num_nl_solves, 1)
+
+        self.assertEqual(prob.model.G1.iter1.num_nl_solves, 9)
+        self.assertEqual(prob.model.G1.iter2.num_nl_solves, 9)
+        self.assertEqual(prob.model.G2.iter3.num_nl_solves, 9)
+        self.assertEqual(prob.model.G2.iter4.num_nl_solves, 9)
+
+        self.assertEqual(prob.model.G2.post1.num_nl_solves, 1)
+        self.assertEqual(prob.model.G2.post2.num_nl_solves, 1)
 
         data = prob.check_totals(method='cs', out_stream=None)
         assert_check_totals(data)

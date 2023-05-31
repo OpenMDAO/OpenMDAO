@@ -403,7 +403,7 @@ class System(object):
     _promotion_tree : dict
         Mapping of system path to promotion info indicating all subsystems where variables
         were promoted.
-    _run_on_opt: _OptStatus
+    _run_on_opt: list of bool
         Indicates whether this system should run before, during, or after the optimization process
         (if there is an optimization process at all).
     """
@@ -551,7 +551,9 @@ class System(object):
 
         self._output_solver_options = {}
         self._promotion_tree = None
-        self._run_on_opt = _OptStatus.OPTIMIZING
+        # need separate values for [PRE, OPTIMIZE, POST] since a Group may participate in
+        # multiple phases because some of its subsystems may be in one phase and some in another.
+        self._run_on_opt = [False, True, False]
 
     @property
     def under_approx(self):
