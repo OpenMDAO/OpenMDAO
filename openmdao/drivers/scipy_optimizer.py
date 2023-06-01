@@ -719,7 +719,7 @@ class ScipyOptimizeDriver(Driver):
             self._grad_cache = grad
 
             # First time through, check for zero row/col.
-            if self._check_jac:
+            if self._check_jac and self._total_jac is not None:
                 raise_error = self.options['singular_jac_behavior'] == 'error'
                 self._total_jac.check_total_jac(raise_error=raise_error,
                                                 tol=self.options['singular_jac_tol'])
@@ -729,10 +729,6 @@ class ScipyOptimizeDriver(Driver):
             if self._exc_info is None:  # only record the first one
                 self._exc_info = sys.exc_info()
             return np.array([[]])
-
-        # print("Gradients calculated for objective")
-        # print('   xnew', x_new)
-        # print('   grad', grad[0, :])
 
         return grad[0, :]
 
