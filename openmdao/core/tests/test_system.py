@@ -548,6 +548,36 @@ class TestSystem(unittest.TestCase):
                     assert_near_equal(system.options['bar'], -np.pi, tolerance=1.0E-9)
                     self.assertEqual(system.options['baz'], 'im_C1_or_C2')
 
+    def test_group_modifies_model_options(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.options_feature_lincomb import LinearCombinationComp
+
+        class MyGroup(om.Group):
+
+            def setup(self):
+                g1 = self.add_subsystem('g1', om.Group())
+                g1.add_subsystem('c1', LinearCombinationComp())
+                g1.add_subsystem('c2', LinearCombinationComp())
+                g1.add_subsystem('c3', LinearCombinationComp())
+
+                # Send options a and b to all children of this model.
+                self.model_options[f'{self.pathname}.*'] = {'a': 3., 'b': 5.}
+
+                g1.connect('c1.y', 'c2.x')
+                g1.connect('c2.y', 'c3.x')
+
+        p = om.Problem()
+        p.model.add_subsystem('my_group', MyGroup())
+        p.setup()
+
+        p.set_val('my_group.g1.c1.x', 4)
+
+        p.run_model()
+
+        c3y = p.get_val('my_group.g1.c3.y')
+        expected = ((4 * 3 + 5) * 3 + 5) * 3 + 5.
+        assert_near_equal(expected, c3y)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -172,7 +172,8 @@ class Problem(object):
     options : <OptionsDictionary>
         Dictionary with general options for the problem.
     model_options : dict
-        A  dictionary of options to be passed to subsystems in the problem's model.
+        A  dictionary of options to be passed to subsystems in the problem's model during
+        the setup process.
         This dictionary is keyed by a path pattern string, and the associated value for each path
         pattern is a dictionary of {option_name: option_val}. Those subsystems within the
         hierarchy which match the path pattern and that have an option of the given name, will
