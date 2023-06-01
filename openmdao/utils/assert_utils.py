@@ -11,6 +11,11 @@ from functools import wraps
 
 import numpy as np
 
+try:
+    from jaxlib.xla_extension import ArrayImpl
+except ImportError:
+    ArrayImpl = None
+
 from openmdao.core.component import Component
 from openmdao.core.group import Group
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
@@ -422,6 +427,13 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
     if type(desired) in [int, float, np.int64, np.float64, np.int32, np.complex128]:
         desired = np.atleast_1d(desired)
 
+    # Handle jax arrays, if available
+    if ArrayImpl is not None:
+        if isinstance(actual, ArrayImpl):
+            actual = np.atleast_1d(actual)
+        if isinstance(desired, ArrayImpl):
+            desired = np.atleast_1d(desired)
+
     # if desired is numeric list or tuple, make ndarray out of it
     if isinstance(actual, (list, tuple)):
         actual = np.asarray(actual)
@@ -435,7 +447,7 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
         desired = dict(desired)
 
     if type(actual) != type(desired):
-        raise ValueError('actual %s, desired %s have different types' % (actual, desired))
+        raise ValueError(f'actual {type(actual)}, desired {type(desired)} have different types')
 
     if isinstance(actual, type) and isinstance(desired, type):
         if actual != desired:
