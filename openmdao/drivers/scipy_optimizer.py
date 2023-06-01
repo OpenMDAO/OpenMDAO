@@ -730,6 +730,10 @@ class ScipyOptimizeDriver(Driver):
                 self._exc_info = sys.exc_info()
             return np.array([[]])
 
+        # print("Gradients calculated for objective")
+        # print('   xnew', x_new)
+        # print('   grad', grad[0, :])
+
         return grad[0, :]
 
     def _congradfunc(self, x_new, name, dbl, idx):
