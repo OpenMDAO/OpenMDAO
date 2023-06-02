@@ -1578,7 +1578,7 @@ class Problem(object):
             significant relative error due to a minor absolute error.  Default is 1.0E-6.
         method : str
             Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'.
-        step : float
+        step : None, float, or list/tuple of float
             Step size for approximation. Default is None, which means 1e-6 for 'fd' and 1e-40 for
             'cs'.
         form : str
