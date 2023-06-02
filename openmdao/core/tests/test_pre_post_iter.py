@@ -2,8 +2,9 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_check_totals
+from openmdao.utils.assert_utils import assert_check_totals, assert_near_equal
 from openmdao.test_suite.components.exec_comp_for_test import ExecComp4Test
+from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
 
 class TestPrePostIter(unittest.TestCase):
@@ -416,6 +417,48 @@ class TestPrePostIter(unittest.TestCase):
 
         data = prob.check_totals(method='cs', out_stream=None)
         assert_check_totals(data)
+
+    def test_newton_with_densejac_under_full_model_fd(self):
+        # Basic sellar test.
+
+        prob = om.Problem(group_by_pre_opt_post=True)
+        model = prob.model = om.Group(assembled_jac_type='dense')
+
+        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('pre_comp', om.ExecComp('out = x + z', z=np.ones(2), out=np.ones(2)), promotes=['x', 'z'])
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
+
+        sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+        sub.add_subsystem('post_comp', om.ExecComp('out = y1 + y2'), promotes=['y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                   z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        sub.linear_solver = om.ScipyKrylov(assemble_jac=True)
+
+        model.approx_totals(method='fd', step=1e-5)
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
+
+        wrt = ['z']
+        of = ['obj']
+
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
+        assert_near_equal(J['obj', 'z'][0][0], 9.61001056, .00001)
+        assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)
 
 
 if __name__ == "__main__":

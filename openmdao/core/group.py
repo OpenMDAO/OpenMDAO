@@ -3191,8 +3191,8 @@ class Group(System):
         """
         # let any lower level systems do their guessing first
         if self._has_guess:
-            for sub in self._solver_subsystem_iter(local_only=False):
-                sname = sub.name
+            for sname, sinfo in self._subsystems_allprocs.items():
+                sub = sinfo.system
                 # TODO: could gather 'has_guess' information during setup and be able to
                 # skip transfer for subs that don't have guesses...
                 self._transfer('nonlinear', 'fwd', sname)
@@ -4415,15 +4415,15 @@ class Group(System):
         self._pre_iterated_subsystems = []
         self._post_iterated_subsystems = []
 
-        if not do_separation or not isinstance(self._nonlinear_solver, NonlinearRunOnce):
-            # skip any system separation and just do it the old way
-            self._iterated_subsystems = [s for s, _ in self._subsystems_allprocs.values()]
-            if do_separation:
-                issue_warning("The 'group_by_pre_opt_post' option is True, but the top level "
-                              "nonlinear solver is not NonlinearRunOnce, so the option will be "
-                              "ignored.  If an iterative solver is needed, move the iterated "
-                              "subsystems into a subgroup and set the nonlinear solver on that.")
-            return
+        # if not do_separation or not isinstance(self._nonlinear_solver, NonlinearRunOnce):
+        #     # skip any system separation and just do it the old way
+        #     self._iterated_subsystems = [s for s, _ in self._subsystems_allprocs.values()]
+        #     if do_separation:
+        #         issue_warning("The 'group_by_pre_opt_post' option is True, but the top level "
+        #                       "nonlinear solver is not NonlinearRunOnce, so the option will be "
+        #                       "ignored.  If an iterative solver is needed, move the iterated "
+        #                       "subsystems into a subgroup and set the nonlinear solver on that.")
+        #     return
 
         dvs = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
         dvs = set([meta['source'] for meta in dvs.values()])
