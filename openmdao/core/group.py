@@ -2,7 +2,6 @@
 import sys
 from collections import Counter, defaultdict
 from collections.abc import Iterable
-from enum import IntEnum
 
 from itertools import product, chain
 from numbers import Number
@@ -183,12 +182,6 @@ class Group(System):
         Dynamic shape dependency graph, or None.
     _shape_knowns : set
         Set of shape dependency graph nodes with known (non-dynamic) shapes.
-    _pre_iterated_subsystems : list or None
-        List of subsystems that will run before the optimization iteration loop.
-    _post_iterated_subsystems : list or None
-        List of subsystems that will run after the optimization iteration loop.
-    _iterated_subsystems : list or None
-        List of subsystems that will run during the optimization iteration loop.
     """
 
     def __init__(self, **kwargs):
@@ -215,9 +208,6 @@ class Group(System):
         self._order_set = False
         self._shapes_graph = None
         self._shape_knowns = None
-        self._pre_iterated_subsystems = None
-        self._iterated_subsystems = None
-        self._post_iterated_subsystems = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -4409,22 +4399,6 @@ class Group(System):
         """
         assert self.pathname == '', "call setup_iteration_lists on the top level Group only!"
 
-        from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
-        from openmdao.core.indepvarcomp import IndepVarComp
-
-        self._pre_iterated_subsystems = []
-        self._post_iterated_subsystems = []
-
-        # if not do_separation or not isinstance(self._nonlinear_solver, NonlinearRunOnce):
-        #     # skip any system separation and just do it the old way
-        #     self._iterated_subsystems = [s for s, _ in self._subsystems_allprocs.values()]
-        #     if do_separation:
-        #         issue_warning("The 'group_by_pre_opt_post' option is True, but the top level "
-        #                       "nonlinear solver is not NonlinearRunOnce, so the option will be "
-        #                       "ignored.  If an iterative solver is needed, move the iterated "
-        #                       "subsystems into a subgroup and set the nonlinear solver on that.")
-        #     return
-
         dvs = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
         dvs = set([meta['source'] for meta in dvs.values()])
         dvsystems = set([name.rpartition('.')[0] for name in dvs])
@@ -4434,19 +4408,9 @@ class Group(System):
         responsesystems = set([name.rpartition('.')[0] for name in responses])
 
         if not dvs or not responses:
-            self._iterated_subsystems = [s for s, _ in self._subsystems_allprocs.values()]
             return
 
         graph = self.compute_sys_graph(comps_only=True, add_edge_info=False)
-
-        # _iterated_subsystems is used to iterate over the systems that depend on the
-        # design variables that the response variables also depend on.  One way to determine the
-        # contents of _iterated_subsystems is to add edges from the response variable systems to
-        # the design variable systems (there are already edges, directly or indirectly, from the
-        # design variable systems to the response variable systems) and then find the strongly
-        # connected components of the resulting graph.  get_sccs_topo returns the strongly
-        # connected components in topological order, so we can use it to give us pre, iterated,
-        # and post subsets of the systems.
 
         # we don't want _auto_ivc dependency to force all subsystems to be iterated, so split
         # the _auto_ivc node into two nodes, one for design vars and one for everything else.
@@ -4467,11 +4431,58 @@ class Group(System):
             if len(list(graph.edges('_auto_ivc_vois'))):
                 dvsystems.add('_auto_ivc_vois')
 
-        # add edges between response systems and design variable systems
+        # One way to determine the contents of the pre/opt/post sets is to add edges from the
+        # response variable systems to the design variable systems (there are already edges,
+        # directly or indirectly, from the design variable systems to the response variable systems)
+        # and then find the strongly connected components of the resulting graph.  get_sccs_topo
+        # returns the strongly connected components in topological order, so we can use it to give
+        # us pre, iterated, and post subsets of the systems.
+
+        # add edges between response systems and design variable systems to form a strongly
+        # connected component for all systems involved in the optimization iteration.
         for respsys in responsesystems:
             for dvsys in dvsystems:
-                if respsys != dvsys:
-                    graph.add_edge(respsys, dvsys)
+                graph.add_edge(respsys, dvsys)
+
+        # find any groups that have a nl solver that computes gradients, because we can't
+        # split up the systems in those groups without inserting zeros into the jacobian.
+        grad_groups = []
+        for s in self.system_iter(recurse=True, include_self=True, typ=Group):
+            if s.nonlinear_solver is not None and s.nonlinear_solver.supports['gradients']:
+                grad_groups.append(s.pathname)
+
+        if grad_groups:
+            if '' in grad_groups:
+                issue_warning("The model has a nonlinear solver that computes gradients, so "
+                              f"the entire model will be included in the optimization iteration.")
+                return
+
+            remaining = set(grad_groups)
+            for name in sorted(grad_groups, key=lambda x: x.count('.')):
+                prefix = name + '.'
+                match = {n for n in remaining if n.startswith(prefix)}
+                remaining -= match
+
+            gradlist = '\n'.join(sorted(remaining))
+            issue_warning("The following groups have a nonlinear solver that computes gradients "
+                          f"and will be treated as atomic for the purposes of determining "
+                          f"which systems are included in the optimization iteration: "
+                          f"\n{gradlist}\n")
+
+            # remaining groups are not contained within a higer level nl solver
+            # using gradient group, so make new connections to/from them to
+            # all systems that they contain.  This will force them to be
+            # treated as 'atomic' within the graph, so that if they contain
+            # any dv or response systems, or if their children are connected to
+            # both dv *and* response systems, then all systems within them will
+            # be included in the 'opt' set.
+            G = list(graph)
+            for grp in remaining:
+                prefix = grp + '.'
+                for node in G:
+                    if node.startswith(prefix):
+                        graph.add_edge(grp, node)
+                        graph.add_edge(node, grp)
 
         sccs = get_sccs_topo(graph)
         pre = addto = set()
@@ -4516,5 +4527,5 @@ class Group(System):
 
             if s.pathname in pre:
                 s._run_on_opt[_OptStatus.PRE] = True
-            elif s.pathname in post:
+            if s.pathname in post:
                 s._run_on_opt[_OptStatus.POST] = True

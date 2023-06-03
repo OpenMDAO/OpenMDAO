@@ -982,6 +982,9 @@ class Problem(object):
 
         self._check_collected_errors()
 
+        do_seps = self.options['group_by_pre_opt_post'] and self.driver.supports['optimization']
+        self.model._setup_iteration_lists(do_seps)
+
         return self
 
     def final_setup(self):
@@ -1015,9 +1018,6 @@ class Problem(object):
             self.model._setup_solver_print()
 
         driver._setup_driver(self)
-
-        do_seps = self.options['group_by_pre_opt_post'] and driver.supports['optimization']
-        self.model._setup_iteration_lists(do_seps)
 
         info = driver._coloring_info
         coloring = info['coloring']
