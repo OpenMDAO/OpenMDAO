@@ -119,6 +119,36 @@ class LinearSchur(BlockLinearSolver):
             subsys2_rhs = self._rhs_vec[off2 : off2 + len(b_vec2)].copy()
 
             ################################
+            #### Beg solve for subsys 1 ####
+            ################################
+
+            # subsys1._doutputs.set_val(0.0)
+            # if self._rel_systems is not None and subsys1.pathname not in self._rel_systems:
+            #     return
+            # must always do the transfer on all procs even if subsys not local
+            system._transfer("linear", mode, subsys1.name)
+
+            # if not subsys1._is_local:
+            #     return
+
+            scope_out, scope_in = system._get_matvec_scope(subsys1)
+            scope_out = self._vars_union(self._scope_out, scope_out)
+            scope_in = self._vars_union(self._scope_in, scope_in)
+
+            if subsys1._iter_call_apply_linear():
+                subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+                b_vec *= -1.0
+                b_vec += self._rhs_vec[off : off + len(b_vec)]
+            else:
+                b_vec.set_val(self._rhs_vec[off : off + len(b_vec)])
+
+            subsys1._solve_linear(mode, self._rel_systems, scope_out, scope_in)
+            subsys1_data = subsys1._vectors["output"]["linear"].asarray(copy=True)
+            ################################
+            #### End solve for subsys 1 ####
+            ################################
+
+            ################################
             #### Beg solve for subsys 2 ####
             ################################
 
@@ -235,38 +265,12 @@ class LinearSchur(BlockLinearSolver):
             system._dresiduals.set_val(resd_cache)
 
             # loop over the variables just to be safe with the ordering
-            # subsys1._doutputs.set_val(subsys1_output)
+            subsys1._doutputs.set_val(subsys1_data)
             for ii, var in enumerate(vars_to_solve):
                 system._doutputs[f"{subsys2.name}.{var}"] = d_subsys2[ii]
 
             ################################
             #### End solve for subsys 2 ####
-            ################################
-
-            # subsys1._doutputs.set_val(0.0)
-            # if self._rel_systems is not None and subsys1.pathname not in self._rel_systems:
-            #     return
-            # must always do the transfer on all procs even if subsys not local
-            system._transfer("linear", mode, subsys1.name)
-
-            # if not subsys1._is_local:
-            #     return
-
-            scope_out, scope_in = system._get_matvec_scope(subsys1)
-            scope_out = self._vars_union(self._scope_out, scope_out)
-            scope_in = self._vars_union(self._scope_in, scope_in)
-
-            if subsys1._iter_call_apply_linear():
-                subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
-                b_vec *= -1.0
-                b_vec += self._rhs_vec[off : off + len(b_vec)]
-            else:
-                b_vec.set_val(self._rhs_vec[off : off + len(b_vec)])
-
-            subsys1._solve_linear(mode, self._rel_systems, scope_out, scope_in)
-
-            ################################
-            #### Beg solve for subsys 1 ####
             ################################
 
         else:  # rev
