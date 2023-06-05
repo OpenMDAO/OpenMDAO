@@ -31,6 +31,7 @@ from openmdao.components.spline_comp import SplineComp
 from openmdao.components.multifi_meta_model_unstructured_comp import MultiFiMetaModelUnStructuredComp
 from openmdao.components.mux_comp import MuxComp
 from openmdao.components.vector_magnitude_comp import VectorMagnitudeComp
+from openmdao.components.submodel_comp import SubmodelComp
 
 
 # Solvers
@@ -135,6 +136,7 @@ from openmdao.utils.om_warnings import (
 # Utils
 from openmdao.utils.general_utils import wing_dbg, env_truthy
 from openmdao.utils.array_utils import shape_to_len
+from openmdao.utils.jax_utils import register_jax_component
 
 # Reports System
 from openmdao.utils.reports_system import (

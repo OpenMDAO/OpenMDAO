@@ -351,7 +351,6 @@ class pyOptSparseDriver(Driver):
 
         # Only need initial run if we have linear constraints or if we are using an optimizer that
         # doesn't perform one initially.
-        con_meta = self._cons
         model_ran = False
         if optimizer in run_required or np.any([con['linear'] for con in self._cons.values()]):
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
@@ -362,19 +361,18 @@ class pyOptSparseDriver(Driver):
                 model_ran = True
             self.iter_count += 1
 
-        # compute dynamic simul deriv coloring or just sparsity if option is set
-        coloring = self._get_coloring(run_model=not model_ran)
+        # compute dynamic simul deriv coloring
+        self._get_coloring(run_model=not model_ran)
 
         comm = None if isinstance(problem.comm, FakeComm) else problem.comm
         opt_prob = Optimization(self.options['title'], WeakMethodWrapper(self, '_objfunc'),
                                 comm=comm)
 
         # Add all design variables
-        dv_meta = self._designvars
-        self._indep_list = indep_list = list(dv_meta)
+        self._indep_list = indep_list = list(self._designvars)
         input_vals = self.get_design_var_values()
 
-        for name, meta in dv_meta.items():
+        for name, meta in self._designvars.items():
             size = meta['global_size'] if meta['distributed'] else meta['size']
             if pyoptsparse_version is None or pyoptsparse_version < Version('2.6.1'):
                 opt_prob.addVarGroup(name, size, type='c',
@@ -397,7 +395,7 @@ class pyOptSparseDriver(Driver):
             self._quantities.append(name)
 
         # Calculate and save derivatives for any linear constraints.
-        lcons = [key for (key, con) in con_meta.items() if con['linear']]
+        lcons = [key for (key, con) in self._cons.items() if con['linear']]
         if len(lcons) > 0:
             _lin_jacs = self._compute_totals(of=lcons, wrt=indep_list,
                                              return_format=self._total_jac_format)
@@ -421,17 +419,17 @@ class pyOptSparseDriver(Driver):
                             jacdct[n] = {'coo': [mat.row, mat.col, mat.data], 'shape': mat.shape}
 
         # Add all equality constraints
-        for name, meta in con_meta.items():
+        for name, meta in self._cons.items():
             if meta['equals'] is None:
                 continue
             size = meta['global_size'] if meta['distributed'] else meta['size']
             lower = upper = meta['equals']
             path = meta['source']
             if fwd:
-                wrt = [v for v in indep_list if path in relevant[dv_meta[v]['source']]]
+                wrt = [v for v in indep_list if path in relevant[self._designvars[v]['source']]]
             else:
                 rels = relevant[path]
-                wrt = [v for v in indep_list if dv_meta[v]['source'] in rels]
+                wrt = [v for v in indep_list if self._designvars[v]['source'] in rels]
 
             if not wrt:
                 issue_warning(f"Equality constraint '{name}' does not depend on any design "
@@ -447,7 +445,7 @@ class pyOptSparseDriver(Driver):
             else:
                 if name in self._res_subjacs:
                     resjac = self._res_subjacs[name]
-                    jac = {n: resjac[dv_meta[n]['source']] for n in wrt}
+                    jac = {n: resjac[self._designvars[n]['source']] for n in wrt}
                 else:
                     jac = None
 
@@ -455,7 +453,7 @@ class pyOptSparseDriver(Driver):
                 self._quantities.append(name)
 
         # Add all inequality constraints
-        for name, meta in con_meta.items():
+        for name, meta in self._cons.items():
             if meta['equals'] is not None:
                 continue
             size = meta['global_size'] if meta['distributed'] else meta['size']
@@ -467,10 +465,10 @@ class pyOptSparseDriver(Driver):
             path = meta['source']
 
             if fwd:
-                wrt = [v for v in indep_list if path in relevant[dv_meta[v]['source']]]
+                wrt = [v for v in indep_list if path in relevant[self._designvars[v]['source']]]
             else:
                 rels = relevant[path]
-                wrt = [v for v in indep_list if dv_meta[v]['source'] in rels]
+                wrt = [v for v in indep_list if self._designvars[v]['source'] in rels]
 
             if not wrt:
                 issue_warning(f"Inequality constraint '{name}' does not depend on any design "
@@ -486,7 +484,7 @@ class pyOptSparseDriver(Driver):
             else:
                 if name in self._res_subjacs:
                     resjac = self._res_subjacs[name]
-                    jac = {n: resjac[dv_meta[n]['source']] for n in wrt}
+                    jac = {n: resjac[self._designvars[n]['source']] for n in wrt}
                 else:
                     jac = None
                 opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt, jac=jac)
@@ -552,13 +550,15 @@ class pyOptSparseDriver(Driver):
                           storeHistory=self.hist_file, hotStart=self.hotstart_file)
 
         except Exception as c:
-            if not self._exc_info:
+            if self._exc_info is None:
                 raise
 
-        if self._exc_info:
-            if self._exc_info[2] is None:
-                raise self._exc_info[1]
-            raise self._exc_info[1].with_traceback(self._exc_info[2])
+        if self._exc_info is not None:
+            exc_info = self._exc_info
+            self._exc_info = None
+            if exc_info[2] is None:
+                raise exc_info[1]
+            raise exc_info[1].with_traceback(exc_info[2])
 
         # Print results
         if self.options['print_results']:
@@ -668,22 +668,22 @@ class pyOptSparseDriver(Driver):
                     model._clear_iprint()
                     fail = 2
 
-                func_dict = self.get_objective_values()
-                func_dict.update(self.get_constraint_values(lintype='nonlinear'))
-
-                if fail > 0 and self._fill_NANs:
-                    for name in func_dict:
-                        func_dict[name].fill(np.NAN)
-
                 # Record after getting obj and constraint to assure they have
                 # been gathered in MPI.
                 rec.abs = 0.0
                 rec.rel = 0.0
 
         except Exception:
-            self._exc_info = sys.exc_info()
+            if self._exc_info is None:  # avoid overwriting an earlier exception
+                self._exc_info = sys.exc_info()
             fail = 1
-            func_dict = {}
+
+        func_dict = self.get_objective_values()
+        func_dict.update(self.get_constraint_values(lintype='nonlinear'))
+
+        if fail > 0 and self._fill_NANs:
+            for name in func_dict:
+                func_dict[name].fill(np.NAN)
 
         # print("Functions calculated")
         # print(dv_dict)
@@ -718,6 +718,7 @@ class pyOptSparseDriver(Driver):
         """
         prob = self._problem()
         fail = 0
+        sens_dict = {}
 
         try:
 
@@ -732,7 +733,7 @@ class pyOptSparseDriver(Driver):
                                                  return_format=self._total_jac_format)
 
                 # First time through, check for zero row/col.
-                if self._check_jac:
+                if self._check_jac and self._total_jac is not None:
                     raise_error = self.options['singular_jac_behavior'] == 'error'
                     self._total_jac.check_total_jac(raise_error=raise_error,
                                                     tol=self.options['singular_jac_tol'])
@@ -768,24 +769,24 @@ class pyOptSparseDriver(Driver):
                             newdv[ikey] = sens_dict[okey][ikey]
                 sens_dict = new_sens
 
-            if fail > 0:
-                # We need to cobble together a sens_dict of the correct size.
-                # Best we can do is return zeros.
+        except Exception:
+            if self._exc_info is None:  # avoid overwriting an earlier exception
+                self._exc_info = sys.exc_info()
+            fail = 1
 
-                sens_dict = {}
-                for okey, oval in func_dict.items():
+        if fail > 0:
+            # We need to cobble together a sens_dict of the correct size.
+            # Best we can do is return zeros or NaNs.
+            for okey, oval in func_dict.items():
+                if okey not in sens_dict:
                     sens_dict[okey] = {}
-                    osize = len(oval)
-                    for ikey, ival in dv_dict.items():
-                        isize = len(ival)
+                osize = len(oval)
+                for ikey, ival in dv_dict.items():
+                    isize = len(ival)
+                    if ikey not in sens_dict[okey] or self._fill_NANs:
                         sens_dict[okey][ikey] = np.zeros((osize, isize))
                         if self._fill_NANs:
                             sens_dict[okey][ikey].fill(np.NAN)
-
-        except Exception:
-            self._exc_info = sys.exc_info()
-            fail = 1
-            sens_dict = {}
 
         # print("Derivatives calculated")
         # print(dv_dict)
@@ -858,8 +859,6 @@ class pyOptSparseDriver(Driver):
         for res, dvdict in total_sparsity.items():  # res are 'driver' names (prom name or alias)
             if res in self._objs:  # skip objectives
                 continue
-            # if res in self._responses and self._responses[res]['alias'] is not None:
-            #     res = self._responses[res]['source']
             self._res_subjacs[res] = {}
             for dv, (rows, cols, shape) in dvdict.items():  # dvs are src names
                 rows = np.array(rows, dtype=INT_DTYPE)

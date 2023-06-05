@@ -15,7 +15,7 @@ from collections.abc import Iterable
 import numpy as np
 
 from openmdao.core.constants import INF_BOUND
-from openmdao.utils.om_warnings import issue_warning, warn_deprecation
+from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.array_utils import shape_to_len
 
 
@@ -387,7 +387,7 @@ def _find_dict_meta(dct, key):
     return False
 
 
-def pad_name(name, pad_num=10, quotes=False):
+def pad_name(name, width=10, quotes=False):
     """
     Pad a string so that they all line up when stacked.
 
@@ -395,7 +395,7 @@ def pad_name(name, pad_num=10, quotes=False):
     ----------
     name : str
         The string to pad.
-    pad_num : int
+    width : int
         The number of total spaces the string should take up.
     quotes : bool
         If name should be quoted.
@@ -405,11 +405,11 @@ def pad_name(name, pad_num=10, quotes=False):
     str
         Padded string.
     """
-    name = f"'{name}'" if quotes else name
-    if pad_num > len(name):
-        return f"{name:<{pad_num}}"
+    name = f"'{name}'" if quotes else str(name)
+    if width > len(name):
+        return f"{name:<{width}}"
     else:
-        return f'{name}'
+        return f"{name}"
 
 
 def add_border(msg, borderstr='=', vpad=0):
@@ -435,7 +435,8 @@ def add_border(msg, borderstr='=', vpad=0):
     border = len(msg) * borderstr
     # handle borderstr of more than 1 char
     border = border[:len(msg)]
-    return f"{border}\n{msg}\n{border}"
+    padding = '\n' * (vpad + 1)
+    return f"{border}{padding}{msg}{padding}{border}"
 
 
 def run_model(prob, ignore_exception=False):
@@ -922,7 +923,7 @@ def common_subpath(pathnames):
 
     Parameters
     ----------
-    pathnames : iter of str
+    pathnames : list or tuple of str
         Dotted pathnames of systems.
 
     Returns
@@ -936,8 +937,7 @@ def common_subpath(pathnames):
     if pathnames:
         npaths = len(pathnames)
         splits = [p.split('.') for p in pathnames]
-        minlen = np.min([len(s) for s in splits])
-        for common_loc in range(minlen):
+        for common_loc in range(np.min([len(s) for s in splits])):
             p0 = splits[0][common_loc]
             for i in range(1, npaths):
                 if p0 != splits[i][common_loc]:
@@ -1001,7 +1001,7 @@ def _src_or_alias_name(meta):
 
 def _src_or_alias_item_iter(proms):
     """
-    Yield items from proms with promoted input names converted to source or alias names.
+    Yield items from proms dict with promoted input names converted to source or alias names.
 
     Parameters
     ----------

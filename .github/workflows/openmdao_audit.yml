@@ -85,19 +85,10 @@ jobs:
         if: matrix.OS != 'windows-latest'
         run: |
           echo "============================================================="
-          echo "Install compilers for PETSc"
-          echo "============================================================="
-          conda install cython compilers openmpi-mpicc -q -y
-
-          echo "============================================================="
           echo "Install PETSc"
           echo "============================================================="
-          if [[ "${{ matrix.OS }}" == "macos-latest" ]]; then
-              conda install mpi4py petsc4py -q -y
-          else
-            python -m pip install git+https://github.com/mpi4py/mpi4py
-            python -m pip install petsc petsc4py
-          fi
+          conda install mpi4py petsc petsc4py -q -y
+
 
       - name: Install pyOptSparse
         if: matrix.OS != 'macos-latest'

@@ -946,10 +946,9 @@ class TestExecComp(unittest.TestCase):
     def test_tags(self):
         prob = om.Problem(model=om.Group())
         C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x+z+1.',
-                                                     x={'val': 1.0, 'units': 'm', 'tags': 'tagx'},
-                                                     y={'units': 'm', 'tags': ['tagy','tagq']},
-                                                     z={'val': 2.0, 'tags': 'tagz'},
-                                                     ))
+                                                        x={'val': 1.0, 'units': 'm', 'tags': 'tagx'},
+                                                        y={'units': 'm', 'tags': ['tagy','tagq']},
+                                                        z={'val': 2.0, 'tags': 'tagz'}))
 
         prob.setup(check=False)
 
@@ -957,49 +956,49 @@ class TestExecComp(unittest.TestCase):
         prob.run_model()
 
         # Inputs no tags
-        inputs = prob.model.list_inputs(val=False, out_stream=None)
+        inputs = prob.model.list_inputs(val=False, prom_name=False, out_stream=None)
         self.assertEqual(sorted(inputs), [
             ('C1.x', {}),
             ('C1.z', {}),
         ])
 
         # Inputs with tags
-        inputs = prob.model.list_inputs(val=False, out_stream=None, tags="tagx")
+        inputs = prob.model.list_inputs(val=False, prom_name=False, out_stream=None, tags="tagx")
         self.assertEqual(sorted(inputs), [
             ('C1.x', {}),
         ])
 
         # Inputs with multiple tags
-        inputs = prob.model.list_inputs(val=False, out_stream=None, tags=["tagx", "tagz"])
+        inputs = prob.model.list_inputs(val=False, prom_name=False, out_stream=None, tags=["tagx", "tagz"])
         self.assertEqual(sorted(inputs), [
             ('C1.x', {}),
             ('C1.z', {}),
         ])
 
         # Inputs with tag that does not match
-        inputs = prob.model.list_inputs(val=False, out_stream=None, tags="tag_wrong")
+        inputs = prob.model.list_inputs(val=False, prom_name=False, out_stream=None, tags="tag_wrong")
         self.assertEqual(sorted(inputs), [])
 
         # Outputs no tags
-        outputs = prob.model.list_outputs(val=False, out_stream=None)
+        outputs = prob.model.list_outputs(val=False, prom_name=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
             ('C1.y', {}),
         ])
 
         # Outputs with tags
-        outputs = prob.model.list_outputs(val=False, out_stream=None, tags="tagy")
+        outputs = prob.model.list_outputs(val=False, prom_name=False, out_stream=None, tags="tagy")
         self.assertEqual(sorted(outputs), [
             ('C1.y', {}),
         ])
 
         # Outputs with multiple tags
-        outputs = prob.model.list_outputs(val=False, out_stream=None, tags=["tagy", "tagx"])
+        outputs = prob.model.list_outputs(val=False, prom_name=False, out_stream=None, tags=["tagy", "tagx"])
         self.assertEqual(sorted(outputs), [
             ('C1.y', {}),
         ])
 
         # Outputs with tag that does not match
-        outputs = prob.model.list_outputs(val=False, out_stream=None, tags="tag_wrong")
+        outputs = prob.model.list_outputs(val=False, prom_name=False, out_stream=None, tags="tag_wrong")
         self.assertEqual(sorted(outputs), [])
 
     def test_feature_has_diag_partials(self):
@@ -1327,23 +1326,23 @@ class TestExecComp(unittest.TestCase):
                             x={'val' : 3.0, 'units' : 'cm'},
                             z={'shape' : (1, ), 'units' : 's'})
 
-        self.assertEquals(cm.exception.args[0],
-                          "Defaults for 'x' have already been defined in a previous "
-                          "expression.")
+        self.assertEqual(cm.exception.args[0],
+                         "Defaults for 'x' have already been defined in a previous "
+                         "expression.")
 
         with self.assertRaises(TypeError) as cm:
             excomp.add_expr(p)
 
-        self.assertEquals(cm.exception.args[0],
-                          "Argument 'expr' must be of type 'str', but type 'Problem' was found.")
+        self.assertEqual(cm.exception.args[0],
+                         "Argument 'expr' must be of type 'str', but type 'Problem' was found.")
 
         excomp.add_expr('y = 2.9*x')
         p.model.add_subsystem('zzz', excomp)
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
 
-        self.assertEquals(cm.exception.args[0],
-                          "'zzz' <class ExecComp>: The output 'y' has already been defined by an expression.")
+        self.assertEqual(cm.exception.args[0],
+                         "'zzz' <class ExecComp>: The output 'y' has already been defined by an expression.")
 
     def test_feature_add_expr(self):
 
@@ -1571,8 +1570,8 @@ class TestFunctionRegistration(unittest.TestCase):
 
             with self.assertRaises(Exception) as cm:
                 data = force_check_partials(p, out_stream=None)
-            self.assertEquals(cm.exception.args[0],
-                              "'comp' <class ExecComp>: expression contains functions ['area'] that are not complex safe. To fix this, call declare_partials('*', ['x'], method='fd') on this component prior to setup.")
+            self.assertEqual(cm.exception.args[0],
+                             "'comp' <class ExecComp>: expression contains functions ['area'] that are not complex safe. To fix this, call declare_partials('*', ['x'], method='fd') on this component prior to setup.")
 
     def test_register_check_partials_not_safe_mult_expr(self):
         with _temporary_expr_dict():
@@ -1625,8 +1624,8 @@ class TestFunctionRegistration(unittest.TestCase):
 
             with self.assertRaises(Exception) as cm:
                 data = force_check_partials(p, out_stream=None, step=1e-7)
-            self.assertEquals(cm.exception.args[0],
-                              "'comp' <class ExecComp>: expression contains functions ['unsafe'] that are not complex safe. To fix this, call declare_partials('*', ['z'], method='fd') on this component prior to setup.")
+            self.assertEqual(cm.exception.args[0],
+                             "'comp' <class ExecComp>: expression contains functions ['unsafe'] that are not complex safe. To fix this, call declare_partials('*', ['z'], method='fd') on this component prior to setup.")
 
     def test_register_check_partials_safe(self):
         with _temporary_expr_dict():
@@ -1775,20 +1774,20 @@ class TestFunctionRegistration(unittest.TestCase):
         with _temporary_expr_dict():
             with self.assertRaises(Exception) as cm:
                 om.ExecComp.register('shape', lambda x: x, complex_safe=True)
-            self.assertEquals(cm.exception.args[0], "ExecComp: cannot register name 'shape' because "
-                              "it's a reserved keyword.")
+            self.assertEqual(cm.exception.args[0], "ExecComp: cannot register name 'shape' because "
+                             "it's a reserved keyword.")
 
     def test_register_err_not_callable(self):
         with _temporary_expr_dict():
             with self.assertRaises(Exception) as cm:
                 om.ExecComp.register('foo', 99, complex_safe=True)
-            self.assertEquals(cm.exception.args[0], "ExecComp: 'foo' passed to register() of type 'int' is not callable.")
+            self.assertEqual(cm.exception.args[0], "ExecComp: 'foo' passed to register() of type 'int' is not callable.")
 
     def test_register_err_dup(self):
         with _temporary_expr_dict():
             with self.assertRaises(Exception) as cm:
                 om.ExecComp.register('exp', lambda x: x, complex_safe=True)
-            self.assertEquals(cm.exception.args[0], "ExecComp: 'exp' has already been registered.")
+            self.assertEqual(cm.exception.args[0], "ExecComp: 'exp' has already been registered.")
 
 
 _MASK = np.array(

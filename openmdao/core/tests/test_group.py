@@ -405,6 +405,33 @@ class TestGroup(unittest.TestCase):
                          "'d1' <class SellarDis2>: 'promotes_outputs' failed to find any matches for "
                          "the following names or patterns: ['foo'].")
 
+    def test_group_promotes_modified_systems(self):
+        # before the fix, this test raised an exception saying multiple outputs were promoted
+        # to the same name.
+        class MyComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_output('x', val=0)
+
+        class SubSubGroup(om.Group):
+            def setup(self):
+                self.add_subsystem("comp", MyComp(), promotes_outputs=["*"])
+
+        class SubGroup(om.Group):
+            def setup(self):
+                self.add_subsystem("sub", SubSubGroup(), promotes_outputs=["*"])
+
+        class ConfigGroup(om.Group):
+            def setup(self):
+                self.add_subsystem("G1", SubGroup(), promotes_outputs=["*"])
+                self.add_subsystem('G2', SubGroup(), promotes_outputs=['*'])
+
+            def configure(self):
+                self.G1.sub.promotes('comp', outputs=[('x', 'OVERRIDE:x')])
+
+        prob = om.Problem()
+        prob.model.add_subsystem('static_analysis', ConfigGroup(), promotes_outputs=['*'])
+        prob.setup()
+
     def test_group_nested_conn(self):
         """Example of adding subsystems and issuing connections with nested groups."""
         g1 = om.Group()
@@ -1372,7 +1399,11 @@ class TestGroup(unittest.TestCase):
             p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "\nCollected errors for problem 'promote_units_and_none':\n   <model> <class Group>: The following inputs, ['c1.x', 'c2.x'], promoted to 'x', are connected but their metadata entries ['units', 'val'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the model to remove the ambiguity.")
+                         "\nCollected errors for problem 'promote_units_and_none':\n   "
+                         "<model> <class Group>: The following inputs, ['c1.x', 'c2.x'], promoted to 'x', "
+                         "are connected but their metadata entries ['units', 'val'] differ. "
+                         "Call <group>.set_input_defaults('x', units=?, val=?), "
+                         "where <group> is the model to remove the ambiguity.")
 
     def test_double_set_input_defaults(self):
         problem = om.Problem()
@@ -1437,6 +1468,104 @@ class TestGroup(unittest.TestCase):
         msg = ("\nCollected errors for problem 'set_input_def_key_error':\n"
                "   <model> <class Group>: The following group inputs, passed to set_input_defaults(), could not be found: ['bad_name'].")
         self.assertEqual(cm.exception.args[0], msg)
+
+    def test_set_input_defaults_compatible_val_and_src_shape(self):
+        class Paraboloid(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', val=0.0, shape=(2,))
+                self.add_input('y', val=0.0)
+
+                self.add_output('f_xy', val=0.0)
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                y = inputs['y']
+                outputs['f_xy'] = (x[0] - 3.0)**2 + x[0] * y + (y + 4.0)**2 - 3.0
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        model.add_design_var('x', lower=-10, upper=10)
+        model.add_design_var('y', lower=-10, upper=10)
+        model.add_objective('f_xy')
+
+        with assert_no_warning(category=PromotionWarning):
+            model.set_input_defaults('x', val=[1.0, 1.0], src_shape=(2,))
+
+        prob.setup()
+
+        np.testing.assert_array_equal(prob['x'], np.ones(2))
+
+    def test_set_input_defaults_scalar_val_with_src_shape(self):
+        class Paraboloid(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', val=0.0, shape=(2,))
+                self.add_input('y', val=0.0)
+
+                self.add_output('f_xy', val=0.0)
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                y = inputs['y']
+                outputs['f_xy'] = (x[0] - 3.0)**2 + x[0] * y + (y + 4.0)**2 - 3.0
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        model.add_design_var('x', lower=-10, upper=10)
+        model.add_design_var('y', lower=-10, upper=10)
+        model.add_objective('f_xy')
+
+        model.set_input_defaults('x', val=1.0, src_shape=(2,))
+
+        prob.setup()
+
+        np.testing.assert_array_equal(prob['x'], np.ones(2))
+
+    def test_set_input_defaults_val_shape_src_indices(self):
+
+        class MyComp1(om.ExplicitComponent):
+            """ multiplies input array by 2. """
+            def setup(self):
+                self.add_input('x', np.ones(3))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])*2.0
+
+        class MyComp2(om.ExplicitComponent):
+            """ multiplies input array by 4. """
+            def setup(self):
+                self.add_input('x', np.ones(2))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])*4.0
+
+        class MyGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', MyComp1())
+                self.add_subsystem('comp2', MyComp2())
+
+            def configure(self):
+                # splits input via promotes using src_indices
+                self.promotes('comp1', inputs=['x'], src_indices=[0, 1, 2])
+                self.promotes('comp2', inputs=['x'], src_indices=[3, 4])
+
+        p = om.Problem()
+
+        # Note: src_shape is different that the shape of either target
+        p.model.set_input_defaults('x', src_shape=(5,), val=1.)
+        p.model.add_subsystem('G1', MyGroup(), promotes_inputs=['x'])
+
+        p.setup()
+
+        np.testing.assert_array_equal(p['x'], np.ones(5))
+
 
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestGroupMPISlice(unittest.TestCase):
@@ -1533,6 +1662,7 @@ class TestGroupMPISlice(unittest.TestCase):
 
         assert_near_equal(p.get_val('C1.x', get_remote=False), np.array([4, 4, 4, 4]))
 
+
 class TestGroupPromotes(unittest.TestCase):
 
     def test_promotes_outputs_in_config(self):
@@ -1615,6 +1745,25 @@ class TestGroupPromotes(unittest.TestCase):
         top.setup()
 
         self.assertEqual(top['bb'], 4.0)
+
+    def test_promotes_star1(self):
+        class SubGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.ExecComp('x=2.0*a+3.0*b', a=3.0, b=4.0))
+
+            def configure(self):
+                self.promotes('comp1', inputs=['b*'])
+
+        class TopGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('sub', SubGroup())
+
+            def configure(self):
+                self.sub.promotes('comp1', inputs=['*'])
+
+        top = om.Problem(model=TopGroup())
+        with assert_no_warning(PromotionWarning):
+            top.setup()
 
     def test_promotes_alias_from_parent(self):
         class SubGroup(om.Group):
@@ -2104,8 +2253,8 @@ class MyComp(om.ExplicitComponent):
 
 class TestConnect(unittest.TestCase):
 
-    def setUp(self):
-        prob = om.Problem(om.Group())
+    def setup_problem(self, probname):
+        prob = om.Problem(om.Group(), name=probname)
 
         sub = prob.model.add_subsystem('sub', om.Group())
 
@@ -2117,93 +2266,98 @@ class TestConnect(unittest.TestCase):
         sub.add_subsystem('cmp', om.ExecComp('z = x'))
         sub.add_subsystem('arr', om.ExecComp('a = x', x=np.zeros(2)))
 
-        self.sub = sub
-        self.prob = prob
+        return prob
 
     def test_src_indices_as_int_list(self):
-        self.sub.connect('src.x', 'tgt.x', src_indices=[1])
+        p = self.setup_problem('test_src_indices_as_int_list')
+        p.model.sub.connect('src.x', 'tgt.x', src_indices=[1])
 
     def test_src_indices_as_int_array(self):
-        self.sub.connect('src.x', 'tgt.x', src_indices=np.zeros(1, dtype=int))
+        p = self.setup_problem('test_src_indices_as_int_array')
+        p.model.sub.connect('src.x', 'tgt.x', src_indices=np.zeros(1, dtype=int))
 
     def test_src_indices_as_float_list(self):
-
+        p = self.setup_problem('test_src_indices_as_float_list')
         with set_env_vars_context(OPENMDAO_FAIL_FAST='1'):
             with self.assertRaises(Exception) as cm:
-                self.sub.connect('src.x', 'tgt.x', src_indices=[1.0])
+                p.model.sub.connect('src.x', 'tgt.x', src_indices=[1.0])
 
         msg = "'sub' <class Group>: When connecting from 'src.x' to 'tgt.x': Can't create an index array using indices of non-integral type 'float64'."
-        self.assertEquals(str(cm.exception), msg)
+        self.assertEqual(str(cm.exception), msg)
 
     def test_src_indices_as_float_array(self):
-        self.prob._name = 'src_indices_as_float_array'
-        self.sub.connect('src.x', 'tgt.x', src_indices=np.zeros(1))
+        p = self.setup_problem('src_indices_as_float_array')
+        p.model.sub.connect('src.x', 'tgt.x', src_indices=np.zeros(1))
         with self.assertRaises(Exception) as cm:
-            self.prob.setup()
-            self.prob.run_model()
+            p.setup()
+            p.run_model()
 
-        self.assertEquals(str(cm.exception),
+        self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'src_indices_as_float_array':"
            "\n   'sub' <class Group>: When connecting from 'src.x' to 'tgt.x': Can't create an "
            "index array using indices of non-integral type 'float64'.")
 
     def test_src_indices_as_str(self):
+        p = self.setup_problem('src_indices_as_str')
         msg = "'sub' <class Group>: src_indices must be a slice, int, or index array. Did you mean connect('src.x', ['tgt.x', 'cmp.x'])?"
         with set_env_vars_context(OPENMDAO_FAIL_FAST='1'):
             with self.assertRaisesRegex(Exception, msg):
-                self.sub.connect('src.x', 'tgt.x', 'cmp.x')
+                p.model.sub.connect('src.x', 'tgt.x', 'cmp.x')
 
     def test_already_connected(self):
+        p = self.setup_problem('test_already_connected')
+        sub = p.model.sub
+
         msg = "'sub' <class Group>: Input 'tgt.x' is already connected to 'src.x'."
 
         with set_env_vars_context(OPENMDAO_FAIL_FAST='1'):
-            self.sub.connect('src.x', 'tgt.x', src_indices=[1])
+            sub.connect('src.x', 'tgt.x', src_indices=[1])
             with self.assertRaises(Exception) as cm:
-                self.sub.connect('cmp.x', 'tgt.x', src_indices=[1])
+                sub.connect('cmp.x', 'tgt.x', src_indices=[1])
 
-        self.assertEquals(str(cm.exception), msg)
+        self.assertEqual(str(cm.exception), msg)
 
     def test_invalid_source(self):
-        self.prob._name = 'invalid_source'
+        p = self.setup_problem('invalid_source')
         # source and target names can't be checked until setup
         # because setup is not called until then
-        self.sub.connect('src.z', 'tgt.x', src_indices=[1])
+        p.model.sub.connect('src.z', 'tgt.x', src_indices=[1])
 
         with self.assertRaises(Exception) as context:
-            self.prob.setup()
+            p.setup()
 
         self.assertEqual(str(context.exception),
            "\nCollected errors for problem 'invalid_source':"
            "\n   'sub' <class Group>: Attempted to connect from 'src.z' to 'tgt.x', but 'src.z' "
            "doesn't exist. Perhaps you meant to connect to one of the following outputs: "
-           "['src.x', 'src.s', 'cmp.z']."
-)
+           "['src.x', 'src.s', 'cmp.z'].")
+
     def test_connect_to_output(self):
-        self.prob._name = 'connect_to_output'
+        p = self.setup_problem('connect_to_output')
         msg = "\nCollected errors for problem 'connect_to_output':\n   'sub' <class Group>: " + \
               "Attempted to connect from 'tgt.y' to 'cmp.z', but 'cmp.z' is an output. " + \
               "All connections must be from an output to an input."
 
         # source and target names can't be checked until setup
         # because setup is not called until then
-        self.sub.connect('tgt.y', 'cmp.z')
+        p.model.sub.connect('tgt.y', 'cmp.z')
 
         with self.assertRaises(Exception) as context:
-            self.prob.setup()
+            p.setup()
 
         self.assertEqual(str(context.exception), msg)
 
     def test_connect_from_input(self):
-        self.prob._name = 'connect_from_input'
+        p = self.setup_problem('connect_from_input')
         msg = "\nCollected errors for problem 'connect_from_input':\n   'sub' <class Group>: " + \
               "Attempted to connect from 'tgt.x' to 'cmp.x', but 'tgt.x' is an input. " + \
               "All connections must be from an output to an input."
 
         # source and target names can't be checked until setup
         # because setup is not called until then
-        self.sub.connect('tgt.x', 'cmp.x')
+        p.model.sub.connect('tgt.x', 'cmp.x')
         with self.assertRaises(Exception) as context:
-            self.prob.setup()
+            p.setup()
 
         self.assertEqual(str(context.exception), msg)
 
@@ -2220,27 +2374,28 @@ class TestConnect(unittest.TestCase):
         p['x']
 
     def test_invalid_target(self):
-        self.prob._name = 'invalid_target'
+        p = self.setup_problem('invalid_target')
         msg = "\nCollected errors for problem 'invalid_target':\n   'sub' <class Group>: " + \
               "Attempted to connect from 'src.x' to 'tgt.z', but 'tgt.z' doesn't exist. " + \
               "Perhaps you meant to connect to one of the following inputs: ['tgt.x']."
 
         # source and target names can't be checked until setup
         # because setup is not called until then
-        self.sub.connect('src.x', 'tgt.z', src_indices=[1])
+        p.model.sub.connect('src.x', 'tgt.z', src_indices=[1])
 
         with self.assertRaises(Exception) as context:
-            self.prob.setup()
+            p.setup()
 
         self.assertEqual(str(context.exception), msg)
 
     def test_connect_within_system(self):
+        p = self.setup_problem('connect_within_system')
         msg = "Output and input are in the same System for connection " + \
               "from 'tgt.y' to 'tgt.x'."
 
         with set_env_vars_context(OPENMDAO_FAIL_FAST='1'):
             with self.assertRaisesRegex(Exception, msg):
-                self.sub.connect('tgt.y', 'tgt.x', src_indices=[1])
+                p.model.sub.connect('tgt.y', 'tgt.x', src_indices=[1])
 
     def test_connect_within_system_with_promotes(self):
         prob = om.Problem(name='connect_within_system_with_promotes')
@@ -2381,16 +2536,16 @@ class TestConnect(unittest.TestCase):
         assert_near_equal(prob['G1.par1.c4.y'], 8.0)
 
     def test_bad_shapes(self):
-        self.prob._name = 'bad_shapes'
-        self.sub.connect('src.s', 'arr.x')
+        p = self.setup_problem('bad_shapes2')
+        p.model.sub.connect('src.s', 'arr.x')
 
-        msg = "\nCollected errors for problem 'bad_shapes':" + \
+        msg = "\nCollected errors for problem 'bad_shapes2':" + \
               "\n   'sub' <class Group>: The source and target shapes do not match or are ambiguous " + \
               "for the connection 'sub.src.s' to 'sub.arr.x'. The source shape is (1,) " + \
               "but the target shape is (2,)."
 
         with self.assertRaises(Exception) as context:
-            self.prob.setup()
+            p.setup()
 
         self.assertEqual(str(context.exception), msg)
 
@@ -2412,32 +2567,32 @@ class TestConnect(unittest.TestCase):
         self.assertEqual(str(context.exception), msg)
 
     def test_bad_indices_dimensions(self):
-        self.prob._name = 'bad_indices_dimensions'
-        self.sub.connect('src.x', 'arr.x', src_indices=[[2,2],[-1,2],[2,2]],
-                         flat_src_indices=False)
+        p = self.setup_problem('bad_indices_dimensions')
+        p.model.sub.connect('src.x', 'arr.x', src_indices=([2,2],[-1,2],[2,2]),
+                            flat_src_indices=False)
 
         msg = "\nCollected errors for problem 'bad_indices_dimensions':\n   <model> <class Group>: " + \
               "When connecting 'sub.src.x' to 'sub.arr.x': Can't set source shape to (5, 3) because " + \
               "indexer ([2, 2], [-1, 2], [2, 2]) expects 3 dimensions."
         try:
-            self.prob.setup()
+            p.setup()
         except Exception as err:
             self.assertEqual(str(err), msg)
         else:
             self.fail('Exception expected.')
 
     def test_bad_indices_index(self):
-        self.prob._name = 'bad_indices_index'
+        p = self.setup_problem('bad_indices_index')
         # the index value within src_indices is outside the valid range for the source
-        self.sub.connect('src.x', 'arr.x', src_indices=[[2, 4],[-1, 4]],
-                         flat_src_indices=False)
+        p.model.sub.connect('src.x', 'arr.x', src_indices=([2, 4],[-1, 4]),
+                            flat_src_indices=False)
 
         msg = "\nCollected errors for problem 'bad_indices_index':\n   <model> <class Group>: " + \
               "When connecting 'sub.src.x' to 'sub.arr.x': index 4 is out of bounds for source " + \
               "dimension of size 3."
 
         try:
-            self.prob.setup()
+            p.setup()
         except Exception as err:
             self.assertEqual(str(err), msg)
         else:
@@ -3934,8 +4089,11 @@ class TestFeatureGuessNonlinear(unittest.TestCase):
                 self.linear_solver = om.DirectSolver()
 
             def guess_nonlinear(self, inputs, outputs, residuals):
-                # Check residuals
-                if np.abs(residuals['x']) > 1.0E-2:
+                # Update the residuals based on the inputs
+                self.run_apply_nonlinear()
+
+                # Check residuals so that we don't reset x if we're nearly converged.
+                if np.any(np.abs(residuals.asarray()) > 1.0E-2):
                     # inputs are addressed using full path name, regardless of promotion
                     external_input = inputs['comp1.external_input']
 

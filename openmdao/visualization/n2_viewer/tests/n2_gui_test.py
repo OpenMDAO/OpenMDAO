@@ -8,11 +8,6 @@ import sys
 
 from openmdao.utils.gui_testing_utils import _GuiTestCase
 
-try:
-    from parameterized import parameterized
-except ImportError:
-    from openmdao.utils.assert_utils import SkipParameterized as parameterized
-
 # set DEBUG to True if you want to view the generated HTML file
 GUI_TEST_SUBDIR = 'gui_test_models'
 GUI_N2_SUFFIX = '_N2_TEST.html'
@@ -36,7 +31,7 @@ if 'win32' in sys.platform:
     # Windows specific event-loop policy & cmd
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
-my_loop = asyncio.get_event_loop()
+my_loop = asyncio.get_event_loop_policy().get_event_loop()
 
 """ A set of toolbar tests that runs on each model. """
 toolbar_script = [
@@ -112,6 +107,13 @@ n2_gui_test_scripts = {
             "selector": "g#n2elements rect#cellShape_node_33.vMid",
             "arrowCount": 4
         },
+        {
+            "desc": "Check number of cells indicating diagram is zoomed on R2",
+            "test": "count",
+            "selector": "g#n2elements > g.n2cell",
+            "count": 5
+        },
+        {"test": "root"},
         {
             "desc": "Hover on an N2 cell with cycle arrows and count",
             "test": "hoverArrow",
@@ -192,6 +194,41 @@ n2_gui_test_scripts = {
             "test": "search",
             "searchString": "V_out",
             "n2ElementCount": 11
+        },
+        {
+            "desc": "Turn on Node Info mode",
+            "test": "click",
+            "selector": "#info-button",
+            "button": "left"
+        },
+        {
+            "desc": "Hover to bring up Node Info window",
+            "test": "hover",
+            "selector": "#circuit_R1_V_out",
+        },
+        {
+            "desc": "Click variable to make Node Info window persistent",
+            "test": "click",
+            "selector": "#circuit_R1_V_out",
+            "button": "left"
+        },
+        {
+            "desc": "Check for Description label in Node Info window",
+            "test": "click",
+            "selector": 'tr:has-text("Description")',
+            "button": "left"
+        },
+        {
+            "desc": "Check for Description value in Node Info window",
+            "test": "click",
+            "selector": 'tr:has-text("Voltage out")',
+            "button": "left"
+        },
+        {
+            "desc": "Close Node Info window",
+            "test": "click",
+            "selector": '[id^="persistentNodeInfo"] span.window-close-button',
+            "button": "left",
         },
         {"test": "root"},
         {
@@ -718,12 +755,15 @@ n2_gui_test_scripts = {
             "test": "click",
             "selector": "#filter-target",
             "button": "left"
-        },   
+        },
     ]
 }
 
 n2_gui_test_models = n2_gui_test_scripts.keys()
 
+n2_gui_test_cmd_args = {
+    "circuit": ["--path", "circuit.R2"],
+}
 
 class n2_gui_test_case(_GuiTestCase):
 
@@ -734,7 +774,7 @@ class n2_gui_test_case(_GuiTestCase):
         print("  Test {:04}".format(current_test) + ": " + msg)
         current_test += 1
 
-    def generate_n2_file(self):
+    def generate_n2_file(self, args=None):
         """ Generate N2 HTML files from all models in GUI_TEST_SUBDIR. """
         self.parentDir = os.path.dirname(os.path.realpath(__file__))
         self.modelDir = os.path.join(self.parentDir, GUI_TEST_SUBDIR)
@@ -748,7 +788,9 @@ class n2_gui_test_case(_GuiTestCase):
         self.n2files[self.current_model] = n2file
         print("Creating " + n2file)
 
-        cmd = ['openmdao', 'n2', '-o', n2file,  '--no_browser', pyfile]
+        cmd = ['openmdao', 'n2', '-o', n2file, '--no_browser', pyfile]
+        if args:
+            cmd.extend(args)
         subprocess.run(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE)  # nosec: trusted input
 
     async def load_test_page(self):
@@ -1033,27 +1075,28 @@ class n2_gui_test_case(_GuiTestCase):
             print(msg)
             self.fail(msg)
 
-    @parameterized.expand(n2_gui_test_models)
     @async_test(loop=my_loop)
-    async def test_n2_gui(self, basename):
-        if (basename[:2] == "__"):
-            return
+    async def test_n2_gui(self):
+        for model in n2_gui_test_models:
+            with self.subTest(model=model):
+                if (model[:2] == "__"):
+                    return
 
-        print("\n" + LINE_STR + "\n" + basename + "\n" + LINE_STR)
+                print("\n" + LINE_STR + "\n" + model + "\n" + LINE_STR)
 
-        self.current_test_desc = ''
-        self.current_model = basename
+                self.current_test_desc = ''
+                self.current_model = model
 
-        self.generate_n2_file()
+                self.generate_n2_file(n2_gui_test_cmd_args.get(model))
 
-        async with async_playwright() as playwright:
-            await self.run_gui_tests(playwright)
+                async with async_playwright() as playwright:
+                    await self.run_gui_tests(playwright)
 
-        if not DEBUG:
-            try:
-                for n2html in self.n2files:
-                    os.remove(self.n2files[n2html])
-            except OSError:
-                # Don't want the test to fail if the test file is
-                # already removed
-                pass
+                if not DEBUG:
+                    try:
+                        for n2html in self.n2files:
+                            os.remove(self.n2files[n2html])
+                    except OSError:
+                        # Don't want the test to fail if the test file is
+                        # already removed
+                        pass

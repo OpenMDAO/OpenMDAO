@@ -328,7 +328,7 @@ class Driver(object):
                 raise RuntimeError(msg)
 
         # Now determine if later we'll need to allgather cons, objs, or desvars.
-        if model.comm.size > 1 and model._subsystems_allprocs:
+        if model.comm.size > 1:
             loc_vars = set(model._outputs._abs_iter())
             # some of these lists could have duplicate src names if aliases are used. We'll
             # fix that when we convert to sets after the allgather.
@@ -357,7 +357,7 @@ class Driver(object):
 
             # Loop over all VOIs.
             for vname, voimeta in chain(self._responses.items(), self._designvars.items()):
-                # vname may be a source or an alias
+                # vname may be a abs output, promoted input, or an alias
 
                 indices = voimeta['indices']
                 vsrc = voimeta['source']
@@ -899,7 +899,7 @@ class Driver(object):
 
         response_size = sum(resps[n]['global_size'] for n in self._get_ordered_nl_responses())
 
-        # Gather up the information for design vars.
+        # Gather up the information for design vars. _designvars are keyed by the promoted name
         self._designvars = designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
         desvar_size = sum(data['global_size'] for data in designvars.values())
 
