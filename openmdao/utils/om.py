@@ -114,7 +114,7 @@ def _view_connections_cmd(options, user_args):
 
     def _view_model_w_errors(prob):
         if prob._metadata['saved_errors']:
-            # only run the viewer here if we've had setup errors. Normally we'd wait until
+            # run the viewer here if we've had setup errors. Normally we'd wait until
             # after setup or final_setup.
             _viewconns(prob)
             # errors will result in exit at the end of the _check_collected_errors method
