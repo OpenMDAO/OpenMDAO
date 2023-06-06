@@ -124,7 +124,7 @@ jobs:
           echo "============================================================="
           echo "Install latest versions of 'notebooks' dependencies"
           echo "============================================================="
-          python -m pip install --pre nbclassic
+          python -m pip install --pre notebook
           python -m pip install --pre ipympl
 
           echo "============================================================="
