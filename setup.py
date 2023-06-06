@@ -26,7 +26,7 @@ optional_dependencies = {
         'pyDOE2'
     ],
     'notebooks': [
-        'notebook',
+        'nbclassic',
         'ipympl'
     ],
     'visualization': [

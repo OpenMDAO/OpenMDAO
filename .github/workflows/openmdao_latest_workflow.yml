@@ -42,6 +42,7 @@ jobs:
           echo "Run #${GITHUB_RUN_NUMBER}"
           echo "Run ID: ${GITHUB_RUN_ID}"
           echo "Testing: ${GITHUB_REPOSITORY}"
+          echo "Branch: ${GITHUB_BASE_REF}"
           echo "Triggered by: ${GITHUB_EVENT_NAME}"
           echo "Initiated by: ${GITHUB_ACTOR}"
           echo "============================================================="
@@ -123,7 +124,7 @@ jobs:
           echo "============================================================="
           echo "Install latest versions of 'notebooks' dependencies"
           echo "============================================================="
-          python -m pip install --pre notebook
+          python -m pip install --pre nbclassic
           python -m pip install --pre ipympl
 
           echo "============================================================="
@@ -177,7 +178,7 @@ jobs:
           echo "============================================================="
           echo "Install latest PETSc"
           echo "============================================================="
-          conda install mpi4py petsc petsc4py -q -y
+          conda install mpi4py petsc petsc4py -q -y --freeze-installed
 
           echo "============================================================="
           echo "Check MPI and PETSc installation"
@@ -201,7 +202,10 @@ jobs:
           echo "Workaround for intermittent failures with OMPI https://github.com/open-mpi/ompi/issues/7393"
           echo "TMPDIR=/tmp" >> $GITHUB_ENV
 
+
       - name: Display environment info
+        id: env_info
+        continue-on-error: true
         run: |
           conda info
           conda list
@@ -209,7 +213,7 @@ jobs:
           echo "============================================================="
           echo "Check installed versions of Python, Numpy and Scipy"
           echo "============================================================="
-          python -c "import platform; assert  platform.python_version().startswith(str(${{ matrix.PY }})), \
+          python -c "import platform; assert platform.python_version().startswith(str(${{ matrix.PY }})), \
                     f'Python was changed from version ${{ matrix.PY }} to {platform.python_version()}'"
 
           python -c "import numpy; assert str(numpy.__version__).startswith('$NUMPY_VER'), \
@@ -217,6 +221,8 @@ jobs:
 
           python -c "import scipy; assert str(scipy.__version__).startswith('$SCIPY_VER'), \
                     f'SciPy was changed from version $SCIPY_VER to {scipy.__version__}'"
+        if: always()
+
 
       - name: Run tests
         id: run_tests
@@ -249,21 +255,27 @@ jobs:
             python openmdao_book/other/disable_snopt_cells.py
           fi
 
-          # start ipcluster to run MPI under notebooks
+          echo "============================================================="
+          echo "Starting ipcluster to run MPI under notebooks"
+          echo "============================================================="
           ./ipcluster_start.sh
           sleep 12
 
           echo "============================================================="
-          echo "Build the docs"
+          echo "Building the docs"
           echo "============================================================="
+          echo "building source docs..."
           python build_source_docs.py
+          echo "building book..."
           jupyter-book build -W --keep-going openmdao_book
+          echo "copying build artifacts..."
           python copy_build_artifacts.py
 
       - name: Display doc build reports
-        if: failure() && steps.build_docs.outcome == 'failure'
+        if: steps.build_docs.outcome == 'failure'
+        continue-on-error: true
         run: |
-          for f in /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports/*; do
+          for f in $(find /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports -name '*.log'); do
             echo "============================================================="
             echo $f
             echo "============================================================="
@@ -272,6 +284,7 @@ jobs:
 
       - name: Deprecations Report
         id: deprecations_report
+        continue-on-error: true
         run: |
           echo "============================================================="
           echo "Display deprecations report"
@@ -282,18 +295,46 @@ jobs:
           head -n 6 $RPT_FILE | cut -d':' -f 1 >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
 
-      - name: Slack summary
-        uses: act10ns/slack@v2.0.0
-        with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          status: ${{ job.status }}
-          message: |
-            ```${{ steps.deprecations_report.outputs.summary }}```
-        if: always()
+          grep '^0 unique deprecation warnings' $RPT_FILE
 
-      - name: Slack status
+      - name: Slack env failure
+        if: steps.env_info.outcome == 'failure'
         uses: act10ns/slack@v2.0.0
         with:
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          status: ${{ job.status }}
-        if: always()
+          status: 'warning'
+          message: |
+            Environment change detected on `Latest` build.
+            Python, NumPy or SciPy was not the requested version, probably due to Conda/PETSc.
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Slack unit test failure
+        if: steps.run_tests.outcome == 'failure'
+        uses: act10ns/slack@v2.0.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: ${{ steps.run_tests.outcome }}
+          message:
+            Unit testing failed on `Latest` build.
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Slack doc build failure
+        if: steps.build_docs.outcome == 'failure'
+        uses: act10ns/slack@v2.0.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: ${{ steps.build_docs.outcome }}
+          message: |
+            Doc build failed on `Latest` build.
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Slack deprecation warnings
+        if: steps.deprecations_report.outcome == 'failure'
+        uses: act10ns/slack@v2.0.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: 'warning'
+          message: |
+            Deprecations were detected on `Latest` build.
+            ```${{ steps.deprecations_report.outputs.summary }}```
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

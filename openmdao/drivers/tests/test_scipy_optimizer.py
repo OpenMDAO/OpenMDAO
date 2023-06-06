@@ -2132,6 +2132,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                 self.add_input('x', np.ones(size))
                 self.add_output('f', 0.0)
 
+                self.declare_partials('*', '*', method='fd')
+
             def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
                 x = inputs['x']
                 outputs['f'] = rastrigin(x)
