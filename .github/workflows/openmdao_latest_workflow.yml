@@ -202,7 +202,6 @@ jobs:
           echo "Workaround for intermittent failures with OMPI https://github.com/open-mpi/ompi/issues/7393"
           echo "TMPDIR=/tmp" >> $GITHUB_ENV
 
-
       - name: Display environment info
         id: env_info
         continue-on-error: true
@@ -222,7 +221,6 @@ jobs:
           python -c "import scipy; assert str(scipy.__version__).startswith('$SCIPY_VER'), \
                     f'SciPy was changed from version $SCIPY_VER to {scipy.__version__}'"
         if: always()
-
 
       - name: Run tests
         id: run_tests
