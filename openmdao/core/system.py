@@ -4528,7 +4528,7 @@ class System(object):
 
     def load_model_options(self):
         """
-        Load the relevant model options from `Problem._metadata['model_options'].
+        Load the relevant model options from `Problem._metadata['model_options']`.
 
         This method examines each path filter and corresponding options in
         self._problem_meta['model_options']. If this System's pathname matches
