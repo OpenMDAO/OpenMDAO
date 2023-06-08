@@ -443,7 +443,7 @@ def _show_pre_post_cmd(options, user_args):
             print("\nPost-optimization systems: []")
 
     # register the hook
-    hooks._register_hook('setup', class_name='Problem', inst_id=options.problem, 
+    hooks._register_hook('setup', class_name='Problem', inst_id=options.problem,
                          post=_show_pre_post, exit=True)
 
     _load_and_exec(options.file[0], user_args)
@@ -505,7 +505,7 @@ _command_map = {
     'scaffold': (_scaffold_setup_parser, _scaffold_exec,
                  'Generate a simple scaffold for a component.'),
     'scaling': (_scaling_setup_parser, _scaling_cmd, 'View driver scaling report.'),
-    'show_pre_post': (_show_pre_post_setup_parser, _show_pre_post_cmd, 
+    'show_pre_post': (_show_pre_post_setup_parser, _show_pre_post_cmd,
                       'Show pre and post setup systems.'),
     'summary': (_config_summary_setup_parser, _config_summary_cmd,
                 'Print a short top-level summary of the problem.'),
