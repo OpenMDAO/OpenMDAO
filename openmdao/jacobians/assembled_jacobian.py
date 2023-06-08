@@ -212,7 +212,6 @@ class AssembledJacobian(Jacobian):
         system : <System>
             The system being solved using a sub-view of the jacobian.
         """
-        abs2meta = system._var_abs2meta['output']
         ranges = self._view_ranges[system.pathname]
 
         ext_mtx = self._matrix_class(system.comm, False)
@@ -376,11 +375,11 @@ class AssembledJacobian(Jacobian):
         mode : str
             'fwd' or 'rev'.
         """
-        int_mtx = self._int_mtx
         ext_mtx = self._ext_mtx[system.pathname]
         if ext_mtx is None and not d_outputs._names:  # avoid unnecessary unscaling
             return
 
+        int_mtx = self._int_mtx
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             do_mask = ext_mtx is not None and d_inputs._names
             if do_mask:

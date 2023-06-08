@@ -4386,16 +4386,11 @@ class Group(System):
                     if s._run_on_opt[opt_status]:
                         yield s
 
-    def _setup_iteration_lists(self, do_separation):
+    def _setup_iteration_lists(self):
         """
         Set up the lists containing the pre, iterated, and post subsets of systems.
 
         This should only be called on the top level Group.
-
-        Parameters
-        ----------
-        do_separation : bool
-            If True, arrange subsystems into pre_opt, opt, and post_opt lists.
         """
         assert self.pathname == '', "call setup_iteration_lists on the top level Group only!"
 

@@ -246,15 +246,16 @@ class COOMatrix(Matrix):
         """
         if d_inputs._in_matvec_context():
             input_names = d_inputs._names
+
             mask = None
             for key, val in self._key_ranges.items():
                 if key[1] in input_names:
                     if mask is None:
                         mask = np.ones(self._matrix.data.size, dtype=bool)
-                    ind1, ind2, _, _ = val
-                    mask[ind1:ind2] = False
+                    start, stop, _, _ = val
+                    mask[start:stop] = False
 
-            if mask is not None:
+            if mask is not None and np.any(mask):
                 # convert the mask indices (if necessary) base on sparse matrix type
                 # (CSC, CSR, etc.)
                 return self._convert_mask(mask)

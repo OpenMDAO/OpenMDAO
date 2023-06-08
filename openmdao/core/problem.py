@@ -982,8 +982,8 @@ class Problem(object):
 
         self._check_collected_errors()
 
-        do_seps = self.options['group_by_pre_opt_post'] and self.driver.supports['optimization']
-        self.model._setup_iteration_lists(do_seps)
+        if self.options['group_by_pre_opt_post'] and self.driver.supports['optimization']:
+            self.model._setup_iteration_lists()
 
         return self
 
