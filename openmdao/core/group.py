@@ -182,6 +182,10 @@ class Group(System):
         Dynamic shape dependency graph, or None.
     _shape_knowns : set
         Set of shape dependency graph nodes with known (non-dynamic) shapes.
+    _pre_systems : set of str or None
+        Set of pathnames of systems that are executed prior to the optimization loop.
+    _post_systems : set of str or None
+        Set of pathnames of systems that are executed after the optimization loop.
     """
 
     def __init__(self, **kwargs):
@@ -208,6 +212,8 @@ class Group(System):
         self._order_set = False
         self._shapes_graph = None
         self._shape_knowns = None
+        self._pre_systems = None
+        self._post_systems = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -4507,6 +4513,9 @@ class Group(System):
             post.discard('_auto_ivc')
         elif '_auto_ivc' in pre:
             post.discard('_auto_ivc')
+
+        self._pre_systems = pre
+        self._post_systems = post
 
         if pre:
             self._run_on_opt[_OptStatus.PRE] = True

@@ -394,6 +394,61 @@ def _cite_cmd(options, user_args):
     _load_and_exec(options.file[0], user_args)
 
 
+def _show_pre_post_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao show_pre_post' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('-p', '--problem', action='store', dest='problem', help='Problem name')
+
+
+def _show_pre_post_cmd(options, user_args):
+    """
+    Return the post_setup hook function for 'openmdao show_pre_post'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+    user_args : list of str
+        Args to be passed to the user script.
+    """
+    def _show_pre_post(prob):
+        model = prob.model
+        if model._pre_systems:
+            sorted_pre = sorted(model._pre_systems)
+            nprem1 = len(sorted_pre) - 1
+
+            print("Pre-optimization systems:")
+            for i, s in enumerate(sorted_pre):
+                if i == nprem1 or not sorted_pre[i + 1].startswith(sorted_pre[i] + '.'):
+                    print(f"    {s}")
+        else:
+            print("Pre-optimization systems: []")
+
+        if model._post_systems:
+            sorted_post = sorted(model._post_systems)
+            npostm1 = len(sorted_post) - 1
+
+            print("Post-optimization systems:")
+            for i, s in enumerate(sorted_post):
+                if i == npostm1 or not sorted_post[i + 1].startswith(sorted_post[i] + '.'):
+                    print(f"    {s}")
+        else:
+            print("Post-optimization systems: []")
+
+    # register the hook
+    hooks._register_hook('setup', class_name='Problem', inst_id=options.problem, 
+                         post=_show_pre_post, exit=True)
+
+    _load_and_exec(options.file[0], user_args)
+
+
 def _get_deps(dep_dict: dict, package_name: str) -> None:
     """
     Recursively determine all installed depenency versions and add newly found ones to dep_dict.
@@ -450,6 +505,8 @@ _command_map = {
     'scaffold': (_scaffold_setup_parser, _scaffold_exec,
                  'Generate a simple scaffold for a component.'),
     'scaling': (_scaling_setup_parser, _scaling_cmd, 'View driver scaling report.'),
+    'show_pre_post': (_show_pre_post_setup_parser, _show_pre_post_cmd, 
+                      'Show pre and post setup systems.'),
     'summary': (_config_summary_setup_parser, _config_summary_cmd,
                 'Print a short top-level summary of the problem.'),
     'timing': (_timing_setup_parser, _timing_cmd, 'Collect timing information for all systems.'),

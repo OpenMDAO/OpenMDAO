@@ -980,10 +980,10 @@ class Problem(object):
 
         self._metadata['setup_status'] = _SetupStatus.POST_SETUP
 
-        self._check_collected_errors()
-
         if self.options['group_by_pre_opt_post'] and self.driver.supports['optimization']:
             self.model._setup_iteration_lists()
+
+        self._check_collected_errors()
 
         return self
 
