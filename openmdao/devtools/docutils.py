@@ -3,13 +3,14 @@ import os
 import sys
 import argparse
 from openmdao.utils.file_utils import files_iter
+from nbformat.validator import normalize
 
 
 def reset_notebook(fname, dryrun=False):
     """
     Empties the output fields and resets execution_count in all code cells in the given notebook.
 
-    Also removes any empty code cells. The specified notebook is overwritten.
+    Also removes any empty code cells and normalizes the specified notebook, which is overwritten.
 
     Parameters
     ----------
@@ -27,6 +28,11 @@ def reset_notebook(fname, dryrun=False):
 
     with open(fname) as f:
         dct = json.load(f)
+
+    changes, dct = normalize(dct)
+    if changes > 0:
+        print(f"nbformat.validator normalize() made {changes} changes.")
+        changed = True
 
     newcells = []
     for cell in dct['cells']:

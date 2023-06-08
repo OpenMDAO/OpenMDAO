@@ -5,8 +5,6 @@ echo "============================================================="
 
 export OMPI_MCA_rmaps_base_oversubscribe=1
 
-jupyter serverextension enable --py ipyparallel
-
 CFG_FILE="$HOME/.ipython/profile_mpi/ipcluster_config.py"
 if [[ -f "$CFG_FILE" ]]; then
   echo "using existing ipcluster configuration: $CFG_FILE"

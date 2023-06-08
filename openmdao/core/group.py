@@ -4533,3 +4533,18 @@ class Group(System):
                 s._run_on_opt[_OptStatus.PRE] = True
             if s.pathname in post:
                 s._run_on_opt[_OptStatus.POST] = True
+
+    @property
+    def model_options(self):
+        """
+        Get the model options from self._problem_meta.
+
+        The user may change the contents of model_options to impact values sent
+        to subsystems of this Group.
+
+        Returns
+        -------
+        dict
+            The model options metadata provided by the associated Problem object.
+        """
+        return self._problem_meta['model_options']
