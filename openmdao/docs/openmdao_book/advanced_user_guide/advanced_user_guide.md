@@ -26,3 +26,10 @@ These tutorials cover more advanced topics. This guide assumes that you have rea
 
 ## Using AnalysisError
 - [Using AnalysisError to avoid a region in the solution space](analysis_errors/analysis_error.ipynb)
+
+## Computing Partial Derivatives using JAX
+- [Computing Partial Derivatives of Explicit Components Using JAX](jax_derivatives/partial_derivs_explicit.ipynb)
+
+```python
+
+```
