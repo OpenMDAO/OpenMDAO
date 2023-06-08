@@ -404,6 +404,8 @@ def _show_pre_post_setup_parser(parser):
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('-o', default=None, action='store', dest='outfile',
+                        help='Name of output file.  By default, output goes to stdout.')
     parser.add_argument('-p', '--problem', action='store', dest='problem', help='Problem name')
 
 
@@ -419,28 +421,33 @@ def _show_pre_post_cmd(options, user_args):
         Args to be passed to the user script.
     """
     def _show_pre_post(prob):
+        if options.outfile is None:
+            out = sys.stdout
+        else:
+            out = open(options.outfile, 'w')
+
         model = prob.model
         if model._pre_systems:
             sorted_pre = sorted(model._pre_systems)
             nprem1 = len(sorted_pre) - 1
 
-            print("\nPre-optimization systems:")
+            print("\nPre-optimization systems:", file=out)
             for i, s in enumerate(sorted_pre):
                 if i == nprem1 or not sorted_pre[i + 1].startswith(sorted_pre[i] + '.'):
-                    print(f"    {s}")
+                    print(f"    {s}", file=out)
         else:
-            print("\nPre-optimization systems: []")
+            print("\nPre-optimization systems: []", file=out)
 
         if model._post_systems:
             sorted_post = sorted(model._post_systems)
             npostm1 = len(sorted_post) - 1
 
-            print("\nPost-optimization systems:")
+            print("\nPost-optimization systems:", file=out)
             for i, s in enumerate(sorted_post):
                 if i == npostm1 or not sorted_post[i + 1].startswith(sorted_post[i] + '.'):
-                    print(f"    {s}")
+                    print(f"    {s}", file=out)
         else:
-            print("\nPost-optimization systems: []")
+            print("\nPost-optimization systems: []", file=out)
 
     # register the hook
     hooks._register_hook('setup', class_name='Problem', inst_id=options.problem,
