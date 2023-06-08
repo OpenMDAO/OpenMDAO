@@ -424,23 +424,23 @@ def _show_pre_post_cmd(options, user_args):
             sorted_pre = sorted(model._pre_systems)
             nprem1 = len(sorted_pre) - 1
 
-            print("Pre-optimization systems:")
+            print("\nPre-optimization systems:")
             for i, s in enumerate(sorted_pre):
                 if i == nprem1 or not sorted_pre[i + 1].startswith(sorted_pre[i] + '.'):
                     print(f"    {s}")
         else:
-            print("Pre-optimization systems: []")
+            print("\nPre-optimization systems: []")
 
         if model._post_systems:
             sorted_post = sorted(model._post_systems)
             npostm1 = len(sorted_post) - 1
 
-            print("Post-optimization systems:")
+            print("\nPost-optimization systems:")
             for i, s in enumerate(sorted_post):
                 if i == npostm1 or not sorted_post[i + 1].startswith(sorted_post[i] + '.'):
                     print(f"    {s}")
         else:
-            print("Post-optimization systems: []")
+            print("\nPost-optimization systems: []")
 
     # register the hook
     hooks._register_hook('setup', class_name='Problem', inst_id=options.problem, 
