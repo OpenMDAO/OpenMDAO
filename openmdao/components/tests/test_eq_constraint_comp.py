@@ -332,8 +332,8 @@ class TestEQConstraintComp(unittest.TestCase):
         model = prob.model
 
         # find where 2*x == x^2
-        model.add_subsystem('multx', om.IndepVarComp('m', val=2.))
         model.add_subsystem('indep', om.IndepVarComp('x', val=1.))
+        model.add_subsystem('multx', om.IndepVarComp('m', val=2.))
         model.add_subsystem('f', om.ExecComp('y=x**2', x=1.))
         model.add_subsystem('equal', om.EQConstraintComp('y', use_mult=True))
 
@@ -364,8 +364,8 @@ class TestEQConstraintComp(unittest.TestCase):
         n = 100
 
         # find where 2*x == x^2, vectorized
-        model.add_subsystem('multx', om.IndepVarComp('m', val=np.ones(n)*2.))
         model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(n)))
+        model.add_subsystem('multx', om.IndepVarComp('m', val=np.ones(n)*2.))
         model.add_subsystem('f', om.ExecComp('y=x**2', x=np.ones(n), y=np.ones(n)))
         model.add_subsystem('equal', om.EQConstraintComp('y', val=np.ones(n),
                             use_mult=True, add_constraint=True))
