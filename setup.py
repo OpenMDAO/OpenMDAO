@@ -92,6 +92,7 @@ setup(
         'openmdao.drivers',
         'openmdao.error_checking',
         'openmdao.jacobians',
+        'openmdao.jax',
         'openmdao.matrices',
         'openmdao.proc_allocators',
         'openmdao.recorders',

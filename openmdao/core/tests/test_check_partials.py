@@ -15,6 +15,7 @@ from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatV
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 from openmdao.test_suite.components.array_comp import ArrayComp
+from openmdao.test_suite.scripts.circle_opt import CircleOpt
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_no_warning, \
      assert_check_partials
 from openmdao.utils.om_warnings import DerivativesWarning, OMInvalidCheckDerivativesOptionsWarning
@@ -195,14 +196,14 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         y_wrt_x1_line = lines.index("  comp: 'y' wrt 'x1'")
 
-        self.assertTrue(lines[y_wrt_x1_line+3].endswith('*'),
+        self.assertTrue(lines[y_wrt_x1_line+4].endswith('*'),
                         msg='Error flag expected in output but not displayed')
-        self.assertTrue(lines[y_wrt_x1_line+5].endswith('*'),
+        self.assertTrue(lines[y_wrt_x1_line+6].endswith('*'),
                         msg='Error flag expected in output but not displayed')
         y_wrt_x2_line = lines.index("  comp: 'y' wrt 'x2'")
-        self.assertTrue(lines[y_wrt_x2_line+3].endswith('*'),
+        self.assertTrue(lines[y_wrt_x2_line+4].endswith('*'),
                         msg='Error flag not expected in output but displayed')
-        self.assertTrue(lines[y_wrt_x2_line+5].endswith('*'),
+        self.assertTrue(lines[y_wrt_x2_line+6].endswith('*'),
                         msg='Error flag not expected in output but displayed')
 
     def test_component_has_no_outputs(self):
@@ -1003,7 +1004,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         lines = stream.getvalue().splitlines()
         self.assertTrue('cs' in lines[6],
                         msg='Did you change the format for printing check derivs?')
-        self.assertTrue('fd' in lines[20],
+        self.assertTrue('fd' in lines[21],
                         msg='Did you change the format for printing check derivs?')
 
     def test_set_check_partial_options_invalid(self):
@@ -1838,7 +1839,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         data = prob.check_partials(out_stream=stream)
         lines = stream.getvalue().splitlines()
 
-        self.assertTrue("Relative Error (Jfor - Jfd) / Jfor : 1." in lines[9])
+        self.assertTrue("Relative Error (Jfor - Jfd) / Jfor : 1." in lines[10])
 
     def test_directional_bug_implicit(self):
         # Test for bug in directional derivative direction for implicit var and matrix-free.
@@ -2184,6 +2185,16 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         prob.setup()
         prob.run_model()
         prob.check_totals(step=1e-7)
+
+        # Scenario 18a:
+        #    Compute totals: approx on totals using defaults
+        #    Check totals: fd, non default steps
+        #    Expected result: No error
+        prob, parab = create_problem()
+        prob.model.approx_totals()
+        prob.setup()
+        prob.run_model()
+        prob.check_totals(step=[1e-7, 1e-8])
 
         # Scenario 19:
         #    Compute totals: approx on totals using defaults
@@ -2657,6 +2668,205 @@ class TestCheckPartialsDistrib(unittest.TestCase):
         prob.setup(force_alloc_complex=True)
 
         prob.check_partials(compact_print=True, method='cs')
+
+
+class TestCheckPartialsMultipleSteps(unittest.TestCase):
+    def setup_model(self, directional=False):
+        class CompGoodPartials(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x1', 3.0)
+                self.add_input('x2', 5.0)
+                self.add_output('y', 5.5)
+                self.declare_partials(of='*', wrt='*')
+                if directional:
+                    self.set_check_partial_options(wrt='*', directional=True)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 3.0 * inputs['x1'] + 4.0 * inputs['x2']
+
+            def compute_partials(self, inputs, partials):
+                """Correct derivative."""
+                J = partials
+                J['y', 'x1'] = np.array([3.0])
+                J['y', 'x2'] = np.array([4.0])
+
+        class CompBadPartials(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('y1', 3.0)
+                self.add_input('y2', 5.0)
+                self.add_output('z', 5.5)
+                self.declare_partials(of='*', wrt='*')
+                if directional:
+                    self.set_check_partial_options(wrt='*', directional=True)
+
+            def compute(self, inputs, outputs):
+                outputs['z'] = 3.0 * inputs['y1'] + 4.0 * inputs['y2']
+
+            def compute_partials(self, inputs, partials):
+                """Intentionally incorrect derivative."""
+                J = partials
+                J['z', 'y1'] = np.array([33.0])
+                J['z', 'y2'] = np.array([40.0])
+
+        prob = om.Problem()
+        prob.model.add_subsystem('good', CompGoodPartials())
+        prob.model.add_subsystem('bad', CompBadPartials())
+        prob.model.connect('good.y', 'bad.y1')
+
+        prob.set_solver_print(level=0)
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+
+        return prob
+
+    def get_tables(self, content):
+        tables = []
+        lines = content.splitlines()
+        tlines = []
+        skipto = 0
+        for i, line in enumerate(lines):
+            if i < skipto:
+                continue
+            if line.startswith('+-'):
+                # start of a table
+                for j in range(i, len(lines)):
+                    if not lines[j].startswith('+') and not lines[j].startswith('|'):
+                        break
+                    tlines.append(lines[j])
+                skipto = j + 1
+                tables.append(tlines)
+                tlines = []
+        return tables
+
+    def test_single_fd_step_fwd(self):
+        p = self.setup_model()
+        stream = StringIO()
+        J = p.check_partials(step=[1e-6], out_stream=stream)
+        contents = stream.getvalue()
+        ncomps = 2
+        nderivs = ncomps * 2
+        self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
+        self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count("Fd Magnitude:"), nderivs)
+        self.assertEqual(contents.count("Absolute Error (Jfor - Jfd), step="), 0)
+        self.assertEqual(contents.count("Absolute Error (Jfor - Jfd)"), nderivs)
+        self.assertEqual(contents.count("Relative Error (Jfor - Jfd) / Jf"), nderivs)
+        self.assertEqual(contents.count("Raw FD Derivative (Jfd), step="), 0)
+        self.assertEqual(contents.count("Raw FD Derivative (Jfd)"), nderivs)
+
+    def test_single_fd_step_compact(self):
+        p = self.setup_model()
+        stream = StringIO()
+        J = p.check_partials(step=[1e-6], compact_print=True, out_stream=stream)
+        contents = stream.getvalue()
+        self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
+        self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count("Sub Jacobian with Largest Relative Error: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count(">ABS_TOL >REL_TOL"), 2)
+        self.assertEqual(contents.count("step"), 0)
+        tables = self.get_tables(contents)
+        self.assertEqual(len(tables), 3)
+        self.assertEqual(len(tables[0]), 7)
+        self.assertEqual(len(tables[1]), 7)
+        self.assertEqual(len(tables[2]), 5)
+        # check cols
+        self.assertEqual(tables[0][0].count('+'), 8)
+        self.assertEqual(tables[1][0].count('+'), 8)
+        self.assertEqual(tables[2][0].count('+'), 7)
+
+    def test_single_cs_step_compact(self):
+        p = self.setup_model()
+        stream = StringIO()
+        J = p.check_partials(method='cs', step=[1e-30], compact_print=True, out_stream=stream)
+        contents = stream.getvalue()
+        self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
+        self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count("Sub Jacobian with Largest Relative Error: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count(">ABS_TOL >REL_TOL"), 2)
+        self.assertEqual(contents.count("step"), 0)
+        tables = self.get_tables(contents)
+        self.assertEqual(len(tables), 3)
+        self.assertEqual(len(tables[0]), 7)
+        self.assertEqual(len(tables[1]), 7)
+        self.assertEqual(len(tables[2]), 5)
+        # check cols
+        self.assertEqual(tables[0][0].count('+'), 8)
+        self.assertEqual(tables[1][0].count('+'), 8)
+        self.assertEqual(tables[2][0].count('+'), 7)
+
+    def test_multi_fd_steps(self):
+        p = self.setup_model()
+        stream = StringIO()
+        J = p.check_partials(step=[1e-6, 1e-7], out_stream=stream)
+        contents = stream.getvalue()
+        ncomps = 2
+        nderivs = ncomps * 2
+        self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
+        self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count("Fd Magnitude:"), nderivs * 2)
+        self.assertEqual(contents.count("Absolute Error (Jfor - Jfd), step="), nderivs * 2)
+        self.assertEqual(contents.count("Relative Error (Jfor - Jfd) / Jf"), nderivs * 2)
+        self.assertEqual(contents.count("Raw FD Derivative (Jfd), step="), nderivs * 2)
+
+    def test_multi_fd_steps_compact(self):
+        p = self.setup_model()
+        stream = StringIO()
+        J = p.check_partials(step=[1e-6, 1e-7], compact_print=True, out_stream=stream)
+        contents = stream.getvalue()
+        self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
+        self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count("Sub Jacobian with Largest Relative Error: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count(">ABS_TOL >REL_TOL"), 4)
+        self.assertEqual(contents.count("step"), 3)
+        tables = self.get_tables(contents)
+        self.assertEqual(len(tables), 3)
+        self.assertEqual(len(tables[0]), 11)
+        self.assertEqual(len(tables[1]), 11)
+        self.assertEqual(len(tables[2]), 5)
+        # check cols
+        self.assertEqual(tables[0][0].count('+'), 9)
+        self.assertEqual(tables[1][0].count('+'), 9)
+        self.assertEqual(tables[2][0].count('+'), 8)
+
+    def test_multi_cs_steps_compact(self):
+        p = self.setup_model()
+        stream = StringIO()
+        J = p.check_partials(method='cs', step=[1e-6, 1e-7], compact_print=True, out_stream=stream)
+        contents = stream.getvalue()
+        self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
+        self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count("Sub Jacobian with Largest Relative Error: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count(">ABS_TOL >REL_TOL"), 4)
+        self.assertEqual(contents.count("step"), 3)
+        tables = self.get_tables(contents)
+        self.assertEqual(len(tables), 3)
+        self.assertEqual(len(tables[0]), 11)
+        self.assertEqual(len(tables[1]), 11)
+        self.assertEqual(len(tables[2]), 5)
+        # check cols
+        self.assertEqual(tables[0][0].count('+'), 9)
+        self.assertEqual(tables[1][0].count('+'), 9)
+        self.assertEqual(tables[2][0].count('+'), 8)
+
+    def test_multi_fd_steps_compact_directional(self):
+        p = self.setup_model(directional=True)
+        stream = StringIO()
+        J = p.check_partials(step=[1e-6, 1e-7], compact_print=True, out_stream=stream)
+        contents = stream.getvalue()
+        self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
+        self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count("Sub Jacobian with Largest Relative Error: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count(">ABS_TOL >REL_TOL"), 4)
+        self.assertEqual(contents.count("step"), 3)
+        tables = self.get_tables(contents)
+        self.assertEqual(len(tables), 3)
+        self.assertEqual(len(tables[0]), 11)
+        self.assertEqual(len(tables[1]), 11)
+        self.assertEqual(len(tables[2]), 5)
+        # check cols
+        self.assertEqual(tables[0][0].count('+'), 9)
+        self.assertEqual(tables[1][0].count('+'), 9)
+        self.assertEqual(tables[2][0].count('+'), 8)
 
 
 if __name__ == "__main__":
