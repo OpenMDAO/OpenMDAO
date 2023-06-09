@@ -22,15 +22,14 @@ from openmdao.core.constants import _SetupStatus
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver, record_iteration, SaveOptResult
 from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.core.system import _OptStatus
 from openmdao.core.group import Group
-from openmdao.core.system import System
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.solvers.solver import SolverInfo
-from openmdao.vectors.vector import _full_slice
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.error_checking.check_config import _default_checks, _all_checks, \
     _all_non_redundant_checks
@@ -44,7 +43,6 @@ from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import abs_key2rel_key
 from openmdao.utils.logger_utils import get_logger, TestLogger
 from openmdao.utils.hooks import _setup_hooks, _reset_all_hooks
-from openmdao.utils.indexer import indexer
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.array_utils import scatter_dist_to_local
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
@@ -253,11 +251,15 @@ class Problem(object):
 
         if model is None:
             self.model = Group()
-        elif isinstance(model, System):
+        elif isinstance(model, Group):
+            from openmdao.core.parallel_group import ParallelGroup
+            if isinstance(model, ParallelGroup):
+                raise TypeError(f"{self.msginfo}: The value provided for 'model' "
+                                "cannot be a ParallelGroup.")
             self.model = model
         else:
             raise TypeError(self.msginfo +
-                            ": The value provided for 'model' is not a valid System.")
+                            ": The value provided for 'model' is not a Group.")
 
         if driver is None:
             driver = Driver()
@@ -283,6 +285,13 @@ class Problem(object):
         self.options.declare('coloring_dir', types=str,
                              default=os.path.join(os.getcwd(), 'coloring_files'),
                              desc='Directory containing coloring files (if any) for this Problem.')
+        self.options.declare('group_by_pre_opt_post', types=bool,
+                             default=False,
+                             desc="If True, group subsystems of the top level model into "
+                             "pre-optimization, optimization, and post-optimization, and only "
+                             "iterate over the optimization subsystems during optimization.  This "
+                             "applies only when the top level nonlinear solver is of type"
+                             "NonlinearRunOnce.")
         self.options.update(options)
 
         # Options passed to models
@@ -632,6 +641,9 @@ class Problem(object):
         finally:
             self._recording_iter.prefix = old_prefix
 
+    def _set_opt_status(self, status):
+        self._metadata['opt_status'] = status
+
     def run_driver(self, case_prefix=None, reset_iter_counts=True):
         """
         Run the driver on the model.
@@ -678,10 +690,27 @@ class Problem(object):
 
             self.model._clear_iprint()
 
-            with SaveOptResult(self.driver):
-                return self.driver.run()
+            if self.options['group_by_pre_opt_post'] and self.driver.supports['optimization']:
+                if self.model._run_on_opt[_OptStatus.PRE]:
+                    self._set_opt_status(_OptStatus.PRE)
+                    self.model.run_solve_nonlinear()
+
+                with SaveOptResult(self.driver):
+                    self._set_opt_status(_OptStatus.OPTIMIZING)
+                    result = self.driver.run()
+
+                if self.model._run_on_opt[_OptStatus.POST]:
+                    self._set_opt_status(_OptStatus.POST)
+                    self.model.run_solve_nonlinear()
+
+                return result
+            else:
+                with SaveOptResult(self.driver):
+                    return self.driver.run()
+
         finally:
             self._recording_iter.prefix = old_prefix
+            self._set_opt_status(None)
 
     def compute_jacvec_product(self, of, wrt, mode, seed):
         """
@@ -945,6 +974,7 @@ class Problem(object):
             'reports_dir': self.get_reports_dir(),  # directory where reports will be written
             'saved_errors': [],  # store setup errors here until after final_setup
             'checking': False,  # True if check_totals or check_partials is running
+            'opt_status': None,  # Tells Systems if they are in an optimization loop
             'model_options': self.model_options  # A dict of options passed to all systems in tree
         }
         model._setup(model_comm, mode, self._metadata)
@@ -957,6 +987,9 @@ class Problem(object):
         self._logger = logger
 
         self._metadata['setup_status'] = _SetupStatus.POST_SETUP
+
+        if self.options['group_by_pre_opt_post'] and self.driver.supports['optimization']:
+            self.model._setup_iteration_lists()
 
         self._check_collected_errors()
 
@@ -2383,6 +2416,47 @@ class Problem(object):
                 print(f'None found', file=out_stream)
 
         return problem_indep_vars
+
+    def iter_count_iter(self, include_driver=True, include_solvers=True, include_systems=False):
+        """
+        Yield iteration counts for driver, solvers and/or systems.
+
+        Parameters
+        ----------
+        include_driver : bool
+            If True, include the driver in the iteration counts.
+        include_solvers : bool
+            If True, include solvers in the iteration counts.
+        include_systems : bool
+            If True, include systems in the iteration counts.
+
+        Yields
+        ------
+        str
+            Name of the object.
+        str
+            Name of the counter.
+        int
+            Value of the counter.
+        """
+        if include_driver:
+            yield ('Driver', 'iter_count', self.driver.iter_count)
+        if include_solvers or include_systems:
+            for s in self.model.system_iter(include_self=True, recurse=True):
+                if include_systems:
+                    for it in ('iter_count', 'iter_count_apply'):
+                        val = getattr(s, it)
+                        if val > 0:
+                            yield (s.pathname, it, val)
+
+                if include_solvers:
+                    prefix = s.pathname + '.' if s.pathname else ''
+                    if s.nonlinear_solver is not None and s.nonlinear_solver._iter_count > 0:
+                        yield (prefix + 'nonlinear_solver', '_iter_count',
+                               s.nonlinear_solver._iter_count)
+                    if s.linear_solver is not None and s.linear_solver._iter_count > 0:
+                        yield (prefix + 'linear_solver', '_iter_count',
+                               s.linear_solver._iter_count)
 
 
 _ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])

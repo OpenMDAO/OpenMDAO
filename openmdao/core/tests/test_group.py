@@ -1308,7 +1308,7 @@ class TestGroup(unittest.TestCase):
 
         totals = p.check_totals(of=['discipline.comp1.z'], wrt=['parameters.input_value'], method='cs', out_stream=None)
 
-        for key, val in totals.items():
+        for val in totals.values():
             assert_near_equal(val['rel error'][0], 0.0, 1e-15)
 
     def test_set_order_in_config_error(self):
