@@ -496,7 +496,7 @@ class Group(System):
             self._group_inputs[n] = lst.copy()
 
         self.matrix_free = False
-        for subsys in self._subsystems_myproc:
+        for subsys in sorted(self._subsystems_myproc, key=lambda s: s.name):
             subsys._configure()
             subsys._setup_var_data()
 
@@ -1637,7 +1637,11 @@ class Group(System):
         self._has_distrib_vars = False
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
 
-        for subsys in self._subsystems_myproc:
+        # sort the subsystems alphabetically in order to make the ordering
+        # of vars in vectors and other data structures independent of the
+        # execution order.
+        # for subsys in self._subsystems_myproc:
+        for subsys in sorted(self._subsystems_myproc, key=lambda s: s.name):
             self._has_output_scaling |= subsys._has_output_scaling
             self._has_output_adder |= subsys._has_output_adder
             self._has_resid_scaling |= subsys._has_resid_scaling
@@ -1973,7 +1977,7 @@ class Group(System):
             'output': np.zeros((self.comm.size, len(all_abs2meta['output'])), dtype=INT_DTYPE),
         }
 
-        for subsys in self._subsystems_myproc:
+        for subsys in sorted(self._subsystems_myproc, key=lambda s: s.name):
             subsys._setup_var_sizes()
 
         iproc = self.comm.rank
@@ -2496,7 +2500,7 @@ class Group(System):
         allprocs_discrete_in = self._var_allprocs_discrete['input']
         allprocs_discrete_out = self._var_allprocs_discrete['output']
 
-        for subsys in self._subsystems_myproc:
+        for subsys in sorted(self._subsystems_myproc, key=lambda s: s.name):
             subsys._setup_connections()
 
         path_dot = pathname + '.' if pathname else ''
@@ -3477,7 +3481,7 @@ class Group(System):
         """
         self._subjacs_info = info = {}
 
-        for subsys in self._subsystems_myproc:
+        for subsys in sorted(self._subsystems_myproc, key=lambda s: s.name):
             subsys._setup_partials()
             info.update(subsys._subjacs_info)
 

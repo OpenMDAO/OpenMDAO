@@ -226,7 +226,8 @@ class AssembledJacobian(Jacobian):
         subjacs_info = self._subjacs_info
 
         sizes = system._var_sizes['output']
-        for s in system.system_iter(recurse=True, include_self=True, typ=Component):
+        for s in sorted(system.system_iter(recurse=True, include_self=True, typ=Component),
+                        key=lambda x: x.name):
             for res_abs_name, res_meta in s._var_abs2meta['output'].items():
                 res_offset = np.sum(sizes[iproc, :abs2idx[res_abs_name]])
 

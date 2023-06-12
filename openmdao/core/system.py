@@ -2206,7 +2206,7 @@ class System(object):
             self._doutputs = vectors['output']['linear']
             self._dresiduals = vectors['residual']['linear']
 
-        for subsys in self._subsystems_myproc:
+        for subsys in sorted(self._subsystems_myproc, key=lambda s: s.name):
             subsys._scale_factors = self._scale_factors
             subsys._setup_vectors(root_vectors)
 
@@ -3492,7 +3492,7 @@ class System(object):
 
         if recurse:
             abs2prom_in = self._var_allprocs_abs2prom['input']
-            for subsys in self._subsystems_myproc:
+            for subsys in sorted(self._subsystems_myproc, key=lambda s: s.name):
                 dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
                                              use_prom_ivc=use_prom_ivc)
                 if use_prom_ivc:
@@ -3643,7 +3643,7 @@ class System(object):
 
         if recurse:
             abs2prom_in = self._var_allprocs_abs2prom['input']
-            for subsys in self._subsystems_myproc:
+            for subsys in sorted(self._subsystems_myproc, key=lambda s: s.name):
                 resps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
                                              use_prom_ivc=use_prom_ivc)
                 if use_prom_ivc:
