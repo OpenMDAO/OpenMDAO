@@ -2206,7 +2206,7 @@ class System(object):
             self._doutputs = vectors['output']['linear']
             self._dresiduals = vectors['residual']['linear']
 
-        for subsys in sorted(self._subsystems_myproc, key=lambda s: s.name):
+        for subsys in self._sorted_sys_iter():
             subsys._scale_factors = self._scale_factors
             subsys._setup_vectors(root_vectors)
 
@@ -3492,7 +3492,7 @@ class System(object):
 
         if recurse:
             abs2prom_in = self._var_allprocs_abs2prom['input']
-            for subsys in sorted(self._subsystems_myproc, key=lambda s: s.name):
+            for subsys in self._sorted_sys_iter():
                 dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
                                              use_prom_ivc=use_prom_ivc)
                 if use_prom_ivc:
@@ -3643,7 +3643,7 @@ class System(object):
 
         if recurse:
             abs2prom_in = self._var_allprocs_abs2prom['input']
-            for subsys in sorted(self._subsystems_myproc, key=lambda s: s.name):
+            for subsys in self._sorted_sys_iter():
                 resps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
                                              use_prom_ivc=use_prom_ivc)
                 if use_prom_ivc:
@@ -6114,3 +6114,6 @@ class System(object):
 
         # return regular dict sorted by system pathname
         return {spath: data for spath, data in sorted(sys_prom_map.items(), key=lambda x: x[0])}
+
+    def _sorted_sys_iter(self, subs=None):
+        yield from ()

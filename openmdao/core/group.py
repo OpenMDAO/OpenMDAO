@@ -146,7 +146,7 @@ class Group(System):
     _proc_info : dict of subsys_name: (min_procs, max_procs, weight, proc_group)
         Information used to determine MPI process allocation to subsystems.
     _subgroups_myproc : list
-        List of local subgroups.
+        List of local subgroups, sorted by name
     _manual_connections : dict
         Dictionary of input_name: (output_name, src_indices) connections.
     _group_inputs : dict
@@ -227,8 +227,10 @@ class Group(System):
 
         self._subsys_graph = None
 
-        # self.options.declare('auto_order', types=bool, default=False,
-        #                      desc='If True the order of subsystems is determined automatically')
+        self.options.declare('auto_order', types=bool, default=True,
+                             desc='If True the order of subsystems is determined automatically '
+                             'based on the dependency graph.  It will not break or reorder '
+                             'cycles.')
 
     def setup(self):
         """
@@ -496,7 +498,7 @@ class Group(System):
             self._group_inputs[n] = lst.copy()
 
         self.matrix_free = False
-        for subsys in sorted(self._subsystems_myproc, key=lambda s: s.name):
+        for subsys in self._sorted_sys_iter():
             subsys._configure()
             subsys._setup_var_data()
 
@@ -622,7 +624,8 @@ class Group(System):
             subsys._setup_procs(subsys.pathname, sub_comm, mode, prob_meta)
 
         # build a list of local subgroups to speed up later loops
-        self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
+        self._subgroups_myproc = sorted(
+            [s for s in self._subsystems_myproc if isinstance(s, Group)], key=lambda x: x.name)
 
         if nproc > 1 and self._mpi_proc_allocator.parallel:
             self._problem_meta['parallel_groups'].append(self.pathname)
@@ -661,7 +664,7 @@ class Group(System):
             List of all states.
         """
         states = []
-        for subsys in self._subsystems_myproc:
+        for subsys in self._sorted_sys_iter():
             states.extend(subsys._list_states())
 
         return sorted(states)
@@ -1641,7 +1644,7 @@ class Group(System):
         # of vars in vectors and other data structures independent of the
         # execution order.
         # for subsys in self._subsystems_myproc:
-        for subsys in sorted(self._subsystems_myproc, key=lambda s: s.name):
+        for subsys in self._sorted_sys_iter():
             self._has_output_scaling |= subsys._has_output_scaling
             self._has_output_adder |= subsys._has_output_adder
             self._has_resid_scaling |= subsys._has_resid_scaling
@@ -1977,7 +1980,7 @@ class Group(System):
             'output': np.zeros((self.comm.size, len(all_abs2meta['output'])), dtype=INT_DTYPE),
         }
 
-        for subsys in sorted(self._subsystems_myproc, key=lambda s: s.name):
+        for subsys in self._sorted_sys_iter():
             subsys._setup_var_sizes()
 
         iproc = self.comm.rank
@@ -2500,7 +2503,7 @@ class Group(System):
         allprocs_discrete_in = self._var_allprocs_discrete['input']
         allprocs_discrete_out = self._var_allprocs_discrete['output']
 
-        for subsys in sorted(self._subsystems_myproc, key=lambda s: s.name):
+        for subsys in self._sorted_sys_iter():
             subsys._setup_connections()
 
         path_dot = pathname + '.' if pathname else ''
@@ -3481,7 +3484,7 @@ class Group(System):
         """
         self._subjacs_info = info = {}
 
-        for subsys in sorted(self._subsystems_myproc, key=lambda s: s.name):
+        for subsys in self._sorted_sys_iter():
             subsys._setup_partials()
             info.update(subsys._subjacs_info)
 
@@ -4370,6 +4373,16 @@ class Group(System):
                 yield from s._ordered_comp_name_iter()
             else:
                 yield s.pathname
+
+    def _sorted_sys_iter(self, subs=None):
+        if subs is None:
+            subs = self._subsystems_myproc
+
+        if self.options['auto_order']:
+            for s in sorted(subs, key=lambda s: s.name):
+                yield s
+        else:
+            yield from subs
 
     def _solver_subsystem_iter(self, local_only=False):
         """
