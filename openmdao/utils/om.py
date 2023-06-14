@@ -403,9 +403,9 @@ def _cite_cmd(options, user_args):
     _load_and_exec(options.file[0], user_args)
 
 
-def _show_pre_post_setup_parser(parser):
+def _list_pre_post_setup_parser(parser):
     """
-    Set up the openmdao subparser for the 'openmdao show_pre_post' command.
+    Set up the openmdao subparser for the 'openmdao list_pre_post' command.
 
     Parameters
     ----------
@@ -418,9 +418,9 @@ def _show_pre_post_setup_parser(parser):
     parser.add_argument('-p', '--problem', action='store', dest='problem', help='Problem name')
 
 
-def _show_pre_post_cmd(options, user_args):
+def _list_pre_post_cmd(options, user_args):
     """
-    Return the post_setup hook function for 'openmdao show_pre_post'.
+    Return the post_setup hook function for 'openmdao list_pre_post'.
 
     Parameters
     ----------
@@ -429,38 +429,12 @@ def _show_pre_post_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    def _show_pre_post(prob):
-        if options.outfile is None:
-            out = sys.stdout
-        else:
-            out = open(options.outfile, 'w')
-
-        model = prob.model
-        if model._pre_systems:
-            sorted_pre = sorted(model._pre_systems)
-            nprem1 = len(sorted_pre) - 1
-
-            print("\nPre-optimization systems:", file=out)
-            for i, s in enumerate(sorted_pre):
-                if i == nprem1 or not sorted_pre[i + 1].startswith(sorted_pre[i] + '.'):
-                    print(f"    {s}", file=out)
-        else:
-            print("\nPre-optimization systems: []", file=out)
-
-        if model._post_systems:
-            sorted_post = sorted(model._post_systems)
-            npostm1 = len(sorted_post) - 1
-
-            print("\nPost-optimization systems:", file=out)
-            for i, s in enumerate(sorted_post):
-                if i == npostm1 or not sorted_post[i + 1].startswith(sorted_post[i] + '.'):
-                    print(f"    {s}", file=out)
-        else:
-            print("\nPost-optimization systems: []", file=out)
+    def _list_pre_post(prob):
+        prob.model.list_pre_post(outfile=options.outfile)
 
     # register the hook
     hooks._register_hook('setup', class_name='Problem', inst_id=options.problem,
-                         post=_show_pre_post, exit=True)
+                         post=_list_pre_post, exit=True)
 
     _load_and_exec(options.file[0], user_args)
 
@@ -521,7 +495,7 @@ _command_map = {
     'scaffold': (_scaffold_setup_parser, _scaffold_exec,
                  'Generate a simple scaffold for a component.'),
     'scaling': (_scaling_setup_parser, _scaling_cmd, 'View driver scaling report.'),
-    'show_pre_post': (_show_pre_post_setup_parser, _show_pre_post_cmd,
+    'list_pre_post': (_list_pre_post_setup_parser, _list_pre_post_cmd,
                       'Show pre and post setup systems.'),
     'summary': (_config_summary_setup_parser, _config_summary_cmd,
                 'Print a short top-level summary of the problem.'),

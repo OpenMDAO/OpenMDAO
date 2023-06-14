@@ -182,10 +182,10 @@ class Group(System):
         Dynamic shape dependency graph, or None.
     _shape_knowns : set
         Set of shape dependency graph nodes with known (non-dynamic) shapes.
-    _pre_systems : set of str or None
-        Set of pathnames of systems that are executed prior to the optimization loop.
-    _post_systems : set of str or None
-        Set of pathnames of systems that are executed after the optimization loop.
+    _pre_components : list of str or None
+        Sorted list of pathnames of components that are executed prior to the optimization loop.
+    _post_components : list of str or None
+        Sorted list of pathnames of components that are executed after the optimization loop.
     """
 
     def __init__(self, **kwargs):
@@ -212,8 +212,8 @@ class Group(System):
         self._order_set = False
         self._shapes_graph = None
         self._shape_knowns = None
-        self._pre_systems = None
-        self._post_systems = None
+        self._pre_components = None
+        self._post_components = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -4406,7 +4406,7 @@ class Group(System):
 
         responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
         responses = [meta['source'] for meta in responses.values()]
-        responsesystems = set([name.rpartition('.')[0] for name in responses])
+        responsesystems = list(set([name.rpartition('.')[0] for name in responses]))
 
         if not dvs or not responses:
             return
@@ -4445,12 +4445,18 @@ class Group(System):
             for dvsys in dvsystems:
                 graph.add_edge(respsys, dvsys)
 
-        # find any groups that have a nl solver that computes gradients, because we can't
+        # Find any groups that have a nl solver that computes gradients, because we can't
         # split up the systems in those groups without inserting zeros into the jacobian.
+        # Also find any components that have the 'always_opt' option set to True and force them
+        # to be part of the optimization iteration.
         grad_groups = []
-        for s in self.system_iter(recurse=True, include_self=True, typ=Group):
-            if s.nonlinear_solver is not None and s.nonlinear_solver.supports['gradients']:
-                grad_groups.append(s.pathname)
+        for s in self.system_iter(recurse=True, include_self=True):
+            if isinstance(s, Group):
+                if s.nonlinear_solver is not None and s.nonlinear_solver.supports['gradients']:
+                    grad_groups.append(s.pathname)
+            elif s.options['always_opt']:  # make component part of opt SCC
+                graph.add_edge(responsesystems[0], s.pathname)
+                graph.add_edge(s.pathname, responsesystems[0])
 
         if grad_groups:
             if '' in grad_groups:
@@ -4514,15 +4520,15 @@ class Group(System):
         elif '_auto_ivc' in pre:
             post.discard('_auto_ivc')
 
-        self._pre_systems = pre
-        self._post_systems = post
-
         if pre:
             self._run_on_opt[_OptStatus.PRE] = True
         if post:
             self._run_on_opt[_OptStatus.POST] = True
 
+        groups = set()
         for s in self.system_iter(recurse=True):
+            if isinstance(s, Group):
+                groups.add(s.pathname)
             if s.pathname in iterated:
                 s._run_on_opt[_OptStatus.OPTIMIZING] = True
             else:
@@ -4533,6 +4539,9 @@ class Group(System):
                 s._run_on_opt[_OptStatus.PRE] = True
             if s.pathname in post:
                 s._run_on_opt[_OptStatus.POST] = True
+
+        self._pre_components = sorted(pre - groups)
+        self._post_components = sorted(post - groups)
 
     @property
     def model_options(self):
