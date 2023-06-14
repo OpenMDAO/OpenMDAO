@@ -992,8 +992,9 @@ class Problem(object):
             if self.driver.supports['optimization']:
                 self.model._setup_iteration_lists()
             else:
-                issue_warning(f"In Problem '{self._name}, the 'group_by_pre_opt_post' option is True but the driver does "
-                              "not support optimization so the option will be ignored.")
+                issue_warning(f"In Problem '{self._name}, the 'group_by_pre_opt_post' option is "
+                              "True but the driver doesn't support optimization so the option will "
+                              "be ignored.")
 
         self._check_collected_errors()
 
@@ -2497,7 +2498,6 @@ class Problem(object):
                 print(f"    {name}", file=out)
         else:
             print("\nPost-optimization components: []", file=out)
-
 
 
 _ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
