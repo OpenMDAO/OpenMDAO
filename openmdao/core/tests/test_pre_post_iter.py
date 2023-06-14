@@ -5,12 +5,14 @@ import openmdao.api as om
 from openmdao.utils.assert_utils import assert_check_totals, assert_near_equal
 from openmdao.test_suite.components.exec_comp_for_test import ExecComp4Test
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
+from openmdao.utils.testing_utils import use_tempdirs
 
 
+@use_tempdirs
 class TestPrePostIter(unittest.TestCase):
 
     def setup_problem(self, do_pre_post_opt, mode, use_ivc=False, coloring=False, size=3, group=False,
-                      force=(), approx=False, force_complex=False):
+                      force=(), approx=False, force_complex=False, recording=False):
         prob = om.Problem()
         prob.options['group_by_pre_opt_post'] = do_pre_post_opt
 
@@ -34,7 +36,7 @@ class TestPrePostIter(unittest.TestCase):
 
         comps = {
             'pre1': G1.add_subsystem('pre1', ExecComp4Test('y=2.*x', x=np.ones(size), y=np.zeros(size))),
-            'pre2': G1.add_subsystem('pre2', ExecComp4Test('y=3.*x + 7.*xx', x=np.ones(size), xx=np.ones(size), y=np.zeros(size))),
+            'pre2': G1.add_subsystem('pre2', ExecComp4Test('y=3.*x - 7.*xx', x=np.ones(size), xx=np.ones(size), y=np.zeros(size))),
 
             'iter1': G1.add_subsystem('iter1', ExecComp4Test('y=x1 + x2*4. + x3',
                                                     x1=np.ones(size), x2=np.ones(size),
@@ -66,12 +68,25 @@ class TestPrePostIter(unittest.TestCase):
         model.connect('iter4.y', 'iter3.x')
         model.connect('post1.y', 'post2.x3')
 
-        prob.model.add_design_var('iter1.x3', lower=0, upper=10)
+        prob.model.add_design_var('iter1.x3', lower=-10, upper=10)
         prob.model.add_constraint('iter2.y', upper=10.)
         prob.model.add_objective('iter3.y', index=0)
 
         if coloring:
             prob.driver.declare_coloring()
+
+        if recording:
+            model.recording_options['record_inputs'] = True
+            model.recording_options['record_outputs'] = True
+            model.recording_options['record_residuals'] = True
+
+            recorder = om.SqliteRecorder("sqlite_test_pre_post", record_viewer_data=False)
+
+            model.add_recorder(recorder)
+            prob.driver.add_recorder(recorder)
+
+            for comp in comps.values():
+                comp.add_recorder(recorder)
 
         prob.setup(mode=mode, force_alloc_complex=force_complex)
 
@@ -491,6 +506,38 @@ class TestPrePostIter(unittest.TestCase):
 
                 J = prob.compute_totals(return_format='flat_dict')
                 assert_near_equal(J[('obj_cmp.obj', 'pz.z')], np.array([[9.62568658, 1.78576699]]), .00001)
+
+    def test_reading_system_cases_pre_opt_post(self):
+        prob = self.setup_problem(do_pre_post_opt=True, mode='fwd', recording=True)
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader('sqlite_test_pre_post')
+
+        # check that we only have the three system sources
+        self.assertEqual(sorted(cr.list_sources(out_stream=None)), ['driver', 'root', 'root.iter1', 'root.iter2', 'root.iter3', 'root.iter4', 'root.post1', 'root.post2', 'root.pre1', 'root.pre2'])
+
+        # check source vars
+        source_vars = cr.list_source_vars('root', out_stream=None)
+        self.assertEqual(sorted(source_vars['inputs']),  ['iter1.x1', 'iter1.x2', 'iter1.x3', 'iter2.x', 'iter3.x', 'iter4.x', 'post1.x', 'post2.x1', 'post2.x2', 'post2.x3', 'pre1.x', 'pre2.x', 'pre2.xx'])
+        self.assertEqual(sorted(source_vars['outputs']), ['iter1.x3', 'iter1.y', 'iter2.y', 'iter3.y', 'iter4.y', 'post1.y', 'post2.y', 'pre1.x', 'pre1.y', 'pre2.x', 'pre2.y'])
+
+        # Test to see if we got the correct number of cases
+        self.assertEqual(len(cr.list_cases('root', recurse=False, out_stream=None)), 5)
+        self.assertEqual(len(cr.list_cases('root.iter1', recurse=False, out_stream=None)), 3)
+        self.assertEqual(len(cr.list_cases('root.iter2', recurse=False, out_stream=None)), 3)
+        self.assertEqual(len(cr.list_cases('root.iter3', recurse=False, out_stream=None)), 3)
+        self.assertEqual(len(cr.list_cases('root.pre1', recurse=False, out_stream=None)), 1)
+        self.assertEqual(len(cr.list_cases('root.pre2', recurse=False, out_stream=None)), 1)
+        self.assertEqual(len(cr.list_cases('root.post1', recurse=False, out_stream=None)), 1)
+        self.assertEqual(len(cr.list_cases('root.post2', recurse=False, out_stream=None)), 1)
+
+        # Test to see if the case keys (iteration coords) come back correctly
+        for i, iter_coord in enumerate(cr.list_cases('root.pre1', recurse=False, out_stream=None)):
+            self.assertEqual(iter_coord, f'rank0:root._solve_nonlinear|{i}|NLRunOnce|{i}|pre1._solve_nonlinear|{i}')
+
+        for i, iter_coord in enumerate(cr.list_cases('root.iter1', recurse=False, out_stream=None)):
+            self.assertEqual(iter_coord, f'rank0:ScipyOptimize_SLSQP|{i}|root._solve_nonlinear|{i + 1}|NLRunOnce|0|iter1._solve_nonlinear|{i}')
 
 
 if __name__ == "__main__":
