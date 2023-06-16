@@ -95,6 +95,7 @@
                 }
             ],
             "options": {
+                "always_opt": false,
                 "distributed": false,
                 "run_root_only": false,
                 "name": "UNDEFINED",
@@ -217,6 +218,7 @@
                                 }
                             ],
                             "options": {
+                                "always_opt": false,
                                 "assembled_jac_type": "csc",
                                 "distributed": false,
                                 "run_root_only": false
@@ -328,6 +330,7 @@
                         }
                     ],
                     "options": {
+                        "always_opt": false,
                         "distributed": false,
                         "run_root_only": false
                     }
@@ -412,6 +415,7 @@
                         }
                     ],
                     "options": {
+                        "always_opt": false,
                         "distributed": false,
                         "run_root_only": false
                     }
@@ -545,6 +549,7 @@
                 }
             ],
             "options": {
+                "always_opt": false,
                 "distributed": false,
                 "run_root_only": false,
                 "has_diag_partials": false,
@@ -614,6 +619,7 @@
                 }
             ],
             "options": {
+                "always_opt": false,
                 "distributed": false,
                 "run_root_only": false,
                 "has_diag_partials": false,
@@ -683,6 +689,7 @@
                 }
             ],
             "options": {
+                "always_opt": false,
                 "distributed": false,
                 "run_root_only": false,
                 "has_diag_partials": false,

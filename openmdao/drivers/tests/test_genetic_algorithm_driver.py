@@ -1382,6 +1382,10 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
                 self.add_subsystem('p3', om.IndepVarComp('z', 1.0))
 
                 self.add_subsystem('comp', om.ExecComp(['f = x + y + z']))
+                
+                self.connect('p1.x', 'comp.x')
+                self.connect('p2.y', 'comp.y')
+                self.connect('p3.z', 'comp.z')
 
                 self.add_design_var('p1.x', lower=-100, upper=100)
                 self.add_design_var('p2.y', lower=-100, upper=100)

@@ -500,6 +500,7 @@ jobs:
           echo "============================================================="
           copy .coveragerc $HOME
           cd $HOME
+          Set-DisplayResolution -Width 1920 -Height 1080 -Force
           testflo -n 2 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20
 
       - name: Submit coverage
