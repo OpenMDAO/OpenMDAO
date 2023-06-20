@@ -1999,10 +1999,11 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
                                       setup=False, run_model=run_model, fname=fname)
 
     if coloring is not None:
-        if driver._coloring_info['show_sparsity']:
-            coloring.display_txt()
-        if driver._coloring_info['show_summary']:
-            coloring.summary()
+        if not problem.model._approx_schemes:  # avoid double display
+            if driver._coloring_info['show_sparsity']:
+                coloring.display_txt()
+            if driver._coloring_info['show_summary']:
+                coloring.summary()
 
         driver._coloring_info['coloring'] = coloring
         driver._setup_simul_coloring()

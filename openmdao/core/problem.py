@@ -988,8 +988,13 @@ class Problem(object):
 
         self._metadata['setup_status'] = _SetupStatus.POST_SETUP
 
-        if self.options['group_by_pre_opt_post'] and self.driver.supports['optimization']:
-            self.model._setup_iteration_lists()
+        if self.options['group_by_pre_opt_post']:
+            if self.driver.supports['optimization']:
+                self.model._setup_iteration_lists()
+            else:
+                issue_warning(f"In Problem '{self._name}, the 'group_by_pre_opt_post' option is "
+                              "True but the driver doesn't support optimization so the option will "
+                              "be ignored.")
 
         self._check_collected_errors()
 
@@ -2455,6 +2460,42 @@ class Problem(object):
                     if s.linear_solver is not None and s.linear_solver._iter_count > 0:
                         yield (prefix + 'linear_solver', '_iter_count',
                                s.linear_solver._iter_count)
+
+    def list_pre_post(self, outfile=None):
+        """
+        Display the pre and post optimization components.
+
+        Parameters
+        ----------
+        outfile : file-like or str or None
+            Where to send human readable output. Default is None, which sends output to stdout.
+        """
+        if self._metadata is None or self._metadata['setup_status'] < _SetupStatus.POST_SETUP:
+            raise RuntimeError(f"{self.msginfo}: list_pre_post can't be called before setup.")
+
+        if outfile is None:
+            out = sys.stdout
+        else:
+            out = open(outfile, 'w')
+
+        if not self.options['group_by_pre_opt_post']:
+            print("\nThe 'group_by_pre_opt_post' option is False, so all components will be "
+                  "included in the optimization loop.", file=out)
+
+        model = self.model
+        if model._pre_components:
+            print("\nPre-optimization components:", file=out)
+            for name in model._pre_components:
+                print(f"    {name}", file=out)
+        else:
+            print("\nPre-optimization components: []", file=out)
+
+        if model._post_components:
+            print("\nPost-optimization components:", file=out)
+            for name in model._post_components:
+                print(f"    {name}", file=out)
+        else:
+            print("\nPost-optimization components: []", file=out)
 
 
 _ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
