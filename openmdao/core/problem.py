@@ -1168,9 +1168,7 @@ class Problem(object):
                     isinstance(comp, ExplicitComponent)):
                 continue
 
-            name = comp.pathname
-
-            if not match_includes_excludes(name, includes, excludes):
+            if not match_includes_excludes(comp.pathname, includes, excludes):
                 continue
 
             comps.append(comp)

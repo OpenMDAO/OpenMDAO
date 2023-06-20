@@ -3488,6 +3488,8 @@ class Group(System):
             subsys._setup_partials()
             info.update(subsys._subjacs_info)
 
+        # self._subjacs_info = {k: v for k, v in sorted(info.items())}
+
         if self._has_distrib_vars and self._owns_approx_jac:
             # We currently cannot approximate across a group with a distributed component if the
             # inputs are distributed via src_indices.
