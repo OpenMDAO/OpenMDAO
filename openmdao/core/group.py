@@ -4376,15 +4376,17 @@ class Group(System):
             else:
                 yield s.pathname
 
-    def _sorted_sys_iter(self, subs=None):
-        if subs is None:
-            subs = self._subsystems_myproc
+    def _sorted_sys_iter(self):
+        """
+        Yield subsystems in sorted order.
 
-        if True:  # self.options['auto_order']:
-            for s in sorted(subs, key=lambda s: s.name):
-                yield s
-        else:
-            yield from subs
+        Yields
+        ------
+        System
+            A subsystem.
+        """
+        for s in sorted(self._subsystems_myproc, key=lambda s: s.name):
+            yield s
 
     def _solver_subsystem_iter(self, local_only=False):
         """

@@ -6115,5 +6115,5 @@ class System(object):
         # return regular dict sorted by system pathname
         return {spath: data for spath, data in sorted(sys_prom_map.items(), key=lambda x: x[0])}
 
-    def _sorted_sys_iter(self, subs=None):
+    def _sorted_sys_iter(self):
         yield from ()
