@@ -71,6 +71,9 @@ class TestDriverScalingReport(unittest.TestCase):
             s_outs = sorted(f"out{i}" for i in outidxs)
             expected.cons.extend(f"comp{icomp}.{n}" for n in s_outs)
 
+        # sort dvs, cons to match actual data ordering
+        expected.dvs = sorted(expected.dvs, key=lambda x: x.rpartition('.')[0])
+        expected.cons = sorted(expected.cons, key=lambda x: x.rpartition('.')[0])
         p.setup()
         return p, expected
 

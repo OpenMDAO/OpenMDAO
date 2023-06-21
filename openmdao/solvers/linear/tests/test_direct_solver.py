@@ -404,7 +404,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "NaN entries found in <model> <class Group> for rows associated with states/residuals ['sub.c2.y', 'c4.y']."
+        expected_msg = "NaN entries found in <model> <class Group> for rows associated with states/residuals ['c4.y', 'sub.c2.y']."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -437,7 +437,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "NaN entries found in <model> <class Group> for rows associated with states/residuals ['sub.c2.y', 'c4.y']."
+        expected_msg = "NaN entries found in <model> <class Group> for rows associated with states/residuals ['c4.y', 'sub.c2.y']."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -470,7 +470,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "NaN entries found in <model> <class Group> for rows associated with states/residuals ['sub.c2.y', 'c4.y']."
+        expected_msg = "NaN entries found in <model> <class Group> for rows associated with states/residuals ['c4.y', 'sub.c2.y']."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -626,8 +626,8 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
             prob.run_model()
 
         expected = "Jacobian in 'sub' is not full rank. The following set of states/residuals contains one or more equations that is a linear combination of the others: \n"
-        expected += " 'gen.I_out' ('sub.gen.I_out') index 0.\n"
         expected += " 'Vm_dc' ('sub.calcs.V_out') index 0.\n"
+        expected += " 'gen.I_out' ('sub.gen.I_out') index 0.\n"
 
         self.assertEqual(expected, str(cm.exception))
 

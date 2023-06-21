@@ -439,6 +439,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "Run Number: 0",
             "    Subsystem : root",
             "        assembled_jac_type: csc",
+            "        auto_order: False",
             "    Subsystem : p1",
             "        distributed: False",
             "        run_root_only: False",
@@ -500,6 +501,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "Run Number: 1",
             "    Subsystem : root",
             "        assembled_jac_type: dense",
+            "        auto_order: False",
             ""
         ]
 
@@ -539,6 +541,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "Run Number: 0",
             "    Subsystem : root",
             "        assembled_jac_type: csc",
+            "        auto_order: False",
             "    Subsystem : p1",
             "        distributed: False",
             "        run_root_only: False",
@@ -600,6 +603,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "Run Number: 1",
             "    Subsystem : root",
             "        assembled_jac_type: dense",
+            "        auto_order: False",
             ""
         ]
 

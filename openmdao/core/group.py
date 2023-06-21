@@ -227,7 +227,7 @@ class Group(System):
 
         self._subsys_graph = None
 
-        self.options.declare('auto_order', types=bool, default=True,
+        self.options.declare('auto_order', types=bool, default=False,
                              desc='If True the order of subsystems is determined automatically '
                              'based on the dependency graph.  It will not break or reorder '
                              'cycles.')
@@ -4380,7 +4380,7 @@ class Group(System):
         if subs is None:
             subs = self._subsystems_myproc
 
-        if self.options['auto_order']:
+        if True:  # self.options['auto_order']:
             for s in sorted(subs, key=lambda s: s.name):
                 yield s
         else:
