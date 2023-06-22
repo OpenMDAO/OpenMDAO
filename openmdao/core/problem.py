@@ -292,6 +292,15 @@ class Problem(object):
                              "iterate over the optimization subsystems during optimization.  This "
                              "applies only when the top level nonlinear solver is of type"
                              "NonlinearRunOnce.")
+        self.options.declare('allow_auto_order', types=bool,
+                             default=True,
+                             desc="If True, the execution order of direct subsystems of any group "
+                             "that sets its 'auto_order' option to True will be automatically "
+                             "ordered according to data dependencies. If this option is False, the "
+                             "'auto_order' option will be ignored and a warning will be issued for "
+                             "each group that has set it to True. Note that subsystems of a Group "
+                             "that form a cycle will never be reordered, regardless of the value of"
+                             " the 'auto_order' option.")
         self.options.update(options)
 
         # Options passed to models
@@ -976,7 +985,14 @@ class Problem(object):
             'checking': False,  # True if check_totals or check_partials is running
             'opt_status': None,  # Tells Systems if they are in an optimization loop
             'model_options': self.model_options,  # A dict of options passed to all systems in tree
-            'has_auto_ordering': False,  # True if any group in the tree has auto_ordering=True
+            'allow_auto_order': self.options['allow_auto_order'],  # If False, auto_ordering=True
+                                                                   # in any Group will be ignored
+                                                                   # and internal data structures
+                                                                   # will not be sorted. This is to
+                                                                   # avoid possibly breaking
+                                                                   # existing models that are very
+                                                                   # sensitive to slight numerical
+                                                                   # changes.
         }
         model._setup(model_comm, mode, self._metadata)
 
@@ -1055,8 +1071,8 @@ class Problem(object):
                           "response variables (objectives and nonlinear constraints).",
                           category=DerivativesWarning)
 
-        if self._metadata['setup_status'] == _SetupStatus.PRE_SETUP and \
-                hasattr(self.model, '_order_set') and self.model._order_set:
+        if (not self._metadata['allow_auto_order'] and
+                self._metadata['setup_status'] == _SetupStatus.PRE_SETUP and self.model._order_set):
             raise RuntimeError(f"{self.msginfo}: Cannot call set_order without calling setup after")
 
         # set up recording, including any new recorders since last setup

@@ -1321,7 +1321,7 @@ class TestGroup(unittest.TestCase):
             def configure(self):
                 self.set_order(['C2', 'C1'])
 
-        prob = om.Problem()
+        prob = om.Problem(allow_auto_order=False)
         model = prob.model
 
         model.add_subsystem('C1', SimpleGroup())
@@ -1340,7 +1340,7 @@ class TestGroup(unittest.TestCase):
                 self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
                 self.add_subsystem('comp2', om.ExecComp('b=2*a'))
 
-        prob = om.Problem()
+        prob = om.Problem(allow_auto_order=False)
         model = prob.model
 
         model.add_subsystem('C1', SimpleGroup())
@@ -1386,6 +1386,41 @@ class TestGroup(unittest.TestCase):
         model.set_order(['C2', 'C1'])
         prob.setup()
         prob.run_model()
+
+    def test_auto_order(self):
+        p = om.Problem()
+        model = p.model
+        model.add_subsystem('C2', om.ExecComp('y=3.0*x'))
+        model.add_subsystem('C1', om.ExecComp('y=2.0*x'))
+        model.add_subsystem('C3', om.ExecComp('y=5.0*x'))
+        model.connect('C1.y', 'C2.x')
+        model.connect('C2.y', 'C3.x')
+        model.options['auto_order'] = True
+
+        p.setup()
+        p.run_model()
+
+        self.assertEqual([s.name for s in model._subsystems_myproc], ['_auto_ivc', 'C1', 'C2', 'C3'])
+
+    def test_auto_order2(self):
+        p = om.Problem()
+        model = p.model
+        model.add_subsystem('C5', om.ExecComp('y=5.0*x1 - 3.*x2'))
+        model.add_subsystem('C1', om.ExecComp('y=2.0*x'))
+        model.add_subsystem('C2', om.ExecComp('y=3.0*x1 + 4.*x2'))
+        model.add_subsystem('C4', om.ExecComp('y=5.0*x'))
+        model.add_subsystem('C3', om.ExecComp(['y=5.0*x', 'z=x']))
+        model.connect('C1.y', ['C2.x1', 'C5.x2'])
+        model.connect('C2.y', 'C4.x')
+        model.connect('C4.y', 'C3.x')
+        model.connect('C3.y', 'C2.x2')
+        model.connect('C3.z', 'C5.x1')
+        model.options['auto_order'] = True
+
+        p.setup()
+        p.run_model()
+
+        self.assertEqual([s.name for s in model._subsystems_myproc], ['_auto_ivc', 'C1', 'C2', 'C4', 'C3', 'C5'])
 
     def test_promote_units_and_none(self):
         p = om.Problem(name='promote_units_and_none')

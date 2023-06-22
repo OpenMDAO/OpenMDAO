@@ -19,6 +19,7 @@ class ParallelGroup(Group):
         """
         super().__init__(**kwargs)
         self._mpi_proc_allocator.parallel = True
+        self.options.undeclare('auto_order')
 
     def _configure(self):
         """
@@ -65,3 +66,10 @@ class ParallelGroup(Group):
                         seen.add(name)
         else:
             yield from super()._ordered_comp_name_iter()
+
+    def _check_auto_order(self):
+        """
+        Check if auto ordering is enabled and if so, set the order appropriately.
+        """
+        for s in self._subsystems_myproc:
+            s._check_auto_order()

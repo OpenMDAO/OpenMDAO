@@ -627,8 +627,11 @@ class Group(System):
             subsys._setup_procs(subsys.pathname, sub_comm, mode, prob_meta)
 
         # build a list of local subgroups to speed up later loops
-        self._subgroups_myproc = sorted(
-            [s for s in self._subsystems_myproc if isinstance(s, Group)], key=lambda x: x.name)
+        if prob_meta['allow_auto_order']:
+            self._subgroups_myproc = sorted(
+                [s for s in self._subsystems_myproc if isinstance(s, Group)], key=lambda x: x.name)
+        else:
+            self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
 
         if nproc > 1 and self._mpi_proc_allocator.parallel:
             self._problem_meta['parallel_groups'].append(self.pathname)
@@ -645,14 +648,6 @@ class Group(System):
                 if par.startswith(prefix) and par != prefix:
                     self._contains_parallel_group = True
                     break
-
-        if comm.size > 1:
-            has_auto = bool(comm.allreduce(int(self.options['auto_order'])))
-        else:
-            has_auto = self.options['auto_order']
-
-        if has_auto:
-            prob_meta['has_auto_ordering'] = True
 
         self._setup_procs_finished = True
 
@@ -1380,6 +1375,7 @@ class Group(System):
         self._resolve_group_input_defaults()
         self._setup_auto_ivcs(mode)
         self._check_prom_masking()
+        self._check_auto_order()
 
     def _check_prom_masking(self):
         """
@@ -1407,6 +1403,67 @@ class Group(System):
                                        " promoting to a different name. This can be caused"
                                        " by promoting '*' at group level or promoting using"
                                        " dotted names.")
+
+    def _check_auto_order(self):
+        """
+        Check if auto ordering is enabled and if so, set the order appropriately.
+        """
+        if not (self.options['auto_order'] and self._problem_meta['allow_auto_order']):
+            if self.options['auto_order']:
+                issue_warning("The 'auto_order' option has been set to True, but auto ordering"
+                              " has been disabled for the model. The 'auto_order' option will"
+                              " be ignored.", prefix=self.msginfo)
+            return
+
+        orders = {name: i for i, name in enumerate(self._subsystems_allprocs)}
+        G = self.compute_sys_graph()
+        strongcomps = get_sccs_topo(G)
+
+        mins = []
+        maxs = []
+        for strongcomp in strongcomps:
+            order_list = [orders[name] for name in strongcomp]
+            mins.append(min(order_list))
+            maxs.append(max(order_list))
+
+        sorted_maxs = sorted(maxs)
+        if sorted_maxs != maxs:
+            self._set_auto_order(strongcomps, orders, mins, maxs)
+            return
+
+        sorted_mins = sorted(mins)
+        if sorted_mins != mins:
+            self._set_auto_order(strongcomps, orders, mins, maxs)
+
+        for s in self._subsystems_myproc:
+            s._check_auto_order()
+
+    def _set_auto_order(self, strongcomps, orders, mins, maxs):
+        """
+        Set the order of the subsystems based on the dependency graph.
+
+        Parameters
+        ----------
+        strongcomps : list of list of str
+            List of lists of subsystem names. Each list contains subsystems that are strongly
+            connected.
+        orders : dict
+            Dictionary mapping subsystem names to their order in the current ordering.
+        mins : list of int
+            List of the minimum order of each strongly connected component.
+        maxs : list of int
+            List of the maximum order of each strongly connected component.
+        """
+        new_order = []
+        for strongcomp in strongcomps:
+            if len(strongcomp) > 1:
+                # keep order of cycles as they were before
+                order_list = [(name, orders[name]) for name in strongcomp]
+                new_order.extend([name for name, _ in sorted(order_list, key=lambda x: x[1])])
+            else:
+                new_order.append(strongcomp.pop())
+
+        self.set_order(new_order)
 
     def _top_level_post_sizes(self):
         # this runs after the variable sizes are known
@@ -3100,14 +3157,14 @@ class Group(System):
 
     def set_order(self, new_order):
         """
-        Specify a new execution order for this system.
+        Specify a new execution order subsystems in this group.
 
         Parameters
         ----------
         new_order : list of str
             List of system names in desired new execution order.
         """
-        if self._problem_meta is not None and \
+        if self._problem_meta is not None and not self._problem_meta['allow_auto_order'] and \
                 self._problem_meta['setup_status'] == _SetupStatus.POST_CONFIGURE:
             raise RuntimeError(f"{self.msginfo}: Cannot call set_order in the configure method.")
 
@@ -3152,8 +3209,11 @@ class Group(System):
             subsystems[name] = sinfo
             sinfo.index = i
 
+        if not self._static_mode:
+            self._subsystems_myproc = [s for s, _ in self._subsystems_allprocs.values()]
+
         self._order_set = True
-        if self._problem_meta is not None:
+        if self._problem_meta is not None and not self._problem_meta['allow_auto_order']:
             # order has been changed so we need a new full setup
             self._problem_meta['setup_status'] = _SetupStatus.PRE_SETUP
 
@@ -4389,14 +4449,17 @@ class Group(System):
 
     def _sorted_sys_iter(self):
         """
-        Yield subsystems in sorted order.
+        Yield subsystems in sorted order if at least one Group in the model uses auto_ordering.
+
+        If no auto ordering is being used, yield subsystems in the order they were added to their
+        parent group.
 
         Yields
         ------
         System
             A subsystem.
         """
-        if self._problem_meta['has_auto_ordering']:
+        if self._problem_meta['allow_auto_order']:
             for s in sorted(self._subsystems_myproc, key=lambda s: s.name):
                 yield s
         else:
