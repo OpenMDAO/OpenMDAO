@@ -975,7 +975,8 @@ class Problem(object):
             'saved_errors': [],  # store setup errors here until after final_setup
             'checking': False,  # True if check_totals or check_partials is running
             'opt_status': None,  # Tells Systems if they are in an optimization loop
-            'model_options': self.model_options  # A dict of options passed to all systems in tree
+            'model_options': self.model_options,  # A dict of options passed to all systems in tree
+            'has_auto_ordering': False,  # True if any group in the tree has auto_ordering=True
         }
         model._setup(model_comm, mode, self._metadata)
 

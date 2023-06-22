@@ -646,6 +646,14 @@ class Group(System):
                     self._contains_parallel_group = True
                     break
 
+        if comm.size > 1:
+            has_auto = bool(comm.allreduce(int(self.options['auto_order'])))
+        else:
+            has_auto = self.options['auto_order']
+
+        if has_auto:
+            prob_meta['has_auto_ordering'] = True
+
         self._setup_procs_finished = True
 
     def _configure_check(self):
@@ -4388,11 +4396,11 @@ class Group(System):
         System
             A subsystem.
         """
-        if self._sorted_subsystems_myproc is None:
-            self._sorted_subsystems_myproc = sorted(self._subsystems_myproc, key=lambda s: s.name)
-
-        for s in self._sorted_subsystems_myproc:
-            yield s
+        if self._problem_meta['has_auto_ordering']:
+            for s in sorted(self._subsystems_myproc, key=lambda s: s.name):
+                yield s
+        else:
+            yield from self._subsystems_myproc
 
     def _solver_subsystem_iter(self, local_only=False):
         """

@@ -607,7 +607,7 @@ class MPIFeatureTests(unittest.TestCase):
 
         # list all model outputs
         outputs = model.list_outputs(all_procs=True)
-        self.assertEqual(['C2.outvec', 'C3.sum', 'indep.x'], [name for name, _ in outputs])
+        self.assertEqual(['indep.x', 'C2.outvec', 'C3.sum'], [name for name, _ in outputs])
 
         # list all model outputs that are an indep_var
         outputs = model.list_outputs(is_indep_var=True, all_procs=True)

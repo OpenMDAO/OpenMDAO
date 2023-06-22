@@ -238,15 +238,15 @@ class TestJacobian(unittest.TestCase):
     )
     def test_src_indices(self, assembled_jac, comp_jac_class, nested, lincalls):
 
-        p = self._setup_model(assembled_jac, comp_jac_class, nested, lincalls)
+        self._setup_model(assembled_jac, comp_jac_class, nested, lincalls)
 
         # if we multiply our jacobian (at x,y = ones) by our work vec of 1's,
         # we get fwd_check
-        fwd_check = np.array([24., 74.,  8., -1., -1., -1., -1., -1.])
+        fwd_check = np.array([-1.0, -1.0, -1.0, -1.0, -1.0, 24., 74., 8.])
 
         # if we multiply our jacobian's transpose by our work vec of 1's,
         # we get rev_check
-        rev_check = np.array([-1.,  6., -1., 35.,  5., -9., 63.,  3.])
+        rev_check = np.array([35., 5., -9., 63., 3., -1., 6., -1.])
 
         self._check_fwd(self.prob, fwd_check)
         # to catch issues with constant subjacobians, repeatedly call linearize
@@ -287,9 +287,8 @@ class TestJacobian(unittest.TestCase):
         prob.set_solver_print(level=0)
 
         prob.setup()
-        prob.run_model()
 
-        return prob
+        prob.run_model()
 
     def _check_fwd(self, prob, check_vec):
         d_inputs, d_outputs, d_residuals = prob.model.get_linear_vectors()
@@ -1098,9 +1097,9 @@ class OverlappingPartialsTestCase(unittest.TestCase):
 
         J = p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
         np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix.toarray(),
-                                       np.array([[-1.,  0.,  13.],
+                                       np.array([[-1.,  0.,  0.],
                                                  [ 0., -1.,  0.],
-                                                 [ 0., 0., -1.]]))
+                                                 [ 0., 13., -1.]]))
 
     def test_repeated_src_indices_dense(self):
         size = 2
@@ -1118,9 +1117,9 @@ class OverlappingPartialsTestCase(unittest.TestCase):
 
         J = p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
         np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix,
-                                       np.array([[-1.,  0.,  13.],
+                                       np.array([[-1.,  0.,  0.],
                                                  [ 0., -1.,  0.],
-                                                 [ 0., 0., -1.]]))
+                                                 [ 0., 13., -1.]]))
 
     def test_multi_inputs_same_src_dense_comp(self):
         p = Problem()
@@ -1136,10 +1135,10 @@ class OverlappingPartialsTestCase(unittest.TestCase):
 
         J = p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
         np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix.toarray(),
-                                       np.array([[-1.,  0.,  9.,  8.],
-                                                 [ 0., -1.,  5.,  10.],
-                                                 [ 0.,  0., -1.,  0.],
-                                                 [ 0.,  0.,  0., -1.]]))
+                                       np.array([[-1.,  0.,  0.,  0.],
+                                                 [ 0., -1.,  0.,  0.],
+                                                 [ 9.,  8., -1.,  0.],
+                                                 [ 5.,  10.,  0., -1.]]))
 
     def test_multi_inputs_same_src_sparse_comp(self):
         p = Problem()
@@ -1155,10 +1154,10 @@ class OverlappingPartialsTestCase(unittest.TestCase):
 
         J = p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
         np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix.toarray(),
-                                       np.array([[-1.,  0.,  9.,  8.],
-                                                 [ 0., -1.,  5.,  10.],
-                                                 [ 0.,  0., -1.,  0.],
-                                                 [ 0.,  0.,  0., -1.]]))
+                                       np.array([[-1.,  0.,  0.,  0.],
+                                                 [ 0., -1.,  0.,  0.],
+                                                 [ 9.,  8., -1.,  0.],
+                                                 [ 5.,  10.,  0., -1.]]))
 
 
 class MaskingTestCase(unittest.TestCase):
