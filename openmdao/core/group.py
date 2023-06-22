@@ -188,6 +188,8 @@ class Group(System):
         Sorted list of pathnames of components that are executed prior to the optimization loop.
     _post_components : list of str or None
         Sorted list of pathnames of components that are executed after the optimization loop.
+    _sorted_subsystems_myproc : list of str
+        List of local subsystems, sorted by name.
     """
 
     def __init__(self, **kwargs):
@@ -216,6 +218,7 @@ class Group(System):
         self._shape_knowns = None
         self._pre_components = None
         self._post_components = None
+        self._sorted_subsystems_myproc = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -4385,7 +4388,10 @@ class Group(System):
         System
             A subsystem.
         """
-        for s in sorted(self._subsystems_myproc, key=lambda s: s.name):
+        if self._sorted_subsystems_myproc is None:
+            self._sorted_subsystems_myproc = sorted(self._subsystems_myproc, key=lambda s: s.name)
+
+        for s in self._sorted_subsystems_myproc:
             yield s
 
     def _solver_subsystem_iter(self, local_only=False):
