@@ -261,7 +261,7 @@ class TestJacobian(unittest.TestCase):
             assert_check_partials(partials, atol=1e-5, rtol=1e-5)
 
     def _setup_model(self, assembled_jac, comp_jac_class, nested, lincalls):
-        self.prob = prob = Problem(allow_auto_order=False)
+        self.prob = prob = Problem(allow_post_setup_reorder=False)
         if nested:
             top = prob.model.add_subsystem('G1', Group())
         else:
@@ -348,7 +348,7 @@ class TestJacobian(unittest.TestCase):
         shape, constructor, expected_shape = shapes
         dtype, value = dtypes
 
-        prob = Problem(allow_auto_order=False)
+        prob = Problem(allow_post_setup_reorder=False)
         comp = ExplicitSetItemComp(dtype, value, shape, constructor)
         comp = prob.model.add_subsystem('C1', comp)
         prob.setup()
@@ -1083,7 +1083,7 @@ class MyDenseComp(ExplicitComponent):
 class OverlappingPartialsTestCase(unittest.TestCase):
     def test_repeated_src_indices_csc(self):
         size = 2
-        p = Problem(allow_auto_order=False)
+        p = Problem(allow_post_setup_reorder=False)
         indeps = p.model.add_subsystem('indeps', IndepVarComp('x', np.ones(size)))
 
         p.model.add_subsystem('C1', ExecComp('z=3.0*x[0]**3 + 2.0*x[1]**2', x=np.zeros(size)))
@@ -1103,7 +1103,7 @@ class OverlappingPartialsTestCase(unittest.TestCase):
 
     def test_repeated_src_indices_dense(self):
         size = 2
-        p = Problem(allow_auto_order=False)
+        p = Problem(allow_post_setup_reorder=False)
         indeps = p.model.add_subsystem('indeps', IndepVarComp('x', np.ones(size)))
 
         p.model.add_subsystem('C1', ExecComp('z=3.0*x[0]**3 + 2.0*x[1]**2', x=np.zeros(size)))
@@ -1122,7 +1122,7 @@ class OverlappingPartialsTestCase(unittest.TestCase):
                                                  [ 0., 13., -1.]]))
 
     def test_multi_inputs_same_src_dense_comp(self):
-        p = Problem(allow_auto_order=False)
+        p = Problem(allow_post_setup_reorder=False)
         indeps = p.model.add_subsystem('indeps', IndepVarComp('x', np.ones(2)))
 
         p.model.add_subsystem('C1', MyDenseComp())
@@ -1141,7 +1141,7 @@ class OverlappingPartialsTestCase(unittest.TestCase):
                                                  [ 5.,  10.,  0., -1.]]))
 
     def test_multi_inputs_same_src_sparse_comp(self):
-        p = Problem(allow_auto_order=False)
+        p = Problem(allow_post_setup_reorder=False)
         indeps = p.model.add_subsystem('indeps', IndepVarComp('x', np.ones(2)))
 
         p.model.add_subsystem('C1', MySparseComp())

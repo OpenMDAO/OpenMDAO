@@ -2350,13 +2350,17 @@ class System(object):
                 old_name, old_key, old_info, old_match_type = matches[io][name]
                 _, info = tup
                 if old_match_type == _MatchType.RENAME:
-                    old_key = (old_name, old_key)
+                    old_key = old_using = (old_name, old_key)
+                    wild = False
                 else:
                     old_using = f"'{old_key}'"
+                    wild = '*' in old_key
+
                 if match_type == _MatchType.RENAME:
                     new_using = (name, tup[0])
                 else:
                     new_using = f"'{tup[0]}'"
+                    wild |= '*' in tup[0]
 
                 diff = info.compare(old_info) if info is not None and old_info is not None else ()
                 if diff:
@@ -2370,7 +2374,7 @@ class System(object):
                                            f"'{tup[0]}' because '{name}' has already been promoted "
                                            f"as '{old_key}'.")
 
-                if old_using != "'*'" and new_using != "'*'":
+                if not wild:
                     msg = f"{io} variable '{name}', promoted using {new_using}, " \
                           f"was already promoted using {old_using}."
                     issue_warning(msg, prefix=self.msginfo, category=PromotionWarning)

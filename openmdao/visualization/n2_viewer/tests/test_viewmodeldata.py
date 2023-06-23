@@ -185,7 +185,7 @@ class TestViewModelData(unittest.TestCase):
         Verify that the correct model structure data exists when stored as compared
         to the expected structure, using the SellarStateConnection model.
         """
-        p = om.Problem(model=SellarStateConnection(), allow_auto_order=False)
+        p = om.Problem(model=SellarStateConnection(), allow_post_setup_reorder=False)
         p.setup()
         p.final_setup()
 
@@ -217,7 +217,7 @@ class TestViewModelData(unittest.TestCase):
         and then pulled out of a sqlite db file and compared to the expected
         structure.  Uses the SellarStateConnection model.
         """
-        p = om.Problem(model=SellarStateConnection(), allow_auto_order=False)
+        p = om.Problem(model=SellarStateConnection(), allow_post_setup_reorder=False)
 
         r = SqliteRecorder(self.sqlite_db_filename)
         p.driver.add_recorder(r)

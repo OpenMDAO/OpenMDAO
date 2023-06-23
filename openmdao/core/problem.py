@@ -292,7 +292,7 @@ class Problem(object):
                              "iterate over the optimization subsystems during optimization.  This "
                              "applies only when the top level nonlinear solver is of type"
                              "NonlinearRunOnce.")
-        self.options.declare('allow_auto_order', types=bool,
+        self.options.declare('allow_post_setup_reorder', types=bool,
                              default=True,
                              desc="If True, the execution order of direct subsystems of any group "
                              "that sets its 'auto_order' option to True will be automatically "
@@ -985,7 +985,7 @@ class Problem(object):
             'checking': False,  # True if check_totals or check_partials is running
             'opt_status': None,  # Tells Systems if they are in an optimization loop
             'model_options': self.model_options,  # A dict of options passed to all systems in tree
-            'allow_auto_order': self.options['allow_auto_order'],  # If False, auto_ordering=True
+            'allow_post_setup_reorder': self.options['allow_post_setup_reorder'],  # If False, auto_ordering=True
                                                                    # in any Group will be ignored
                                                                    # and internal data structures
                                                                    # will not be sorted. This is to
@@ -1071,7 +1071,7 @@ class Problem(object):
                           "response variables (objectives and nonlinear constraints).",
                           category=DerivativesWarning)
 
-        if (not self._metadata['allow_auto_order'] and
+        if (not self._metadata['allow_post_setup_reorder'] and
                 self._metadata['setup_status'] == _SetupStatus.PRE_SETUP and self.model._order_set):
             raise RuntimeError(f"{self.msginfo}: Cannot call set_order without calling setup after")
 

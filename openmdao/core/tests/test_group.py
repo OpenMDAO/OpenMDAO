@@ -1186,7 +1186,7 @@ class TestGroup(unittest.TestCase):
     def test_set_order(self):
 
         order_list = []
-        prob = om.Problem()
+        prob = om.Problem(allow_post_setup_reorder=False)
         model = prob.model
         model.nonlinear_solver = om.NonlinearRunOnce()
         model.add_subsystem('C1', ReportOrderComp(order_list), promotes_inputs=['x'])
@@ -1321,7 +1321,7 @@ class TestGroup(unittest.TestCase):
             def configure(self):
                 self.set_order(['C2', 'C1'])
 
-        prob = om.Problem(allow_auto_order=False)
+        prob = om.Problem(allow_post_setup_reorder=False)
         model = prob.model
 
         model.add_subsystem('C1', SimpleGroup())
@@ -1340,7 +1340,7 @@ class TestGroup(unittest.TestCase):
                 self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
                 self.add_subsystem('comp2', om.ExecComp('b=2*a'))
 
-        prob = om.Problem(allow_auto_order=False)
+        prob = om.Problem(allow_post_setup_reorder=False)
         model = prob.model
 
         model.add_subsystem('C1', SimpleGroup())
@@ -3802,7 +3802,7 @@ class TestFeatureSetOrder(unittest.TestCase):
         # this list will record the execution order of our C1, C2, and C3 components
         order_list = []
 
-        prob = om.Problem()
+        prob = om.Problem(allow_post_setup_reorder=False)
         model = prob.model
 
         model.add_subsystem('C1', ReportOrderComp(order_list))

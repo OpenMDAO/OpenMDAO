@@ -230,7 +230,7 @@ class Group(System):
 
         self._subsys_graph = None
 
-        self.options.declare('auto_order', types=bool, default=False,
+        self.options.declare('auto_order', types=bool, default=True,
                              desc='If True the order of subsystems is determined automatically '
                              'based on the dependency graph.  It will not break or reorder '
                              'cycles.')
@@ -585,8 +585,7 @@ class Group(System):
 
             # Call the load balancing algorithm
             try:
-                sub_inds, sub_comm = self._mpi_proc_allocator(
-                    proc_info, len(allsubs), comm)
+                sub_inds, sub_comm = self._mpi_proc_allocator(proc_info, len(allsubs), comm)
             except ProcAllocationError as err:
                 if err.sub_inds is None:
                     raise RuntimeError("%s: %s" % (self.msginfo, err.msg))
@@ -627,7 +626,7 @@ class Group(System):
             subsys._setup_procs(subsys.pathname, sub_comm, mode, prob_meta)
 
         # build a list of local subgroups to speed up later loops
-        if prob_meta['allow_auto_order']:
+        if prob_meta['allow_post_setup_reorder']:
             self._subgroups_myproc = sorted(
                 [s for s in self._subsystems_myproc if isinstance(s, Group)], key=lambda x: x.name)
         else:
@@ -1375,7 +1374,11 @@ class Group(System):
         self._resolve_group_input_defaults()
         self._setup_auto_ivcs(mode)
         self._check_prom_masking()
-        self._check_auto_order()
+        if self._problem_meta['allow_post_setup_reorder']:
+            ubcs = self._check_auto_order()
+            if ubcs:
+                import pprint
+                # raise RuntimeError(f"{self.msginfo}: OUT-OF-ORDER CONNECTIONS:\n{pprint.pformat(ubcs)}")
 
     def _check_prom_masking(self):
         """
@@ -1404,41 +1407,51 @@ class Group(System):
                                        " by promoting '*' at group level or promoting using"
                                        " dotted names.")
 
-    def _check_auto_order(self):
+    def _check_auto_order(self, reorder=True, recurse=True, ubcs=None):
         """
         Check if auto ordering is enabled and if so, set the order appropriately.
+
+        Parameters
+        ----------
+        reorder : bool
+            If True, reorder the subsystems based on the new order.  Otherwise
+            just return the out-of-order connections.
+        recurse : bool
+            If True, call this method on all subgroups.
+        ubcs : dict
+            Lists of out-of-order connections keyed by group pathname.
+
+        Returns
+        -------
+        dict
+            Lists of out-of-order connections keyed by group pathname.
         """
-        if not (self.options['auto_order'] and self._problem_meta['allow_auto_order']):
-            if self.options['auto_order']:
-                issue_warning("The 'auto_order' option has been set to True, but auto ordering"
-                              " has been disabled for the model. The 'auto_order' option will"
-                              " be ignored.", prefix=self.msginfo)
-            return
+        if ubcs is None:
+            ubcs = {}
 
-        orders = {name: i for i, name in enumerate(self._subsystems_allprocs)}
-        G = self.compute_sys_graph()
-        strongcomps = get_sccs_topo(G)
+        if self.options['auto_order']:
+            orders = {name: i for i, name in enumerate(self._subsystems_allprocs)}
+            G = self.compute_sys_graph()
+            strongcomps = get_sccs_topo(G)
 
-        mins = []
-        maxs = []
-        for strongcomp in strongcomps:
-            order_list = [orders[name] for name in strongcomp]
-            mins.append(min(order_list))
-            maxs.append(max(order_list))
+            new_ubcs = []
+            for strongcomp in strongcomps:
+                for u, v in G.edges(strongcomp):
+                    if u in strongcomp and v not in strongcomp and orders[u] > orders[v]:
+                        new_ubcs.append((u, v))
 
-        sorted_maxs = sorted(maxs)
-        if sorted_maxs != maxs:
-            self._set_auto_order(strongcomps, orders, mins, maxs)
-            return
+            if new_ubcs:
+                ubcs[self.pathname] = new_ubcs
+                self._set_auto_order(strongcomps, orders)
 
-        sorted_mins = sorted(mins)
-        if sorted_mins != mins:
-            self._set_auto_order(strongcomps, orders, mins, maxs)
+        if recurse:
+            for s in self._subgroups_myproc:
+                if s.options['auto_order']:
+                    s._check_auto_order(reorder, recurse, ubcs)
 
-        for s in self._subsystems_myproc:
-            s._check_auto_order()
+        return ubcs
 
-    def _set_auto_order(self, strongcomps, orders, mins, maxs):
+    def _set_auto_order(self, strongcomps, orders):
         """
         Set the order of the subsystems based on the dependency graph.
 
@@ -1449,10 +1462,6 @@ class Group(System):
             connected.
         orders : dict
             Dictionary mapping subsystem names to their order in the current ordering.
-        mins : list of int
-            List of the minimum order of each strongly connected component.
-        maxs : list of int
-            List of the maximum order of each strongly connected component.
         """
         new_order = []
         for strongcomp in strongcomps:
@@ -3164,7 +3173,7 @@ class Group(System):
         new_order : list of str
             List of system names in desired new execution order.
         """
-        if self._problem_meta is not None and not self._problem_meta['allow_auto_order'] and \
+        if self._problem_meta is not None and not self._problem_meta['allow_post_setup_reorder'] and \
                 self._problem_meta['setup_status'] == _SetupStatus.POST_CONFIGURE:
             raise RuntimeError(f"{self.msginfo}: Cannot call set_order in the configure method.")
 
@@ -3213,7 +3222,7 @@ class Group(System):
             self._subsystems_myproc = [s for s, _ in self._subsystems_allprocs.values()]
 
         self._order_set = True
-        if self._problem_meta is not None and not self._problem_meta['allow_auto_order']:
+        if self._problem_meta is not None and not self._problem_meta['allow_post_setup_reorder']:
             # order has been changed so we need a new full setup
             self._problem_meta['setup_status'] = _SetupStatus.PRE_SETUP
 
@@ -4459,7 +4468,7 @@ class Group(System):
         System
             A subsystem.
         """
-        if self._problem_meta['allow_auto_order']:
+        if self._problem_meta['allow_post_setup_reorder']:
             for s in sorted(self._subsystems_myproc, key=lambda s: s.name):
                 yield s
         else:

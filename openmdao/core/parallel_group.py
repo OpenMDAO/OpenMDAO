@@ -19,7 +19,7 @@ class ParallelGroup(Group):
         """
         super().__init__(**kwargs)
         self._mpi_proc_allocator.parallel = True
-        self.options.undeclare('auto_order')
+        # self.options.undeclare('auto_order')
 
     def _configure(self):
         """
@@ -67,9 +67,24 @@ class ParallelGroup(Group):
         else:
             yield from super()._ordered_comp_name_iter()
 
-    def _check_auto_order(self):
+    def _check_auto_order(self, reorder=True, recurse=True, ubcs=None):
         """
         Check if auto ordering is enabled and if so, set the order appropriately.
+
+        Parameters
+        ----------
+        reorder : bool
+            If True, reorder the subsystems based on the new order.  Otherwise
+            just return the out-of-order connections.
+        recurse : bool
+            If True, call this method on all subgroups.
+        ubcs : dict
+            Lists of out-of-order connections keyed by group pathname.
+
+        Returns
+        -------
+        dict
+            Lists of out-of-order connections keyed by group pathname.
         """
-        for s in self._subsystems_myproc:
-            s._check_auto_order()
+        for s in self._subgroups_myproc:
+            s._check_auto_order(reorder, recurse, ubcs)
