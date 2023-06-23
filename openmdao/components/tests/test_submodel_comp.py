@@ -440,3 +440,22 @@ class TestSubmodelComp(unittest.TestCase):
         self.assertEqual(p.get_val('new_r'), 20)
         self.assertEqual(p.get_val('new_theta'), 0.5)
         self.assertEqual(p.get_val('new_x'), 100)
+
+    def test_subprob_solver_print(self):
+        p = om.Problem()
+        subprob = om.Problem()
+        subprob.model.add_subsystem('comp', om.ExecComp('x = r*cos(theta)'), promotes=['*'])
+        submodel = om.SubmodelComp(problem=subprob)
+
+        submodel.add_input('r', name='new_r', val=20)
+        submodel.add_input('theta', name='new_theta', val=0.5)
+        submodel.add_output('x', name='new_x', val=100)
+        
+        submodel.set_subprob_solver_print(level=3, depth=20, type_='NL')
+
+        p.model.add_subsystem('submodel', submodel, promotes=['*'])
+
+        p.setup()
+        p.final_setup()
+        print()
+        self.assertTrue((3, 20, 'NL') in p.model.submodel._subprob.model._solver_print_cache)

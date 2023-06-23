@@ -36,6 +36,8 @@ class SubmodelComp(ExplicitComponent):
     ----------
     _subprob : <Problem>
         Instantiated problem used to run the model.
+    _subprob_solver_print_options: dict
+        Arguments for the subproblems solver print.
     submodel_inputs : list of tuple
         List of inputs requested by user to be used as inputs in the
         subproblem's system.
@@ -44,7 +46,8 @@ class SubmodelComp(ExplicitComponent):
         subproblem's system.
     """
 
-    def __init__(self, problem, inputs=None, outputs=None, reports=False, **kwargs):
+    def __init__(self, problem, inputs=None, outputs=None, reports=False,
+                 solver_print_options={'level': 2, 'depth': 1e99, 'type_': 'all'}, **kwargs):
         """
         Initialize all attributes.
         """
@@ -53,6 +56,8 @@ class SubmodelComp(ExplicitComponent):
         if not reports:
             clear_reports(problem)
         self._subprob = problem
+
+        self._subprob_solver_print_options = solver_print_options
 
         self.submodel_inputs = {}
         self.submodel_outputs = {}
@@ -74,6 +79,11 @@ class SubmodelComp(ExplicitComponent):
                     self.submodel_outputs[out[0]] = {'iface_name': out[1]}
                 else:
                     raise Exception(f'Expected output of type str or tuple, got {type(out)}.')
+    
+    def set_subprob_solver_print(self, level=2, depth=1e99, type_='all'):
+        self._subprob_solver_options['level'] = level
+        self._subprob_solver_options['depth'] = depth
+        self._subprob_solver_options['type_'] = type_
 
     def add_input(self, path, name=None, **kwargs):
         """
@@ -382,7 +392,7 @@ class SubmodelComp(ExplicitComponent):
             p.model.add_constraint(prom_name)
 
         # setup again to compute coloring
-        p.set_solver_print(-1)
+        p.set_solver_print(**self._subprob_solver_print_options)
         if self._problem_meta is None:
             p.setup(force_alloc_complex=False)
         else:
