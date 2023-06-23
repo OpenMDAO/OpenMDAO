@@ -34,7 +34,7 @@ Users have requested an easier way to set options recursively on deep models, an
 corresponding option/value pairs in the model_options dictionary and attempts to set the value of any options which it has.
 This is a generic implementation and by using a standard dictionary, users may specify this common options in their run script or use various serialization formations as configuration files for their particular model.
 
-- POEM_089: The automatic grouping of systems into "pre", "opt", and "post" sets.  
+### POEM_089: The automatic grouping of systems into "pre", "opt", and "post" sets.  
 
 When the user sets the Problem option `'group_by_pre_opt_post'`, OpenMDAO will attempt to determine how components
 impact outputs needed for optimization.
