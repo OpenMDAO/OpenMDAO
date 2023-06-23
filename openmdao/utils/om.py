@@ -430,7 +430,7 @@ def _list_pre_post_cmd(options, user_args):
         Args to be passed to the user script.
     """
     def _list_pre_post(prob):
-        prob.model.list_pre_post(outfile=options.outfile)
+        prob.list_pre_post(outfile=options.outfile)
 
     # register the hook
     hooks._register_hook('setup', class_name='Problem', inst_id=options.problem,
