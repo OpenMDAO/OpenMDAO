@@ -450,7 +450,7 @@ class TestSubmodelComp(unittest.TestCase):
         submodel.add_input('r', name='new_r', val=20)
         submodel.add_input('theta', name='new_theta', val=0.5)
         submodel.add_output('x', name='new_x', val=100)
-        
+
         submodel.set_subprob_solver_print(level=3, depth=20, type_='NL')
 
         p.model.add_subsystem('submodel', submodel, promotes=['*'])

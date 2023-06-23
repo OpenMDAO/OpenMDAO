@@ -79,11 +79,27 @@ class SubmodelComp(ExplicitComponent):
                     self.submodel_outputs[out[0]] = {'iface_name': out[1]}
                 else:
                     raise Exception(f'Expected output of type str or tuple, got {type(out)}.')
-    
+
     def set_subprob_solver_print(self, level=2, depth=1e99, type_='all'):
-        self._subprob_solver_options['level'] = level
-        self._subprob_solver_options['depth'] = depth
-        self._subprob_solver_options['type_'] = type_
+        """
+        Cache options to be used in self._subprob.set_solver_print later.
+
+        Parameters
+        ----------
+        level : int
+            Iprint level. Set to 2 to print residuals each iteration; set to 1
+            to print just the iteration totals; set to 0 to disable all printing
+            except for failures, and set to -1 to disable all printing including failures.
+        depth : int
+            How deep to recurse. For example, you can set this to 0 if you only want
+            to print the top level linear and nonlinear solver messages. Default
+            prints everything.
+        type_ : str
+            Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
+        """
+        self._subprob_solver_print_options['level'] = level
+        self._subprob_solver_print_options['depth'] = depth
+        self._subprob_solver_print_options['type_'] = type_
 
     def add_input(self, path, name=None, **kwargs):
         """
