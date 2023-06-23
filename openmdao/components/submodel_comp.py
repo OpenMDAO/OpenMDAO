@@ -29,6 +29,8 @@ class SubmodelComp(ExplicitComponent):
     reports : bool
         Determines if reports should be include in subproblem. Default is False because
         submodelcomp runs faster without reports.
+    solver_print_options : dict
+        Dict for any options the user would want for the internal problems solver print.
     **kwargs : named args
         All remaining named args that become options for `SubmodelComp`.
 
