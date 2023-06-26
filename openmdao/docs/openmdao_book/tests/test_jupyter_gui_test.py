@@ -2,8 +2,14 @@
 import unittest
 import os
 
-os.system("playwright install")
-from .jupyter_gui_test import TestOpenMDAOJupyterBookDocs
+try:
+    import playwright
+except ImportError:
+    playwright = None
 
-if __name__ == "__main__":
-    unittest.main()
+if playwright:
+    os.system("playwright install")
+    from .jupyter_gui_test import TestOpenMDAOJupyterBookDocs
+
+    if __name__ == "__main__":
+        unittest.main()
