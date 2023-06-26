@@ -451,11 +451,8 @@ class TestSubmodelComp(unittest.TestCase):
         submodel.add_input('theta', name='new_theta', val=0.5)
         submodel.add_output('x', name='new_x', val=100)
 
-        submodel.set_subprob_solver_print(level=3, depth=20, type_='NL')
+        submodel._subprob.set_solver_print(level=3, depth=20, type_='NL')
 
         p.model.add_subsystem('submodel', submodel, promotes=['*'])
 
-        p.setup()
-        p.final_setup()
-        print()
         self.assertTrue((3, 20, 'NL') in p.model.submodel._subprob.model._solver_print_cache)
