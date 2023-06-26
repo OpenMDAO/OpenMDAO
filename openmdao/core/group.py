@@ -1407,7 +1407,7 @@ class Group(System):
                                        " by promoting '*' at group level or promoting using"
                                        " dotted names.")
 
-    def _check_auto_order(self, reorder=True, recurse=True, ubcs=None):
+    def _check_auto_order(self, reorder=True, recurse=True, out_of_order=None):
         """
         Check if auto ordering is enabled and if so, set the order appropriately.
 
@@ -1418,7 +1418,7 @@ class Group(System):
             just return the out-of-order connections.
         recurse : bool
             If True, call this method on all subgroups.
-        ubcs : dict
+        out_of_order : dict
             Lists of out-of-order connections keyed by group pathname.
 
         Returns
@@ -1426,30 +1426,32 @@ class Group(System):
         dict
             Lists of out-of-order connections keyed by group pathname.
         """
-        if ubcs is None:
-            ubcs = {}
+        if out_of_order is None:
+            out_of_order = {}
 
         if self.options['auto_order']:
             orders = {name: i for i, name in enumerate(self._subsystems_allprocs)}
             G = self.compute_sys_graph()
             strongcomps = get_sccs_topo(G)
 
-            new_ubcs = []
+            new_out_of_order = []
             for strongcomp in strongcomps:
                 for u, v in G.edges(strongcomp):
+                    # for any connection between a system in this strongcomp and a system
+                    # outside of it, the target must be ordered after the source.
                     if u in strongcomp and v not in strongcomp and orders[u] > orders[v]:
-                        new_ubcs.append((u, v))
+                        new_out_of_order.append((u, v))
 
-            if new_ubcs:
-                ubcs[self.pathname] = new_ubcs
+            if new_out_of_order:
+                out_of_order[self.pathname] = new_out_of_order
                 self._set_auto_order(strongcomps, orders)
 
         if recurse:
             for s in self._subgroups_myproc:
                 if s.options['auto_order']:
-                    s._check_auto_order(reorder, recurse, ubcs)
+                    s._check_auto_order(reorder, recurse, out_of_order)
 
-        return ubcs
+        return out_of_order
 
     def _set_auto_order(self, strongcomps, orders):
         """
@@ -1466,11 +1468,11 @@ class Group(System):
         new_order = []
         for strongcomp in strongcomps:
             if len(strongcomp) > 1:
-                # keep order of cycles as they were before
+                # keep order of cycles as it was before
                 order_list = [(name, orders[name]) for name in strongcomp]
                 new_order.extend([name for name, _ in sorted(order_list, key=lambda x: x[1])])
             else:
-                new_order.append(strongcomp.pop())
+                new_order.append(list(strongcomp)[0])
 
         self.set_order(new_order)
 
