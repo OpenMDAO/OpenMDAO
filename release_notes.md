@@ -85,6 +85,7 @@ Note that using this may add other components to the opt set depending on the fl
 - Fixed view_connections to show the viewer even in cases where setup errors occur [#2940](https://github.com/OpenMDAO/OpenMDAO/pull/2940)
 - Fixed bug in n2 causing load failure if a Broyden solver is in the model. [#2890](https://github.com/OpenMDAO/OpenMDAO/pull/2890)
 - Fixed a hang in check_totals under MPI [#2888](https://github.com/OpenMDAO/OpenMDAO/pull/2888)
+- Fixed bug in 'list_pre_post' command [#2951](https://github.com/OpenMDAO/OpenMDAO/pull/2951)
 
 ## Miscellaneous
 
