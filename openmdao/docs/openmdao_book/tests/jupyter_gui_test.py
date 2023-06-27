@@ -1,5 +1,6 @@
 """Test Jupyter doc GUI mods specific to OpenMDAO using Playwright."""
 import asyncio
+from aiounittest import async_test
 import contextlib
 import http.server
 import os
@@ -8,11 +9,6 @@ import socket
 import sys
 import threading
 import unittest
-
-try:
-    from aiounittest import async_test
-except ImportError:
-    from unittest import skip as async_test
 
 from playwright.async_api import async_playwright
 
