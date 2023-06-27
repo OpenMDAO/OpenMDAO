@@ -1,6 +1,7 @@
 """Define the ParallelGroup class."""
 
 from openmdao.core.group import Group
+from openmdao.utils.om_warnings import issue_warning
 
 
 class ParallelGroup(Group):
@@ -67,7 +68,7 @@ class ParallelGroup(Group):
         else:
             yield from super()._ordered_comp_name_iter()
 
-    def _check_auto_order(self, reorder=True, recurse=True, ubcs=None):
+    def _check_order(self, reorder=True, recurse=True, out_of_order=None):
         """
         Check if auto ordering is enabled and if so, set the order appropriately.
 
@@ -78,7 +79,7 @@ class ParallelGroup(Group):
             just return the out-of-order connections.
         recurse : bool
             If True, call this method on all subgroups.
-        ubcs : dict
+        out_of_order : dict
             Lists of out-of-order connections keyed by group pathname.
 
         Returns
@@ -86,5 +87,11 @@ class ParallelGroup(Group):
         dict
             Lists of out-of-order connections keyed by group pathname.
         """
-        for s in self._subgroups_myproc:
-            s._check_auto_order(reorder, recurse, ubcs)
+        if out_of_order is None:
+            out_of_order = {}
+
+        if recurse:
+            for s in self._subgroups_myproc:
+                s._check_order(reorder, recurse, out_of_order)
+
+        return out_of_order

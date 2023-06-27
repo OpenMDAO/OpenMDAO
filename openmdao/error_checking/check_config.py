@@ -71,34 +71,50 @@ def _check_ubcs(group, warnings):
     warnings : list
         List to collect warning messages.
     """
-    cycles = _check_cycles(group)
+    out_of_order = group._check_order(reorder=False, recurse=False)
+    for syspath, conns in out_of_order.items():
+        prefix = f"   In System '{syspath}', subsystem " if syspath else "   System "
+        for tgt, srcs in conns.items():
+            warnings.append(f"{prefix}'{tgt}' executes out-of-order "
+                            f"with respect to its source systems {srcs}\n")
 
-    cycle_idxs = {}
+    parallel_solvers = {}
+    allsubs = group._subsystems_allprocs
+    for sub, _ in allsubs.values():
+        if hasattr(sub, '_mpi_proc_allocator') and sub._mpi_proc_allocator.parallel:
+            parallel_solvers[sub.name] = sub.nonlinear_solver.SOLVER
 
-    for i, cycle in enumerate(cycles):
-        # keep track of cycles so we can detect when a system in
-        # one cycle is out of order with a system in a different cycle.
-        for s in cycle:
-            cycle_idxs[s] = i
+    if parallel_solvers:
+        _check_parallel_solvers(group, parallel_solvers)
 
-    ubcs = _get_used_before_calc_subs(group, group._conn_global_abs_in2out)
 
-    for tgt_system, src_systems in sorted(ubcs.items()):
-        keep_srcs = []
+def _check_parallel_solvers(group, parallel_solvers):
+    """
+    Report any parallel groups that don't have the proper solver.
 
-        for src_system in src_systems:
-            if (src_system not in cycle_idxs or
-                    tgt_system not in cycle_idxs or
-                    cycle_idxs[tgt_system] != cycle_idxs[src_system]):
-                keep_srcs.append(src_system)
+    Parameters
+    ----------
+    group : <Group>
+        The Group being checked.
+    parallel_solvers : dict
+        Dictionary of parallel solvers keyed by subsystem names.
+    """
+    glen = len(group.pathname.split('.')) if group.pathname else 0
 
-        if keep_srcs:
-            if group.pathname:
-                tgt_system = '.'.join((group.pathname, tgt_system))
-                keep_srcs = ['.'.join((group.pathname, n)) for n in keep_srcs]
-            warnings.append("   System '%s' executes out-of-order with "
-                            "respect to its source systems %s\n" %
-                            (tgt_system, sorted(keep_srcs)))
+    for tgt_abs, src_abs in group._conn_global_abs_in2out.items():
+        iparts = tgt_abs.split('.')
+        oparts = src_abs.split('.')
+        src_sys = oparts[glen]
+        tgt_sys = iparts[glen]
+        hierarchy_check = oparts[glen + 1] == iparts[glen + 1]
+
+        if (src_sys in parallel_solvers and tgt_sys in parallel_solvers and
+                (parallel_solvers[src_sys] not in ["NL: NLBJ", "NL: Newton", "NL: BROYDEN"]) and
+                src_sys == tgt_sys and
+                not hierarchy_check):
+            msg = f"Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver " \
+                    f"to '{src_sys}' when connecting components inside parallel groups"
+            issue_warning(msg, category=SetupWarning)
 
 
 def _check_cycles_prob(prob, logger):

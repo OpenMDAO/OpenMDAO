@@ -230,7 +230,7 @@ class Group(System):
 
         self._subsys_graph = None
 
-        self.options.declare('auto_order', types=bool, default=True,
+        self.options.declare('auto_order', types=bool, default=False,
                              desc='If True the order of subsystems is determined automatically '
                              'based on the dependency graph.  It will not break or reorder '
                              'cycles.')
@@ -626,11 +626,9 @@ class Group(System):
             subsys._setup_procs(subsys.pathname, sub_comm, mode, prob_meta)
 
         # build a list of local subgroups to speed up later loops
+        self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
         if prob_meta['allow_post_setup_reorder']:
-            self._subgroups_myproc = sorted(
-                [s for s in self._subsystems_myproc if isinstance(s, Group)], key=lambda x: x.name)
-        else:
-            self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
+            self._subgroups_myproc.sort(key=lambda x: x.name)
 
         if nproc > 1 and self._mpi_proc_allocator.parallel:
             self._problem_meta['parallel_groups'].append(self.pathname)
@@ -1375,10 +1373,7 @@ class Group(System):
         self._setup_auto_ivcs(mode)
         self._check_prom_masking()
         if self._problem_meta['allow_post_setup_reorder']:
-            ubcs = self._check_auto_order()
-            if ubcs:
-                import pprint
-                # raise RuntimeError(f"{self.msginfo}: OUT-OF-ORDER CONNECTIONS:\n{pprint.pformat(ubcs)}")
+            self._check_order()
 
     def _check_prom_masking(self):
         """
@@ -1407,18 +1402,18 @@ class Group(System):
                                        " by promoting '*' at group level or promoting using"
                                        " dotted names.")
 
-    def _check_auto_order(self, reorder=True, recurse=True, out_of_order=None):
+    def _check_order(self, reorder=True, recurse=True, out_of_order=None):
         """
-        Check if auto ordering is enabled and if so, set the order appropriately.
+        Check if auto ordering is enabled, optionally reordering subsystems if appropriate.
 
         Parameters
         ----------
         reorder : bool
-            If True, reorder the subsystems based on the new order.  Otherwise
+            If True, reorder the subsystems based on the computed order.  Otherwise
             just return the out-of-order connections.
         recurse : bool
             If True, call this method on all subgroups.
-        out_of_order : dict
+        out_of_order : dict or None
             Lists of out-of-order connections keyed by group pathname.
 
         Returns
@@ -1429,11 +1424,11 @@ class Group(System):
         if out_of_order is None:
             out_of_order = {}
 
-        if self.options['auto_order']:
-            orders = {name: i for i, name in enumerate(self._subsystems_allprocs)}
+        if self.options['auto_order'] or not reorder:
             G = self.compute_sys_graph()
             strongcomps = get_sccs_topo(G)
 
+            orders = {name: i for i, name in enumerate(self._subsystems_allprocs)}
             new_out_of_order = []
             for strongcomp in strongcomps:
                 for u, v in G.edges(strongcomp):
@@ -1443,13 +1438,23 @@ class Group(System):
                         new_out_of_order.append((u, v))
 
             if new_out_of_order:
-                out_of_order[self.pathname] = new_out_of_order
-                self._set_auto_order(strongcomps, orders)
+                # group targets with all of their sources
+                tgts = {}
+                for u, v in new_out_of_order:
+                    if v not in tgts:
+                        tgts[v] = []
+                    tgts[v].append(u)
+
+                for t in tgts:
+                    tgts[t] = sorted(tgts[t])
+
+                out_of_order[self.pathname] = tgts
+                if reorder:
+                    self._set_auto_order(strongcomps, orders)
 
         if recurse:
             for s in self._subgroups_myproc:
-                if s.options['auto_order']:
-                    s._check_auto_order(reorder, recurse, out_of_order)
+                s._check_order(reorder, recurse, out_of_order)
 
         return out_of_order
 
@@ -1460,19 +1465,20 @@ class Group(System):
         Parameters
         ----------
         strongcomps : list of list of str
-            List of lists of subsystem names. Each list contains subsystems that are strongly
-            connected.
+            List of sets of subsystem names. Each list contains subsystems that are strongly
+            connected.  Sets containing 2 or more subsystems indicate a cycle.
         orders : dict
             Dictionary mapping subsystem names to their order in the current ordering.
         """
         new_order = []
         for strongcomp in strongcomps:
             if len(strongcomp) > 1:
-                # keep order of cycles as it was before
+                # never change the internal order in a cycle
                 order_list = [(name, orders[name]) for name in strongcomp]
                 new_order.extend([name for name, _ in sorted(order_list, key=lambda x: x[1])])
             else:
-                new_order.append(list(strongcomp)[0])
+                for s in strongcomp:
+                    new_order.append(s)
 
         self.set_order(new_order)
 
