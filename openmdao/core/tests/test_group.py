@@ -3813,7 +3813,7 @@ class TestFeatureSetOrder(unittest.TestCase):
         # now swap C2 and C1 in the order
         model.set_order(['C2', 'C1', 'C3'])
 
-        # after changing the order, we must call setup again
+        # after changing the order, we must call setup again since allow_post_setup_reorder is False
         prob.setup()
         prob.run_model()
 

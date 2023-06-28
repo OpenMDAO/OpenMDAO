@@ -1395,7 +1395,7 @@ class Group(System):
                                        " dotted names.")
 
     def _check_order(self, reorder=True, recurse=True, out_of_order=None):
-        f"""
+        """
         Check if auto ordering is needed, optionally reordering subsystems if appropriate.
 
         Parameters
@@ -1407,8 +1407,8 @@ class Group(System):
             If True, call this method on all subgroups.
         out_of_order : dict or None
             Lists of out-of-order connections keyed by group pathname. Out of order connections
-            are of the form {{tgt_system1: [src_system1, src_system2, ...], ...}}. If incoming
-            value of out_of_order is None, then a new dict is created and returned.
+            are keyed by target system name and have values that are lists of source system names.
+            If incoming value of out_of_order is None, then a new dict is created and returned.
 
         Returns
         -------
