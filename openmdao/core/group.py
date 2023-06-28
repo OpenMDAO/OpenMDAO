@@ -4456,10 +4456,9 @@ class Group(System):
 
     def _sorted_sys_iter(self):
         """
-        Yield subsystems in sorted order if at least one Group in the model uses auto_ordering.
+        Yield subsystems in sorted order if Problem option allow_post_setup_reorder is True.
 
-        If no auto ordering is being used, yield subsystems in the order they were added to their
-        parent group.
+        Otherwise, yield subsystems in the order they were added to their parent group.
 
         Yields
         ------
