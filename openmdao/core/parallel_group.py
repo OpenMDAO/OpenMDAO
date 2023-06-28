@@ -20,7 +20,6 @@ class ParallelGroup(Group):
         """
         super().__init__(**kwargs)
         self._mpi_proc_allocator.parallel = True
-        # self.options.undeclare('auto_order')
 
     def _configure(self):
         """
@@ -70,7 +69,7 @@ class ParallelGroup(Group):
 
     def _check_order(self, reorder=True, recurse=True, out_of_order=None):
         """
-        Check if auto ordering is enabled and if so, set the order appropriately.
+        Check if auto ordering is needed and if so, set the order appropriately.
 
         Parameters
         ----------
@@ -87,6 +86,10 @@ class ParallelGroup(Group):
         dict
             Lists of out-of-order connections keyed by group pathname.
         """
+        if self.options['auto_order']:
+            issue_warning("auto_order is not supported in ParallelGroup. "
+                          "Ignoring auto_order option.", prefix=self.msginfo)
+
         if out_of_order is None:
             out_of_order = {}
 

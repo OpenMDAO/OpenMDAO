@@ -146,7 +146,8 @@ class Group(System):
     _proc_info : dict of subsys_name: (min_procs, max_procs, weight, proc_group)
         Information used to determine MPI process allocation to subsystems.
     _subgroups_myproc : list
-        List of local subgroups, sorted by name
+        List of local subgroups, (sorted by name if Problem option allow_post_setup_reorder is
+        True).
     _manual_connections : dict
         Dictionary of input_name: (output_name, src_indices) connections.
     _group_inputs : dict
@@ -182,14 +183,10 @@ class Group(System):
         Dynamic shape dependency graph, or None.
     _shape_knowns : set
         Set of shape dependency graph nodes with known (non-dynamic) shapes.
-    _subsys_graph : nx.DiGraph
-        Graph of subsystem dependencies.
     _pre_components : list of str or None
         Sorted list of pathnames of components that are executed prior to the optimization loop.
     _post_components : list of str or None
         Sorted list of pathnames of components that are executed after the optimization loop.
-    _sorted_subsystems_myproc : list of str
-        List of local subsystems, sorted by name.
     """
 
     def __init__(self, **kwargs):
@@ -218,7 +215,6 @@ class Group(System):
         self._shape_knowns = None
         self._pre_components = None
         self._post_components = None
-        self._sorted_subsystems_myproc = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -227,8 +223,6 @@ class Group(System):
             self._nonlinear_solver = NonlinearRunOnce()
         if not self._linear_solver:
             self._linear_solver = LinearRunOnce()
-
-        self._subsys_graph = None
 
         self.options.declare('auto_order', types=bool, default=False,
                              desc='If True the order of subsystems is determined automatically '
@@ -538,7 +532,6 @@ class Group(System):
         """
         super()._setup_procs(pathname, comm, mode, prob_meta)
         self._setup_procs_finished = False
-        self._subsys_graph = None
 
         nproc = comm.size
 
@@ -1402,8 +1395,8 @@ class Group(System):
                                        " dotted names.")
 
     def _check_order(self, reorder=True, recurse=True, out_of_order=None):
-        """
-        Check if auto ordering is enabled, optionally reordering subsystems if appropriate.
+        f"""
+        Check if auto ordering is needed, optionally reordering subsystems if appropriate.
 
         Parameters
         ----------
@@ -1413,7 +1406,9 @@ class Group(System):
         recurse : bool
             If True, call this method on all subgroups.
         out_of_order : dict or None
-            Lists of out-of-order connections keyed by group pathname.
+            Lists of out-of-order connections keyed by group pathname. Out of order connections
+            are of the form {{tgt_system1: [src_system1, src_system2, ...], ...}}. If incoming
+            value of out_of_order is None, then a new dict is created and returned.
 
         Returns
         -------
@@ -1459,7 +1454,7 @@ class Group(System):
             List of sets of subsystem names. Each list contains subsystems that are strongly
             connected.  Sets containing 2 or more subsystems indicate a cycle.
         orders : dict
-            Dictionary mapping subsystem names to their order in the current ordering.
+            Dictionary mapping subsystem names to their index in the current ordering.
         """
         new_order = []
         for strongcomp in strongcomps:
@@ -1726,7 +1721,6 @@ class Group(System):
         # sort the subsystems alphabetically in order to make the ordering
         # of vars in vectors and other data structures independent of the
         # execution order.
-        # for subsys in self._subsystems_myproc:
         for subsys in self._sorted_sys_iter():
             self._has_output_scaling |= subsys._has_output_scaling
             self._has_output_adder |= subsys._has_output_adder
@@ -3172,7 +3166,7 @@ class Group(System):
 
     def set_order(self, new_order):
         """
-        Specify a new execution order subsystems in this group.
+        Specify a new execution order for subsystems in this group.
 
         Parameters
         ----------
@@ -3573,8 +3567,6 @@ class Group(System):
         for subsys in self._sorted_sys_iter():
             subsys._setup_partials()
             info.update(subsys._subjacs_info)
-
-        # self._subjacs_info = {k: v for k, v in sorted(info.items())}
 
         if self._has_distrib_vars and self._owns_approx_jac:
             # We currently cannot approximate across a group with a distributed component if the

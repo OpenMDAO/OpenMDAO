@@ -115,15 +115,14 @@ class TestLogger(object):
     Attributes
     ----------
     _msgs : dict
-        Stores lists of messages under 'error', 'warning', 'info', and 'debug'
-        keys.
+        Stores lists of messages under 'error', 'warning', and 'info' keys.
     """
 
     def __init__(self):
         """
         Initialize the message dict.
         """
-        self._msgs = {'error': [], 'warning': [], 'info': [], 'debug': []}
+        self._msgs = {'error': [], 'warning': [], 'info': []}
 
     def error(self, msg):
         """
@@ -157,17 +156,6 @@ class TestLogger(object):
             An informational message.
         """
         self._msgs['info'].append(msg)
-
-    def debug(self, msg):
-        """
-        Collect a debug message.
-
-        Parameters
-        ----------
-        msg : str
-            A debugging message.
-        """
-        self._msgs['debug'].append(msg)
 
     def get(self, typ):
         """
