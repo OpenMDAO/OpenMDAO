@@ -1372,8 +1372,7 @@ class Group(System):
         self._resolve_group_input_defaults()
         self._setup_auto_ivcs(mode)
         self._check_prom_masking()
-        if self._problem_meta['allow_post_setup_reorder']:
-            self._check_order()
+        self._check_order()
 
     def _check_prom_masking(self):
         """
@@ -1472,7 +1471,14 @@ class Group(System):
                 for s in strongcomp:
                     new_order.append(s)
 
-        self.set_order(new_order)
+        if self._problem_meta['allow_post_setup_reorder']:
+            self.set_order(new_order)
+        else:
+            issue_warning(f"{self.msginfo}: A new execution order {new_order} is recommended, but "
+                          "auto ordering has been disabled because the Problem option "
+                          "'allow_post_setup_reorder' is False. It is recommended to either set "
+                          "`allow_post_setup_reorder` to True or to manually set the execution "
+                          "order to the recommended order using `set_order`.")
 
     def _top_level_post_sizes(self):
         # this runs after the variable sizes are known
@@ -3173,8 +3179,8 @@ class Group(System):
         new_order : list of str
             List of system names in desired new execution order.
         """
-        if self._problem_meta is not None and not self._problem_meta['allow_post_setup_reorder'] and \
-                self._problem_meta['setup_status'] == _SetupStatus.POST_CONFIGURE:
+        if self._problem_meta is not None and not self._problem_meta['allow_post_setup_reorder'] \
+                and self._problem_meta['setup_status'] == _SetupStatus.POST_CONFIGURE:
             raise RuntimeError(f"{self.msginfo}: Cannot call set_order in the configure method.")
 
         # Make sure the new_order is valid. It must contain all subsystems

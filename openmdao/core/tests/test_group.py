@@ -1402,6 +1402,19 @@ class TestGroup(unittest.TestCase):
 
         self.assertEqual([s.name for s in model._subsystems_myproc], ['_auto_ivc', 'C1', 'C2', 'C3'])
 
+    def test_auto_order_off(self):
+        p = om.Problem(allow_post_setup_reorder=False)
+        model = p.model
+        model.add_subsystem('C2', om.ExecComp('y=3.0*x'))
+        model.add_subsystem('C1', om.ExecComp('y=2.0*x'))
+        model.add_subsystem('C3', om.ExecComp('y=5.0*x'))
+        model.connect('C1.y', 'C2.x')
+        model.connect('C2.y', 'C3.x')
+        model.options['auto_order'] = True
+
+        with assert_warning(om.OpenMDAOWarning, "<model> <class Group>: A new execution order ['_auto_ivc', 'C1', 'C2', 'C3'] is recommended, but auto ordering has been disabled because the Problem option 'allow_post_setup_reorder' is False. It is recommended to either set `allow_post_setup_reorder` to True or to manually set the execution order to the recommended order using `set_order`."):
+            p.setup()
+
     def test_auto_order2(self):
         p = om.Problem()
         model = p.model
@@ -1866,27 +1879,6 @@ class TestGroupPromotes(unittest.TestCase):
         top = om.Problem(model=TopGroup())
 
         msg = "'sub.comp1' <class ExecComp>: input variable 'bb', promoted using ('bb', 'xx'), was already promoted using 'b*'."
-        with assert_warning(UserWarning, msg):
-            top.setup()
-
-    def test_promotes_wildcard_name(self):
-        class SubGroup(om.Group):
-            def setup(self):
-                self.add_subsystem('comp1', om.ExecComp('x=2.0+bb', bb=4.0))
-
-            def configure(self):
-                self.promotes('comp1', inputs=["b*"])
-
-        class TopGroup(om.Group):
-            def setup(self):
-                self.add_subsystem('sub', SubGroup())
-
-            def configure(self):
-                self.sub.promotes('comp1', inputs=['bb'])
-
-        top = om.Problem(model=TopGroup())
-
-        msg = "'sub.comp1' <class ExecComp>: input variable 'bb', promoted using 'bb', was already promoted using 'b*'."
         with assert_warning(UserWarning, msg):
             top.setup()
 

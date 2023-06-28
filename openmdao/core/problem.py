@@ -985,14 +985,15 @@ class Problem(object):
             'checking': False,  # True if check_totals or check_partials is running
             'opt_status': None,  # Tells Systems if they are in an optimization loop
             'model_options': self.model_options,  # A dict of options passed to all systems in tree
-            'allow_post_setup_reorder': self.options['allow_post_setup_reorder'],  # If False, auto_ordering=True
-                                                                   # in any Group will be ignored
-                                                                   # and internal data structures
-                                                                   # will not be sorted. This is to
-                                                                   # avoid possibly breaking
-                                                                   # existing models that are very
-                                                                   # sensitive to slight numerical
-                                                                   # changes.
+            'allow_post_setup_reorder':
+                self.options['allow_post_setup_reorder'],  # If False, auto_ordering=True
+                                                           # in any Group will be ignored
+                                                           # and internal data structures
+                                                           # will not be sorted. This is to
+                                                           # avoid possibly breaking
+                                                           # existing models that are very
+                                                           # sensitive to slight numerical
+                                                           # changes.
         }
         model._setup(model_comm, mode, self._metadata)
 

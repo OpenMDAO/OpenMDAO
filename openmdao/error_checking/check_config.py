@@ -112,9 +112,9 @@ def _check_parallel_solvers(group, parallel_solvers):
                 (parallel_solvers[src_sys] not in ["NL: NLBJ", "NL: Newton", "NL: BROYDEN"]) and
                 src_sys == tgt_sys and
                 not hierarchy_check):
-            msg = f"Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver " \
-                    f"to '{src_sys}' when connecting components inside parallel groups"
-            issue_warning(msg, category=SetupWarning)
+            issue_warning("Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver to "
+                          f"'{src_sys}' when connecting components inside parallel groups",
+                          category=SetupWarning)
 
 
 def _check_cycles_prob(prob, logger):

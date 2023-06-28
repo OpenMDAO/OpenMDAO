@@ -54,7 +54,7 @@ class NumberDict(OrderedDict):
             value of the given key
         """
         try:
-            return dict.__getitem__(self, item)  #@IgnoreException
+            return dict.__getitem__(self, item)
         except KeyError:
             return 0
 
@@ -875,7 +875,7 @@ def _find_unit(unit, error=False):
 
         name = unit.strip()
         try:
-            unit = _UNIT_CACHE[name]  #@IgnoreException
+            unit = _UNIT_CACHE[name]
         except KeyError:
             try:
                 unit = eval(name, {'__builtins__': None},  # nosec: scope limited

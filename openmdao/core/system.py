@@ -2358,6 +2358,7 @@ class System(object):
 
                 if match_type == _MatchType.RENAME:
                     new_using = (name, tup[0])
+                    wild = False
                 else:
                     new_using = f"'{tup[0]}'"
                     wild |= '*' in tup[0]
