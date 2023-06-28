@@ -29,7 +29,7 @@ from openmdao.utils.general_utils import common_subpath, all_ancestors, \
     convert_src_inds, ContainsAll, shape2tuple, get_connection_owner, ensure_compatible
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
-from openmdao.utils.graph_utils import get_sccs_topo
+from openmdao.utils.graph_utils import get_sccs_topo, get_out_of_order_nodes
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
@@ -1426,16 +1426,8 @@ class Group(System):
 
         if self.options['auto_order'] or not reorder:
             G = self.compute_sys_graph()
-            strongcomps = get_sccs_topo(G)
-
             orders = {name: i for i, name in enumerate(self._subsystems_allprocs)}
-            new_out_of_order = []
-            for strongcomp in strongcomps:
-                for u, v in G.edges(strongcomp):
-                    # for any connection between a system in this strongcomp and a system
-                    # outside of it, the target must be ordered after the source.
-                    if u in strongcomp and v not in strongcomp and orders[u] > orders[v]:
-                        new_out_of_order.append((u, v))
+            strongcomps, new_out_of_order = get_out_of_order_nodes(G, orders)
 
             if new_out_of_order:
                 # group targets with all of their sources
