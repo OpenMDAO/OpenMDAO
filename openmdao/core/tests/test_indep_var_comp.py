@@ -267,91 +267,19 @@ class TestIndepVarComp(unittest.TestCase):
         self.assertEqual(len(prob.get_val('num_x')), 4)
         self.assertEqual(prob.get_val('val_y'), 2.5)
 
-
-
-num_nodes = 3
-
-class CounterIVC(om.IndepVarComp):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.ncompute = 0
-
-
-class CounterComp(om.ExplicitComponent):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.ncompute = 0
-
-
-
-class MeshComp(CounterIVC):
-    def setup(self):
-        self.add_output('x_aero0', val=np.ones(num_nodes*3), tags=['mphys_coordinates'])
-
-
-class PreCouplingComp(CounterIVC):
-    def setup(self):
-        self.add_input('x_aero', shape_by_conn=True, tags=['mphys_coordinates'])
-        self.add_output('prestate_aero', tags=['mphys_coupling'])
-
-    def compute(self, inputs, outputs):
-        outputs['prestate_aero'] = np.sum(inputs['x_aero'])
-        self.ncompute += 1
-
-
-class CouplingComp(CounterComp):
-    def setup(self):
-        self.add_input('x_aero', shape_by_conn=True, tags=['mphys_coordinates'])
-        self.add_input('prestate_aero', tags=['mphys_coupling'])
-        self.add_output('f_aero', shape=num_nodes*3, tags=['mphys_coupling'])
-
-    def compute(self, inputs, outputs):
-        outputs['f_aero'] = inputs['x_aero'] + inputs['prestate_aero']
-        self.ncompute += 1
-
-
-class PostCouplingComp(CounterIVC):
-    def setup(self):
-        self.add_input('prestate_aero', tags=['mphys_coupling'])
-        self.add_input('x_aero', shape_by_conn=True, tags=['mphys_coordinates'])
-        self.add_input('f_aero', shape_by_conn=True, tags=['mphys_coupling'])
-        self.add_output('func_aero', val=1.0, tags=['mphys_result'])
-
-    def compute(self, inputs, outputs):
-        outputs['func_aero'] = np.sum(inputs['f_aero'] + inputs['prestate_aero'] + inputs['x_aero'])
-        self.ncompute += 1
-
-
-class Geometry(CounterComp):
-    def setup(self):
-        self.add_input('x_aero_in', shape_by_conn=True)
-        self.add_output('x_aero0', shape=3*num_nodes, tags=['mphys_coordinates'])
-
-    def compute(self, inputs, outputs):
-        outputs['x_aero0'] = inputs['x_aero_in']
-        self.ncompute += 1
-
-
-class TestScenario(unittest.TestCase):
-
-    def setUp(self):
-        self.scenarios = ['cruise', 'maneuver']
-        self.prob = om.Problem()
-        self.prob.model.add_subsystem('mesh', MeshComp())
-        for scenario in self.scenarios:
-            scen = self.prob.model.add_subsystem(scenario, om.Group())
-            scen.add_subsystem('aero_pre', PreCouplingComp(), promotes=['*'])
-            scen.add_subsystem('coupling', CouplingComp(), promotes=['*'])
-            scen.add_subsystem('aero_post', PostCouplingComp(), promotes=['*'])
-            self.prob.model.connect('mesh.x_aero0', f'{scenario}.x_aero')
-        self.prob.setup()
-
-    def test_run_model(self):
-        self.prob.run_model()
-        for scenario in self.scenarios:
-            for name in ['aero_pre', 'coupling', 'aero_post']:
-                comp = self.prob.model._get_subsystem(f'{scenario}.{name}')
-                self.assertEqual(comp.ncompute, 1)
+    def test_add_input(self):
+        try:
+            prob = om.Problem()
+            ivc = prob.model.add_subsystem('ivc', om.IndepVarComp(), promotes=['*'])
+            ivc.add_input('x', 1.0)
+        except Exception as err:
+            self.assertEqual(str(err), "Can't add input 'x' to IndepVarComp 'ivc'. IndepVarComps are "
+                             "not allowed to have inputs. If you want IndepVarComp-like behavior for "
+                             "some outputs of a component that has inputs, you can tag those outputs "
+                             "with 'openmdao:indep_var' and 'openmdao:allow_desvar' and they will be "
+                             "treated as independent variables.")
+        else:
+            self.fail('Exception expected.')
 
 
 if __name__ == '__main__':
