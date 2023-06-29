@@ -6,7 +6,6 @@ import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
-from openmdao.utils.om_warnings import OMDeprecationWarning
 
 
 class TestSystem(unittest.TestCase):
@@ -198,6 +197,29 @@ class TestSystem(unittest.TestCase):
         # assign bad list shape to array
         with self.assertRaisesRegex(ValueError, msg):
             residuals['C2.y'] = bad_val.tolist()
+
+    def test_list_inputs_outputs_invalid_return_format(self):
+        from openmdao.test_suite.components.paraboloid_problem import ParaboloidProblem
+        prob = ParaboloidProblem()
+        prob.setup()
+        prob.final_setup()
+
+        with self.assertRaises(ValueError) as cm:
+            prob.model.list_inputs(return_format=dict)
+
+        msg = f"Invalid value (<class 'dict'>) for return_format, " \
+              "must be a string value of 'list' or 'dict'"
+
+        self.assertEqual(str(cm.exception), msg)
+
+        with self.assertRaises(ValueError) as cm:
+            prob.model.list_outputs(return_format='dct')
+
+        msg = f"Invalid value ('dct') for return_format, " \
+              "must be a string value of 'list' or 'dict'"
+
+        self.assertEqual(str(cm.exception), msg)
+
 
     def test_list_inputs_output_with_includes_excludes(self):
         from openmdao.test_suite.scripts.circuit_analysis import Circuit
