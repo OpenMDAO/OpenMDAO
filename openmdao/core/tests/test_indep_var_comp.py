@@ -4,7 +4,6 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_warnings
-from openmdao.utils.om_warnings import OMDeprecationWarning
 
 
 class TestIndepVarComp(unittest.TestCase):
@@ -267,6 +266,20 @@ class TestIndepVarComp(unittest.TestCase):
 
         self.assertEqual(len(prob.get_val('num_x')), 4)
         self.assertEqual(prob.get_val('val_y'), 2.5)
+
+    def test_add_input(self):
+        try:
+            prob = om.Problem()
+            ivc = prob.model.add_subsystem('ivc', om.IndepVarComp(), promotes=['*'])
+            ivc.add_input('x', 1.0)
+        except Exception as err:
+            self.assertEqual(str(err), "Can't add input 'x' to IndepVarComp 'ivc'. IndepVarComps are "
+                             "not allowed to have inputs. If you want IndepVarComp-like behavior for "
+                             "some outputs of a component that has inputs, you can tag those outputs "
+                             "with 'openmdao:indep_var' and 'openmdao:allow_desvar' and they will be "
+                             "treated as independent variables.")
+        else:
+            self.fail('Exception expected.')
 
 
 if __name__ == '__main__':

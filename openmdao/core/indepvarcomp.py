@@ -110,6 +110,48 @@ class IndepVarComp(ExplicitComponent):
 
         super()._configure_check()
 
+    def add_input(self, name, val=1.0, shape=None, units=None, desc='', tags=None,
+                  shape_by_conn=False, copy_shape=None, distributed=None):
+        """
+        Add an input variable to the component.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable in this component's namespace.
+        val : float or list or tuple or ndarray or Iterable
+            The initial value of the variable being added in user-defined units.
+            Default is 1.0.
+        shape : int or tuple or list or None
+            Shape of this variable, only required if val is not an array. Default is None.
+        units : str or None
+            Units in which this input variable will be provided to the component
+            during execution. Default is None, which means it is unitless.
+        desc : str
+            Description of the variable.
+        tags : str or list of strs
+            User defined tags that can be used to filter what gets listed when calling
+            list_inputs and list_outputs.
+        shape_by_conn : bool
+            If True, shape this input to match its connected output.
+        copy_shape : str or None
+            If a str, that str is the name of a variable. Shape this input to match that of
+            the named variable.
+        distributed : bool
+            If True, this variable is a distributed variable, so it can have different sizes/values
+            across MPI processes.
+
+        Returns
+        -------
+        dict
+            Metadata for added variable.
+        """
+        raise RuntimeError(f"Can't add input '{name}' to IndepVarComp '{self.name}'. IndepVarComps "
+                           "are not allowed to have inputs. If you want IndepVarComp-like behavior"
+                           " for some outputs of a component that has inputs, you can tag those "
+                           "outputs with 'openmdao:indep_var' and 'openmdao:allow_desvar' and they "
+                           "will be treated as independent variables.")
+
     def add_output(self, name, val=1.0, shape=None, units=None, desc='', tags=None,
                    shape_by_conn=False, copy_shape=None, distributed=None):
         """
@@ -203,8 +245,7 @@ class IndepVarComp(ExplicitComponent):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
-        # define this for IndepVarComp to avoid overhead of
-        # ExplicitComponent._apply_nonlinear.
+        # define this for IndepVarComp to avoid overhead of ExplicitComponent._apply_nonlinear.
         self.iter_count_apply += 1
 
     def _solve_nonlinear(self):
