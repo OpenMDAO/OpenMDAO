@@ -2239,7 +2239,7 @@ class Problem(object):
         def set_later(var_name):
             # determine if variable should be set later via an overridden load_case method
             for pathname in system_overrides:
-                if var_name.startswith(pathname):
+                if var_name.startswith(pathname + '.'):
                     return True
             return False
 
