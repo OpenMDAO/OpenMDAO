@@ -121,7 +121,7 @@ def show_options_table(reference, recording_options=False, options_dict='options
                              'warning.')
             opt = obj.recording_options
         elif has_attr(obj, options_dict):
-            opt =  getattr(obj, options_dict)
+            opt = getattr(obj, options_dict)
         else:
             raise AttributeError('Object {reference} has no attribute {options_dict}.')
 
