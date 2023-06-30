@@ -13,7 +13,9 @@ The user may now specify the step as a sequence of step sizes to test the impact
 
 ### POEM_081: Submodel component.
 
-SubmodelComp provides a way to evaluate an OpenMDAO Problem within a Component. Using a subproblem exposes only a limited number of inputs and outputs of the underlying model to the parent system. This may be beneficial from a performance standpoint when there are many inputs and outputs of the internal model that aren’t needed in the top-level model.
+SubmodelComp provides a way to evaluate an OpenMDAO Problem within a Component. When using a SubmodelComp, the subproblem
+exposes only a limited number of inputs and outputs of the underlying model to the parent system. This may be beneficial
+from a performance standpoint when there are many inputs and outputs of the internal model that aren’t needed in the top-level model.
 
 ### POEM_084: OpenMDAO jax subpackage.
 
