@@ -11,6 +11,8 @@ except ImportError:
     ipy = display = HTML = IFrame = None
 
 from openmdao.utils.om_warnings import issue_warning
+from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.utils.om_warnings import warn_deprecation
 
 colab = 'google.colab' in sys.modules
 
@@ -89,7 +91,7 @@ def display_source(reference, hide_doc_string=False):
         display(get_code(reference, hide_doc_string))
 
 
-def show_options_table(reference, recording_options=False):
+def show_options_table(reference, recording_options=False, options_dict='options'):
     """
     Return the options table of the given reference path.
 
@@ -97,9 +99,11 @@ def show_options_table(reference, recording_options=False):
     ----------
     reference : str or object
         Dot path of desired class or function or an instance.
-
     recording_options : bool
         If True, display recording options instead of options.
+    options_dict : str
+        The string name of the attribute of the reference object
+        that provides to OptionsDictionary.
 
     Returns
     -------
@@ -112,12 +116,19 @@ def show_options_table(reference, recording_options=False):
         obj = reference
 
     if ipy:
-        if not hasattr(obj, "options"):
-            opt = obj
-        elif not recording_options:
-            opt = obj.options
-        else:
+        if recording_options:
+            warn_deprecation('Argument `recording_options` is deprecated. Use '
+                             '`options_dict="recording_options" to remove this '
+                             'warning.')
             opt = obj.recording_options
+        elif has_attr(obj, options_dict):
+            opt =  getattr(obj, options_dict)
+        else:
+            raise AttributeError('Object {reference} has no attribute {options_dict}.')
+
+        if not isinstance(opt, om.OptionsDictionary):
+            raise AttributeError('Object {reference} attribute {options_dict} is not '
+                                 'an OpenMDAO OptionsDictionary.')
 
         return display(HTML(str(opt.to_table(fmt='html', display=False))))
     else:
