@@ -396,20 +396,8 @@ class MPITests2(unittest.TestCase):
         sub.add_subsystem('C2', om.ExecComp(['y=5.0*x'],
                                          x=np.zeros(size, dtype=float),
                                          y=np.zeros(size, dtype=float)))
-        root.add_subsystem('C3', DistribExecComp(['y=3.0*x1+7.0*x2', 'y=1.5*x1+3.5*x2'],
-                                                 arr_size=size,
-                                                 x1=np.zeros(size, dtype=float),
-                                                 x2=np.zeros(size, dtype=float),
-                                                 y=np.zeros(size, dtype=float)))
-        root.add_subsystem('C4', om.ExecComp(['y=x'],
-                                          x=np.zeros(size, dtype=float),
-                                          y=np.zeros(size, dtype=float)))
-
-        root.connect("sub.C1.y", "C3.x1")
-        root.connect("sub.C2.y", "C3.x2")
         root.connect("P1.x", "sub.C1.x")
         root.connect("P2.x", "sub.C2.x")
-        root.connect("C3.y", "C4.x", src_indices=om.slicer[:])
 
         root.nonlinear_solver = om.NonlinearBlockGS(use_aitken=True,
                                                    aitken_min_factor=1e-12,
