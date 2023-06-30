@@ -120,10 +120,10 @@ def show_options_table(reference, recording_options=False, options_dict='options
                              '`options_dict="recording_options" to remove this '
                              'warning.')
             opt = obj.recording_options
-        elif has_attr(obj, options_dict):
+        elif hasattr(obj, options_dict):
             opt = getattr(obj, options_dict)
         else:
-            raise AttributeError('Object {reference} has no attribute {options_dict}.')
+            raise AttributeError(f'Object {reference} has no attribute {options_dict}.')
 
         return display(HTML(str(opt.to_table(fmt='html', display=False))))
     else:
