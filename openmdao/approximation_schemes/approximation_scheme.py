@@ -364,7 +364,7 @@ class ApproximationScheme(object):
 
         # Clean vector for results (copy of the outputs or resids)
         vec = system._outputs if total_or_semi else system._residuals
-        results_array = vec.asarray(True)
+        results_array = vec.asarray(copy=True)
 
         use_parallel_fd = system._num_par_fd > 1 and (system._full_comm is not None and
                                                       system._full_comm.size > 1)
@@ -484,8 +484,8 @@ class ApproximationScheme(object):
         total_or_semi = total or _is_group(system)
 
         # Clean vector for results (copy of the outputs or resids)
-        results_array = system._outputs.asarray(True) if total_or_semi \
-            else system._residuals.asarray(True)
+        results_array = system._outputs.asarray(copy=True) if total_or_semi \
+            else system._residuals.asarray(copy=True)
         use_parallel_fd = system._num_par_fd > 1 and (system._full_comm is not None and
                                                       system._full_comm.size > 1)
         num_par_fd = system._num_par_fd if use_parallel_fd else 1

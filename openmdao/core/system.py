@@ -119,6 +119,25 @@ class _MatchType(IntEnum):
     PATTERN = 2
 
 
+class _OptStatus(IntEnum):
+    """
+    Class used to define different states during the optimization process.
+
+    Attributes
+    ----------
+    PRE : int
+        Before the optimization.
+    OPTIMIZING : int
+        During the optimization.
+    POST : int
+        After the optimization.
+    """
+
+    PRE = 0
+    OPTIMIZING = 1
+    POST = 2
+
+
 def collect_errors(method):
     """
     Decorate a method so that it will collect any exceptions for later display.
@@ -194,7 +213,7 @@ class System(object):
     iter_count_apply : int
         Counts the number of times the system has called _apply_nonlinear. For ExplicitComponent,
         calls to apply_nonlinear also call compute, so number of executions can be found by adding
-        this and iter_count together. Recorders do no record calls to apply_nonlinear.
+        this and iter_count together. Recorders do not record calls to apply_nonlinear.
     iter_count_without_approx : int
         Counts the number of times the system has iterated but excludes any that occur during
         approximation of derivatives.
@@ -384,6 +403,9 @@ class System(object):
     _promotion_tree : dict
         Mapping of system path to promotion info indicating all subsystems where variables
         were promoted.
+    _run_on_opt: list of bool
+        Indicates whether this system should run before, during, or after the optimization process
+        (if there is an optimization process at all).
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -529,6 +551,9 @@ class System(object):
 
         self._output_solver_options = {}
         self._promotion_tree = None
+        # need separate values for [PRE, OPTIMIZE, POST] since a Group may participate in
+        # multiple phases because some of its subsystems may be in one phase and some in another.
+        self._run_on_opt = [False, True, False]
 
     @property
     def under_approx(self):
@@ -1988,6 +2013,7 @@ class System(object):
         self._responses = {}
         self._design_vars.update(self._static_design_vars)
         self._responses.update(self._static_responses)
+        self.load_model_options()
 
     def _setup_var_data(self):
         """
@@ -2823,6 +2849,22 @@ class System(object):
             if recurse:
                 for sub in s.system_iter(recurse=True, typ=typ):
                     yield sub
+
+    def _solver_subsystem_iter(self, local_only=True):
+        """
+        Do nothing.
+
+        Parameters
+        ----------
+        local_only : bool
+            If True, only iterate over local subsystems.
+
+        Returns
+        -------
+        tuple
+            An empty tuple.
+        """
+        return ()
 
     def _create_indexer(self, indices, typename, vname, flat_src=False):
         """
@@ -4004,6 +4046,11 @@ class System(object):
                           "display the default values of variables and will not show the result of "
                           "any `set_val` calls.")
 
+        if return_format not in ('list', 'dict'):
+            badarg = f"'{return_format}'" if isinstance(return_format, str) else f"{return_format}"
+            raise ValueError(f"Invalid value ({badarg}) for return_format, "
+                             "must be a string value of 'list' or 'dict'")
+
         metavalues = val and self._inputs is None
 
         keynames = ['val', 'units', 'shape', 'global_shape', 'desc', 'tags']
@@ -4163,6 +4210,11 @@ class System(object):
         list of (name, metadata) or dict of {name: metadata}
             List or dict of output names and other optional information about those outputs.
         """
+        if return_format not in ('list', 'dict'):
+            badarg = f"'{return_format}'" if isinstance(return_format, str) else f"{return_format}"
+            raise ValueError(f"Invalid value ({badarg}) for return_format, "
+                             "must be a string value of 'list' or 'dict'")
+
         keynames = ['val', 'units', 'shape', 'global_shape', 'desc', 'tags']
         keyflags = [val, units, shape, global_shape, desc, tags]
 
@@ -4524,6 +4576,22 @@ class System(object):
             List of all states.
         """
         return []
+
+    def load_model_options(self):
+        """
+        Load the relevant model options from `Problem._metadata['model_options']`.
+
+        This method examines each path filter and corresponding options in
+        self._problem_meta['model_options']. If this System's pathname matches
+        the given path filter, it will assume the value for each given option
+        which it possesses.
+        """
+        model_options = self._problem_meta['model_options']
+        for path_filter, path_options in model_options.items():
+            if fnmatchcase(self.pathname, path_filter):
+                for option, val in path_options.items():
+                    if option in self.options:
+                        self.options[option] = val
 
     def add_recorder(self, recorder, recurse=False):
         """

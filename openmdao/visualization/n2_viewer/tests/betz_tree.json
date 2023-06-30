@@ -123,6 +123,7 @@
                 }
             ],
             "options": {
+                "always_opt": false,
                 "distributed": false,
                 "run_root_only": false,
                 "name": "UNDEFINED",
@@ -370,6 +371,7 @@
                 }
             ],
             "options": {
+                "always_opt": false,
                 "distributed": false,
                 "run_root_only": false
             }

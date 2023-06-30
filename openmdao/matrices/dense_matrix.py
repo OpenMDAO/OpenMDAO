@@ -100,13 +100,13 @@ class DenseMatrix(COOMatrix):
             The mask array or None.
         """
         if d_inputs._in_matvec_context():
-            sub = d_inputs._names
+            input_names = d_inputs._names
             mask = np.ones(len(d_inputs), dtype=bool)
             for key, val in self._metadata.items():
-                if key[1] in sub:
-                    mask[val[1]] = False
+                if key[1] in input_names:
+                    mask[val[0]:val[1]] = False
 
-            return mask
+            return mask if np.any(mask) else None
 
     def _pre_update(self):
         """

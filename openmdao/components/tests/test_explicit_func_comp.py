@@ -904,8 +904,8 @@ def mat_factory(ninputs, noutputs):
     inshapes = list(zip(np.random.randint(1, 4, ninputs), np.random.randint(1, 4, ninputs)))
     outshapes = list(zip(np.random.randint(1, 4, noutputs), np.random.randint(1, 4, noutputs)))
 
-    nrows = np.sum([np.product(shp) for shp in outshapes])
-    ncols = np.sum([np.product(shp) for shp in inshapes])
+    nrows = np.sum([np.prod(shp) for shp in outshapes])
+    ncols = np.sum([np.prod(shp) for shp in inshapes])
 
     # create a sparse matrix
     mat = np.random.random((nrows, ncols)) < 0.2
@@ -1054,7 +1054,7 @@ class TestJax(unittest.TestCase):
         p.run_model()
         J = p.compute_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'])
 
-        I = np.eye(np.product(shape, dtype=int))
+        I = np.eye(np.prod(shape, dtype=int))
         assert_near_equal(J['comp.x', 'comp.a'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.b'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.c'], I * 3.)
@@ -1231,7 +1231,7 @@ class TestJaxNumpy(unittest.TestCase):
 
         J = p.compute_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'])
 
-        I = np.eye(np.product(shape)) if shape else np.eye(1)
+        I = np.eye(np.prod(shape)) if shape else np.eye(1)
         assert_near_equal(J['comp.x', 'comp.a'], I * p['comp.b'].ravel() * np.cos(p['comp.a']).ravel(), tolerance=1e-7)
         assert_near_equal(J['comp.x', 'comp.b'], I * np.sin(p['comp.a']).ravel(), tolerance=1e-7)
         assert_near_equal(J['comp.x', 'comp.c'], I * 3., tolerance=1e-7)
@@ -1276,7 +1276,7 @@ class TestJax2retvals(unittest.TestCase):
         p.run_model()
         J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
 
-        I = np.eye(np.product(shape)) if shape else np.eye(1)
+        I = np.eye(np.prod(shape)) if shape else np.eye(1)
         assert_near_equal(J['comp.x', 'comp.a'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.b'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.c'], I * 3.)
@@ -1379,7 +1379,7 @@ class TestJax2retvalsColoring(unittest.TestCase):
         p.run_model()
         J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
 
-        I = np.eye(np.product(shape)) if shape else np.eye(1)
+        I = np.eye(np.prod(shape)) if shape else np.eye(1)
         assert_near_equal(J['comp.x', 'comp.a'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.b'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.c'], I * 3.)

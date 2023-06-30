@@ -1302,7 +1302,7 @@ class TestProblem(unittest.TestCase):
         self.assertTrue(isinstance(prob.driver, om.ScipyOptimizeDriver))
 
         # invalid model
-        msg = "Problem .*: The value provided for 'model' is not a valid System."
+        msg = "Problem .*: The value provided for 'model' is not a Group."
         with self.assertRaisesRegex(TypeError, msg) :
             prob = om.Problem(om.ScipyOptimizeDriver())
 

@@ -343,7 +343,7 @@ jobs:
           echo "Build the docs"
           echo "============================================================="
           python build_source_docs.py
-          jupyter-book build openmdao_book
+          jupyter-book build -W --keep-going openmdao_book
           python copy_build_artifacts.py
 
       - name: Display doc build reports
@@ -500,6 +500,7 @@ jobs:
           echo "============================================================="
           copy .coveragerc $HOME
           cd $HOME
+          Set-DisplayResolution -Width 1920 -Height 1080 -Force
           testflo -n 2 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20
 
       - name: Submit coverage

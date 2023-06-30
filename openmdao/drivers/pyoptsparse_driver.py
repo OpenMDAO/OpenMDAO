@@ -54,7 +54,9 @@ grad_drivers = optlist.intersection({'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP', 'PSQP'
 multi_obj_drivers = {'NSGA2'}
 
 # All optimizers that require an initial run
-run_required = {'NSGA2', 'ALPSO'}
+run_required = {'NSGA2'}
+if pyoptsparse_version is None or pyoptsparse_version < Version('2.9.4'):
+    run_required.add('ALPSO')  # ALPSO bug fixed in v2.9.4
 
 # The pyoptsparse API provides for an optional 'fail' flag in the return value of
 # objective and gradient functions, but this flag is only used by a subset of the

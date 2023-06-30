@@ -168,7 +168,8 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
         del options['min_improve_pct']
 
     if 'dynamic_total_coloring' in options:
-        p.driver.declare_coloring(tol=1e-15, min_improve_pct=min_improve_pct)
+        if options['dynamic_total_coloring']:
+            p.driver.declare_coloring(tol=1e-15, min_improve_pct=min_improve_pct)
         del options['dynamic_total_coloring']
 
     p.driver.options.update(options)
@@ -657,6 +658,38 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         # coloring saves 11 solves per driver iter  (11 vs 22)
         self.assertEqual(p.model._solve_count, 22)
         self.assertEqual(p_color.model._solve_count, 11)
+
+    def test_dynamic_fwd_simul_coloring_pyoptsparse_slsqp(self):
+        try:
+            from pyoptsparse import OPT
+        except ImportError:
+            raise unittest.SkipTest("This test requires pyoptsparse.")
+
+        try:
+            OPT('SLSQP')
+        except:
+            raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
+
+        p_color = run_opt(pyOptSparseDriver, 'fwd', optimizer='SLSQP', print_results=False,
+                          dynamic_total_coloring=True)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
+
+        # Tests a bug where coloring ran the model when not needed.
+        self.assertEqual(p_color.model.iter_count, 9)
+
+        # run w/o coloring
+        p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SLSQP', print_results=False)
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+
+        p.model._solve_count = 0
+        p_color.model._solve_count = 0
+
+        J = p.driver._compute_totals()
+        J_color = p_color.driver._compute_totals()
+
+        # coloring saves 16 solves per driver iter  (5 vs 21)
+        self.assertEqual(p.model._solve_count, 21)
+        self.assertEqual(p_color.model._solve_count, 5)
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_total_coloring_auto_con_alias_pyoptsparse(self):
