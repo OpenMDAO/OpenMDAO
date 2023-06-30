@@ -11,6 +11,10 @@ Highlights of newly implemented features are:
 
 The user may now specify the step as a sequence of step sizes to test the impact of step size on finite difference accuracy.
 
+### POEM_081: Submodel component.
+
+SubmodelComp provides a way to evaluate an OpenMDAO Problem within a Component. Using a subproblem exposes only a limited number of inputs and outputs of the underlying model to the parent system. This may be beneficial from a performance standpoint when there are many inputs and outputs of the internal model that aren’t needed in the top-level model.
+
 ### POEM_084: OpenMDAO jax subpackage.
 
 In an effort to remove the need for users to find analytic derivatives for their components, we initially
@@ -63,6 +67,7 @@ Note that using this may add other components to the opt set depending on the fl
 ## New Features
 
 - POEM 089: Added 'group_by_pre_opt_post' option to Problem. [#2942](https://github.com/OpenMDAO/OpenMDAO/pull/2942)
+- POEM 081: Implement Submodel Component [#2817](https://github.com/OpenMDAO/OpenMDAO/pull/2817)
 - Documented use of JAX for the Sellar model [#2933](https://github.com/OpenMDAO/OpenMDAO/pull/2933)
 - POEM_086 Implementation: model_options [#2931](https://github.com/OpenMDAO/OpenMDAO/pull/2931)
 - Implemented POEM_077: Derivative checks with multiple step sizes. [#2927](https://github.com/OpenMDAO/OpenMDAO/pull/2927)
