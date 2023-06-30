@@ -11,7 +11,6 @@ except ImportError:
     ipy = display = HTML = IFrame = None
 
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.om_warnings import warn_deprecation
 
 colab = 'google.colab' in sys.modules
@@ -125,10 +124,6 @@ def show_options_table(reference, recording_options=False, options_dict='options
             opt =  getattr(obj, options_dict)
         else:
             raise AttributeError('Object {reference} has no attribute {options_dict}.')
-
-        if not isinstance(opt, om.OptionsDictionary):
-            raise AttributeError('Object {reference} attribute {options_dict} is not '
-                                 'an OpenMDAO OptionsDictionary.')
 
         return display(HTML(str(opt.to_table(fmt='html', display=False))))
     else:
