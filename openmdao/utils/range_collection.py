@@ -2,30 +2,53 @@
 from openmdao.utils.array_utils import shape_to_len
 
 
-class RangeTree(object):
-    """
-    A binary search tree of ranges, mapping a name to an index range.
+# if the total array size is less than this, we'll just use a flat list mapping
+# indices to names instead of a binary search tree
+_MAX_FLAT_RANGE_SIZE = 10000
 
-    Allows for fast lookup of the name corresponding to a given index. The ranges must be
-    contiguous, but they can be of different sizes.
 
-    Search complexity is O(log2 n). Better than FlatRangeMapper when total array size is large.
-    """
+class NameRangeMapper(object):
     def __init__(self, ranges):
+        self._name2range = {}
+        self._range2name = {}
+        self.size = ranges[-1][2] - ranges[0][1]
+
+    @staticmethod
+    def create(ranges):
         """
-        Initialize a RangeTree.
+        Return a mapper that maps indices to variable names and relative indices.
 
         Parameters
         ----------
         ranges : list of (name, start, stop)
-            List of (name, start, stop) tuples, where name is the variable name and start and stop
-            define the range of indices for that variable.
-        """
-        self.size = ranges[-1][2] - ranges[0][1]
-        self._rangedict = {}
-        self.root = RangeTree.build(ranges, self._rangedict)
+            Ordered list of (name, start, stop) tuples, where start and stop define the range of
+            indices for that name. Ranges must be contiguous.
 
-    def get_range(self, name):
+        Returns
+        -------
+        FlatRangeMapper or RangeTree
+            A mapper that maps indices to variable names and relative indices.
+        """
+        size = ranges[-1][2] - ranges[0][1]
+        return FlatRangeMapper(ranges) if size < _MAX_FLAT_RANGE_SIZE else RangeTree(ranges)
+
+    def add_range(self, name, start, stop):
+        """
+        Add a range to the mapper.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
+        start : int
+            Starting index of the variable.
+        stop : int
+            Ending index of the variable.
+        """
+        self._name2range[name] = (start, stop)
+        self._range2name[(start, stop)] = name
+
+    def name2range(self, name):
         """
         Get the range corresponding to the given name.
 
@@ -39,9 +62,74 @@ class RangeTree(object):
         tuple of (int, int)
             The range of indices corresponding to the given name.
         """
-        return self._rangedict[name]
-            
-    def find_name(self, idx):
+        return self._name2range[name]
+
+    def index2name(self, idx):
+        """
+        Find the name corresponding to the given index.
+
+        Parameters
+        ----------
+        idx : int
+            The index into the full array.
+
+        Returns
+        -------
+        str or None
+            The name corresponding to the given index, or None if not found.
+        """
+        raise NotImplementedError("index2name method must be implemented by subclass.")
+
+    def index2names(self, idxs):
+        """
+        Find the names corresponding to the given indices.
+
+        Parameters
+        ----------
+        idxs : list of int
+            The indices into the full array.
+
+        Returns
+        -------
+        list of str
+            The names corresponding to the given indices.
+        """
+        names = {self.index2name(idx) for idx in idxs}
+        if None in names:
+            missing = []
+            for idx in idxs:
+                if self.index2name(idx) is None:
+                    missing.append(idx)
+            raise RuntimeError("Indices %s are not in any range." % sorted(missing))
+
+        return names
+
+
+class RangeTree(NameRangeMapper):
+    """
+    A binary search tree of ranges, mapping a name to an index range.
+
+    Allows for fast lookup of the name corresponding to a given index. The ranges must be
+    contiguous, but they can be of different sizes.
+
+    Search complexity is O(log2 n). Uses less memory than FlatRangeMapper when total array size is
+    large.
+    """
+    def __init__(self, ranges):
+        """
+        Initialize a RangeTree.
+
+        Parameters
+        ----------
+        ranges : list of (name, start, stop)
+            List of (name, start, stop) tuples, where name is the variable name and start and stop
+            define the range of indices for that variable.
+        """
+        super().__init__(ranges)
+        self.size = ranges[-1][2] - ranges[0][1]
+        self.root = self.build(ranges)
+
+    def index2name(self, idx):
         """
         Find the name corresponding to the given index.
 
@@ -63,8 +151,8 @@ class RangeTree(object):
                 node = node.right
             else:
                 return node.name
-    
-    def find_name_and_rel_ind(self, idx):
+
+    def index2name_and_rel_ind(self, idx):
         """
         Find the name and relative index corresponding to the matched range.
 
@@ -91,8 +179,7 @@ class RangeTree(object):
 
         return None, None
 
-    @staticmethod
-    def build(ranges, rngdict):
+    def build(self, ranges):
         """
         Build a binary search tree to map indices to variable names.
 
@@ -101,8 +188,6 @@ class RangeTree(object):
         ranges : list of (name, start, stop)
             List of (name, start, stop) tuples, where name is the variable name and start and stop
             define the range of indices for that variable. Ranges must be contiguous.
-        rngdict : dict
-            Dictionary to be populated with the ranges, keyed by name.
 
         Returns
         -------
@@ -113,41 +198,20 @@ class RangeTree(object):
         name, start, stop = ranges[half]
 
         node = RangeTreeNode(name, start, stop)
-        rngdict[name] = (start, stop)
+        self.add_range(name, start, stop)
 
         left_slices = ranges[:half]
         if left_slices:
-            node.left = RangeTree.build(left_slices, rngdict)
+            node.left = self.build(left_slices)
 
         right_slices = ranges[half + 1:]
         if right_slices:
-            node.right = RangeTree.build(right_slices, rngdict)
+            node.right = self.build(right_slices)
 
         return node
 
-    def compute_transfer_inds(self, target_mapper, sources, targets):
-        """
-        Compute the transfer indices for the given sources and targets.
 
-        Parameters
-        ----------
-        target_mapper : NameRangeMapper
-            The NameRangeMapper for the target side of the transfer.
-        sources : list of str
-            List of source names.
-        targets : list of str
-            List of target names.
-
-        Returns
-        -------
-        tuple of (dict, dict)
-            A tuple of (src_inds, tgt_inds), where src_inds is a dict mapping source names to
-            lists of indices and tgt_inds is a dict mapping target names to lists of indices.
-        """
-        pass    
-
-
-class RangeTreeNode(object):
+class RangeTreeNode(NameRangeMapper):
     """
     A node in a binary search tree of ranges, mapping a name to an index range.
 
@@ -187,9 +251,77 @@ class RangeTreeNode(object):
         self.right = None
 
 
-# if the total array size is less than this, we'll just use a flat list mapping
-# indices to names instead of a binary search tree
-_MAX_FLAT_RANGE_SIZE = 10000
+class FlatRangeMapper(NameRangeMapper):
+    """
+    A flat list mapping indices to variable names and relative indices.
+
+    Parameters
+    ----------
+    ranges : list of (name, start, stop)
+        Ordered list of (name, start, stop) tuples, where start and stop define the range of
+        indices for that name. Ranges must be contiguous.
+
+    Attributes
+    ----------
+    size : int
+        Total size of all of the ranges combined.
+    ranges : list of (name, start, stop)
+        List of (name, start, stop) tuples, where start and stop define the range of
+        indices for that name. Ranges must be contiguous.
+    """
+
+    def __init__(self, ranges):
+        """
+        Initialize a FlatRangeMapper.
+        """
+        super().__init__(ranges)
+        self.ranges = [None] * self.size
+        for rng in ranges:
+            name, start, stop = rng
+            self.ranges[start:stop] = [rng] * (stop - start)
+            self.add_range(name, start, stop)
+
+    def index2name(self, idx):
+        """
+        Find the name corresponding to the given index.
+
+        Parameters
+        ----------
+        idx : int
+            The index into the full array.
+
+        Returns
+        -------
+        str or None
+            The name corresponding to the given index, or None if not found.
+        """
+        try:
+            return self.ranges[idx][0]
+        except IndexError:
+            return None
+
+    def index2name_and_rel_ind(self, idx):
+        """
+        Find the name and relative index corresponding to the matched range.
+
+        Parameters
+        ----------
+        idx : int
+            The index into the full array.
+
+        Returns
+        -------
+        str or None
+            The name corresponding to the matched range, or None if not found.
+        int or None
+            The relative index into the matched range, or None if not found.
+        """
+        try:
+            name, start, _ = self.ranges[idx]
+        except IndexError:
+            return (None, None)
+
+        return (name, idx - start)
 
 
 def metas2ranges(meta_iter, shape_name='shape'):
@@ -222,7 +354,7 @@ def metas2ranges(meta_iter, shape_name='shape'):
 def metas2shapes(meta_iter, shape_name='shape'):
     """
     Convert an iterator of metadata to an iterator of (name, shape) tuples.
-    
+
     Parameters
     ----------
     meta_iter : iterator of (name, meta)
@@ -235,97 +367,6 @@ def metas2shapes(meta_iter, shape_name='shape'):
     """
     for name, meta in meta_iter:
         yield (name, meta[shape_name])
-
-
-class FlatRangeMapper(object):
-    """
-    A flat list mapping indices to variable names and relative indices.
-
-    Parameters
-    ----------
-    ranges : list of (name, start, stop)
-        Ordered list of (name, start, stop) tuples, where start and stop define the range of
-        indices for that name. Ranges must be contiguous.
-
-    Attributes
-    ----------
-    size : int
-        Total size of all of the ranges combined.
-    ranges : list of (name, start, stop)
-        List of (name, start, stop) tuples, where start and stop define the range of
-        indices for that name. Ranges must be contiguous.
-    """
-
-    def __init__(self, ranges):
-        """
-        Initialize a FlatRangeMapper.
-        """
-        self.size = ranges[-1][2] - ranges[0][1]
-        self.ranges = [None] * self.size
-        for rng in ranges:
-            _, start, stop = rng
-            self.ranges[start:stop] = [rng] * (stop - start)
-
-    def find_name(self, idx):
-        """
-        Find the name corresponding to the given index.
-
-        Parameters
-        ----------
-        idx : int
-            The index into the full array.
-
-        Returns
-        -------
-        str or None
-            The name corresponding to the given index, or None if not found.
-        """
-        try:
-            return self.ranges[idx][0]
-        except IndexError:
-            return None
-
-    def find_name_and_rel_ind(self, idx):
-        """
-        Find the name and relative index corresponding to the matched range.
-
-        Parameters
-        ----------
-        idx : int
-            The index into the full array.
-
-        Returns
-        -------
-        str or None
-            The name corresponding to the matched range, or None if not found.
-        int or None
-            The relative index into the matched range, or None if not found.
-        """
-        try:
-            name, start, _ = self.ranges[idx]
-        except IndexError:
-            return (None, None)
-
-        return (name, idx - start)
-
-
-def NameRangeMapper(ranges):
-    """
-    Return a mapper that maps indices to variable names and relative indices.
-
-    Parameters
-    ----------
-    ranges : list of (name, start, stop)
-        Ordered list of (name, start, stop) tuples, where start and stop define the range of
-        indices for that name. Ranges must be contiguous.
-
-    Returns
-    -------
-    FlatRangeMapper or RangeTree
-        A mapper that maps indices to variable names and relative indices.
-    """
-    size = ranges[-1][2] - ranges[0][1]
-    return FlatRangeMapper(ranges) if size < _MAX_FLAT_RANGE_SIZE else RangeTree(ranges)
 
 
 if __name__ == '__main__':
@@ -344,9 +385,7 @@ if __name__ == '__main__':
     flat = FlatRangeMapper(ranges)
 
     for i in range(34):
-        rname, rind = rtree.find_name_and_rel_ind(i)
-        fname, find = flat.find_name_and_rel_ind(i)
-        assert rname == fname and rind == find, 'i = %d, rname = %s, rind = %s, fname = %s, find = %s' % (i, rname, rind, fname, find)
+        rname, rind = rtree.index2name_and_rel_ind(i)
+        fname, find = flat.index2name_and_rel_ind(i)
+        assert rname == fname and rind == find, f'i = {i}, rname = {rname}, rind = {rind}, fname = {fname}, find = {find}'
         print(i, rname, rind, fname, find)
-
-
