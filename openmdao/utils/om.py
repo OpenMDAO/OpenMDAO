@@ -111,6 +111,15 @@ def _view_connections_cmd(options, user_args):
         funcname = 'final_setup'
     else:
         funcname = 'setup'
+
+    def _view_model_w_errors(prob):
+        if prob._metadata['saved_errors']:
+            # run the viewer here if we've had setup errors. Normally we'd wait until
+            # after setup or final_setup.
+            _viewconns(prob)
+            # errors will result in exit at the end of the _check_collected_errors method
+
+    hooks._register_hook('_check_collected_errors', 'Problem', pre=_view_model_w_errors)
     hooks._register_hook(funcname, class_name='Problem', inst_id=options.problem, post=_viewconns,
                          exit=True)
 
@@ -394,6 +403,42 @@ def _cite_cmd(options, user_args):
     _load_and_exec(options.file[0], user_args)
 
 
+def _list_pre_post_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao list_pre_post' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('-o', default=None, action='store', dest='outfile',
+                        help='Name of output file.  By default, output goes to stdout.')
+    parser.add_argument('-p', '--problem', action='store', dest='problem', help='Problem name')
+
+
+def _list_pre_post_cmd(options, user_args):
+    """
+    Return the post_setup hook function for 'openmdao list_pre_post'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+    user_args : list of str
+        Args to be passed to the user script.
+    """
+    def _list_pre_post(prob):
+        prob.list_pre_post(outfile=options.outfile)
+
+    # register the hook
+    hooks._register_hook('setup', class_name='Problem', inst_id=options.problem,
+                         post=_list_pre_post, exit=True)
+
+    _load_and_exec(options.file[0], user_args)
+
+
 def _get_deps(dep_dict: dict, package_name: str) -> None:
     """
     Recursively determine all installed depenency versions and add newly found ones to dep_dict.
@@ -450,6 +495,8 @@ _command_map = {
     'scaffold': (_scaffold_setup_parser, _scaffold_exec,
                  'Generate a simple scaffold for a component.'),
     'scaling': (_scaling_setup_parser, _scaling_cmd, 'View driver scaling report.'),
+    'list_pre_post': (_list_pre_post_setup_parser, _list_pre_post_cmd,
+                      'Show pre and post setup systems.'),
     'summary': (_config_summary_setup_parser, _config_summary_cmd,
                 'Print a short top-level summary of the problem.'),
     'timing': (_timing_setup_parser, _timing_cmd, 'Collect timing information for all systems.'),

@@ -1197,32 +1197,34 @@ class MaskingTestCase(unittest.TestCase):
                 partials['Tp', 'chord'] = np.array([9., 10, 11, 12])
                 partials['Tp', 'phi'] = np.array([13., 14, 15, 16])
 
+        for asjac_type in ('csc', 'dense'):
+            with self.subTest(asjac_type=asjac_type):
 
-        prob = Problem()
-        model = prob.model
-
-        comp = IndepVarComp()
-        comp.add_output('chord', val=np.ones((4, )))
-        model.add_subsystem('indep_var_comp', comp, promotes=['*'])
-
-        comp = CCBladeResidualComp(num_nodes=1, num_radial=4, assembled_jac_type='csc')
-
-        comp.linear_solver = DirectSolver(assemble_jac=True)
-        model.add_subsystem('ccblade_comp', comp, promotes_inputs=['chord'], promotes_outputs=['Tp'])
-
-
-        prob.setup(mode='fwd')
-        prob.run_model()
-        totals = prob.compute_totals(of=['Tp'], wrt=['chord'], return_format='array')
-
-        expected = np.array([
-        [-6.4,0.,0.,0.],
-        [ 0.,-5.33333333,0.,0.],
-        [ 0.,0.,-4.57142857,0.],
-        [ 0.,0.,0.,-4.]]
-        )
-
-        np.testing.assert_allclose(totals, expected)
+                prob = Problem()
+                model = prob.model
+        
+                ivc = IndepVarComp()
+                ivc.add_output('chord', val=np.ones((4, )))
+                model.add_subsystem('indep_var_comp', ivc, promotes=['*'])
+        
+                comp = CCBladeResidualComp(num_nodes=1, num_radial=4, assembled_jac_type=asjac_type)
+        
+                comp.linear_solver = DirectSolver(assemble_jac=True)
+                model.add_subsystem('ccblade_comp', comp, promotes_inputs=['chord'], promotes_outputs=['Tp'])
+        
+        
+                prob.setup(mode='fwd')
+                prob.run_model()
+                totals = prob.compute_totals(of=['Tp'], wrt=['chord'], return_format='array')
+        
+                expected = np.array([
+                [-6.4,0.,0.,0.],
+                [ 0.,-5.33333333,0.,0.],
+                [ 0.,0.,-4.57142857,0.],
+                [ 0.,0.,0.,-4.]]
+                )
+        
+                np.testing.assert_allclose(totals, expected)
 
 
 if __name__ == '__main__':

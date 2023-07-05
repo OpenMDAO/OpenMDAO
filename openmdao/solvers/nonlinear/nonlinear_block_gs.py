@@ -211,7 +211,7 @@ class NonlinearBlockGS(NonlinearSolver):
         maxiter = self.options['maxiter']
         itercount = self._iter_count
 
-        if self.options['use_apply_nonlinear'] or (itercount < 1 and maxiter < 2):
+        if (maxiter < 2 and itercount < 1) or self.options['use_apply_nonlinear']:
 
             # This option runs apply_nonlinear to calculate the residuals, and thus ends up
             # executing ExplicitComponents twice per iteration.
@@ -233,7 +233,7 @@ class NonlinearBlockGS(NonlinearSolver):
                 outputs_n = outputs.asarray(copy=True)
 
             self._solver_info.append_subsolver()
-            for subsys, _ in system._subsystems_allprocs.values():
+            for subsys in system._solver_subsystem_iter(local_only=False):
                 system._transfer('nonlinear', 'fwd', subsys.name)
                 if subsys._is_local:
                     subsys._solve_nonlinear()

@@ -118,6 +118,9 @@ class Component(System):
                              desc='If True, call compute, compute_partials, linearize, '
                                   'apply_linear, apply_nonlinear, and compute_jacvec_product '
                                   'only on rank 0 and broadcast the results to the other ranks.')
+        self.options.declare('always_opt', types=bool, default=False,
+                             desc='If True, force this component to be included in the optimization'
+                                  ' loop if the Problem option "group_by_pre_opt_post" is True.')
 
     def _check_matfree_deprecation(self):
         # check for mixed distributed variables
