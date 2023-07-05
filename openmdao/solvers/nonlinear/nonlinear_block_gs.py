@@ -140,12 +140,9 @@ class NonlinearBlockGS(NonlinearSolver):
         self._gs_iter()
         self._solver_info.pop()
 
-        out_arr = outputs.asarray()
-        res_arr = residuals.asarray()
-
         if use_aitken:
             # compute the change in the outputs after the NLBGS iteration
-            delta_outputs_n -= out_arr
+            delta_outputs_n -= outputs.asarray()
             delta_outputs_n *= -1
 
             if self._iter_count >= 2:
@@ -172,7 +169,7 @@ class NonlinearBlockGS(NonlinearSolver):
                 if system.comm.size > 1:
                     backup_o = outputs.asarray(copy=True)
                     outputs.set_val(delta_outputs_n)
-                    tddo = res_arr.dot(out_arr)
+                    tddo = residuals.dot(outputs)
                     residuals.set_val(backup_r)
                     outputs.set_val(backup_o)
                 else:
