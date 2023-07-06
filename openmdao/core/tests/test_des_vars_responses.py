@@ -361,13 +361,13 @@ class TestDesvarOnModel(unittest.TestCase):
         prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('junk')
-
+        prob.setup()
+        
         with self.assertRaises(RuntimeError) as context:
-            prob.setup()
+            prob.final_setup()
 
         self.assertEqual(str(context.exception),
-           "\nCollected errors for problem 'design_var_not_exist':"
-           "\n   <model> <class SellarDerivatives>: Output not found for design variable 'junk'.")
+           "<model> <class SellarDerivatives>: Output not found for design variable 'junk'.")
 
     def test_desvar_affine_and_scaleradder(self):
 
@@ -507,13 +507,13 @@ class TestConstraintOnModel(unittest.TestCase):
         prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_constraint('junk')
+        prob.setup()
 
         with self.assertRaises(Exception) as context:
-            prob.setup()
-
+            prob.final_setup()
+            
         self.assertEqual(str(context.exception),
-           "\nCollected errors for problem 'constraint_not_exist':"
-           "\n   <model> <class SellarDerivatives>: Output not found for response 'junk'.")
+           "<model> <class SellarDerivatives>: Output not found for response 'junk'.")
 
     def test_constraint_affine_and_scaleradder(self):
 
@@ -868,12 +868,13 @@ class TestObjectiveOnModel(unittest.TestCase):
         prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_objective('junk')
-
+        prob.setup()
+        
         with self.assertRaises(RuntimeError) as context:
-            prob.setup()
+            prob.final_setup()
 
         self.assertEqual(str(context.exception),
-                         "\nCollected errors for problem 'obective_not_exist':\n   <model> <class SellarDerivatives>: Output not found for response 'junk'.")
+                         "<model> <class SellarDerivatives>: Output not found for response 'junk'.")
 
     def test_objective_affine_and_scaleradder(self):
 

@@ -2287,14 +2287,12 @@ class TestPyoptSparse(unittest.TestCase):
     def test_constraint_alias(self):
         p = om.Problem()
 
-        exec = om.ExecComp(['y = x**2',
-                            'z = a + x**2'],
-                        a={'shape': (1,)},
-                        y={'shape': (101,)},
-                        x={'shape': (101,)},
-                        z={'shape': (101,)})
-
-        p.model.add_subsystem('exec', exec)
+        p.model.add_subsystem('exec', om.ExecComp(['y = x**2',
+                                                   'z = a + x**2'],
+                                                  a={'shape': (1,)},
+                                                  y={'shape': (101,)},
+                                                  x={'shape': (101,)},
+                                                  z={'shape': (101,)}))
 
         p.model.add_design_var('exec.a', lower=-1000, upper=1000)
         p.model.add_objective('exec.y', index=50)
@@ -2714,7 +2712,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         p = om.Problem()
 
-        exec = om.ExecComp(['y = x**2',
+        exec = om.ExecComp(['y = a*x**2',
                             'z = a + x**2'],
                             a={'shape': (1,)},
                             y={'shape': (101,)},

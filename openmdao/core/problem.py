@@ -1022,7 +1022,7 @@ class Problem(object):
             mode = self._orig_mode
 
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-            self.model._final_setup(self.comm)
+            self.model._final_setup(self.comm, self._orig_mode)
 
         # If set_solver_print is called after an initial run, in a multi-run scenario,
         #  this part of _final_setup still needs to happen so that change takes effect

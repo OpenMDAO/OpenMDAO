@@ -396,6 +396,8 @@ class pyOptSparseDriver(Driver):
             opt_prob.addObj(name)
             self._quantities.append(name)
 
+        cons_to_remove = set()
+
         # Calculate and save derivatives for any linear constraints.
         lcons = [key for (key, con) in self._cons.items() if con['linear']]
         if len(lcons) > 0:
@@ -436,6 +438,7 @@ class pyOptSparseDriver(Driver):
             if not wrt:
                 issue_warning(f"Equality constraint '{name}' does not depend on any design "
                               "variables and was not added to the optimization.")
+                cons_to_remove.add(name)
                 continue
 
             if meta['linear']:
@@ -475,6 +478,7 @@ class pyOptSparseDriver(Driver):
             if not wrt:
                 issue_warning(f"Inequality constraint '{name}' does not depend on any design "
                               "variables and was not added to the optimization.")
+                cons_to_remove.add(name)
                 continue
 
             if meta['linear']:
@@ -491,6 +495,10 @@ class pyOptSparseDriver(Driver):
                     jac = None
                 opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt, jac=jac)
                 self._quantities.append(name)
+
+        for name in cons_to_remove:
+            del self._cons[name]
+            del self._responses[name]
 
         # Instantiate the requested optimizer
         try:

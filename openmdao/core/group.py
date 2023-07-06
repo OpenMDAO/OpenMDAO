@@ -29,7 +29,7 @@ from openmdao.utils.general_utils import common_subpath, all_ancestors, \
     convert_src_inds, ContainsAll, shape2tuple, get_connection_owner, ensure_compatible
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
-from openmdao.utils.graph_utils import get_sccs_topo
+from openmdao.utils.graph_utils import get_sccs_topo, get_hybrid_graph
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
@@ -748,11 +748,11 @@ class Group(System):
 
         self._top_level_post_sizes()
 
-        try:
-            self._problem_meta['relevant'] = self._init_relevance(mode)
-        except RuntimeError:
-            type_exc, exc, tb = sys.exc_info()
-            self._collect_error(str(exc), exc_type=type_exc, tback=tb)
+        # try:
+        #     self._problem_meta['relevant'] = self._init_relevance(mode)
+        # except RuntimeError:
+        #     type_exc, exc, tb = sys.exc_info()
+        #     self._collect_error(str(exc), exc_type=type_exc, tback=tb)
 
         # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
@@ -773,6 +773,8 @@ class Group(System):
         dict
             The relevance dictionary.
         """
+        assert self.pathname == '', "Relevance can only be initialized on the top level System."
+
         if self._use_derivatives:
             desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
             responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
@@ -805,35 +807,36 @@ class Group(System):
             keyed by design vars and responses.
         """
         conns = self._conn_global_abs_in2out
+        graph = get_hybrid_graph(conns)
 
-        # Create a hybrid graph with components and all connected vars.  If a var is connected,
-        # also connect it to its corresponding component.  This results in a smaller graph
-        # (fewer edges) than would be the case for a pure variable graph where all inputs
-        # to a particular component would have to be connected to all outputs from that component.
-        graph = nx.DiGraph()
-        for tgt, src in conns.items():
-            if src not in graph:
-                graph.add_node(src, type_='out')
-
-            graph.add_node(tgt, type_='in')
-
-            src_sys, _, _ = src.rpartition('.')
-            graph.add_edge(src_sys, src)
-
-            tgt_sys, _, _ = tgt.rpartition('.')
-            graph.add_edge(tgt, tgt_sys)
-
-            graph.add_edge(src, tgt)
-
-        for dv in desvars:
+        # now add design vars and responses to the graph
+        for meta in desvars.values():
+            dv = meta['source']
             if dv not in graph:
                 graph.add_node(dv, type_='out')
                 graph.add_edge(dv.rpartition('.')[0], dv)
 
-        for res in responses:
+        for meta in responses.values():
+            res = meta['source']
             if res not in graph:
                 graph.add_node(res, type_='out')
                 graph.add_edge(res.rpartition('.')[0], res)
+
+        # figure out if we can remove any edges based on zero partials we find
+        # in components.  By default all component connected component outputs
+        # are also connected to all connected inputs from the same component.
+        missing_partials = {}
+        self._get_missing_partials(missing_partials)
+        for pathname, missing in missing_partials.items():
+            connected_outs = [n for _, n in graph.out_edges(pathname)]
+            connected_ins = [n for n, _ in graph.in_edges(pathname)]
+            graph.remove_node(pathname)
+
+            for of in connected_outs:
+                for wrt in connected_ins:
+                    if (of, wrt) not in missing:
+                        # raise RuntimeError("MISSING: %s %s" % (pathname, missing))
+                        graph.add_edge(wrt, of)
 
         nodes = graph.nodes
         grev = graph.reverse(copy=False)
@@ -846,14 +849,16 @@ class Group(System):
 
         relevant = defaultdict(dict)
 
-        for desvar, dvmeta in desvars.items():
+        for dvmeta in desvars.values():
+            desvar = dvmeta['source']
             dvset = set(self.all_connected_nodes(graph, desvar))
             parallel_deriv_color = dvmeta['parallel_deriv_color']
             if parallel_deriv_color:
                 pd_dv_locs[desvar] = set(self.all_connected_nodes(graph, desvar, local=True))
                 pd_err_chk[parallel_deriv_color][desvar] = pd_dv_locs[desvar]
 
-            for response, resmeta in responses.items():
+            for resmeta in responses.values():
+                response = resmeta['source']
                 if response not in rescache:
                     rescache[response] = set(self.all_connected_nodes(grev, response))
                     parallel_deriv_color = resmeta['parallel_deriv_color']
@@ -862,11 +867,13 @@ class Group(System):
                                                                              local=True))
                         pd_err_chk[parallel_deriv_color][response] = pd_res_locs[response]
 
+                # print("DVSET:", sorted(dvset), "\nRESSET:", sorted(rescache[response]))
                 common = dvset.intersection(rescache[response])
+                # print("DV:", desvar, "\nRES:", response, '\nCOMMON:', sorted(common))
 
                 if common:
-                    dv = conns[desvar] if desvar in conns else desvar
-                    r = conns[response] if response in conns else response
+                    dv = desvar # conns[desvar] if desvar in conns else desvar
+                    r = response # conns[response] if response in conns else response
                     if desvar in pd_dv_locs and pd_dv_locs[desvar]:
                         pd_common[dv][r] = pd_dv_locs[desvar].intersection(rescache[response])
                     elif response in pd_res_locs and pd_res_locs[response]:
@@ -878,32 +885,32 @@ class Group(System):
                     for node in common:
                         if 'type_' in nodes[node]:
                             typ = nodes[node]['type_']
-                            system = node.rpartition('.')[0]
                             if typ == 'in':  # input var
                                 input_deps.add(node)
-                                if system not in sys_deps:
-                                    sys_deps.update(all_ancestors(system))
                             else:  # output var
                                 output_deps.add(node)
-                                if system not in sys_deps:
-                                    sys_deps.update(all_ancestors(system))
+                            system = node.rpartition('.')[0]
+                            if system not in sys_deps:
+                                sys_deps.update(all_ancestors(system))
 
                 elif desvar == response:
                     input_deps = set()
                     output_deps = set([response])
                     sys_deps = set(all_ancestors(desvar.rpartition('.')[0]))
 
-                if common or desvar == response:
-                    desvar = conns[desvar] if desvar in conns else desvar
-                    response = conns[response] if response in conns else response
-                    if mode != 'rev':  # fwd or auto
-                        relevant[desvar][response] = ({'input': input_deps,
-                                                       'output': output_deps}, sys_deps)
-                    if mode != 'fwd':  # rev or auto
-                        relevant[response][desvar] = ({'input': input_deps,
-                                                       'output': output_deps}, sys_deps)
+                else:
+                    continue
 
-                    sys_deps.add('')  # top level Group is always relevant
+                #desvar = conns[desvar] if desvar in conns else desvar
+                #response = conns[response] if response in conns else response
+                if mode != 'rev':  # fwd or auto
+                    relevant[desvar][response] = ({'input': input_deps,
+                                                    'output': output_deps}, sys_deps)
+                if mode != 'fwd':  # rev or auto
+                    relevant[response][desvar] = ({'input': input_deps,
+                                                    'output': output_deps}, sys_deps)
+
+                sys_deps.add('')  # top level Group is always relevant
 
         rescache = None
 
@@ -942,18 +949,17 @@ class Group(System):
 
         voi_lists = []
         if mode != 'rev':
-            voi_lists.append((desvars, responses))
+            voi_lists.append((desvars.values(), responses.values()))
         if mode != 'fwd':
-            voi_lists.append((responses, desvars))
+            voi_lists.append((responses.values(), desvars.values()))
 
         # now calculate dependencies between each VOI and all other VOIs of the
         # other type, e.g for each input VOI wrt all output VOIs.  This is only
         # done for design vars in fwd mode or responses in rev mode. In auto mode,
         # we combine the results for fwd and rev modes.
-        for inputs, outputs in voi_lists:
-            for inp in inputs:
-                if inp in conns:
-                    inp = conns[inp]
+        for inputs_meta, outputs_meta in voi_lists:
+            for inpmeta in inputs_meta:
+                inp = inpmeta['source']
                 relinp = relevant[inp]
                 if relinp:
                     if '@all' in relinp:
@@ -965,7 +971,8 @@ class Group(System):
                         total_outs = set()
                         total_systems = set()
 
-                    for out in outputs:
+                    for outmeta in outputs_meta:
+                        out = outmeta['source']
                         if out in relinp:
                             dct, systems = relinp[out]
                             total_inps.update(dct['input'])
@@ -1196,7 +1203,7 @@ class Group(System):
 
         return sarr, tarr, tsize, has_dist_data
 
-    def _final_setup(self, comm):
+    def _final_setup(self, comm, mode):
         """
         Perform final setup for this system and its descendant systems.
 
@@ -1206,10 +1213,14 @@ class Group(System):
         ----------
         comm : MPI.Comm or <FakeComm> or None
             The global communicator.
+        mode : str
+            Derivative direction, either 'fwd', 'rev', or 'auto'.
         """
         if self._use_derivatives:
             # must call this before vector setup because it determines if we need to alloc commplex
             self._setup_partials()
+
+        self._problem_meta['relevant'] = self._init_relevance(mode)
 
         self._setup_vectors(self._get_root_vectors())
 
@@ -1688,9 +1699,7 @@ class Group(System):
 
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
-            mysub = self._subsystems_myproc[0] if self._subsystems_myproc else False
-            if (mysub and mysub.comm.rank == 0 and (mysub._full_comm is None or
-                                                    mysub._full_comm.rank == 0)):
+            if self._should_gather():
                 raw = (allprocs_discrete, allprocs_prom2abs_list, allprocs_abs2meta,
                        self._has_output_scaling, self._has_output_adder,
                        self._has_resid_scaling, self._group_inputs, self._has_distrib_vars)
@@ -2220,7 +2229,7 @@ class Group(System):
 
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             # If running in parallel, allgather
-            if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
+            if self._should_gather():
                 raw = (global_abs_in2out, src_ind_inputs)
             else:
                 raw = ({}, ())
@@ -3485,6 +3494,31 @@ class Group(System):
                     msg += "component whose input '{}' is distributed using src_indices. "
                     raise RuntimeError(msg.format(self.msginfo, iname))
 
+    def _declared_partials_iter(self):
+        """
+        Iterate over all declared partials.
+
+        Yields
+        ------
+        (key, meta) : (key, dict)
+            key: a tuple of the form (of, wrt)
+            meta: a dict containing the partial metadata
+        """
+        for subsys in self._subsystems_myproc:
+            yield from subsys._declared_partials_iter()
+
+    def _get_missing_partials(self, missing):
+        """
+        Return a list of (of, wrt) tuples for which derivatives have not been declared.
+
+        Parameters
+        ----------
+        missing : dict
+            Dictionary containing list of missing derivatives keyed by system pathname.
+        """
+        for subsys in self._subsystems_myproc:
+            subsys._get_missing_partials(missing)
+
     def _approx_subjac_keys_iter(self):
         if self._owns_approx_wrt and not self.pathname:
             candidate_wrt = self._owns_approx_wrt
@@ -4557,3 +4591,14 @@ class Group(System):
             The model options metadata provided by the associated Problem object.
         """
         return self._problem_meta['model_options']
+
+    def _should_gather(self):
+        """
+        Return True if this system should gather data from its children.
+
+        Returns
+        -------
+        bool
+            True if this system should gather data from its children.
+        """
+        return False
