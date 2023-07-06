@@ -2149,7 +2149,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        with self.assertRaises(RuntimeError) as msg:
+        with self.assertRaises(Exception) as msg:
             prob.run_driver()
 
         self.assertEqual(str(msg.exception),

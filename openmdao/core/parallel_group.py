@@ -114,18 +114,3 @@ class ParallelGroup(Group):
                         seen.add(sysname)
         else:
             super()._get_missing_partials(missing)
-
-    def _should_gather(self):
-        """
-        Return True if this system should gather data from its children.
-
-        Returns
-        -------
-        bool
-            True if this system should gather data from its children.
-        """
-        if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
-            return self._subsystems_myproc[0]._full_comm is None or \
-                self._subsystems_myproc[0]._full_comm.rank == 0
-
-        return False

@@ -26,7 +26,8 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len
 from openmdao.utils.general_utils import common_subpath, all_ancestors, \
-    convert_src_inds, ContainsAll, shape2tuple, get_connection_owner, ensure_compatible
+    convert_src_inds, ContainsAll, shape2tuple, get_connection_owner, ensure_compatible, \
+    meta2src_iter
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
 from openmdao.utils.graph_utils import get_sccs_topo, get_hybrid_graph
@@ -748,12 +749,6 @@ class Group(System):
 
         self._top_level_post_sizes()
 
-        # try:
-        #     self._problem_meta['relevant'] = self._init_relevance(mode)
-        # except RuntimeError:
-        #     type_exc, exc, tb = sys.exc_info()
-        #     self._collect_error(str(exc), exc_type=type_exc, tback=tb)
-
         # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
 
@@ -810,14 +805,12 @@ class Group(System):
         graph = get_hybrid_graph(conns)
 
         # now add design vars and responses to the graph
-        for meta in desvars.values():
-            dv = meta['source']
+        for dv in meta2src_iter(desvars.values()):
             if dv not in graph:
                 graph.add_node(dv, type_='out')
                 graph.add_edge(dv.rpartition('.')[0], dv)
 
-        for meta in responses.values():
-            res = meta['source']
+        for res in meta2src_iter(responses.values()):
             if res not in graph:
                 graph.add_node(res, type_='out')
                 graph.add_edge(res.rpartition('.')[0], res)
@@ -835,7 +828,6 @@ class Group(System):
             for of in connected_outs:
                 for wrt in connected_ins:
                     if (of, wrt) not in missing:
-                        # raise RuntimeError("MISSING: %s %s" % (pathname, missing))
                         graph.add_edge(wrt, of)
 
         nodes = graph.nodes
@@ -4601,4 +4593,9 @@ class Group(System):
         bool
             True if this system should gather data from its children.
         """
+        if self._mpi_proc_allocator.parallel:
+            if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
+                return self._subsystems_myproc[0]._full_comm is None or \
+                    self._subsystems_myproc[0]._full_comm.rank == 0
+
         return False
