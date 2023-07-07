@@ -3222,8 +3222,8 @@ class System(object):
         resp['flat_indices'] = flat_indices
 
         if alias in responses:
-            raise TypeError(f"Constraint alias '{alias}' is a duplicate of an existing alias or "
-                            "variable name.")
+            raise TypeError(f"{self.msginfo}: Constraint alias '{alias}' is a duplicate of an "
+                            "existing alias or variable name.")
 
         responses[name] = resp
 
@@ -3579,8 +3579,8 @@ class System(object):
                     if alias in prom2abs_out or alias in prom2abs_in:
                         # Constraint alias should never be the same as any openmdao variable.
                         path = prom2abs_out[prom][0] if prom in prom2abs_out else prom
-                        raise RuntimeError(f"Constraint alias '{alias}' on '{path}' is the same "
-                                           "name as an existing variable.")
+                        raise RuntimeError(f"{self.msginfo}: Constraint alias '{alias}' on '{path}'"
+                                           " is the same name as an existing variable.")
                     data['alias_path'] = self.pathname
 
                 if prom_or_alias in prom2abs_out:

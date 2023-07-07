@@ -196,18 +196,28 @@ def _load_and_exec(script_name, user_args):
     exec(code, globals_dict)  # nosec: private, internal use only
 
 
-def fname2mod_name(s):
+def fname2mod_name(fname):
     """
     Convert a string to a valid python module name.
+
+    Parameters
+    ----------
+    fname : str
+        The filename to convert.
+
+    Returns
+    -------
+    str
+        A valid module name corresponding to the given filename.
     """
     to_replace = ['-', ' ', '.', '(', ')', '[', ']', '{', '}', '=', '+'
                   '!', '@', '#', '$', '%', '^', '&', '*', '~', '`',
                   ';', ':', '"', "'", '<', '>', '?', '/', '\\', '|']
 
-    if not s.endswith('.py'):
+    if not fname.endswith('.py'):
         raise ValueError(f"'{s}' does not end with '.py'")
 
-    s = os.path.basename(s).rsplit('.', 1)[0]
+    s = os.path.basename(fname).rsplit('.', 1)[0]
 
     for c in to_replace:
         s = s.replace(c, '_')

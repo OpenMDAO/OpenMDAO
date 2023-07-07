@@ -1343,9 +1343,13 @@ class TestProblem(unittest.TestCase):
         p.setup(check=False, mode='rev')
         p.final_setup()
 
-        dumb_meta = {'parallel_deriv_color': None}
-        relevant = model.get_relevant_vars({'indep1.x': dumb_meta, 'indep2.x': dumb_meta},
-                                           {'C8.y': dumb_meta, 'Unconnected.y': dumb_meta}, mode='rev')
+        dvs = {}
+        resps = {}
+        for name in ('indep1.x', 'indep2.x'):
+            dvs[name] = {'parallel_deriv_color': None, 'source': name}
+        for name in ('C8.y', 'Unconnected.y'):
+            resps[name] = {'parallel_deriv_color': None, 'source': name}
+        relevant = model.get_relevant_vars(dvs, resps, mode='rev')
 
         indep1_ins = {'C8.b', 'G2.C5.a', 'G1.C1.a'}
         indep1_outs = {'C8.y', 'G1.C1.z', 'G2.C5.x', 'indep1.x'}
@@ -1886,17 +1890,17 @@ class TestProblem(unittest.TestCase):
         model.add_constraint('f', indices=[1], flat_indices=True, lower=10.0)
         model.add_constraint('f', indices=[5], flat_indices=True, alias='g', lower=0.5)
 
-        msg = "Constraint alias 'f' is a duplicate of an existing alias or variable name."
+        msg = "<class Group>: Constraint alias 'f' is a duplicate of an existing alias or variable name."
         with self.assertRaises(Exception) as cm:
             model.add_constraint('f', indices=[3], flat_indices=True, alias='f', lower=0.5)
 
         self.assertEqual(str(cm.exception), msg)
 
-        msg = "\nCollected errors for problem 'constraint_alias_duplicate_errors':" + \
-              "\n   <model> <class Group>: Constraint alias 'g' on 'comp1.f' is the same name as " + \
+        msg = "<model> <class Group>: Constraint alias 'g' on 'comp1.f' is the same name as " + \
               "an existing variable."
+        prob.setup()
         with self.assertRaises(Exception) as cm:
-            prob.setup()
+            prob.final_setup()
 
         self.assertEqual(str(cm.exception), msg)
 
@@ -2037,12 +2041,12 @@ class TestProblem(unittest.TestCase):
                                        promotes_inputs=['x'])
 
         c1.add_design_var('x', lower=0, upper=5)
+        prob.setup()
 
         with self.assertRaises(Exception) as cm:
-            prob.setup()
+            prob.final_setup()
 
-        msg = "\nCollected errors for problem 'output_as_input_err':" + \
-              "\n   <model> <class Group>: Design variable 'x' is connected to 'initial_comp.x', " + \
+        msg = "<model> <class Group>: Design variable 'x' is connected to 'initial_comp.x', " + \
               "but 'initial_comp.x' is not an IndepVarComp or ImplicitComp output."
         self.assertEqual(str(cm.exception), msg)
 

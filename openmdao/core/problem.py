@@ -671,6 +671,9 @@ class Problem(object):
                                ": Before calling `run_driver`, the `setup` method must be called "
                                "if set_output_solver_options has been called.")
 
+        if 'singular_jac_behavior' in self.driver.options:
+            self._metadata['singular_jac_behavior'] = self.driver.options['singular_jac_behavior']
+
         old_prefix = self._recording_iter.prefix
 
         if case_prefix is not None:
@@ -975,7 +978,8 @@ class Problem(object):
             'saved_errors': [],  # store setup errors here until after final_setup
             'checking': False,  # True if check_totals or check_partials is running
             'opt_status': None,  # Tells Systems if they are in an optimization loop
-            'model_options': self.model_options  # A dict of options passed to all systems in tree
+            'model_options': self.model_options,  # A dict of options passed to all systems in tree
+            'singular_jac_behavior': 'warn',  # How to handle singular jac conditions
         }
         model._setup(model_comm, mode, self._metadata)
 

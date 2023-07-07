@@ -35,7 +35,7 @@ from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_c
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
-    PromotionWarning, MPIWarning
+    PromotionWarning, MPIWarning, DerivativesWarning
 
 # regex to check for valid names.
 import re
@@ -804,13 +804,16 @@ class Group(System):
         conns = self._conn_global_abs_in2out
         graph = get_hybrid_graph(conns)
 
+        dvs = set(meta2src_iter(desvars.values()))
+        resps = set(meta2src_iter(responses.values()))
+
         # now add design vars and responses to the graph
-        for dv in meta2src_iter(desvars.values()):
+        for dv in dvs:
             if dv not in graph:
                 graph.add_node(dv, type_='out')
                 graph.add_edge(dv.rpartition('.')[0], dv)
 
-        for res in meta2src_iter(responses.values()):
+        for res in resps:
             if res not in graph:
                 graph.add_node(res, type_='out')
                 graph.add_edge(res.rpartition('.')[0], res)
@@ -820,15 +823,28 @@ class Group(System):
         # are also connected to all connected inputs from the same component.
         missing_partials = {}
         self._get_missing_partials(missing_partials)
+        missing_responses = set()
         for pathname, missing in missing_partials.items():
-            connected_outs = [n for _, n in graph.out_edges(pathname)]
-            connected_ins = [n for n, _ in graph.in_edges(pathname)]
+            outputs = [n for _, n in graph.out_edges(pathname)]
+            inputs = [n for n, _ in graph.in_edges(pathname)]
             graph.remove_node(pathname)
 
-            for of in connected_outs:
-                for wrt in connected_ins:
-                    if (of, wrt) not in missing:
-                        graph.add_edge(wrt, of)
+            for output in outputs:
+                for inp in inputs:
+                    if (output, inp) in missing:
+                        if output in resps:
+                            missing_responses.add(output)
+                    else:
+                        graph.add_edge(inp, output)
+
+        if missing_responses:
+            msg = (f"Constraints or objectives [{', '.join(sorted(missing_responses))}] cannot"
+                   " be impacted by the design variables of the problem because no partials "
+                   "were defined for them in their parent component(s).")
+            if self._problem_meta['singular_jac_behavior'] == 'error':
+                raise RuntimeError(msg)
+            else:
+                issue_warning(msg, category=DerivativesWarning)
 
         nodes = graph.nodes
         grev = graph.reverse(copy=False)
@@ -859,17 +875,14 @@ class Group(System):
                                                                              local=True))
                         pd_err_chk[parallel_deriv_color][response] = pd_res_locs[response]
 
-                # print("DVSET:", sorted(dvset), "\nRESSET:", sorted(rescache[response]))
                 common = dvset.intersection(rescache[response])
-                # print("DV:", desvar, "\nRES:", response, '\nCOMMON:', sorted(common))
 
                 if common:
-                    dv = desvar # conns[desvar] if desvar in conns else desvar
-                    r = response # conns[response] if response in conns else response
                     if desvar in pd_dv_locs and pd_dv_locs[desvar]:
-                        pd_common[dv][r] = pd_dv_locs[desvar].intersection(rescache[response])
+                        pd_common[desvar][response] = \
+                            pd_dv_locs[desvar].intersection(rescache[response])
                     elif response in pd_res_locs and pd_res_locs[response]:
-                        pd_common[r][dv] = pd_res_locs[response].intersection(dvset)
+                        pd_common[response][desvar] = pd_res_locs[response].intersection(dvset)
 
                     input_deps = set()
                     output_deps = set()
@@ -893,14 +906,12 @@ class Group(System):
                 else:
                     continue
 
-                #desvar = conns[desvar] if desvar in conns else desvar
-                #response = conns[response] if response in conns else response
                 if mode != 'rev':  # fwd or auto
                     relevant[desvar][response] = ({'input': input_deps,
-                                                    'output': output_deps}, sys_deps)
+                                                   'output': output_deps}, sys_deps)
                 if mode != 'fwd':  # rev or auto
                     relevant[response][desvar] = ({'input': input_deps,
-                                                    'output': output_deps}, sys_deps)
+                                                   'output': output_deps}, sys_deps)
 
                 sys_deps.add('')  # top level Group is always relevant
 

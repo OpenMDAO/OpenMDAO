@@ -2099,6 +2099,7 @@ class TestPyoptSparse(unittest.TestCase):
             def setup(self):
                 self.add_input('x', 1.0)
                 self.add_output('y', 1.0)
+                self.declare_partials('*', '*')
 
             def compute(self, inputs, outputs):
                 outputs['y'] = 4.8 * inputs['x'] - 3.0
@@ -2153,8 +2154,7 @@ class TestPyoptSparse(unittest.TestCase):
             prob.run_driver()
 
         self.assertEqual(str(msg.exception),
-                         "Constraints or objectives [('parab.z', inds=[0])] cannot be impacted by the design " + \
-                         "variables of the problem.")
+                         'Constraints or objectives [parab.z] cannot be impacted by the design variables of the problem because no partials were defined for them in their parent component(s).')
 
     def test_singular_jac_error_desvars(self):
         prob = om.Problem()
@@ -2247,7 +2247,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        msg = "Constraints or objectives [('parab.z', inds=[0])] cannot be impacted by the design variables of the problem."
+        msg = 'Constraints or objectives [parab.z] cannot be impacted by the design variables of the problem because no partials were defined for them in their parent component(s).'
 
         with assert_warning(UserWarning, msg):
             prob.run_driver()
@@ -2405,14 +2405,15 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_objective('exec.y', index=50)
         p.model.add_constraint('exec.z', indices=[0, 1], equals=25)
 
+        p.model.add_constraint('exec.z', indices=om.slicer[1:10], lower=20, alias="ALIAS_TEST")
+        p.setup()
+
         # Need to fix up this test to run right
         with self.assertRaises(RuntimeError) as ctx:
-            p.model.add_constraint('exec.z', indices=om.slicer[1:10], lower=20, alias="ALIAS_TEST")
-            p.setup()
+            p.final_setup()
 
         self.assertEqual(str(ctx.exception),
-           "\nCollected errors for problem 'overlapping_response_indices':"
-           "\n   <model> <class Group>: Indices for aliases ['ALIAS_TEST'] are overlapping "
+           "<model> <class Group>: Indices for aliases ['ALIAS_TEST'] are overlapping "
            "constraint/objective 'exec.z'.")
 
         p = om.Problem(name='overlapping_response_indices2')
@@ -2430,13 +2431,14 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_objective('exec.y', index=50)
         p.model.add_constraint('exec.z', indices=[0, 1], equals=25)
 
+        p.model.add_constraint('exec.z', indices=[0], lower=20, alias="ALIAS_TEST")
+        p.setup()
+
         with self.assertRaises(RuntimeError) as ctx:
-            p.model.add_constraint('exec.z', indices=[0], lower=20, alias="ALIAS_TEST")
-            p.setup()
+            p.final_setup()
 
         self.assertEqual(str(ctx.exception),
-           "\nCollected errors for problem 'overlapping_response_indices2':"
-           "\n   <model> <class Group>: Indices for aliases ['ALIAS_TEST'] are overlapping "
+           "<model> <class Group>: Indices for aliases ['ALIAS_TEST'] are overlapping "
            "constraint/objective 'exec.z'.")
 
         p = om.Problem(name='overlapping_response_indices3')
@@ -2454,13 +2456,14 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_objective('exec.y', index=50)
         p.model.add_constraint('exec.z', indices=[0, 1], equals=25)
 
+        p.model.add_constraint('exec.z', indices=[1, 2], lower=20, alias="ALIAS_TEST")
+        p.setup()
+
         with self.assertRaises(RuntimeError) as ctx:
-            p.model.add_constraint('exec.z', indices=[1, 2], lower=20, alias="ALIAS_TEST")
-            p.setup()
+            p.final_setup()
 
         self.assertEqual(str(ctx.exception),
-           "\nCollected errors for problem 'overlapping_response_indices3':"
-           "\n   <model> <class Group>: Indices for aliases ['ALIAS_TEST'] are overlapping "
+           "<model> <class Group>: Indices for aliases ['ALIAS_TEST'] are overlapping "
            "constraint/objective 'exec.z'.")
 
         p = om.Problem(name='overlapping_response_indices4')
@@ -2478,13 +2481,14 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_objective('exec.y', index=50)
         p.model.add_constraint('exec.z', indices=[0, 100], equals=25)
 
+        p.model.add_constraint('exec.z', indices=[-1], lower=20, alias="ALIAS_TEST")
+        p.setup()
+
         with self.assertRaises(RuntimeError) as ctx:
-            p.model.add_constraint('exec.z', indices=[-1], lower=20, alias="ALIAS_TEST")
-            p.setup()
+            p.final_setup()
 
         self.assertEqual(str(ctx.exception),
-            "\nCollected errors for problem 'overlapping_response_indices4':"
-            "\n   <model> <class Group>: Indices for aliases ['ALIAS_TEST'] are overlapping "
+            "<model> <class Group>: Indices for aliases ['ALIAS_TEST'] are overlapping "
             "constraint/objective 'exec.z'.")
 
     def test_constraint_aliases_standalone(self):
