@@ -819,7 +819,7 @@ class Group(System):
                 graph.add_edge(res.rpartition('.')[0], res)
 
         # figure out if we can remove any edges based on zero partials we find
-        # in components.  By default all component connected component outputs
+        # in components.  By default all component connected outputs
         # are also connected to all connected inputs from the same component.
         missing_partials = {}
         self._get_missing_partials(missing_partials)
