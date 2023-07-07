@@ -100,9 +100,9 @@ class ParallelGroup(Group):
             Dictionary containing list of missing derivatives keyed by system pathname.
         """
         if self.comm.size > 1:
+            msng = {}
+            super()._get_missing_partials(msng)
             if self._should_gather():
-                msng = {}
-                super()._get_missing_partials(msng)
                 gathered = self.comm.allgather(msng)
             else:
                 gathered = self.comm.allgather({})
