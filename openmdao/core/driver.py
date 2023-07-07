@@ -887,8 +887,6 @@ class Driver(object):
         self._objs = objs = {}
         self._cons = cons = {}
 
-        model._setup_driver_units()
-
         # driver _responses are keyed by either the alias or the promoted name
         self._responses = resps = model.get_responses(recurse=True, use_prom_ivc=True)
         for name, data in resps.items():
@@ -902,6 +900,8 @@ class Driver(object):
         # Gather up the information for design vars. _designvars are keyed by the promoted name
         self._designvars = designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
         desvar_size = sum(data['global_size'] for data in designvars.values())
+
+        model._setup_driver_units()
 
         return response_size, desvar_size
 

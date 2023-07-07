@@ -2121,7 +2121,7 @@ class System(object):
                 try:
                     units_src = meta['source']
                 except KeyError:
-                    units_src = self.get_source(name)
+                    units_src = self.get_source(meta['name'])
 
                 src_units = abs2meta[units_src]['units']
 
