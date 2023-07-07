@@ -43,7 +43,6 @@ def get_hybrid_graph(connections):
     networkx.DiGraph
         Graph of all variables and components in the model.
     """
-
     # Create a hybrid graph with components and all connected vars.  If a var is connected,
     # also connect it to its corresponding component.  This results in a smaller graph
     # (fewer edges) than would be the case for a pure variable graph where all inputs

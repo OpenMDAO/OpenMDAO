@@ -362,7 +362,7 @@ class TestDesvarOnModel(unittest.TestCase):
 
         prob.model.add_design_var('junk')
         prob.setup()
-        
+
         with self.assertRaises(RuntimeError) as context:
             prob.final_setup()
 
@@ -511,7 +511,7 @@ class TestConstraintOnModel(unittest.TestCase):
 
         with self.assertRaises(Exception) as context:
             prob.final_setup()
-            
+
         self.assertEqual(str(context.exception),
            "<model> <class SellarDerivatives>: Output not found for response 'junk'.")
 
@@ -849,13 +849,12 @@ class TestAddConstraintMPI(unittest.TestCase):
 
         sub.add_constraint('d1.junk', equals=0.0, cache_linear_solution=True)
 
+        prob.setup(mode='rev')
         with self.assertRaises(RuntimeError) as context:
-            prob.setup(mode='rev')
+            prob.final_setup()
 
         self.assertEqual(str(context.exception),
-           "\nCollected errors for problem 'add_bad_con':"
-           "\n   <model> <class Group>: 'sub' <class SellarDerivatives>: Output not found for "
-           "response 'd1.junk'.")
+           "'sub' <class SellarDerivatives>: Output not found for response 'd1.junk'.")
 
 
 class TestObjectiveOnModel(unittest.TestCase):
@@ -869,7 +868,7 @@ class TestObjectiveOnModel(unittest.TestCase):
 
         prob.model.add_objective('junk')
         prob.setup()
-        
+
         with self.assertRaises(RuntimeError) as context:
             prob.final_setup()
 
