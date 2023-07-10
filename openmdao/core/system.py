@@ -2069,12 +2069,14 @@ class System(object):
         if abs2meta is None:
             abs2meta = self._var_allprocs_abs2meta['output']
 
+        has_scaling = False
+
         dv = self._design_vars
         for name, meta in dv.items():
 
             units = meta['units']
-            dv[name]['total_adder'] = dv[name]['adder']
-            dv[name]['total_scaler'] = dv[name]['scaler']
+            meta['total_adder'] = meta['adder']
+            meta['total_scaler'] = meta['scaler']
 
             if units is not None:
                 # If derivatives are not being calculated, then you reach here before source
@@ -2101,11 +2103,14 @@ class System(object):
 
                 factor, offset = unit_conversion(var_units, units)
                 base_adder, base_scaler = determine_adder_scaler(None, None,
-                                                                 dv[name]['adder'],
-                                                                 dv[name]['scaler'])
+                                                                 meta['adder'],
+                                                                 meta['scaler'])
 
-                dv[name]['total_adder'] = offset + base_adder / factor
-                dv[name]['total_scaler'] = base_scaler * factor
+                meta['total_adder'] = offset + base_adder / factor
+                meta['total_scaler'] = base_scaler * factor
+
+            if meta['total_scaler'] is not None:
+                has_scaling = True
 
         resp = self._responses
         type_dict = {'con': 'constraint', 'obj': 'objective'}
@@ -2148,8 +2153,17 @@ class System(object):
                 meta['total_scaler'] = base_scaler * factor
                 meta['total_adder'] = offset + base_adder / factor
 
+            if meta['total_scaler'] is not None:
+                has_scaling = True
+
         for s in self._subsystems_myproc:
-            s._setup_driver_units(abs2meta)
+            has_scaling |= s._setup_driver_units(abs2meta)
+
+        if (self.comm.size > 1 and self._subsystems_allprocs and
+                self._mpi_proc_allocator.parallel):
+            has_scaling = bool(self.comm.allreduce(int(has_scaling)))
+
+        return has_scaling
 
     def _setup_connections(self):
         """
