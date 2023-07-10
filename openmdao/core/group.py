@@ -830,12 +830,14 @@ class Group(System):
             graph.remove_node(pathname)
 
             for output in outputs:
+                found = False
                 for inp in inputs:
-                    if (output, inp) in missing:
-                        if output in resps:
-                            missing_responses.add(output)
-                    else:
+                    if (output, inp) not in missing:
                         graph.add_edge(inp, output)
+                        found = True
+
+                if not found and output in resps:
+                    missing_responses.add(output)
 
         if missing_responses:
             msg = (f"Constraints or objectives [{', '.join(sorted(missing_responses))}] cannot"
