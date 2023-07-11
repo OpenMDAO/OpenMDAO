@@ -77,7 +77,7 @@ class ParallelGroup(Group):
             meta: a dict containing the partial metadata
         """
         if self.comm.size > 1:
-            if self._should_gather():
+            if self._gather_full_data():
                 gathered = self.comm.allgather(self._subjacs_info)
             else:
                 gathered = self.comm.allgather({})
@@ -102,7 +102,7 @@ class ParallelGroup(Group):
         if self.comm.size > 1:
             msng = {}
             super()._get_missing_partials(msng)
-            if self._should_gather():
+            if self._gather_full_data():
                 gathered = self.comm.allgather(msng)
             else:
                 gathered = self.comm.allgather({})

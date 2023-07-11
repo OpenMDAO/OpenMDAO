@@ -1704,7 +1704,7 @@ class Group(System):
 
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
-            if self._should_gather():
+            if self._gather_full_data():
                 raw = (allprocs_discrete, allprocs_prom2abs_list, allprocs_abs2meta,
                        self._has_output_scaling, self._has_output_adder,
                        self._has_resid_scaling, self._group_inputs, self._has_distrib_vars)
@@ -2234,7 +2234,7 @@ class Group(System):
 
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             # If running in parallel, allgather
-            if self._should_gather():
+            if self._gather_full_data():
                 raw = (global_abs_in2out, src_ind_inputs)
             else:
                 raw = ({}, ())
@@ -4597,14 +4597,18 @@ class Group(System):
         """
         return self._problem_meta['model_options']
 
-    def _should_gather(self):
+    def _gather_full_data(self):
         """
-        Return True if this system should gather data from its children.
+        Return True if this system should contribute full data to an allgather.
+
+        This prevents sending a lot of unnecessary data across the network.
 
         Returns
         -------
         bool
-            True if this system should gather data from its children.
+            True if this system should contribute its full data. Otherwise it
+            should contribute only an 'empty' version of the data.  What
+            'empty' means depends on the structure of the data being gathered.
         """
         if self._mpi_proc_allocator.parallel:
             if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
