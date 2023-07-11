@@ -1418,22 +1418,23 @@ class TestGroup(unittest.TestCase):
     def test_auto_order2(self):
         p = om.Problem()
         model = p.model
-        model.add_subsystem('C5', om.ExecComp('y=5.0*x1 - 3.*x2'))
-        model.add_subsystem('C1', om.ExecComp('y=2.0*x'))
-        model.add_subsystem('C2', om.ExecComp('y=3.0*x1 + 4.*x2'))
-        model.add_subsystem('C4', om.ExecComp('y=5.0*x'))
-        model.add_subsystem('C3', om.ExecComp(['y=5.0*x', 'z=x']))
-        model.connect('C1.y', ['C2.x1', 'C5.x2'])
-        model.connect('C2.y', 'C4.x')
-        model.connect('C4.y', 'C3.x')
-        model.connect('C3.y', 'C2.x2')
-        model.connect('C3.z', 'C5.x1')
-        model.options['auto_order'] = True
+        sub = model.add_subsystem('sub', om.Group())
+        sub.add_subsystem('C5', om.ExecComp('y=5.0*x1 - 3.*x2'))
+        sub.add_subsystem('C1', om.ExecComp('y=2.0*x'))
+        sub.add_subsystem('C2', om.ExecComp('y=3.0*x1 + 4.*x2'))
+        sub.add_subsystem('C4', om.ExecComp('y=5.0*x'))
+        sub.add_subsystem('C3', om.ExecComp(['y=5.0*x', 'z=x']))
+        sub.connect('C1.y', ['C2.x1', 'C5.x2'])
+        sub.connect('C2.y', 'C4.x')
+        sub.connect('C4.y', 'C3.x')
+        sub.connect('C3.y', 'C2.x2')
+        sub.connect('C3.z', 'C5.x1')
+        sub.options['auto_order'] = True
 
         p.setup()
         p.run_model()
 
-        self.assertEqual([s.name for s in model._subsystems_myproc], ['_auto_ivc', 'C1', 'C2', 'C4', 'C3', 'C5'])
+        self.assertEqual([s.name for s in sub._subsystems_myproc], ['C1', 'C2', 'C4', 'C3', 'C5'])
 
     def test_promote_units_and_none(self):
         p = om.Problem(name='promote_units_and_none')
