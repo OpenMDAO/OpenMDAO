@@ -393,6 +393,8 @@ class SubmodelComp(ExplicitComponent):
             p.model.add_constraint(prom_name)
 
         # setup again to compute coloring
+        p.set_solver_print(level=-1)
+        p.set_solver_print(level=1, depth=2)
         if self._problem_meta is None:
             p.setup(force_alloc_complex=False)
         else:
@@ -434,6 +436,14 @@ class SubmodelComp(ExplicitComponent):
         # set initial output vals
         for prom_name, meta in self.submodel_outputs.items():
             p.set_val(prom_name, outputs[meta['iface_name']])
+        
+        for i in inputs:
+            if 'mach' in i:
+                print(self.pathname, i)
+                print(inputs[i])
+                print()
+
+        # exit()
 
         p.driver.run()
 
