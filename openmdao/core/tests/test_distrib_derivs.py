@@ -380,6 +380,44 @@ class MPITests2(unittest.TestCase):
         assert_near_equal(J['C4.y', 'P1.x'], diag1, 1e-6)
         assert_near_equal(J['C4.y', 'P2.x'], diag2, 1e-6)
 
+    def test_fan_in_grouped_nlbgs_bug(self):
+        size = 3
+
+        prob = om.Problem()
+        prob.model = root = om.Group()
+
+        root.add_subsystem('P1', om.IndepVarComp('x', np.ones(size, dtype=float)))
+        root.add_subsystem('P2', om.IndepVarComp('x', np.ones(size, dtype=float)))
+        sub = root.add_subsystem('sub', om.ParallelGroup())
+
+        sub.add_subsystem('C1', om.ExecComp(['y=-2.0*x'],
+                                         x=np.zeros(size, dtype=float),
+                                         y=np.zeros(size, dtype=float)))
+        sub.add_subsystem('C2', om.ExecComp(['y=5.0*x'],
+                                         x=np.zeros(size, dtype=float),
+                                         y=np.zeros(size, dtype=float)))
+        root.connect("P1.x", "sub.C1.x")
+        root.connect("P2.x", "sub.C2.x")
+
+        root.nonlinear_solver = om.NonlinearBlockGS(use_aitken=True,
+                                                   aitken_min_factor=1e-12,
+                                                   aitken_max_factor=1000.)
+
+        prob.set_solver_print(0)
+        prob.setup(mode='fwd')
+        prob.run_model()
+
+        if prob.comm.rank == 0:
+            val = np.arange(size) + 1
+        else:
+            val = np.arange(size) + size + 1
+
+        sub._outputs.set_val(val)
+        root.nonlinear_solver._single_iteration()
+
+        expected = 0.
+        assert_near_equal(root.nonlinear_solver._theta_n_1, expected, 1e-6)
+
     def test_distrib_voi_dense(self):
         size = 7
 
