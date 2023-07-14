@@ -2115,7 +2115,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
             prob.run_driver()
 
         self.assertEqual(str(msg.exception),
-                         'Constraints or objectives [parab.f_z] cannot be impacted by the design variables of the problem because no partials were defined for them in their parent component(s).')
+                         "Constraints or objectives [('parab.f_z', inds=[(1, 1, 0)])] cannot be impacted by the design variables of the problem.")
 
     @unittest.skipUnless(Version(scipy_version) >= Version("1.2"),
                          "scipy >= 1.2 is required.")

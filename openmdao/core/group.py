@@ -187,6 +187,8 @@ class Group(System):
         Sorted list of pathnames of components that are executed prior to the optimization loop.
     _post_components : list of str or None
         Sorted list of pathnames of components that are executed after the optimization loop.
+    _relevance_graph : nx.DiGraph
+        Graph of relevance connections.  Always None except in the top level Group.
     """
 
     def __init__(self, **kwargs):
@@ -215,6 +217,7 @@ class Group(System):
         self._shape_knowns = None
         self._pre_components = None
         self._post_components = None
+        self._relevance_graph = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -506,6 +509,14 @@ class Group(System):
         # are our descendents).
         self._problem_meta['config_info']._update_modified_systems(self)
 
+    def _reset_setup_vars(self):
+        """
+        Reset all the stuff that gets initialized in setup.
+        """
+        super()._reset_setup_vars()
+        self._relevance_graph = None
+        self._setup_procs_finished = False
+
     def _setup_procs(self, pathname, comm, mode, prob_meta):
         """
         Execute first phase of the setup process.
@@ -526,7 +537,6 @@ class Group(System):
             Problem level metadata.
         """
         super()._setup_procs(pathname, comm, mode, prob_meta)
-        self._setup_procs_finished = False
 
         nproc = comm.size
 
@@ -780,11 +790,9 @@ class Group(System):
 
         return {'@all': ({'input': ContainsAll(), 'output': ContainsAll()}, ContainsAll())}
 
-    def get_relevant_vars(self, desvars, responses, mode):
+    def get_relevance_graph(self, desvars, responses):
         """
-        Find all relevant vars between desvars and responses.
-
-        Both vars are assumed to be outputs (either design vars or responses).
+        Return a graph of the relevance between desvars and responses.
 
         Parameters
         ----------
@@ -792,15 +800,15 @@ class Group(System):
             Dictionary of design variable metadata.
         responses : dict
             Dictionary of response variable metadata.
-        mode : str
-            Direction of derivatives, either 'fwd' or 'rev'.
 
         Returns
         -------
-        dict
-            Dict of ({'outputs': dep_outputs, 'inputs': dep_inputs}, dep_systems)
-            keyed by design vars and responses.
+        DiGraph
+            Graph of the relevance between desvars and responses.
         """
+        if self._relevance_graph is not None:
+            return self._relevance_graph
+
         conns = self._conn_global_abs_in2out
         graph = get_hybrid_graph(conns)
 
@@ -848,6 +856,31 @@ class Group(System):
             else:
                 issue_warning(msg, category=DerivativesWarning)
 
+        self._relevance_graph = graph
+        return graph
+
+    def get_relevant_vars(self, desvars, responses, mode):
+        """
+        Find all relevant vars between desvars and responses.
+
+        Both vars are assumed to be outputs (either design vars or responses).
+
+        Parameters
+        ----------
+        desvars : dict
+            Dictionary of design variable metadata.
+        responses : dict
+            Dictionary of response variable metadata.
+        mode : str
+            Direction of derivatives, either 'fwd' or 'rev'.
+
+        Returns
+        -------
+        dict
+            Dict of ({'outputs': dep_outputs, 'inputs': dep_inputs}, dep_systems)
+            keyed by design vars and responses.
+        """
+        graph = self.get_relevance_graph(desvars, responses)
         nodes = graph.nodes
         grev = graph.reverse(copy=False)
         rescache = {}

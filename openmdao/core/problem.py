@@ -992,14 +992,6 @@ class Problem(object):
 
         self._metadata['setup_status'] = _SetupStatus.POST_SETUP
 
-        if self.options['group_by_pre_opt_post']:
-            if self.driver.supports['optimization']:
-                self.model._setup_iteration_lists()
-            else:
-                issue_warning(f"In Problem '{self._name}, the 'group_by_pre_opt_post' option is "
-                              "True but the driver doesn't support optimization so the option will "
-                              "be ignored.")
-
         self._check_collected_errors()
 
         return self
@@ -1027,6 +1019,14 @@ class Problem(object):
 
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             self.model._final_setup(self.comm, self._orig_mode)
+
+        if self.options['group_by_pre_opt_post']:
+            if self.driver.supports['optimization']:
+                self.model._setup_iteration_lists()
+            else:
+                issue_warning(f"In Problem '{self._name}, the 'group_by_pre_opt_post' option is "
+                              "True but the driver doesn't support optimization so the option will "
+                              "be ignored.")
 
         # If set_solver_print is called after an initial run, in a multi-run scenario,
         #  this part of _final_setup still needs to happen so that change takes effect

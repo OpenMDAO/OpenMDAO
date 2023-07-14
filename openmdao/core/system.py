@@ -1979,6 +1979,23 @@ class System(object):
         for subsys in self._subsystems_myproc:
             subsys._setup_recording()
 
+    def _reset_setup_vars(self):
+        """
+        Reset all the stuff that gets initialized in setup.
+        """
+        self._first_call_to_linearize = True
+        self._is_local = True
+        self._vectors = {}
+        self._full_comm = None
+        self._approx_subjac_keys = None
+
+        self.options._parent_name = self.msginfo
+        self.recording_options._parent_name = self.msginfo
+        self._design_vars = {}
+        self._responses = {}
+        self._design_vars.update(self._static_design_vars)
+        self._responses.update(self._static_responses)
+
     def _setup_procs(self, pathname, comm, mode, prob_meta):
         """
         Execute first phase of the setup process.
@@ -1998,21 +2015,11 @@ class System(object):
         prob_meta : dict
             Problem level options.
         """
-        self.pathname = pathname
-        self._set_problem_meta(prob_meta)
-        self._first_call_to_linearize = True
-        self._is_local = True
-        self._vectors = {}
-        self._full_comm = None
-        self._approx_subjac_keys = None
+        self._reset_setup_vars()
 
-        self.options._parent_name = self.msginfo
-        self.recording_options._parent_name = self.msginfo
+        self.pathname = pathname
         self._mode = mode
-        self._design_vars = {}
-        self._responses = {}
-        self._design_vars.update(self._static_design_vars)
-        self._responses.update(self._static_responses)
+        self._set_problem_meta(prob_meta)
         self.load_model_options()
 
     def _setup_var_data(self):

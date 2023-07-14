@@ -1339,18 +1339,17 @@ class TestProblem(unittest.TestCase):
         model.connect('G2.C6.y', 'G2.C7.b')
         model.connect('G2.C5.x', 'C8.b')
         model.connect('G2.C7.x', 'C8.a')
+        
+        model.add_design_var('indep1.x')
+        model.add_design_var('indep2.x')
+        model.add_constraint('C8.y')
+        model.add_constraint('Unconnected.y')
 
         p.setup(check=False, mode='rev')
         p.final_setup()
 
-        dvs = {}
-        resps = {}
-        for name in ('indep1.x', 'indep2.x'):
-            dvs[name] = {'parallel_deriv_color': None, 'source': name}
-        for name in ('C8.y', 'Unconnected.y'):
-            resps[name] = {'parallel_deriv_color': None, 'source': name}
-        relevant = model.get_relevant_vars(dvs, resps, mode='rev')
-
+        relevant = model._relevant
+        
         indep1_ins = {'C8.b', 'G2.C5.a', 'G1.C1.a'}
         indep1_outs = {'C8.y', 'G1.C1.z', 'G2.C5.x', 'indep1.x'}
         indep1_sys = {'C8', 'G1.C1', 'G2.C5', 'indep1', 'G1', 'G2', ''}
