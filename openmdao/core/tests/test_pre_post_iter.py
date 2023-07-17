@@ -8,6 +8,33 @@ from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, Sel
 from openmdao.utils.testing_utils import use_tempdirs
 
 
+class IncompletePartialsComp(om.ExplicitComponent):
+    def __init__(self, size=3, **kwargs):
+        super().__init__(**kwargs)
+        self.size = size
+        self.num_nl_solves = 0
+
+    def setup(self):
+        self.add_input('x1', np.ones(self.size))
+        self.add_input('x2', np.ones(self.size))
+        self.add_output('y1', np.ones(self.size))
+        self.add_output('y2', np.ones(self.size))
+
+        self.declare_partials('y1', 'x1')
+        self.declare_partials('y2', 'x2')
+
+    def compute(self, inputs, outputs):
+        try:
+            outputs['y1'] = 2.0 * inputs['x1']
+            outputs['y2'] = 3.0 * inputs['x2']
+        finally:
+            self.num_nl_solves += 1
+
+    def compute_partials(self, inputs, partials):
+        partials['y1', 'x1'] = 2.0
+        partials['y2', 'x2'] = 3.0
+
+
 @use_tempdirs
 class TestPrePostIter(unittest.TestCase):
 
@@ -539,6 +566,71 @@ class TestPrePostIter(unittest.TestCase):
         for i, iter_coord in enumerate(cr.list_cases('root.iter1', recurse=False, out_stream=None)):
             self.assertEqual(iter_coord, f'rank0:ScipyOptimize_SLSQP|{i}|root._solve_nonlinear|{i + 1}|NLRunOnce|0|iter1._solve_nonlinear|{i}')
 
+    def test_incomplets_partials(self):
+        p = om.Problem()
+        model = p.model
+        size = 3
+
+        p.options['group_by_pre_opt_post'] = True
+
+        p.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False)
+        p.set_solver_print(level=0)
+
+        model.add_subsystem('pre1', ExecComp4Test('y=2.*x', x=np.ones(size), y=np.zeros(size)))
+        model.add_subsystem('pre2', ExecComp4Test('y=3.*x - 7.*xx', x=np.ones(size), xx=np.ones(size), y=np.zeros(size)))
+
+        model.add_subsystem('incomplete', IncompletePartialsComp(size=size))
+        model.add_subsystem('iter1', ExecComp4Test('y=x1 + x2*4. + x3',
+                                                    x1=np.ones(size), x2=np.ones(size),
+                                                    x3=np.ones(size), y=np.zeros(size)))
+        model.add_subsystem('iter2', ExecComp4Test('y=.5*x', x=np.ones(size), y=np.zeros(size)))
+        model.add_subsystem('iter4', ExecComp4Test('y=7.*x', x=np.ones(size), y=np.zeros(size)))
+        model.add_subsystem('iter3', ExecComp4Test('y=6.*x', x=np.ones(size), y=np.zeros(size)))
+
+        model.add_subsystem('post1', ExecComp4Test('y=8.*x', x=np.ones(size), y=np.zeros(size)))
+        model.add_subsystem('post2', ExecComp4Test('y=x1*9. + x2*5. + x3*3.', x1=np.ones(size),
+                                                    x2=np.ones(size), x3=np.zeros(size),
+                                                    y=np.zeros(size)))
+
+        model.connect('pre1.y', ['iter1.x1', 'pre2.xx'])
+        model.connect('pre2.y', ['incomplete.x1', 'iter1.x2'])
+        model.connect('incomplete.y1', 'post1.x')
+        model.connect('iter1.y', 'incomplete.x2')
+        model.connect('incomplete.y2', 'iter2.x')
+        model.connect('iter2.y', 'iter4.x')
+        model.connect('iter3.y', 'post2.x2')
+        model.connect('iter4.y', 'iter3.x')
+        model.connect('post1.y', 'post2.x3')
+
+        p.model.add_design_var('iter1.x3', lower=-10, upper=10)
+        p.model.add_constraint('iter2.y', upper=10.)
+        p.model.add_objective('iter3.y', index=0)
+
+        p.setup(mode='fwd', force_alloc_complex=True)
+
+        # we don't want ExecComps to be colored because it makes the iter counting more complicated.
+        for comp in model.system_iter(recurse=True, typ=ExecComp4Test):
+            comp.options['do_coloring'] = False
+            comp.options['has_diag_partials'] = True
+
+        p.run_driver()
+
+        om.n2(p)
+
+        self.assertEqual(p.model.pre1.num_nl_solves, 1)
+        self.assertEqual(p.model.pre2.num_nl_solves, 1)
+
+        self.assertEqual(p.model.incomplete.num_nl_solves, 2)
+        self.assertEqual(p.model.iter1.num_nl_solves, 2)
+        self.assertEqual(p.model.iter2.num_nl_solves, 2)
+        self.assertEqual(p.model.iter3.num_nl_solves, 2)
+        self.assertEqual(p.model.iter4.num_nl_solves, 2)
+
+        self.assertEqual(p.model.post1.num_nl_solves, 1)
+        self.assertEqual(p.model.post2.num_nl_solves, 1)
+
+        data = p.check_totals(method='cs', out_stream=None)
+        assert_check_totals(data)
 
 if __name__ == "__main__":
     unittest.main()
