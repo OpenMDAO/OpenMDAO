@@ -63,3 +63,32 @@ def get_hybrid_graph(connections):
         graph.add_edge(src, tgt)
 
     return graph
+
+
+def collapse_component_node(graph, compnode):
+    """
+    Collapse a component node and its var nodes in a graph into a single node.
+
+    Parameters
+    ----------
+    graph : networkx.DiGraph
+        Graph of all variables and components in the model.
+
+    compnode : str
+        Name of the component node to be collapsed.
+    """
+    invarnodes = list(graph.predecessors(compnode))
+    outvarnodes = list(graph.successors(compnode))
+
+    # add edges from var preds to comp
+    for invarnode in invarnodes:
+        for pred in graph.predecessors(invarnode):
+            graph.add_edge(pred, compnode)
+
+    for outvarnode in outvarnodes:
+        for succ in graph.successors(outvarnode):
+            graph.add_edge(compnode, succ)
+
+    # remove var nodes
+    graph.remove_nodes_from(invarnodes)
+    graph.remove_nodes_from(outvarnodes)
