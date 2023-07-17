@@ -4484,6 +4484,19 @@ class Group(System):
         dvs = set([meta['source'] for meta in dvs.values()])
         responses = [meta['source'] for meta in responses.values()]
 
+        # Find any groups that have a nl solver that computes gradients, because we can't
+        # split up the systems in those groups without inserting zeros into the jacobian.
+        # Also find any components that have the 'always_opt' option set to True and force them
+        # to be part of the optimization iteration.
+        grad_groups = []
+        always_opt = {}
+        for s in self.system_iter(recurse=True, include_self=True):
+            if isinstance(s, Group):
+                if s.nonlinear_solver is not None and s.nonlinear_solver.supports['gradients']:
+                    grad_groups.append(s.pathname)
+            elif s.options['always_opt']:
+                always_opt[s.pathname] = None
+
         # we don't want _auto_ivc dependency to force all subsystems to be iterated, so split
         # the _auto_ivc node into two nodes, one for design vars and one for everything else.
         if '_auto_ivc' in graph:
@@ -4499,17 +4512,39 @@ class Group(System):
                         graph.add_edge(newtgt, v)
                     graph.remove_node(tgt)
 
-        # add 'backward' connections from inputs and outputs to their component
+        # add 'reverse' connections from inputs and outputs to their component
         # if it exists in order to keep component and its vars in the same SCC.
-        for node, data in graph.nodes.items():
-            if 'type_' in data:
-                sysname = node.rpartition('.')[0]
-                if data['type_'] == 'out':
-                    if sysname in graph:
-                        graph.add_edge(node, sysname)
-                else:  # type_ == 'in'
-                    if sysname in graph:
-                        graph.add_edge(sysname, node)
+        # Also add 'reverse' connections between connected inputs and outputs
+        # belonging to the same component if the component is not in the graph so
+        # that they will be in the same SCC.
+        # Also, for any 'always_opt' components, loop them into a response to
+        # force them to be in the opt SCC.
+        edges_to_add = []
+        for src, tgt in graph.edges():
+            varsrc = 'type_' in graph.nodes[src]
+            vartgt = 'type_' in graph.nodes[tgt]
+            if varsrc and not vartgt:  # tgt is a system
+                edges_to_add.append((tgt, src))  # connect from system back to var
+                if tgt in always_opt and always_opt[tgt] is None:
+                    always_opt[tgt] = [tgt]
+            elif vartgt and not varsrc:  # src is a system
+                edges_to_add.append((tgt, src))  # connect from var back to system
+                if src in always_opt and always_opt[src] is None:
+                    always_opt[src] = [src]
+            elif vartgt and varsrc:  # both are var nodes
+                srcsys = src.rpartition('.')[0]
+                tgtsys = tgt.rpartition('.')[0]
+                if srcsys == tgtsys:
+                    edges_to_add.append((tgt, src))  # connect from tgt back to src
+                    if tgtsys in always_opt:
+                        always_opt[tgtsys].append(tgt)
+                    else:
+                        always_opt[tgtsys] = [tgt]
+            else:
+                # this should never happen
+                raise RuntimeError(f"Unexpected graph connection between {src} and {tgt}.")
+
+        graph.add_edges_from(edges_to_add)
 
         # One way to determine the contents of the pre/opt/post sets is to add edges from the
         # response variables to the design variables (there are already edges,
@@ -4524,40 +4559,13 @@ class Group(System):
             for dv in dvs:
                 graph.add_edge(res, dv)
 
-        # Find any groups that have a nl solver that computes gradients, because we can't
-        # split up the systems in those groups without inserting zeros into the jacobian.
-        # Also find any components that have the 'always_opt' option set to True and force them
-        # to be part of the optimization iteration.
-        grad_groups = []
-        always_opt = []
-        for s in self.system_iter(recurse=True, include_self=True):
-            if isinstance(s, Group):
-                if s.nonlinear_solver is not None and s.nonlinear_solver.supports['gradients']:
-                    grad_groups.append(s.pathname)
-            elif s.options['always_opt']:  # make component part of opt SCC
-                if s.pathname in graph:
-                    graph.add_edge(responses[0], s.pathname)
-                    graph.add_edge(s.pathname, responses[0])
-                else:
-                    always_opt.append(s.pathname)
-
         if always_opt:
-            # systems here weren't found in the graph, which means they've been removed
-            # and replaced with direct connections between their inputs and outputs during creation
-            # of the relevance graph.  So we need to find any variables belonging to these
-            # systems and connect them to the responses to force them to be included
-            # in the strongly connected component for the optimization.
-            for comp in always_opt:
-                edges = list(graph.edges(comp))
-                in_edges = list(graph.in_edges(comp))
-                for src, tgt in edges:
-                    if 'type_' in graph.nodes[tgt]:
-                        graph.add_edge(tgt, responses[0])
-                        graph.add_edge(responses[0], tgt)
-                for src, tgt in in_edges:
-                    if 'type_' in graph.nodes[src]:
-                        graph.add_edge(src, responses[0])
-                        graph.add_edge(responses[0], src)
+            # loop 'always_opt' components (or their outputs if the component is not in the graph)
+            # into a response to force them to be in the opt SCC.
+            for tgts in always_opt.values():
+                for tgt in tgts:
+                    graph.add_edge(tgt, responses[0])
+                    graph.add_edge(responses[0], tgt)
 
         if grad_groups:
             if '' in grad_groups:
