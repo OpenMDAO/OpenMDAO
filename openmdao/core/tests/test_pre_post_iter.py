@@ -615,7 +615,7 @@ class TestPrePostIter(unittest.TestCase):
 
         p.run_driver()
 
-        om.n2(p)
+        # om.n2(p)
 
         self.assertEqual(p.model.pre1.num_nl_solves, 1)
         self.assertEqual(p.model.pre2.num_nl_solves, 1)
