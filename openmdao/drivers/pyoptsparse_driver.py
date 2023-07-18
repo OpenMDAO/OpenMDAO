@@ -422,8 +422,6 @@ class pyOptSparseDriver(Driver):
                             # by pyoptsparse.
                             jacdct[n] = {'coo': [mat.row, mat.col, mat.data], 'shape': mat.shape}
 
-        # allcons = []
-
         # Add all equality constraints
         for name, meta in self._cons.items():
             if meta['equals'] is None:
@@ -458,8 +456,6 @@ class pyOptSparseDriver(Driver):
 
                 opt_prob.addConGroup(name, size, lower=lower, upper=upper, wrt=wrt, jac=jac)
                 self._quantities.append(name)
-            # for w in wrt:
-            #     allcons.append((name, w))
 
         # Add all inequality constraints
         for name, meta in self._cons.items():
@@ -499,12 +495,6 @@ class pyOptSparseDriver(Driver):
                     jac = None
                 opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt, jac=jac)
                 self._quantities.append(name)
-
-            # for w in wrt:
-            #     allcons.append((name, w))
-
-        # for a, b in sorted(allcons):
-        #     print(f"{a} wrt {b}")
 
         for name in cons_to_remove:
             del self._cons[name]
