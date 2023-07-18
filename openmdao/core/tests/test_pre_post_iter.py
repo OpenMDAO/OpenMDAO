@@ -576,35 +576,27 @@ class TestPrePostIter(unittest.TestCase):
         p.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False)
         p.set_solver_print(level=0)
 
-        model.add_subsystem('pre1', ExecComp4Test('y=2.*x', x=np.ones(size), y=np.zeros(size)))
-        model.add_subsystem('pre2', ExecComp4Test('y=3.*x - 7.*xx', x=np.ones(size), xx=np.ones(size), y=np.zeros(size)))
+        model.add_subsystem('pre1', ExecComp4Test('y=2.*x', shape=size))
+        model.add_subsystem('pre2', ExecComp4Test('y=3.*x1 - 7.*x2', shape=size))
 
-        model.add_subsystem('incomplete', IncompletePartialsComp(size=size))
-        model.add_subsystem('iter1', ExecComp4Test('y=x1 + x2*4. + x3',
-                                                    x1=np.ones(size), x2=np.ones(size),
-                                                    x3=np.ones(size), y=np.zeros(size)))
-        model.add_subsystem('iter2', ExecComp4Test('y=.5*x', x=np.ones(size), y=np.zeros(size)))
-        model.add_subsystem('iter4', ExecComp4Test('y=7.*x', x=np.ones(size), y=np.zeros(size)))
-        model.add_subsystem('iter3', ExecComp4Test('y=6.*x', x=np.ones(size), y=np.zeros(size)))
+        model.add_subsystem('ivc', om.IndepVarComp('x', np.ones(size)))
 
-        model.add_subsystem('post1', ExecComp4Test('y=8.*x', x=np.ones(size), y=np.zeros(size)))
-        model.add_subsystem('post2', ExecComp4Test('y=x1*9. + x2*5. + x3*3.', x1=np.ones(size),
-                                                    x2=np.ones(size), x3=np.zeros(size),
-                                                    y=np.zeros(size)))
+        model.add_subsystem('iter1', ExecComp4Test('y=x*3.2', shape=size))
+        model.add_subsystem('incomplete', ExecComp4Test(['y1=3.*x1', 'y2=5*x2'], shape=size))
+        model.add_subsystem('obj', ExecComp4Test('obj=.5*x', shape=size))
 
-        model.connect('pre1.y', ['iter1.x1', 'pre2.xx'])
-        model.connect('pre2.y', ['incomplete.x1', 'iter1.x2'])
-        model.connect('incomplete.y1', 'post1.x')
+        model.add_subsystem('post1', ExecComp4Test('y=8.*x', shape=size))
+
+        model.connect('ivc.x', 'iter1.x')
         model.connect('iter1.y', 'incomplete.x2')
-        model.connect('incomplete.y2', 'iter2.x')
-        model.connect('iter2.y', 'iter4.x')
-        model.connect('iter3.y', 'post2.x2')
-        model.connect('iter4.y', 'iter3.x')
-        model.connect('post1.y', 'post2.x3')
+        model.connect('incomplete.y2', 'obj.x')
+        model.connect('incomplete.y1', 'post1.x')
+        model.connect('pre1.y', 'pre2.x2')
+        model.connect('post1.y', 'pre2.x1')
+        model.connect('pre2.y', 'incomplete.x1')
 
-        p.model.add_design_var('iter1.x3', lower=-10, upper=10)
-        p.model.add_constraint('iter2.y', upper=10.)
-        p.model.add_objective('iter3.y', index=0)
+        p.model.add_design_var('ivc.x', lower=-10, upper=10)
+        p.model.add_objective('obj.obj', index=0)
 
         p.setup(mode='fwd', force_alloc_complex=True)
 
@@ -615,19 +607,14 @@ class TestPrePostIter(unittest.TestCase):
 
         p.run_driver()
 
-        # om.n2(p)
-
         self.assertEqual(p.model.pre1.num_nl_solves, 1)
         self.assertEqual(p.model.pre2.num_nl_solves, 1)
 
-        self.assertEqual(p.model.incomplete.num_nl_solves, 2)
-        self.assertEqual(p.model.iter1.num_nl_solves, 2)
-        self.assertEqual(p.model.iter2.num_nl_solves, 2)
-        self.assertEqual(p.model.iter3.num_nl_solves, 2)
-        self.assertEqual(p.model.iter4.num_nl_solves, 2)
+        self.assertEqual(p.model.incomplete.num_nl_solves, 4)
+        self.assertEqual(p.model.iter1.num_nl_solves, 4)
+        self.assertEqual(p.model.obj.num_nl_solves, 4)
 
         self.assertEqual(p.model.post1.num_nl_solves, 1)
-        self.assertEqual(p.model.post2.num_nl_solves, 1)
 
         data = p.check_totals(method='cs', out_stream=None)
         assert_check_totals(data)
