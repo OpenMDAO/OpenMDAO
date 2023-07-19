@@ -393,8 +393,6 @@ class SubmodelComp(ExplicitComponent):
             p.model.add_constraint(prom_name)
 
         # setup again to compute coloring
-        p.set_solver_print(level=-1)
-        p.set_solver_print(level=1, depth=2)
         if self._problem_meta is None:
             p.setup(force_alloc_complex=False)
         else:
