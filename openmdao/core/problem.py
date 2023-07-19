@@ -8,6 +8,7 @@ import os
 import weakref
 import pathlib
 import textwrap
+import traceback
 
 from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
@@ -578,22 +579,23 @@ class Problem(object):
         if self._metadata['saved_errors'] is None:
             return
 
-        errors = self._metadata['saved_errors']
+        unique_errors = self._get_unique_saved_errors()
 
         # set the errors to None so that all future calls will immediately raise an exception.
         self._metadata['saved_errors'] = None
 
-        if errors:
+        if unique_errors:
             final_msg = [f"\nCollected errors for problem '{self._name}':"]
-            seen = set()
-            for ident, msg, exc_type, tback in errors:
-                if ident is None or ident not in seen:
-                    final_msg.append(f"   {msg}")
-                    seen.add(ident)
+            for _, msg, exc_type, tback in unique_errors:
+                final_msg.append(f"   {msg}")
 
-                # if there's only one error, include its traceback if there is one.
-                if len(errors) == 1:
-                    raise exc_type('\n'.join(final_msg)).with_traceback(tback)
+                # if there's only one error, include its traceback if it exists.
+                if len(unique_errors) == 1:
+                    if isinstance(tback, str):
+                        final_msg.append('Traceback (most recent call last):')
+                        final_msg.append(tback)
+                    else:
+                        raise exc_type('\n'.join(final_msg)).with_traceback(tback)
 
             raise RuntimeError('\n'.join(final_msg))
 
@@ -2498,6 +2500,57 @@ class Problem(object):
                 print(f"    {name}", file=out)
         else:
             print("\nPost-optimization components: []", file=out)
+
+    def _any_rank_has_saved_errors(self):
+        """
+        Return True if any rank has saved errors.
+
+        Returns
+        -------
+        bool
+            True if any rank has errors.
+        """
+        if self._metadata is None:
+            return False
+        else:
+            if MPI and self.comm is not None and self.comm.size > 1:
+                if self._metadata['saved_errors'] is None:
+                    nerrs = 0
+                else:
+                    nerrs = len(self._metadata['saved_errors'])
+                return self.comm.allreduce(nerrs, op=MPI.SUM) > 0
+            else:
+                return bool(self._metadata['saved_errors'])
+
+    def _get_unique_saved_errors(self):
+        """
+        Get a list of unique saved errors.
+
+        Returns
+        -------
+        list
+            List of unique saved errors.
+        """
+        unique_errors = []
+        if self._metadata is not None:
+            if self._any_rank_has_saved_errors():
+                # traceback won't pickle, so convert to string
+                if self.comm.size > 1:
+                    saved = [(ident, msg, exc_type, ''.join(traceback.format_tb(tback)))
+                             for ident, msg, exc_type, tback in self._metadata['saved_errors']]
+                    all_errors = self.comm.allgather(saved)
+                else:
+                    all_errors = [self._metadata['saved_errors']]
+
+                seen = set()
+                for errors in all_errors:
+                    for ident, msg, exc_type, tback in errors:
+                        if (ident is None and msg not in seen) or ident not in seen:
+                            unique_errors.append((ident, msg, exc_type, tback))
+                            seen.add(ident)
+                            seen.add(msg)
+
+        return unique_errors
 
 
 _ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])

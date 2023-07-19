@@ -436,13 +436,6 @@ class SubmodelComp(ExplicitComponent):
         # set initial output vals
         for prom_name, meta in self.submodel_outputs.items():
             p.set_val(prom_name, outputs[meta['iface_name']])
-        
-        for i in inputs:
-            if ('mach' in i) or ('alt' in i) or ('dTs' in i) or ('throttle' in i) or ('electric' in i) or ('rhs:W' in i) or ('BurnerArea' in i):
-                print(self.pathname, i, inputs[i])
-                print()
-
-        # exit()
 
         p.driver.run()
 
