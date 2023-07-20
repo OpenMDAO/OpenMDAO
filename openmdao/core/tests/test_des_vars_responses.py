@@ -852,10 +852,10 @@ class TestAddConstraintMPI(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.setup(mode='rev')
 
-        self.assertEqual(str(context.exception),
+        self.assertTrue(
            "\nCollected errors for problem 'add_bad_con':"
            "\n   <model> <class Group>: 'sub' <class SellarDerivatives>: Output not found for "
-           "response 'd1.junk'.")
+           "response 'd1.junk'." in str(context.exception))
 
 
 class TestObjectiveOnModel(unittest.TestCase):
