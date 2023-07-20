@@ -4473,7 +4473,6 @@ class Group(System):
         assert self.pathname == '', "call setup_iteration_lists on the top level Group only!"
 
         dvs = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
-
         responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
 
         if not dvs or not responses:
@@ -4590,7 +4589,7 @@ class Group(System):
                           f"which systems are included in the optimization iteration: "
                           f"\n{gradlist}\n")
 
-            # remaining groups are not contained within a higer level nl solver
+            # remaining groups are not contained within a higher level nl solver
             # using gradient group, so make new connections to/from them to
             # all systems that they contain.  This will force them to be
             # treated as 'atomic' within the graph, so that if they contain
@@ -4627,11 +4626,10 @@ class Group(System):
                     if s not in addto:
                         addto.update(all_ancestors(s))
 
-        # change _auto_ivc_other and _auto_ivc_other back to _auto_ivc.
+        # change _auto_ivc_other back to _auto_ivc.
         # Note that this could cause _auto_ivc to be in multiple places, but that's ok.
         for iterset in (pre, iterated, post):
-            if '_auto_ivc_other' in iterset:
-                iterset.remove('_auto_ivc_other')
+            iterset.discard('_auto_ivc_other')
             if iterset:
                 iterset.add('_auto_ivc')
 
@@ -4686,7 +4684,8 @@ class Group(System):
         """
         Return True if this system should contribute full data to an allgather.
 
-        This prevents sending a lot of unnecessary data across the network.
+        This prevents sending a lot of unnecessary data across the network when
+        the data is duplicated across multiple processes.
 
         Returns
         -------
