@@ -4472,6 +4472,24 @@ class Group(System):
         """
         assert self.pathname == '', "call setup_iteration_lists on the top level Group only!"
 
+        # Find any groups that have a nl solver that computes gradients, because we can't
+        # split up the systems in those groups without inserting zeros into the jacobian.
+        # Also find any components that have the 'always_opt' option set to True and force them
+        # to be part of the optimization iteration.
+        if self.nonlinear_solver is not None and self.nonlinear_solver.supports['gradients']:
+            issue_warning("The top level group has a nonlinear solver that computes gradients, so "
+                          "the entire model will be included in the optimization iteration.")
+            return
+
+        grad_groups = []
+        always_opt = {}
+        for s in self.system_iter(recurse=True, include_self=True):
+            if isinstance(s, Group):
+                if s.nonlinear_solver is not None and s.nonlinear_solver.supports['gradients']:
+                    grad_groups.append(s.pathname)
+            elif s.options['always_opt']:
+                always_opt[s.pathname] = None
+
         dvs = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
         responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
 
@@ -4482,19 +4500,6 @@ class Group(System):
 
         dvs = set([meta['source'] for meta in dvs.values()])
         responses = [meta['source'] for meta in responses.values()]
-
-        # Find any groups that have a nl solver that computes gradients, because we can't
-        # split up the systems in those groups without inserting zeros into the jacobian.
-        # Also find any components that have the 'always_opt' option set to True and force them
-        # to be part of the optimization iteration.
-        grad_groups = []
-        always_opt = {}
-        for s in self.system_iter(recurse=True, include_self=True):
-            if isinstance(s, Group):
-                if s.nonlinear_solver is not None and s.nonlinear_solver.supports['gradients']:
-                    grad_groups.append(s.pathname)
-            elif s.options['always_opt']:
-                always_opt[s.pathname] = None
 
         # we don't want _auto_ivc dependency to force all subsystems to be iterated, so split
         # the _auto_ivc node into two nodes, one for design vars and one for everything else.
@@ -4567,12 +4572,6 @@ class Group(System):
                     graph.add_edge(responses[0], tgt)
 
         if grad_groups:
-            if '' in grad_groups:
-                issue_warning("The model has a nonlinear solver that computes gradients, so "
-                              f"the entire model will be included in the optimization iteration.")
-                self._relevance_graph = None  # reset graph since we've modified it
-                return
-
             if self.comm.size > 1:
                 grad_groups = self.comm.allgather(grad_groups)
                 grad_groups = {g for grp in grad_groups for g in grp}
