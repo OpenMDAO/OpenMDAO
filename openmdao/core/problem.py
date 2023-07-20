@@ -11,7 +11,6 @@ import textwrap
 import traceback
 
 from collections import defaultdict, namedtuple
-from fnmatch import fnmatchcase
 from itertools import product
 
 from io import StringIO, TextIOBase
@@ -23,7 +22,7 @@ from openmdao.core.constants import _SetupStatus
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver, record_iteration, SaveOptResult
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.core.system import _OptStatus
+from openmdao.core.system import System, _OptStatus
 from openmdao.core.group import Group
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
@@ -46,6 +45,7 @@ from openmdao.utils.logger_utils import get_logger, TestLogger
 from openmdao.utils.hooks import _setup_hooks, _reset_all_hooks
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.array_utils import scatter_dist_to_local
+from openmdao.utils.class_util import overrides_method
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
     clear_reports, get_reports_dir, _load_report_plugins
 from openmdao.utils.general_utils import ContainsAll, pad_name, LocalRangeIterable, \
@@ -2219,39 +2219,121 @@ class Problem(object):
 
         Parameters
         ----------
-        case : Case object
-            A Case from a CaseRecorder file.
+        case : Case or dict
+            A Case from a CaseReader, or a dictionary with key 'inputs' mapped to the
+            output of problem.model.list_inputs and key 'outputs' mapped to the output
+            of prob.model.list_outputs. Both list_inputs and list_outputs should be called
+            with `prom_name=True` and `return_format='dict'`.
         """
-        inputs = case.inputs if case.inputs is not None else None
-        abs2idx = self.model._var_allprocs_abs2idx
-        if inputs:
-            meta = self.model._var_allprocs_abs2meta['input']
-            abs2prom = self.model._var_allprocs_abs2prom['input']
-            for name in inputs.absolute_names():
-                if name not in abs2prom:
-                    raise KeyError(f"{self.msginfo}: Input variable, '{name}', recorded in the "
-                                   "case is not found in the model")
-                varmeta = meta[name]
-                if varmeta['distributed'] and self.model.comm.size > 1:
-                    sizes = self.model._var_sizes['input'][:, abs2idx[name]]
-                    self[name] = scatter_dist_to_local(inputs[name], self.model.comm, sizes)
-                else:
-                    self[name] = inputs[name]
+        model = self.model
 
-        outputs = case.outputs if case.outputs is not None else None
-        if outputs:
-            meta = self.model._var_allprocs_abs2meta['output']
-            abs2prom = self.model._var_allprocs_abs2prom['output']
-            for name in outputs.absolute_names():
-                if name not in abs2prom:
-                    raise KeyError(f"{self.msginfo}: Output variable, '{name}', recorded in the "
-                                   "case is not found in the model")
-                varmeta = meta[name]
-                if varmeta['distributed'] and self.model.comm.size > 1:
-                    sizes = self.model._var_sizes['output'][:, abs2idx[name]]
-                    self[name] = scatter_dist_to_local(outputs[name], self.model.comm, sizes)
+        # if model overrides load_case, then call the overloaded method
+        if overrides_method('load_case', model, System):
+            model.load_case(case)
+            return
+
+        # find all subsystems that override the load_case method
+        system_overrides = {}
+        for subsys in model.system_iter(include_self=False, recurse=True):
+            if overrides_method('load_case', subsys, System):
+                system_overrides[subsys.pathname] = subsys
+
+        def set_later(var_name):
+            # determine if variable should be set later via an overridden load_case method
+            for pathname in system_overrides:
+                if var_name.startswith(pathname + '.'):
+                    return True
+            return False
+
+        if isinstance(case, dict):
+            # case data comes from list_inputs/list_outputs, keyed on absolute pathname
+            # we need it to be keyed on promoted name
+            if 'inputs' in case:
+                inputs = {meta['prom_name']: meta for meta in case['inputs'].values()}
+            else:
+                inputs = None
+            if 'outputs' in case:
+                outputs = {meta['prom_name']: meta for meta in case['outputs'].values()}
+            else:
+                outputs = None
+        else:
+            inputs = case.inputs
+            outputs = case.outputs
+
+        abs2idx = model._var_allprocs_abs2idx
+        prom2abs_in = model._var_allprocs_prom2abs_list['input']
+        prom2abs_out = model._var_allprocs_prom2abs_list['output']
+        abs2meta_in = model._var_allprocs_abs2meta['input']
+        abs2meta_out = model._var_allprocs_abs2meta['output']
+
+        if inputs:
+            for name in inputs:
+                if set_later(name):
+                    continue
+
+                if name in prom2abs_in:
+                    for abs_name in prom2abs_in[name]:
+                        if set_later(abs_name):
+                            continue
+
+                        if isinstance(case, dict):
+                            val = inputs[name]['val']
+                        else:
+                            # need a unique abs_name to get value from a case
+                            # if there is a matching abs_name in the case, use that value
+                            # otherwise use the value of the first matching abs_name
+                            case_abs_names = case._prom2abs['input'][name]
+                            if abs_name in case_abs_names:
+                                val = case.inputs[abs_name]
+                            else:
+                                val = case.inputs[case_abs_names[0]]
+
+                        varmeta = abs2meta_in[abs_name]
+                        if varmeta['distributed'] and model.comm.size > 1:
+                            sizes = model._var_sizes['input'][:, abs2idx[abs_name]]
+                            model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
+                        else:
+                            model.set_val(abs_name, val)
                 else:
-                    self[name] = outputs[name]
+                    issue_warning(f"{model.msginfo}: Input variable, '{name}', recorded "
+                                  "in the case is not found in the model.")
+
+        if outputs:
+            for name in outputs:
+                if set_later(name):
+                    continue
+
+                # auto_ivc output may point to a promoted input name
+                if name in prom2abs_out:
+                    prom2abs = prom2abs_out
+                    abs2meta = abs2meta_out
+                else:
+                    prom2abs = prom2abs_in
+                    abs2meta = abs2meta_in
+
+                if name in prom2abs:
+                    if isinstance(case, dict):
+                        val = outputs[name]['val']
+                    else:
+                        val = outputs[name]
+
+                    for abs_name in prom2abs[name]:
+                        if set_later(abs_name):
+                            continue
+
+                        varmeta = abs2meta[abs_name]
+                        if varmeta['distributed'] and model.comm.size > 1:
+                            sizes = model._var_sizes['output'][:, abs2idx[abs_name]]
+                            model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
+                        else:
+                            model.set_val(abs_name, val)
+                else:
+                    issue_warning(f"{model.msginfo}: Output variable, '{name}', recorded "
+                                  "in the case is not found in the model.")
+
+        # call the overridden load_case method on applicable subsystems (in top-down order)
+        for sys_name in sorted(system_overrides.keys()):
+            system_overrides[sys_name].load_case(case)
 
     def check_config(self, logger=None, checks=_default_checks, out_file='openmdao_checks.out'):
         """
