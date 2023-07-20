@@ -8,33 +8,6 @@ from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, Sel
 from openmdao.utils.testing_utils import use_tempdirs
 
 
-class IncompletePartialsComp(om.ExplicitComponent):
-    def __init__(self, size=3, **kwargs):
-        super().__init__(**kwargs)
-        self.size = size
-        self.num_nl_solves = 0
-
-    def setup(self):
-        self.add_input('x1', np.ones(self.size))
-        self.add_input('x2', np.ones(self.size))
-        self.add_output('y1', np.ones(self.size))
-        self.add_output('y2', np.ones(self.size))
-
-        self.declare_partials('y1', 'x1')
-        self.declare_partials('y2', 'x2')
-
-    def compute(self, inputs, outputs):
-        try:
-            outputs['y1'] = 2.0 * inputs['x1']
-            outputs['y2'] = 3.0 * inputs['x2']
-        finally:
-            self.num_nl_solves += 1
-
-    def compute_partials(self, inputs, partials):
-        partials['y1', 'x1'] = 2.0
-        partials['y2', 'x2'] = 3.0
-
-
 @use_tempdirs
 class TestPrePostIter(unittest.TestCase):
 
