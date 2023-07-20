@@ -566,7 +566,7 @@ class TestPrePostIter(unittest.TestCase):
         for i, iter_coord in enumerate(cr.list_cases('root.iter1', recurse=False, out_stream=None)):
             self.assertEqual(iter_coord, f'rank0:ScipyOptimize_SLSQP|{i}|root._solve_nonlinear|{i + 1}|NLRunOnce|0|iter1._solve_nonlinear|{i}')
 
-    def test_incomplets_partials(self):
+    def test_incomplete_partials(self):
         p = om.Problem()
         model = p.model
         size = 3
@@ -592,7 +592,6 @@ class TestPrePostIter(unittest.TestCase):
         model.connect('incomplete.y2', 'obj.x')
         model.connect('incomplete.y1', 'post1.x')
         model.connect('pre1.y', 'pre2.x2')
-        model.connect('post1.y', 'pre2.x1')
         model.connect('pre2.y', 'incomplete.x1')
 
         p.model.add_design_var('ivc.x', lower=-10, upper=10)
