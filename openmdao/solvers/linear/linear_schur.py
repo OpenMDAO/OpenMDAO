@@ -428,12 +428,12 @@ class LinearSchur(BlockLinearSolver):
             scope_in = self._vars_union(self._scope_in, scope_in)
             subsys1._solve_linear(mode, self._rel_systems, scope_out, scope_in)
 
-            if subsys1._iter_call_apply_linear():
-                subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
-            else:
-                b_vec.set_val(0.0)
-                # else:
-                #     system._transfer('linear', mode, subsys1.name)
+            # if subsys1._iter_call_apply_linear():
+            subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+            # else:
+            # b_vec.set_val(0.0)
+            # else:
+            #     system._transfer('linear', mode, subsys1.name)
 
             ################################
             #### End solve for subsys 1 ####
