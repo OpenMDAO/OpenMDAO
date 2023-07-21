@@ -68,7 +68,7 @@ class LinearSchur(BlockLinearSolver):
         system = self._system()
         mode = self._mode_linear
         self._update_rhs_vec()
-
+        print(self._rhs_vec[:])
         # take the subsystems
         subsys1, _ = system._subsystems_allprocs[self._groupNames[0]]
         subsys2, _ = system._subsystems_allprocs[self._groupNames[1]]
@@ -363,9 +363,9 @@ class LinearSchur(BlockLinearSolver):
             system._doutputs.set_val(outp_cache)
             system._dresiduals.set_val(resd_cache)
 
-            b_vec2.set_val(0.0)
+            # b_vec2.set_val(0.0)
 
-            system._transfer("linear", mode, subsys2.name)
+            # system._transfer("linear", mode, subsys2.name)
 
             # b_vec2 *= -1.0
             # # b_vec += subsys1_rhs
@@ -385,7 +385,7 @@ class LinearSchur(BlockLinearSolver):
             schur_rhs = subsys2_rhs - schur_rhs
 
             d_subsys2 = scipy.linalg.solve(schur_jac, schur_rhs)
-
+            print(schur_jac, schur_rhs, d_subsys2)
             scope_out, scope_in = system._get_matvec_scope(subsys2)
             scope_out = self._vars_union(self._scope_out, scope_out)
             scope_in = self._vars_union(self._scope_in, scope_in)
@@ -400,12 +400,12 @@ class LinearSchur(BlockLinearSolver):
             # subsys1._dresiduals.set_val(0.0)
             # system._apply_linear(None, None, mode, scope_out, scope_in)
 
-            if subsys2._iter_call_apply_linear():
-                subsys2._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
-            else:
-                b_vec2.set_val(0.0)
-                # else:
-                #     system._transfer('linear', mode, subsys2.name)
+            # if subsys2._iter_call_apply_linear():
+            subsys2._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+            # else:
+            #     b_vec2.set_val(0.0)
+            # else:
+            #     system._transfer('linear', mode, subsys2.name)
             ################################
             #### End solve for subsys 2 ####
             ################################
