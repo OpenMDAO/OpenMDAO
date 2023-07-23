@@ -340,25 +340,31 @@ class LinearSchur(BlockLinearSolver):
             scope_in = self._vars_union(self._scope_in, scope_in)
             subsys1._solve_linear(mode, self._rel_systems, scope_out, scope_in)
 
-            subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+            # scope_out, scope_in = system._get_matvec_scope()
+            # print("R", subsys1._dresiduals.asarray(), subsys1_rhs)
+            # system._doutputs.set_val(0.0)
+            # system._apply_linear(None, None, mode, scope_out, scope_in)
 
+            subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+            # print(system._dinputs.asarray())
+            # print(system._doutputs.asarray())
             # subsys2_output = subsys2._vectors["output"]["linear"].asarray(copy=True)
-            subsys2._vectors["output"]["linear"].set_val(0.0)
+            b_vec2.set_val(0.0)
             system._transfer("linear", mode, subsys2.name)
 
             # the same solve requires in the rhs too, so we save them
             schur_rhs = subsys2._vectors["output"]["linear"].asarray(copy=True)
-            rvec.set_val(np.zeros(len(rvec)))
-            ovec.set_val(np.zeros(len(ovec)))
-            ivec.set_val(np.zeros(len(ivec)))
-            # put back the vectors
-            rvec.set_val(r_data)
-            ovec.set_val(o_data)
-            ivec.set_val(i_data)
+            # rvec.set_val(np.zeros(len(rvec)))
+            # ovec.set_val(np.zeros(len(ovec)))
+            # ivec.set_val(np.zeros(len(ivec)))
+            # # put back the vectors
+            # rvec.set_val(r_data)
+            # ovec.set_val(o_data)
+            # ivec.set_val(i_data)
 
-            ################################
-            #### Beg solve for subsys 2 ####
-            ################################
+            # ################################
+            # #### Beg solve for subsys 2 ####
+            # ################################
             system._dinputs.set_val(inpu_cache)
             system._doutputs.set_val(outp_cache)
             system._dresiduals.set_val(resd_cache)
@@ -400,7 +406,17 @@ class LinearSchur(BlockLinearSolver):
             # system._apply_linear(None, None, mode, scope_out, scope_in)
 
             # if subsys2._iter_call_apply_linear():
+            # b_vec2.set_val(0.0)
+
+            # print(system._doutputs.asarray())
+            # print(system._dresiduals.asarray())
+            # if subsys2._iter_call_apply_linear():
             subsys2._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+            # else:
+            #     b_vec2.set_val(0.0)
+            # print(subsys2._dinputs.asarray())
+            # print(subsys2._doutputs.asarray())
+            # print(system._dresiduals.asarray())
             # else:
             #     b_vec2.set_val(0.0)
             # else:
@@ -429,7 +445,10 @@ class LinearSchur(BlockLinearSolver):
             subsys1._solve_linear(mode, self._rel_systems, scope_out, scope_in)
 
             # if subsys1._iter_call_apply_linear():
-            subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+            if subsys1._iter_call_apply_linear():
+                subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+            else:
+                b_vec.set_val(0.0)
             # else:
             # b_vec.set_val(0.0)
             # else:
