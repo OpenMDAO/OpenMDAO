@@ -951,6 +951,9 @@ def _draw_boundary_label(ax, pointer_plot_coord, s):
 
 
 def _draw_pointer_and_label(ax, pointer_plot_coord, pointer_color, value):
+    print("pointer_plot_coord", type(pointer_plot_coord))
+    print("_pointer_half_width", type(_pointer_half_width))
+    print("_pointer_height", type(_pointer_height), flush=True)
     pts = np.array([
         [pointer_plot_coord - _pointer_half_width, -_pointer_height],
         [pointer_plot_coord + _pointer_half_width, -_pointer_height],
