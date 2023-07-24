@@ -347,6 +347,25 @@ class DynShapeGroupConnectedInputs(om.Group):
 
 
 class TestDynShapes(unittest.TestCase):
+    def test_simple(self):
+        p = om.Problem()
+        indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
+        indep.add_output('x2', val=np.ones((4,2)))
+        p.model.add_subsystem('C1', DynShapeComp(2))
+        p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
+                                                  x1={'shape_by_conn': True, 'copy_shape': 'y1'},
+                                                  x2={'shape_by_conn': True, 'copy_shape': 'y2'},
+                                                  y1={'shape_by_conn': True, 'copy_shape': 'x1'},
+                                                  y2={'shape_by_conn': True, 'copy_shape': 'x2'}))
+        p.model.connect('C1.y1', 'sink.x1')
+        p.model.connect('C1.y2', 'sink.x2')
+        p.model.connect('indep.x1', 'C1.x1')
+        p.model.connect('indep.x2', 'C1.x2')
+        p.setup()
+        p.run_model()
+        np.testing.assert_allclose(p['sink.y1'], np.ones((2,3))*16)
+        np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*16)
+
     def test_baseline_series(self):
         # this is just a sized source and unsized sink, and we put a DynShapeGroupSeries in between them
         p = om.Problem()

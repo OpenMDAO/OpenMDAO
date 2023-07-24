@@ -130,7 +130,7 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
             shape = '?'
             node_colors.append('red')
         else:
-            if meta.get('shape_by_conn', False) or meta.get('copy_shape', False):
+            if meta.get('shape_by_conn', False) or meta.get('compute_shape', False):
                 node_colors.append('blue')
             else:
                 node_colors.append('green')

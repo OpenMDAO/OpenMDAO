@@ -1,6 +1,7 @@
 """Define the Component class."""
 
 import sys
+import types
 from collections import defaultdict
 from collections.abc import Iterable
 from itertools import product
@@ -206,7 +207,7 @@ class Component(System):
             # reset shape if any dynamic shape parameters are set in case this is a resetup
             # NOTE: this is necessary because we allow variables to be added in __init__.
             if 'shape_by_conn' in meta and (meta['shape_by_conn'] or
-                                            meta['copy_shape'] is not None):
+                                            meta['compute_shape'] is not None):
                 meta['shape'] = None
                 if not isscalar(meta['val']):
                     if meta['val'].size > 0:
@@ -464,7 +465,7 @@ class Component(System):
                     self._subjacs_info[abs_key]['sparsity'] = tup
 
     def add_input(self, name, val=1.0, shape=None, units=None, desc='', tags=None,
-                  shape_by_conn=False, copy_shape=None, distributed=None):
+                  shape_by_conn=False, copy_shape=None, compute_shape=None, distributed=None):
         """
         Add an input variable to the component.
 
@@ -490,6 +491,9 @@ class Component(System):
         copy_shape : str or None
             If a str, that str is the name of a variable. Shape this input to match that of
             the named variable.
+        compute_shape : function
+            A function taking a dict arg containing names and shapes of this component's outputs
+            and returning the shape of this input.
         distributed : bool
             If True, this variable is a distributed variable, so it can have different sizes/values
             across MPI processes.
@@ -519,12 +523,24 @@ class Component(System):
         if tags is not None and not isinstance(tags, (str, list)):
             raise TypeError('The tags argument should be a str or list')
 
-        if (shape_by_conn or copy_shape):
+        if copy_shape and compute_shape:
+            raise ValueError(f"{self.msginfo}: Only one of 'copy_shape' or 'compute_shape' can "
+                             "be specified.")
+
+        if copy_shape and not isinstance(copy_shape, str):
+            raise TypeError(f"{self.msginfo}: The copy_shape argument should be a str or None but "
+                            f"a '{type(copy_shape).__name__}' was given.")
+
+        if compute_shape and not isinstance(compute_shape, types.FunctionType):
+            raise TypeError(f"{self.msginfo}: The compute_shape argument should be a function but "
+                            f"a '{type(compute_shape).__name__}' was given.")
+
+        if (shape_by_conn or copy_shape or compute_shape):
             if shape is not None or ndim(val) > 0:
-                raise ValueError("%s: If shape is to be set dynamically using 'shape_by_conn' or "
-                                 "'copy_shape', 'shape' and 'val' should be a scalar, "
-                                 "but shape of '%s' and val of '%s' was given for variable '%s'."
-                                 % (self.msginfo, shape, val, name))
+                raise ValueError("%s: If shape is to be set dynamically using 'shape_by_conn', "
+                                 "'copy_shape', or 'compute_shape', 'shape' and 'val' should be a "
+                                 "scalar, but shape of '%s' and val of '%s' was given for variable"
+                                  " '%s'." % (self.msginfo, shape, val, name))
         else:
             # value, shape: based on args, making sure they are compatible
             val, shape = ensure_compatible(name, val, shape)
@@ -537,6 +553,11 @@ class Component(System):
                 distributed = False
             # using ._dict below to avoid tons of deprecation warnings
             distributed = distributed or self.options._dict['distributed']['val']
+
+        # convert copy_shape into a compute_shape function so we can handle it the same as
+        # compute_shape.
+        if copy_shape:
+            compute_shape = lambda shapes: shapes[copy_shape]
 
         metadata = {}
 
@@ -551,7 +572,7 @@ class Component(System):
             'distributed': distributed,
             'tags': make_set(tags),
             'shape_by_conn': shape_by_conn,
-            'copy_shape': copy_shape,
+            'compute_shape': compute_shape,
         })
 
         # this will get reset later if comm size is 1
@@ -633,7 +654,7 @@ class Component(System):
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,
-                   shape_by_conn=False, copy_shape=None, distributed=None):
+                   shape_by_conn=False, copy_shape=None, compute_shape=None, distributed=None):
         """
         Add an output variable to the component.
 
@@ -681,6 +702,9 @@ class Component(System):
         copy_shape : str or None
             If a str, that str is the name of a variable. Shape this output to match that of
             the named variable.
+        compute_shape : function
+            A function taking a dict arg containing names and shapes of this component's inputs
+            and returning the shape of this output.
         distributed : bool
             If True, this variable is a distributed variable, so it can have different sizes/values
             across MPI processes.
@@ -693,10 +717,10 @@ class Component(System):
         global _allowed_types
 
         # First, type check all arguments
-        if (shape_by_conn or copy_shape) and (shape is not None or ndim(val) > 0):
-            raise ValueError("%s: If shape is to be set dynamically using 'shape_by_conn' or "
-                             "'copy_shape', 'shape' and 'val' should be scalar, "
-                             "but shape of '%s' and val of '%s' was given for variable '%s'."
+        if (shape_by_conn or copy_shape or compute_shape) and (shape is not None or ndim(val) > 0):
+            raise ValueError("%s: If shape is to be set dynamically using 'shape_by_conn', "
+                             "'copy_shape', or 'compute_shape', 'shape' and 'val' should be scalar,"
+                             " but shape of '%s' and val of '%s' was given for variable '%s'."
                              % (self.msginfo, shape, val, name))
 
         if not isinstance(name, str):
@@ -775,6 +799,23 @@ class Component(System):
             # using ._dict below to avoid tons of deprecation warnings
             distributed = distributed or self.options._dict['distributed']['val']
 
+        if copy_shape and compute_shape:
+            raise ValueError(f"{self.msginfo}: Only one of 'copy_shape' or 'compute_shape' can "
+                             "be specified.")
+
+        if copy_shape and not isinstance(copy_shape, str):
+            raise TypeError(f"{self.msginfo}: The copy_shape argument should be a str or None but "
+                            f"a '{type(copy_shape).__name__}' was given.")
+
+        if compute_shape and not isinstance(compute_shape, types.FunctionType):
+            raise TypeError(f"{self.msginfo}: The compute_shape argument should be a function but "
+                            f"a '{type(compute_shape).__name__}' was given.")
+
+        # convert copy_shape into a compute_shape function so we can handle it the same as
+        # compute_shape.
+        if copy_shape:
+            compute_shape = lambda shapes: shapes[copy_shape]
+
         metadata = {}
 
         metadata.update({
@@ -792,7 +833,7 @@ class Component(System):
             'lower': lower,
             'upper': upper,
             'shape_by_conn': shape_by_conn,
-            'copy_shape': copy_shape
+            'compute_shape': compute_shape
         })
 
         # this will get reset later if comm size is 1
