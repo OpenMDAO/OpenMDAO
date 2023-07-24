@@ -305,10 +305,15 @@ class LinearSchur(BlockLinearSolver):
 
                 # we get the C[{ii},:] vector by apply_linear on the system
                 scope_out, scope_in = system._get_matvec_scope()
+                scope_out = self._vars_union(self._scope_out, scope_out)
+                scope_in = self._vars_union(self._scope_in, scope_in)
                 system._apply_linear(None, None, mode, scope_out, scope_in)
 
                 # do a solve_linear to find C[{ii},:] A^-1
-                subsys1._solve_linear(mode, ContainsAll())
+                scope_out, scope_in = system._get_matvec_scope(subsys1)
+                scope_out = self._vars_union(self._scope_out, scope_out)
+                scope_in = self._vars_union(self._scope_in, scope_in)
+                subsys1._solve_linear(mode, self._rel_systems, scope_out, scope_in)
 
                 # negate the resdiual first
                 subsys1._vectors["residual"]["linear"] *= -1.0
@@ -320,7 +325,7 @@ class LinearSchur(BlockLinearSolver):
                 system._transfer("linear", mode, subsys2.name)
 
                 # put this value into the jacobian.
-                schur_jac[ii, :] = subsys2._vectors["output"]["linear"].asarray()
+                schur_jac[:, ii] = subsys2._vectors["output"]["linear"].asarray()
 
                 # set back the seed to zero for the next vector
                 rvec[f"{subsys2.name}.{var}"] = 0.0
@@ -369,9 +374,9 @@ class LinearSchur(BlockLinearSolver):
             system._doutputs.set_val(outp_cache)
             system._dresiduals.set_val(resd_cache)
 
-            # b_vec2.set_val(0.0)
+            b_vec2.set_val(0.0)
 
-            # system._transfer("linear", mode, subsys2.name)
+            system._transfer("linear", mode, subsys2.name)
 
             # b_vec2 *= -1.0
             # # b_vec += subsys1_rhs
@@ -391,6 +396,7 @@ class LinearSchur(BlockLinearSolver):
             schur_rhs = subsys2_rhs - schur_rhs
 
             d_subsys2 = scipy.linalg.solve(schur_jac, schur_rhs)
+            print(d_subsys2, schur_jac, schur_rhs)
             scope_out, scope_in = system._get_matvec_scope(subsys2)
             scope_out = self._vars_union(self._scope_out, scope_out)
             scope_in = self._vars_union(self._scope_in, scope_in)
@@ -445,10 +451,10 @@ class LinearSchur(BlockLinearSolver):
             subsys1._solve_linear(mode, self._rel_systems, scope_out, scope_in)
 
             # if subsys1._iter_call_apply_linear():
-            if subsys1._iter_call_apply_linear():
-                subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
-            else:
-                b_vec.set_val(0.0)
+            # if subsys1._iter_call_apply_linear():
+            subsys1._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+            # else:
+            # b_vec.set_val(0.0)
             # else:
             # b_vec.set_val(0.0)
             # else:
