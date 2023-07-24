@@ -203,16 +203,15 @@ class SubmodelComp(ExplicitComponent):
 
         self.all_outputs = {}
         outputs = p.model.list_outputs(out_stream=None, prom_name=True,
-                                       units=True, shape=True, desc=True)
+                                       units=True, shape=True, desc=True,
+                                       all_procs=True)
 
         # turn outputs into dict
         for _, meta in outputs:
             self.all_outputs[meta['prom_name']] = meta
 
-        wildcard_inputs = [var for var, _ in self.submodel_inputs.items()
-                           if '*' in var]
-        wildcard_outputs = [var for var, _ in self.submodel_outputs.items()
-                            if '*' in var]
+        wildcard_inputs = [var for var in self.submodel_inputs if '*' in var]
+        wildcard_outputs = [var for var in self.submodel_outputs if '*' in var]
 
         for inp in wildcard_inputs:
             matches = find_matches(inp, list(self.boundary_inputs.keys()))
