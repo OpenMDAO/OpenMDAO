@@ -396,7 +396,7 @@ class LinearSchur(BlockLinearSolver):
             schur_rhs = subsys2_rhs - schur_rhs
 
             d_subsys2 = scipy.linalg.solve(schur_jac, schur_rhs)
-            print(d_subsys2, schur_jac, schur_rhs)
+            # print(d_subsys2, schur_jac, schur_rhs)
             scope_out, scope_in = system._get_matvec_scope(subsys2)
             scope_out = self._vars_union(self._scope_out, scope_out)
             scope_in = self._vars_union(self._scope_in, scope_in)
