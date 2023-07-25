@@ -350,8 +350,7 @@ class NonlinearSchurSolver(NonlinearSolver):
                 system._apply_linear(None, None, mode, scope_out, scope_in)
 
                 # do a solve_linear to find C[{ii},:] A^-1
-                scope_out, scope_in = system._get_matvec_scope(subsys1)
-                subsys1._solve_linear(mode, None, scope_out, scope_in)
+                subsys1._solve_linear(mode, ContainsAll())
 
                 # negate the resdiual first
                 subsys1._vectors["residual"]["linear"] *= -1.0
