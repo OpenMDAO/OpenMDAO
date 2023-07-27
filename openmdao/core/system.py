@@ -3818,7 +3818,7 @@ class System(object):
             excludes = (excludes,)
 
         gather_keys = {'val', 'src_indices'}
-        need_gather = get_remote and self.comm.size > 1
+        need_gather = get_remote and self.comm is not None and self.comm.size > 1
         if metadata_keys is not None:
             keyset = set(metadata_keys)
             diff = keyset - allowed_meta_names
@@ -4041,7 +4041,8 @@ class System(object):
         list of (name, metadata) or dict of {name: metadata}
             List or dict of input names and other optional information about those inputs.
         """
-        if (self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP) and val:
+        if (self._problem_meta is None or
+                self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP) and val:
             issue_warning("Calling `list_inputs` before `final_setup` will only "
                           "display the default values of variables and will not show the result of "
                           "any `set_val` calls.")
@@ -4089,7 +4090,10 @@ class System(object):
                         meta['max'] = np.round(np.max(meta['val']), np_precision)
 
         if not inputs or (not all_procs and self.comm.rank != 0):
-            return []
+            if return_format == 'dict':
+                return {}
+            else:
+                return []
 
         if out_stream:
             self._write_table('input', inputs, hierarchical, print_arrays, all_procs,

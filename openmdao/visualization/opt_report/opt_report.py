@@ -951,9 +951,6 @@ def _draw_boundary_label(ax, pointer_plot_coord, s):
 
 
 def _draw_pointer_and_label(ax, pointer_plot_coord, pointer_color, value):
-    print("pointer_plot_coord", type(pointer_plot_coord))
-    print("_pointer_half_width", type(_pointer_half_width))
-    print("_pointer_height", type(_pointer_height), flush=True)
     pts = np.array([
         [pointer_plot_coord - _pointer_half_width, -_pointer_height],
         [pointer_plot_coord + _pointer_half_width, -_pointer_height],
@@ -972,4 +969,6 @@ def _val_to_plot_coord(value, lower, upper):
     # and where lower maps to 1./3 and upper to 2/3
     # Used with Python's functools to make a Python function out of this
     plot_coord = 1. / 3. + (value - lower) / (upper - lower) * 1. / 3.
+    if isinstance(plot_coord, np.ndarray):
+        return plot_coord[0]
     return plot_coord

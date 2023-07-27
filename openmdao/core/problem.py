@@ -2097,9 +2097,9 @@ class Problem(object):
             The header line for the table.
         col_names : list of str
             List of column labels.
-        meta : OrderedDict
+        meta : dict
             Dictionary of metadata for each problem variable.
-        vals : OrderedDict
+        vals : dict
             Dictionary of values for each problem variable.
         print_arrays : bool, optional
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
@@ -2416,7 +2416,7 @@ class Problem(object):
 
         return reports_dirpath
 
-    def list_indep_vars(self, include_design_vars=True, options=None,
+    def list_indep_vars(self, include_design_vars=True, options=(),
                         print_arrays=False, out_stream=_DEFAULT_OUT_STREAM):
         """
         Retrieve the independent variables in the Problem.
@@ -2436,12 +2436,12 @@ class Problem(object):
             The user may provide values for these but ultimately they will
             be overwritten by the Driver.
             Default is False.
-        options : list of str or None
+        options : list of str or ()
             List of optional columns to be displayed in the independent variable table.
             Allowed values are:
-            ['name', 'units', 'shape', 'size', 'desc', 'ref', 'ref0', 'res_ref',
+            ['units', 'shape', 'size', 'desc', 'ref', 'ref0', 'res_ref',
             'distributed', 'lower', 'upper', 'tags', 'shape_by_conn', 'copy_shape',
-            'global_size', 'global_shape', 'value'].
+            'global_size', 'global_shape', 'val'].
         print_arrays : bool, optional
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
             The norm is surrounded by vertical bars to indicate that it is a norm.
@@ -2466,11 +2466,13 @@ class Problem(object):
                                                   use_prom_ivc=True,
                                                   get_sizes=False).keys()
 
-        problem_indep_vars = []
+        problem_indep_vars = {}
         indep_var_names = set()
 
-        default_col_names = ['name', 'units', 'val']
-        col_names = default_col_names + ([] if options is None else options)
+        col_names = ['name', 'units', 'val']
+        for opt in options:
+            if opt not in col_names:
+                col_names.append(opt)
 
         abs2meta = model._var_allprocs_abs2meta['output']
         prom2abs = self.model._var_allprocs_prom2abs_list['input']
@@ -2486,15 +2488,15 @@ class Problem(object):
 
             if (include_design_vars or name not in desvar_prom_names) \
                     and name not in indep_var_names:
-                problem_indep_vars.append((name, meta))
+                problem_indep_vars[name] = meta
                 indep_var_names.add(name)
 
         if out_stream is not None:
             header = f'Problem {self._name} Independent Variables'
             if problem_indep_vars:
-                meta = {key: meta for key, meta in problem_indep_vars}
-                vals = {key: self.get_val(key) for key in meta}
-                self._write_var_info_table(header, col_names, meta, vals, print_arrays=print_arrays,
+                vals = {key: self.get_val(key) for key in problem_indep_vars}
+                self._write_var_info_table(header, col_names, problem_indep_vars, vals,
+                                           print_arrays=print_arrays,
                                            show_promoted_name=True, col_spacing=1,
                                            out_stream=out_stream)
             else:
