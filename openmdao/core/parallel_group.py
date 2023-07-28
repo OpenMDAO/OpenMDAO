@@ -66,7 +66,7 @@ class ParallelGroup(Group):
         else:
             yield from super()._ordered_comp_name_iter()
 
-    def comm_info_iter(self, parent_comm_size=None, show_changed_only=True):
+    def comm_info_iter(self):
         """
         Yield comm size and rank for this system and all subsystems.
 
@@ -76,19 +76,7 @@ class ParallelGroup(Group):
             A tuple of the form (abs_name, comm_size).
         """
         if self.comm.size > 1:
-            if show_changed_only:
-                mysub = self._subsystems_myproc[0] if self._subsystems_myproc else False
-                if (mysub and mysub.comm.rank == 0 and (mysub._full_comm is None or
-                                                        mysub._full_comm.rank == 0)):
-                    myinfo = list(super().comm_info_iter(parent_comm_size, show_changed_only))
-                else:
-                    for _ in super().comm_info_iter(parent_comm_size, show_changed_only):
-                        pass  # need to do this to prevent hanging at lower levels
-                    myinfo = []
-            else:
-                myinfo = list(super().comm_info_iter(parent_comm_size, show_changed_only))
-
-            for info in self.comm.allgather(myinfo):
+            for info in self.comm.allgather(list(super().comm_info_iter())):
                 yield from info
         else:
-            yield from super().comm_info_iter(parent_comm_size, show_changed_only)
+            yield from super().comm_info_iter()

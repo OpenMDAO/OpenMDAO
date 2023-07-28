@@ -568,7 +568,7 @@ def comm_info(system, outfile=None, verbose=False, table_format='box_grid'):
     """
     if MPI and MPI.COMM_WORLD.size > 1:
         dct = {}
-        for path, csize, rank, wrank in system.comm_info_iter(show_changed_only=False):
+        for path, csize, rank, wrank in system.comm_info_iter():
             if path not in dct:
                 dct[path] = [csize, wrank, wrank]
             else:
@@ -621,8 +621,10 @@ def comm_info(system, outfile=None, verbose=False, table_format='box_grid'):
                 col_meta[0]['max_width'] = 5
                 col_meta[1]['max_width'] = 15
 
-            generate_table(table_data, headers=headers, column_meta=col_meta,
-                            tablefmt=table_format).display(outfile=outfile)
+            outf = generate_table(table_data, headers=headers, column_meta=col_meta,
+                                  tablefmt=table_format).display(outfile=outfile)
+            if outf is not None and MPI.COMM_WORLD.rank == 0:
+                print(f"comm info table written to {outf}")
     else:
         if outfile is None:
             print("No MPI process info available.")
