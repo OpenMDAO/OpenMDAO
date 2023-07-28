@@ -81,6 +81,9 @@ CITATION = """@article{openmdao_2019,
 # Also handles sub problems
 _problem_names = []
 
+# Used to keep track of the current Problem tree if there are any subproblems
+_prob_setup_stack = []
+
 
 def _clear_problem_names():
     global _problem_names
@@ -942,6 +945,7 @@ class Problem(object):
         # this metadata will be shared by all Systems/Solvers in the system tree
         self._metadata = {
             'name': self._name,  # the name of this Problem
+            'pathname': None,  # the pathname of this Problem in the tree of Problems
             'comm': comm,
             'coloring_dir': self.options['coloring_dir'],  # directory for coloring files
             'recording_iter': _RecIteration(comm.rank),  # manager of recorder iterations
@@ -979,7 +983,18 @@ class Problem(object):
             'opt_status': None,  # Tells Systems if they are in an optimization loop
             'model_options': self.model_options  # A dict of options passed to all systems in tree
         }
-        model._setup(model_comm, mode, self._metadata)
+
+        if _prob_setup_stack:
+            self._metadata['pathname'] = _prob_setup_stack[-1]._metadata['pathname'] + '.' + \
+                self._name
+        else:
+            self._metadata['pathname'] = self._name
+
+        _prob_setup_stack.append(self)
+        try:
+            model._setup(model_comm, mode, self._metadata)
+        finally:
+            _prob_setup_stack.pop()
 
         # set static mode back to True in all systems in this Problem
         self._metadata['static_mode'] = True

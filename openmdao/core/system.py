@@ -15,7 +15,6 @@ from fnmatch import fnmatchcase
 from numbers import Integral
 
 import numpy as np
-import networkx as nx
 
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE, INF_BOUND, \
     _SetupStatus
@@ -6149,3 +6148,18 @@ class System(object):
             with `prom_name=True` and `return_format='dict'`.
         """
         pass
+
+    def comm_info_iter(self):
+        """
+        Yield comm size for this system and all subsystems.
+
+        Yields
+        ------
+        tuple
+            A tuple of the form (abs_name, comm_size).
+        """
+        if MPI:
+            yield (self.pathname, self.comm.size, self.comm.rank, MPI.COMM_WORLD.rank)
+
+            for s in self._subsystems_myproc:
+                yield from s.comm_info_iter()

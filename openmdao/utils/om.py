@@ -43,13 +43,12 @@ from openmdao.components.meta_model_semi_structured_comp import MetaModelSemiStr
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
 from openmdao.core.component import Component
-from openmdao.devtools.debug import config_summary, tree
+from openmdao.devtools.debug import config_summary, tree, comm_info
 from openmdao.devtools.itrace import _itrace_exec, _itrace_setup_parser
 from openmdao.devtools.iprofile_app.iprofile_app import _iprof_exec, _iprof_setup_parser
 from openmdao.devtools.iprofile import _iprof_totals_exec, _iprof_totals_setup_parser
 from openmdao.devtools.iprof_mem import _mem_prof_exec, _mem_prof_setup_parser, \
     _mempost_exec, _mempost_setup_parser
-from openmdao.devtools.iprof_utils import _Options
 from openmdao.error_checking.check_config import _check_config_cmd, _check_config_setup_parser
 from openmdao.utils.mpi import MPI
 from openmdao.utils.find_cite import print_citations
@@ -465,6 +464,65 @@ def _get_deps(dep_dict: dict, package_name: str) -> None:
             pass
 
 
+def _comm_info_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao comm_info' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('-o', default=None, action='store', dest='outfile',
+                        help='Name of output file.  By default, output goes to stdout.')
+    parser.add_argument('-p', '--problem', action='store', dest='problem', help='Problem name')
+    parser.add_argument('-v', '--verbose', action='store_true', dest='verbose',
+                        help="If True, display comm size and rank range for all Systems. "
+                             "Otherwise, display only Systems having a comm size different from "
+                             "their parent system.")
+    parser.add_argument('--format', action='store', dest='table_format', default='simple_grid',
+                        help='Table format.  All formats compatible with the generate_table '
+                             'function are available.')
+
+
+def _comm_info_cmd(options, user_args):
+    """
+    Run the `openmdao comm_info` command.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+    user_args : list of str
+        Args to be passed to the user script.
+    """
+    def _comm_info(model):
+        if options.problem:
+            if model._problem_meta['name'] != options.problem and \
+                    model._problem_meta['pathname'] != options.problem:
+                return
+        elif '.' in model._problem_meta['pathname']:
+            # by default, only display comm info for a top level problem
+            return
+
+        comm_info(model, outfile=options.outfile, verbose=options.verbose,
+                  table_format=options.table_format)
+
+        exit()
+
+    def _set_dyn_hook(prob):
+        # set the _comm_info hook to be called right after _setup_procs on the model
+        prob.model.pathname = ''
+        hooks._register_hook('_setup_procs', class_name='Group', inst_id='', post=_comm_info)
+        hooks._setup_hooks(prob.model)
+
+    # register the hook to be called right after setup on the problem
+    hooks._register_hook('setup', 'Problem', pre=_set_dyn_hook, ncalls=1)
+
+    _load_and_exec(options.file[0], user_args)
+
+
 # this dict should contain names mapped to tuples of the form:
 #   (setup_parser_func, executor, description)
 _command_map = {
@@ -474,6 +532,8 @@ _command_map = {
     'check': (_check_config_setup_parser, _check_config_cmd,
               'Perform a number of configuration checks on the problem.'),
     'cite': (_cite_setup_parser, _cite_cmd, 'Print citations referenced by the problem.'),
+    'comm_info': (_comm_info_setup_parser, _comm_info_cmd,
+                  'Print MPI communicator info for systems.'),
     'compute_entry_points': (_compute_entry_points_setup_parser, _compute_entry_points_exec,
                              'Compute entry point declarations to add to the setup.py file.'),
     'find_plugins': (_find_plugins_setup_parser, _find_plugins_exec,
