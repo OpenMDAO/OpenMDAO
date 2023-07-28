@@ -6145,3 +6145,18 @@ class System(object):
             with `prom_name=True` and `return_format='dict'`.
         """
         pass
+
+    def comm_info_iter(self, parent_comm_size=None, show_changed_only=True):
+        """
+        Yield comm size for this system and all subsystems.
+
+        Yields
+        ------
+        tuple
+            A tuple of the form (abs_name, comm_size).
+        """
+        if parent_comm_size is None or parent_comm_size != self.comm.size or not show_changed_only:
+            yield (self.pathname, self.comm.size, self.comm.rank, self._problem_meta['comm'].rank)
+
+        for s in self._subsystems_myproc:
+            yield from s.comm_info_iter(self.comm.size, show_changed_only)

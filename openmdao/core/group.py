@@ -4558,3 +4558,4 @@ class Group(System):
             The model options metadata provided by the associated Problem object.
         """
         return self._problem_meta['model_options']
+

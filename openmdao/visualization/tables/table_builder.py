@@ -12,6 +12,7 @@ from html import escape
 from dataclasses import dataclass
 from numbers import Number, Integral
 from openmdao.utils.notebook_utils import notebook, display, HTML, IFrame, colab
+from openmdao.utils.om_warnings import issue_warning
 
 
 _align2symbol = {
@@ -1479,6 +1480,12 @@ class TabulatorJSBuilder(TableBuilder):
     def _setup_fit_columns_layout(self):
         smeta = self.sorted_meta()
         maxws = [m['max_width'] for m in smeta]
+        if None in maxws:
+            issue_warning("Can't use 'layout' of 'fitColumns' with columns that have no "
+                          "max_width set. Switching to layout of 'fitDataTable'.")
+            self._table_meta['layout'] = 'fitDataTable'
+            return
+
         mx = sum(maxws)
         pcts = [int(w / mx * 100) for w in maxws]
         rempcts = 100 - sum(pcts)
