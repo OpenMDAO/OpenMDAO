@@ -37,12 +37,14 @@ class SubmodelComp(ExplicitComponent):
     ----------
     _subprob : <Problem>
         Instantiated problem used to run the model.
-    submodel_inputs : list of tuple
-        List of inputs requested by user to be used as inputs in the
-        subproblem's system.
-    submodel_outputs : list of tuple
-        List of outputs requested by user to be used as outputs in the
-        subproblem's system.
+    submodel_inputs : dict
+        Inputs to be used as inputs in the subproblem's system.
+    submodel_outputs : dict
+        Outputs to be used as outputs in the subproblem's system.
+    _static_submodel_inputs : dict
+        Inputs passed into __init__ to be used as inputs in the subproblem's system.
+    _static_submodel_outputs : dict
+        Outputs passed into __init__ to be used as outputs in the subproblem's system.
     """
 
     def __init__(self, problem, inputs=None, outputs=None, reports=False, **kwargs):
@@ -209,7 +211,7 @@ class SubmodelComp(ExplicitComponent):
         # because list_indep_vars doesn't have prom_name as part of its meta data
         # TODO some of this might not be necessary... need to revisit
         self.boundary_inputs = {}
-        for name, meta in p.list_indep_vars(out_stream=None).items():
+        for name, meta in p.list_indep_vars(out_stream=None):
             if name in p.model._var_abs2prom['input']:
                 meta['prom_name'] = p.model._var_abs2prom['input'][name]
             elif name in p.model._var_abs2prom['output']:
