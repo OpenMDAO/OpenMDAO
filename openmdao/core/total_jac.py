@@ -1242,6 +1242,8 @@ class _TotalJacInfo(object):
                 if vnames is not None:
                     vec_names.add(vnames[0])
 
+        print(self.comm.rank, 'invec', mode, self.input_vec[mode]._data)
+        
         if vec_names:
             return all_rel_systems, sorted(vec_names), (inds[0], mode)
         else:
@@ -1308,6 +1310,7 @@ class _TotalJacInfo(object):
         if mode == 'fwd':
             self.J[jac_idxs, i] = deriv_val[deriv_idxs]
         else:  # rev
+            print(f'J[{i}, {jac_idxs}] = {deriv_val}   [{deriv_idxs}]')
             self.J[i, jac_idxs] = deriv_val[deriv_idxs]
 
     def _jac_setter_dist(self, i, mode):
@@ -2035,9 +2038,8 @@ def _fix_pdc_lengths(idx_iter_dict):
         Dict of a name/color mapped to indexing information.
     """
     for imeta, _ in idx_iter_dict.values():
-        par_deriv_color = imeta['par_deriv_color']
-        range_list = imeta['idx_list']
-        if par_deriv_color:
+        if imeta['par_deriv_color']:
+            range_list = imeta['idx_list']
             lens = np.array([end - start for start, end in range_list])
             maxlen = np.max(lens)
             diffs = lens - maxlen

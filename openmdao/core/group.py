@@ -2685,6 +2685,8 @@ class Group(System):
                 self._discrete_transfer(sub)
             return
 
+        print(self.pathname, "transfer to", sub)
+        
         vec_inputs = self._vectors['input'][vec_name]
 
         if mode == 'fwd':
