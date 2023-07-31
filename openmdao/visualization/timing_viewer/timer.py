@@ -55,8 +55,8 @@ def _timing_file_iter(timing_file):
 def _get_par_child_info(timing_iter, method):
     # puts timing info for direct children of parallel groups into a dict.
     parents = {}
-    for rank, probname, classname, sysname, level, parallel, nprocs, func, ncalls, avg, tmin, tmax,\
-            ttot, tot_time in timing_iter:
+    for rank, probname, classname, sysname, level, parallel, nprocs, func, ncalls, avg, \
+            tmin, tmax, ttot, tot_time in timing_iter:
         if not parallel or method != func:
             continue
 
