@@ -2778,7 +2778,6 @@ class TestPyoptSparse(unittest.TestCase):
 
         # run driver and save history
         prob = ParaboloidProblem()
-
         driver = prob.driver = pyOptSparseDriver(print_results=False)
 
         msg = "The 'hist_file' attribute is deprecated. Use the 'hist_file' option instead."
