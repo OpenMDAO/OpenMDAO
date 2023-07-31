@@ -306,7 +306,6 @@ class pyOptSparseDriver(Driver):
                          "Use the 'hotstart_file' option instead.")
         self.options['hotstart_file'] = file_name
 
-
     def _setup_driver(self, problem):
         """
         Prepare the driver for execution.
