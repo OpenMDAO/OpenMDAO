@@ -1243,7 +1243,7 @@ class _TotalJacInfo(object):
                     vec_names.add(vnames[0])
 
         print(self.comm.rank, 'invec', mode, self.input_vec[mode]._data)
-        
+
         if vec_names:
             return all_rel_systems, sorted(vec_names), (inds[0], mode)
         else:

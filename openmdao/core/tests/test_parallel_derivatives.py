@@ -434,6 +434,64 @@ class IndicesTestCase2(unittest.TestCase):
         assert_near_equal(J['G1.par2.c5.y', 'G1.par2.p.x'][0], np.array([20., 25.]), 1e-6)
         assert_near_equal(J['G1.par1.c4.y', 'G1.par1.p.x'][0], np.array([8., 0.]), 1e-6)
 
+    def test_src_indices_rev(self):
+        class DummyComp(om.ExplicitComponent):
+            def initialize(self):
+                self.options.declare('a',default=0.)
+                self.options.declare('b',default=0.)
+
+            def setup(self):
+                self.add_input('x')
+                self.add_output('y', 0.)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = self.options['a']*inputs['x'] + self.options['b']
+
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                if mode=='rev':
+                    if 'y' in d_outputs:
+                        if 'x' in d_inputs:
+                            d_inputs['x'] += self.options['a'] * d_outputs['y']
+                            print(self.pathname, 'compute_jvp: dinputs[x]', d_inputs['x'])
+                else:
+                    raise RuntimeError("fwd mode not supported")
+
+        class DummyGroup(om.ParallelGroup):
+            def setup(self):
+                self.add_subsystem('C1',DummyComp(a=1,b=2.))
+                self.add_subsystem('C2',DummyComp(a=3.,b=4.))
+
+        class Top(om.Group):
+            def setup(self):
+                self.add_subsystem('dvs',om.IndepVarComp(), promotes=['*'])
+                #if self.comm.rank == 0:
+                    #self.dvs.add_output('x', [1.], distributed=True)
+                #else:
+                    #self.dvs.add_output('x', [2.], distributed=True)
+
+                self.dvs.add_output('x',[1.,2.])
+                self.add_subsystem('par',DummyGroup())
+                self.connect('x','par.C1.x',src_indices=[0])
+                self.connect('x','par.C2.x',src_indices=[1])
+
+        prob = om.Problem(model=Top())
+        prob.model.add_design_var('x',lower=0.,upper=1.)
+
+        # None or string
+        deriv_color = 'deriv_color'
+
+        # compute derivatives for made-up y constraints in parallel
+        prob.model.add_constraint('par.C1.y',
+                                lower=1.0,
+                                parallel_deriv_color=deriv_color)
+        prob.model.add_constraint('par.C2.y',
+                                lower=1.0,
+                                parallel_deriv_color=deriv_color)
+
+        prob.setup(mode='rev')
+        prob.run_model()
+        assert_check_totals(prob.check_totals())
+
 
 class SumComp(om.ExplicitComponent):
     def __init__(self, size):
