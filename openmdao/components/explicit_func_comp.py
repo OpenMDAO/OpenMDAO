@@ -15,7 +15,6 @@ try:
     import jax
     from jax import jit
     import jax.numpy as jnp
-    from jax.numpy import DeviceArray
     from jax.config import config
     config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
 except Exception:
@@ -23,6 +22,12 @@ except Exception:
     if not isinstance(err, ImportError):
         traceback.print_tb(tb)
     jax = None
+
+if jax:
+    try:
+        from jax.numpy import DeviceArray as JaxArray
+    except ImportError:
+        from jax import Array as JaxArray
 
 
 class ExplicitFuncComp(ExplicitComponent):
@@ -103,7 +108,7 @@ class ExplicitFuncComp(ExplicitComponent):
             else:
                 kwargs = omf._filter_dict(meta, omf._allowed_add_input_args)
                 if use_jax:
-                    # make sure internal openmdao values are numpy arrays and not DeviceArrays
+                    # make sure internal openmdao values are numpy arrays and not jax Arrays
                     self._dev_arrays_to_np_arrays(kwargs)
                 self.add_input(name, **kwargs)
 
@@ -111,13 +116,13 @@ class ExplicitFuncComp(ExplicitComponent):
             _check_var_name(self, name)
             kwargs = _copy_with_ignore(meta, omf._allowed_add_output_args, ignore=('resid',))
             if use_jax:
-                # make sure internal openmdao values are numpy arrays and not DeviceArrays
+                # make sure internal openmdao values are numpy arrays and not jax Arrays
                 self._dev_arrays_to_np_arrays(kwargs)
             self.add_output(name, **kwargs)
 
     def _dev_arrays_to_np_arrays(self, meta):
         if 'val' in meta:
-            if isinstance(meta['val'], DeviceArray):
+            if isinstance(meta['val'], JaxArray):
                 meta['val'] = np.asarray(meta['val'])
 
     def _linearize(self, jac=None, sub_do_ln=False):
