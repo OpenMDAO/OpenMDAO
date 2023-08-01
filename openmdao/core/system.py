@@ -2369,7 +2369,7 @@ class System(object):
                                            f"'{tup[0]}' because '{name}' has already been promoted "
                                            f"as '{old_key}'.")
 
-                if old_using != "'*'" and new_using != "'*'":
+                if old_using != "'*'" and new_using != "'*'" and old_using != new_using:
                     msg = f"{io} variable '{name}', promoted using {new_using}, " \
                           f"was already promoted using {old_using}."
                     issue_warning(msg, prefix=self.msginfo, category=PromotionWarning)
