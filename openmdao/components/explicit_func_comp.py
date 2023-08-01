@@ -15,6 +15,7 @@ try:
     import jax
     from jax import jit
     import jax.numpy as jnp
+    from jax import Array as JaxArray
     from jax.config import config
     config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
 except Exception:
@@ -22,12 +23,6 @@ except Exception:
     if not isinstance(err, ImportError):
         traceback.print_tb(tb)
     jax = None
-
-if jax:
-    try:
-        from jax.numpy import DeviceArray as JaxArray
-    except ImportError:
-        from jax import Array as JaxArray
 
 
 class ExplicitFuncComp(ExplicitComponent):
