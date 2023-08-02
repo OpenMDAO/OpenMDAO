@@ -75,7 +75,7 @@ class ExplicitFuncComp(ExplicitComponent):
         if self.options['use_jax']:
             if jax is None:
                 raise RuntimeError(f"{self.msginfo}: jax is not installed. "
-                                   "Try 'pip install openmdao[jax]'.")
+                                   "Try 'pip install openmdao[jax]' with Python>=3.8.")
             self._compute_jax = omf.jax_decorate(self._compute._f)
 
         self._tangents = None
