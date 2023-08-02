@@ -2,6 +2,7 @@
 
 import copy
 import unittest
+import os.path
 
 from packaging.version import Version
 
@@ -10,11 +11,13 @@ import numpy as np
 import openmdao.api as om
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.test_suite.components.paraboloid_problem import ParaboloidProblem
 from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
 from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
-from openmdao.utils.testing_utils import use_tempdirs, require_pyoptsparse, set_env_vars_context
+from openmdao.utils.testing_utils import use_tempdirs, require_pyoptsparse
+from openmdao.utils.om_warnings import OMDeprecationWarning
 from openmdao.utils.mpi import MPI
 
 
@@ -2749,6 +2752,64 @@ class TestPyoptSparse(unittest.TestCase):
         assert_near_equal(J[('ALIAS_TEST', 'exec.a')].flatten(), np.array([1.]))
         assert_near_equal(p.get_val('exec.z')[0], 25, tolerance=1e-4)
         assert_near_equal(p.get_val('exec.z')[50], -75, tolerance=1e-4)
+
+    def test_hist_file_hotstart(self):
+        filename = "hist_file"
+
+        # run driver and save history
+        prob = ParaboloidProblem()
+        prob.driver = pyOptSparseDriver(print_results=False, hist_file=filename)
+
+        prob.setup()
+        prob.run_driver()
+
+        self.assertTrue(prob.driver.iter_count > 1)
+        self.assertTrue(os.path.exists(filename))
+
+        # run driver and restart from history
+        prob = ParaboloidProblem()
+        prob.driver = pyOptSparseDriver(print_results=False, hotstart_file=filename)
+
+        prob.setup()
+        prob.run_driver()
+
+        self.assertEqual(prob.driver.iter_count, 1)
+
+    def test_hist_file_hotstart_deprecated(self):
+        filename = "hist_file"
+
+        # run driver and save history
+        prob = ParaboloidProblem()
+        driver = prob.driver = pyOptSparseDriver(print_results=False)
+
+        msg = "The 'hist_file' attribute is deprecated. Use the 'hist_file' option instead."
+        with assert_warning(OMDeprecationWarning, msg):
+            driver.hist_file = filename
+        with assert_warning(OMDeprecationWarning, msg):
+            driver.hist_file
+        self.assertEqual(driver.options['hist_file'], filename)
+
+        prob.setup()
+        prob.run_driver()
+
+        self.assertTrue(driver.iter_count > 1)
+        self.assertTrue(os.path.exists(filename))
+
+        # run driver and restart from history
+        prob = ParaboloidProblem()
+        driver = prob.driver = pyOptSparseDriver(print_results=False)
+
+        msg = "The 'hotstart_file' attribute is deprecated. Use the 'hotstart_file' option instead."
+        with assert_warning(OMDeprecationWarning, msg):
+            driver.hotstart_file = filename
+        with assert_warning(OMDeprecationWarning, msg):
+            driver.hotstart_file
+        self.assertEqual(driver.options['hotstart_file'], filename)
+
+        prob.setup()
+        prob.run_driver()
+
+        self.assertEqual(driver.iter_count, 1)
 
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
