@@ -280,7 +280,7 @@ class OMWrappedFunc(object):
         jaxerr = False
         if 'method' in kwargs and kwargs['method'] == 'jax':
             if jax is None:
-                raise RuntimeError("jax is not installed.  Try 'pip install jax'.")
+                raise RuntimeError("jax is not installed.  Try 'pip install openmdao[jax]'.")
             if self._declare_partials and not self._use_jax:
                 jaxerr = True
             self._use_jax = True
@@ -317,7 +317,7 @@ class OMWrappedFunc(object):
             self._declare_coloring['wrt'] = wrt
             if 'method' in kwargs and kwargs['method'] == 'jax':
                 if jax is None:
-                    raise RuntimeError("jax is not installed. Try 'pip install jax'.")
+                    raise RuntimeError("jax is not installed.  Try 'pip install openmdao[jax]'.")
                 self._use_jax = True
             return self
         raise RuntimeError("declare_coloring has already been called.")

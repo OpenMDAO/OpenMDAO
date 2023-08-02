@@ -82,7 +82,7 @@ jobs:
             PYOPTSPARSE: 'v1.2'
             SNOPT: '7.2'
             OPTIONAL: '[all]'
-            JAX: '0.3.0'
+            JAX: '0.4.0'
             TESTS: true
 
           # build docs (baseline versions)

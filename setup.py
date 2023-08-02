@@ -25,6 +25,10 @@ optional_dependencies = {
     'doe': [
         'pyDOE2'
     ],
+    'jax': [
+        'jax>4.0',
+        'jaxlib>4.0'
+    ],
     'notebooks': [
         'notebook',
         'ipympl'

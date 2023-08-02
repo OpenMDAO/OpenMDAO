@@ -28,7 +28,9 @@ if jax is not None:
         from jax import Array as JaxArray
     except ImportError:
         # versions of jax before 0.3.18 do not have the jax.Array base class
-        from jax.numpy import DeviceArray as JaxArray
+        raise RuntimeError(f"An unsupported version of jax is installed. "
+                           "OpenMDAO requires 'jax>=4.0' and 'jaxlib>=4.0'. "
+                           "Try 'pip install openmdao[jax]'.")
 
 
 class ExplicitFuncComp(ExplicitComponent):
@@ -72,7 +74,8 @@ class ExplicitFuncComp(ExplicitComponent):
 
         if self.options['use_jax']:
             if jax is None:
-                raise RuntimeError(f"{self.msginfo}: jax is not installed. Try 'pip install jax'.")
+                raise RuntimeError(f"{self.msginfo}: jax is not installed. "
+                                   "Try 'pip install openmdao[jax]'.")
             self._compute_jax = omf.jax_decorate(self._compute._f)
 
         self._tangents = None
