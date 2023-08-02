@@ -26,8 +26,8 @@ optional_dependencies = {
         'pyDOE2'
     ],
     'jax': [
-        'jax>=0.4.0',
-        'jaxlib>=0.4.0'
+        'jax>=0.4.0; python_version>="3.8"',
+        'jaxlib>=0.4.0; python_version>="3.8"'
     ],
     'notebooks': [
         'notebook',

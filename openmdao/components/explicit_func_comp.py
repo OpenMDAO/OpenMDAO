@@ -30,7 +30,7 @@ if jax is not None:
         # versions of jax before 0.3.18 do not have the jax.Array base class
         raise RuntimeError(f"An unsupported version of jax is installed. "
                            "OpenMDAO requires 'jax>=4.0' and 'jaxlib>=4.0'. "
-                           "Try 'pip install openmdao[jax]'.")
+                           "Try 'pip install openmdao[jax]' with Python>=3.8.")
 
 
 class ExplicitFuncComp(ExplicitComponent):
