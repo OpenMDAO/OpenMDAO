@@ -34,7 +34,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, \
-    DerivativesWarning, PromotionWarning, UnusedOptionWarning
+    DerivativesWarning, PromotionWarning, UnusedOptionWarning, UnitsWarning
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, \
     ensure_compatible, env_truthy, make_traceback, _is_slicer_op
@@ -5154,8 +5154,13 @@ class System(object):
                     if sunits is not None:
                         if gunits is not None and gunits != tunits:
                             value = model.convert_from_units(src, value, gunits)
-                        else:
+                        elif tunits is not None:
                             value = model.convert_from_units(src, value, tunits)
+                        else:
+                            msg = f"A value with no units has been specified for input " + \
+                                  f"'{name}', but the source ('{src}') has units '{sunits}'. " + \
+                                  f"No unit checking can be done."
+                            issue_warning(msg, prefix=self.msginfo, category=UnitsWarning)
                 else:
                     if gunits is None:
                         ivalue = model.convert_from_units(abs_name, value, units)
@@ -6124,3 +6129,19 @@ class System(object):
 
         # return regular dict sorted by system pathname
         return {spath: data for spath, data in sorted(sys_prom_map.items(), key=lambda x: x[0])}
+
+    def load_case(self, case):
+        """
+        Pull all input and output variables from a Case into this System.
+
+        Override this method if the System requires special handling when loading a case.
+
+        Parameters
+        ----------
+        case : Case or dict
+            A Case from a CaseReader, or a dictionary with key 'inputs' mapped to the
+            output of problem.model.list_inputs and key 'outputs' mapped to the output
+            of prob.model.list_outputs. Both list_inputs and list_outputs should be called
+            with `prom_name=True` and `return_format='dict'`.
+        """
+        pass

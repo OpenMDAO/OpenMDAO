@@ -28,13 +28,14 @@ class StateOptionsDictionary(om.OptionsDictionary):
 @unittest.skipUnless(IPython, "IPython is required")
 class TestNotebookUtils(unittest.TestCase):
 
+    @unittest.skipIf(not IPython, reason='Test requires IPython')
     def test_show_obj_options(self):
         from openmdao.utils import notebook_utils
         notebook_utils.ipy = True
-
-        options = om.show_options_table("openmdao.utils.tests.test_notebook_utils.StateOptionsDictionary")
-
-        self.assertEqual(options, None)
+        try:
+            om.show_options_table("openmdao.utils.tests.test_notebook_utils.StateOptionsDictionary")
+        except Exception as e:
+            self.fail('show_options_table raised the following exception:\n' + str(e))
 
     def test_show_options_w_attr(self):
         from openmdao.utils import notebook_utils

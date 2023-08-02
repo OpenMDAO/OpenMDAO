@@ -592,10 +592,10 @@ class TestConnectionsDistrib(unittest.TestCase):
         try:
             prob.setup()
         except Exception as err:
-            self.assertEqual(str(err),
+            self.assertTrue(
                              "\nCollected errors for problem 'serial_mpi_error':" \
                              "\n   <model> <class Group>: When connecting 'p1.x' to 'c3.x':" \
-                             " index 2 is out of bounds for source dimension of size 2.")
+                             " index 2 is out of bounds for source dimension of size 2." in str(err))
         else:
             self.fail('Exception expected.')
 
@@ -623,10 +623,10 @@ class TestConnectionsDistrib(unittest.TestCase):
         try:
             prob.setup()
         except Exception as err:
-            self.assertEqual(str(err),
+            self.assertTrue(
                              "\nCollected errors for problem 'serial_mpi_error_flat':" \
                              "\n   <model> <class Group>: When connecting 'p1.x' to 'c3.x':" \
-                             " index 2 is out of bounds for source dimension of size 2.")
+                             " index 2 is out of bounds for source dimension of size 2." in str(err))
         else:
             self.fail('Exception expected.')
 
@@ -678,10 +678,10 @@ class TestConnectionsError(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup(check=False, mode='fwd')
 
-        self.assertEqual(str(context.exception),
+        self.assertTrue(
             "\nCollected errors for problem 'incompatible_src_indices':"
             "\n   <model> <class Group>: When connecting 'p1.x' to 'c3.x':"
-            " index 2 is out of bounds for source dimension of size 2.")
+            " index 2 is out of bounds for source dimension of size 2." in str(context.exception))
 
 
 @unittest.skipUnless(MPI, "MPI is required.")

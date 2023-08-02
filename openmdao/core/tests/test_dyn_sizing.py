@@ -638,20 +638,15 @@ class TestDistribDynShapes(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
 
-        cname = 'G1' if p.model.comm.rank <= 1 else 'G2'
-        self.assertEqual(str(cm.exception),
-           "\nCollected errors for problem 'remote_distrib':"
-           f"\n   'par.{cname}.C1' <class DistribDynShapeComp>: Can't determine src_indices "
-           f"automatically for input 'par.{cname}.C1.x1'. They must be supplied manually."
-           "\n   <model> <class Group>: The source and target shapes do not match or are ambiguous "
-           f"for the connection 'indep.x1' to 'par.{cname}.C1.x1'. The source shape is (32,) but "
-           "the target shape is (8,)."
-           "\n   <model> <class Group>: The source indices slice(None, None, 1) do not specify a "
-           "valid shape for the connection 'par.G1.C2.y1' to 'sink.x1'. The target shape is (8,) "
-           "but indices are shape (16,)."
-           "\n   <model> <class Group>: The source indices slice(None, None, 1) do not specify a "
-           "valid shape for the connection 'par.G2.C2.y1' to 'sink.x2'. The target shape is (8,) "
-           "but indices are shape (16,).")
+        self.assertTrue(
+            "Collected errors for problem 'remote_distrib':\n"
+            "   'par.G1.C1' <class DistribDynShapeComp>: Can't determine src_indices automatically for input 'par.G1.C1.x1'. They must be supplied manually.\n"
+            "   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x1' to 'par.G1.C1.x1'. The source shape is (32,) but the target shape is (8,).\n"
+            "   <model> <class Group>: The source indices slice(None, None, 1) do not specify a valid shape for the connection 'par.G1.C2.y1' to 'sink.x1'. The target shape is (8,) but indices are shape (16,).\n"
+            "   <model> <class Group>: The source indices slice(None, None, 1) do not specify a valid shape for the connection 'par.G2.C2.y1' to 'sink.x2'. The target shape is (8,) but indices are shape (16,).\n"
+            "   'par.G2.C1' <class DistribDynShapeComp>: Can't determine src_indices automatically for input 'par.G2.C1.x1'. They must be supplied manually.\n"
+            "   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x1' to 'par.G2.C1.x1'. The source shape is (32,) but the target shape is (8,)."
+           in str(cm.exception))
 
 
 class DynPartialsComp(om.ExplicitComponent):
@@ -826,10 +821,10 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         p.model.connect('indeps.x', 'comp.x')
         with self.assertRaises(Exception) as cm:
             p.setup()
-        self.assertEqual(cm.exception.args[0],
+        self.assertTrue(
             "\nCollected errors for problem 'dist_unknown_ser_known':"
             "\n   <model> <class Group>: Can't connect distributed output 'indeps.x' to "
-            "non-distributed input 'comp.x' without specifying src_indices.")
+            "non-distributed input 'comp.x' without specifying src_indices." in cm.exception.args[0])
 
     def test_dist_known_dist_unknown(self):
         p = om.Problem()

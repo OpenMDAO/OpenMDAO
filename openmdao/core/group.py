@@ -1528,7 +1528,8 @@ class Group(System):
                     try:
                         if pinfo.src_shape is None:
                             pinfo.set_src_shape(root_shape)
-                        elif pinfo.src_indices is not None and root_shape != pinfo.src_shape:
+                        elif pinfo.src_indices is not None and \
+                                not array_connection_compatible(root_shape, pinfo.src_shape):
                             self._collect_error(f"When connecting '{src}' to "
                                                 f"'{pinfo.prom_path()}': Promoted src_shape of "
                                                 f"{pinfo.src_shape} for "
