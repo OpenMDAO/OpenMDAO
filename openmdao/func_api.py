@@ -282,7 +282,6 @@ class OMWrappedFunc(object):
             if jax is None:
                 raise RuntimeError("jax is not installed. "
                                    "Try 'pip install openmdao[jax]' with Python>=3.8.")
-
             if self._declare_partials and not self._use_jax:
                 jaxerr = True
             self._use_jax = True
