@@ -168,21 +168,21 @@ else:
                                            sizes_in[myproc, idx_in], dtype=INT_DTYPE)
 
                     # Now the indices are ready - input_inds, output_inds
-                    sub_in = abs_in[mypathlen:].split('.', 1)[0]
+                    sub_in = abs_in[mypathlen:].partition('.')[0]
                     fwd_xfer_in[sub_in].append(input_inds)
                     fwd_xfer_out[sub_in].append(output_inds)
                     if rev:
-                        sub_out = abs_out[mypathlen:].split('.', 1)[0]
+                        sub_out = abs_out[mypathlen:].partition('.')[0]
                         rev_xfer_in[sub_out].append(input_inds)
                         rev_xfer_out[sub_out].append(output_inds)
                 else:
                     # not a local input but still need entries in the transfer dicts to
                     # avoid hangs
-                    sub_in = abs_in[mypathlen:].split('.', 1)[0]
+                    sub_in = abs_in[mypathlen:].partition('.')[0]
                     fwd_xfer_in[sub_in]  # defaultdict will create an empty list there
                     fwd_xfer_out[sub_in]
                     if rev:
-                        sub_out = abs_out[mypathlen:].split('.', 1)[0]
+                        sub_out = abs_out[mypathlen:].partition('.')[0]
                         rev_xfer_in[sub_out]
                         rev_xfer_out[sub_out]
 
