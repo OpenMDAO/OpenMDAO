@@ -58,7 +58,8 @@ def register_jax_component(comp_class):
         If jax is not available.
     """
     if jax is None:
-        raise RuntimeError('jax is not available. Try `pip install jax jaxlib`')
+        raise RuntimeError("jax is not available. "
+                           "Try 'pip install openmdao[jax]' with Python>=3.8.")
 
     if not hasattr(comp_class, '_tree_flatten'):
         raise NotImplementedError(f'class {comp_class} does not implement method _tree_flatten.'
