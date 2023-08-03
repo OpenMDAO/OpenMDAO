@@ -3510,7 +3510,8 @@ class System(object):
                     self._mpi_proc_allocator.parallel):
                 my_out = out
                 out = {}
-                for all_out in self.comm.allgather(my_out):
+                all_outs = self.comm.allgather(my_out)
+                for all_out in all_outs:
                     for name, meta in all_out.items():
                         if name not in out:
                             if name in my_out:
