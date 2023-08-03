@@ -823,6 +823,24 @@ def filtered_name_iter(name_iter, includes=None, excludes=None):
             yield name
 
 
+def meta2src_iter(meta_iter):
+    """
+    Yield the source name for each metadata dict in the given iterator.
+
+    Parameters
+    ----------
+    meta_iter : iter of dict
+        Iterator over metadata dicts.
+
+    Yields
+    ------
+    str
+        The source name for each metadata dict.
+    """
+    for meta in meta_iter:
+        yield meta['source']
+
+
 def match_prom_or_abs(name, prom_name, includes=None, excludes=None):
     """
     Check to see if the variable names pass through the includes and excludes filter.
