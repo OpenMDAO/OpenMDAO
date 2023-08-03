@@ -1,8 +1,15 @@
+import unittest
 from numpy import pi
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal
-import unittest
+from openmdao.utils.mpi import MPI
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
+from openmdao.test_suite.groups.parallel_groups import FanIn, FanOut
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 class TestSubmodelComp(unittest.TestCase):
@@ -440,3 +447,41 @@ class TestSubmodelComp(unittest.TestCase):
         self.assertEqual(p.get_val('new_r'), 20)
         self.assertEqual(p.get_val('new_theta'), 0.5)
         self.assertEqual(p.get_val('new_x'), 100)
+
+    def test_subprob_solver_print(self):
+        p = om.Problem()
+        subprob = om.Problem()
+        subprob.model.add_subsystem('comp', om.ExecComp('x = r*cos(theta)'), promotes=['*'])
+        submodel = om.SubmodelComp(problem=subprob)
+
+        submodel.add_input('r', name='new_r', val=20)
+        submodel.add_input('theta', name='new_theta', val=0.5)
+        submodel.add_output('x', name='new_x', val=100)
+
+        submodel._subprob.set_solver_print(level=3, depth=20, type_='NL')
+
+        p.model.add_subsystem('submodel', submodel, promotes=['*'])
+
+        self.assertTrue((3, 20, 'NL') in p.model.submodel._subprob.model._solver_print_cache)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestSubmodelCompMPI(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_submodel_comp(self):
+        p = om.Problem()
+
+        model = p.model
+
+        par = model.add_subsystem('par', om.ParallelGroup())
+
+        par.add_subsystem('subprob1', om.SubmodelComp(problem=om.Problem(model=FanOut()),
+                                                      inputs=['p.x'], outputs=['comp2.y', 'comp3.y']))
+        par.add_subsystem('subprob2', om.SubmodelComp(problem=om.Problem(model=FanIn()),
+                                                      inputs=['p1.x1', 'p2.x2'], outputs=['comp3.y']))
+
+        p.setup(force_alloc_complex=True)
+        p.run_model()
+        cpd = p.check_partials(method='cs', out_stream=None)
+        assert_check_partials(cpd)

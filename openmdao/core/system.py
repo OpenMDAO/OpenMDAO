@@ -34,7 +34,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, \
-    DerivativesWarning, PromotionWarning, UnusedOptionWarning
+    DerivativesWarning, PromotionWarning, UnusedOptionWarning, UnitsWarning
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, \
     ensure_compatible, env_truthy, make_traceback, _is_slicer_op
@@ -1979,6 +1979,23 @@ class System(object):
         for subsys in self._subsystems_myproc:
             subsys._setup_recording()
 
+    def _reset_setup_vars(self):
+        """
+        Reset all the stuff that gets initialized in setup.
+        """
+        self._first_call_to_linearize = True
+        self._is_local = True
+        self._vectors = {}
+        self._full_comm = None
+        self._approx_subjac_keys = None
+
+        self.options._parent_name = self.msginfo
+        self.recording_options._parent_name = self.msginfo
+        self._design_vars = {}
+        self._responses = {}
+        self._design_vars.update(self._static_design_vars)
+        self._responses.update(self._static_responses)
+
     def _setup_procs(self, pathname, comm, mode, prob_meta):
         """
         Execute first phase of the setup process.
@@ -1998,21 +2015,11 @@ class System(object):
         prob_meta : dict
             Problem level options.
         """
-        self.pathname = pathname
-        self._set_problem_meta(prob_meta)
-        self._first_call_to_linearize = True
-        self._is_local = True
-        self._vectors = {}
-        self._full_comm = None
-        self._approx_subjac_keys = None
+        self._reset_setup_vars()
 
-        self.options._parent_name = self.msginfo
-        self.recording_options._parent_name = self.msginfo
+        self.pathname = pathname
         self._mode = mode
-        self._design_vars = {}
-        self._responses = {}
-        self._design_vars.update(self._static_design_vars)
-        self._responses.update(self._static_responses)
+        self._set_problem_meta(prob_meta)
         self.load_model_options()
 
     def _setup_var_data(self):
@@ -2069,12 +2076,14 @@ class System(object):
         if abs2meta is None:
             abs2meta = self._var_allprocs_abs2meta['output']
 
+        has_scaling = False
+
         dv = self._design_vars
         for name, meta in dv.items():
 
             units = meta['units']
-            dv[name]['total_adder'] = dv[name]['adder']
-            dv[name]['total_scaler'] = dv[name]['scaler']
+            meta['total_adder'] = meta['adder']
+            meta['total_scaler'] = meta['scaler']
 
             if units is not None:
                 # If derivatives are not being calculated, then you reach here before source
@@ -2101,11 +2110,14 @@ class System(object):
 
                 factor, offset = unit_conversion(var_units, units)
                 base_adder, base_scaler = determine_adder_scaler(None, None,
-                                                                 dv[name]['adder'],
-                                                                 dv[name]['scaler'])
+                                                                 meta['adder'],
+                                                                 meta['scaler'])
 
-                dv[name]['total_adder'] = offset + base_adder / factor
-                dv[name]['total_scaler'] = base_scaler * factor
+                meta['total_adder'] = offset + base_adder / factor
+                meta['total_scaler'] = base_scaler * factor
+
+            if meta['total_scaler'] is not None:
+                has_scaling = True
 
         resp = self._responses
         type_dict = {'con': 'constraint', 'obj': 'objective'}
@@ -2121,7 +2133,7 @@ class System(object):
                 try:
                     units_src = meta['source']
                 except KeyError:
-                    units_src = self.get_source(name)
+                    units_src = self.get_source(meta['name'])
 
                 src_units = abs2meta[units_src]['units']
 
@@ -2148,8 +2160,17 @@ class System(object):
                 meta['total_scaler'] = base_scaler * factor
                 meta['total_adder'] = offset + base_adder / factor
 
+            if meta['total_scaler'] is not None:
+                has_scaling = True
+
         for s in self._subsystems_myproc:
-            s._setup_driver_units(abs2meta)
+            has_scaling |= s._setup_driver_units(abs2meta)
+
+        if (self.comm.size > 1 and self._subsystems_allprocs and
+                self._mpi_proc_allocator.parallel):
+            has_scaling = bool(self.comm.allreduce(int(has_scaling)))
+
+        return has_scaling
 
     def _setup_connections(self):
         """
@@ -3227,8 +3248,8 @@ class System(object):
         resp['flat_indices'] = flat_indices
 
         if alias in responses:
-            raise TypeError(f"Constraint alias '{alias}' is a duplicate of an existing alias or "
-                            "variable name.")
+            raise TypeError(f"{self.msginfo}: Constraint alias '{alias}' is a duplicate of an "
+                            "existing alias or variable name.")
 
         responses[name] = resp
 
@@ -3584,8 +3605,8 @@ class System(object):
                     if alias in prom2abs_out or alias in prom2abs_in:
                         # Constraint alias should never be the same as any openmdao variable.
                         path = prom2abs_out[prom][0] if prom in prom2abs_out else prom
-                        raise RuntimeError(f"Constraint alias '{alias}' on '{path}' is the same "
-                                           "name as an existing variable.")
+                        raise RuntimeError(f"{self.msginfo}: Constraint alias '{alias}' on '{path}'"
+                                           " is the same name as an existing variable.")
                     data['alias_path'] = self.pathname
 
                 if prom_or_alias in prom2abs_out:
@@ -4051,6 +4072,11 @@ class System(object):
                           "display the default values of variables and will not show the result of "
                           "any `set_val` calls.")
 
+        if return_format not in ('list', 'dict'):
+            badarg = f"'{return_format}'" if isinstance(return_format, str) else f"{return_format}"
+            raise ValueError(f"Invalid value ({badarg}) for return_format, "
+                             "must be a string value of 'list' or 'dict'")
+
         metavalues = val and self._inputs is None
 
         keynames = ['val', 'units', 'shape', 'global_shape', 'desc', 'tags']
@@ -4210,6 +4236,11 @@ class System(object):
         list of (name, metadata) or dict of {name: metadata}
             List or dict of output names and other optional information about those outputs.
         """
+        if return_format not in ('list', 'dict'):
+            badarg = f"'{return_format}'" if isinstance(return_format, str) else f"{return_format}"
+            raise ValueError(f"Invalid value ({badarg}) for return_format, "
+                             "must be a string value of 'list' or 'dict'")
+
         keynames = ['val', 'units', 'shape', 'global_shape', 'desc', 'tags']
         keyflags = [val, units, shape, global_shape, desc, tags]
 
@@ -5149,8 +5180,13 @@ class System(object):
                     if sunits is not None:
                         if gunits is not None and gunits != tunits:
                             value = model.convert_from_units(src, value, gunits)
-                        else:
+                        elif tunits is not None:
                             value = model.convert_from_units(src, value, tunits)
+                        else:
+                            msg = f"A value with no units has been specified for input " + \
+                                  f"'{name}', but the source ('{src}') has units '{sunits}'. " + \
+                                  f"No unit checking can be done."
+                            issue_warning(msg, prefix=self.msginfo, category=UnitsWarning)
                 else:
                     if gunits is None:
                         ivalue = model.convert_from_units(abs_name, value, units)
@@ -6122,3 +6158,19 @@ class System(object):
 
     def _sorted_sys_iter(self):
         yield from ()
+
+    def load_case(self, case):
+        """
+        Pull all input and output variables from a Case into this System.
+
+        Override this method if the System requires special handling when loading a case.
+
+        Parameters
+        ----------
+        case : Case or dict
+            A Case from a CaseReader, or a dictionary with key 'inputs' mapped to the
+            output of problem.model.list_inputs and key 'outputs' mapped to the output
+            of prob.model.list_outputs. Both list_inputs and list_outputs should be called
+            with `prom_name=True` and `return_format='dict'`.
+        """
+        pass

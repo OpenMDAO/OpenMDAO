@@ -4,6 +4,7 @@ from openmdao.core.constants import _SetupStatus, INF_BOUND
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.general_utils import find_matches
 from openmdao.utils.reports_system import clear_reports
+from openmdao.utils.mpi import MPI, FakeComm
 
 
 class SubmodelComp(ExplicitComponent):
@@ -165,6 +166,16 @@ class SubmodelComp(ExplicitComponent):
         Perform some final setup and checks.
         """
         p = self._subprob
+
+        # make sure comm is correct or at least reasonable.  In cases
+        # where the submodel comp setup() is being called from the parent
+        # setup(), our comm will be None, and we don't want to use the
+        # parent's comm because it could be too big if we're under a ParallelGroup.
+        # If our comm is not None then we'll just set the problem comm to ours.
+        if self.comm is None:
+            p.comm = FakeComm()
+        else:
+            p.comm = self.comm
 
         # if subprob.setup is called before the top problem setup, we can't rely
         # on using the problem meta data, so default to False
@@ -382,7 +393,6 @@ class SubmodelComp(ExplicitComponent):
             p.model.add_constraint(prom_name)
 
         # setup again to compute coloring
-        p.set_solver_print(-1)
         if self._problem_meta is None:
             p.setup(force_alloc_complex=False)
         else:

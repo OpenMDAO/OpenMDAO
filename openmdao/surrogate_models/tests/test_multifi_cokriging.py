@@ -3,10 +3,39 @@ import unittest
 import numpy as np
 
 from openmdao.api import MultiFiCoKrigingSurrogate
+from openmdao.surrogate_models.multifi_cokriging import MultiFiCoKriging
 from openmdao.utils.assert_utils import assert_near_equal
 
 
 class CoKrigingSurrogateTest(unittest.TestCase):
+
+    def test_multifi_cokriging_model(self):
+        # Test the MultiFiCoKriging implementation outside the context of a surrogate.
+        # This example was in the docstring of MultiFiCoKriging, but missing a training point.
+        # A matching test using the OpenMDAO surrogate class is below (test_1d_2fi_cokriging).
+
+        # high fidelity model
+        fe = lambda x: ((x * 6 - 2) ** 2) * np.sin((x * 6 - 2) * 2)
+
+        # low fidelity model
+        fc = lambda x: 0.5 * fe(x) + (x - 0.5) * 10. - 5
+
+        # Xe: DOE for expensive code (nested in Xc)
+        # Xc: DOE for cheap code
+        # ye: expensive response
+        # yc: cheap response
+
+        Xe = np.array([[0],[0.4],[0.6],[1]])
+        Xc = np.vstack((np.array([[0.1],[0.2],[0.3],[0.5],[0.7],[0.8],[0.9]]), Xe))
+
+        ye = fe(Xe)
+        yc = fc(Xc)
+
+        model = MultiFiCoKriging(theta0=1, thetaL=1e-5, thetaU=50.)
+        model.fit([Xc, Xe], [yc, ye])
+
+        # Prediction on x=0.05
+        self.assertTrue(model.predict([0.05])[0].item() - fe(0.05) < 0.05)
 
     def test_1d_1fi_cokriging(self):
         # CoKrigingSurrogate with one fidelity could be used as a KrigingSurrogate

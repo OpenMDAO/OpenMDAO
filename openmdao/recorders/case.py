@@ -468,6 +468,11 @@ class Case(object):
         list of (name, metadata) or dict of {name: metadata}
             List or dict of input names and other optional information about those inputs.
         """
+        if return_format not in ('list', 'dict'):
+            badarg = f"'{return_format}'" if isinstance(return_format, str) else f"{return_format}"
+            raise ValueError(f"Invalid value ({badarg}) for return_format, "
+                             "must be a string value of 'list' or 'dict'")
+
         abs2meta = self._abs2meta
         inputs = []
 
@@ -657,6 +662,11 @@ class Case(object):
         list of (name, metadata) or dict of {name: metadata}
             List or dict of output names and other optional information about those outputs.
         """
+        if return_format not in ('list', 'dict'):
+            badarg = f"'{return_format}'" if isinstance(return_format, str) else f"{return_format}"
+            raise ValueError(f"Invalid value ({badarg}) for return_format, "
+                             "must be a string value of 'list' or 'dict'")
+
         abs2meta = self._abs2meta
         expl_outputs = []
         impl_outputs = []

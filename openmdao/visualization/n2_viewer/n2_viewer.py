@@ -350,19 +350,11 @@ def _get_declare_partials(system):
         beginning from the given system on down.
     """
     declare_partials_list = []
+    for key, _ in system._declared_partials_iter():
+        of, wrt = key
+        if of != wrt:
+            declare_partials_list.append(f"{of} > {wrt}")
 
-    def recurse_get_partials(system, dpl):
-        if isinstance(system, Component):
-            subjacs = system._subjacs_info
-            for abs_key, meta in subjacs.items():
-                if abs_key[0] != abs_key[1]:
-                    dpl.append("{} > {}".format(abs_key[0], abs_key[1]))
-        elif isinstance(system, Group):
-            for s in system._subsystems_myproc:
-                recurse_get_partials(s, dpl)
-        return
-
-    recurse_get_partials(system, declare_partials_list)
     return declare_partials_list
 
 
@@ -661,14 +653,13 @@ def _run_n2_report(prob, report_filename=_default_n2_filename):
 
 
 def _run_n2_report_w_errors(prob, report_filename=_default_n2_filename):
-    errs = prob._metadata['saved_errors']
-    if errs:
+    if prob._any_rank_has_saved_errors():
         n2_filepath = str(pathlib.Path(prob.get_reports_dir()).joinpath(report_filename))
         # only run the n2 here if we've had setup errors. Normally we'd wait until
         # after final_setup in order to have correct values for all of the I/O variables.
         try:
             n2(prob, show_browser=False, outfile=n2_filepath, display_in_notebook=False)
-        except RuntimeError as err:
+        except Exception as err:
             # We ignore this error
             if str(err) != "Can't compute total derivatives unless " \
                            "both 'of' or 'wrt' variables have been specified.":

@@ -444,12 +444,12 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
         desired = np.asarray(desired)
 
     # In case they are PromAbsDict and other dict-like objects
-    if isinstance(actual, dict) and type(actual) != dict:
+    if isinstance(actual, dict) and type(actual) is not dict:
         actual = dict(actual)
-    if isinstance(desired, dict) and type(desired) != dict:
+    if isinstance(desired, dict) and type(desired) is not dict:
         desired = dict(desired)
 
-    if type(actual) != type(desired):
+    if type(actual) is not type(desired):
         raise ValueError(f'actual {type(actual)}, desired {type(desired)} have different types')
 
     if isinstance(actual, type) and isinstance(desired, type):

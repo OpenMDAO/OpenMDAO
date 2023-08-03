@@ -1,4 +1,111 @@
 ***********************************
+# Release Notes for OpenMDAO 3.27.0
+
+June 26, 2023
+
+The release of OpenMDAO 3.27.0 implements several new features implemented based on proposals
+submitted as [POEMS](https://github.com/OpenMDAO/POEMs).
+Highlights of newly implemented features are:
+
+### POEM_077: Derivative checks with multiple step sizes.
+
+The user may now specify the step as a sequence of step sizes to test the impact of step size on finite difference accuracy.
+
+### POEM_081: Submodel component.
+
+SubmodelComp provides a way to evaluate an OpenMDAO Problem within a Component. When using a SubmodelComp, the subproblem
+exposes only a limited number of inputs and outputs of the underlying model to the parent system. This may be beneficial
+from a performance standpoint when there are many inputs and outputs of the internal model that aren’t needed in the top-level model.
+
+### POEM_084: OpenMDAO jax subpackage.
+
+In an effort to remove the need for users to find analytic derivatives for their components, we initially
+started down the path of providing common mathematical operations and their derivatives. It soon
+became apparent that leveraging automatic differentiation was the way to go. We've added the
+OpenMDAO jax subpackage which adds a few functions built on top of jax's already extensive `jax.numpy`
+subpackage and added examples of how to use jax for automatic differentiation of partials. This will
+allow users to compose more complex component compute methods without breaking them up for the sake
+of easier differentiation. Going forward, we're going to advocate jax more and more as a way
+to reduce the time required to develop working models.
+
+### POEM_085: View connections can now save to CSV format.
+
+Users found applying a diff to CSV representations of connections to be a useful way of determining differences between two models.
+This POEM allows view_connections to output a CSV file instead of HTML.
+
+### POEM_086: Model options
+
+Users have requested an easier way to set options recursively on deep models, and model options are designed to satisfy this need.
+`Problem.model_options` is now a dictionary keyed by a string. If the path of a given system in the model is a glob-match of the key, then it looks at the
+corresponding option/value pairs in the model_options dictionary and attempts to set the value of any options that exist for that System.
+This is a generic implementation and by using a standard dictionary, users may specify this common options in their run script or use various serialization formats as configuration files for their particular model.
+
+### POEM_089: The automatic grouping of systems into "pre", "opt", and "post" sets.
+
+When the user sets the Problem option `'group_by_pre_opt_post'`, OpenMDAO will attempt to determine how components
+impact outputs needed for optimization.
+If components are not dependent upon the design variables they will be grouped into the "pre" set which is evaluated once prior to the optimization iteration.
+If components are functions of the design variables of the optimization, they are grouped into the "opt" set which is evaluated during each iteration of the driver.
+Components that are identified as "post-processing" components that only need to be run after the optimization is complete are grouped into the "post" set.
+
+This grouping can significantly speed up optimization in some cases by eliminated unnecessary computation.
+It is currently turned off by default. Users will need to set the Problem option `'group_by_pre_opt_post'` to test this behavior.
+If a user desires to have a Component's compute always run during optimziation iterations, they can set the new component option `'always_opt'` to force it to be a member of the "opt" set.
+Note that using this may add other components to the opt set depending on the flow of data in the model.
+
+## New Deprecations
+
+- None
+
+## Backwards Incompatible API Changes
+
+- Changed the default value of the 'prom_name' argument on the list_inputs/list_outputs functions to True [#2900](https://github.com/OpenMDAO/OpenMDAO/pull/2900)
+- Removed deprecated 'value' argument from Problem.set_val() [#2892](https://github.com/OpenMDAO/OpenMDAO/pull/2892)
+
+## Backwards Incompatible Non-API Changes
+
+- None
+
+## New Features
+
+- POEM 089: Added 'group_by_pre_opt_post' option to Problem. [#2942](https://github.com/OpenMDAO/OpenMDAO/pull/2942)
+- POEM 081: Implement Submodel Component [#2817](https://github.com/OpenMDAO/OpenMDAO/pull/2817)
+- Documented use of JAX for the Sellar model [#2933](https://github.com/OpenMDAO/OpenMDAO/pull/2933)
+- POEM_086 Implementation: model_options [#2931](https://github.com/OpenMDAO/OpenMDAO/pull/2931)
+- Implemented POEM_077: Derivative checks with multiple step sizes. [#2927](https://github.com/OpenMDAO/OpenMDAO/pull/2927)
+- Implemented POEM_085: Added capability for view_connections to export csv instead of html. [#2925](https://github.com/OpenMDAO/OpenMDAO/pull/2925)
+- Added variable  description to the information popup when hovering over a variable in the N2 viewer. [#2920](https://github.com/OpenMDAO/OpenMDAO/pull/2920)
+- Added 'path' argument to the N2 function [#2918](https://github.com/OpenMDAO/OpenMDAO/pull/2918)
+- Implemented POEM_084: Added openmdao.jax subpackage [#2913](https://github.com/OpenMDAO/OpenMDAO/pull/2913)
+- Made `list_indep_vars` return only one var per source [#2906](https://github.com/OpenMDAO/OpenMDAO/pull/2906)
+- Updated `set_input_defaults` method to ensure compatibility between 'val' and 'src_shape' arguments [#2904](https://github.com/OpenMDAO/OpenMDAO/pull/2904)
+- Changed the default value of the 'prom_name' argument on the list_inputs/list_outputs functions to True [#2900](https://github.com/OpenMDAO/OpenMDAO/pull/2900)
+- Removed promotion warning if either old or new is '*'. [#2889](https://github.com/OpenMDAO/OpenMDAO/pull/2889)
+
+## Bug Fixes
+
+- Fixed bug where multi-level promotion aliasing could result in an unrecognized connection. [#2897](https://github.com/OpenMDAO/OpenMDAO/pull/2897)
+- Fixed issue where `list_indep_vars` would sometimes return duplicates. [#2902](https://github.com/OpenMDAO/OpenMDAO/pull/2902)
+- Fixed issue with promotion in config when the promoted parent group is more than one level below the current group. [#2916](https://github.com/OpenMDAO/OpenMDAO/pull/2916)
+- Fixed several failing tests where an exception was raised from pyOptSparseDriver _gradfunc and _objfunc [#2922](https://github.com/OpenMDAO/OpenMDAO/pull/2922)
+- Fixed interplay between scaling report and ScipyOptimizeDriver that can result in an exception. [#2935](https://github.com/OpenMDAO/OpenMDAO/pull/2935)
+- Fixed view_connections to show the viewer even in cases where setup errors occur [#2940](https://github.com/OpenMDAO/OpenMDAO/pull/2940)
+- Fixed bug in n2 causing load failure if a Broyden solver is in the model. [#2890](https://github.com/OpenMDAO/OpenMDAO/pull/2890)
+- Fixed a hang in check_totals under MPI [#2888](https://github.com/OpenMDAO/OpenMDAO/pull/2888)
+- Fixed bug in 'list_pre_post' command [#2951](https://github.com/OpenMDAO/OpenMDAO/pull/2951)
+
+## Miscellaneous
+
+- Resolved a Numpy 1.25 deprecation by replacing occurrences of 'product' with 'prod' [#2947](https://github.com/OpenMDAO/OpenMDAO/pull/2947)
+- Updated documentation of guess_nonlinear method to use run_apply_nonlinear. [#2899](https://github.com/OpenMDAO/OpenMDAO/pull/2899)
+- Cleaned up internal handling of response names/aliases/source_names. [#2917](https://github.com/OpenMDAO/OpenMDAO/pull/2917)
+- Updated `Latest` workflow; fixed some tests and docs [#2941](https://github.com/OpenMDAO/OpenMDAO/pull/2941)
+- Added -W flag to doc build in test workflow [#2943](https://github.com/OpenMDAO/OpenMDAO/pull/2943)
+- Removed code from MultiFiCoKriging docstring and added it as a test [#2944](https://github.com/OpenMDAO/OpenMDAO/pull/2944)
+- Moved various System methods to Group since Problem.model must now be a Group. [#2896](https://github.com/OpenMDAO/OpenMDAO/pull/2896)
+- Removed deprecated value argument from Problem.set_val() [#2892](https://github.com/OpenMDAO/OpenMDAO/pull/2892)
+
+***********************************
 # Release Notes for OpenMDAO 3.26.0
 
 April 14, 2023

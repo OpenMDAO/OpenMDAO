@@ -8,6 +8,33 @@ from openmdao.utils.testing_utils import use_tempdirs
 
 @use_tempdirs
 class ListOutputsTest(unittest.TestCase):
+
+    def test_invalid_return_format(self):
+        prob = ParaboloidProblem()
+        rec = om.SqliteRecorder('test_list_outputs.db')
+        prob.model.add_recorder(rec)
+
+        prob.setup()
+        prob.run_model()
+
+        case = om.CaseReader('test_list_outputs.db').get_case(-1)
+
+        with self.assertRaises(ValueError) as cm:
+            case.list_inputs(return_format=dict)
+
+        msg = f"Invalid value (<class 'dict'>) for return_format, " \
+              "must be a string value of 'list' or 'dict'"
+
+        self.assertEqual(str(cm.exception), msg)
+
+        with self.assertRaises(ValueError) as cm:
+            case.list_outputs(return_format='dct')
+
+        msg = f"Invalid value ('dct') for return_format, " \
+              "must be a string value of 'list' or 'dict'"
+
+        self.assertEqual(str(cm.exception), msg)
+
     def test_list_outputs(self):
         """
         Confirm that includes/excludes has the same result between System.list_inputs() and

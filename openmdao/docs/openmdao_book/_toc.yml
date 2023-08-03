@@ -67,8 +67,8 @@ parts:
     - file: examples/simul_deriv_example
 - caption: Other Useful Docs
   chapters:
-  - file: other_useful_docs/om_command.ipynb
-  - file: other/citing.ipynb
+  - file: other_useful_docs/om_command
+  - file: other/citing
   - file: other_useful_docs/building_a_tool/building_a_tool.md
     sections:
     - file: other_useful_docs/building_a_tool/repository_structure
@@ -77,13 +77,15 @@ parts:
     - file: other_useful_docs/building_a_tool/travis
   - file: other_useful_docs/auto_ivc_api_translation
   - file: other_useful_docs/api_translation
-  - file: other_useful_docs/environment_vars.ipynb
-  - file: other_useful_docs/file_wrap.ipynb
+  - file: other_useful_docs/environment_vars
+  - file: other_useful_docs/file_wrap
   - file: _srcdocs/index
   - file: other_useful_docs/developer_docs/developer_docs
     sections:
-    - file: other_useful_docs/developer_docs/signing_commits.ipynb
-    - file: other_useful_docs/developer_docs/doc_build.ipynb
-    - file: other_useful_docs/developer_docs/doc_style_guide.ipynb
-    - file: other_useful_docs/developer_docs/sphinx_decorators.ipynb
-    - file: other_useful_docs/developer_docs/writing_plugins.ipynb
+    - file: other_useful_docs/developer_docs/signing_commits
+    - file: other_useful_docs/developer_docs/unit_testing
+    - file: other_useful_docs/developer_docs/ci_testing
+    - file: other_useful_docs/developer_docs/doc_build
+    - file: other_useful_docs/developer_docs/doc_style_guide
+    - file: other_useful_docs/developer_docs/sphinx_decorators
+    - file: other_useful_docs/developer_docs/writing_plugins

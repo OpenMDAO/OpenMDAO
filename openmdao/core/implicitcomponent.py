@@ -455,6 +455,14 @@ class ImplicitComponent(Component):
 
         return meta
 
+    def _reset_setup_vars(self):
+        """
+        Reset all the stuff that gets initialized in setup.
+        """
+        super()._reset_setup_vars()
+        self._declared_residuals = {}
+        self._resid2out_subjac_map = {}
+
     def _setup_procs(self, pathname, comm, mode, prob_meta):
         """
         Execute first phase of the setup process.
@@ -473,9 +481,7 @@ class ImplicitComponent(Component):
         prob_meta : dict
             Problem level metadata.
         """
-        self._declared_residuals = {}
         super()._setup_procs(pathname, comm, mode, prob_meta)
-        self._resid2out_subjac_map = {}
 
     def _resid_name_shape_iter(self):
         for name, meta in self._declared_residuals.items():
@@ -903,6 +909,7 @@ class _ResidsWrapper(object):
 
 
 class _JacobianWrapper(object):
+
     def __init__(self, jac, res2outmap):
         self.__dict__['_jac'] = jac
         self.__dict__['_dct'] = res2outmap

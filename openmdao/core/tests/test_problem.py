@@ -1339,24 +1339,20 @@ class TestProblem(unittest.TestCase):
         model.connect('G2.C6.y', 'G2.C7.b')
         model.connect('G2.C5.x', 'C8.b')
         model.connect('G2.C7.x', 'C8.a')
+        
+        model.add_design_var('indep1.x')
+        model.add_design_var('indep2.x')
+        model.add_constraint('C8.y')
+        model.add_constraint('Unconnected.y')
 
         p.setup(check=False, mode='rev')
+        p.final_setup()
 
-        dumb_meta = {'parallel_deriv_color': None}
-        relevant = model.get_relevant_vars({'indep1.x': dumb_meta, 'indep2.x': dumb_meta},
-                                           {'C8.y': dumb_meta, 'Unconnected.y': dumb_meta}, mode='rev')
-
-        indep1_ins = set(['C3.b', 'C3.c', 'C8.b', 'G1.C1.a', 'G2.C5.a', 'G2.C5.b'])
-        indep1_outs = set(['C3.y', 'C8.y', 'G1.C1.z', 'G2.C5.x', 'indep1.x'])
-        indep1_sys = set(['C3', 'C8', 'G1.C1', 'G2.C5', 'indep1', 'G1', 'G2', ''])
-
-        dct, systems = relevant['C8.y']['indep1.x']
-        inputs = dct['input']
-        outputs = dct['output']
-
-        self.assertEqual(inputs, indep1_ins)
-        self.assertEqual(outputs, indep1_outs)
-        self.assertEqual(systems, indep1_sys)
+        relevant = model._relevant
+        
+        indep1_ins = {'C8.b', 'G2.C5.a', 'G1.C1.a'}
+        indep1_outs = {'C8.y', 'G1.C1.z', 'G2.C5.x', 'indep1.x'}
+        indep1_sys = {'C8', 'G1.C1', 'G2.C5', 'indep1', 'G1', 'G2', ''}
 
         dct, systems = relevant['C8.y']['indep1.x']
         inputs = dct['input']
@@ -1366,33 +1362,23 @@ class TestProblem(unittest.TestCase):
         self.assertEqual(outputs, indep1_outs)
         self.assertEqual(systems, indep1_sys)
 
-        indep2_ins = set(['C8.a', 'G2.C6.a', 'G2.C7.b'])
-        indep2_outs = set(['C8.y', 'G2.C6.y', 'G2.C7.x', 'indep2.x'])
-        indep2_sys = set(['C8', 'G2.C6', 'G2.C7', 'indep2', 'G2', ''])
-
-        dct, systems = relevant['C8.y']['indep2.x']
+        dct, systems = relevant['C8.y']['indep1.x']
         inputs = dct['input']
         outputs = dct['output']
 
-        self.assertEqual(inputs, indep2_ins)
-        self.assertEqual(outputs, indep2_outs)
-        self.assertEqual(systems, indep2_sys)
+        self.assertEqual(inputs, indep1_ins)
+        self.assertEqual(outputs, indep1_outs)
+        self.assertEqual(systems, indep1_sys)
 
-        dct, systems = relevant['C8.y']['indep2.x']
-        inputs = dct['input']
-        outputs = dct['output']
-
-        self.assertEqual(inputs, indep2_ins)
-        self.assertEqual(outputs, indep2_outs)
-        self.assertEqual(systems, indep2_sys)
+        self.assertTrue('indep2.x' not in relevant['C8.y'])
 
         dct, systems = relevant['C8.y']['@all']
         inputs = dct['input']
         outputs = dct['output']
 
-        self.assertEqual(inputs, indep1_ins | indep2_ins)
-        self.assertEqual(outputs, indep1_outs | indep2_outs)
-        self.assertEqual(systems, indep1_sys | indep2_sys)
+        self.assertEqual(inputs, indep1_ins)
+        self.assertEqual(outputs, indep1_outs)
+        self.assertEqual(systems, indep1_sys)
 
     def test_system_setup_and_configure(self):
         # Test that we can change solver settings on a subsystem in a system's setup method.
@@ -1903,17 +1889,17 @@ class TestProblem(unittest.TestCase):
         model.add_constraint('f', indices=[1], flat_indices=True, lower=10.0)
         model.add_constraint('f', indices=[5], flat_indices=True, alias='g', lower=0.5)
 
-        msg = "Constraint alias 'f' is a duplicate of an existing alias or variable name."
+        msg = "<class Group>: Constraint alias 'f' is a duplicate of an existing alias or variable name."
         with self.assertRaises(Exception) as cm:
             model.add_constraint('f', indices=[3], flat_indices=True, alias='f', lower=0.5)
 
         self.assertEqual(str(cm.exception), msg)
 
-        msg = "\nCollected errors for problem 'constraint_alias_duplicate_errors':" + \
-              "\n   <model> <class Group>: Constraint alias 'g' on 'comp1.f' is the same name as " + \
+        msg = "<model> <class Group>: Constraint alias 'g' on 'comp1.f' is the same name as " + \
               "an existing variable."
+        prob.setup()
         with self.assertRaises(Exception) as cm:
-            prob.setup()
+            prob.final_setup()
 
         self.assertEqual(str(cm.exception), msg)
 
@@ -2054,12 +2040,12 @@ class TestProblem(unittest.TestCase):
                                        promotes_inputs=['x'])
 
         c1.add_design_var('x', lower=0, upper=5)
+        prob.setup()
 
         with self.assertRaises(Exception) as cm:
-            prob.setup()
+            prob.final_setup()
 
-        msg = "\nCollected errors for problem 'output_as_input_err':" + \
-              "\n   <model> <class Group>: Design variable 'x' is connected to 'initial_comp.x', " + \
+        msg = "<model> <class Group>: Design variable 'x' is connected to 'initial_comp.x', " + \
               "but 'initial_comp.x' is not an IndepVarComp or ImplicitComp output."
         self.assertEqual(str(cm.exception), msg)
 
