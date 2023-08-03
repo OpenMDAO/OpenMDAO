@@ -409,6 +409,16 @@ class NonlinearSchurSolver(NonlinearSolver):
                 elif system._outputs[f"{subsys2.name}.{var}"] > upperB[ii]:
                     system._outputs[f"{subsys2.name}.{var}"] = upperB[ii]
 
+        # print outputs
+        if system.comm.rank == 0:
+            print("\n+  -------------------")
+            print("+  Balance variables:")
+            print("+  -------------------\n+")
+            for ii, var in enumerate(vars_to_solve):
+                ivar = var.split(".")
+                print("+ ", ivar[-1], " = ", system._outputs[f"{subsys2.name}.{var}"][0])
+            print("\n")
+
         self._solver_info.pop()
 
         # Hybrid newton support.
