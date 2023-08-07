@@ -925,15 +925,14 @@ class Driver(object):
         problem = self._problem()
         model = problem.model
 
-        # relevance not relevant if derivatives are approximated?
-        if model._approx_schemes:
+        # relevance not relevant if not using derivatives
+        if not self.supports['gradients'] or model._approx_schemes:
             return
 
         relevant = model._relevant
         fwd = problem._mode == 'fwd'
 
         des_vars = self._designvars
-        responses = self._responses
         constraints = self._cons
 
         indep_list = list(des_vars)
@@ -958,9 +957,7 @@ class Driver(object):
             #       implements bounds on design variables by adding them as constraints.
             #       These design variables as constraints will not appear in the wrt list.
             if not wrt and name not in indep_list:
-                rtype = response_type[responses[name]['type']]
-
-                raise RuntimeError(f"{self.msginfo}: {rtype} '{name}' does not depend on any "
+                raise RuntimeError(f"{self.msginfo}: Constraint '{name}' does not depend on any "
                                    "design variables. Please check your problem formulation.")
 
     def run(self):

@@ -852,19 +852,6 @@ class TestCheckRelevance(unittest.TestCase):
         # does not depend on a design variable should not trigger a RuntimeError
         prob.run_driver()
 
-    def test_simple_paraboloid_irrelevant_objective_run_once(self):
-        # define model with default driver
-        prob = self.setup_problem()
-
-        # add objective that does not depend on a design var
-        prob.model.add_objective('bad')
-
-        prob.setup()
-
-        # the default driver does not support optimization, so an objective that
-        # does not depend on a design variable should not trigger a RuntimeError
-        prob.run_driver()
-
     def test_simple_paraboloid_irrelevant_constraint(self):
         # define model with optimizing driver
         prob = self.setup_problem(driver=om.ScipyOptimizeDriver())
@@ -882,23 +869,6 @@ class TestCheckRelevance(unittest.TestCase):
             prob.run_driver()
 
         self.assertTrue("Constraint 'bad.bad' does not depend on any design variables."
-                        in str(err.exception))
-
-    def test_simple_paraboloid_irrelevant_objective(self):
-        # define model with optimizing driver
-        prob = self.setup_problem(driver=om.ScipyOptimizeDriver())
-
-        # add objective that does not depend on a design var
-        prob.model.add_objective('bad')
-
-        prob.setup()
-
-        # since driver is an optimizer, an objective that does not depend
-        # on a design variable should trigger a RuntimeError
-        with self.assertRaises(RuntimeError) as err:
-            prob.run_driver()
-
-        self.assertTrue("Objective 'bad.bad' does not depend on any design variables."
                         in str(err.exception))
 
 
