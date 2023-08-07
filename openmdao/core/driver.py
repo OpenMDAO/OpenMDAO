@@ -5,6 +5,7 @@ import sys
 import time
 import os
 import weakref
+from collections import defaultdict
 
 import numpy as np
 
@@ -914,6 +915,53 @@ class Driver(object):
             String indicating result of driver run.
         """
         return 'FAIL' if self.fail else 'SUCCESS'
+
+    def check_relevance(self):
+        """
+        Check if there are constraints that don't depend on any design vars.
+
+        This usually indicates something is wrong with the problem formulation.
+        """
+        problem = self._problem()
+        model = problem.model
+
+        # relevance not relevant if derivatives are approximated?
+        if model._approx_schemes:
+            return
+
+        relevant = model._relevant
+        fwd = problem._mode == 'fwd'
+
+        des_vars = self._designvars
+        responses = self._responses
+        constraints = self._cons
+
+        indep_list = list(des_vars)
+
+        response_type = defaultdict(lambda: 'Response')
+        response_type.update({
+            'con': 'Constraint',
+            'obj': 'Objective'
+        })
+
+        for name, meta in constraints.items():
+
+            path = meta['source']
+
+            if fwd:
+                wrt = [v for v in indep_list if path in relevant[des_vars[v]['source']]]
+            else:
+                rels = relevant[path]
+                wrt = [v for v in indep_list if des_vars[v]['source'] in rels]
+
+            # Note: There is a hack in ScipyOptimizeDriver for older versions of COBYLA that
+            #       implements bounds on design variables by adding them as constraints.
+            #       These design variables as constraints will not appear in the wrt list.
+            if not wrt and name not in indep_list:
+                rtype = response_type[responses[name]['type']]
+
+                raise RuntimeError(f"{self.msginfo}: {rtype} '{name}' does not depend on any "
+                                   "design variables. Please check your problem formulation.")
 
     def run(self):
         """

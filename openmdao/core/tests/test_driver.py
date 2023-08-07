@@ -815,6 +815,93 @@ class TestDriver(unittest.TestCase):
         assert_near_equal(totals['sub.comp.f_xy', 'sub.y']['J_fd'], [[1.58e2]], 1e-5)
 
 
+@use_tempdirs
+class TestCheckRelevance(unittest.TestCase):
+    def setup_problem(self, driver=None):
+        prob = om.Problem(driver=driver)
+        model = prob.model
+
+        # the customary Paraboloid model
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_constraint('c', equals=-15.0)
+
+        # add extra comps for testing constraints/objectives
+        model.add_subsystem('p3', om.IndepVarComp('z', 50.0), promotes=['*'])
+        model.add_subsystem('bad', om.ExecComp('bad = - z'), promotes=['*'])
+
+        return prob
+
+    def test_simple_paraboloid_irrelevant_constraint_run_once(self):
+        # setup problem with default driver
+        prob = self.setup_problem()
+
+        prob.model.add_objective('f_xy')
+
+        # add constraint that does not depend on a design var
+        prob.model.add_constraint('bad', equals=-15.0)
+
+        prob.setup()
+
+        # the default driver does not support optimization, so a constraint that
+        # does not depend on a design variable should not trigger a RuntimeError
+        prob.run_driver()
+
+    def test_simple_paraboloid_irrelevant_objective_run_once(self):
+        # define model with default driver
+        prob = self.setup_problem()
+
+        # add objective that does not depend on a design var
+        prob.model.add_objective('bad')
+
+        prob.setup()
+
+        # the default driver does not support optimization, so an objective that
+        # does not depend on a design variable should not trigger a RuntimeError
+        prob.run_driver()
+
+    def test_simple_paraboloid_irrelevant_constraint(self):
+        # define model with optimizing driver
+        prob = self.setup_problem(driver=om.ScipyOptimizeDriver())
+
+        prob.model.add_objective('f_xy')
+
+        # add constraint that does not depend on a design var
+        prob.model.add_constraint('bad', equals=-15.0)
+
+        prob.setup()
+
+        # since driver is an optimizer, a constraint that does not depend
+        # on a design variable should trigger a RuntimeError
+        with self.assertRaises(RuntimeError) as err:
+            prob.run_driver()
+
+        self.assertTrue("Constraint 'bad.bad' does not depend on any design variables."
+                        in str(err.exception))
+
+    def test_simple_paraboloid_irrelevant_objective(self):
+        # define model with optimizing driver
+        prob = self.setup_problem(driver=om.ScipyOptimizeDriver())
+
+        # add objective that does not depend on a design var
+        prob.model.add_objective('bad')
+
+        prob.setup()
+
+        # since driver is an optimizer, an objective that does not depend
+        # on a design variable should trigger a RuntimeError
+        with self.assertRaises(RuntimeError) as err:
+            prob.run_driver()
+
+        self.assertTrue("Objective 'bad.bad' does not depend on any design variables."
+                        in str(err.exception))
+
+
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestDriverMPI(unittest.TestCase):
 

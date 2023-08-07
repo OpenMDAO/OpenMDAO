@@ -664,17 +664,20 @@ class Problem(object):
         bool
             Failure flag; True if failed to converge, False is successful.
         """
+        model = self.model
+        driver = self.driver
+
         if self._mode is None:
             raise RuntimeError(self.msginfo +
                                ": The `setup` method must be called before `run_driver`.")
 
-        if not self.model._have_output_solver_options_been_applied():
+        if not model._have_output_solver_options_been_applied():
             raise RuntimeError(self.msginfo +
                                ": Before calling `run_driver`, the `setup` method must be called "
                                "if set_output_solver_options has been called.")
 
-        if 'singular_jac_behavior' in self.driver.options:
-            self._metadata['singular_jac_behavior'] = self.driver.options['singular_jac_behavior']
+        if 'singular_jac_behavior' in driver.options:
+            self._metadata['singular_jac_behavior'] = driver.options['singular_jac_behavior']
 
         old_prefix = self._recording_iter.prefix
 
@@ -684,34 +687,38 @@ class Problem(object):
             self._recording_iter.prefix = case_prefix
 
         try:
-            if self.model.iter_count > 0 and reset_iter_counts:
-                self.driver.iter_count = 0
-                self.model._reset_iter_counts()
+            if model.iter_count > 0 and reset_iter_counts:
+                driver.iter_count = 0
+                model._reset_iter_counts()
 
             self.final_setup()
+
+            # for optimizing drivers, check that responses
+            if driver.supports['optimization'] and self._metadata['use_derivatives']:
+                driver.check_relevance()
 
             self._run_counter += 1
             record_model_options(self, self._run_counter)
 
-            self.model._clear_iprint()
+            model._clear_iprint()
 
-            if self.options['group_by_pre_opt_post'] and self.driver.supports['optimization']:
-                if self.model._run_on_opt[_OptStatus.PRE]:
+            if self.options['group_by_pre_opt_post'] and driver.supports['optimization']:
+                if model._run_on_opt[_OptStatus.PRE]:
                     self._set_opt_status(_OptStatus.PRE)
-                    self.model.run_solve_nonlinear()
+                    model.run_solve_nonlinear()
 
-                with SaveOptResult(self.driver):
+                with SaveOptResult(driver):
                     self._set_opt_status(_OptStatus.OPTIMIZING)
-                    result = self.driver.run()
+                    result = driver.run()
 
-                if self.model._run_on_opt[_OptStatus.POST]:
+                if model._run_on_opt[_OptStatus.POST]:
                     self._set_opt_status(_OptStatus.POST)
-                    self.model.run_solve_nonlinear()
+                    model.run_solve_nonlinear()
 
                 return result
             else:
-                with SaveOptResult(self.driver):
-                    return self.driver.run()
+                with SaveOptResult(driver):
+                    return driver.run()
 
         finally:
             self._recording_iter.prefix = old_prefix

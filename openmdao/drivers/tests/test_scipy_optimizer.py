@@ -1108,7 +1108,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                 # Outputs
                 self.add_output('Vd', 0.0, units="m/s",
                                 desc="Slipstream air velocity, downstream of rotor")
-                
+
                 self.declare_partials('*', '*')  # do this else compute_partials won't run at all
 
             def compute(self, inputs, outputs):
