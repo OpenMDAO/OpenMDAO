@@ -922,7 +922,6 @@ class Driver(object):
 
         This usually indicates something is wrong with the problem formulation.
         """
-
         # relevance not relevant if not using derivatives
         if not self.supports['gradients']:
             return
