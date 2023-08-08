@@ -922,26 +922,19 @@ class Driver(object):
 
         This usually indicates something is wrong with the problem formulation.
         """
-        problem = self._problem()
-        model = problem.model
 
         # relevance not relevant if not using derivatives
-        if not self.supports['gradients'] or model._approx_schemes:
+        if not self.supports['gradients']:
             return
 
-        relevant = model._relevant
+        problem = self._problem()
+        relevant = problem.model._relevant
         fwd = problem._mode == 'fwd'
 
         des_vars = self._designvars
         constraints = self._cons
 
         indep_list = list(des_vars)
-
-        response_type = defaultdict(lambda: 'Response')
-        response_type.update({
-            'con': 'Constraint',
-            'obj': 'Objective'
-        })
 
         for name, meta in constraints.items():
 
