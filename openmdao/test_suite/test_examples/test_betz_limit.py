@@ -185,6 +185,7 @@ class TestBetzLimit(unittest.TestCase):
         # setup the optimization
         prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['singular_jac_behavior'] = 'ignore'  # Area doesn't impact Cp
 
         prob.model.add_design_var('a', lower=0., upper=1.)
         prob.model.add_design_var('Area', lower=0., upper=1.)
@@ -312,9 +313,11 @@ class TestBetzLimit(unittest.TestCase):
         # setup the optimization
         prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['singular_jac_behavior'] = 'ignore'  # Area doesn't impact Cp
 
         prob.model.add_design_var('a', lower=0., upper=1.)
         prob.model.add_design_var('Area', lower=0., upper=1.)
+
         # negative one so we maximize the objective
         prob.model.add_objective('a_disk.Cp', scaler=-1)
 

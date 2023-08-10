@@ -173,6 +173,7 @@ class TestImplicitFuncComp(unittest.TestCase):
         p_opt.model.linear_solver = om.DirectSolver(assemble_jac=True)
 
         p_opt.driver = om.ScipyOptimizeDriver()
+        p_opt.driver.options['singular_jac_behavior'] = 'ignore'
         p_opt.driver.options['disp'] = False
 
         p_opt.model.add_design_var('x', lower=-10, upper=10)
