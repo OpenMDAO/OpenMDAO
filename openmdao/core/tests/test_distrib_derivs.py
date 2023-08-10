@@ -1536,6 +1536,7 @@ class MPITestsBug(unittest.TestCase):
         prob.setup(mode="rev")
         prob.driver = om.pyOptSparseDriver()
         prob.driver.options["optimizer"] = "SLSQP"
+        prob.driver.options['singular_jac_behavior'] = 'ignore'
         prob.run_driver()
 
 

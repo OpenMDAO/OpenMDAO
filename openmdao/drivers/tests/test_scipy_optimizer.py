@@ -29,7 +29,6 @@ except ImportError:
     vector_class = om.DefaultVector
     PETScVector = None
 
-rosenbrock_size = 6  # size of the design variable
 
 def rosenbrock(x):
     x_0 = x[:-1]
@@ -39,17 +38,39 @@ def rosenbrock(x):
 
 class Rosenbrock(om.ExplicitComponent):
 
+    def initialize(self):
+        self.options.declare('size', default=6)
+
     def setup(self):
-        self.add_input('x', np.ones(rosenbrock_size))
+        self.add_input('x', np.ones(self.options['size']))
         self.add_output('f', 0.0)
+
+        self.declare_partials(of='*', wrt='*', method='fd')
 
     def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
         x = inputs['x']
         outputs['f'] = rosenbrock(x)
 
+
 def rastrigin(x):
     a = 10  # constant
     return np.sum(np.square(x) - a * np.cos(2 * np.pi * x)) + a * np.size(x)
+
+
+class Rastrigin(om.ExplicitComponent):
+
+    def initialize(self):
+        self.options.declare('size', default=3)
+
+    def setup(self):
+        self.add_input('x', 0.5 * np.ones(self.options['size']))
+        self.add_output('f', 0.5)
+
+        self.declare_partials(of='*', wrt='*', method='fd')
+
+    def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
+        x = inputs['x']
+        outputs['f'] = rastrigin(x)
 
 
 class DummyComp(om.ExplicitComponent):
@@ -1089,6 +1110,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         # None when unused.
         p = om.Problem(model=SineFitter())
         p.driver = om.ScipyOptimizeDriver()
+        p.driver.options['singular_jac_behavior'] = 'ignore'
 
         p.setup()
         p.run_driver()
@@ -1108,7 +1130,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                 # Outputs
                 self.add_output('Vd', 0.0, units="m/s",
                                 desc="Slipstream air velocity, downstream of rotor")
-                
+
                 self.declare_partials('*', '*')  # do this else compute_partials won't run at all
 
             def compute(self, inputs, outputs):
@@ -1796,21 +1818,11 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         size = 3  # size of the design variable
 
-        class Rastrigin(om.ExplicitComponent):
-
-            def setup(self):
-                self.add_input('x', 0.5 * np.ones(size))
-                self.add_output('f', 0.5)
-
-            def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
-                x = inputs['x']
-                outputs['f'] = rastrigin(x)
-
         prob = om.Problem()
         model = prob.model
 
         model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(size)), promotes=['*'])
-        model.add_subsystem('rastrigin', Rastrigin(), promotes=['*'])
+        model.add_subsystem('rastrigin', Rastrigin(size=size), promotes=['*'])
 
         prob.driver = driver = om.ScipyOptimizeDriver()
         driver.options['optimizer'] = 'dual_annealing'
@@ -1828,27 +1840,15 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['f'], 0.0, 1e-2)
 
     def test_differential_evolution(self):
-        # Source of example:
-        # https://scipy.github.io/devdocs/generated/scipy.optimize.dual_annealing.html
         np.random.seed(6)
 
         size = 3  # size of the design variable
-
-        class Rastrigin(om.ExplicitComponent):
-
-            def setup(self):
-                self.add_input('x', 0.5 * np.ones(size))
-                self.add_output('f', 0.5)
-
-            def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
-                x = inputs['x']
-                outputs['f'] = rastrigin(x)
 
         prob = om.Problem()
         model = prob.model
 
         model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(size)), promotes=['*'])
-        model.add_subsystem('rastrigin', Rastrigin(), promotes=['*'])
+        model.add_subsystem('rastrigin', Rastrigin(size=size), promotes=['*'])
 
         prob.driver = driver = om.ScipyOptimizeDriver()
         driver.options['optimizer'] = 'differential_evolution'
@@ -1869,21 +1869,11 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         size = 3  # size of the design variable
 
-        class Rastrigin(om.ExplicitComponent):
-
-            def setup(self):
-                self.add_input('x', 0.5 * np.ones(size))
-                self.add_output('f', 0.5)
-
-            def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
-                x = inputs['x']
-                outputs['f'] = rastrigin(x)
-
         prob = om.Problem()
         model = prob.model
 
         model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(size)), promotes=['*'])
-        model.add_subsystem('rastrigin', Rastrigin(), promotes=['*'])
+        model.add_subsystem('rastrigin', Rastrigin(size=size), promotes=['*'])
 
         prob.driver = driver = om.ScipyOptimizeDriver()
         driver.options['optimizer'] = 'differential_evolution'
@@ -1903,22 +1893,26 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         # Source of example:
         # https://stefan-endres.github.io/shgo/
 
+        size = 6
+
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(rosenbrock_size)), promotes=['*'])
-        model.add_subsystem('rosen', Rosenbrock(), promotes=['*'])
+        model.add_subsystem('indep', om.IndepVarComp('x', np.ones(size)), promotes=['*'])
+        model.add_subsystem('rosen', Rosenbrock(size=size), promotes=['*'])
 
         prob.driver = driver = om.ScipyOptimizeDriver()
         driver.options['optimizer'] = 'shgo'
         driver.options['disp'] = False
         driver.opt_settings['maxiter'] = None
 
-        model.add_design_var('x', lower=np.zeros(rosenbrock_size), upper=2*np.ones(rosenbrock_size))
+        model.add_design_var('x', lower=np.zeros(size), upper=2*np.ones(size))
         model.add_objective('f')
+
         prob.setup()
         prob.run_driver()
-        assert_near_equal(prob['x'], np.ones(rosenbrock_size), 1e-2)
+
+        assert_near_equal(prob['x'], np.ones(size), 1e-2)
         assert_near_equal(prob['f'], 0.0, 1e-2)
 
     def test_singular_jac_error_responses(self):
@@ -2033,7 +2027,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob.model.set_input_defaults('y', -4.0)
 
         prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP')
-        # Default behavior is 'warn'
+        prob.driver.options['singular_jac_behavior'] = 'warn'
 
         prob.model.add_design_var('x', lower=-50, upper=50)
         prob.model.add_design_var('y', lower=-50, upper=50)
@@ -2124,26 +2118,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         size = 3  # size of the design variable
 
-        def rastrigin(x):
-            a = 10  # constant
-            return np.sum(np.square(x) - a * np.cos(2 * np.pi * x)) + a * np.size(x)
-
-        class Rastrigin(om.ExplicitComponent):
-
-            def setup(self):
-                self.add_input('x', np.ones(size))
-                self.add_output('f', 0.0)
-
-                self.declare_partials('*', '*', method='fd')
-
-            def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
-                x = inputs['x']
-                outputs['f'] = rastrigin(x)
-
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('rastrigin', Rastrigin(), promotes=['*'])
+        model.add_subsystem('rastrigin', Rastrigin(size=size), promotes=['*'])
 
         prob.driver = driver = om.ScipyOptimizeDriver()
         driver.options['optimizer'] = 'shgo'
@@ -2181,6 +2159,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         p.model.add_constraint('exec.z', indices=[-1], equals=25, alias="ALIAS_TEST")
 
         p.driver = om.ScipyOptimizeDriver()
+        p.driver.options['singular_jac_behavior'] = 'ignore'
 
         p.setup()
 

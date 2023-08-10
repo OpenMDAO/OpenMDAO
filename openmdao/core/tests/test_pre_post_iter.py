@@ -547,6 +547,8 @@ class TestPrePostIter(unittest.TestCase):
         p.options['group_by_pre_opt_post'] = True
 
         p.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False)
+        p.driver.options['singular_jac_behavior'] = 'ignore'
+
         p.set_solver_print(level=0)
 
         model.add_subsystem('pre1', ExecComp4Test('y=2.*x', shape=size))

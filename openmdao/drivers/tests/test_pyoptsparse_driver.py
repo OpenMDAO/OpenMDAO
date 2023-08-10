@@ -2237,7 +2237,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
-        # Default behavior is 'warn'
+        prob.driver.options['singular_jac_behavior'] = 'warn'
 
         prob.model.add_design_var('x', lower=-50, upper=50)
         prob.model.add_design_var('y', lower=-50, upper=50)
@@ -2304,6 +2304,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         p.driver = om.pyOptSparseDriver()
         p.driver.options['optimizer'] = OPTIMIZER
+        p.driver.options['singular_jac_behavior'] = 'ignore'
 
         p.setup()
 
@@ -2382,6 +2383,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         p.driver = om.pyOptSparseDriver()
         p.driver.options['optimizer'] = OPTIMIZER
+        p.driver.options['singular_jac_behavior'] = 'ignore'
 
         p.setup()
 
@@ -2644,6 +2646,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         p.driver = om.pyOptSparseDriver()
         p.driver.options['optimizer'] = OPTIMIZER
+        p.driver.options['singular_jac_behavior'] = 'ignore'
 
         # FWD
         p.setup(mode='fwd')
@@ -2686,6 +2689,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         p.driver = om.pyOptSparseDriver()
         p.driver.options['optimizer'] = OPTIMIZER
+        p.driver.options['singular_jac_behavior'] = 'ignore'
 
         # FWD
         p.setup(mode='fwd')
@@ -2735,6 +2739,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         p.driver = om.pyOptSparseDriver()
         p.driver.options['optimizer'] = "SNOPT"
+        p.driver.options['singular_jac_behavior'] = 'ignore'
 
         p.driver.declare_coloring()
 

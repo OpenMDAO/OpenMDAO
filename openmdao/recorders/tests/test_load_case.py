@@ -505,12 +505,16 @@ class TestLoadCaseMPI(unittest.TestCase):
 
     def test_distrib_var_load(self):
         prob = om.Problem()
+
         ivc = prob.model.add_subsystem('ivc',om.IndepVarComp(), promotes=['*'])
         ivc.add_output('x', val = np.ones(100 if prob.comm.rank == 0 else 10), distributed=True)
         ivc.add_output('y', val = 1.0)
 
         prob.model.add_subsystem('adder', Adder(), promotes=['*'])
+
         prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9)
+        prob.driver.options['singular_jac_behavior'] = 'ignore'
+
         prob.model.add_design_var('y', lower=-1, upper=1)
         prob.model.add_objective('x_sum')
 

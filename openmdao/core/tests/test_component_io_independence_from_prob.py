@@ -22,6 +22,8 @@ class TestComponentIOIndependenceFromProb(unittest.TestCase):
             self.add_input('a', units='mm')
             self.add_output('y', units='mm')
 
+            self.declare_partials('*', '*', method='fd')
+
         def compute(self, inputs, outputs):
             x = inputs['x']
             a = inputs['a']
@@ -47,7 +49,6 @@ class TestComponentIOIndependenceFromProb(unittest.TestCase):
 
             prob.setup()
             prob.run_driver()
-
 
     class ParabolaSystem(om.Group):
 

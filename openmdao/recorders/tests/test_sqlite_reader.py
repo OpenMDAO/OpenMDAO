@@ -3048,6 +3048,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         p.model.add_constraint('exec.z', indices=[1], lower=0, alias="con|with->scaling", ref=11.0)
 
         driver = p.driver = om.pyOptSparseDriver()
+        driver.options['singular_jac_behavior'] = 'ignore'
         driver.recording_options['record_derivatives'] = True
         driver.add_recorder(om.SqliteRecorder('cases.sql'))
 
