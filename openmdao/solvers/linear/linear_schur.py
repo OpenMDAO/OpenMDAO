@@ -394,8 +394,10 @@ class LinearSchur(BlockLinearSolver):
             # b_vec2 *= -1.0
             # b_vec2 += subsys2_rhs
             schur_rhs = subsys2_rhs - schur_rhs
-            schur_jac = schur_jac + 1e-16
+            iD_schur = np.eye(n_vars, dtype=system._vectors["residual"]["linear"].asarray(copy=True).dtype) * 1e-16
+            schur_jac = schur_jac + iD_schur
             d_subsys2 = scipy.linalg.solve(schur_jac, schur_rhs)
+
             # print(d_subsys2, schur_jac, schur_rhs)
             scope_out, scope_in = system._get_matvec_scope(subsys2)
             scope_out = self._vars_union(self._scope_out, scope_out)
