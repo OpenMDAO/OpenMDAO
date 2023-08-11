@@ -349,7 +349,7 @@ jobs:
       - name: Display doc build reports
         if: failure() && matrix.BUILD_DOCS && steps.build_docs.outcome == 'failure'
         run: |
-          for f in /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports/*; do
+          for f in $(find /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports -name '*.log'); do
             echo "============================================================="
             echo $f
             echo "============================================================="
