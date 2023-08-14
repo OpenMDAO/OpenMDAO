@@ -3975,16 +3975,15 @@ class Group(System):
 
         return graph
 
-    def _get_auto_ivc_out_val(self, tgts, vars_to_gather, abs2meta_in):
+    def _get_auto_ivc_out_val(self, tgts, vars_to_gather):
         # all tgts are continuous variables
         # only called from top level group
         info = None
         src_idx_found = []
         max_size = -1
         found_dup = False
-
+        abs2meta_in = self._var_abs2meta['input']
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
-
         start_val = val = None
         val_shape = None
         chosen_tgt = None
@@ -4022,12 +4021,6 @@ class Group(System):
 
         info = None
         for tgt in tgts:
-            # if tgt in vars_to_gather and self.comm.rank != vars_to_gather[tgt]:
-            #     if info is None or max_size < 0:
-            #         info = (tgt, np.zeros(0), True)
-            #         max_size = 0
-            #     continue
-
             if tgt in abs2meta_in:  # tgt is local
                 meta = abs2meta_in[tgt]
                 size = meta['size']
@@ -4123,16 +4116,14 @@ class Group(System):
                 keep_val = val
                 val = start_val
 
-        if tgt in vars_to_gather:
-            if vars_to_gather[tgt] == self.comm.rank:  # this rank 'owns' the var
+        if tgt in vars_to_gather:  # tgt var is remote somewhere (but not distributed)
+            owner = vars_to_gather[tgt]
+            if owner == self.comm.rank:  # this rank 'owns' the var
                 val = keep_val
+                self.comm.bcast(val, root=owner)
             else:
-                val = None
-
-            for v in self.comm.allgather(val):
-                if v is not None:
-                    val = v
-                    break
+                val = self.comm.bcast(None, root=owner)
+            self.comm.Bcast(val, root=owner)
 
             info = (tgt, val, False)
 
@@ -4196,12 +4187,11 @@ class Group(System):
         conns.update(auto_conns)
         auto_ivc.auto2tgt = auto2tgt
 
-        abs2meta_in = self._var_abs2meta['input']
         vars2gather = self._vars_to_gather
 
         for src, tgts in auto2tgt.items():
             prom = self._var_allprocs_abs2prom['input'][tgts[0]]
-            ret = self._get_auto_ivc_out_val(tgts, vars2gather, abs2meta_in)
+            ret = self._get_auto_ivc_out_val(tgts, vars2gather)
             if ret is None:  # setup error occurred. Try to continue
                 continue
             tgt, val, remote = ret
