@@ -1243,8 +1243,6 @@ class _TotalJacInfo(object):
                 if vnames is not None:
                     vec_names.add(vnames[0])
 
-        # print(self.comm.rank, 'invec', mode, self.input_vec[mode]._data)
-
         if vec_names:
             return all_rel_systems, sorted(vec_names), (inds[0], mode)
         else:
@@ -1311,7 +1309,6 @@ class _TotalJacInfo(object):
         if mode == 'fwd':
             self.J[jac_idxs, i] = deriv_val[deriv_idxs]
         else:  # rev
-            # print(f'J[{i}, {jac_idxs}] = {deriv_val}   [{deriv_idxs}]')
             self.J[i, jac_idxs] = deriv_val[deriv_idxs]
 
     def _jac_setter_dist(self, i, mode):
