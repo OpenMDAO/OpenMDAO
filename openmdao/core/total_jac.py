@@ -91,7 +91,7 @@ class _TotalJacInfo(object):
         (local indices, local sizes).
     in_idx_map : dict
         Mapping of jacobian row/col index to a tuple of the form
-        (ndups, relevant_systems, cache_linear_solutions_flag)
+        (ndups, relevant_systems, cache_linear_solutions_flag, name, parallel_deriv_color)
     total_relevant_systems : set
         The set of names of all systems relevant to the computation of the total derivatives.
     directional : bool
@@ -803,10 +803,10 @@ class _TotalJacInfo(object):
                 relsystems = relevant[path]['@all'][1]
                 if self.total_relevant_systems is not _contains_all:
                     self.total_relevant_systems.update(relsystems)
-                tup = (ndups, relsystems, cache_lin_sol, name)
+                tup = (ndups, relsystems, cache_lin_sol, name, parallel_deriv_color)
             else:
                 self.total_relevant_systems = _contains_all
-                tup = (ndups, _contains_all, cache_lin_sol, name)
+                tup = (ndups, _contains_all, cache_lin_sol, name, parallel_deriv_color)
 
             idx_map.extend([tup] * (end - start))
             start = end
@@ -830,7 +830,7 @@ class _TotalJacInfo(object):
             locs = None
             for ilist in simul_coloring.color_iter(mode):
                 for i in ilist:
-                    _, rel_systems, cache_lin_sol, _ = idx_map[i]
+                    _, rel_systems, cache_lin_sol, _, _ = idx_map[i]
                     _update_rel_systems(all_rel_systems, rel_systems)
                     cache |= cache_lin_sol
 
@@ -1161,7 +1161,8 @@ class _TotalJacInfo(object):
         int or None
             key used for storage of cached linear solve (if active, else None).
         """
-        _, rel_systems, cache_lin_sol, _ = self.in_idx_map[mode][idx]
+        _, rel_systems, cache_lin_sol, _, par_deriv_color = self.in_idx_map[mode][idx]
+        self.model._problem_meta['par_deriv_color'] = par_deriv_color
 
         self._zero_vecs(mode)
 
@@ -1272,7 +1273,7 @@ class _TotalJacInfo(object):
             Not used.
         """
         for i in inds:
-            _, rel_systems, _, _ = self.in_idx_map[mode][i]
+            _, rel_systems, _, _, _ = self.in_idx_map[mode][i]
             break
 
         self._zero_vecs(mode)
@@ -1310,7 +1311,7 @@ class _TotalJacInfo(object):
         if mode == 'fwd':
             self.J[jac_idxs, i] = deriv_val[deriv_idxs]
         else:  # rev
-            print(f'J[{i}, {jac_idxs}] = {deriv_val}   [{deriv_idxs}]')
+            # print(f'J[{i}, {jac_idxs}] = {deriv_val}   [{deriv_idxs}]')
             self.J[i, jac_idxs] = deriv_val[deriv_idxs]
 
     def _jac_setter_dist(self, i, mode):
@@ -1335,7 +1336,7 @@ class _TotalJacInfo(object):
         elif mode == 'rev':
             # for rows corresponding to serial 'of' vars, we need to correct for
             # duplication of their seed values by dividing by the number of duplications.
-            ndups, _, _, _ = self.in_idx_map[mode][i]
+            ndups, _, _, _, par_deriv_color = self.in_idx_map[mode][i]
             if self.get_remote:
                 scratch = self.jac_scratch['rev'][0]
                 scratch[:] = self.J[i]

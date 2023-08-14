@@ -452,7 +452,7 @@ class IndicesTestCase2(unittest.TestCase):
                     if 'y' in d_outputs:
                         if 'x' in d_inputs:
                             d_inputs['x'] += self.options['a'] * d_outputs['y']
-                            print(self.pathname, 'compute_jvp: dinputs[x]', d_inputs['x'])
+                            # print(self.pathname, 'compute_jvp: dinputs[x]', d_inputs['x'])
                 else:
                     raise RuntimeError("fwd mode not supported")
 

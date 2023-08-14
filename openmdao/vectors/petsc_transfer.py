@@ -242,7 +242,8 @@ else:
             in_petsc = in_vec._petsc
             out_petsc = out_vec._petsc
 
-            print(in_vec._system().pathname, 'rank', in_vec._system().comm.rank, mode, 'PRE', 'invec:', in_petsc.array, 'outvec:', out_petsc.array)
+            # print(in_vec._system().pathname, 'rank', in_vec._system().comm.rank, mode,
+            #       'PRE', 'invec:', in_petsc.array, 'outvec:', out_petsc.array)
 
             # For Complex Step, need to disassemble real and imag parts, transfer them separately,
             # then reassemble them.
@@ -279,5 +280,5 @@ else:
                     data = in_vec._get_data()
                     data[:] = in_petsc.array
 
-                print(in_vec._system().pathname, 'rank', in_vec._system().comm.rank, mode, 'POST', 'invec:', in_petsc.array, 'outvec:', out_petsc.array)
-
+                # print(in_vec._system().pathname, 'rank', in_vec._system().comm.rank, mode,
+                #       'POST', 'invec:', in_petsc.array, 'outvec:', out_petsc.array)
