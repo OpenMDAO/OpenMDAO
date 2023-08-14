@@ -3,7 +3,7 @@
 import sys
 from collections import defaultdict
 from collections.abc import Iterable
-from itertools import product
+from itertools import product, chain
 
 from numbers import Integral
 import numpy as np
@@ -374,6 +374,44 @@ class Component(System):
         all variables.
         """
         pass
+
+    def _declared_partials_iter(self):
+        """
+        Iterate over all declared partials.
+
+        Yields
+        ------
+        (key, meta) : (key, dict)
+            key: a tuple of the form (of, wrt)
+            meta: a dict containing the partial metadata
+        """
+        for key, meta in self._subjacs_info.items():
+            yield key, meta
+
+    def _get_missing_partials(self, missing):
+        """
+        Return a list of (of, wrt) tuples for which derivatives have not been declared.
+
+        Parameters
+        ----------
+        missing : dict
+            Dictionary containing set of missing derivatives keyed by system pathname.
+        """
+        if ('*', '*') in self._declared_partials:
+            return
+
+        if self.matrix_free and not self._declared_partials:
+            return
+
+        keyset = {key for key, _ in self._declared_partials_iter()}
+        mset = set()
+        for of in self._var_allprocs_abs2meta['output']:
+            for wrt in self._var_allprocs_abs2meta['input']:
+                if (of, wrt) not in keyset:
+                    mset.add((of, wrt))
+
+        if mset:
+            missing[self.pathname] = mset
 
     @property
     def checking(self):

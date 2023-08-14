@@ -673,6 +673,9 @@ class Problem(object):
                                ": Before calling `run_driver`, the `setup` method must be called "
                                "if set_output_solver_options has been called.")
 
+        if 'singular_jac_behavior' in self.driver.options:
+            self._metadata['singular_jac_behavior'] = self.driver.options['singular_jac_behavior']
+
         old_prefix = self._recording_iter.prefix
 
         if case_prefix is not None:
@@ -978,7 +981,8 @@ class Problem(object):
             'saved_errors': [],  # store setup errors here until after final_setup
             'checking': False,  # True if check_totals or check_partials is running
             'opt_status': None,  # Tells Systems if they are in an optimization loop
-            'model_options': self.model_options  # A dict of options passed to all systems in tree
+            'model_options': self.model_options,  # A dict of options passed to all systems in tree
+            'singular_jac_behavior': 'warn',  # How to handle singular jac conditions
         }
         model._setup(model_comm, mode, self._metadata)
 
@@ -990,14 +994,6 @@ class Problem(object):
         self._logger = logger
 
         self._metadata['setup_status'] = _SetupStatus.POST_SETUP
-
-        if self.options['group_by_pre_opt_post']:
-            if self.driver.supports['optimization']:
-                self.model._setup_iteration_lists()
-            else:
-                issue_warning(f"In Problem '{self._name}, the 'group_by_pre_opt_post' option is "
-                              "True but the driver doesn't support optimization so the option will "
-                              "be ignored.")
 
         self._check_collected_errors()
 
@@ -1025,7 +1021,15 @@ class Problem(object):
             mode = self._orig_mode
 
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-            self.model._final_setup(self.comm)
+            self.model._final_setup(self.comm, self._orig_mode)
+
+        if self.options['group_by_pre_opt_post']:
+            if self.driver.supports['optimization']:
+                self.model._setup_iteration_lists()
+            else:
+                issue_warning(f"In Problem '{self._name}, the 'group_by_pre_opt_post' option is "
+                              "True but the driver doesn't support optimization so the option will "
+                              "be ignored.")
 
         # If set_solver_print is called after an initial run, in a multi-run scenario,
         #  this part of _final_setup still needs to happen so that change takes effect

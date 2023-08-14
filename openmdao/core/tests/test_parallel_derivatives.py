@@ -835,12 +835,12 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         model.add_objective('dc3.y', index=2, parallel_deriv_color=pdc)
 
         prob = om.Problem(model=model, name='parallel_deriv_coloring_overlap_err')
+        prob.setup(mode='rev')
         with self.assertRaises(Exception) as ctx:
-            prob.setup(mode='rev')
-        self.assertTrue(
-           "\nCollected errors for problem 'parallel_deriv_coloring_overlap_err':"
-           "\n   <model> <class Group>: response 'pg.dc2.y' has overlapping dependencies on the "
-           "same rank with other responses in parallel_deriv_color 'a'." in str(ctx.exception))
+            prob.final_setup()
+        self.assertEqual(str(ctx.exception),
+           "<model> <class Group>: response 'pg.dc2.y' has overlapping dependencies on the "
+           "same rank with other responses in parallel_deriv_color 'a'.")
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests

@@ -5,7 +5,7 @@ Utilities for working with files.
 import sys
 import os
 import importlib
-import functools
+import types
 from fnmatch import fnmatch
 from os.path import join, basename, dirname, isfile, split, splitext, abspath
 
@@ -196,6 +196,34 @@ def _load_and_exec(script_name, user_args):
     exec(code, globals_dict)  # nosec: private, internal use only
 
 
+def fname2mod_name(fname):
+    """
+    Convert a string to a valid python module name.
+
+    Parameters
+    ----------
+    fname : str
+        The filename to convert.
+
+    Returns
+    -------
+    str
+        A valid module name corresponding to the given filename.
+    """
+    to_replace = ['-', ' ', '.', '(', ')', '[', ']', '{', '}', '=', '+'
+                  '!', '@', '#', '$', '%', '^', '&', '*', '~', '`',
+                  ';', ':', '"', "'", '<', '>', '?', '/', '\\', '|']
+
+    if not fname.endswith('.py'):
+        raise ValueError(f"'{s}' does not end with '.py'")
+
+    s = os.path.basename(fname).rsplit('.', 1)[0]
+
+    for c in to_replace:
+        s = s.replace(c, '_')
+    return s
+
+
 def _load_and_run_test(testspec):
     """
     Load and run an individual test function.
@@ -208,12 +236,26 @@ def _load_and_run_test(testspec):
     syspath_save = sys.path[:]
 
     modpath, funcpath = testspec.rsplit(':', 1)
+    orig_modpath = modpath
 
     if modpath.endswith('.py'):
         modpath = get_module_path(modpath)
-
-    sys.path.append('.')
-    mod = importlib.import_module(modpath)
+        if modpath is None:
+            # create a module dynamically
+            modpath = fname2mod_name(orig_modpath)
+            mod = types.ModuleType(modpath)
+            sys.modules[modpath] = mod
+            mod.__file__ = modpath
+            mod.__name__ = modpath
+            mod.__package__ = None
+            mod.__cached__ = None
+            with open(orig_modpath, 'rb') as fp:
+                code = compile(fp.read(), orig_modpath, 'exec')
+            exec(code, mod.__dict__)  # nosec: private, internal use only
+        else:
+            mod = importlib.import_module(modpath)
+    else:
+        mod = importlib.import_module(modpath)
 
     try:
         return _run_test_func(mod, funcpath)

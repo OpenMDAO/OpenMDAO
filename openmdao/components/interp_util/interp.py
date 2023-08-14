@@ -9,7 +9,7 @@ import numpy as np
 from openmdao.components.interp_util.interp_akima import InterpAkima, Interp1DAkima
 from openmdao.components.interp_util.interp_bsplines import InterpBSplines
 from openmdao.components.interp_util.interp_cubic import InterpCubic
-from openmdao.components.interp_util.interp_lagrange2 import InterpLagrange2, Interp3DLagrange2,\
+from openmdao.components.interp_util.interp_lagrange2 import InterpLagrange2, Interp3DLagrange2, \
     Interp2DLagrange2, Interp1DLagrange2
 from openmdao.components.interp_util.interp_lagrange3 import InterpLagrange3, Interp3DLagrange3, \
     Interp2DLagrange3, Interp1DLagrange3
