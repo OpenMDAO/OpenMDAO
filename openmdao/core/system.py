@@ -1017,7 +1017,9 @@ class System(object):
         #   this var
         new_desvar_metadata = {
             'scaler': scaler,
+            'total_scaler': scaler,
             'adder': adder,
+            'total_adder': adder,
             'upper': upper,
             'lower': lower,
             'ref': ref,
@@ -1215,7 +1217,9 @@ class System(object):
             'lower': lower,
             'upper': upper,
             'adder': adder,
+            'total_adder': adder,
             'scaler': scaler,
+            'total_scaler': scaler,
         }
 
         responses[name].update(new_cons_metadata)
@@ -1264,7 +1268,7 @@ class System(object):
             responses = self._responses
 
         # Look through responses to see if there are multiple responses with that name
-        aliases = [resp['alias'] for key, resp in responses.items() if resp['name'] == name]
+        aliases = [resp['alias'] for resp in responses.values() if resp['name'] == name]
         if len(aliases) > 1 and alias is _UNDEFINED:
             msg = "{}: set_objective_options called with objective variable '{}' that has " \
                   "multiple aliases: {}. Call set_objective_options with the 'alias' argument " \
@@ -1290,8 +1294,6 @@ class System(object):
         if ref0 is _UNDEFINED:
             ref0 = None
 
-        new_obj_metadata = {}
-
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
         ref0 = format_as_float_or_array('ref0', ref0, val_if_none=None, flatten=True)
@@ -1311,10 +1313,14 @@ class System(object):
         elif adder == 0.0:
             adder = None
 
-        new_obj_metadata['scaler'] = scaler
-        new_obj_metadata['adder'] = adder
-        new_obj_metadata['ref'] = ref
-        new_obj_metadata['ref0'] = ref0
+        new_obj_metadata = {
+            'ref': ref,
+            'ref0': ref0,
+            'adder': adder,
+            'total_adder': adder,
+            'scaler': scaler,
+            'total_scaler': scaler,
+        }
 
         responses[name].update(new_obj_metadata)
 

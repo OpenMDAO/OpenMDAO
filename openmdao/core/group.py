@@ -4123,7 +4123,6 @@ class Group(System):
                 self.comm.bcast(val, root=owner)
             else:
                 val = self.comm.bcast(None, root=owner)
-            self.comm.Bcast(val, root=owner)
 
             info = (tgt, val, False)
 
