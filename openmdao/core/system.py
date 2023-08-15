@@ -3052,6 +3052,7 @@ class System(object):
         dv['indices'] = indices
         dv['flat_indices'] = flat_indices
         dv['parallel_deriv_color'] = parallel_deriv_color
+        dv['total_scaler'] = None
 
         design_vars[name] = dv
 
@@ -3241,6 +3242,7 @@ class System(object):
         resp['cache_linear_solution'] = cache_linear_solution
         resp['parallel_deriv_color'] = parallel_deriv_color
         resp['flat_indices'] = flat_indices
+        resp['total_scaler'] = None
 
         if alias in responses:
             raise TypeError(f"{self.msginfo}: Constraint alias '{alias}' is a duplicate of an "
