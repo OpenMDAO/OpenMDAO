@@ -848,6 +848,77 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
            "<model> <class Group>: response 'pg.dc2.y' has overlapping dependencies on the "
            "same rank with other responses in parallel_deriv_color 'a'.")
 
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestAutoIVCParDerivBug(unittest.TestCase):
+    N_PROCS = 4
+
+    def test_auto_ivc_par_deriv_bug(self):
+        class SimpleAero(om.ExplicitComponent):
+            """Simple aerodynamic model"""
+
+            def initialize(self):
+                self.options.declare( "CLwing", default=0.5, desc="Wing lift factor", )
+                self.options.declare( "CLtail", default=0.25, desc="tail lift factor", )
+                self.options.declare( "CDwing", default=0.05, desc="Wing drag factor", )
+                self.options.declare( "CDtail", default=0.025, desc="tail drag factor", )
+
+            def setup(self):
+                # Inputs
+                self.add_input('alpha', 0.1, desc="Angle of attack of wing")
+                self.add_input('tail_angle', 0.01, desc="Angle of attack of tail")
+
+                # Outputs
+                self.add_output('L', 0.0, desc="Total lift")
+                self.add_output('D', 0.0, desc="Total drag")
+
+                # Set options
+                self.CLwing = self.options["CLwing"]
+                self.CDwing = self.options["CDwing"]
+                self.CLtail = self.options["CLtail"]
+                self.CDtail = self.options["CDtail"]
+
+                self.declare_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                """ A simple surrogate for a 2 dof aero problem"""
+                outputs['L'] = self.CLwing * inputs['alpha'] + self.CLtail * inputs['tail_angle']
+                outputs['D'] = self.CDwing * inputs['alpha'] ** 2 + self.CDtail * inputs['tail_angle'] ** 2
+
+            def compute_partials(self, inputs, partials):
+                """Analytical derivatives"""
+                partials['L', 'alpha'] = self.CLwing
+                partials['L', 'tail_angle'] = self.CLtail
+                partials['D', 'alpha'] = 2 * self.CDwing * inputs['alpha']
+                partials['D', 'tail_angle'] = 2 * self.CDtail * inputs['tail_angle']
+
+        # Use parallel group to solve flight conditions simultaneously
+        flight_conds = om.ParallelGroup()
+        flight_conds.add_subsystem("cruise", SimpleAero(CLwing=0.5, CDwing=0.05, CLtail=0.25, CDtail=0.025))
+        flight_conds.add_subsystem("maneuver", SimpleAero(CLwing=0.75, CDwing=0.25, CLtail=0.45, CDtail=0.15))
+
+        # build the model
+        prob = om.Problem()
+        prob.model.add_subsystem('flight_conditions', flight_conds)
+
+        # Set dvs for each flight condition
+        prob.model.add_design_var('flight_conditions.cruise.alpha', lower=-50, upper=50)
+        prob.model.add_design_var('flight_conditions.cruise.tail_angle', lower=-50, upper=50)
+        prob.model.add_design_var('flight_conditions.maneuver.alpha', lower=-50, upper=50)
+        prob.model.add_design_var('flight_conditions.maneuver.tail_angle', lower=-50, upper=50)
+        # Use the parallel derivative option to solve lift constraint simultaneously
+        prob.model.add_constraint('flight_conditions.cruise.L', equals=1.0, parallel_deriv_color="lift")
+        prob.model.add_constraint('flight_conditions.maneuver.L', equals=2.5, parallel_deriv_color="lift")
+        # Set cruise drag as objective
+        prob.model.add_objective('flight_conditions.cruise.D')
+
+        prob.setup(mode='rev', force_alloc_complex=True)
+
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+
+
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests
     mpirun_tests()
