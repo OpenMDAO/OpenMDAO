@@ -1108,6 +1108,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                 # Outputs
                 self.add_output('Vd', 0.0, units="m/s",
                                 desc="Slipstream air velocity, downstream of rotor")
+                
+                self.declare_partials('*', '*')  # do this else compute_partials won't run at all
 
             def compute(self, inputs, outputs):
                 a = inputs['a']
@@ -1116,6 +1118,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                 outputs['Vd'] = Vu * (1 - 2 * a)
 
             def compute_partials(self, inputs, J):
+                raise RuntimeError("Error raised from compute_partials!")
                 Vu = inputs['Vu']
 
                 J['Vd', 'a'] = -2.0 * Vu
@@ -1137,11 +1140,11 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        with self.assertRaises(KeyError) as context:
+        with self.assertRaises(RuntimeError) as context:
             prob.run_driver()
 
-        msg = 'Variable name pair ("Vd", "a") must first be declared.'
-        self.assertTrue(msg in str(context.exception))
+        msg = "'a_disk' <class ReducedActuatorDisc>: Error calling compute_partials(), Error raised from compute_partials!"
+        self.assertEqual(context.exception.args[0], msg)
 
     def test_simple_paraboloid_upper_COBYLA(self):
 
@@ -1951,8 +1954,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
             prob.run_driver()
 
         self.assertEqual(str(msg.exception),
-                         "Constraints or objectives [('parab.z', inds=[0, 1, 2])] cannot be impacted by the design " + \
-                         "variables of the problem.")
+                         'Constraints or objectives [parab.z] cannot be impacted by the design variables of the problem because no partials were defined for them in their parent component(s).')
 
     def test_singular_jac_error_desvars(self):
         prob = om.Problem()

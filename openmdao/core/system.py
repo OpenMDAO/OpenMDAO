@@ -1978,6 +1978,23 @@ class System(object):
         for subsys in self._subsystems_myproc:
             subsys._setup_recording()
 
+    def _reset_setup_vars(self):
+        """
+        Reset all the stuff that gets initialized in setup.
+        """
+        self._first_call_to_linearize = True
+        self._is_local = True
+        self._vectors = {}
+        self._full_comm = None
+        self._approx_subjac_keys = None
+
+        self.options._parent_name = self.msginfo
+        self.recording_options._parent_name = self.msginfo
+        self._design_vars = {}
+        self._responses = {}
+        self._design_vars.update(self._static_design_vars)
+        self._responses.update(self._static_responses)
+
     def _setup_procs(self, pathname, comm, mode, prob_meta):
         """
         Execute first phase of the setup process.
@@ -1997,21 +2014,11 @@ class System(object):
         prob_meta : dict
             Problem level options.
         """
-        self.pathname = pathname
-        self._set_problem_meta(prob_meta)
-        self._first_call_to_linearize = True
-        self._is_local = True
-        self._vectors = {}
-        self._full_comm = None
-        self._approx_subjac_keys = None
+        self._reset_setup_vars()
 
-        self.options._parent_name = self.msginfo
-        self.recording_options._parent_name = self.msginfo
+        self.pathname = pathname
         self._mode = mode
-        self._design_vars = {}
-        self._responses = {}
-        self._design_vars.update(self._static_design_vars)
-        self._responses.update(self._static_responses)
+        self._set_problem_meta(prob_meta)
         self.load_model_options()
 
     def _setup_var_data(self):
@@ -2068,12 +2075,14 @@ class System(object):
         if abs2meta is None:
             abs2meta = self._var_allprocs_abs2meta['output']
 
+        has_scaling = False
+
         dv = self._design_vars
         for name, meta in dv.items():
 
             units = meta['units']
-            dv[name]['total_adder'] = dv[name]['adder']
-            dv[name]['total_scaler'] = dv[name]['scaler']
+            meta['total_adder'] = meta['adder']
+            meta['total_scaler'] = meta['scaler']
 
             if units is not None:
                 # If derivatives are not being calculated, then you reach here before source
@@ -2100,11 +2109,14 @@ class System(object):
 
                 factor, offset = unit_conversion(var_units, units)
                 base_adder, base_scaler = determine_adder_scaler(None, None,
-                                                                 dv[name]['adder'],
-                                                                 dv[name]['scaler'])
+                                                                 meta['adder'],
+                                                                 meta['scaler'])
 
-                dv[name]['total_adder'] = offset + base_adder / factor
-                dv[name]['total_scaler'] = base_scaler * factor
+                meta['total_adder'] = offset + base_adder / factor
+                meta['total_scaler'] = base_scaler * factor
+
+            if meta['total_scaler'] is not None:
+                has_scaling = True
 
         resp = self._responses
         type_dict = {'con': 'constraint', 'obj': 'objective'}
@@ -2120,7 +2132,7 @@ class System(object):
                 try:
                     units_src = meta['source']
                 except KeyError:
-                    units_src = self.get_source(name)
+                    units_src = self.get_source(meta['name'])
 
                 src_units = abs2meta[units_src]['units']
 
@@ -2147,8 +2159,17 @@ class System(object):
                 meta['total_scaler'] = base_scaler * factor
                 meta['total_adder'] = offset + base_adder / factor
 
+            if meta['total_scaler'] is not None:
+                has_scaling = True
+
         for s in self._subsystems_myproc:
-            s._setup_driver_units(abs2meta)
+            has_scaling |= s._setup_driver_units(abs2meta)
+
+        if (self.comm.size > 1 and self._subsystems_allprocs and
+                self._mpi_proc_allocator.parallel):
+            has_scaling = bool(self.comm.allreduce(int(has_scaling)))
+
+        return has_scaling
 
     def _setup_connections(self):
         """
@@ -3221,8 +3242,8 @@ class System(object):
         resp['flat_indices'] = flat_indices
 
         if alias in responses:
-            raise TypeError(f"Constraint alias '{alias}' is a duplicate of an existing alias or "
-                            "variable name.")
+            raise TypeError(f"{self.msginfo}: Constraint alias '{alias}' is a duplicate of an "
+                            "existing alias or variable name.")
 
         responses[name] = resp
 
@@ -3579,8 +3600,8 @@ class System(object):
                     if alias in prom2abs_out or alias in prom2abs_in:
                         # Constraint alias should never be the same as any openmdao variable.
                         path = prom2abs_out[prom][0] if prom in prom2abs_out else prom
-                        raise RuntimeError(f"Constraint alias '{alias}' on '{path}' is the same "
-                                           "name as an existing variable.")
+                        raise RuntimeError(f"{self.msginfo}: Constraint alias '{alias}' on '{path}'"
+                                           " is the same name as an existing variable.")
                     data['alias_path'] = self.pathname
 
                 if prom_or_alias in prom2abs_out:

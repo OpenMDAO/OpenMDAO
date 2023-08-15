@@ -539,6 +539,57 @@ class TestPrePostIter(unittest.TestCase):
         for i, iter_coord in enumerate(cr.list_cases('root.iter1', recurse=False, out_stream=None)):
             self.assertEqual(iter_coord, f'rank0:ScipyOptimize_SLSQP|{i}|root._solve_nonlinear|{i + 1}|NLRunOnce|0|iter1._solve_nonlinear|{i}')
 
+    def test_incomplete_partials(self):
+        p = om.Problem()
+        model = p.model
+        size = 3
+
+        p.options['group_by_pre_opt_post'] = True
+
+        p.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False)
+        p.set_solver_print(level=0)
+
+        model.add_subsystem('pre1', ExecComp4Test('y=2.*x', shape=size))
+        model.add_subsystem('pre2', ExecComp4Test('y=3.*x1 - 7.*x2', shape=size))
+
+        model.add_subsystem('ivc', om.IndepVarComp('x', np.ones(size)))
+
+        model.add_subsystem('iter1', ExecComp4Test('y=x*3.2', shape=size))
+        model.add_subsystem('incomplete', ExecComp4Test(['y1=3.*x1', 'y2=5*x2'], shape=size))
+        model.add_subsystem('obj', ExecComp4Test('obj=.5*x', shape=size))
+
+        model.add_subsystem('post1', ExecComp4Test('y=8.*x', shape=size))
+
+        model.connect('ivc.x', 'iter1.x')
+        model.connect('iter1.y', 'incomplete.x2')
+        model.connect('incomplete.y2', 'obj.x')
+        model.connect('incomplete.y1', 'post1.x')
+        model.connect('pre1.y', 'pre2.x2')
+        model.connect('pre2.y', 'incomplete.x1')
+
+        p.model.add_design_var('ivc.x', lower=-10, upper=10)
+        p.model.add_objective('obj.obj', index=0)
+
+        p.setup(mode='fwd', force_alloc_complex=True)
+
+        # we don't want ExecComps to be colored because it makes the iter counting more complicated.
+        for comp in model.system_iter(recurse=True, typ=ExecComp4Test):
+            comp.options['do_coloring'] = False
+            comp.options['has_diag_partials'] = True
+
+        p.run_driver()
+
+        self.assertEqual(p.model.pre1.num_nl_solves, 1)
+        self.assertEqual(p.model.pre2.num_nl_solves, 1)
+
+        self.assertEqual(p.model.incomplete.num_nl_solves, 4)
+        self.assertEqual(p.model.iter1.num_nl_solves, 4)
+        self.assertEqual(p.model.obj.num_nl_solves, 4)
+
+        self.assertEqual(p.model.post1.num_nl_solves, 1)
+
+        data = p.check_totals(method='cs', out_stream=None)
+        assert_check_totals(data)
 
 if __name__ == "__main__":
     unittest.main()
