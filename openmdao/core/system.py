@@ -3028,6 +3028,7 @@ class System(object):
         elif scaler == 1.0:
             scaler = None
         dv['scaler'] = scaler
+        dv['total_scaler'] = scaler
 
         if isinstance(adder, np.ndarray):
             if not np.any(adder):
@@ -3035,6 +3036,7 @@ class System(object):
         elif adder == 0.0:
             adder = None
         dv['adder'] = adder
+        dv['total_adder'] = adder
 
         dv['name'] = name
         dv['upper'] = upper
@@ -3052,8 +3054,6 @@ class System(object):
         dv['indices'] = indices
         dv['flat_indices'] = flat_indices
         dv['parallel_deriv_color'] = parallel_deriv_color
-        dv['total_scaler'] = None
-        dv['total_adder'] = None
 
         design_vars[name] = dv
 
@@ -3228,6 +3228,7 @@ class System(object):
         elif scaler == 1.0:
             scaler = None
         resp['scaler'] = scaler
+        resp['total_scaler'] = scaler
 
         if isinstance(adder, np.ndarray):
             if not np.any(adder):
@@ -3235,6 +3236,7 @@ class System(object):
         elif adder == 0.0:
             adder = None
         resp['adder'] = adder
+        resp['total_adder'] = adder
 
         resp['ref'] = ref
         resp['ref0'] = ref0
@@ -3243,8 +3245,6 @@ class System(object):
         resp['cache_linear_solution'] = cache_linear_solution
         resp['parallel_deriv_color'] = parallel_deriv_color
         resp['flat_indices'] = flat_indices
-        resp['total_scaler'] = None
-        resp['total_adder'] = None
 
         if alias in responses:
             raise TypeError(f"{self.msginfo}: Constraint alias '{alias}' is a duplicate of an "
