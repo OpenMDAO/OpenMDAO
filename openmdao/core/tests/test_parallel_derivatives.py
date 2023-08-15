@@ -464,12 +464,18 @@ class IndicesTestCase2(unittest.TestCase):
         class Top(om.Group):
             def setup(self):
                 self.add_subsystem('dvs',om.IndepVarComp(), promotes=['*'])
-                #if self.comm.rank == 0:
-                    #self.dvs.add_output('x', [1.], distributed=True)
-                #else:
-                    #self.dvs.add_output('x', [2.], distributed=True)
 
-                self.dvs.add_output('x',[1.,2.])
+                # this only currently works if we make dvs.x a distributed output.
+                if self.comm.rank == 0:
+                    self.dvs.add_output('x', [1.], distributed=True)
+                else:
+                    self.dvs.add_output('x', [2.], distributed=True)
+
+                # making dvs.x a non-distributed variable as below results in
+                # one deriv being zero and the other being the sum of the two
+                # parallel derivs.
+                # self.dvs.add_output('x',[1.,2.])
+
                 self.add_subsystem('par',DummyGroup())
                 self.connect('x','par.C1.x',src_indices=[0])
                 self.connect('x','par.C2.x',src_indices=[1])
