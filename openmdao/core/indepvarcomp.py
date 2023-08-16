@@ -127,7 +127,7 @@ class IndepVarComp(ExplicitComponent):
                            "outputs with 'openmdao:indep_var' and 'openmdao:allow_desvar' and they "
                            "will be treated as independent variables.")
 
-    def add_output(self, name, **kwargs):
+    def add_output(self, name, val=1.0, **kwargs):
         """
         Add an independent variable to this component.
 
@@ -135,6 +135,8 @@ class IndepVarComp(ExplicitComponent):
         ----------
         name : str
             Name of the variable in this component's namespace.
+        val : float or ndarray
+            The initial value of the variable being added in user-defined units. Default is 1.0.
         **kwargs : named args
             Remaining args passed to the base class add_output.
 
@@ -147,7 +149,7 @@ class IndepVarComp(ExplicitComponent):
         if 'tags' in kwargs and kwargs['tags'] is not None:
             tags.update(make_set(kwargs['tags'], name='tags'))
         kwargs['tags'] = tags
-        return super().add_output(name, **kwargs)
+        return super().add_output(name, val=val, **kwargs)
 
     def add_discrete_output(self, name, val, desc='', tags=None):
         """
