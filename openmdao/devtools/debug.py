@@ -621,10 +621,15 @@ def comm_info(system, outfile=None, verbose=False, table_format='box_grid'):
                 col_meta[0]['max_width'] = 5
                 col_meta[1]['max_width'] = 15
 
+            probpath = system._problem_meta['pathname']
+            if outfile is None:
+                print(f"Printing comm info table for Problem '{probpath}'")
+
             outf = generate_table(table_data, headers=headers, column_meta=col_meta,
                                   tablefmt=table_format).display(outfile=outfile)
+
             if outf is not None and MPI.COMM_WORLD.rank == 0:
-                print(f"comm info table written to {outf}")
+                print(f"comm info table for Problem '{probpath}' written to {outf}")
     else:
         if outfile is None:
             print("No MPI process info available.")

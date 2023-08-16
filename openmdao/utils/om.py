@@ -502,7 +502,7 @@ def _comm_info_cmd(options, user_args):
             if model._problem_meta['name'] != options.problem and \
                     model._problem_meta['pathname'] != options.problem:
                 return
-        elif '.' in model._problem_meta['pathname']:
+        elif '/' in model._problem_meta['pathname']:
             # by default, only display comm info for a top level problem
             return
 

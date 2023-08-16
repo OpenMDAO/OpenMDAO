@@ -948,7 +948,7 @@ class Problem(object):
         # this metadata will be shared by all Systems/Solvers in the system tree
         self._metadata = {
             'name': self._name,  # the name of this Problem
-            'pathname': None,  # the pathname of this Problem in the tree of Problems
+            'pathname': None,  # the pathname of this Problem in the current tree of Problems
             'comm': comm,
             'coloring_dir': self.options['coloring_dir'],  # directory for coloring files
             'recording_iter': _RecIteration(comm.rank),  # manager of recorder iterations
@@ -989,7 +989,7 @@ class Problem(object):
         }
 
         if _prob_setup_stack:
-            self._metadata['pathname'] = _prob_setup_stack[-1]._metadata['pathname'] + '.' + \
+            self._metadata['pathname'] = _prob_setup_stack[-1]._metadata['pathname'] + '/' + \
                 self._name
         else:
             self._metadata['pathname'] = self._name
