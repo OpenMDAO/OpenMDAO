@@ -1,5 +1,6 @@
 import sys
 import subprocess
+from packaging.version import Version
 
 
 def get_tag_info():
@@ -19,7 +20,7 @@ def get_tag_info():
         raise Exception('No tags found in repository')
 
     # use sort to put the versions list in order from lowest to highest
-    version_tags.sort(key=lambda s: [int(u) for u in s.split('.')])
+    version_tags.sort(key=Version)
 
     # grab the highest tag that this repo knows about
     latest_tag = version_tags[-1]

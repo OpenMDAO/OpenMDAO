@@ -65,3 +65,52 @@ class ParallelGroup(Group):
                         seen.add(name)
         else:
             yield from super()._ordered_comp_name_iter()
+
+    def _declared_partials_iter(self):
+        """
+        Iterate over all declared partials.
+
+        Yields
+        ------
+        (key, meta) : (key, dict)
+            key: a tuple of the form (of, wrt)
+            meta: a dict containing the partial metadata
+        """
+        if self.comm.size > 1:
+            if self._gather_full_data():
+                gathered = self.comm.allgather(self._subjacs_info)
+            else:
+                gathered = self.comm.allgather({})
+            seen = set()
+            for rankdict in gathered:
+                for key, meta in rankdict.items():
+                    if key not in seen:
+                        yield key, meta
+                        seen.add(key)
+        else:
+            yield from super()._declared_partials_iter()
+
+    def _get_missing_partials(self, missing):
+        """
+        Return a list of (of, wrt) tuples for which derivatives have not been declared.
+
+        Parameters
+        ----------
+        missing : dict
+            Dictionary containing list of missing derivatives keyed by system pathname.
+        """
+        if self.comm.size > 1:
+            msng = {}
+            super()._get_missing_partials(msng)
+            if self._gather_full_data():
+                gathered = self.comm.allgather(msng)
+            else:
+                gathered = self.comm.allgather({})
+            seen = set()
+            for rankdict in gathered:
+                for sysname, mset in rankdict.items():
+                    if sysname not in seen:
+                        missing[sysname] = mset
+                        seen.add(sysname)
+        else:
+            super()._get_missing_partials(missing)

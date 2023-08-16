@@ -20,7 +20,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import sizes2offsets
 from openmdao.vectors.vector import _full_slice, _flat_full_indexer
-from openmdao.utils.indexer import indexer, slicer
+from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, DriverWarning
 import openmdao.utils.coloring as c_mod
 
@@ -91,6 +91,8 @@ class Driver(object):
         Cached linear total jacobian handling object.
     opt_result : dict
         Dictionary containing information for use in the optimization report.
+    _has_scaling : bool
+        If True, scaling has been set for this driver.
     """
 
     def __init__(self, **kwargs):
@@ -195,6 +197,8 @@ class Driver(object):
             'exit_status': 'NOT_RUN'
         }
 
+        self._has_scaling = False
+
         # Want to allow the setting of hooks on Drivers
         _setup_hooks(self)
 
@@ -282,11 +286,6 @@ class Driver(object):
         model = problem.model
 
         self._total_jac = None
-
-        self._has_scaling = (
-            np.any([r['total_scaler'] is not None for r in self._responses.values()]) or
-            np.any([dv['total_scaler'] is not None for dv in self._designvars.values()])
-        )
 
         # Determine if any design variables are discrete.
         self._designvars_discrete = [name for name, meta in self._designvars.items()
@@ -887,8 +886,6 @@ class Driver(object):
         self._objs = objs = {}
         self._cons = cons = {}
 
-        model._setup_driver_units()
-
         # driver _responses are keyed by either the alias or the promoted name
         self._responses = resps = model.get_responses(recurse=True, use_prom_ivc=True)
         for name, data in resps.items():
@@ -902,6 +899,8 @@ class Driver(object):
         # Gather up the information for design vars. _designvars are keyed by the promoted name
         self._designvars = designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
         desvar_size = sum(data['global_size'] for data in designvars.values())
+
+        self._has_scaling = model._setup_driver_units()
 
         return response_size, desvar_size
 

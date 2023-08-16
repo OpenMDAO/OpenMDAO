@@ -28,8 +28,7 @@ from openmdao.core.driver import Driver, RecordingDebugging
 import openmdao.utils.coloring as c_mod
 from openmdao.utils.class_util import WeakMethodWrapper
 from openmdao.utils.mpi import FakeComm, MPI
-from openmdao.utils.general_utils import _src_or_alias_name
-from openmdao.utils.om_warnings import issue_warning
+from openmdao.utils.om_warnings import issue_warning, warn_deprecation
 
 # what version of pyoptspare are we working with
 if pyoptsparse and hasattr(pyoptsparse, '__version__'):
@@ -160,11 +159,6 @@ class pyOptSparseDriver(Driver):
     ----------
     fail : bool
         Flag that indicates failure of most recent optimization.
-    hist_file : str or None
-        File location for saving pyopt_sparse optimization history.
-        Default is None for no output.
-    hotstart_file : str
-        Optional file to hot start the optimization.
     opt_settings : dict
         Dictionary for setting optimizer-specific options.
     pyopt_solution : Solution
@@ -223,13 +217,6 @@ class pyOptSparseDriver(Driver):
         # The user places optimizer-specific settings in here.
         self.opt_settings = {}
 
-        # The user can set a file name here to store history
-        self.hist_file = None
-
-        # The user can set a file here to hot start the optimization
-        # with a history file
-        self.hotstart_file = None
-
         # We save the pyopt_solution so that it can be queried later on.
         self.pyopt_solution = None
 
@@ -276,6 +263,48 @@ class pyOptSparseDriver(Driver):
                                   "ignore - don't perform check.")
         self.options.declare('singular_jac_tol', default=1e-16,
                              desc='Tolerance for zero row/column check.')
+        self.options.declare('hist_file', types=str, default=None, allow_none=True,
+                             desc='File location for saving pyopt_sparse optimization history. '
+                                  'Default is None for no output.')
+        self.options.declare('hotstart_file', types=str, default=None, allow_none=True,
+                             desc='File location of a pyopt_sparse optimization history to use '
+                                  'to hot start the optimization. Default is None.')
+
+    @property
+    def hist_file(self):
+        """
+        Get the 'hist_file' option for this driver.
+        """
+        warn_deprecation("The 'hist_file' attribute is deprecated. "
+                         "Use the 'hist_file' option instead.")
+        return self.options['hist_file']
+
+    @hist_file.setter
+    def hist_file(self, file_name):
+        """
+        Set the 'hist_file' option for this driver.
+        """
+        warn_deprecation("The 'hist_file' attribute is deprecated. "
+                         "Use the 'hist_file' option instead.")
+        self.options['hist_file'] = file_name
+
+    @property
+    def hotstart_file(self):
+        """
+        Get the 'hotstart_file' option for this driver.
+        """
+        warn_deprecation("The 'hotstart_file' attribute is deprecated. "
+                         "Use the 'hotstart_file' option instead.")
+        return self.options['hist_file']
+
+    @hotstart_file.setter
+    def hotstart_file(self, file_name):
+        """
+        Set the 'hotstart_file' option for this driver.
+        """
+        warn_deprecation("The 'hotstart_file' attribute is deprecated. "
+                         "Use the 'hotstart_file' option instead.")
+        self.options['hotstart_file'] = file_name
 
     def _setup_driver(self, problem):
         """
@@ -396,6 +425,8 @@ class pyOptSparseDriver(Driver):
             opt_prob.addObj(name)
             self._quantities.append(name)
 
+        cons_to_remove = set()
+
         # Calculate and save derivatives for any linear constraints.
         lcons = [key for (key, con) in self._cons.items() if con['linear']]
         if len(lcons) > 0:
@@ -436,6 +467,7 @@ class pyOptSparseDriver(Driver):
             if not wrt:
                 issue_warning(f"Equality constraint '{name}' does not depend on any design "
                               "variables and was not added to the optimization.")
+                cons_to_remove.add(name)
                 continue
 
             if meta['linear']:
@@ -475,6 +507,7 @@ class pyOptSparseDriver(Driver):
             if not wrt:
                 issue_warning(f"Inequality constraint '{name}' does not depend on any design "
                               "variables and was not added to the optimization.")
+                cons_to_remove.add(name)
                 continue
 
             if meta['linear']:
@@ -491,6 +524,10 @@ class pyOptSparseDriver(Driver):
                     jac = None
                 opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt, jac=jac)
                 self._quantities.append(name)
+
+        for name in cons_to_remove:
+            del self._cons[name]
+            del self._responses[name]
 
         # Instantiate the requested optimizer
         try:
@@ -529,8 +566,9 @@ class pyOptSparseDriver(Driver):
                 # TODO: Need to get this from OpenMDAO
                 # fd_step = problem.model.deriv_options['step_size']
                 fd_step = 1e-6
-                sol = opt(opt_prob, sens='FD', sensStep=fd_step, storeHistory=self.hist_file,
-                          hotStart=self.hotstart_file)
+                sol = opt(opt_prob, sens='FD', sensStep=fd_step,
+                          storeHistory=self.options['hist_file'],
+                          hotStart=self.options['hotstart_file'])
 
             elif self.options['gradient_method'] == 'snopt_fd':
                 if self.options['optimizer'] == 'SNOPT':
@@ -539,8 +577,9 @@ class pyOptSparseDriver(Driver):
                     # TODO: Need to get this from OpenMDAO
                     # fd_step = problem.model.deriv_options['step_size']
                     fd_step = 1e-6
-                    sol = opt(opt_prob, sens=None, sensStep=fd_step, storeHistory=self.hist_file,
-                              hotStart=self.hotstart_file)
+                    sol = opt(opt_prob, sens=None, sensStep=fd_step,
+                              storeHistory=self.options['hist_file'],
+                              hotStart=self.options['hotstart_file'])
 
                 else:
                     msg = "SNOPT's internal finite difference can only be used with SNOPT"
@@ -549,7 +588,8 @@ class pyOptSparseDriver(Driver):
 
                 # Use OpenMDAO's differentiator for the gradient
                 sol = opt(opt_prob, sens=WeakMethodWrapper(self, '_gradfunc'),
-                          storeHistory=self.hist_file, hotStart=self.hotstart_file)
+                          storeHistory=self.options['hist_file'],
+                          hotStart=self.options['hotstart_file'])
 
         except Exception as c:
             if self._exc_info is None:

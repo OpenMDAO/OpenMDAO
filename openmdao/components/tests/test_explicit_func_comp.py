@@ -6,8 +6,7 @@ from numpy.testing import assert_almost_equal
 from io import StringIO
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals, \
-    assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
 from openmdao.utils.cs_safe import abs, arctan2
 import openmdao.func_api as omf
 from openmdao.utils.coloring import compute_total_coloring

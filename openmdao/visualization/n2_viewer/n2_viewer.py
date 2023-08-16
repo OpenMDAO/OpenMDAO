@@ -350,19 +350,11 @@ def _get_declare_partials(system):
         beginning from the given system on down.
     """
     declare_partials_list = []
+    for key, _ in system._declared_partials_iter():
+        of, wrt = key
+        if of != wrt:
+            declare_partials_list.append(f"{of} > {wrt}")
 
-    def recurse_get_partials(system, dpl):
-        if isinstance(system, Component):
-            subjacs = system._subjacs_info
-            for abs_key, meta in subjacs.items():
-                if abs_key[0] != abs_key[1]:
-                    dpl.append("{} > {}".format(abs_key[0], abs_key[1]))
-        elif isinstance(system, Group):
-            for s in system._subsystems_myproc:
-                recurse_get_partials(s, dpl)
-        return
-
-    recurse_get_partials(system, declare_partials_list)
     return declare_partials_list
 
 
