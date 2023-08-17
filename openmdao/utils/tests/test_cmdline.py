@@ -100,9 +100,10 @@ class CmdlineTestCase(unittest.TestCase):
         # check the expected output at all.  The underlying functions that implement the
         # commands should be tested seperately.
         try:
-            output = subprocess.check_output(cmd.split())  # nosec: trusted input
+            output = subprocess.check_output(cmd.split(),
+                                             stderr=subprocess.STDOUT)  # nosec: trusted input
         except subprocess.CalledProcessError as err:
-            self.fail("Command '{}' failed.  Return code: {}".format(cmd, err.returncode))
+            self.fail(f"Command '{cmd}' failed.  Return code: {err.returncode}: \n{output}")
 
     def test_n2_err(self):
         # command should raise exception but still produce an n2 html file
