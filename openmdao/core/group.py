@@ -4816,9 +4816,3 @@ class Group(System):
                     self._subsystems_myproc[0]._full_comm.rank == 0
 
         return False
-
-
-# for debugging
-def dump_shapes(graph):
-    for u, v in graph.edges():
-        print(u, graph.nodes[u]['allmeta']['shape'], '->', v, graph.nodes[v]['allmeta']['shape'])
