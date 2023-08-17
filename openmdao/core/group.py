@@ -27,7 +27,7 @@ from openmdao.utils.array_utils import array_connection_compatible, _flatten_src
     shape_to_len
 from openmdao.utils.general_utils import common_subpath, all_ancestors, \
     convert_src_inds, ContainsAll, shape2tuple, get_connection_owner, ensure_compatible, \
-    meta2src_iter
+    _src_name_iter, meta2src_iter
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
 from openmdao.utils.graph_utils import get_sccs_topo, get_hybrid_graph
@@ -187,6 +187,10 @@ class Group(System):
         Sorted list of pathnames of components that are executed prior to the optimization loop.
     _post_components : list of str or None
         Sorted list of pathnames of components that are executed after the optimization loop.
+    _abs_desvars : set
+        Set of absolute design variable names.
+    _abs_responses : set
+        Set of absolute response names.
     _relevance_graph : nx.DiGraph
         Graph of relevance connections.  Always None except in the top level Group.
     """
@@ -217,6 +221,8 @@ class Group(System):
         self._shape_knowns = None
         self._pre_components = None
         self._post_components = None
+        self._abs_desvars = None
+        self._abs_responses = None
         self._relevance_graph = None
 
         # TODO: we cannot set the solvers with property setters at the moment
@@ -778,15 +784,15 @@ class Group(System):
         dict
             The relevance dictionary.
         """
+        abs_desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
+        abs_responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
+        self._abs_desvars = set(_src_name_iter(abs_desvars))
+        self._abs_responses = set(_src_name_iter(abs_responses))
         assert self.pathname == '', "Relevance can only be initialized on the top level System."
 
         if self._use_derivatives:
-            desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
-            responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
-
-            responses = self._check_alias_overlaps(responses)
-
-            return self.get_relevant_vars(desvars, responses, mode)
+            return self.get_relevant_vars(abs_desvars,
+                                          self._check_alias_overlaps(abs_responses), mode)
 
         return {'@all': ({'input': ContainsAll(), 'output': ContainsAll()}, ContainsAll())}
 
@@ -3969,16 +3975,15 @@ class Group(System):
 
         return graph
 
-    def _get_auto_ivc_out_val(self, tgts, vars_to_gather, abs2meta_in):
+    def _get_auto_ivc_out_val(self, tgts, vars_to_gather):
         # all tgts are continuous variables
         # only called from top level group
         info = None
         src_idx_found = []
         max_size = -1
         found_dup = False
-
+        abs2meta_in = self._var_abs2meta['input']
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
-
         start_val = val = None
         val_shape = None
         chosen_tgt = None
@@ -4016,108 +4021,110 @@ class Group(System):
 
         info = None
         for tgt in tgts:
-            # if tgt in vars_to_gather and tgt not in abs2meta_in:
-            if tgt in vars_to_gather and self.comm.rank != vars_to_gather[tgt]:
-                if info is None or max_size < 0:
-                    info = (tgt, np.zeros(0), True)
-                    max_size = 0
-                continue
+            if tgt in abs2meta_in:  # tgt is local
+                meta = abs2meta_in[tgt]
+                size = meta['size']
+                value = meta['val']
+                src_indices = None
+                if tgt in abs_in2prom_info:
+                    # traverse down the promotes list, (abs_in2prom_info[tgt]), to get the
+                    # final src_indices down at the component level so we can set the value of
+                    # that component input into the appropriate place(s) in the auto_ivc output.
+                    # If a tgt has no src_indices anywhere, it will not be found in
+                    # abs_in2prom_info.
+                    newshape = val_shape
+                    for pinfo in abs_in2prom_info[tgt]:
+                        if pinfo is None:
+                            continue
+                        inds, _, shape = pinfo
+                        if inds is not None:
+                            if shape is None:
+                                shape = newshape
+                                if inds._src_shape is None:
+                                    try:
+                                        inds.set_src_shape(shape)
+                                    except IndexError:
+                                        exc_class, exc, tb = sys.exc_info()
+                                        self._collect_error(f"When promoting '{pinfo.prom}' from "
+                                                            f"system '{pinfo.promoted_from}' with "
+                                                            f"src_indices {inds} and src_shape "
+                                                            f"{shape}: {exc}",
+                                                            exc_type=exc_class, tback=tb,
+                                                            ident=(pinfo.prom, pinfo.promoted_from))
 
-            # if we get here, tgt is local
-            meta = abs2meta_in[tgt]
-            size = meta['size']
-            value = meta['val']
-            src_indices = None
-            if tgt in abs_in2prom_info:
-                # traverse down the promotes list, (abs_in2prom_info[tgt]), to get the
-                # final src_indices down at the component level so we can set the value of
-                # that component input into the appropriate place(s) in the auto_ivc output.
-                # If a tgt has no src_indices anywhere, it will not be found in
-                # abs_in2prom_info.
-                newshape = val_shape
-                for pinfo in abs_in2prom_info[tgt]:
-                    if pinfo is None:
-                        continue
-                    inds, _, shape = pinfo
-                    if inds is not None:
-                        if shape is None:
-                            shape = newshape
-                            if inds._src_shape is None:
-                                try:
-                                    inds.set_src_shape(shape)
-                                except IndexError:
-                                    exc_class, exc, tb = sys.exc_info()
-                                    self._collect_error(f"When promoting '{pinfo.prom}' from system"
-                                                        f" '{pinfo.promoted_from}' with src_indices"
-                                                        f" {inds} and src_shape {shape}: {exc}",
-                                                        exc_type=exc_class, tback=tb,
-                                                        ident=(pinfo.prom, pinfo.promoted_from))
+                            if src_indices is None:
+                                src_indices = inds
+                            else:
+                                sinds = convert_src_inds(src_indices, newshape, inds, shape)
+                                # final src_indices are wrt original full sized source and are flat,
+                                # so use val_shape and flat_src=True
+                                src_indices = indexer(sinds, src_shape=val_shape, flat_src=True)
+                            newshape = src_indices.indexed_src_shape
 
-                        if src_indices is None:
-                            src_indices = inds
-                        else:
-                            sinds = convert_src_inds(src_indices, newshape, inds, shape)
-                            # final src_indices are wrt original full sized source and are flat,
-                            # so use val_shape and flat_src=True
-                            src_indices = indexer(sinds, src_shape=val_shape, flat_src=True)
-                        newshape = src_indices.indexed_src_shape
+                if src_indices is None:
+                    src_indices = meta['src_indices']
 
-            if src_indices is None:
-                src_indices = meta['src_indices']
-
-            if src_indices is not None:
-                if val is None:
-                    if val_shape is None and not found_dup:
-                        src_idx_found.append(tgt)
-                    val = value
-                else:
-                    try:
-                        if src_indices._flat_src:
-                            val.ravel()[src_indices.flat()] = value.flat
-                        else:
-                            val[src_indices()] = value
-                    except Exception as err:
-                        src = self._conn_global_abs_in2out[tgt]
-                        msg = f"{self.msginfo}: The source indices " + \
-                              f"{src_indices} do not specify a " + \
-                              f"valid shape for the connection '{src}' to " + \
-                              f"'{tgt}'. (target shape=" + \
-                              f"{meta['shape']}, indices_shape=" + \
-                              f"{src_indices.indexed_src_shape}): {err}"
-                        self._collect_error(msg, ident=(src, tgt))
-                        continue
-            else:
-                if val is None:
-                    val = value
-                elif np.ndim(value) == 0:
-                    if val.size > 1:
-                        src = self._conn_global_abs_in2out[tgt]
-                        self._collect_error(f"Shape of input '{tgt}', (), doesn't match shape "
-                                            f"{val.shape}.", ident=(src, tgt))
-                        continue
-                elif np.squeeze(val).shape != np.squeeze(value).shape:
-                    src = self._conn_global_abs_in2out[tgt]
-                    self._collect_error(f"Shape of input '{tgt}', {value.shape}, doesn't match "
-                                        f"shape {val.shape}.", ident=(src, tgt))
-                    continue
-
-                if val is not value:
-                    if val.shape:
-                        val = np.reshape(value, newshape=val.shape)
-                    else:
+                if src_indices is not None:
+                    if val is None:
+                        if val_shape is None and not found_dup:
+                            src_idx_found.append(tgt)
                         val = value
+                    else:
+                        try:
+                            if src_indices._flat_src:
+                                val.ravel()[src_indices.flat()] = value.flat
+                            else:
+                                val[src_indices()] = value
+                        except Exception as err:
+                            src = self._conn_global_abs_in2out[tgt]
+                            msg = f"{self.msginfo}: The source indices " + \
+                                f"{src_indices} do not specify a " + \
+                                f"valid shape for the connection '{src}' to " + \
+                                f"'{tgt}'. (target shape=" + \
+                                f"{meta['shape']}, indices_shape=" + \
+                                f"{src_indices.indexed_src_shape}): {err}"
+                            self._collect_error(msg, ident=(src, tgt))
+                            continue
+                else:
+                    if val is None:
+                        val = value
+                    elif np.ndim(value) == 0:
+                        if val.size > 1:
+                            src = self._conn_global_abs_in2out[tgt]
+                            self._collect_error(f"Shape of input '{tgt}', (), doesn't match shape "
+                                                f"{val.shape}.", ident=(src, tgt))
+                            continue
+                    elif np.squeeze(val).shape != np.squeeze(value).shape:
+                        src = self._conn_global_abs_in2out[tgt]
+                        self._collect_error(f"Shape of input '{tgt}', {value.shape}, doesn't match "
+                                            f"shape {val.shape}.", ident=(src, tgt))
+                        continue
 
-                if tgt not in vars_to_gather:
-                    found_dup = True
+                    if val is not value:
+                        if val.shape:
+                            val = np.reshape(value, newshape=val.shape)
+                        else:
+                            val = value
 
-            if tgt == chosen_tgt:
-                max_size = size
-                info = (tgt, val, False)
-            elif chosen_tgt is None and size > max_size:
-                max_size = size
-                info = (tgt, val, False)
+                    if tgt not in vars_to_gather:
+                        found_dup = True
 
-            val = start_val
+                if tgt == chosen_tgt or (chosen_tgt is None and size > max_size):
+                    max_size = size
+                    info = (tgt, val, False)
+
+                keep_val = val
+                val = start_val
+
+        if tgt in vars_to_gather:  # tgt var is remote somewhere (but not distributed)
+            owner = vars_to_gather[tgt]
+            if owner == self.comm.rank:  # this rank 'owns' the var
+                val = keep_val
+                self.comm.bcast(val, root=owner)
+            else:
+                val = self.comm.bcast(None, root=owner)
+
+            info = (tgt, val, False)
 
         if src_idx_found:  # auto_ivc connected to local vars with src_indices
             self._collect_error("Attaching src_indices to inputs requires that the shape of the "
@@ -4179,12 +4186,11 @@ class Group(System):
         conns.update(auto_conns)
         auto_ivc.auto2tgt = auto2tgt
 
-        abs2meta_in = self._var_abs2meta['input']
         vars2gather = self._vars_to_gather
 
         for src, tgts in auto2tgt.items():
             prom = self._var_allprocs_abs2prom['input'][tgts[0]]
-            ret = self._get_auto_ivc_out_val(tgts, vars2gather, abs2meta_in)
+            ret = self._get_auto_ivc_out_val(tgts, vars2gather)
             if ret is None:  # setup error occurred. Try to continue
                 continue
             tgt, val, remote = ret
