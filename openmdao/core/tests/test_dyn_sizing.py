@@ -418,8 +418,8 @@ class TestDynShapes(unittest.TestCase):
         indep.add_output('x2', val=np.ones((2,3)))
         p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3, 2, DynShapeComp))
         p.model.add_subsystem('comp', om.ExecComp('y1, y2 = x1*2, x2*2',
-                                                  x1={'copy_shape': 'x2'},
-                                                  x2={'copy_shape': 'x1'},
+                                                  x1={'copy_shape': 'x2', 'shape_by_conn': True},
+                                                  x2={'copy_shape': 'x1', 'shape_by_conn': True},
                                                   y1={'shape_by_conn': True},
                                                   y2={'shape_by_conn': True}))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
@@ -617,7 +617,8 @@ class TestDynShapes(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'bad_copy_shape_name':"
-           "\n   <model> <class Group>: Can't copy shape of variable 'sink.x11'. Variable doesn't exist.")
+           "\n   <model> <class Group>: Can't compute shape of variable 'sink.y1': variable 'sink.x11' doesn't exist."
+           "\n   <model> <class Group>: Failed to resolve shapes for ['sink.y1']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.")
 
     def test_unconnected_var_dyn_shape(self):
         p = om.Problem(name='unconnected_var_dyn_shape')
@@ -699,7 +700,7 @@ class TestDynShapeFeature(unittest.TestCase):
         J = p.compute_totals(of=['sink.y'], wrt=['indeps.x'])
         assert_near_equal(J['sink.y', 'indeps.x'], np.eye(5)*3.)
 
-    def test_feature_rev(sefl):
+    def test_feature_rev(self):
 
         p = om.Problem()
         p.model.add_subsystem('comp', DynPartialsComp())
