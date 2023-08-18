@@ -103,7 +103,7 @@ class CmdlineTestCase(unittest.TestCase):
             output = subprocess.check_output(cmd.split(),
                                              stderr=subprocess.STDOUT)  # nosec: trusted input
         except subprocess.CalledProcessError as err:
-            self.fail(f"Command '{cmd}' failed.  Return code: {err.returncode}: \n{output}")
+            self.fail(f"Command '{cmd}' failed.  Return code: {err.returncode}: \n{err.output}")
 
     def test_n2_err(self):
         # command should raise exception but still produce an n2 html file
