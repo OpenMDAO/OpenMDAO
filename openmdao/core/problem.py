@@ -693,7 +693,7 @@ class Problem(object):
 
             self.final_setup()
 
-            # for optimizing drivers, check that responses
+            # for optimizing drivers, check that constraints are affected by design vars
             if driver.supports['optimization'] and self._metadata['use_derivatives']:
                 driver.check_relevance()
 

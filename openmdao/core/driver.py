@@ -5,7 +5,6 @@ import sys
 import time
 import os
 import weakref
-from collections import defaultdict
 
 import numpy as np
 
