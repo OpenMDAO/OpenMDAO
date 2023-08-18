@@ -103,7 +103,8 @@ class CmdlineTestCase(unittest.TestCase):
             output = subprocess.check_output(cmd.split(),
                                              stderr=subprocess.STDOUT)  # nosec: trusted input
         except subprocess.CalledProcessError as err:
-            self.fail(f"Command '{cmd}' failed.  Return code: {err.returncode}: \n{err.output}")
+            self.fail(f"Command '{cmd}' failed.  Return code: {err.returncode}: "
+                      f"Output was: \n{err.output.decode('utf-8')}")
 
     def test_n2_err(self):
         # command should raise exception but still produce an n2 html file
@@ -162,7 +163,8 @@ class CmdlineTestfuncTestCase(unittest.TestCase):
         try:
             output = subprocess.check_output(cmd.split())  # nosec: trusted input
         except subprocess.CalledProcessError as err:
-            self.fail("Command '{}' failed.  Return code: {}".format(cmd, err.returncode))
+            self.fail(f"Command '{cmd}' failed.  Return code: {err.returncode} "
+                      f"Output was: \n{err.output.decode('utf-8')}")
 
 
 test_cmd_err = [
