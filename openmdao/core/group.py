@@ -2286,7 +2286,10 @@ class Group(System):
 
     def _setup_dynamic_shapes(self):
         """
-        Add shape/size metadata for variables that were created with shape_by_conn or copy_shape.
+        Dynamically add shape/size metadata for variables.
+
+        This only happens if the user has set shape_by_conn, copy_shape, or compute_shape
+        for a variable.
         """
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
         all_abs2meta_in = self._var_allprocs_abs2meta['input']
@@ -2376,6 +2379,8 @@ class Group(System):
 
             if from_var in distrib_sizes:
                 distrib_sizes[to_var] = distrib_sizes[from_var]
+                
+            return from_shape
 
         all_abs2prom_in = self._var_allprocs_abs2prom['input']
         nprocs = self.comm.size
@@ -2398,6 +2403,7 @@ class Group(System):
                 'shape': meta['shape'],
                 'compute_shape': meta['compute_shape'],
                 'shape_by_conn': meta['shape_by_conn'],
+                'copy_shape': meta['copy_shape'],
             }
 
         self._shapes_graph = graph = nx.Graph()
@@ -2405,6 +2411,8 @@ class Group(System):
         dist_sz = {}  # local distrib sizes
         my_abs2meta_out = self._var_abs2meta['output']
         my_abs2meta_in = self._var_abs2meta['input']
+        all_abs2meta_out = self._var_allprocs_abs2meta['output']
+        all_abs2meta_in = self._var_allprocs_abs2meta['input']
         grp_shapes = {}
         comp_shapes = defaultdict(lambda: [{}, 0])
         compute_shape_functs = {}
@@ -2442,7 +2450,7 @@ class Group(System):
                                                **meta2node_data(inmeta))
                                 graph.add_edge(name, inp)
                                 print("adding edge:", (name, inp))
-                        elif not meta['compute_shape']:
+                        elif not meta['compute_shape'] and not meta['copy_shape']:
                             # check to see if we can get shape from _group_inputs
                             fail = True
                             if io == 'input':
@@ -2475,7 +2483,27 @@ class Group(System):
                                     f"{self.msginfo}: 'shape_by_conn' was set for "
                                     f"unconnected variable '{name}'.")
 
-                if meta['compute_shape']:
+                if meta['copy_shape']:
+                    # variable whose shape is being copied must be on the same component, and
+                    # name stored in 'copy_shape' entry must be the relative name.
+                    abs_from = name.rpartition('.')[0] + '.' + meta['copy_shape']
+                    if abs_from in all_abs2meta_in or abs_from in all_abs2meta_out:
+                        a2m = all_abs2meta_in if abs_from in all_abs2meta_in else all_abs2meta_out
+                        if name not in graph:
+                            graph.add_node(name, io=io, known_count=0,
+                                           **meta2node_data(meta))
+                        if abs_from not in graph:
+                            from_io = 'input' if abs_from in all_abs2meta_in else 'output'
+                            from_meta = a2m[abs_from]
+                            graph.add_node(abs_from, io=from_io, known_count=0,
+                                           **meta2node_data(from_meta))
+
+                        graph.add_edge(name, abs_from)
+                    else:
+                        self._collect_error(f"{self.msginfo}: Can't copy shape of variable "
+                                            f"'{abs_from}'. Variable doesn't exist or is not "
+                                            "continuous.")
+                elif meta['compute_shape']:
                     compute_shape_functs[name] = meta['compute_shape']
                     if name not in graph:
                         graph.add_node(name, shape=meta['shape'], io=io,
@@ -2546,12 +2574,15 @@ class Group(System):
                 known_sys = known.rpartition('.')[0]
                 data =  nodes[known]
                 known_shape = data['shape']
+                assert known_shape is not None, "known shape is None!!!"
                 known_dist = data['distributed']
+                known_io = data['io']
 
                 for node in graph.neighbors(known):
                     node_data = nodes[node]
                     shape = node_data['shape']
                     dist = node_data['distributed']
+                    node_io = node_data['io']
 
                     if node in all_knowns:
                         # check to see if shapes agree
@@ -2564,42 +2595,37 @@ class Group(System):
                     else:
                         node_sys = node.rpartition('.')[0]
                         if known_sys == node_sys:
-                            if node_data['compute_shape']:
-                                # compute_shape nodes can have multiple inputs, so we need to
-                                # check all of them to see if they're known
-                                if node in my_abs2meta_out:
+                            if node_data['copy_shape']:
+                                abs_copy_var = node_sys + '.' + node_data['copy_shape']
+                                if abs_copy_var in all_abs2meta_out:
+                                    comp_shape_dct, known_count = comp_shapes[node_sys, 'output']
+                                else:
+                                    comp_shape_dct, known_count = comp_shapes[node_sys, 'input']
+                                shp = copy_var_meta(graph, abs_copy_var, node, distrib_sizes, grp_shapes)
+
+                            elif node_data['compute_shape']:
+                                if node in all_abs2meta_out:
                                     comp_shape_dct, known_count = comp_shapes[node_sys, 'input']
                                 else:
                                     comp_shape_dct, known_count = comp_shapes[node_sys, 'output']
+                                # compute_shape nodes can have multiple inputs, so we need to
+                                # check all of them to see if they're known
                                 if len(comp_shape_dct) == known_count:
                                     # all inputs have known shapes, so call compute_shape funct
                                     shp = compute_var_meta(graph, node, comp_shape_dct,
                                                            node_data['compute_shape'])
-                                    print("computed shape", shp, "for", node)
-                                    if shp is None:
-                                        continue
-                                    all_knowns.add(node)
-                                    queue.append(node)
                             else:
                                 raise RuntimeError("Graph implementation error. This shouldn't happen!")
-                        else:  # known_sys != node_sys
-                            if node_data['shape_by_conn']:
-                                # transfer the known shape info to the unshaped variable
-                                copy_var_meta(graph, known, node, distrib_sizes, grp_shapes)
-                                all_knowns.add(node)
-                                queue.append(node)
-                            elif node_data['compute_shape']:
-                                # this can happen if user set copy_shape=<some var of same io type>
-                                if node in my_abs2meta_out:
-                                    comp_shape_dct, known_count = comp_shapes[node_sys, 'output']
-                                else:
-                                    comp_shape_dct, known_count = comp_shapes[node_sys, 'input']
-                                shp = compute_var_meta(graph, node, comp_shape_dct,
-                                                       node_data['compute_shape'])
-                                print("computed shape", shp, "for", node)
-                                if shp is None:
-                                    continue
-
+                            if shp is None:
+                                continue
+                            print("computed shape", shp, "for", node)
+                            all_knowns.add(node)
+                            queue.append(node)
+                        elif node_data['shape_by_conn']:  # known_sys != node_sys
+                            # transfer the known shape info to the unshaped variable
+                            copy_var_meta(graph, known, node, distrib_sizes, grp_shapes)
+                            all_knowns.add(node)
+                            queue.append(node)
 
         # debugging
         print('graph dump:')

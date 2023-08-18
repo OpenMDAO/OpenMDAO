@@ -418,8 +418,8 @@ class TestDynShapes(unittest.TestCase):
         indep.add_output('x2', val=np.ones((2,3)))
         p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3, 2, DynShapeComp))
         p.model.add_subsystem('comp', om.ExecComp('y1, y2 = x1*2, x2*2',
-                                                  x1={'copy_shape': 'x2', 'shape_by_conn': True},
-                                                  x2={'copy_shape': 'x1', 'shape_by_conn': True},
+                                                  x1={'copy_shape': 'x2'},
+                                                  x2={'copy_shape': 'x1'},
                                                   y1={'shape_by_conn': True},
                                                   y2={'shape_by_conn': True}))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',

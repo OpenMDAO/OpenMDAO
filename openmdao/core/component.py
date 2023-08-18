@@ -592,11 +592,6 @@ class Component(System):
             # using ._dict below to avoid tons of deprecation warnings
             distributed = distributed or self.options._dict['distributed']['val']
 
-        # convert copy_shape into a compute_shape function so we can handle it the same as
-        # compute_shape.
-        if copy_shape:
-            compute_shape = lambda shapes: shapes[copy_shape]
-
         metadata = {}
 
         metadata.update({
@@ -611,6 +606,7 @@ class Component(System):
             'tags': make_set(tags),
             'shape_by_conn': shape_by_conn,
             'compute_shape': compute_shape,
+            'copy_shape': copy_shape,
         })
 
         # this will get reset later if comm size is 1
@@ -849,11 +845,6 @@ class Component(System):
             raise TypeError(f"{self.msginfo}: The compute_shape argument should be a function but "
                             f"a '{type(compute_shape).__name__}' was given.")
 
-        # convert copy_shape into a compute_shape function so we can handle it the same as
-        # compute_shape.
-        if copy_shape:
-            compute_shape = lambda shapes: shapes[copy_shape]
-
         metadata = {}
 
         metadata.update({
@@ -871,7 +862,8 @@ class Component(System):
             'lower': lower,
             'upper': upper,
             'shape_by_conn': shape_by_conn,
-            'compute_shape': compute_shape
+            'compute_shape': compute_shape,
+            'copy_shape': copy_shape,
         })
 
         # this will get reset later if comm size is 1
