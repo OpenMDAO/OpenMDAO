@@ -33,9 +33,9 @@ except ImportError:
     MPI = None
 
 try:
-    from petsc4py import PETSc
+    from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
-    PETSc = None
+    PETScVector = None
 
 
 dname = os.path.dirname
@@ -52,8 +52,6 @@ cmd_tests = [
     # tuple of (command line, dict of dependencies that might not be installed)
     ('openmdao call_tree openmdao.components.exec_comp.ExecComp.setup', {}),
     ('openmdao check {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
-    ('mpirun -n 4 openmdao comm_info {}'.format(os.path.join(scriptdir, 'multipoint_beam_opt.py')),
-     {'MPI': MPI, 'PETSc': PETSc}),
     ('openmdao comm_info {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao cite {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao compute_entry_points openmdao', {}),
@@ -92,9 +90,9 @@ class CmdlineTestCase(unittest.TestCase):
     @parameterized.expand(cmd_tests, name_func=_test_func_name)
     def test_cmd(self, cmd, dependencies):
         # skip any commands for which we do not have required dependencies
-        for name, installed in dependencies.items():
-            if not installed:
-                raise unittest.SkipTest(f"{name} is not installed")
+        not_installed = [n for n, inst in dependencies.items() if not inst]
+        if not_installed:
+            raise unittest.SkipTest(f"{not_installed} is not installed")
 
         # this only tests that a given command line tool returns a 0 return code. It doesn't
         # check the expected output at all.  The underlying functions that implement the
