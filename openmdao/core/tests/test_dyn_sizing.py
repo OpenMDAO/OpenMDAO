@@ -363,8 +363,8 @@ class TestDynShapes(unittest.TestCase):
         p.model.connect('indep.x2', 'C1.x2')
         p.setup()
         p.run_model()
-        np.testing.assert_allclose(p['sink.y1'], np.ones((2,3))*16)
-        np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*16)
+        np.testing.assert_allclose(p['sink.y1'], np.ones((2,3))*4)
+        np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*4)
 
     def test_simple_compute_shape(self):
         p = om.Problem()
@@ -382,8 +382,8 @@ class TestDynShapes(unittest.TestCase):
         p.model.connect('indep.x2', 'C1.x2')
         p.setup()
         p.run_model()
-        np.testing.assert_allclose(p['sink.y1'], np.ones((2,3))*16)
-        np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*16)
+        np.testing.assert_allclose(p['sink.y1'], np.ones((2,3))*4)
+        np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*4)
 
     def test_baseline_series(self):
         # this is just a sized source and unsized sink, and we put a DynShapeGroupSeries in between them
@@ -505,11 +505,7 @@ class TestDynShapes(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'mismatched_dyn_shapes':"
-           "\n   <model> <class Group>: Shape mismatch, (3, 2) vs. (4, 2) for variable 'sink.x2' "
-           "during dynamic shape determination."
-           "\n   <model> <class Group>: The source and target shapes do not match or are ambiguous "
-           "for the connection 'Gdyn.C3.y2' to 'sink.x2'. The source shape is (4, 2) but the target "
-           "shape is (3, 2).")
+           "\n   <model> <class Group>: Shape mismatch, (4, 2) vs. (3, 2) for variables 'Gdyn.C2.x2' and 'Gdyn.C2.y2' during dynamic shape determination.")
 
     def test_baseline_conn_inputs(self):
         # this is a sized source and unsized sink, with a DynShapeGroupConnectedInputs between them

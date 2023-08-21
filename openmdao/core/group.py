@@ -2418,7 +2418,7 @@ class Group(System):
                             from_meta = all_abs2meta_out[abs_from]
                             graph.add_node(abs_from, io='output', **meta2node_data(from_meta))
                         graph.add_edge(abs_from, name, multi=False)
-                        print("adding edge:", (abs_from, name))
+                        # print("adding edge:", (abs_from, name))
                     else:
                         if rev_conn is None:
                             rev_conn = get_rev_conn()
@@ -2427,7 +2427,7 @@ class Group(System):
                                 inmeta = all_abs2meta_in[inp]
                                 graph.add_node(inp, io='input', **meta2node_data(inmeta))
                                 graph.add_edge(inp, name, multi=False)
-                                print("adding edge:", (name, inp))
+                                # print("adding edge:", (name, inp))
                         elif not meta['compute_shape'] and not meta['copy_shape']:
                             # check to see if we can get shape from _group_inputs
                             fail = True
@@ -2441,7 +2441,7 @@ class Group(System):
                                                    distributed=False, shape_by_conn=None,
                                                    compute_shape=None)
                                     graph.add_edge(gnode, name, multi=False)
-                                    print("adding edge:", (gnode, name))
+                                    # print("adding edge:", (gnode, name))
                                     grp_shapes[prom] = grp_shape
                                     fail = False
                                 else:  # see if there are any connected inputs with known shape
@@ -2455,7 +2455,7 @@ class Group(System):
                                                 graph.add_node(n, io='input', known_count=0,
                                                                 **meta2node_data(all_abs2meta_in[n]))
                                                 graph.add_edge(n, name, multi=False)
-                                                print("adding edge:", (n, name))
+                                                # print("adding edge:", (n, name))
                                                 break
                             if fail:
                                 self._collect_error(
@@ -2561,13 +2561,11 @@ class Group(System):
 
             return active_single_edges, active_multi_nodes
 
-
         def is_unresolved(graph, node):
             for s in graph.successors(node):
                 if graph.nodes[s]['shape'] is None:
                     return True
             return False
-
 
         # loop over any 'compute_shape' variables and add edges to the graph
         for name in compute_shape_functs:
@@ -2582,7 +2580,7 @@ class Group(System):
                     graph.add_node(abs_name, io=io, **meta2node_data(meta))
 
                 graph.add_edge(abs_name, name, multi=True)
-                print("adding edge:", (abs_name, name))
+                # print("adding edge:", (abs_name, name))
 
         if graph.order() == 0:
             # we don't have any shape_by_conn or copy_shape variables, so we're done
@@ -2602,6 +2600,8 @@ class Group(System):
         nodes = graph.nodes
         edges = graph.edges
 
+        check = {}  # for consistency check of computed shapes vs. others
+
         # connected_components needs an undirected graph, so create a temporary one here
         for comps in nx.connected_components(nx.Graph(graph)):
 
@@ -2617,8 +2617,7 @@ class Group(System):
 
                 active_single_edges, active_multi_nodes = get_actives(graph, unresolved_knowns)
                 for k, u in active_single_edges:
-                    copy_var_meta(graph, k, u, distrib_sizes)
-                    # nodes[u]['shape'] = nodes[k]['shape']
+                    shp = copy_var_meta(graph, k, u, distrib_sizes)
                     if is_unresolved(graph, u):
                         unresolved_knowns.add(u)
                     all_knowns.add(u)
@@ -2635,9 +2634,8 @@ class Group(System):
                             n.rpartition('.')[-1]: nodes[n]['shape']
                             for n in graph.predecessors(mnode)
                         }
-                        # shp = nodes[mnode]['compute_shape'](shapes)
-                        # nodes[mnode]['shape'] = shp
-                        compute_var_meta(graph, mnode, shapes, nodes[mnode]['compute_shape'])
+                        shp = compute_var_meta(graph, mnode, shapes, nodes[mnode]['compute_shape'])
+                        check[mnode] = shp
                         if is_unresolved(graph, mnode):
                             unresolved_knowns.add(mnode)
                         all_knowns.add(mnode)
@@ -2779,6 +2777,25 @@ class Group(System):
         #print('graph dump:')
         #for u, v in graph.edges():
             #print(u, graph.nodes[u]['shape'], v, graph.nodes[v]['shape'])
+
+        # now perform a consistency check on all computed/copied shapes
+        mismatches = set()
+        for u, v, data in graph.edges(data=True):
+            if not data['multi']:
+                ushape = nodes[u]['shape']
+                vshape = nodes[v]['shape']
+                if ushape != vshape and ushape is not None and vshape is not None:
+                    udist = nodes[u]['distributed']
+                    vdist = nodes[v]['distributed']
+                    if not (udist ^ vdist):
+                        mismatches.add(tuple(sorted((u, v))))
+
+        if mismatches:
+            for u, v in mismatches:
+                self._collect_error(f"{self.msginfo}: Shape mismatch, {nodes[u]['shape']} vs. "
+                                    f"{nodes[v]['shape']} for variables '{u}' and '{v}' during "
+                                    "dynamic shape determination.")
+
 
         # update variable metadata based on graph shapes
         for node, data in graph.nodes(data=True):
