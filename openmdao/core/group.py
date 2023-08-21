@@ -2824,7 +2824,7 @@ class Group(System):
 
         unresolved = set(graph.nodes()) - all_knowns
         if unresolved:
-            unresolved = sorted(unresolved)
+            unresolved = tuple(sorted(unresolved))
             self._collect_error(f"{self.msginfo}: Failed to resolve shapes for {unresolved}. "
                                 "To see the dynamic shape dependency graph, "
                                 "do 'openmdao view_dyn_shapes <your_py_file>'.")
