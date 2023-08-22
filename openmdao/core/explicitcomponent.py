@@ -232,6 +232,8 @@ class ExplicitComponent(Component):
         copy_shape : str or None
             If a str, that str is the name of a variable. Shape this output to match that of
             the named variable.
+        compute_shape : function or None
+            If a function, that function is called to determine the shape of this output.
         distributed : bool
             If True, this variable is a distributed variable, so it can have different sizes/values
             across MPI processes.

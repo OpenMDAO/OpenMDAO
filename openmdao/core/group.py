@@ -2368,10 +2368,75 @@ class Group(System):
 
             return from_shape
 
-        all_abs2prom_in = self._var_allprocs_abs2prom['input']
-        nprocs = self.comm.size
-        conn = self._conn_global_abs_in2out
-        rev_conn = None
+        def get_unresolved_knowns(graph, nodes=None):
+            """
+            Return all unresolved nodes with known shape.
+
+            Unresolved means that the node has known shape and at least one successor
+            with unknown shape.
+
+            Parameters
+            ----------
+            graph : nx.DiGraph
+                Graph containing all variables with shape info.
+            nodes : list of str or None
+                List of nodes to check.  If None, check all nodes in the graph.
+
+            Returns
+            -------
+            set of str
+                Set of nodes with known shape but at least one successor with unknown shape.
+            """
+            unresolved = set()
+            gnodes = graph.nodes
+            if nodes is None:
+                nodes = graph.nodes()
+
+            for node in nodes:
+                if gnodes[node]['shape'] is not None:  # node is known
+                    for succ in graph.successors(node):
+                        if gnodes[succ]['shape'] is None:
+                            unresolved.add(node)
+                            break
+
+            return unresolved
+
+        def get_actives(graph, knowns):
+            """
+            Return all active single edges and active multi nodes.
+
+            Parameters
+            ----------
+            graph : nx.DiGraph
+                Graph containing all variables with shape info.
+            knowns : list of str
+                List of nodes with known shape.
+
+            Returns
+            -------
+            active_single_edges : set of (str, str)
+                Set of active 'single' edges (for copy_shape and shape_by_conn).
+            active_multi_nodes : set of str
+                Set of active nodes with 'multi' edges (for compute_shape).
+            """
+            active_single_edges = set()
+            active_multi_nodes = set()
+
+            for known in knowns:
+                for succ in graph.successors(known):
+                    if nodes[succ]['shape'] is None:
+                        if edges[known, succ]['multi']:
+                            active_multi_nodes.add(succ)
+                        else:
+                            active_single_edges.add((known, succ))
+
+            return active_single_edges, active_multi_nodes
+
+        def is_unresolved(graph, node):
+            for s in graph.successors(node):
+                if graph.nodes[s]['shape'] is None:
+                    return True
+            return False
 
         def get_rev_conn():
             # build reverse connection dict (src: tgts)
@@ -2382,6 +2447,11 @@ class Group(System):
                 else:
                     rev[src] = [tgt]
             return rev
+
+        all_abs2prom_in = self._var_allprocs_abs2prom['input']
+        nprocs = self.comm.size
+        conn = self._conn_global_abs_in2out
+        rev_conn = None
 
         def meta2node_data(meta):
             return {
@@ -2453,7 +2523,7 @@ class Group(System):
                                                     or m['copy_shape']):
                                                 fail = False
                                                 graph.add_node(n, io='input', known_count=0,
-                                                                **meta2node_data(all_abs2meta_in[n]))
+                                                               **meta2node_data(all_abs2meta_in[n]))
                                                 graph.add_edge(n, name, multi=False)
                                                 # print("adding edge:", (n, name))
                                                 break
@@ -2497,76 +2567,6 @@ class Group(System):
                     else:
                         dist_sz[name] = 0
 
-        def get_unresolved_knowns(graph, nodes=None):
-            """
-            Return all unresolved nodes with known shape.
-
-            Unresolved means that the node has known shape and at least one successor
-            with unknown shape.
-
-            Parameters
-            ----------
-            graph : nx.DiGraph
-                Graph containing all variables with shape info.
-            nodes : list of str or None
-                List of nodes to check.  If None, check all nodes in the graph.
-
-            Returns
-            -------
-            set of str
-                Set of nodes with known shape but at least one successor with unknown shape.
-            """
-            unresolved = set()
-            gnodes = graph.nodes
-            if nodes is None:
-                nodes = graph.nodes()
-
-            for node in nodes:
-                if gnodes[node]['shape'] is not None:  # node is known
-                    for succ in graph.successors(node):
-                        if gnodes[succ]['shape'] is None:
-                            unresolved.add(node)
-                            break
-
-            return unresolved
-
-        def get_actives(graph, knowns):
-            """
-            Return all active single edges and active multi nodes.
-
-            Parameters
-            ----------
-            graph : nx.DiGraph
-                Graph containing all variables with shape info.
-            knowns : list of str
-                List of nodes with known shape.
-
-            Returns
-            -------
-            active_single_edges : set of (str, str)
-                Set of active 'single' edges (for copy_shape and shape_by_conn).
-            active_multi_nodes : set of str
-                Set of active nodes with 'multi' edges (for compute_shape).
-            """
-            active_single_edges = set()
-            active_multi_nodes = set()
-
-            for known in knowns:
-                for succ in graph.successors(known):
-                    if nodes[succ]['shape'] is None:
-                        if edges[known, succ]['multi']:
-                            active_multi_nodes.add(succ)
-                        else:
-                            active_single_edges.add((known, succ))
-
-            return active_single_edges, active_multi_nodes
-
-        def is_unresolved(graph, node):
-            for s in graph.successors(node):
-                if graph.nodes[s]['shape'] is None:
-                    return True
-            return False
-
         # loop over any 'compute_shape' variables and add edges to the graph
         for name in compute_shape_functs:
             comp_name = name.rpartition('.')[0]
@@ -2600,8 +2600,6 @@ class Group(System):
         nodes = graph.nodes
         edges = graph.edges
 
-        check = {}  # for consistency check of computed shapes vs. others
-
         # connected_components needs an undirected graph, so create a temporary one here
         for comps in nx.connected_components(nx.Graph(graph)):
 
@@ -2611,18 +2609,20 @@ class Group(System):
                 # no knowns in this component, so we fail.
                 continue
 
-            progress = True
+            progress = 1
             while progress:
+                progress = 0
                 unresolved_knowns = get_unresolved_knowns(graph, unresolved_knowns)
 
                 active_single_edges, active_multi_nodes = get_actives(graph, unresolved_knowns)
                 for k, u in active_single_edges:
                     shp = copy_var_meta(graph, k, u, distrib_sizes)
-                    if is_unresolved(graph, u):
-                        unresolved_knowns.add(u)
-                    all_knowns.add(u)
+                    if shp is not None:
+                        if is_unresolved(graph, u):
+                            unresolved_knowns.add(u)
 
-                progress = len(active_single_edges) > 0
+                        all_knowns.add(u)
+                        progress += 1
 
                 for mnode in active_multi_nodes:
                     for k, _, data in graph.in_edges(mnode, data=True):
@@ -2635,148 +2635,11 @@ class Group(System):
                             for n in graph.predecessors(mnode)
                         }
                         shp = compute_var_meta(graph, mnode, shapes, nodes[mnode]['compute_shape'])
-                        check[mnode] = shp
-                        if is_unresolved(graph, mnode):
-                            unresolved_knowns.add(mnode)
-                        all_knowns.add(mnode)
-                        progress = True
-
-            # progress = True
-
-            # while progress:
-            #     progress = False
-            #     new_knowns = set()
-            #     active_unknowns = set()
-
-            #     for known in comp_knowns:
-            #         known_shape = nodes[known]['shape']
-            #         known_dist = nodes[known]['distributed']
-            #         for succ in graph.successors(known):
-            #             if succ in comp_knowns:
-            #                 dist = nodes[succ]['distributed']
-            #                 if nodes[succ]['shape'] != known_shape and not (dist ^ known_dist):
-            #                     self._collect_error(f"{self.msginfo}: Shape mismatch, {shape} vs. "
-            #                                         f"{known_shape} for variable '{succ}' during "
-            #                                         "dynamic shape determination.")
-            #             else:
-            #                 if graph.edges[known, succ]['multi']:
-            #                     for u, _, data in graph.in_edges(succ, data=True):
-            #                         if nodes[u]['shape'] is None and data['multi']:
-            #                             active_unknowns.add(succ)
-            #                             break
-            #                     else:
-            #                         # all 'compute_shape' preds are known so compute shape
-            #                         shapes = {
-            #                             n.rpartition('.')[-1]: nodes[n]['shape'] for n in graph.predecessors(succ)
-            #                         }
-            #                         shp = nodes[succ]['compute_shape'](shapes)
-            #                         nodes[succ]['shape'] = shp
-            #                         new_knowns.add(succ)
-            #                         progress = True
-            #                 else:
-            #                     nodes[succ]['shape'] = known_shape
-            #                     new_knowns.add(succ)
-            #                     progress = True
-
-            #     active_unknowns -= new_knowns
-            #     for unknown in active_unknowns:
-            #         for u, _, data in graph.in_edges(unknown, data=True):
-            #             if nodes[u]['shape'] is None and data['multi']:
-            #                 break
-            #         else:
-            #             # all 'compute_shape' preds are known so compute shape
-            #             shapes = {
-            #                 n.rpartition('.')[-1]: nodes[n]['shape'] for n in graph.predecessors(unknown)
-            #             }
-            #             shp = nodes[unknown]['compute_shape'](shapes)
-            #             nodes[unknown]['shape'] = shp
-            #             new_knowns.add(unknown)
-            #             progress = True
-
-            #     comp_knowns.update(new_knowns)
-
-            #active_unknowns = sorted(active_unknowns, key=lambda n: graph.in_degree(n))
-            #num_knowns = len(all_knowns)
-
-            #for unk in active_unknowns:
-                #for pred in graph.predecessors(unk):
-                    #if nodes[pred]['shape'] is None:
-                        #break
-                #else:
-                    #pass
-
-
-
-            ## because comps is a connected component, we only need 1 known node to resolve
-            ## the rest
-            #queue = deque(sorted(comp_knowns))  # sort to keep error messages consistent
-            #while queue:
-                #known = queue.popleft()
-                #known_sys = known.rpartition('.')[0]
-                #data =  nodes[known]
-                #known_shape = data['shape']
-                #known_dist = data['distributed']
-
-                #for node in graph.successors(known):
-                    #node_data = nodes[node]
-                    #shape = node_data['shape']
-                    #dist = node_data['distributed']
-
-                    #if node in all_knowns:
-                        ## check to see if shapes agree
-                        ## can't compare shapes if one is dist and other is not. The mismatch
-                        ## will be caught later in setup_connections in that case.
-                        #if (node_data['compute_shape'] is None and
-                                #(node, known) not in mismatches and
-                                #shape != known_shape and not (dist ^ known_dist)):
-                            #self._collect_error(f"{self.msginfo}: Shape mismatch, {shape} vs. "
-                                                #f"{known_shape} for variable '{node}' during "
-                                                #"dynamic shape determination.")
-                            #mismatches.add((node, known))
-                            #mismatches.add((known, node))
-                    #else:
-                        #for pred in graph.predecessors(node):
-                            #if graph.nodes[pred]['shape'] is None:
-                                #break
-                        #else:
-                            #node_sys = node.rpartition('.')[0]
-                            #if known_sys == node_sys:
-                                #if node_data['copy_shape']:
-                                    #abs_copy_var = node_sys + '.' + node_data['copy_shape']
-                                    #if abs_copy_var in all_abs2meta_out:
-                                        #comp_shape_dct, known_count = comp_shapes[node_sys, 'output']
-                                    #else:
-                                        #comp_shape_dct, known_count = comp_shapes[node_sys, 'input']
-                                    #shp = copy_var_meta(graph, abs_copy_var, node, distrib_sizes, grp_shapes)
-
-                                #elif node_data['compute_shape']:
-                                    #if node in all_abs2meta_out:
-                                        #comp_shape_dct, known_count = comp_shapes[node_sys, 'input']
-                                    #else:
-                                        #comp_shape_dct, known_count = comp_shapes[node_sys, 'output']
-                                    ## compute_shape nodes can have multiple inputs, so we need to
-                                    ## check all of them to see if they're known
-                                    #if len(comp_shape_dct) == known_count:
-                                        ## all inputs have known shapes, so call compute_shape funct
-                                        #shp = compute_var_meta(graph, node, comp_shape_dct,
-                                                               #node_data['compute_shape'])
-                                #else:
-                                    #raise RuntimeError("Graph implementation error. This shouldn't happen!")
-                                #if shp is None:
-                                    #continue
-                                #print("computed shape", shp, "for", node)
-                                #all_knowns.add(node)
-                                #queue.append(node)
-                            #elif node_data['shape_by_conn']:  # known_sys != node_sys
-                                ## transfer the known shape info to the unshaped variable
-                                #copy_var_meta(graph, known, node, distrib_sizes, grp_shapes)
-                                #all_knowns.add(node)
-                                #queue.append(node)
-
-        ## debugging
-        #print('graph dump:')
-        #for u, v in graph.edges():
-            #print(u, graph.nodes[u]['shape'], v, graph.nodes[v]['shape'])
+                        if shp is not None:
+                            if is_unresolved(graph, mnode):
+                                unresolved_knowns.add(mnode)
+                            all_knowns.add(mnode)
+                            progress += 1
 
         # now perform a consistency check on all computed/copied shapes
         mismatches = set()
@@ -2796,7 +2659,6 @@ class Group(System):
                                     f"{nodes[v]['shape']} for variables '{u}' and '{v}' during "
                                     "dynamic shape determination.")
 
-
         # update variable metadata based on graph shapes
         for node, data in graph.nodes(data=True):
             if node.startswith('#'):
@@ -2805,7 +2667,7 @@ class Group(System):
             allmeta = self._var_allprocs_abs2meta[io][node]
 
             shape = data['shape']
-            size =  shape_to_len(shape)
+            size = shape_to_len(shape)
             allmeta['shape'] = shape
             allmeta['size'] = size
 
@@ -2824,7 +2686,7 @@ class Group(System):
 
         unresolved = set(graph.nodes()) - all_knowns
         if unresolved:
-            unresolved = tuple(sorted(unresolved))
+            unresolved = sorted(unresolved)
             self._collect_error(f"{self.msginfo}: Failed to resolve shapes for {unresolved}. "
                                 "To see the dynamic shape dependency graph, "
                                 "do 'openmdao view_dyn_shapes <your_py_file>'.")

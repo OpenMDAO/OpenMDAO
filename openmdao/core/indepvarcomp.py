@@ -110,7 +110,7 @@ class IndepVarComp(ExplicitComponent):
 
         super()._configure_check()
 
-    def add_input(self, name, **kwargs):
+    def add_input(self, name, val=1.0, **kwargs):
         """
         Add an input variable to the component.
 
@@ -118,6 +118,8 @@ class IndepVarComp(ExplicitComponent):
         ----------
         name : str
             Name of the variable in this component's namespace.
+        val : float or ndarray
+            The initial value of the variable being added in user-defined units. Default is 1.0.
         **kwargs : named args
             Remaining args.
         """

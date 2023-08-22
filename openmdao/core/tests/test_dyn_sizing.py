@@ -222,8 +222,12 @@ class TestPassSizeDistributed(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.setup()
 
-        msg = "\nCollected errors for problem 'serial_start':\n   <model> <class Group>: dynamic sizing of non-distributed input 'E.in' from distributed output 'D.out' is not supported.\n   <model> <class Group>: Can't connect distributed output 'D.out' to non-distributed input 'E.in' without specifying src_indices.\n   <model> <class Group>: The source indices slice(None, None, 1) do not specify a valid shape for the connection 'B.out' to 'C.in'. The target shape is (4,) but indices are shape (12,)."
-        self.assertEqual(str(cm.exception), msg)
+        self.assertEqual(str(cm.exception),
+            "\nCollected errors for problem 'serial_start':"
+            "\n   <model> <class Group>: dynamic sizing of non-distributed input 'E.in' from distributed output 'D.out' is not supported."
+            "\n   <model> <class Group>: Failed to resolve shapes for ['E.in', 'E.out']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
+            "\n   <model> <class Group>: Can't connect distributed output 'D.out' to non-distributed input 'E.in' without specifying src_indices."
+            "\n   <model> <class Group>: The source indices slice(None, None, 1) do not specify a valid shape for the connection 'B.out' to 'C.in'. The target shape is (4,) but indices are shape (12,).")
 
     def test_distributed_start(self):
         """the size information starts in the distributed component C"""
@@ -256,15 +260,11 @@ class TestPassSizeDistributed(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'distributed_start':"
-           "\n   <model> <class Group>: dynamic sizing of non-distributed output 'A.out' from "
-           "distributed input 'B.in' is not supported because not all B.in ranks are the same size "
-           "(sizes=[1 2 0])."
-           "\n   <model> <class Group>: dynamic sizing of non-distributed input 'E.in' from "
-           "distributed output 'D.out' is not supported."
-           "\n   'B' <class B_distrib>: Can't determine src_indices automatically for input "
-           "'B.in'. They must be supplied manually."
-           "\n   <model> <class Group>: Can't connect distributed output 'D.out' to "
-           "non-distributed input 'E.in' without specifying src_indices.")
+           "\n   <model> <class Group>: dynamic sizing of non-distributed output 'A.out' from distributed input 'B.in' is not supported because not all B.in ranks are the same size (sizes=[1 2 0])."
+           "\n   <model> <class Group>: dynamic sizing of non-distributed input 'E.in' from distributed output 'D.out' is not supported."
+           "\n   <model> <class Group>: Failed to resolve shapes for ['A.out', 'E.in', 'E.out']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
+           "\n   'B' <class B_distrib>: Can't determine src_indices automatically for input 'B.in'. They must be supplied manually."
+           "\n   <model> <class Group>: Can't connect distributed output 'D.out' to non-distributed input 'E.in' without specifying src_indices.")
 
 class ResizableComp(om.ExplicitComponent):
     # this is just a component that allows us to resize between setups
@@ -415,7 +415,7 @@ class TestDynShapes(unittest.TestCase):
                                                   x1={'shape_by_conn': True, 'copy_shape': 'y1'},
                                                   x2={'shape_by_conn': True, 'copy_shape': 'y2'},
                                                   y1={'copy_shape': 'y2'},
-                                                  y2={'copy_shape': 'y1'}))
+                                                  y2={'copy_shape': 'x1'}))
         p.model.connect('Gdyn.C3.y1', 'sink.x1')
         p.model.connect('Gdyn.C3.y2', 'sink.x2')
         p.model.connect('indep.x1', 'Gdyn.C1.x1')
@@ -427,18 +427,13 @@ class TestDynShapes(unittest.TestCase):
 
     def test_copy_shape_in_in(self):
         # test copy_shape from input to input
-        # The fact that this case works is a bit of a surprise since comp.x1 and comp.x2 do not set
-        # shape_by_conn, so you would expect them to be unresolvable, but they connect to dynamic
-        # shaped vars that DO have shape_by_conn set.  Basically, if shape_by_conn is set on either
-        # end of a connection when both vars are dynamically shaped, it's the same effect as if
-        # both had set shape_by_conn since the shapes of any two connected vars must match.
         p = om.Problem()
         indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
         indep.add_output('x2', val=np.ones((2,3)))
         p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3, 2, DynShapeComp))
         p.model.add_subsystem('comp', om.ExecComp('y1, y2 = x1*2, x2*2',
                                                   x1={'copy_shape': 'x2'},
-                                                  x2={'copy_shape': 'x1'},
+                                                  x2={'copy_shape': 'x1', 'shape_by_conn': True,},
                                                   y1={'shape_by_conn': True},
                                                   y2={'shape_by_conn': True}))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
@@ -459,9 +454,6 @@ class TestDynShapes(unittest.TestCase):
 
     def test_copy_shape_in_in_unresolvable(self):
         # test copy_shape from input to input
-        # In this case, our dynamicaly shaped inputs that do copy_shape from other inputs are connected to
-        # non-dynamically shaped outputs, and because they don't set shape_by_conn, they are unresolvable,
-        # unlike the test above where they connected to dynamically shaped outputs.
         p = om.Problem(name='copy_shape_in_in_unresolvable')
         indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
         indep.add_output('x2', val=np.ones((2,3)))
@@ -632,7 +624,7 @@ class TestDynShapes(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'bad_copy_shape_name':"
-           "\n   <model> <class Group>: Can't compute shape of variable 'sink.y1': variable 'sink.x11' doesn't exist."
+           "\n   <model> <class Group>: Can't copy shape of variable 'sink.x11'. Variable doesn't exist or is not continuous."
            "\n   <model> <class Group>: Failed to resolve shapes for ['sink.y1']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.")
 
     def test_unconnected_var_dyn_shape(self):
@@ -647,7 +639,8 @@ class TestDynShapes(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'unconnected_var_dyn_shape':"
-           "\n   <model> <class Group>: 'shape_by_conn' was set for unconnected variable 'sink.y1'.")
+           "\n   <model> <class Group>: 'shape_by_conn' was set for unconnected variable 'sink.y1'."
+           "\n   <model> <class Group>: Failed to resolve shapes for ['sink.y1']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.")
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -826,10 +819,9 @@ class TestDistribDynShapeCombos(unittest.TestCase):
             p.setup()
         self.assertEqual(cm.exception.args[0],
            "\nCollected errors for problem 'ser_unknown_dist_known_err':"
-           "\n   <model> <class Group>: dynamic sizing of non-distributed output 'indeps.x' from "
-           "distributed input 'comp.x' is not supported because not all comp.x ranks are the same "
-           "size (sizes=[3 6 9]).\n   'comp' <class DistCompDiffSizeKnownInput>: Can't determine "
-           "src_indices automatically for input 'comp.x'. They must be supplied manually.")
+           "\n   <model> <class Group>: dynamic sizing of non-distributed output 'indeps.x' from distributed input 'comp.x' is not supported because not all comp.x ranks are the same size (sizes=[3 6 9])."
+           "\n   <model> <class Group>: Failed to resolve shapes for ['indeps.x']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
+           "\n   'comp' <class DistCompDiffSizeKnownInput>: Can't determine src_indices automatically for input 'comp.x'. They must be supplied manually.")
 
     def test_dist_known_ser_unknown(self):
         p = om.Problem(name='dist_known_ser_unknown')
@@ -843,10 +835,9 @@ class TestDistribDynShapeCombos(unittest.TestCase):
             p.setup()
         self.assertEqual(cm.exception.args[0],
             "\nCollected errors for problem 'dist_known_ser_unknown':"
-            "\n   <model> <class Group>: dynamic sizing of non-distributed input 'comp.x' from "
-            "distributed output 'indeps.x' is not supported."
-            "\n   <model> <class Group>: Can't connect distributed output 'indeps.x' to "
-            "non-distributed input 'comp.x' without specifying src_indices.")
+            "\n   <model> <class Group>: dynamic sizing of non-distributed input 'comp.x' from distributed output 'indeps.x' is not supported."
+            "\n   <model> <class Group>: Failed to resolve shapes for ['comp.x', 'comp.y']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
+            "\n   <model> <class Group>: Can't connect distributed output 'indeps.x' to non-distributed input 'comp.x' without specifying src_indices.")
 
     def test_dist_unknown_ser_known(self):
         p = om.Problem(name='dist_unknown_ser_known')
@@ -881,6 +872,7 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         p.setup()
         p.run_model()
         np.testing.assert_allclose(p.get_val('indeps.x'), p.get_val('comp.x'))
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestDynShapesEmptyError(unittest.TestCase):

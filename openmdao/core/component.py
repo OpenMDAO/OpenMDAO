@@ -578,7 +578,7 @@ class Component(System):
                 raise ValueError("%s: If shape is to be set dynamically using 'shape_by_conn', "
                                  "'copy_shape', or 'compute_shape', 'shape' and 'val' should be a "
                                  "scalar, but shape of '%s' and val of '%s' was given for variable"
-                                  " '%s'." % (self.msginfo, shape, val, name))
+                                 " '%s'." % (self.msginfo, shape, val, name))
         else:
             # value, shape: based on args, making sure they are compatible
             val, shape = ensure_compatible(name, val, shape)

@@ -1470,9 +1470,8 @@ class TestExecComp(unittest.TestCase):
 
         comp = model.add_subsystem('comp', om.ExecComp('y=x+a',
                                                        y={'shape': (3,), 'val': np.zeros(3)},
-
-                                                x=np.array([1., 2., 3.]),
-                                                a={ 'val': np.array([1., 2., 3.]), 'constant':True}))
+                                                       x=np.array([1., 2., 3.]),
+                                                       a={ 'val': np.array([1., 2., 3.]), 'constant':True}))
 
         prob.setup()
 

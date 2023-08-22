@@ -333,6 +333,7 @@ class ExecComp(ExplicitComponent):
         self._exprs_info = exprs_info = []
         outs = set()
         allvars = set()
+        constants = set()
         self._requires_fd = {}
 
         for expr in exprs:
@@ -340,11 +341,10 @@ class ExecComp(ExplicitComponent):
             onames = self._parse_for_out_vars(lhs)
             vnames, fnames = self._parse_for_names(rhs)
 
+            constants.update([n for n, val in kwargs.items()
+                 if isinstance(val, dict) and 'constant' in val and val['constant']])
             # remove constants
-            vnames = vnames.difference(
-                [n for n, val in kwargs.items()
-                 if isinstance(val, dict) and 'constant' in val and val['constant']]
-            )
+            vnames = vnames.difference(constants)
 
             allvars.update(vnames)
             outs.update(onames)
@@ -379,7 +379,7 @@ class ExecComp(ExplicitComponent):
         # make sure all kwargs are legit
         for varname, val in kwargs.items():
 
-            if varname not in allvars:
+            if varname not in allvars and varname not in constants:
                 msg = f"{self.msginfo}: arg '{varname}' in call to ExecComp() " \
                       f"does not refer to any variable in the expressions {exprs}"
                 if varname in ('promotes', 'promotes_inputs', 'promotes_outputs'):
