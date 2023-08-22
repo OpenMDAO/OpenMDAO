@@ -1032,5 +1032,49 @@ class TestDynShapesWithInputConns(unittest.TestCase):
            "\n   <model> <class Group>: Shape of input 'sub.comp2.x', (2,), doesn't match shape (3,).")
 
 
+
+
+class MMP(om.ExplicitComponent):
+    def setup(self):
+        self.add_input('M', shape_by_conn=True)
+        self.add_input('N', shape_by_conn=True)
+        self.add_output('out', compute_shape=lambda shapes: (shapes['M'][0], shapes['N'][1]))
+
+    def compute(self, inputs, outputs):
+        outputs['out'] = np.dot(inputs['M'], inputs['N'])
+
+
+class TestComputeShape(unittest.TestCase):
+    def test_mvp(self):
+        p = om.Problem()
+        model = p.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_output('M', val=np.random.random((3, 2)))
+        indep.add_output('N', val=np.random.random((2, 8)))
+        indep.add_output('O', val=np.random.random((8, 5)))
+        indep.add_output('P', val=np.random.random((5, 7)))
+
+
+        model.add_subsystem('C1', MMP())
+        model.add_subsystem('C2', MMP())
+        model.add_subsystem('C3', MMP())
+
+        model.connect('indep.M', 'C1.M')
+        model.connect('indep.N', 'C1.N')
+        model.connect('indep.O', 'C2.M')
+        model.connect('indep.P', 'C2.N')
+        model.connect('C1.out', 'C3.M')
+        model.connect('C2.out', 'C3.N')
+
+        p.setup()
+        p.run_model()
+
+        self.assertEqual(model.C3._outputs['out'].shape, (3, 7))
+
+
+
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -779,7 +779,7 @@ class Component(System):
         if tags is not None and not isinstance(tags, (str, set, list)):
             raise TypeError('The tags argument should be a str, set, or list')
 
-        if not (copy_shape or shape_by_conn):
+        if not (copy_shape or shape_by_conn or compute_shape):
             if not isscalar(val) and not isinstance(val, _allowed_types):
                 msg = '%s: The val argument should be a float, list, tuple, ndarray or Iterable'
                 raise TypeError(msg % self.msginfo)
