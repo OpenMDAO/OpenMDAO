@@ -379,16 +379,7 @@ class ExecComp(ExplicitComponent):
         # make sure all kwargs are legit
         for varname, val in kwargs.items():
 
-            if varname in constants:
-                if 'val' not in val:
-                    raise RuntimeError(f"{self.msginfo}: arg '{varname}' in call to ExecComp() "
-                                       "is a constant but no value is given.")
-                for ignored_meta in ['units', 'shape']:
-                    if ignored_meta in val:
-                        issue_warning(f"arg '{varname}' in call to ExecComp() "
-                                      f"is a constant. The {ignored_meta} will be ignored",
-                                      prefix=self.msginfo, category=SetupWarning)
-            elif varname not in allvars:
+            if varname not in allvars and varname not in constants:
                 msg = f"{self.msginfo}: arg '{varname}' in call to ExecComp() " \
                       f"does not refer to any variable in the expressions {exprs}"
                 if varname in ('promotes', 'promotes_inputs', 'promotes_outputs'):
