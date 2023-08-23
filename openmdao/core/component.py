@@ -4,7 +4,7 @@ import sys
 import types
 from collections import defaultdict
 from collections.abc import Iterable
-from itertools import product, chain
+from itertools import product
 
 from numbers import Integral
 import numpy as np

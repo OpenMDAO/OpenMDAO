@@ -2289,6 +2289,22 @@ class Group(System):
         for a variable.
         """
         def get_group_input_shape(prom, gshapes):
+            """
+            Get the shape of the given promoted group input.
+
+            Parameters
+            ----------
+            prom : str
+                Promoted name of the group input.
+            gshapes : dict
+                Mapping of group input name to shape.
+
+            Returns
+            -------
+            tuple or None
+                If the shape of the variable is known, return the shape.
+                Otherwise, return None.
+            """
             if prom in gshapes:
                 return gshapes[prom]
 
@@ -2300,6 +2316,26 @@ class Group(System):
                         return np.asarray(d['val']).shape
 
         def compute_var_meta(graph, to_var, shapes, func):
+            """
+            Compute shape info for the given variable using the given function.
+
+            Parameters
+            ----------
+            graph : nx.DiGraph
+                Graph containing all variables with shape info.
+            to_var : str
+                Name of variable to compute shape info for.
+            shapes : dict
+                Mapping of variable name to shape.
+            func : function
+                Function to use to compute the shape.
+
+            Returns
+            -------
+            tuple or None
+                If the shape of the variable is known, return the shape.
+                Otherwise, return None.
+            """
             compname = to_var.rpartition('.')[0]
             try:
                 from_shape = func(shapes)
@@ -2318,7 +2354,26 @@ class Group(System):
             return from_shape
 
         def copy_var_meta(graph, from_var, to_var, distrib_sizes):
-            # copy size/shape info from from_var's metadata to to_var's metadata
+            """
+            Copy shape info from from_var's metadata to to_var's metadata in the graph.
+
+            Parameters
+            ----------
+            graph : nx.DiGraph
+                Graph containing all variables with shape info.
+            from_var : str
+                Name of variable to copy shape info from.
+            to_var : str
+                Name of variable to copy shape info to.
+            distrib_sizes : dict
+                Mapping of distributed variable name to sizes in each rank.
+
+            Returns
+            -------
+            tuple or None
+                If the shape of the variable is known, return the shape.
+                Otherwise, return None.
+            """
 
             if to_var.startswith('#'):
                 return
@@ -2384,13 +2439,13 @@ class Group(System):
             set of str
                 Set of nodes with known shape but at least one successor with unknown shape.
             """
-            unresolved = set()
             gnodes = graph.nodes
             if nodes is None:
                 nodes = graph.nodes()
 
+            unresolved = set()
             for node in nodes:
-                if gnodes[node]['shape'] is not None:  # node is known
+                if gnodes[node]['shape'] is not None:  # node has known shape
                     for succ in graph.successors(node):
                         if gnodes[succ]['shape'] is None:
                             unresolved.add(node)
@@ -2401,6 +2456,17 @@ class Group(System):
         def get_actives(graph, knowns):
             """
             Return all active single edges and active multi nodes.
+
+            Active edges are those that are connected on one end to a known shape variable
+            and on the other end to an unknown shape variable.  Active nodes are those that
+            have unknown shape but are connected to a known shape variable.
+
+            Single edges correspond to 'shape_by_conn' and 'copy_shape' connections.
+            Multi nodes are variables that have 'compute_shape' set to True so they
+            connect to multiple nodes of the opposite io type in a component. For example
+            a 'compute_shape' output variable will connect to all inputs in the component and
+            each of those edges will be labeled as 'multi'. So a multi node is a node that
+            has 'multi' incoming edges.
 
             Parameters
             ----------
@@ -2430,13 +2496,37 @@ class Group(System):
             return active_single_edges, active_multi_nodes
 
         def is_unresolved(graph, node):
+            """
+            Return True if the given node is unresolved.
+
+            Unresolved means that the node has at least one successor with unknown shape.
+
+            Parameters
+            ----------
+            graph : nx.DiGraph
+                Graph containing all variables with shape info.
+            node : str
+                Node to check.
+
+            Returns
+            -------
+            bool
+                True if the node is unresolved.
+            """
             for s in graph.successors(node):
                 if graph.nodes[s]['shape'] is None:
                     return True
             return False
 
         def get_rev_conn():
-            # build reverse connection dict (src: tgts)
+            """
+            Return a dict mapping each connected input to a list of its connected outputs.
+
+            Returns
+            -------
+            dict
+                Dict mapping each connected input to a list of its connected outputs.
+            """
             rev = {}
             for tgt, src in conn.items():
                 if src in rev:
@@ -2445,12 +2535,20 @@ class Group(System):
                     rev[src] = [tgt]
             return rev
 
-        all_abs2prom_in = self._var_allprocs_abs2prom['input']
-        nprocs = self.comm.size
-        conn = self._conn_global_abs_in2out
-        rev_conn = None
-
         def meta2node_data(meta):
+            """
+            Return a dict containing select metadata for the given variable.
+
+            Parameters
+            ----------
+            meta : dict
+                Metadata for the variable.
+
+            Returns
+            -------
+            dict
+                Dict containing select metadata for the variable.
+            """
             return {
                 'distributed': meta['distributed'],
                 'shape': meta['shape'],
@@ -2458,6 +2556,11 @@ class Group(System):
                 'shape_by_conn': meta['shape_by_conn'],
                 'copy_shape': meta['copy_shape'],
             }
+
+        all_abs2prom_in = self._var_allprocs_abs2prom['input']
+        nprocs = self.comm.size
+        conn = self._conn_global_abs_in2out
+        rev_conn = None
 
         self._shapes_graph = graph = nx.DiGraph()
         knowns = set()
@@ -2588,6 +2691,7 @@ class Group(System):
 
         knowns = {n for n, d in graph.nodes(data=True) if d['shape'] is not None}
         all_knowns = knowns.copy()
+        all_resolved = set()
 
         nodes = graph.nodes
         edges = graph.edges
