@@ -524,6 +524,8 @@ class NonlinearSolver(Solver):
         Saved output values from last successful solve, if any.
     _prev_fail : bool
         If True, previous solve failed.
+    _restarted : bool
+        If True, solve was restarted from a sucessful point.
     """
 
     def __init__(self, **kwargs):

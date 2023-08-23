@@ -101,8 +101,9 @@ class NonlinearBlockGS(NonlinearSolver):
         if system.under_complex_step and self.options['cs_reconverge']:
             system._outputs += np.linalg.norm(system._outputs.asarray()) * 1e-10
 
-        # Execute guess_nonlinear if specified and not restarting from a successful point
-        if not self._restarted:
+        # Execute guess_nonlinear if specified and
+        # we have not sucessfully restarted from a saved point
+        if not (self._restarted and not self._prev_fail):
             system._guess_nonlinear()
 
         return super()._iter_initialize()
