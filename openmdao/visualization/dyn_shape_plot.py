@@ -96,7 +96,6 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
         raise RuntimeError("The view_dyn_shapes command requires matplotlib.")
 
     graph = system._shapes_graph
-    knowns = system._shape_knowns
 
     if graph is None:
         raise RuntimeError("Can't plot dynamic shape dependency graph because it hasn't been "

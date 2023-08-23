@@ -1,6 +1,6 @@
 """Define the Group class."""
 import sys
-from collections import Counter, defaultdict, deque
+from collections import Counter, defaultdict
 from collections.abc import Iterable
 
 from itertools import product, chain
@@ -181,8 +181,6 @@ class Group(System):
         List of Auto IVC warnings to be raised later.
     _shapes_graph : nx.Graph
         Dynamic shape dependency graph, or None.
-    _shape_knowns : set
-        Set of shape dependency graph nodes with known (non-dynamic) shapes.
     _pre_components : list of str or None
         Sorted list of pathnames of components that are executed prior to the optimization loop.
     _post_components : list of str or None
@@ -214,7 +212,6 @@ class Group(System):
         self._contains_parallel_group = False
         self._order_set = False
         self._shapes_graph = None
-        self._shape_knowns = None
         self._pre_components = None
         self._post_components = None
         self._relevance_graph = None
@@ -2463,7 +2460,7 @@ class Group(System):
             }
 
         self._shapes_graph = graph = nx.DiGraph()
-        self._shape_knowns = knowns = set()
+        knowns = set()
         dist_sz = {}  # local distrib sizes
         my_abs2meta_out = self._var_abs2meta['output']
         my_abs2meta_in = self._var_abs2meta['input']
@@ -2488,7 +2485,6 @@ class Group(System):
                             from_meta = all_abs2meta_out[abs_from]
                             graph.add_node(abs_from, io='output', **meta2node_data(from_meta))
                         graph.add_edge(abs_from, name, multi=False)
-                        # print("adding edge:", (abs_from, name))
                     else:
                         if rev_conn is None:
                             rev_conn = get_rev_conn()
@@ -2497,7 +2493,6 @@ class Group(System):
                                 inmeta = all_abs2meta_in[inp]
                                 graph.add_node(inp, io='input', **meta2node_data(inmeta))
                                 graph.add_edge(inp, name, multi=False)
-                                # print("adding edge:", (name, inp))
                         elif not meta['compute_shape'] and not meta['copy_shape']:
                             # check to see if we can get shape from _group_inputs
                             fail = True
@@ -2511,7 +2506,6 @@ class Group(System):
                                                    distributed=False, shape_by_conn=None,
                                                    compute_shape=None)
                                     graph.add_edge(gnode, name, multi=False)
-                                    # print("adding edge:", (gnode, name))
                                     grp_shapes[prom] = grp_shape
                                     fail = False
                                 else:  # see if there are any connected inputs with known shape
@@ -2525,7 +2519,6 @@ class Group(System):
                                                 graph.add_node(n, io='input', known_count=0,
                                                                **meta2node_data(all_abs2meta_in[n]))
                                                 graph.add_edge(n, name, multi=False)
-                                                # print("adding edge:", (n, name))
                                                 break
                             if fail:
                                 self._collect_error(
@@ -2580,7 +2573,6 @@ class Group(System):
                     graph.add_node(abs_name, io=io, **meta2node_data(meta))
 
                 graph.add_edge(abs_name, name, multi=True)
-                # print("adding edge:", (abs_name, name))
 
         if graph.order() == 0:
             # we don't have any shape_by_conn or copy_shape variables, so we're done
@@ -2674,7 +2666,7 @@ class Group(System):
             try:
                 meta = self._var_abs2meta[io][node]
             except KeyError:
-                pass
+                pass  # node is not local, so no need to update local metadata
             else:
                 meta['shape'] = shape
                 meta['size'] = size
@@ -2682,7 +2674,6 @@ class Group(System):
 
         # save graph info for possible later plotting
         self._shapes_graph = graph
-        self._shape_knowns = knowns
 
         unresolved = set(graph.nodes()) - all_knowns
         if unresolved:
