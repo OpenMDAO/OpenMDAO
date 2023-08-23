@@ -342,7 +342,7 @@ class ExecComp(ExplicitComponent):
             vnames, fnames = self._parse_for_names(rhs)
 
             constants.update([n for n, val in kwargs.items()
-                 if isinstance(val, dict) and 'constant' in val and val['constant']])
+                              if isinstance(val, dict) and 'constant' in val and val['constant']])
             # remove constants
             vnames = vnames.difference(constants)
 
