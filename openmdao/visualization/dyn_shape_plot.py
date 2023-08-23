@@ -118,6 +118,8 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
 
     abs2meta = system._var_allprocs_abs2meta
 
+    dyn_names = ['shape_by_conn', 'compute_shape', 'copy_shape']
+
     # label variables with known shape at the start of the algorithm in green, unknowns in red.
     # prepend the shape onto the variable name
     node_colors = []
@@ -129,8 +131,10 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
             shape = '?'
             node_colors.append('red')
         else:
-            if meta.get('shape_by_conn', False) or meta.get('compute_shape', False):
-                node_colors.append('blue')
+            for shname in dyn_names:
+                if meta.get(shname, False):
+                    node_colors.append('blue')
+                    break
             else:
                 node_colors.append('green')
         node_labels[n] = f"{shape}: {n[common_idx:]}"
