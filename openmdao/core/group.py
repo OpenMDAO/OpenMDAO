@@ -2374,7 +2374,6 @@ class Group(System):
                 If the shape of the variable is known, return the shape.
                 Otherwise, return None.
             """
-
             if to_var.startswith('#'):
                 return
 
