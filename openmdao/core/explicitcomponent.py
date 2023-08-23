@@ -388,12 +388,12 @@ class ExplicitComponent(Component):
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
             d_inputs, d_outputs, d_residuals = vecs
 
-            # Jacobian and vectors are all scaled, unitless
-            J._apply(self, d_inputs, d_outputs, d_residuals, mode)
-
             if not self.matrix_free:
                 # if we're not matrix free, we can skip the rest because
                 # compute_jacvec_product does nothing.
+
+                # Jacobian and vectors are all scaled, unitless
+                J._apply(self, d_inputs, d_outputs, d_residuals, mode)
                 return
 
             # Jacobian and vectors are all unscaled, dimensional

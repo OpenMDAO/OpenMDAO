@@ -150,8 +150,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         prob.set_val('length', 3.)
         prob.set_val('width', 2.)
-        with assert_warning(UserWarning, "'comp2' <class RectangleJacVec>: matrix free component has declared the following partials: [('comp2.area', 'comp2.length'), ('comp2.area', 'comp2.width')], which will allocate (possibly unnecessary) memory for each of those sub-jacobians."):
-            prob.run_model()
+        prob.run_model()
 
         assert_near_equal(prob['comp1.area'], 6.)
         assert_near_equal(prob['comp2.area'], 6.)
