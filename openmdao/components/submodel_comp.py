@@ -42,9 +42,13 @@ class SubmodelComp(ExplicitComponent):
     submodel_outputs : dict
         Outputs to be used as outputs in the subproblem's system.
     _static_submodel_inputs : dict
-        Inputs passed into __init__ to be used as inputs in the subproblem's system.
+        Inputs passed into __init__ to be used as inputs in the subproblem's system. These
+        must be bookkept separately from submodel inputs added at setup time because setup
+        can be called multiple times and the submodel inputs dict is reset each time.
     _static_submodel_outputs : dict
-        Outputs passed into __init__ to be used as outputs in the subproblem's system.
+        Outputs passed into __init__ to be used as outputs in the subproblem's system. These
+        must be bookkept separately from submodel outputs added at setup time because setup
+        can be called multiple times and the submodel outputs dict is reset each time.
     """
 
     def __init__(self, problem, inputs=None, outputs=None, reports=False, **kwargs):
@@ -231,8 +235,8 @@ class SubmodelComp(ExplicitComponent):
         for _, meta in outputs:
             self.all_outputs[meta['prom_name']] = meta
 
-        self.submodel_inputs = submodel_inputs = {}
-        self.submodel_outputs = submodel_outputs = {}
+        self.submodel_inputs = {}
+        self.submodel_outputs = {}
         boundary_keys = list(self.boundary_inputs.keys())
 
         for var, meta in self._static_submodel_inputs.items():
