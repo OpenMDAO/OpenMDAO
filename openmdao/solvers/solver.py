@@ -534,6 +534,7 @@ class NonlinearSolver(Solver):
         self._err_cache = {}
         self._output_cache = None
         self._prev_fail = False
+        self._restarted = False
 
     def _declare_options(self):
         """
@@ -819,6 +820,7 @@ class NonlinearSolver(Solver):
                 # the outputs using the cache.
                 if self._prev_fail and self._output_cache is not None:
                     system._outputs.set_val(self._output_cache)
+                    self._restarted = True
 
                 self.solve()
 
