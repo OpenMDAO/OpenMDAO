@@ -359,12 +359,6 @@ class Component(System):
             of, wrt = key
             self._declare_partials(of, wrt, dct)
 
-        if self.matrix_free and self._subjacs_info:
-            issue_warning("matrix free component has declared the following "
-                          f"partials: {sorted(self._subjacs_info)}, which will allocate "
-                          "(possibly unnecessary) memory for each of those sub-jacobians.",
-                          prefix=self.msginfo, category=DerivativesWarning)
-
     def setup_partials(self):
         """
         Declare partials.
@@ -400,6 +394,8 @@ class Component(System):
         if ('*', '*') in self._declared_partials:
             return
 
+        # keep old default behavior where matrix free components are assumed to have
+        # 'dense' whole variable to whole variable partials if no partials are declared.
         if self.matrix_free and not self._declared_partials:
             return
 

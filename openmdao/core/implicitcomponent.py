@@ -463,26 +463,6 @@ class ImplicitComponent(Component):
         self._declared_residuals = {}
         self._resid2out_subjac_map = {}
 
-    def _setup_procs(self, pathname, comm, mode, prob_meta):
-        """
-        Execute first phase of the setup process.
-
-        Distribute processors, assign pathnames, and call setup on the component.
-
-        Parameters
-        ----------
-        pathname : str
-            Global name of the system, including the path.
-        comm : MPI.Comm or <FakeComm>
-            MPI communicator object.
-        mode : str
-            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
-            reverse (adjoint). Default is 'rev'.
-        prob_meta : dict
-            Problem level metadata.
-        """
-        super()._setup_procs(pathname, comm, mode, prob_meta)
-
     def _resid_name_shape_iter(self):
         for name, meta in self._declared_residuals.items():
             yield name, meta['shape']

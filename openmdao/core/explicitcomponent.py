@@ -143,6 +143,9 @@ class ExplicitComponent(Component):
         """
         super()._setup_partials()
 
+        if self.matrix_free:
+            return
+
         # Note: These declare calls are outside of setup_partials so that users do not have to
         # call the super version of setup_partials. This is still in the final setup.
         for out_abs, meta in self._var_abs2meta['output'].items():
@@ -156,7 +159,7 @@ class ExplicitComponent(Component):
             size = meta['size']
 
             # ExplicitComponent jacobians have -1 on the diagonal.
-            if size > 0 and not self.matrix_free:
+            if size > 0:
                 arange = np.arange(size, dtype=INT_DTYPE)
 
                 self._subjacs_info[abs_key] = {
