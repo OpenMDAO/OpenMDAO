@@ -307,8 +307,8 @@ class BroydenSolver(NonlinearSolver):
         self._computed_jacobians = 0
 
         # Execute guess_nonlinear if specified and
-        # we have not sucessfully restarted from a saved point
-        if not (self._restarted and not self._prev_fail):
+        # we have not restarted from a saved point
+        if not self._restarted:
             system._guess_nonlinear()
 
         # When under a complex step from higher in the hierarchy, sometimes the step is too small

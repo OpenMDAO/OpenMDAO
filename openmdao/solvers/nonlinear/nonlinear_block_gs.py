@@ -102,8 +102,8 @@ class NonlinearBlockGS(NonlinearSolver):
             system._outputs += np.linalg.norm(system._outputs.asarray()) * 1e-10
 
         # Execute guess_nonlinear if specified and
-        # we have not sucessfully restarted from a saved point
-        if not (self._restarted and not self._prev_fail):
+        # we have not restarted from a saved point
+        if not self._restarted:
             system._guess_nonlinear()
 
         return super()._iter_initialize()

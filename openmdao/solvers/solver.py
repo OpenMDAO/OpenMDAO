@@ -823,6 +823,8 @@ class NonlinearSolver(Solver):
                 if self._prev_fail and self._output_cache is not None:
                     system._outputs.set_val(self._output_cache)
                     self._restarted = True
+                else:
+                    self._restarted = False
 
                 self.solve()
 
