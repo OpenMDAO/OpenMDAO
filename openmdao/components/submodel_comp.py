@@ -37,12 +37,18 @@ class SubmodelComp(ExplicitComponent):
     ----------
     _subprob : <Problem>
         Instantiated problem used to run the model.
-    submodel_inputs : list of tuple
-        List of inputs requested by user to be used as inputs in the
-        subproblem's system.
-    submodel_outputs : list of tuple
-        List of outputs requested by user to be used as outputs in the
-        subproblem's system.
+    submodel_inputs : dict
+        Inputs to be used as inputs in the subproblem's system.
+    submodel_outputs : dict
+        Outputs to be used as outputs in the subproblem's system.
+    _static_submodel_inputs : dict
+        Inputs passed into __init__ to be used as inputs in the subproblem's system. These
+        must be bookkept separately from submodel inputs added at setup time because setup
+        can be called multiple times and the submodel inputs dict is reset each time.
+    _static_submodel_outputs : dict
+        Outputs passed into __init__ to be used as outputs in the subproblem's system. These
+        must be bookkept separately from submodel outputs added at setup time because setup
+        can be called multiple times and the submodel outputs dict is reset each time.
     """
 
     def __init__(self, problem, inputs=None, outputs=None, reports=False, **kwargs):
@@ -57,24 +63,36 @@ class SubmodelComp(ExplicitComponent):
 
         self.submodel_inputs = {}
         self.submodel_outputs = {}
+        self._static_submodel_inputs = {}
+        self._static_submodel_outputs = {}
 
         if inputs is not None:
             for inp in inputs:
                 if isinstance(inp, str):
-                    self.submodel_inputs[inp] = {'iface_name': inp.replace('.', ':')}
+                    self._add_static_input(inp)
                 elif isinstance(inp, tuple):
-                    self.submodel_inputs[inp[0]] = {'iface_name': inp[1]}
+                    self._add_static_input(inp[0], name=inp[1])
                 else:
                     raise Exception(f'Expected input of type str or tuple, got {type(inp)}.')
 
         if outputs is not None:
             for out in outputs:
                 if isinstance(out, str):
-                    self.submodel_outputs[out] = {'iface_name': out.replace('.', ':')}
+                    self._add_static_output(out)
                 elif isinstance(out, tuple):
-                    self.submodel_outputs[out[0]] = {'iface_name': out[1]}
+                    self._add_static_output(out[0], name=out[1])
                 else:
                     raise Exception(f'Expected output of type str or tuple, got {type(out)}.')
+
+    def _add_static_input(self, path, name=None, **kwargs):
+        if name is None:
+            name = path.replace('.', ':')
+        self._static_submodel_inputs[path] = {'iface_name': name, **kwargs}
+
+    def _add_static_output(self, path, name=None, **kwargs):
+        if name is None:
+            name = path.replace('.', ':')
+        self._static_submodel_outputs[path] = {'iface_name': name, **kwargs}
 
     def add_input(self, path, name=None, **kwargs):
         """
@@ -90,6 +108,10 @@ class SubmodelComp(ExplicitComponent):
         **kwargs : named args
             All remaining named args that can become options for `add_input`.
         """
+        if self._static_mode:
+            self._add_static_input(path, name, **kwargs)
+            return
+
         if name is None:
             name = path.replace('.', ':')
 
@@ -127,6 +149,10 @@ class SubmodelComp(ExplicitComponent):
         **kwargs : named args
             All remaining named args that can become options for `add_output`.
         """
+        if self._static_mode:
+            self._add_static_output(path, name, **kwargs)
+            return
+
         if name is None:
             name = path.replace('.', ':')
 
@@ -189,8 +215,7 @@ class SubmodelComp(ExplicitComponent):
         # because list_indep_vars doesn't have prom_name as part of its meta data
         # TODO some of this might not be necessary... need to revisit
         self.boundary_inputs = {}
-        indep_vars = p.list_indep_vars(out_stream=None)
-        for name, meta in indep_vars:
+        for name, meta in p.list_indep_vars(out_stream=None):
             if name in p.model._var_abs2prom['input']:
                 meta['prom_name'] = p.model._var_abs2prom['input'][name]
             elif name in p.model._var_abs2prom['output']:
@@ -203,41 +228,45 @@ class SubmodelComp(ExplicitComponent):
 
         self.all_outputs = {}
         outputs = p.model.list_outputs(out_stream=None, prom_name=True,
-                                       units=True, shape=True, desc=True)
+                                       units=True, shape=True, desc=True,
+                                       all_procs=True)
 
         # turn outputs into dict
         for _, meta in outputs:
             self.all_outputs[meta['prom_name']] = meta
 
-        wildcard_inputs = [var for var, _ in self.submodel_inputs.items()
-                           if '*' in var]
-        wildcard_outputs = [var for var, _ in self.submodel_outputs.items()
-                            if '*' in var]
+        self.submodel_inputs = {}
+        self.submodel_outputs = {}
+        boundary_keys = list(self.boundary_inputs.keys())
 
-        for inp in wildcard_inputs:
-            matches = find_matches(inp, list(self.boundary_inputs.keys()))
-            if len(matches) == 0:
-                raise Exception(f'Pattern {inp} not found in model')
-            for match in matches:
-                self.submodel_inputs[match] = {'iface_name': match.replace('.', ':')}
-            self.submodel_inputs.pop(inp)
+        for var, meta in self._static_submodel_inputs.items():
+            if '*' in var:
+                matches = find_matches(var, boundary_keys)
+                if len(matches) == 0:
+                    raise Exception(f"Pattern '{var}' not found in model")
+                for match in matches:
+                    self.submodel_inputs[match] = {'iface_name': match.replace('.', ':')}
+            else:
+                self.submodel_inputs[var] = meta.copy()
 
-        for out in wildcard_outputs:
-            matches = find_matches(out, list(self.all_outputs.keys()))
-            if len(matches) == 0:
-                raise Exception(f'Pattern {out} not found in model')
-            for match in matches:
-                self.submodel_outputs[match] = {'iface_name': match.replace('.', ':')}
-            self.submodel_outputs.pop(out)
+        for var, meta in self._static_submodel_outputs.items():
+            if '*' in var:
+                matches = find_matches(var, self.all_outputs)
+                if len(matches) == 0:
+                    raise Exception(f"Pattern '{var}' not found in model")
+                for match in matches:
+                    self.submodel_outputs[match] = {'iface_name': match.replace('.', ':')}
+            else:
+                self.submodel_outputs[var] = meta.copy()
 
         # NOTE iface_name is what the outer problem knows the variable to be
         # it can't be the same name as the prom name in the inner variable because
         # component var names can't include '.'
-        for var in self.submodel_inputs.items():
-            iface_name = var[1]['iface_name']
+        for var, data in sorted(self.submodel_inputs.items(), key=lambda x: x[0]):
+            iface_name = data['iface_name']
             if iface_name in self._static_var_rel2meta or iface_name in self._var_rel2meta:
                 continue
-            prom_name = var[0]
+            prom_name = var
             try:
                 meta = self.boundary_inputs[p.model.get_source(prom_name)] \
                     if not p.model.get_source(prom_name).startswith('_auto_ivc.') \
@@ -246,7 +275,7 @@ class SubmodelComp(ExplicitComponent):
                 raise Exception(f'Variable {prom_name} not found in model')
             meta.pop('prom_name')
 
-            for key, val in var[1].items():
+            for key, val in data.items():
                 if key == 'iface_name':
                     continue
                 meta[key] = val
@@ -254,18 +283,18 @@ class SubmodelComp(ExplicitComponent):
             super().add_input(iface_name, **meta)
             meta['prom_name'] = prom_name
 
-        for var in self.submodel_outputs.items():
-            iface_name = var[1]['iface_name']
+        for var, data in sorted(self.submodel_outputs.items(), key=lambda x: x[0]):
+            iface_name = data['iface_name']
             if iface_name in self._static_var_rel2meta or iface_name in self._var_rel2meta:
                 continue
-            prom_name = var[0]
+            prom_name = var
             try:
                 meta = self.all_outputs[prom_name]
             except Exception:
                 raise Exception(f'Variable {prom_name} not found in model')
             meta.pop('prom_name')
 
-            for key, val in var[1].items():
+            for key, val in data.items():
                 if key == 'iface_name':
                     continue
                 meta[key] = val
@@ -380,12 +409,12 @@ class SubmodelComp(ExplicitComponent):
         if len(inputs) == 0 or len(outputs) == 0:
             return
 
-        for prom_name in self.submodel_inputs.keys():
+        for prom_name in sorted(self.submodel_inputs.keys()):
             if prom_name in p.model._static_design_vars or prom_name in p.model._design_vars:
                 continue
             p.model.add_design_var(prom_name)
 
-        for prom_name in self.submodel_outputs.keys():
+        for prom_name in sorted(self.submodel_outputs.keys()):
             # got abs name back for self._cons key for some reason in `test_multiple_setups`
             # TODO look into this
             if prom_name in p.model._responses:

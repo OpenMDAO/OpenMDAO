@@ -27,6 +27,17 @@ try:
 except ImportError:
     tornado = None
 
+try:
+    from mpi4py import MPI
+except ImportError:
+    MPI = None
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
+
+
 dname = os.path.dirname
 
 scriptdir = os.path.join(dname(dname(dname(os.path.abspath(__file__)))), 'test_suite', 'scripts')
@@ -41,6 +52,7 @@ cmd_tests = [
     # tuple of (command line, dict of dependencies that might not be installed)
     ('openmdao call_tree openmdao.components.exec_comp.ExecComp.setup', {}),
     ('openmdao check {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
+    ('openmdao comm_info {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao cite {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao compute_entry_points openmdao', {}),
     ('openmdao iprof --no_browser {}'.format(os.path.join(scriptdir, 'circle_opt.py')),
@@ -78,17 +90,19 @@ class CmdlineTestCase(unittest.TestCase):
     @parameterized.expand(cmd_tests, name_func=_test_func_name)
     def test_cmd(self, cmd, dependencies):
         # skip any commands for which we do not have required dependencies
-        for name, installed in dependencies.items():
-            if not installed:
-                raise unittest.SkipTest(f"{name} is not installed")
+        not_installed = [n for n, inst in dependencies.items() if not inst]
+        if not_installed:
+            raise unittest.SkipTest(f"{not_installed} is not installed")
 
         # this only tests that a given command line tool returns a 0 return code. It doesn't
         # check the expected output at all.  The underlying functions that implement the
         # commands should be tested seperately.
         try:
-            output = subprocess.check_output(cmd.split())  # nosec: trusted input
+            output = subprocess.check_output(cmd.split(),
+                                             stderr=subprocess.STDOUT)  # nosec: trusted input
         except subprocess.CalledProcessError as err:
-            self.fail("Command '{}' failed.  Return code: {}".format(cmd, err.returncode))
+            self.fail(f"Command '{cmd}' failed.  Return code: {err.returncode}: "
+                      f"Output was: \n{err.output.decode('utf-8')}")
 
     def test_n2_err(self):
         # command should raise exception but still produce an n2 html file
@@ -147,7 +161,8 @@ class CmdlineTestfuncTestCase(unittest.TestCase):
         try:
             output = subprocess.check_output(cmd.split())  # nosec: trusted input
         except subprocess.CalledProcessError as err:
-            self.fail("Command '{}' failed.  Return code: {}".format(cmd, err.returncode))
+            self.fail(f"Command '{cmd}' failed.  Return code: {err.returncode} "
+                      f"Output was: \n{err.output.decode('utf-8')}")
 
 
 test_cmd_err = [

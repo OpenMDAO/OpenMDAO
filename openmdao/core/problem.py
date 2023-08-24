@@ -81,6 +81,9 @@ CITATION = """@article{openmdao_2019,
 # Also handles sub problems
 _problem_names = []
 
+# Used to keep track of the current Problem tree if there are any subproblems
+_prob_setup_stack = []
+
 
 def _clear_problem_names():
     global _problem_names
@@ -945,6 +948,7 @@ class Problem(object):
         # this metadata will be shared by all Systems/Solvers in the system tree
         self._metadata = {
             'name': self._name,  # the name of this Problem
+            'pathname': None,  # the pathname of this Problem in the current tree of Problems
             'comm': comm,
             'coloring_dir': self.options['coloring_dir'],  # directory for coloring files
             'recording_iter': _RecIteration(comm.rank),  # manager of recorder iterations
@@ -983,7 +987,18 @@ class Problem(object):
             'model_options': self.model_options,  # A dict of options passed to all systems in tree
             'singular_jac_behavior': 'warn',  # How to handle singular jac conditions
         }
-        model._setup(model_comm, mode, self._metadata)
+
+        if _prob_setup_stack:
+            self._metadata['pathname'] = _prob_setup_stack[-1]._metadata['pathname'] + '/' + \
+                self._name
+        else:
+            self._metadata['pathname'] = self._name
+
+        _prob_setup_stack.append(self)
+        try:
+            model._setup(model_comm, mode, self._metadata)
+        finally:
+            _prob_setup_stack.pop()
 
         # set static mode back to True in all systems in this Problem
         self._metadata['static_mode'] = True
@@ -2101,9 +2116,9 @@ class Problem(object):
             The header line for the table.
         col_names : list of str
             List of column labels.
-        meta : OrderedDict
+        meta : dict
             Dictionary of metadata for each problem variable.
-        vals : OrderedDict
+        vals : dict
             Dictionary of values for each problem variable.
         print_arrays : bool, optional
             When False, in the columnar display, just display norm of any ndarrays with size > 1.

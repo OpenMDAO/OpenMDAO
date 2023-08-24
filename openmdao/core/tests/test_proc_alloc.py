@@ -1,11 +1,13 @@
 
+import sys
 import unittest
+from io import StringIO
 
-from openmdao.api import Problem, Group, ExecComp
-from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, LinearBlockGS, \
-    ExecComp, ExplicitComponent, PETScVector, ScipyKrylov, NonlinearBlockGS
+from openmdao.api import ParallelGroup, Problem, IndepVarComp, ExecComp, PETScVector
+from openmdao.devtools.debug import comm_info
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.testing_utils import use_tempdirs
 
 try:
     from openmdao.api import PETScVector
@@ -186,6 +188,35 @@ class ProcTestCase6(unittest.TestCase):
             self.assertEqual(str(err), "'par' <class ParallelGroup>: too many MPI procs allocated. Comm is size 6 but can only use 5.")
         else:
             self.fail("Exception expected.")
+
+
+@use_tempdirs
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class ProcTestCase6comm_info(unittest.TestCase):
+
+    N_PROCS = 6
+    def test_comm_info_cmd(self):
+        p = _build_model(nsubs=3, weights=[1.0, 2.0, 1.0])
+        comm_info(p.model, outfile='comm_info.txt', table_format='grid')
+
+        p.model.comm.barrier()
+        with open('comm_info.txt', 'r') as f:
+            output = f.read()
+
+        expected = """+-------+-----------------+-----------------+
+| Comm  |   COMM_WORLD    | System Pathname |
+| Size  |    Range(s)     |                 |
++=======+=================+=================+
+|   6   |      0 - 5      |                 |
++-------+-----------------+-----------------+
+|   3   |      2 - 4      | par.C1          |
++-------+-----------------+-----------------+
+|   2   |      0 - 1      | par.C0          |
++-------+-----------------+-----------------+
+|   1   |        5        | par.C2          |
++-------+-----------------+-----------------+
+"""
+        self.assertEqual(output, expected)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
