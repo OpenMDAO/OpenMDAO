@@ -152,8 +152,7 @@ class TestOutputCache(unittest.TestCase):
 
     def test_coupled_system_with_guess_nonlinear(self):
         prob = om.Problem()
-        model = prob.model
-        simple = model.add_subsystem("simple", NLBGSGroup())
+        simple = prob.model.add_subsystem("simple", NLBGSGroup())
 
         prob.setup()
 
