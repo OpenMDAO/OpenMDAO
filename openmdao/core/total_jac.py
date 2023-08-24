@@ -2035,9 +2035,8 @@ def _fix_pdc_lengths(idx_iter_dict):
         Dict of a name/color mapped to indexing information.
     """
     for imeta, _ in idx_iter_dict.values():
-        par_deriv_color = imeta['par_deriv_color']
-        range_list = imeta['idx_list']
-        if par_deriv_color:
+        if imeta['par_deriv_color']:
+            range_list = imeta['idx_list']
             lens = np.array([end - start for start, end in range_list])
             maxlen = np.max(lens)
             diffs = lens - maxlen

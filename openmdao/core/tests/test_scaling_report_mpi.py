@@ -2,7 +2,7 @@
 import os
 import unittest
 
-import  openmdao.core.tests.test_scaling_report as NonMPI
+import openmdao.core.tests.test_scaling_report as NonMPI
 
 
 @unittest.skipIf(os.environ.get("GITHUB_ACTION"), "Unreliable on GitHub Actions workflows.")

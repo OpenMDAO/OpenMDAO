@@ -1103,7 +1103,7 @@ class BlockLinearSolver(LinearSolver):
             self._rhs_vec[:] = self._system()._dresiduals.asarray()
         else:
             self._rhs_vec[:] = self._system()._doutputs.asarray()
-        # print("Updating RHS vec to", self._rhs_vec)
+        # print(self._system().pathname, "Updating RHS vec to", self._rhs_vec)  # DO NOT DELETE
 
     def _set_complex_step_mode(self, active):
         """

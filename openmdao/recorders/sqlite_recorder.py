@@ -350,19 +350,20 @@ class SqliteRecorder(CaseRecorder):
 
         states = system._list_states_allprocs()
 
+        if driver is None:
+            desvars = system.get_design_vars(True, get_sizes=False, use_prom_ivc=False)
+            responses = system.get_responses(True, get_sizes=False, use_prom_ivc=False)
+            constraints = {}
+            objectives = {}
+            for name, data in responses.items():
+                if data['type'] == 'con':
+                    constraints[name] = data
+                else:
+                    objectives[name] = data
+
         if self.connection:
 
-            if driver is None:
-                desvars = system.get_design_vars(True, get_sizes=False, use_prom_ivc=False)
-                responses = system.get_responses(True, get_sizes=False, use_prom_ivc=False)
-                constraints = {}
-                objectives = {}
-                for name, data in responses.items():
-                    if data['type'] == 'con':
-                        constraints[name] = data
-                    else:
-                        objectives[name] = data
-            else:
+            if driver is not None:
                 desvars = driver._designvars.copy()
                 responses = driver._responses.copy()
                 constraints = driver._cons.copy()

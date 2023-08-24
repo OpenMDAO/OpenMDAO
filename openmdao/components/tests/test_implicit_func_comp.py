@@ -126,7 +126,12 @@ class TestImplicitFuncComp(unittest.TestCase):
             z0 = z[0]
             z1 = z[1]
 
-            return 0., (y1**.5 + z0 + z1) - y2, (z0**2 + z1 + x - 0.2*y2) - y1 - R_y1, (y1**.5 + z0 + z1) - y2 - R_y2
+            return (
+                0.,
+                (y1**.5 + z0 + z1) - y2,
+                (z0**2 + z1 + x - 0.2*y2) - y1 - R_y1,
+                (y1**.5 + z0 + z1) - y2 - R_y2
+            )
 
         f = (omf.wrap(apply_nonlinear)
                 .add_input('z', val=np.array([-1., -1.]))
@@ -170,7 +175,7 @@ class TestImplicitFuncComp(unittest.TestCase):
         p_opt.driver = om.ScipyOptimizeDriver()
         p_opt.driver.options['disp'] = False
 
-        p_opt.model.add_design_var('y1', lower=-10, upper=10)
+        p_opt.model.add_design_var('x', lower=-10, upper=10)
         p_opt.model.add_constraint('R_y1', equals=0)
 
         p_opt.model.add_objective('y2')
@@ -183,9 +188,9 @@ class TestImplicitFuncComp(unittest.TestCase):
 
         p_opt.run_driver()
 
-        np.testing.assert_almost_equal(p_opt['y1'], 2.109516506074582, decimal=5)
-        np.testing.assert_almost_equal(p_opt['y2'], -0.5475825303740725, decimal=5)
-        np.testing.assert_almost_equal(p_opt['x'], 2.0, decimal=5)
+        np.testing.assert_almost_equal(p_opt['y1'], 5., decimal=5)
+        np.testing.assert_almost_equal(p_opt['y2'], 0.2360679774997898, decimal=5)
+        np.testing.assert_almost_equal(p_opt['x'], 5.047213595499958, decimal=5)
         np.testing.assert_almost_equal(p_opt['z'], np.array([-1., -1.]), decimal=5)
 
     def test_apply_nonlinear(self):

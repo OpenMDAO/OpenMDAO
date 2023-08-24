@@ -99,6 +99,21 @@ class ParallelGroup(Group):
 
         return out_of_order
 
+    def comm_info_iter(self):
+        """
+        Yield comm size and rank for this system and all subsystems.
+
+        Yields
+        ------
+        tuple
+            A tuple of the form (abs_name, comm_size).
+        """
+        if self.comm.size > 1:
+            for info in self.comm.allgather(list(super().comm_info_iter())):
+                yield from info
+        else:
+            yield from super().comm_info_iter()
+
     def _declared_partials_iter(self):
         """
         Iterate over all declared partials.

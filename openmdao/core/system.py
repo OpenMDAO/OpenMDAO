@@ -15,7 +15,6 @@ from fnmatch import fnmatchcase
 from numbers import Integral
 
 import numpy as np
-import networkx as nx
 
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE, INF_BOUND, \
     _SetupStatus
@@ -1017,7 +1016,9 @@ class System(object):
         #   this var
         new_desvar_metadata = {
             'scaler': scaler,
+            'total_scaler': scaler,
             'adder': adder,
+            'total_adder': adder,
             'upper': upper,
             'lower': lower,
             'ref': ref,
@@ -1215,7 +1216,9 @@ class System(object):
             'lower': lower,
             'upper': upper,
             'adder': adder,
+            'total_adder': adder,
             'scaler': scaler,
+            'total_scaler': scaler,
         }
 
         responses[name].update(new_cons_metadata)
@@ -1264,7 +1267,7 @@ class System(object):
             responses = self._responses
 
         # Look through responses to see if there are multiple responses with that name
-        aliases = [resp['alias'] for key, resp in responses.items() if resp['name'] == name]
+        aliases = [resp['alias'] for resp in responses.values() if resp['name'] == name]
         if len(aliases) > 1 and alias is _UNDEFINED:
             msg = "{}: set_objective_options called with objective variable '{}' that has " \
                   "multiple aliases: {}. Call set_objective_options with the 'alias' argument " \
@@ -1290,8 +1293,6 @@ class System(object):
         if ref0 is _UNDEFINED:
             ref0 = None
 
-        new_obj_metadata = {}
-
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
         ref0 = format_as_float_or_array('ref0', ref0, val_if_none=None, flatten=True)
@@ -1311,10 +1312,14 @@ class System(object):
         elif adder == 0.0:
             adder = None
 
-        new_obj_metadata['scaler'] = scaler
-        new_obj_metadata['adder'] = adder
-        new_obj_metadata['ref'] = ref
-        new_obj_metadata['ref0'] = ref0
+        new_obj_metadata = {
+            'ref': ref,
+            'ref0': ref0,
+            'adder': adder,
+            'total_adder': adder,
+            'scaler': scaler,
+            'total_scaler': scaler,
+        }
 
         responses[name].update(new_obj_metadata)
 
@@ -2370,25 +2375,22 @@ class System(object):
             try:
                 old_name, old_key, old_info, old_match_type = matches[io][name]
                 _, info = tup
+
                 if old_match_type == _MatchType.RENAME:
                     old_key = old_using = (old_name, old_key)
-                    wild = False
                 else:
-                    old_using = f"'{old_key}'"
-                    wild = '*' in old_key
+                    old_using = old_key
 
                 if match_type == _MatchType.RENAME:
                     new_using = (name, tup[0])
-                    wild = False
                 else:
-                    new_using = f"'{tup[0]}'"
-                    wild |= '*' in tup[0]
+                    new_using = tup[0]
 
                 diff = info.compare(old_info) if info is not None and old_info is not None else ()
                 if diff:
                     raise RuntimeError(f"{self.msginfo}: {io} variable '{name}', promoted using "
-                                       f"{new_using}, was already promoted using {old_using} with "
-                                       f"different values for {diff}.")
+                                       f"'{new_using}', was already promoted using '{old_using}' "
+                                       f"with different values for {diff}.")
 
                 if old_match_type != _MatchType.PATTERN:
                     if old_key != tup[0]:
@@ -2396,10 +2398,10 @@ class System(object):
                                            f"'{tup[0]}' because '{name}' has already been promoted "
                                            f"as '{old_key}'.")
 
-                if not wild:
-                    msg = f"{io} variable '{name}', promoted using {new_using}, " \
-                          f"was already promoted using {old_using}."
-                    issue_warning(msg, prefix=self.msginfo, category=PromotionWarning)
+                if old_using != new_using and '*' not in old_using and '*' not in new_using:
+                    issue_warning(f"{io} variable '{name}', promoted using {new_using}, "
+                                  f"was already promoted using {old_using}.",
+                                  prefix=self.msginfo, category=PromotionWarning)
             except Exception:
                 type_exc, exc, tb = sys.exc_info()
                 self._collect_error(str(exc), exc_type=type_exc, tback=tb)
@@ -3033,6 +3035,7 @@ class System(object):
         elif scaler == 1.0:
             scaler = None
         dv['scaler'] = scaler
+        dv['total_scaler'] = scaler
 
         if isinstance(adder, np.ndarray):
             if not np.any(adder):
@@ -3040,6 +3043,7 @@ class System(object):
         elif adder == 0.0:
             adder = None
         dv['adder'] = adder
+        dv['total_adder'] = adder
 
         dv['name'] = name
         dv['upper'] = upper
@@ -3231,6 +3235,7 @@ class System(object):
         elif scaler == 1.0:
             scaler = None
         resp['scaler'] = scaler
+        resp['total_scaler'] = scaler
 
         if isinstance(adder, np.ndarray):
             if not np.any(adder):
@@ -3238,6 +3243,7 @@ class System(object):
         elif adder == 0.0:
             adder = None
         resp['adder'] = adder
+        resp['total_adder'] = adder
 
         resp['ref'] = ref
         resp['ref0'] = ref0
@@ -3844,7 +3850,7 @@ class System(object):
             excludes = (excludes,)
 
         gather_keys = {'val', 'src_indices'}
-        need_gather = get_remote and self.comm.size > 1
+        need_gather = get_remote and self.comm is not None and self.comm.size > 1
         if metadata_keys is not None:
             keyset = set(metadata_keys)
             diff = keyset - allowed_meta_names
@@ -4067,7 +4073,8 @@ class System(object):
         list of (name, metadata) or dict of {name: metadata}
             List or dict of input names and other optional information about those inputs.
         """
-        if (self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP) and val:
+        if (self._problem_meta is None or
+                self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP) and val:
             issue_warning("Calling `list_inputs` before `final_setup` will only "
                           "display the default values of variables and will not show the result of "
                           "any `set_val` calls.")
@@ -4115,7 +4122,10 @@ class System(object):
                         meta['max'] = np.round(np.max(meta['val']), np_precision)
 
         if not inputs or (not all_procs and self.comm.rank != 0):
-            return []
+            if return_format == 'dict':
+                return {}
+            else:
+                return []
 
         if out_stream:
             self._write_table('input', inputs, hierarchical, print_arrays, all_procs,
@@ -6174,3 +6184,18 @@ class System(object):
             with `prom_name=True` and `return_format='dict'`.
         """
         pass
+
+    def comm_info_iter(self):
+        """
+        Yield comm size for this system and all subsystems.
+
+        Yields
+        ------
+        tuple
+            A tuple of the form (abs_name, comm_size).
+        """
+        if MPI:
+            yield (self.pathname, self.comm.size, self.comm.rank, MPI.COMM_WORLD.rank)
+
+            for s in self._subsystems_myproc:
+                yield from s.comm_info_iter()
