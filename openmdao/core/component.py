@@ -246,7 +246,7 @@ class Component(System):
         # If declare partials wasn't called, call it with of='*' and wrt='*' so we'll have
         # something to color.
         if self._coloring_info['coloring'] is not None:
-            for key, meta in self._declared_partials.items():
+            for meta in self._declared_partials.values():
                 if 'method' in meta and meta['method'] is not None:
                     break
             else:
@@ -1405,6 +1405,7 @@ class Component(System):
         val = dct['val'] if 'val' in dct else None
         is_scalar = isscalar(val)
         dependent = dct['dependent']
+        matfree = self.matrix_free
 
         if dependent:
             if 'rows' in dct and dct['rows'] is not None:  # sparse list format
@@ -1426,7 +1427,7 @@ class Component(System):
                                          'must be a scalar or have the same shape, val: {}, '
                                          'rows/cols: {}'.format(self.msginfo, of, wrt,
                                                                 val.shape, rows.shape))
-                else:
+                elif not matfree:
                     val = np.zeros_like(rows, dtype=float)
 
                 if rows.size > 0:
@@ -1506,7 +1507,7 @@ class Component(System):
                             # distributed vars are allowed to have zero size outputs on some procs
                             cols_max = -1
 
-                if val is None:
+                if val is None and not matfree:
                     # we can only get here if rows is None  (we're not sparse list format)
                     meta['val'] = np.zeros(shape)
                 elif is_array:

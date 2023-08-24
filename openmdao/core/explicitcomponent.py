@@ -418,12 +418,12 @@ class ExplicitComponent(Component):
                             # 'val' in the code below is a reference to the part of the
                             # output or residual array corresponding to the variable 'v'
                             if mode == 'fwd':
-                                for v in d_out_names: # self._var_abs2meta['output']:
+                                for v in d_out_names:
                                     if subjacs_empty or (v, v) not in self._subjacs_info:
                                         val = rflat(v)
                                         val -= oflat(v)
                             else:  # rev
-                                for v in d_out_names: # self._var_abs2meta['output']:
+                                for v in d_out_names:
                                     if subjacs_empty or (v, v) not in self._subjacs_info:
                                         val = oflat(v)
                                         val -= rflat(v)
