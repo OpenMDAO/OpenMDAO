@@ -1339,7 +1339,7 @@ class TestProblem(unittest.TestCase):
         model.connect('G2.C6.y', 'G2.C7.b')
         model.connect('G2.C5.x', 'C8.b')
         model.connect('G2.C7.x', 'C8.a')
-        
+
         model.add_design_var('indep1.x')
         model.add_design_var('indep2.x')
         model.add_constraint('C8.y')
@@ -1349,7 +1349,7 @@ class TestProblem(unittest.TestCase):
         p.final_setup()
 
         relevant = model._relevant
-        
+
         indep1_ins = {'C8.b', 'G2.C5.a', 'G1.C1.a'}
         indep1_outs = {'C8.y', 'G1.C1.z', 'G2.C5.x', 'indep1.x'}
         indep1_sys = {'C8', 'G1.C1', 'G2.C5', 'indep1', 'G1', 'G2', ''}
@@ -1835,8 +1835,8 @@ class TestProblem(unittest.TestCase):
     def test_list_problem_w_multi_constraints(self):
         p = om.Problem()
 
-        exec = om.ExecComp(['y = x**2',
-                            'z = a + x**2'],
+        exec = om.ExecComp(['y = a + x**2',
+                            'z = a * x**2'],
                         a={'shape': (1,)},
                         y={'shape': (101,)},
                         x={'shape': (101,)},

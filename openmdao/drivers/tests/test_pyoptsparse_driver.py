@@ -2211,12 +2211,9 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.model.add_design_var('x', lower=-50, upper=50)
         prob.model.add_design_var('y', lower=-50, upper=50)
-        prob.model.add_objective('parab.f_xy')
+        prob.model.add_objective('parab.z')
 
         prob.model.add_constraint('const.g', lower=0, upper=10.)
-
-        # This constraint produces a zero row.
-        prob.model.add_constraint('parab.z', equals=12.)
 
         prob.setup()
 
@@ -2241,12 +2238,9 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.model.add_design_var('x', lower=-50, upper=50)
         prob.model.add_design_var('y', lower=-50, upper=50)
-        prob.model.add_objective('parab.f_xy')
+        prob.model.add_objective('parab.z')
 
         prob.model.add_constraint('const.g', lower=0, upper=10.)
-
-        # This constraint produces a zero row.
-        prob.model.add_constraint('parab.z', equals=12.)
 
         prob.setup()
 

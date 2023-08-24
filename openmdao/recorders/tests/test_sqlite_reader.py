@@ -3032,7 +3032,7 @@ class TestSqliteCaseReader(unittest.TestCase):
     def test_constraints_with_aliases(self):
         p = om.Problem()
 
-        exec = om.ExecComp(['y = x**2',
+        exec = om.ExecComp(['y = a + x**2',
                             'z = a * x**2'],
                         a={'shape': (1,)},
                         y={'shape': (3,)},
