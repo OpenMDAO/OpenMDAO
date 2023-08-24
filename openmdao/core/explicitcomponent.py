@@ -407,7 +407,7 @@ class ExplicitComponent(Component):
 
                 try:
                     # handle identity subjacs (output_or_resid wrt itself)
-                    if isinstance(J, DictionaryJacobian):
+                    if J is None or isinstance(J, DictionaryJacobian):
                         d_out_names = d_outputs._names
 
                         if d_out_names:
@@ -418,15 +418,13 @@ class ExplicitComponent(Component):
                             # 'val' in the code below is a reference to the part of the
                             # output or residual array corresponding to the variable 'v'
                             if mode == 'fwd':
-                                for v in self._var_abs2meta['output']:
-                                    if v in d_out_names and (subjacs_empty or
-                                                             (v, v) not in self._subjacs_info):
+                                for v in d_out_names: # self._var_abs2meta['output']:
+                                    if subjacs_empty or (v, v) not in self._subjacs_info:
                                         val = rflat(v)
                                         val -= oflat(v)
                             else:  # rev
-                                for v in self._var_abs2meta['output']:
-                                    if v in d_out_names and (subjacs_empty or
-                                                             (v, v) not in self._subjacs_info):
+                                for v in d_out_names: # self._var_abs2meta['output']:
+                                    if subjacs_empty or (v, v) not in self._subjacs_info:
                                         val = oflat(v)
                                         val -= rflat(v)
 

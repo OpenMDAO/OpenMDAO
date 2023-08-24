@@ -341,7 +341,8 @@ class Component(System):
         Process all partials and approximations that the user declared.
         """
         self._subjacs_info = {}
-        self._jacobian = DictionaryJacobian(system=self)
+        if not self.matrix_free:
+            self._jacobian = DictionaryJacobian(system=self)
 
         self.setup_partials()  # hook for component writers to specify sparsity patterns
 
@@ -1632,7 +1633,8 @@ class Component(System):
                     if not self._coloring_info['dynamic']:
                         coloring._check_config_partial(self)
                     self._update_subjac_sparsity(coloring.get_subjac_sparsity())
-                self._jacobian._restore_approx_sparsity()
+                if self._jacobian is not None:
+                    self._jacobian._restore_approx_sparsity()
 
     def _resolve_src_inds(self):
         abs2prom = self._var_abs2prom['input']
