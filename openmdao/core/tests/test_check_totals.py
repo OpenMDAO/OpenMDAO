@@ -255,10 +255,8 @@ class I2O2JacVec(om.ExplicitComponent):
             if 'out1' in d_outputs:
                 if 'in1' in d_inputs:
                     d_outputs['out1'] += inputs['in2'] * d_inputs['in1']
-                    # d_outputs['out2'] += 3. * d_inputs['in1']
                 if 'in2' in d_inputs:
                     d_outputs['out1'] += inputs['in1'] * d_inputs['in2']
-                    # d_outputs['out2'] += 5. * d_inputs['in2']
             if 'out2' in d_outputs:
                 if 'in1' in d_inputs:
                     d_outputs['out2'] += 3. * d_inputs['in1']
