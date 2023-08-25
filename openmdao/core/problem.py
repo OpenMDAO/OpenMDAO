@@ -982,6 +982,8 @@ class Problem(object):
             'opt_status': None,  # Tells Systems if they are in an optimization loop
             'model_options': self.model_options,  # A dict of options passed to all systems in tree
             'singular_jac_behavior': 'warn',  # How to handle singular jac conditions
+            'coloring_randgen': None,  # If total coloring is being computed, will contain a random
+                                       # number generator, else None.
         }
         model._setup(model_comm, mode, self._metadata)
 

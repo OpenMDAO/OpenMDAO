@@ -41,9 +41,6 @@ class Jacobian(object):
         When True, this Jacobian is under complex step, using a complex jacobian.
     _abs_keys : dict
         A cache dict for key to absolute key.
-    _randgen : Generator or None
-        If not None, use the generator to generate random numbers during computation of
-        sparsity for for simultaneous derivative coloring.
     _col_var_offset : dict
         Maps column name to offset into the result array.
     _col_varnames : list
@@ -60,7 +57,6 @@ class Jacobian(object):
         self._subjacs_info = system._subjacs_info
         self._under_complex_step = False
         self._abs_keys = {}
-        self._randgen = None
         self._col_var_offset = None
         self._col_varnames = None
         self._col2name_ind = None
@@ -225,6 +221,12 @@ class Jacobian(object):
             return type(self).__name__
         return '{} in {}'.format(type(self).__name__, self._system().msginfo)
 
+    @property
+    def _randgen(self):
+        s = self._system()
+        if s is not None:
+            return s._problem_meta['coloring_randgen']
+
     def _update(self, system):
         """
         Read the user's sub-Jacobians and set into the global matrix.
@@ -294,6 +296,7 @@ class Jacobian(object):
         else:
             r = self._randgen.random(subjac.shape)
             r += 1.0
+
         return r
 
     def set_complex_step_mode(self, active):

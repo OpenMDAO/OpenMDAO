@@ -255,9 +255,14 @@ class I2O2JacVec(om.ExplicitComponent):
             if 'out1' in d_outputs:
                 if 'in1' in d_inputs:
                     d_outputs['out1'] += inputs['in2'] * d_inputs['in1']
-                    d_outputs['out2'] += 3. * d_inputs['in1']
+                    # d_outputs['out2'] += 3. * d_inputs['in1']
                 if 'in2' in d_inputs:
                     d_outputs['out1'] += inputs['in1'] * d_inputs['in2']
+                    # d_outputs['out2'] += 5. * d_inputs['in2']
+            if 'out2' in d_outputs:
+                if 'in1' in d_inputs:
+                    d_outputs['out2'] += 3. * d_inputs['in1']
+                if 'in2' in d_inputs:
                     d_outputs['out2'] += 5. * d_inputs['in2']
         else:  # rev
             if 'out1' in d_outputs:
@@ -271,6 +276,75 @@ class I2O2JacVec(om.ExplicitComponent):
                 if 'in2' in d_inputs:
                     d_inputs['in2'] += 5. * d_outputs['out2']
 
+
+class SparseJacVec(om.ExplicitComponent):
+
+    def __init__(self, size, **kwargs):
+        super().__init__(**kwargs)
+        self.size = size
+
+    def setup(self):
+        self.add_input('in1', val=np.ones(self.size))
+        self.add_input('in2', val=np.ones(self.size))
+        self.add_input('in3', val=np.ones(self.size))
+        self.add_input('in4', val=np.ones(self.size))
+        self.add_output('out1', val=np.ones(self.size))
+        self.add_output('out2', val=np.ones(self.size))
+        self.add_output('out3', val=np.ones(self.size))
+        self.add_output('out4', val=np.ones(self.size))
+
+        #self.declare_partials(of=['out1', 'out2'], wrt=['in1', 'in2'])
+        #self.declare_partials(of=['out3', 'out4'], wrt=['in3', 'in4'])
+
+    def compute(self, inputs, outputs):
+        outputs['out1'] = inputs['in1'] * inputs['in2']
+        outputs['out2'] = 3. * inputs['in1'] + 5. * inputs['in2']
+        outputs['out3'] = inputs['in3'] * inputs['in4']
+        outputs['out4'] = 7. * inputs['in3'] + 9. * inputs['in4']
+
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        if mode == 'fwd':
+            if 'out1' in d_outputs:
+                if 'in1' in d_inputs:
+                    d_outputs['out1'] += inputs['in2'] * d_inputs['in1']
+                if 'in2' in d_inputs:
+                    d_outputs['out1'] += inputs['in1'] * d_inputs['in2']
+            if 'out2' in d_outputs:
+                if 'in1' in d_inputs:
+                    d_outputs['out2'] += 3. * d_inputs['in1']
+                if 'in2' in d_inputs:
+                    d_outputs['out2'] += 5. * d_inputs['in2']
+            if 'out3' in d_outputs:
+                if 'in3' in d_inputs:
+                    d_outputs['out3'] += inputs['in4'] * d_inputs['in3']
+                if 'in4' in d_inputs:
+                    d_outputs['out3'] += inputs['in3'] * d_inputs['in4']
+            if 'out4' in d_outputs:
+                if 'in3' in d_inputs:
+                    d_outputs['out4'] += 7. * d_inputs['in3']
+                if 'in4' in d_inputs:
+                    d_outputs['out4'] += 9. * d_inputs['in4']
+        else:  # rev
+            if 'out1' in d_outputs:
+                if 'in1' in d_inputs:
+                    d_inputs['in1'] += inputs['in2'] * d_outputs['out1']
+                if 'in2' in d_inputs:
+                    d_inputs['in2'] += inputs['in1'] * d_outputs['out1']
+            if 'out2' in d_outputs:
+                if 'in1' in d_inputs:
+                    d_inputs['in1'] += 3. * d_outputs['out2']
+                if 'in2' in d_inputs:
+                    d_inputs['in2'] += 5. * d_outputs['out2']
+            if 'out3' in d_outputs:
+                if 'in3' in d_inputs:
+                    d_inputs['in3'] += inputs['in4'] * d_outputs['out3']
+                if 'in4' in d_inputs:
+                    d_inputs['in4'] += inputs['in3'] * d_outputs['out3']
+            if 'out4' in d_outputs:
+                if 'in3' in d_inputs:
+                    d_inputs['in3'] += 7. * d_outputs['out4']
+                if 'in4' in d_inputs:
+                    d_inputs['in4'] += 9. * d_outputs['out4']
 
 
 class TestProblemCheckTotals(unittest.TestCase):
@@ -1747,6 +1821,30 @@ class TestProblemCheckTotals(unittest.TestCase):
         data = p.check_totals(method='cs', directional=True)
         assert_check_totals(data, atol=1e-6, rtol=1e-6)
 
+    def test_sparse_matfree(self):
+        prob = om.Problem()
+        prob.driver = om.ScipyOptimizeDriver()
+
+        prob.model.add_subsystem('comp', SparseJacVec(size=5))
+        prob.model.add_design_var('comp.in1')
+        prob.model.add_design_var('comp.in2')
+        prob.model.add_design_var('comp.in3')
+        prob.model.add_design_var('comp.in4')
+        prob.model.add_constraint('comp.out1', lower=-999., upper=999.)
+        prob.model.add_constraint('comp.out2', lower=-999., upper=999.)
+        prob.model.add_constraint('comp.out3', lower=-999., upper=999.)
+        prob.model.add_objective('comp.out4', index=0)
+
+        prob.setup(force_alloc_complex=True, mode='auto')
+        prob.run_model()
+
+        from openmdao.utils.coloring import dynamic_total_coloring
+        dynamic_total_coloring(prob.driver, run_model=False)
+        # prob.driver._coloring_info['dynamic'] = True
+        # prob.driver._coloring_info['coloring'].display()
+
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestProblemCheckTotalsMPI(unittest.TestCase):
@@ -1815,7 +1913,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 self.assertEqual(contents.count("step"), 0)
                 # check number of rows/cols
                 self.assertEqual(contents.count("+-------------------------------+------------------+-------------+-------------+-------------+-------------+--------------------+"), nsubjacs + 1)
-            
+
     def test_single_cs_step_compact(self):
         for mode in ('fwd', 'rev'):
             with self.subTest(f"{mode} derivatives"):
@@ -1829,7 +1927,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 self.assertEqual(contents.count("step"), 0)
                 # check number of rows/cols
                 self.assertEqual(contents.count("+-------------------------------+------------------+-------------+-------------+-------------+-------------+------------+"), nsubjacs + 1)
-            
+
     def test_multi_fd_steps_fwd(self):
         p = om.Problem(model=CircleOpt(), driver=om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False))
         p.setup(mode='fwd')
@@ -1897,7 +1995,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 self.assertEqual(contents.count("step"), 1)
                 # check number of rows/cols
                 self.assertEqual(contents.count("+-------------------------------+------------------+-------------+-------------+-------------+-------------+-------------+--------------------+"), (nsubjacs*2) + 1)
-            
+
     def test_multi_cs_steps_compact(self):
         for mode in ('fwd', 'rev'):
             with self.subTest(f"{mode} derivatives"):
@@ -1915,7 +2013,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
     def test_multi_fd_steps_compact_directional(self):
         expected_divs = {
             'fwd': ('+----------------------------------------------------------------------------------------+------------------+-------------+-------------+-------------+-------------+-------------+------------+', 7),
-            'rev': ('+-------------------------------+-----------------------------------------+-------------+-------------+-------------+-------------+-------------+------------+', 13), 
+            'rev': ('+-------------------------------+-----------------------------------------+-------------+-------------+-------------+-------------+-------------+------------+', 13),
         }
         for mode in ('fwd', 'rev'):
             with self.subTest(f"{mode} derivatives"):
@@ -1929,7 +2027,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 # check number of rows/cols
                 s, times = expected_divs[mode]
                 self.assertEqual(contents.count(s), times)
-            
+
 
 
 if __name__ == "__main__":
