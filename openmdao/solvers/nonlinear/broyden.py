@@ -306,8 +306,10 @@ class BroydenSolver(NonlinearSolver):
         self._converge_failures = 0
         self._computed_jacobians = 0
 
-        # Execute guess_nonlinear if specified.
-        system._guess_nonlinear()
+        # Execute guess_nonlinear if specified and
+        # we have not restarted from a saved point
+        if not self._restarted:
+            system._guess_nonlinear()
 
         # When under a complex step from higher in the hierarchy, sometimes the step is too small
         # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
