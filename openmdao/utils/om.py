@@ -572,9 +572,10 @@ def openmdao_cmd():
         parser_setup_func(subp)
         subp.set_defaults(executor=executor)
 
-    # handle case where someone just runs `openmdao <script> [dashed-args]`
     args = [a for a in sys.argv[1:] if not a.startswith('-')]
     cmdargs = [a for a in sys.argv[1:] if a not in ('-h', '--version', '--dependency_versions')]
+
+    # handle case where someone just runs `openmdao <script> [dashed-args]`
     if not set(args).intersection(subs.choices) and len(args) == 1 and os.path.isfile(cmdargs[0]):
         _load_and_exec(args[0], user_args)
     else:
