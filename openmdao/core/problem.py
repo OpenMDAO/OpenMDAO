@@ -2474,7 +2474,7 @@ class Problem(object):
             List of optional columns to be displayed in the independent variable table.
             Allowed values are:
             ['name', 'units', 'shape', 'size', 'desc', 'ref', 'ref0', 'res_ref',
-            'distributed', 'lower', 'upper', 'tags', 'shape_by_conn', 'copy_shape',
+            'distributed', 'lower', 'upper', 'tags', 'shape_by_conn', 'copy_shape', 'compute_shape',
             'global_size', 'global_shape', 'value'].
         print_arrays : bool, optional
             When False, in the columnar display, just display norm of any ndarrays with size > 1.

@@ -135,7 +135,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
 
         super()._setup_procs(pathname, comm, mode, prob_meta)
 
-    def add_input(self, name, val=1.0, shape=None, units=None, desc=''):
+    def add_input(self, name, val=1.0, **kwargs):
         """
         Add an input variable to the component.
 
@@ -143,18 +143,12 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         ----------
         name : str
             Name of the variable in this component's namespace.
-        val : float or list or tuple or ndarray or Iterable
-            The initial value of the variable being added in user-defined units.
-            Default is 1.0.
-        shape : int or tuple or list or None
-            Shape of this variable, only required if val is not an array. Default is None.
-        units : str or None
-            Units in which this input variable will be provided to the component
-            during execution. Default is None, which means it is unitless.
-        desc : str
-            Description of the variable.
+        val : float or list or tuple or ndarray
+            The initial value of the variable being added in user-defined units. Default is 1.0.
+        **kwargs : dict
+            Additional arguments to be passed to the add_input method of the base class.
         """
-        metadata = super().add_input(name, val, shape=shape, units=units, desc=desc)
+        metadata = super().add_input(name, val=val, **kwargs)
         if self.options['vec_size'] > 1:
             input_size = metadata['val'][0].size
         else:

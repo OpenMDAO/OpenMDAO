@@ -776,6 +776,7 @@ class DiscreteTestCase(unittest.TestCase):
 
         assert_near_equal(prob.model.get_io_metadata(includes='comp.*'), {
                           'comp.a': {'copy_shape': None,
+                                     'compute_shape': None, 
                                      'desc': '',
                                      'discrete': False,
                                      'distributed': False,
@@ -789,6 +790,7 @@ class DiscreteTestCase(unittest.TestCase):
                                      'tags': set(),
                                      'units': None},
                           'comp.b': {'copy_shape': None,
+                                     'compute_shape': None, 
                                      'desc': '',
                                      'discrete': False,
                                      'distributed': False,

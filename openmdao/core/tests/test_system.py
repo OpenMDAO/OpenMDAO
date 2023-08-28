@@ -424,6 +424,7 @@ class TestSystem(unittest.TestCase):
 
         assert_near_equal(prob.model.get_io_metadata(includes='x'), {
                           'cycle.d1.x': {'copy_shape': None,
+                                         'compute_shape': None,
                                          'desc': '',
                                          'discrete': False,
                                          'distributed': False,
@@ -437,6 +438,7 @@ class TestSystem(unittest.TestCase):
                                          'tags': set(),
                                          'units': None},
                           'obj_cmp.x':  {'copy_shape': None,
+                                         'compute_shape': None,
                                          'desc': '',
                                          'discrete': False,
                                          'distributed': False,
