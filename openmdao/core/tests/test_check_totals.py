@@ -291,8 +291,8 @@ class SparseJacVec(om.ExplicitComponent):
         self.add_output('out3', val=np.ones(self.size))
         self.add_output('out4', val=np.ones(self.size))
 
-        #self.declare_partials(of=['out1', 'out2'], wrt=['in1', 'in2'])
-        #self.declare_partials(of=['out3', 'out4'], wrt=['in3', 'in4'])
+        self.declare_partials(of=['out1', 'out2'], wrt=['in1', 'in2'])
+        self.declare_partials(of=['out3', 'out4'], wrt=['in3', 'in4'])
 
     def compute(self, inputs, outputs):
         outputs['out1'] = inputs['in1'] * inputs['in2']
@@ -1819,7 +1819,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         data = p.check_totals(method='cs', directional=True)
         assert_check_totals(data, atol=1e-6, rtol=1e-6)
 
-    def test_sparse_matfree(self):
+    def test_sparse_matfree_fwd(self):
         prob = om.Problem()
         prob.driver = om.ScipyOptimizeDriver()
 
@@ -1833,7 +1833,31 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.model.add_constraint('comp.out3', lower=-999., upper=999.)
         prob.model.add_objective('comp.out4', index=0)
 
-        prob.setup(force_alloc_complex=True, mode='auto')
+        prob.setup(force_alloc_complex=True, mode='fwd')
+        prob.run_model()
+
+        from openmdao.utils.coloring import dynamic_total_coloring
+        dynamic_total_coloring(prob.driver, run_model=False)
+        # prob.driver._coloring_info['dynamic'] = True
+        # prob.driver._coloring_info['coloring'].display()
+
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+
+    def test_sparse_matfree_rev(self):
+        prob = om.Problem()
+        prob.driver = om.ScipyOptimizeDriver()
+
+        prob.model.add_subsystem('comp', SparseJacVec(size=5))
+        prob.model.add_design_var('comp.in1')
+        prob.model.add_design_var('comp.in2')
+        prob.model.add_design_var('comp.in3')
+        prob.model.add_design_var('comp.in4')
+        prob.model.add_constraint('comp.out1', lower=-999., upper=999.)
+        prob.model.add_constraint('comp.out2', lower=-999., upper=999.)
+        prob.model.add_constraint('comp.out3', lower=-999., upper=999.)
+        prob.model.add_objective('comp.out4', index=0)
+
+        prob.setup(force_alloc_complex=True, mode='rev')
         prob.run_model()
 
         from openmdao.utils.coloring import dynamic_total_coloring
