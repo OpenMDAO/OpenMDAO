@@ -1,15 +1,17 @@
 """
 Routines to compute coloring for use with simultaneous derivatives.
 """
+import datetime
+import itertools
 import os
 import time
 import pickle
 import traceback
 import pathlib
-from itertools import combinations
+from itertools import combinations, groupby, product
 from contextlib import contextmanager
+from math import ceil
 from pprint import pprint
-from itertools import groupby
 from packaging.version import Version
 
 
@@ -875,6 +877,197 @@ class Coloring(object):
             pyplot.savefig(fname)
 
         pyplot.close(fig)
+
+    @staticmethod
+    def display_bokeh(source, output_file='total_coloring.html', show=True, _max_colors=200):
+        """
+        Display a plot of the sparsity pattern, showing grouping by color.
+
+        Parameters
+        ----------
+        source : str or Driver
+            The source for the coloring information, which can either be a string of the filepath
+            to the coloring data file or the Driver containing the coloring information.
+        output_file : str
+            The name of the output html file in which the display is written.
+        show : bool
+            If True, a browswer will be opened to display the generated file.
+        _max_colors : int
+            Bokeh supports at most 200 colors in a colormap. This function reduces that number
+            to some default length, otherwise both forward and reverse displays may share shades
+            very near white and be difficult to distinguish. Once the number of forward or reverse
+            solves exceeds this threshold, the color pattern restarts.
+        """
+        try:
+            from bokeh.models import Div, FixedTicker, HoverTool, LinearColorMapper, ColumnDataSource
+            from bokeh.layouts import column, grid, gridplot
+            from bokeh.palettes import Blues256, Reds256, gray
+            from bokeh.plotting import figure
+            import bokeh.resources as bokeh_resources
+            from bokeh.transform import linear_cmap, transform
+            import bokeh.io
+
+        except ImportError:
+            print("bokeh is not installed so the coloring viewer is not available. The ascii "
+                  "based coloring viewer can be accessed by calling display_txt() on the Coloring "
+                  "object or by using 'openmdao view_coloring --textview <your_coloring_file>' "
+                  "from the command line.")
+            return
+
+        if isinstance(source, str):
+            coloring = Coloring.load(source)
+            timestamp = datetime.datetime.fromtimestamp(pathlib.Path(source).stat().st_mtime)
+            source_name = pathlib.Path(source).absolute()
+        elif hasattr(source, '_coloring_info'):
+            coloring = source._coloring_info['coloring']
+            timestamp = datetime.datetime.now()
+            source_name = source._problem()._name
+        else:
+            raise ValueError(f'display_bokeh was expecting the source to be a valid coloring file'
+                             f'or an instance of driver but instead got f{type(source)}')
+
+        nrows, ncols = coloring._shape
+        aspect_ratio = ncols / nrows
+
+        tot_size, tot_colors, fwd_solves, rev_solves, pct = coloring._solves_info()
+
+        data = {}
+
+        # The row and column indices of the individual jacobian elements
+        data['col_idx'] = np.tile(np.arange(ncols, dtype=int), nrows)
+        data['row_idx'] = np.repeat(np.arange(nrows, dtype=int), ncols)
+
+        # The indices of the responses and desvars obtained by binning the row/col indices
+        desvar_idx_bins = np.cumsum(coloring._col_var_sizes)
+        response_idx_bins = np.cumsum(coloring._row_var_sizes)
+
+        data['response_idx'] = np.digitize(data['row_idx'], response_idx_bins)
+        data['response_name'] = [coloring._row_vars[i] for i in data['response_idx']]
+        data['desvar_idx'] = np.digitize(data['col_idx'], desvar_idx_bins)
+        data['desvar_name'] = [coloring._col_vars[i] for i in data['desvar_idx']]
+        data['pattern'] = data['desvar_idx'] % 2 + data['response_idx'] % 2
+        data['fwd_color_idx'] = np.nan * np.ones(ncols*nrows, dtype=int)
+        data['rev_color_idx'] = np.nan * np.ones(ncols*nrows, dtype=int)
+
+        # Add the color group information to the data source
+        fwd_map = {}
+        for idx_fwd, (_cols, _nz_rows) in enumerate(coloring.color_nonzero_iter('fwd')):
+            for _row_idx, _col_idx in zip(_nz_rows, _cols):
+                fwd_grp_idxs = itertools.product(_row_idx, [_col_idx])
+                fwd_map.update({(i, j): idx_fwd for i, j in fwd_grp_idxs})
+
+        rev_map = {}
+        for idx_rev, (_rows, _nz_cols) in enumerate(coloring.color_nonzero_iter('rev')):
+            for _row_idx, _col_idx in zip(_rows, _nz_cols):
+                rev_grp_idxs = itertools.product([_row_idx], _col_idx)
+                rev_map.update({(i, j): idx_rev for i, j in rev_grp_idxs})
+
+        for i in range(nrows * ncols):
+            r = data['row_idx'][i]
+            c = data['col_idx'][i]
+            if (r, c) in fwd_map:
+                data['fwd_color_idx'][i] = fwd_map[r, c]
+            if (r, c) in rev_map:
+                data['rev_color_idx'][i] = rev_map[r, c]
+
+        data_source = ColumnDataSource(data)
+
+        HEIGHT = 800
+
+        layout = gridplot([], sizing_mode='stretch_both')
+
+        fig = figure(toolbar_location="above",
+                     x_range=(-1, ncols+1), y_range=(nrows+1, -1),
+                     x_axis_location="above", width=int(HEIGHT * aspect_ratio), height=HEIGHT)
+
+        fig.xaxis.visible = False
+        fig.yaxis.visible = False
+
+        fig.xgrid.grid_line_color = None
+        fig.ygrid.grid_line_color = None
+
+        # Plot the background pattern
+        gray_cm = gray(12)
+        background_mapper = LinearColorMapper(palette=gray_cm[-4:-1],
+                                              low=0, high=2)
+
+        fig.rect(x='col_idx', y='row_idx', width=1, height=1, source=data_source, alpha=0.5,
+                 line_color=None, fill_color=transform('pattern', background_mapper))
+
+        # Plot the fwd solve groups
+        if fwd_solves > 0:
+            fwd_colors = list(Blues256)[:_max_colors][::-1]
+            fwd_cm = fwd_colors * (fwd_solves // _max_colors + 1)
+            fwd_mapper = LinearColorMapper(palette=fwd_cm, low=-1, high=fwd_solves-1, nan_color=(0, 0, 0, 0))
+            fwd_rect = fig.rect(x='col_idx', y='row_idx', width=1, height=1, source=data_source, alpha=0.8,
+                                line_color=None, fill_color=transform('fwd_color_idx', fwd_mapper))
+
+            fig.add_layout(fwd_rect.construct_color_bar(
+                major_label_text_font_size="7px",
+                ticker=FixedTicker(ticks=np.arange(fwd_solves, dtype=int)),
+                label_standoff=6,
+                border_line_color=None,
+                padding=5,
+                title='forward solves',
+                display_low=0
+            ), 'right')
+
+        # Plot the rev solve groups
+        if rev_solves > 0:
+            rev_colors = list(Reds256)[:_max_colors][::-1]
+            rev_cm = rev_colors * (rev_solves // _max_colors + 1)
+            rev_mapper = LinearColorMapper(palette=rev_cm, low=-1, high=rev_solves-1, nan_color=(0, 0, 0, 0))
+            rev_rect = fig.rect(x='col_idx', y='row_idx', width=1, height=1, source=data_source, alpha=0.8,
+                                line_color=None, fill_color=transform('rev_color_idx', rev_mapper))
+
+            fig.add_layout(rev_rect.construct_color_bar(
+                major_label_text_font_size="7px",
+                ticker=FixedTicker(ticks=np.arange(rev_solves, dtype=int)),
+                label_standoff=6,
+                border_line_color=None,
+                padding=5,
+                title='reverse solves',
+                display_low=0
+            ), 'right')
+
+        # Add a tooltip on hover
+        tooltips = [
+            ('Response', '@response_name'),
+            ('Design Var', '@desvar_name'),
+            ('Forward solve:', '@fwd_color_idx'),
+            ('Reverse solve:', '@rev_color_idx'),
+        ]
+
+        fig.add_tools(HoverTool(tooltips=tooltips))
+
+        # Summary info
+        nnz = np.count_nonzero(np.logical_or(data['fwd_color_idx'] != -1, data['rev_color_idx'] != -1))
+
+        summary = (rf'Design Vars: {len(coloring._col_var_sizes)}',
+                   rf'Responses: {len(coloring._row_var_sizes)}',
+                   rf'Rows: {nrows}',
+                   rf'Columns: {ncols}',
+                   rf'Nonzeros: {nnz} of {nrows*ncols} ({100 * nnz / (nrows*ncols):6.2f}%)',
+                   rf'Forward solves: {fwd_solves}',
+                   rf'Reverse solves: {rev_solves}',
+                   rf'Total solves: {fwd_solves + rev_solves} vs. {min(nrows, ncols)} ({pct:6.2f}% improvement)',
+                   rf'Timestamp: {timestamp.strftime("%Y-%m-%d %H:%M:%S")}')
+
+        header_divs = [Div(text=f'Total Coloring Report<br>{source_name}',
+                           styles={'font-size': '16pt', 'font-style': 'bold'})]
+
+        summary_divs = [Div(text=s, styles={'font-size': '12pt'}) for s in summary]
+
+        report_layout = column(children=[grid(header_divs, ncols=2),
+                                         fig,
+                                         grid(summary_divs, ncols=2)])
+        # Save and show
+        bokeh.io.save(report_layout, filename=output_file,
+                      title=f'total coloring report for {source_name}',
+                      resources=bokeh_resources.INLINE)
+
+        if show:
+            bokeh.io.show(report_layout)
 
     def get_dense_sparsity(self, dtype=bool):
         """
@@ -2013,16 +2206,8 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
 
 
 def _run_total_coloring_report(driver):
-    coloring = driver._coloring_info['coloring']
-    if coloring is not None:
-        prob = driver._problem()
-        path = str(pathlib.Path(prob.get_reports_dir()).joinpath(_default_coloring_imagefile))
-        coloring.display(show=False, fname=path)
-
-        # now create html file that wraps the image file
-        htmlpath = str(pathlib.Path(prob.get_reports_dir()).joinpath("total_coloring.html"))
-        with open(htmlpath, 'w') as f:
-            f.write(image2html(_default_coloring_imagefile))
+    htmlpath = str(pathlib.Path(driver._problem().get_reports_dir()).joinpath("total_coloring.html"))
+    Coloring.display_bokeh(source=driver, output_file=htmlpath, show=False)
 
 
 # entry point for coloring report
