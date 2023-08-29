@@ -14,7 +14,6 @@ from math import ceil
 from pprint import pprint
 from packaging.version import Version
 
-
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 
@@ -27,6 +26,27 @@ from openmdao.utils.file_utils import _load_and_exec, image2html
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 from openmdao.utils.reports_system import register_report
 from openmdao.devtools.memory import mem_usage
+
+try:
+    import matplotlib as mpl
+    from matplotlib import pyplot
+
+    if Version(mpl.__version__) < Version("3.6"):
+        from matplotlib import cm
+except ImportError:
+    mpl = None
+
+try:
+    from bokeh.models import Div, FixedTicker, HoverTool, LinearColorMapper, ColumnDataSource
+    from bokeh.layouts import column, grid, gridplot
+    from bokeh.palettes import Blues256, Reds256, gray
+    from bokeh.plotting import figure
+    import bokeh.resources as bokeh_resources
+    from bokeh.transform import linear_cmap, transform
+    import bokeh.io
+except ImportError:
+    bokeh_resources = None
+
 
 
 CITATIONS = """
@@ -705,13 +725,7 @@ class Coloring(object):
         fname : str
             Path to the location where the plot file should be saved.
         """
-        try:
-            import matplotlib as mpl
-            from matplotlib import pyplot
-            if Version(mpl.__version__) < Version("3.6"):
-                from matplotlib import cm
-
-        except ImportError:
+        if mpl is None:
             print("matplotlib is not installed so the coloring viewer is not available. The ascii "
                   "based coloring viewer can be accessed by calling display_txt() on the Coloring "
                   "object or by using 'openmdao view_coloring --textview <your_coloring_file>' "
@@ -893,22 +907,13 @@ class Coloring(object):
         show : bool
             If True, a browswer will be opened to display the generated file.
         _max_colors : int
-            Bokeh supports at most 200 colors in a colormap. This function reduces that number
+            Bokeh supports at most 256 colors in a colormap. This function reduces that number
             to some default length, otherwise both forward and reverse displays may share shades
             very near white and be difficult to distinguish. Once the number of forward or reverse
             solves exceeds this threshold, the color pattern restarts.
         """
-        try:
-            from bokeh.models import Div, FixedTicker, HoverTool, LinearColorMapper, ColumnDataSource
-            from bokeh.layouts import column, grid, gridplot
-            from bokeh.palettes import Blues256, Reds256, gray
-            from bokeh.plotting import figure
-            import bokeh.resources as bokeh_resources
-            from bokeh.transform import linear_cmap, transform
-            import bokeh.io
-
-        except ImportError:
-            print("bokeh is not installed so the coloring viewer is not available. The ascii "
+        if bokeh_resources is None:
+            print("bokeh is not installed so this coloring viewer is not available. The ascii "
                   "based coloring viewer can be accessed by calling display_txt() on the Coloring "
                   "object or by using 'openmdao view_coloring --textview <your_coloring_file>' "
                   "from the command line.")
@@ -1041,7 +1046,7 @@ class Coloring(object):
         fig.add_tools(HoverTool(tooltips=tooltips))
 
         # Summary info
-        nnz = np.count_nonzero(np.logical_or(data['fwd_color_idx'] != -1, data['rev_color_idx'] != -1))
+        nnz = np.count_nonzero(np.logical_or(~np.isnan(data['fwd_color_idx']), ~np.isnan(data['rev_color_idx'])))
 
         summary = (rf'Design Vars: {len(coloring._col_var_sizes)}',
                    rf'Responses: {len(coloring._row_var_sizes)}',
@@ -1062,6 +1067,7 @@ class Coloring(object):
                                          fig,
                                          grid(summary_divs, ncols=2)])
         # Save and show
+        bokeh.io.curdoc().theme = 'light_minimal'
         bokeh.io.save(report_layout, filename=output_file,
                       title=f'total coloring report for {source_name}',
                       resources=bokeh_resources.INLINE)
@@ -2206,8 +2212,21 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
 
 
 def _run_total_coloring_report(driver):
-    htmlpath = str(pathlib.Path(driver._problem().get_reports_dir()).joinpath("total_coloring.html"))
-    Coloring.display_bokeh(source=driver, output_file=htmlpath, show=False)
+    if bokeh_resources is not None:
+        htmlpath = str(pathlib.Path(driver._problem().get_reports_dir()).joinpath('total_coloring.html'))
+        Coloring.display_bokeh(source=driver, output_file=htmlpath, show=False)
+    else:
+        issue_warning('bokeh not available. total coloring report will be generated with matplotlib.')
+        coloring = driver._coloring_info['coloring']
+        if coloring is not None:
+            prob = driver._problem()
+            path = str(pathlib.Path(prob.get_reports_dir()).joinpath(_default_coloring_imagefile))
+            coloring.display(show=False, fname=path)
+
+            # now create html file that wraps the image file
+            htmlpath = str(pathlib.Path(prob.get_reports_dir()).joinpath("total_coloring.html"))
+            with open(htmlpath, 'w') as f:
+                f.write(image2html(_default_coloring_imagefile))
 
 
 # entry point for coloring report
