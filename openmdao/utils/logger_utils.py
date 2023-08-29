@@ -110,12 +110,12 @@ def get_logger(name='default_logger', level=logging.INFO, use_format=False,
 
 class TestLogger(object):
     """
-    A logger replacement for testing that simplifies checking log output.
+    A logger that saves messages in lists.
 
     Attributes
     ----------
     _msgs : dict
-        Stores lists of messages under 'error', 'warning' and 'info' keys.
+        Stores lists of messages under 'error', 'warning', and 'info' keys.
     """
 
     def __init__(self):
@@ -156,17 +156,6 @@ class TestLogger(object):
             An informational message.
         """
         self._msgs['info'].append(msg)
-
-    def debug(self, msg):
-        """
-        Collect a debug message.
-
-        Parameters
-        ----------
-        msg : str
-            A debugging message.
-        """
-        self._msgs['debug'].append(msg)
 
     def get(self, typ):
         """

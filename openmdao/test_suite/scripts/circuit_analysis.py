@@ -18,8 +18,8 @@ class Resistor(om.ExplicitComponent):
         self.add_output('I', units='A')
 
     def setup_partials(self):
-        self.declare_partials('I', 'V_in', method='fd')
-        self.declare_partials('I', 'V_out', method='fd')
+        self.declare_partials('I', 'V_in', method='cs')
+        self.declare_partials('I', 'V_out', method='cs')
 
     def compute(self, inputs, outputs):
         deltaV = inputs['V_in'] - inputs['V_out']
@@ -39,8 +39,8 @@ class Diode(om.ExplicitComponent):
         self.add_output('I', units='A')
 
     def setup_partials(self):
-        self.declare_partials('I', 'V_in', method='fd')
-        self.declare_partials('I', 'V_out', method='fd')
+        self.declare_partials('I', 'V_in', method='cs')
+        self.declare_partials('I', 'V_out', method='cs')
 
     def compute(self, inputs, outputs):
         deltaV = inputs['V_in'] - inputs['V_out']
@@ -70,7 +70,7 @@ class Node(om.ImplicitComponent):
     def setup_partials(self):
         #note: we don't declare any partials wrt `V` here,
         #      because the residual doesn't directly depend on it
-        self.declare_partials('V', 'I*', method='fd')
+        self.declare_partials('V', 'I*', method='cs')
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         residuals['V'] = 0.

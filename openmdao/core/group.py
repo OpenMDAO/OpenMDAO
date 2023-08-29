@@ -30,7 +30,7 @@ from openmdao.utils.general_utils import common_subpath, all_ancestors, \
     _src_name_iter, meta2src_iter
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
-from openmdao.utils.graph_utils import get_sccs_topo, get_hybrid_graph
+from openmdao.utils.graph_utils import get_sccs_topo, get_out_of_order_nodes, get_hybrid_graph
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
@@ -147,7 +147,8 @@ class Group(System):
     _proc_info : dict of subsys_name: (min_procs, max_procs, weight, proc_group)
         Information used to determine MPI process allocation to subsystems.
     _subgroups_myproc : list
-        List of local subgroups.
+        List of local subgroups, (sorted by name if Problem option allow_post_setup_reorder is
+        True).
     _manual_connections : dict
         Dictionary of input_name: (output_name, src_indices) connections.
     _group_inputs : dict
@@ -229,6 +230,11 @@ class Group(System):
             self._nonlinear_solver = NonlinearRunOnce()
         if not self._linear_solver:
             self._linear_solver = LinearRunOnce()
+
+        self.options.declare('auto_order', types=bool, default=False,
+                             desc='If True the order of subsystems is determined automatically '
+                             'based on the dependency graph.  It will not break or reorder '
+                             'cycles.')
 
     def setup(self):
         """
@@ -496,7 +502,7 @@ class Group(System):
             self._group_inputs[n] = lst.copy()
 
         self.matrix_free = False
-        for subsys in self._subsystems_myproc:
+        for subsys in self._sorted_sys_iter():
             subsys._configure()
             subsys._setup_var_data()
 
@@ -586,8 +592,7 @@ class Group(System):
 
             # Call the load balancing algorithm
             try:
-                sub_inds, sub_comm, sub_proc_range = self._mpi_proc_allocator(
-                    proc_info, len(allsubs), comm)
+                sub_inds, sub_comm = self._mpi_proc_allocator(proc_info, len(allsubs), comm)
             except ProcAllocationError as err:
                 if err.sub_inds is None:
                     raise RuntimeError("%s: %s" % (self.msginfo, err.msg))
@@ -624,12 +629,13 @@ class Group(System):
             s.pathname = '.'.join((self.pathname, s.name)) if self.pathname else s.name
 
         # Perform recursion
-        allsubs = self._subsystems_allprocs
         for subsys in self._subsystems_myproc:
             subsys._setup_procs(subsys.pathname, sub_comm, mode, prob_meta)
 
         # build a list of local subgroups to speed up later loops
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
+        if prob_meta['allow_post_setup_reorder']:
+            self._subgroups_myproc.sort(key=lambda x: x.name)
 
         if nproc > 1 and self._mpi_proc_allocator.parallel:
             self._problem_meta['parallel_groups'].append(self.pathname)
@@ -668,7 +674,7 @@ class Group(System):
             List of all states.
         """
         states = []
-        for subsys in self._subsystems_myproc:
+        for subsys in self._sorted_sys_iter():
             states.extend(subsys._list_states())
 
         return sorted(states)
@@ -1411,6 +1417,7 @@ class Group(System):
         self._resolve_group_input_defaults()
         self._setup_auto_ivcs(mode)
         self._check_prom_masking()
+        self._check_order()
 
     def _check_prom_masking(self):
         """
@@ -1438,6 +1445,87 @@ class Group(System):
                                        " promoting to a different name. This can be caused"
                                        " by promoting '*' at group level or promoting using"
                                        " dotted names.")
+
+    def _check_order(self, reorder=True, recurse=True, out_of_order=None):
+        """
+        Check if auto ordering is needed, optionally reordering subsystems if appropriate.
+
+        Parameters
+        ----------
+        reorder : bool
+            If True, reorder the subsystems based on the computed order.  Otherwise
+            just return the out-of-order connections.
+        recurse : bool
+            If True, call this method on all subgroups.
+        out_of_order : dict or None
+            Lists of out-of-order connections keyed by group pathname. Out of order connections
+            are keyed by target system name and have values that are lists of source system names.
+            If incoming value of out_of_order is None, then a new dict is created and returned.
+
+        Returns
+        -------
+        dict
+            Lists of out-of-order connections keyed by group pathname.
+        """
+        if out_of_order is None:
+            out_of_order = {}
+
+        if self.options['auto_order'] or not reorder:
+            G = self.compute_sys_graph()
+            orders = {name: i for i, name in enumerate(self._subsystems_allprocs)}
+            strongcomps, new_out_of_order = get_out_of_order_nodes(G, orders)
+
+            if new_out_of_order:
+                # group targets with all of their sources
+                tgts = {}
+                for u, v in new_out_of_order:
+                    if v not in tgts:
+                        tgts[v] = []
+                    tgts[v].append(u)
+
+                for t in tgts:
+                    tgts[t] = sorted(tgts[t])
+
+                out_of_order[self.pathname] = tgts
+                if reorder:
+                    self._set_auto_order(strongcomps, orders)
+
+        if recurse:
+            for s in self._subgroups_myproc:
+                s._check_order(reorder, recurse, out_of_order)
+
+        return out_of_order
+
+    def _set_auto_order(self, strongcomps, orders):
+        """
+        Set the order of the subsystems based on the dependency graph.
+
+        Parameters
+        ----------
+        strongcomps : list of list of str
+            List of sets of subsystem names. Each list contains subsystems that are strongly
+            connected.  Sets containing 2 or more subsystems indicate a cycle.
+        orders : dict
+            Dictionary mapping subsystem names to their index in the current ordering.
+        """
+        new_order = []
+        for strongcomp in strongcomps:
+            if len(strongcomp) > 1:
+                # never change the internal order in a cycle
+                order_list = [(name, orders[name]) for name in strongcomp]
+                new_order.extend([name for name, _ in sorted(order_list, key=lambda x: x[1])])
+            else:
+                for s in strongcomp:
+                    new_order.append(s)
+
+        if self._problem_meta['allow_post_setup_reorder']:
+            self.set_order(new_order)
+        else:
+            issue_warning(f"{self.msginfo}: A new execution order {new_order} is recommended, but "
+                          "auto ordering has been disabled because the Problem option "
+                          "'allow_post_setup_reorder' is False. It is recommended to either set "
+                          "`allow_post_setup_reorder` to True or to manually set the execution "
+                          "order to the recommended order using `set_order`.")
 
     def _top_level_post_sizes(self):
         # this runs after the variable sizes are known
@@ -1683,7 +1771,10 @@ class Group(System):
         self._has_distrib_vars = False
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
 
-        for subsys in self._subsystems_myproc:
+        # sort the subsystems alphabetically in order to make the ordering
+        # of vars in vectors and other data structures independent of the
+        # execution order.
+        for subsys in self._sorted_sys_iter():
             self._has_output_scaling |= subsys._has_output_scaling
             self._has_output_adder |= subsys._has_output_adder
             self._has_resid_scaling |= subsys._has_resid_scaling
@@ -2017,7 +2108,7 @@ class Group(System):
             'output': np.zeros((self.comm.size, len(all_abs2meta['output'])), dtype=INT_DTYPE),
         }
 
-        for subsys in self._subsystems_myproc:
+        for subsys in self._sorted_sys_iter():
             subsys._setup_var_sizes()
 
         iproc = self.comm.rank
@@ -2806,7 +2897,7 @@ class Group(System):
         allprocs_discrete_in = self._var_allprocs_discrete['input']
         allprocs_discrete_out = self._var_allprocs_discrete['output']
 
-        for subsys in self._subsystems_myproc:
+        for subsys in self._sorted_sys_iter():
             subsys._setup_connections()
 
         path_dot = pathname + '.' if pathname else ''
@@ -3392,15 +3483,15 @@ class Group(System):
 
     def set_order(self, new_order):
         """
-        Specify a new execution order for this system.
+        Specify a new execution order for subsystems in this group.
 
         Parameters
         ----------
         new_order : list of str
             List of system names in desired new execution order.
         """
-        if self._problem_meta is not None and \
-                self._problem_meta['setup_status'] == _SetupStatus.POST_CONFIGURE:
+        if self._problem_meta is not None and not self._problem_meta['allow_post_setup_reorder'] \
+                and self._problem_meta['setup_status'] == _SetupStatus.POST_CONFIGURE:
             raise RuntimeError(f"{self.msginfo}: Cannot call set_order in the configure method.")
 
         # Make sure the new_order is valid. It must contain all subsystems
@@ -3444,8 +3535,11 @@ class Group(System):
             subsystems[name] = sinfo
             sinfo.index = i
 
+        if not self._static_mode:
+            self._subsystems_myproc = [s for s, _ in self._subsystems_allprocs.values()]
+
         self._order_set = True
-        if self._problem_meta is not None:
+        if self._problem_meta is not None and not self._problem_meta['allow_post_setup_reorder']:
             # order has been changed so we need a new full setup
             self._problem_meta['setup_status'] = _SetupStatus.PRE_SETUP
 
@@ -3787,7 +3881,7 @@ class Group(System):
         """
         self._subjacs_info = info = {}
 
-        for subsys in self._subsystems_myproc:
+        for subsys in self._sorted_sys_iter():
             subsys._setup_partials()
             info.update(subsys._subjacs_info)
 
@@ -4701,6 +4795,23 @@ class Group(System):
                 yield from s._ordered_comp_name_iter()
             else:
                 yield s.pathname
+
+    def _sorted_sys_iter(self):
+        """
+        Yield subsystems in sorted order if Problem option allow_post_setup_reorder is True.
+
+        Otherwise, yield subsystems in the order they were added to their parent group.
+
+        Yields
+        ------
+        System
+            A subsystem.
+        """
+        if self._problem_meta['allow_post_setup_reorder']:
+            for s in sorted(self._subsystems_myproc, key=lambda s: s.name):
+                yield s
+        else:
+            yield from self._subsystems_myproc
 
     def _solver_subsystem_iter(self, local_only=False):
         """
