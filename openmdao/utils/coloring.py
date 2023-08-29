@@ -6,10 +6,12 @@ import itertools
 import os
 import time
 import pickle
+import sys
 import traceback
 import pathlib
 from itertools import combinations, groupby, product
 from contextlib import contextmanager
+from io import StringIO
 from math import ceil
 from pprint import pprint
 from packaging.version import Version
@@ -17,7 +19,7 @@ from packaging.version import Version
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 
-from openmdao.core.constants import INT_DTYPE
+from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM
 from openmdao.utils.general_utils import _src_or_alias_dict, \
     _src_name_iter, _src_or_alias_item_iter
 import openmdao.utils.hooks as hooks
@@ -46,7 +48,6 @@ try:
     import bokeh.io
 except ImportError:
     bokeh_resources = None
-
 
 
 CITATIONS = """
@@ -172,6 +173,8 @@ class Coloring(object):
         self._row_var_sizes = row_var_sizes
         self._col_vars = col_vars
         self._col_var_sizes = col_var_sizes
+
+        self._source_to_promname = None
 
         self._fwd = None
         self._rev = None
@@ -586,50 +589,56 @@ class Coloring(object):
             f", pct nonzero: {self._pct_nonzero:.2f}, tol: {self._meta.get('good_tol')}"
         )
 
-    def summary(self):
+    def summary(self, out_stream=_DEFAULT_OUT_STREAM):
         """
         Print a summary of this coloring.
         """
         nrows = self._shape[0] if self._shape else -1
         ncols = self._shape[1] if self._shape else -1
 
-        print("\nJacobian shape: (%d, %d)  (%5.2f%% nonzero)" % (nrows, ncols, self._pct_nonzero))
+        if out_stream == _DEFAULT_OUT_STREAM:
+            out_stream = sys.stdout
+
+        print("\nJacobian shape: (%d, %d)  (%5.2f%% nonzero)" % (nrows, ncols, self._pct_nonzero),
+              file=out_stream)
         if self._fwd is None and self._rev is None:
             tot_size = min(nrows, ncols)
             if tot_size < 0:
                 tot_size = '?'
             print("Simultaneous derivatives can't improve on the total number of solves "
-                  "required (%s) for this configuration" % tot_size)
+                  "required (%s) for this configuration" % tot_size, file=out_stream)
         else:
             tot_size, tot_colors, fwd_solves, rev_solves, pct = self._solves_info()
 
-            print("FWD solves: %d   REV solves: %d" % (fwd_solves, rev_solves))
+            print("FWD solves: %d   REV solves: %d" % (fwd_solves, rev_solves), file=out_stream)
             print("Total colors vs. total size: %d vs %s  (%.1f%% improvement)" %
-                  (tot_colors, tot_size, pct))
+                  (tot_colors, tot_size, pct), file=out_stream)
 
         meta = self._meta
-        print()
+        print('', file=out_stream)
         good_tol = meta.get('good_tol')
         if good_tol is not None:
-            print("Sparsity computed using tolerance: %g" % meta['good_tol'])
+            print("Sparsity computed using tolerance: %g" % meta['good_tol'], file=out_stream)
             if meta['n_tested'] > 1:
                 print("Most common number of nonzero entries (%d of %d) repeated %d times out "
                       "of %d tolerances tested.\n" % (meta['J_size'] - meta['zero_entries'],
                                                       meta['J_size'],
-                                                      meta['nz_matches'], meta['n_tested']))
+                                                      meta['nz_matches'], meta['n_tested']),
+                      file=out_stream)
 
         sparsity_time = meta.get('sparsity_time')
         if sparsity_time is not None:
-            print("Time to compute sparsity: %f sec." % sparsity_time)
+            print("Time to compute sparsity: %f sec." % sparsity_time, file=out_stream)
 
         coloring_time = meta.get('coloring_time')
         if coloring_time is not None:
-            print("Time to compute coloring: %f sec." % coloring_time)
+            print("Time to compute coloring: %f sec." % coloring_time, file=out_stream)
         coloring_mem = meta.get('coloring_memory')
         if coloring_mem is not None:
-            print("Memory to compute coloring: %f MB." % coloring_mem)
+            print("Memory to compute coloring: %f MB." % coloring_mem, file=out_stream)
 
-    def display_txt(self):
+    @staticmethod
+    def display_txt(source, out_stream=_DEFAULT_OUT_STREAM, html=False):
         """
         Print the structure of a boolean array with coloring info for each nonzero value.
 
@@ -642,20 +651,46 @@ class Coloring(object):
         alongside each row and print the names of the column vars, aligned with each column,
         at the bottom.
         """
-        shape = self._shape
+        if isinstance(source, str):
+            coloring = Coloring.load(source)
+            timestamp = datetime.datetime.fromtimestamp(pathlib.Path(source).stat().st_mtime)
+            source_name = pathlib.Path(source).absolute()
+        elif hasattr(source, '_coloring_info'):
+            coloring = source._coloring_info['coloring']
+            timestamp = datetime.datetime.now()
+            source_name = source._problem()._name
+        else:
+            raise ValueError(f'display_txt was expecting the source to be a valid coloring file '
+                             f'or an instance of driver but instead got f{type(source)}')
+
+        if out_stream == _DEFAULT_OUT_STREAM:
+            out_stream = sys.stdout
+
+        shape = coloring._shape
         nrows, ncols = shape
+
+        if html:
+            out_stream.write(f'<html>\n'
+                             f'<head>\n'
+                             f'<title>total coloring report: {source_name}</title>\n'
+                             f'</head>\n'
+                             f'<body>\n'
+                             f'Total Coloring Report<br>\n'
+                             f'{source_name}\n'
+                             f'<hr style="width:100%;text-align:left;margin-left:0">\n'
+                             f'<pre>\n')
 
         # array of chars the same size as dense jacobian
         charr = np.full(shape, '.', dtype=str)
 
         # mark all nonzero entries as 'x' initially, so the 'x' will be left
         # if not covered with an 'f' or an 'r'
-        charr[self._nzrows, self._nzcols] = 'x'
+        charr[coloring._nzrows, coloring._nzcols] = 'x'
 
-        if self._fwd:
+        if coloring._fwd:
             full_rows = np.arange(nrows, dtype=INT_DTYPE)
-            col2row = self._fwd[1]
-            for grp in self._fwd[0]:
+            col2row = coloring._fwd[1]
+            for grp in coloring._fwd[0]:
                 for c in grp:
                     rows = col2row[c]
                     if rows is None:
@@ -663,10 +698,10 @@ class Coloring(object):
                     charr[rows, c] = 'f'
 
         has_overlap = False
-        if self._rev:
+        if coloring._rev:
             full_cols = np.arange(ncols, dtype=INT_DTYPE)
-            row2col = self._rev[1]
-            for grp in self._rev[0]:
+            row2col = coloring._rev[1]
+            for grp in coloring._rev[0]:
                 for r in grp:
                     cols = row2col[r]
                     if cols is None:
@@ -680,35 +715,77 @@ class Coloring(object):
                         else:
                             charr[r, c] = 'r'
 
-        if (self._row_vars is None or self._row_var_sizes is None or self._col_vars is None or
-                self._col_var_sizes is None):
+        if (coloring._row_vars is None or coloring._row_var_sizes is None or coloring._col_vars is None or
+                coloring._col_var_sizes is None):
             # we don't have var name/size info, so just show the unadorned matrix
             for r in range(nrows):
                 for c in range(ncols):
-                    print(charr[r, c], end='')
-                print(' %d' % r)
+                    print(charr[r, c], end='', file=out_stream)
+                print(' %d' % r, file=out_stream)
         else:
             # we have var name/size info, so mark rows/cols with their respective variable names
             rowstart = rowend = 0
-            for rv, rvsize in zip(self._row_vars, self._row_var_sizes):
+            for rv, rvsize in zip(coloring._row_vars, coloring._row_var_sizes):
                 rowend += rvsize
                 for r in range(rowstart, rowend):
                     colstart = colend = 0
-                    for _, cvsize in zip(self._col_vars, self._col_var_sizes):
+                    for _, cvsize in zip(coloring._col_vars, coloring._col_var_sizes):
                         colend += cvsize
                         for c in range(colstart, colend):
-                            print(charr[r, c], end='')
+                            print(charr[r, c], end='', file=out_stream)
                         colstart = colend
-                    print(' %d  %s' % (r, rv))  # include row variable with each row
+                    print(' %d  %s' % (r, rv), file=out_stream)  # include row variable with each row
                 rowstart = rowend
 
             # now print the column vars below the matrix, with each one spaced over to line up
             # with the appropriate starting column of the matrix ('|' marks the start of each var)
             start = 0
-            for name, size in zip(self._col_vars, self._col_var_sizes):
+
+            for name, size in zip(coloring._col_vars, coloring._col_var_sizes):
                 tab = ' ' * start
-                print('%s|%s' % (tab, name))
+                if hasattr(coloring, '_source_to_promname'):
+                    col_var_name = coloring._source_to_promname[name]
+                else:
+                    col_var_name = name
+                print('%s|%s' % (tab, col_var_name), file=out_stream)
                 start += size
+
+        if html:
+            print('</pre>\n', file=out_stream)
+
+        tot_size, tot_colors, fwd_solves, rev_solves, pct = coloring._solves_info()
+        nnz = np.count_nonzero(charr != '.')
+
+        summary = (rf'Design Vars: {len(coloring._col_var_sizes)}',
+                   rf'Responses: {len(coloring._row_var_sizes)}',
+                   rf'Rows: {nrows}',
+                   rf'Columns: {ncols}',
+                   rf'Nonzeros: {nnz} of {nrows * ncols} ({100 * nnz / (nrows * ncols):6.2f}%)',
+                   rf'Forward solves: {fwd_solves}',
+                   rf'Reverse solves: {rev_solves}',
+                   rf'Total solves: {fwd_solves + rev_solves} vs. {min(nrows, ncols)} ({pct:6.2f}% improvement)',
+                   rf'Timestamp: {timestamp.strftime("%Y-%m-%d %H:%M:%S")}')
+
+        if html:
+            print('<hr style="width:100%;text-align:left;margin-left:0">', file=out_stream)
+            print('<table>\n', file=out_stream)
+            col_count = 0
+            for s in summary:
+                if col_count == 0:
+                    print('<tr>\n', file=out_stream)
+                print(f'<td>{s}</td>\n', file=out_stream)
+                col_count += 1
+                if col_count == 2:
+                    print('</tr>\n', file=out_stream)
+                    col_count = 0
+            print('</table>\n', file=out_stream)
+        else:
+            for s in summary:
+                print(s, file=out_stream)
+
+        if html:
+            out_stream.write(f'</body>\n'
+                             f'</html>')
 
         if has_overlap:
             raise RuntimeError("Internal coloring bug: jacobian has entries where fwd and rev "
@@ -893,7 +970,7 @@ class Coloring(object):
         pyplot.close(fig)
 
     @staticmethod
-    def display_bokeh(source, output_file='total_coloring.html', show=True, _max_colors=200):
+    def display_bokeh(source, output_file='total_coloring.html', show=False, _max_colors=200):
         """
         Display a plot of the sparsity pattern, showing grouping by color.
 
@@ -928,7 +1005,7 @@ class Coloring(object):
             timestamp = datetime.datetime.now()
             source_name = source._problem()._name
         else:
-            raise ValueError(f'display_bokeh was expecting the source to be a valid coloring file'
+            raise ValueError(f'display_bokeh was expecting the source to be a valid coloring file '
                              f'or an instance of driver but instead got f{type(source)}')
 
         nrows, ncols = coloring._shape
@@ -946,26 +1023,33 @@ class Coloring(object):
         desvar_idx_bins = np.cumsum(coloring._col_var_sizes)
         response_idx_bins = np.cumsum(coloring._row_var_sizes)
 
-        data['response_idx'] = np.digitize(data['row_idx'], response_idx_bins)
+        if hasattr(coloring, '_source_to_promname'):
+            col_var_map = coloring._source_to_promname
+        else:
+            col_var_map = {name: name for name in coloring._col_vars}
+
+        data['response_idx'] = np.digitize(data['row_idx'], response_idx_bins) # index of response out of all responses
         data['response_name'] = [coloring._row_vars[i] for i in data['response_idx']]
-        data['desvar_idx'] = np.digitize(data['col_idx'], desvar_idx_bins)
-        data['desvar_name'] = [coloring._col_vars[i] for i in data['desvar_idx']]
+        data['desvar_idx'] = np.digitize(data['col_idx'], desvar_idx_bins)  # index of desvar out of all desvars
+        data['desvar_name'] = [col_var_map[coloring._col_vars[i]] for i in data['desvar_idx']]
         data['pattern'] = data['desvar_idx'] % 2 + data['response_idx'] % 2
         data['fwd_color_idx'] = np.nan * np.ones(ncols*nrows, dtype=int)
         data['rev_color_idx'] = np.nan * np.ones(ncols*nrows, dtype=int)
 
         # Add the color group information to the data source
         fwd_map = {}
-        for idx_fwd, (_cols, _nz_rows) in enumerate(coloring.color_nonzero_iter('fwd')):
-            for _row_idx, _col_idx in zip(_nz_rows, _cols):
-                fwd_grp_idxs = itertools.product(_row_idx, [_col_idx])
-                fwd_map.update({(i, j): idx_fwd for i, j in fwd_grp_idxs})
+        if coloring._fwd is not None:
+            for idx_fwd, (_cols, _nz_rows) in enumerate(coloring.color_nonzero_iter('fwd')):
+                for _row_idx, _col_idx in zip(_nz_rows, _cols):
+                    fwd_grp_idxs = itertools.product(_row_idx, [_col_idx])
+                    fwd_map.update({(i, j): idx_fwd for i, j in fwd_grp_idxs})
 
         rev_map = {}
-        for idx_rev, (_rows, _nz_cols) in enumerate(coloring.color_nonzero_iter('rev')):
-            for _row_idx, _col_idx in zip(_rows, _nz_cols):
-                rev_grp_idxs = itertools.product([_row_idx], _col_idx)
-                rev_map.update({(i, j): idx_rev for i, j in rev_grp_idxs})
+        if coloring._rev is not None:
+            for idx_rev, (_rows, _nz_cols) in enumerate(coloring.color_nonzero_iter('rev')):
+                for _row_idx, _col_idx in zip(_rows, _nz_cols):
+                    rev_grp_idxs = itertools.product([_row_idx], _col_idx)
+                    rev_map.update({(i, j): idx_rev for i, j in rev_grp_idxs})
 
         for i in range(nrows * ncols):
             r = data['row_idx'][i]
@@ -977,13 +1061,12 @@ class Coloring(object):
 
         data_source = ColumnDataSource(data)
 
-        HEIGHT = 800
-
-        layout = gridplot([], sizing_mode='stretch_both')
+        HEIGHT = 600
 
         fig = figure(toolbar_location="above",
                      x_range=(-1, ncols+1), y_range=(nrows+1, -1),
-                     x_axis_location="above", width=int(HEIGHT * aspect_ratio), height=HEIGHT)
+                     x_axis_location="above", width=int(HEIGHT * aspect_ratio), height=HEIGHT,
+                     sizing_mode='scale_both')
 
         fig.xaxis.visible = False
         fig.yaxis.visible = False
@@ -1004,7 +1087,7 @@ class Coloring(object):
             fwd_colors = list(Blues256)[:_max_colors][::-1]
             fwd_cm = fwd_colors * (fwd_solves // _max_colors + 1)
             fwd_mapper = LinearColorMapper(palette=fwd_cm, low=-1, high=fwd_solves-1, nan_color=(0, 0, 0, 0))
-            fwd_rect = fig.rect(x='col_idx', y='row_idx', width=1, height=1, source=data_source, alpha=0.8,
+            fwd_rect = fig.rect(x='col_idx', y='row_idx', width=1, height=1, source=data_source, alpha=1.0,
                                 line_color=None, fill_color=transform('fwd_color_idx', fwd_mapper))
 
             fig.add_layout(fwd_rect.construct_color_bar(
@@ -1022,7 +1105,7 @@ class Coloring(object):
             rev_colors = list(Reds256)[:_max_colors][::-1]
             rev_cm = rev_colors * (rev_solves // _max_colors + 1)
             rev_mapper = LinearColorMapper(palette=rev_cm, low=-1, high=rev_solves-1, nan_color=(0, 0, 0, 0))
-            rev_rect = fig.rect(x='col_idx', y='row_idx', width=1, height=1, source=data_source, alpha=0.8,
+            rev_rect = fig.rect(x='col_idx', y='row_idx', width=1, height=1, source=data_source, alpha=1.0,
                                 line_color=None, fill_color=transform('rev_color_idx', rev_mapper))
 
             fig.add_layout(rev_rect.construct_color_bar(
@@ -1030,7 +1113,7 @@ class Coloring(object):
                 ticker=FixedTicker(ticks=np.arange(rev_solves, dtype=int)),
                 label_standoff=6,
                 border_line_color=None,
-                padding=5,
+                padding=0,
                 title='reverse solves',
                 display_low=0
             ), 'right')
@@ -1065,7 +1148,8 @@ class Coloring(object):
 
         report_layout = column(children=[grid(header_divs, ncols=2),
                                          fig,
-                                         grid(summary_divs, ncols=2)])
+                                         grid(summary_divs, ncols=2)],
+                               sizing_mode='scale_height')
         # Save and show
         bokeh.io.curdoc().theme = 'light_minimal'
         bokeh.io.save(report_layout, filename=output_file,
@@ -2142,6 +2226,9 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
             # save metadata we used to create the coloring
             coloring._meta.update(sparsity_info)
 
+            # save the desvar and response information to the coloring
+            coloring._source_to_promname = {meta['source']: name for name, meta in driver._designvars.items()}
+
             system = problem.model
             if fname is not None:
                 if ((system._full_comm is not None and system._full_comm.rank == 0) or
@@ -2212,21 +2299,24 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
 
 
 def _run_total_coloring_report(driver):
-    if bokeh_resources is not None:
-        htmlpath = str(pathlib.Path(driver._problem().get_reports_dir()).joinpath('total_coloring.html'))
+    htmlpath = str(pathlib.Path(driver._problem().get_reports_dir()).joinpath('total_coloring.html'))
+    # if bokeh_resources is not None:
+    if False:
         Coloring.display_bokeh(source=driver, output_file=htmlpath, show=False)
     else:
-        issue_warning('bokeh not available. total coloring report will be generated with matplotlib.')
-        coloring = driver._coloring_info['coloring']
-        if coloring is not None:
-            prob = driver._problem()
-            path = str(pathlib.Path(prob.get_reports_dir()).joinpath(_default_coloring_imagefile))
-            coloring.display(show=False, fname=path)
+        # issue_warning('bokeh not available. total coloring report will be generated with matplotlib.')
+        with open(htmlpath, 'w') as f:
+            Coloring.display_txt(source=driver, out_stream=f, html=True)
 
-            # now create html file that wraps the image file
-            htmlpath = str(pathlib.Path(prob.get_reports_dir()).joinpath("total_coloring.html"))
-            with open(htmlpath, 'w') as f:
-                f.write(image2html(_default_coloring_imagefile))
+        # if coloring is not None:
+        #     prob = driver._problem()
+        #     path = str(pathlib.Path(prob.get_reports_dir()).joinpath(_default_coloring_imagefile))
+        #     coloring.display(show=False, fname=path)
+        #
+        #     # now create html file that wraps the image file
+        #     htmlpath = str(pathlib.Path(prob.get_reports_dir()).joinpath("total_coloring.html"))
+        #     with open(htmlpath, 'w') as f:
+        #         f.write(image2html(_default_coloring_imagefile))
 
 
 # entry point for coloring report
@@ -2527,7 +2617,10 @@ def _view_coloring_exec(options, user_args):
         coloring.display_txt()
 
     if options.show_sparsity:
-        coloring.display()
+        if bokeh_resources is not None:
+            Coloring.display_bokeh(source=options.file[0], show=True)
+        else:
+            coloring.display()
 
     if options.subjac_sparsity:
         print("\nSubjacobian sparsity:")
