@@ -18,12 +18,14 @@ class NodeConnection {
         this.conn = conn;
 
         this.srcObj = nodes[conn.src];
-        this.srcObj.connTargets.add(conn.tgt);
         const srcObjParents = [];
+
         if (!this.srcObj) {
             console.warn(`Cannot find connection source ${conn.src}.`);
         }
         else {
+            this.srcObj.connTargets.add(conn.tgt);
+
             // Collect all parents of the source node.
             srcObjParents.push(this.srcObj);
             for (let parentObj = this.srcObj.parent; parentObj != null; parentObj = parentObj.parent) {
@@ -44,7 +46,7 @@ class NodeConnection {
                 tgtObjParents.push(parentObj);
             }
         }
-    
+
         // Make sure all parents of the source and target are aware of the
         // connection. Required for handling collapsed or offscreen node connections.
         for (const srcParent of srcObjParents) {
