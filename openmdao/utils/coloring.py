@@ -39,8 +39,8 @@ except ImportError:
     mpl = None
 
 try:
-    from bokeh.models import CategoricalColorMapper, ColumnDataSource, Div, FixedTicker,\
-        HoverTool, LinearColorMapper
+    from bokeh.models import CategoricalColorMapper, ColumnDataSource, CustomJSHover, \
+        Div, FixedTicker, HoverTool, LinearColorMapper
     from bokeh.layouts import column, grid, gridplot
     from bokeh.palettes import Blues256, Reds256, gray, interp_palette
     from bokeh.plotting import figure
@@ -1055,14 +1055,11 @@ class Coloring(object):
         else:
             col_var_map = {name: name for name in coloring._col_vars}
 
-        data['response_idx'] = np.digitize(data['row_idx'], response_idx_bins)
-        data['response_name'] = [coloring._row_vars[i] for i in data['response_idx']]
-        data['desvar_idx'] = np.digitize(data['col_idx'], desvar_idx_bins)
-        data['desvar_name'] = [col_var_map[coloring._col_vars[i]] for i in data['desvar_idx']]
+        response_idx = np.digitize(data['row_idx'], response_idx_bins)
+        desvar_idx = np.digitize(data['col_idx'], desvar_idx_bins)
+
         data['pattern'] = np.full(nrows * ncols, '', dtype=str)
-        data['pattern'][...] = np.asarray(data['desvar_idx'] % 2 + data['response_idx'] % 2, dtype=str)
-        # Note these dtypes need to be object because str would only allocate
-        # a single character per element.
+        data['pattern'][...] = np.asarray(desvar_idx % 2 + response_idx % 2, dtype=str)
         data['fwd_color_idx'] = np.full(nrows * ncols, '', dtype=object)
         data['rev_color_idx'] = np.full(nrows * ncols, '', dtype=object)
 
@@ -1114,7 +1111,6 @@ class Coloring(object):
 
         # Plot the fwd solve groups
         if fwd_solves > 0:
-            fwd_colors = list(Blues256)[:_max_colors][::-1]
             fwd_colors = interp_palette(list(Blues256)[:_max_colors], fwd_solves)
             fwd_mapper = CategoricalColorMapper(factors=[str(i) for i in range(fwd_solves)],
                                                 palette=fwd_colors,
@@ -1151,14 +1147,40 @@ class Coloring(object):
             ), 'right')
 
         # Add a tooltip on hover
-        tooltips = [
-            ('Response', '@response_name'),
-            ('Design Var', '@desvar_name'),
-            ('Forward solve:', '@fwd_color_idx'),
-            ('Reverse solve:', '@rev_color_idx'),
-        ]
+        desvar_col_map = {col_var_map[desvar_name]: set() for desvar_name in coloring._col_vars}
+        for col_idx in range(ncols):
+            desvar_name = col_var_map[coloring._col_vars[np.digitize(col_idx, desvar_idx_bins)]]
+            desvar_col_map[desvar_name].add(col_idx)
 
-        fig.add_tools(HoverTool(tooltips=tooltips))
+        resvar_col_map = {varname: set() for varname in coloring._row_vars}
+        for row_idx in range(nrows):
+            resvar_name = coloring._row_vars[np.digitize(row_idx, response_idx_bins)]
+            resvar_col_map[resvar_name].add(row_idx)
+
+        design_var_js = CustomJSHover(code="""
+        for (var name in varnames_map) {
+            if (varnames_map[name].has(special_vars.snap_x)) {
+                return name;
+            }
+        }
+        return ''; 
+        """, args=dict(varnames_map=desvar_col_map))
+
+        response_var_js = CustomJSHover(code="""
+        for (var name in varnames_map) {
+            if (varnames_map[name].has(special_vars.snap_y)) {
+                return name;
+            }
+        }
+        return ''; 
+        """, args=dict(varnames_map=resvar_col_map))
+
+        fig.add_tools(HoverTool(tooltips=[('Response', '$snap_y{0}'), # {0} triggers the formatter
+                                          ('Design Var', '$snap_x{0}'),
+                                          ('Forward solve', '@fwd_color_idx'),
+                                          ('Reverse solve', '@rev_color_idx')],
+                                formatters={'$snap_y': response_var_js,
+                                            '$snap_x': design_var_js}))
 
         # Summary info
         nnz = np.count_nonzero(np.logical_or(~(data['fwd_color_idx']==''),
