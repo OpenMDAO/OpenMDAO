@@ -1,5 +1,5 @@
 ***********************************
-# Release Notes for OpenMDAO 3.27.0
+# Release Notes for OpenMDAO 3.28.0
 
 August 30, 2023
 
