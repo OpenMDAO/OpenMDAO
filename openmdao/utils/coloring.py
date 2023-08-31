@@ -602,6 +602,11 @@ class Coloring(object):
     def summary(self, out_stream=_DEFAULT_OUT_STREAM):
         """
         Print a summary of this coloring.
+
+        Parameters
+        ----------
+        out_stream : file-like or _DEFAULT_OUT_STREAM
+            The destination stream to which the text representation of coloring is to be written.
         """
         nrows = self._shape[0] if self._shape else -1
         ncols = self._shape[1] if self._shape else -1
@@ -620,7 +625,8 @@ class Coloring(object):
         else:
             tot_size, tot_colors, fwd_solves, rev_solves, pct = self._solves_info()
             print(f"FWD solves: {fwd_solves}   REV solves: {rev_solves}", file=out_stream)
-            print(f"Total colors vs. total size: {tot_colors} vs {tot_size}  ({pct:.2f}% improvement)",
+            print(f"Total colors vs. total size: {tot_colors} vs {tot_size}  "
+                  f"({pct:.2f}% improvement)",
                   file=out_stream)
 
         meta = self._meta
@@ -777,7 +783,6 @@ class Coloring(object):
         if has_overlap:
             raise RuntimeError("Internal coloring bug: jacobian has entries where fwd and rev "
                                "colorings overlap!")
-
 
     def display(self, show=True, fname=_default_coloring_imagefile):
         """
@@ -1024,8 +1029,10 @@ class Coloring(object):
 
             # The indices of the responses and desvars obtained by binning the row/col indices
             if have_vars:
-                desvar_idx_bins = [] if coloring._col_var_sizes is None else np.cumsum(coloring._col_var_sizes)
-                response_idx_bins = [] if coloring._row_var_sizes is None else np.cumsum(coloring._row_var_sizes)
+                desvar_idx_bins = [] if coloring._col_var_sizes is None else \
+                    np.cumsum(coloring._col_var_sizes)
+                response_idx_bins = [] if coloring._row_var_sizes is None else \
+                    np.cumsum(coloring._row_var_sizes)
 
                 response_idx = np.digitize(data['row_idx'], response_idx_bins)
                 desvar_idx = np.digitize(data['col_idx'], desvar_idx_bins)
@@ -1137,7 +1144,7 @@ class Coloring(object):
                         return name;
                     }
                 }
-                return ''; 
+                return '';
                 """, args=dict(varnames_map=desvar_col_map))
 
                 response_var_js = CustomJSHover(code="""
@@ -1146,7 +1153,7 @@ class Coloring(object):
                         return name;
                     }
                 }
-                return ''; 
+                return '';
                 """, args=dict(varnames_map=resvar_col_map))
 
                 tooltips = [('Response', '$snap_y{0}'),  # {0} triggers the formatter
@@ -2267,8 +2274,9 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
         else:
             coloring = problem.comm.bcast(None, root=0)
 
-    coloring._meta['timestamp'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    coloring._meta['source'] = problem._name
+    if coloring is not None:
+        coloring._meta['timestamp'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        coloring._meta['source'] = problem._name
 
     return coloring
 
@@ -2329,6 +2337,7 @@ def _run_total_coloring_report(driver):
 
     display_coloring(source=driver, output_file=htmlpath,
                      as_text=bokeh_resources is None, show=False)
+
 
 # entry point for coloring report
 def _total_coloring_report_register():
@@ -2806,7 +2815,8 @@ class _ColSparsityJac(object):
         return coo_matrix((data, (rows, cols)), shape=(self._nrows, self._ncols)), info
 
 
-def display_coloring(source, output_file='total_coloring.html', as_text=False, show=True, max_colors=200):
+def display_coloring(source, output_file='total_coloring.html', as_text=False, show=True,
+                     max_colors=200):
     """
     Display the coloring information from source to html format.
 
@@ -2862,4 +2872,3 @@ def display_coloring(source, output_file='total_coloring.html', as_text=False, s
 
     else:
         coloring.display_bokeh(output_file, show=show, _max_colors=max_colors)
-
