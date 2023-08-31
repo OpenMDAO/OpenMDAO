@@ -778,6 +778,7 @@ class Coloring(object):
             raise RuntimeError("Internal coloring bug: jacobian has entries where fwd and rev "
                                "colorings overlap!")
 
+
     def display(self, show=True, fname=_default_coloring_imagefile):
         """
         Display a plot of the sparsity pattern, showing grouping by color.
