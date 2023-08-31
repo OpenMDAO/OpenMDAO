@@ -221,8 +221,10 @@ def _get_tree_dict(system, values=True, is_parallel=False):
 
     Parameters
     ----------
+    system : System
+        The System at the root of the hierarchy
     values : bool
-        If True, include variable values, otherwise all values will be None.
+        If True, include variable values. If False, all values will be None.
     is_parallel : bool
         If True, values can be remote and are not available.
     """
@@ -379,7 +381,7 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
         If the case recorder file from a parallel run has separate metadata, the
         filenames can be specified with a comma, e.g.: case.sql_0,case.sql_meta
     values : bool or _UNDEFINED
-        If True, include variable values, otherwise all values will be None.
+        If True, include variable values. If False, all values will be None.
         If unspecified, this behaves as if set to True unless the data source is a Problem or
         model for which setup is not complete, in which case it behaves as if set to False.
     case_id : int or str or None
@@ -413,8 +415,8 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
 
         # set default behavior for values flag
         if values is _UNDEFINED:
-            values = data_source._metadata is not None and \
-                     data_source._metadata['setup_status'] >= _SetupStatus.POST_FINAL_SETUP
+            values = (data_source._metadata is not None and
+                      data_source._metadata['setup_status'] >= _SetupStatus.POST_FINAL_SETUP)
 
     elif isinstance(data_source, Group):
         if not data_source.pathname:  # root group
@@ -430,8 +432,8 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
 
         # set default behavior for values flag
         if values is _UNDEFINED:
-            values = data_source._problem_meta is not None and \
-                     data_source._problem_meta['setup_status'] >= _SetupStatus.POST_FINAL_SETUP
+            values = (data_source._problem_meta is not None and
+                      data_source._problem_meta['setup_status'] >= _SetupStatus.POST_FINAL_SETUP)
 
     elif isinstance(data_source, str):
         if ',' in data_source:
@@ -601,7 +603,7 @@ def n2(data_source, outfile=_default_n2_filename, path=None, values=_UNDEFINED, 
         If specified, the n2 viewer will begin in a state that is zoomed in on the selected path.
         This path should be the absolute path of a system in the model.
     values : bool or _UNDEFINED
-        If True, include variable values, otherwise all values will be None.
+        If True, include variable values. If False, all values will be None.
         If unspecified, this behaves as if set to True unless the data source is a Problem or
         model for which setup is not complete, in which case it behaves as if set to False.
     case_id : int, str, or None
