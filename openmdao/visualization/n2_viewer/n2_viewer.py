@@ -12,8 +12,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.parallel_group import ParallelGroup
 from openmdao.core.group import Group
-from openmdao.core.problem import Problem
-from openmdao.core.component import Component
+from openmdao.core.problem import Problem, _SetupStatus
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.constants import _UNDEFINED
 from openmdao.components.exec_comp import ExecComp
@@ -111,7 +110,7 @@ def _get_array_info(system, vec, name, prom, var_dict, from_src=True):
     var_dict['val_max'] = ndarray_to_convert[max_indices]
 
 
-def _get_var_dict(system, typ, name, is_parallel, is_implicit):
+def _get_var_dict(system, typ, name, is_parallel, is_implicit, values):
     if name in system._var_abs2meta[typ]:
         meta = system._var_abs2meta[typ][name]
         prom = system._var_abs2prom[typ][name]
@@ -149,7 +148,7 @@ def _get_var_dict(system, typ, name, is_parallel, is_implicit):
             var_dict['units'] = meta['units']
 
         try:
-            if val.size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
+            if values and val.size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
                 if not MPI:
                     # Get the current value
                     _get_array_info(system, vec, name, prom, var_dict, from_src=True)
@@ -177,10 +176,11 @@ def _get_var_dict(system, typ, name, is_parallel, is_implicit):
             'dtype': type(val).__name__,
             'is_discrete': True,
         }
-        if MPI is None or isinstance(val, (int, str, list, dict, complex, np.ndarray)):
-            var_dict['val'] = default_noraise(system.get_val(name))
+        if values:
+            if MPI is None or isinstance(val, (int, str, list, dict, complex, np.ndarray)):
+                var_dict['val'] = default_noraise(system.get_val(name))
         else:
-            var_dict['val'] = type(val).__name__
+            var_dict['val'] = None
 
     if 'surrogate_name' in meta:
         var_dict['surrogate_name'] = meta['surrogate_name']
@@ -215,9 +215,16 @@ def _serialize_single_option(option):
     return default_noraise(val)
 
 
-def _get_tree_dict(system, is_parallel=False):
+def _get_tree_dict(system, values=True, is_parallel=False):
     """
     Get a dictionary representation of the system hierarchy.
+
+    Parameters
+    ----------
+    values : bool
+        If True, include variable values, otherwise all values will be None.
+    is_parallel : bool
+        If True, values can be remote and are not available.
     """
     tree_dict = {
         'name': system.name if system.name else 'root',
@@ -238,7 +245,8 @@ def _get_tree_dict(system, is_parallel=False):
         tree_dict['subsystem_type'] = 'group'
         tree_dict['is_parallel'] = is_parallel
 
-        children = [_get_tree_dict(s, is_parallel) for s in system._subsystems_myproc]
+        children = [_get_tree_dict(s, values, is_parallel)
+                    for s in system._subsystems_myproc]
 
         if system.comm.size > 1:
             if system._subsystems_myproc:
@@ -305,10 +313,12 @@ def _get_tree_dict(system, is_parallel=False):
         children = []
         for typ in ['input', 'output']:
             for abs_name in system._var_abs2meta[typ]:
-                children.append(_get_var_dict(system, typ, abs_name, is_parallel, is_implicit))
+                children.append(_get_var_dict(system, typ, abs_name,
+                                              is_parallel, is_implicit, values))
 
             for prom_name in system._var_discrete[typ]:
-                children.append(_get_var_dict(system, typ, prom_name, is_parallel, is_implicit))
+                children.append(_get_var_dict(system, typ, prom_name,
+                                              is_parallel, is_implicit, values))
 
     tree_dict['children'] = children
 
@@ -358,7 +368,7 @@ def _get_declare_partials(system):
     return declare_partials_list
 
 
-def _get_viewer_data(data_source, case_id=None):
+def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
     """
     Get the data needed by the N2 viewer as a dictionary.
 
@@ -368,7 +378,10 @@ def _get_viewer_data(data_source, case_id=None):
         A Problem or Group or case recorder filename containing the model or model data.
         If the case recorder file from a parallel run has separate metadata, the
         filenames can be specified with a comma, e.g.: case.sql_0,case.sql_meta
-
+    values : bool or _UNDEFINED
+        If True, include variable values, otherwise all values will be None.
+        If unspecified, this behaves as if set to True unless the data source is a Problem or
+        model for which setup is not complete, in which case it behaves as if set to False.
     case_id : int or str or None
         Case name or index of case in SQL file.
 
@@ -398,6 +411,11 @@ def _get_viewer_data(data_source, case_id=None):
         else:
             driver_opt_settings = None
 
+        # set default behavior for values flag
+        if values is _UNDEFINED:
+            values = data_source._metadata is not None and \
+                     data_source._metadata['setup_status'] >= _SetupStatus.POST_FINAL_SETUP
+
     elif isinstance(data_source, Group):
         if not data_source.pathname:  # root group
             root_group = data_source
@@ -410,6 +428,11 @@ def _get_viewer_data(data_source, case_id=None):
             msg = f"Viewer data is not available for sub-Group '{data_source.pathname}'."
             raise TypeError(msg)
 
+        # set default behavior for values flag
+        if values is _UNDEFINED:
+            values = data_source._problem_meta is not None and \
+                     data_source._problem_meta['setup_status'] >= _SetupStatus.POST_FINAL_SETUP
+
     elif isinstance(data_source, str):
         if ',' in data_source:
             filenames = data_source.split(',')
@@ -418,6 +441,10 @@ def _get_viewer_data(data_source, case_id=None):
             cr = CaseReader(data_source)
 
         data_dict = cr.problem_metadata
+
+        # set default behavior for values flag
+        if values is _UNDEFINED:
+            values = True
 
         if case_id is not None:
             cases = cr.get_case(case_id)
@@ -431,6 +458,8 @@ def _get_viewer_data(data_source, case_id=None):
                             stack.append(child['name'])
                             recurse(child['children'], stack)
                             stack.pop()
+                    elif not values:
+                        child['val'] = None
                     elif child['type'] == 'input':
                         if cases.inputs is None:
                             child['val'] = 'N/A'
@@ -446,6 +475,7 @@ def _get_viewer_data(data_source, case_id=None):
                                 child['val'] = cases.outputs[path]
                             except KeyError:
                                 child['val'] = 'N/A'
+
             recurse(data_dict['tree']['children'], [])
 
         # Delete the variables key since it's not used in N2
@@ -463,7 +493,7 @@ def _get_viewer_data(data_source, case_id=None):
                         "The source must be a Problem, model or the filename of a recording.")
 
     data_dict = {}
-    data_dict['tree'] = _get_tree_dict(root_group)
+    data_dict['tree'] = _get_tree_dict(root_group, values=values)
     data_dict['md5_hash'] = root_group._generate_md5_hash()
 
     connections_list = []
@@ -554,7 +584,7 @@ def _get_viewer_data(data_source, case_id=None):
     return data_dict
 
 
-def n2(data_source, outfile=_default_n2_filename, path=None, case_id=None,
+def n2(data_source, outfile=_default_n2_filename, path=None, values=_UNDEFINED, case_id=None,
        show_browser=True, embeddable=False, title=None, display_in_notebook=True):
     """
     Generate an HTML file containing a tree viewer.
@@ -570,6 +600,10 @@ def n2(data_source, outfile=_default_n2_filename, path=None, case_id=None,
     path : str, optional
         If specified, the n2 viewer will begin in a state that is zoomed in on the selected path.
         This path should be the absolute path of a system in the model.
+    values : bool or _UNDEFINED
+        If True, include variable values, otherwise all values will be None.
+        If unspecified, this behaves as if set to True unless the data source is a Problem or
+        model for which setup is not complete, in which case it behaves as if set to False.
     case_id : int, str, or None
         Case name or index of case in SQL file if data_source is a database.
     show_browser : bool, optional
@@ -586,7 +620,7 @@ def n2(data_source, outfile=_default_n2_filename, path=None, case_id=None,
     """
     # grab the model viewer data
     try:
-        model_data = _get_viewer_data(data_source, case_id=case_id)
+        model_data = _get_viewer_data(data_source, values=values, case_id=case_id)
         err_msg = ''
     except TypeError as err:
         model_data = {}

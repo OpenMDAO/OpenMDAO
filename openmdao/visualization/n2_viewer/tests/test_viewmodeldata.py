@@ -22,7 +22,6 @@ from openmdao.recorders.sqlite_recorder import SqliteRecorder
 from openmdao.test_suite.test_examples.test_betz_limit import ActuatorDisc
 from openmdao.utils.mpi import MPI
 from openmdao.utils.shell_proc import check_call
-from openmdao.utils.assert_utils import assert_warning
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
 
@@ -435,8 +434,7 @@ class TestViewModelData(unittest.TestCase):
         sqlite_model_data = self._extract_compressed_model(self.sqlite_html_filename)
         compare_model_data = self._extract_compressed_model(self.compare_html_filename)
 
-        self.assertTrue(sqlite_model_data == compare_model_data,
-                        'Model data from sqlite does not match data from Problem.')
+        self.assertDictEqual(sqlite_model_data, compare_model_data)
 
     def test_n2_command(self):
         """
