@@ -34,12 +34,13 @@ class NodeConnection {
         }
 
         this.tgtObj = nodes[conn.tgt];
-        this.tgtObj.connSources.add(conn.src);
         const tgtObjParents = [];
         if (!this.tgtObj) {
             console.warn(`Cannot find connection target ${conn.tgt}.`);
         }
         else {
+            this.tgtObj.connSources.add(conn.src);
+
             // Collect all parents of the target node.
             tgtObjParents.push(this.tgtObj);
             for (let parentObj = this.tgtObj.parent; parentObj != null; parentObj = parentObj.parent) {
