@@ -301,7 +301,7 @@ class NonlinearSchurSolver(NonlinearSolver):
                 subsys1._apply_linear(None, None, mode, scope_out, scope_in)
 
                 # amd then, by performing solve_linear we get A^-1 B[:,{ii}]
-                subsys1._solve_linear(mode, ContainsAll())
+                subsys1._solve_linear(mode, None, scope_out, scope_in)
 
                 # do another mat-mult with the solution of this linear system, we want to get the final
                 # jacobian using the schur method here, so we will need to do a bit more math
