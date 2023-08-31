@@ -79,7 +79,7 @@ class TestTheoryDocExample(unittest.TestCase):
 
     # this mimics the "Reverse-mode Derivatives in Parallel Subsystems" example in the theory manual
     def test_theory_example(self):
-        p = om.Problem()
+        p = om.Problem(allow_post_setup_reorder=False)
         model = p.model
         model.add_subsystem('C1', I1O1Comp(mult=2.0))
         sub = model.add_subsystem('par', om.ParallelGroup())

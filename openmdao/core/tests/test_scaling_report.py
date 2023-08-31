@@ -47,7 +47,7 @@ class TestDriverScalingReport(unittest.TestCase):
         expected = _Obj()
         expected.objs.append("objective_comp.out")
 
-        p = om.Problem()
+        p = om.Problem(allow_post_setup_reorder=False)
         model = p.model
         for icomp in range(ncomps):
             exprs = []

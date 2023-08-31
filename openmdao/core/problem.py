@@ -296,6 +296,15 @@ class Problem(object):
                              "iterate over the optimization subsystems during optimization.  This "
                              "applies only when the top level nonlinear solver is of type"
                              "NonlinearRunOnce.")
+        self.options.declare('allow_post_setup_reorder', types=bool,
+                             default=True,
+                             desc="If True, the execution order of direct subsystems of any group "
+                             "that sets its 'auto_order' option to True will be automatically "
+                             "ordered according to data dependencies. If this option is False, the "
+                             "'auto_order' option will be ignored and a warning will be issued for "
+                             "each group that has set it to True. Note that subsystems of a Group "
+                             "that form a cycle will never be reordered, regardless of the value of"
+                             " the 'auto_order' option.")
         self.options.update(options)
 
         # Options passed to models
@@ -992,6 +1001,7 @@ class Problem(object):
             'checking': False,  # True if check_totals or check_partials is running
             'opt_status': None,  # Tells Systems if they are in an optimization loop
             'model_options': self.model_options,  # A dict of options passed to all systems in tree
+            'allow_post_setup_reorder': self.options['allow_post_setup_reorder'],  # see option
             'singular_jac_behavior': 'warn',  # How to handle singular jac conditions
         }
 
@@ -1082,8 +1092,8 @@ class Problem(object):
                           "response variables (objectives and nonlinear constraints).",
                           category=DerivativesWarning)
 
-        if self._metadata['setup_status'] == _SetupStatus.PRE_SETUP and \
-                hasattr(self.model, '_order_set') and self.model._order_set:
+        if (not self._metadata['allow_post_setup_reorder'] and
+                self._metadata['setup_status'] == _SetupStatus.PRE_SETUP and self.model._order_set):
             raise RuntimeError(f"{self.msginfo}: Cannot call set_order without calling setup after")
 
         # set up recording, including any new recorders since last setup
@@ -1201,9 +1211,7 @@ class Problem(object):
                     isinstance(comp, ExplicitComponent)):
                 continue
 
-            name = comp.pathname
-
-            if not match_includes_excludes(name, includes, excludes):
+            if not match_includes_excludes(comp.pathname, includes, excludes):
                 continue
 
             comps.append(comp)
@@ -2466,7 +2474,7 @@ class Problem(object):
             List of optional columns to be displayed in the independent variable table.
             Allowed values are:
             ['name', 'units', 'shape', 'size', 'desc', 'ref', 'ref0', 'res_ref',
-            'distributed', 'lower', 'upper', 'tags', 'shape_by_conn', 'copy_shape',
+            'distributed', 'lower', 'upper', 'tags', 'shape_by_conn', 'copy_shape', 'compute_shape',
             'global_size', 'global_shape', 'value'].
         print_arrays : bool, optional
             When False, in the columnar display, just display norm of any ndarrays with size > 1.

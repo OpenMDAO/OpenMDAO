@@ -581,7 +581,7 @@ class MPIFeatureTests(unittest.TestCase):
 
         model.add_design_var('indep.x')
 
-        prob = om.Problem(model)
+        prob = om.Problem(model, allow_post_setup_reorder=False)
         prob.setup()
 
         # prior to model execution, the global shape of a distributed variable is not available

@@ -74,10 +74,10 @@ _recordable_funcs = frozenset(['_apply_linear', '_apply_nonlinear', '_solve_line
 # the following are local metadata that will also be accessible for vars on all procs
 global_meta_names = {
     'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc', 'shape_by_conn',
-              'copy_shape'),
+              'compute_shape', 'copy_shape'),
     'output': ('units', 'shape', 'size', 'desc',
                'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags', 'shape_by_conn',
-               'copy_shape'),
+               'compute_shape', 'copy_shape'),
 }
 
 allowed_meta_names = {
@@ -2232,7 +2232,7 @@ class System(object):
             self._doutputs = vectors['output']['linear']
             self._dresiduals = vectors['residual']['linear']
 
-        for subsys in self._subsystems_myproc:
+        for subsys in self._sorted_sys_iter():
             subsys._scale_factors = self._scale_factors
             subsys._setup_vectors(root_vectors)
 
@@ -2375,8 +2375,9 @@ class System(object):
             try:
                 old_name, old_key, old_info, old_match_type = matches[io][name]
                 _, info = tup
+
                 if old_match_type == _MatchType.RENAME:
-                    old_key = (old_name, old_key)
+                    old_key = old_using = (old_name, old_key)
                 else:
                     old_using = f"'{old_key}'"
                 if match_type == _MatchType.RENAME:
@@ -2387,8 +2388,8 @@ class System(object):
                 diff = info.compare(old_info) if info is not None and old_info is not None else ()
                 if diff:
                     raise RuntimeError(f"{self.msginfo}: {io} variable '{name}', promoted using "
-                                       f"{new_using}, was already promoted using {old_using} with "
-                                       f"different values for {diff}.")
+                                       f"'{new_using}', was already promoted using '{old_using}' "
+                                       f"with different values for {diff}.")
 
                 if old_match_type != _MatchType.PATTERN:
                     if old_key != tup[0]:
@@ -2396,7 +2397,7 @@ class System(object):
                                            f"'{tup[0]}' because '{name}' has already been promoted "
                                            f"as '{old_key}'.")
 
-                if old_using != "'*'" and new_using != "'*'" and old_using != new_using:
+                if old_using != "'*'" and new_using != "'*'":
                     msg = f"{io} variable '{name}', promoted using {new_using}, " \
                           f"was already promoted using {old_using}."
                     issue_warning(msg, prefix=self.msginfo, category=PromotionWarning)
@@ -3522,7 +3523,7 @@ class System(object):
 
         if recurse:
             abs2prom_in = self._var_allprocs_abs2prom['input']
-            for subsys in self._subsystems_myproc:
+            for subsys in self._sorted_sys_iter():
                 dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
                                              use_prom_ivc=use_prom_ivc)
                 if use_prom_ivc:
@@ -3673,7 +3674,7 @@ class System(object):
 
         if recurse:
             abs2prom_in = self._var_allprocs_abs2prom['input']
-            for subsys in self._subsystems_myproc:
+            for subsys in self._sorted_sys_iter():
                 resps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
                                              use_prom_ivc=use_prom_ivc)
                 if use_prom_ivc:
@@ -6163,6 +6164,9 @@ class System(object):
 
         # return regular dict sorted by system pathname
         return {spath: data for spath, data in sorted(sys_prom_map.items(), key=lambda x: x[0])}
+
+    def _sorted_sys_iter(self):
+        yield from ()
 
     def load_case(self, case):
         """
