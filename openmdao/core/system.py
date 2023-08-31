@@ -1589,7 +1589,7 @@ class System(object):
             print("\nColoring for '%s' (class %s)" % (self.pathname, type(self).__name__))
 
         if info['show_sparsity']:
-            coloring.display_txt()
+            coloring.display_txt(summary=False)
         if info['show_summary']:
             coloring.summary()
 

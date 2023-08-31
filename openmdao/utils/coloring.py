@@ -2,19 +2,21 @@
 Routines to compute coloring for use with simultaneous derivatives.
 """
 import datetime
+import io
 import itertools
 import os
 import time
 import pickle
 import sys
+import tempfile
 import traceback
 import pathlib
-from itertools import combinations, groupby, product
+import webbrowser
+from itertools import combinations, groupby
 from contextlib import contextmanager
-from io import StringIO
-from math import ceil
 from pprint import pprint
 from packaging.version import Version
+
 
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
@@ -40,7 +42,7 @@ except ImportError:
 
 try:
     from bokeh.models import CategoricalColorMapper, ColumnDataSource, CustomJSHover, \
-        Div, FixedTicker, HoverTool, LinearColorMapper
+        Div, FixedTicker, HoverTool, LinearColorMapper, PreText
     from bokeh.layouts import column, grid, gridplot
     from bokeh.palettes import Blues256, Reds256, gray, interp_palette
     from bokeh.plotting import figure
@@ -175,12 +177,11 @@ class Coloring(object):
         self._col_vars = col_vars
         self._col_var_sizes = col_var_sizes
 
-        self._source_to_promname = None
-
         self._fwd = None
         self._rev = None
         self._meta = {
             'version': '1.0',
+            'source': '',
         }
 
         self._names_array = {'fwd': None, 'rev': None}
@@ -446,6 +447,14 @@ class Coloring(object):
                 newgrps.extend(old[1:])
                 coloring._rev = (newgrps, coloring._rev[1])
 
+        if 'timestamp' not in coloring._meta:
+            file_mtime = pathlib.Path(fname).stat().st_mtime
+            coloring._meta['timestamp'] = datetime.datetime.\
+                fromtimestamp(file_mtime).strftime("%Y-%m-%d %H:%M:%S")
+
+        if 'source' not in coloring._meta:
+            coloring._meta['source'] = pathlib.Path(fname).absolute()
+
         return coloring
 
     def save(self, fname):
@@ -600,20 +609,19 @@ class Coloring(object):
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
-        print("\nJacobian shape: (%d, %d)  (%5.2f%% nonzero)" % (nrows, ncols, self._pct_nonzero),
+        print(f"\nJacobian shape: ({nrows}, {ncols})  ({self._pct_nonzero:.2f}% nonzero)",
               file=out_stream)
         if self._fwd is None and self._rev is None:
             tot_size = min(nrows, ncols)
             if tot_size < 0:
                 tot_size = '?'
-            print("Simultaneous derivatives can't improve on the total number of solves "
-                  "required (%s) for this configuration" % tot_size, file=out_stream)
+            print(f"Simultaneous derivatives can't improve on the total number of solves "
+                  f"required ({tot_size}) for this configuration", file=out_stream)
         else:
             tot_size, tot_colors, fwd_solves, rev_solves, pct = self._solves_info()
-
-            print("FWD solves: %d   REV solves: %d" % (fwd_solves, rev_solves), file=out_stream)
-            print("Total colors vs. total size: %d vs %s  (%.1f%% improvement)" %
-                  (tot_colors, tot_size, pct), file=out_stream)
+            print(f"FWD solves: {fwd_solves}   REV solves: {rev_solves}", file=out_stream)
+            print(f"Total colors vs. total size: {tot_colors} vs {tot_size}  ({pct:.2f}% improvement)",
+                  file=out_stream)
 
         meta = self._meta
         print('', file=out_stream)
@@ -627,19 +635,23 @@ class Coloring(object):
                                                       meta['nz_matches'], meta['n_tested']),
                       file=out_stream)
 
-        sparsity_time = meta.get('sparsity_time')
+        sparsity_time = meta.get('sparsity_time', None)
         if sparsity_time is not None:
-            print("Time to compute sparsity: %f sec." % sparsity_time, file=out_stream)
+            print(f"Time to compute sparsity: {sparsity_time:8.4f} sec", file=out_stream)
 
-        coloring_time = meta.get('coloring_time')
+        coloring_time = meta.get('coloring_time', None)
         if coloring_time is not None:
-            print("Time to compute coloring: %f sec." % coloring_time, file=out_stream)
-        coloring_mem = meta.get('coloring_memory')
-        if coloring_mem is not None:
-            print("Memory to compute coloring: %f MB." % coloring_mem, file=out_stream)
+            print(f"Time to compute coloring: {coloring_time:8.4f} sec", file=out_stream)
 
-    @staticmethod
-    def display_txt(source, out_stream=_DEFAULT_OUT_STREAM, html=False):
+        coloring_mem = meta.get('coloring_memory', None)
+        if coloring_mem is not None:
+            print(f"Memory to compute coloring: {coloring_mem:8.4f} MB", file=out_stream)
+
+        coloring_timestamp = meta.get('timestamp', None)
+        if coloring_timestamp is not None:
+            print(f"Coloring created on: {coloring_timestamp}", file=out_stream)
+
+    def display_txt(self, out_stream=_DEFAULT_OUT_STREAM, html=False, summary=True):
         """
         Print the structure of a boolean array with coloring info for each nonzero value.
 
@@ -654,36 +666,20 @@ class Coloring(object):
 
         Parameters
         ----------
-        source : str or Coloring or Driver
-            The source of the coloring information to be displayed. May be a string or an
-            instance of Coloring or a Driver with coloring information.
         out_stream : file-like or _DEFAULT_OUT_STREAM
             The destination stream to which the text representation of coloring is to be written.
         html : bool
             If True, the output will be formatted as HTML. If False, the resulting output will
             be plain text.
+        summary : bool
+            If True, include the coloring summary.
         """
-        if isinstance(source, str):
-            coloring = Coloring.load(source)
-            timestamp = datetime.datetime.fromtimestamp(pathlib.Path(source).stat().st_mtime)
-            source_name = pathlib.Path(source).absolute()
-        elif isinstance(source, Coloring):
-            coloring = source
-            timestamp = datetime.datetime.now()
-            source_name = ''
-        elif hasattr(source, '_coloring_info'):
-            coloring = source._coloring_info['coloring']
-            timestamp = datetime.datetime.now()
-            source_name = source._problem()._name
-        else:
-            raise ValueError(f'display_txt was expecting the source to be a valid '
-                             f'coloring file or an instance of Coloring or driver '
-                             f'but instead got f{type(source)}')
-
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
-        shape = coloring._shape
+        source_name = self._meta['source']
+
+        shape = self._shape
         nrows, ncols = shape
 
         if html:
@@ -702,12 +698,12 @@ class Coloring(object):
 
         # mark all nonzero entries as 'x' initially, so the 'x' will be left
         # if not covered with an 'f' or an 'r'
-        charr[coloring._nzrows, coloring._nzcols] = 'x'
+        charr[self._nzrows, self._nzcols] = 'x'
 
-        if coloring._fwd:
+        if self._fwd:
             full_rows = np.arange(nrows, dtype=INT_DTYPE)
-            col2row = coloring._fwd[1]
-            for grp in coloring._fwd[0]:
+            col2row = self._fwd[1]
+            for grp in self._fwd[0]:
                 for c in grp:
                     rows = col2row[c]
                     if rows is None:
@@ -715,10 +711,10 @@ class Coloring(object):
                     charr[rows, c] = 'f'
 
         has_overlap = False
-        if coloring._rev:
+        if self._rev:
             full_cols = np.arange(ncols, dtype=INT_DTYPE)
-            row2col = coloring._rev[1]
-            for grp in coloring._rev[0]:
+            row2col = self._rev[1]
+            for grp in self._rev[0]:
                 for r in grp:
                     cols = row2col[r]
                     if cols is None:
@@ -732,8 +728,8 @@ class Coloring(object):
                         else:
                             charr[r, c] = 'r'
 
-        if (coloring._row_vars is None or coloring._row_var_sizes is None or
-                coloring._col_vars is None or coloring._col_var_sizes is None):
+        if (self._row_vars is None or self._row_var_sizes is None or
+                self._col_vars is None or self._col_var_sizes is None):
             # we don't have var name/size info, so just show the unadorned matrix
             for r in range(nrows):
                 for c in range(ncols):
@@ -742,11 +738,11 @@ class Coloring(object):
         else:
             # we have var name/size info, so mark rows/cols with their respective variable names
             rowstart = rowend = 0
-            for rv, rvsize in zip(coloring._row_vars, coloring._row_var_sizes):
+            for rv, rvsize in zip(self._row_vars, self._row_var_sizes):
                 rowend += rvsize
                 for r in range(rowstart, rowend):
                     colstart = colend = 0
-                    for _, cvsize in zip(coloring._col_vars, coloring._col_var_sizes):
+                    for _, cvsize in zip(self._col_vars, self._col_var_sizes):
                         colend += cvsize
                         for c in range(colstart, colend):
                             print(charr[r, c], end='', file=out_stream)
@@ -758,48 +754,21 @@ class Coloring(object):
             # with the appropriate starting column of the matrix ('|' marks the start of each var)
             start = 0
 
-            for name, size in zip(coloring._col_vars, coloring._col_var_sizes):
+            for name, size in zip(self._col_vars, self._col_var_sizes):
                 tab = ' ' * start
-                if hasattr(coloring, '_source_to_promname'):
-                    col_var_name = coloring._source_to_promname[name]
-                else:
-                    col_var_name = name
+                col_var_name = name
                 print('%s|%s' % (tab, col_var_name), file=out_stream)
                 start += size
 
         if html:
             print('</pre>\n', file=out_stream)
 
-        tot_size, tot_colors, fwd_solves, rev_solves, pct = coloring._solves_info()
-        nnz = np.count_nonzero(charr != '.')
-
-        summary = (rf'Design Vars: {len(coloring._col_var_sizes)}',
-                   rf'Responses: {len(coloring._row_var_sizes)}',
-                   rf'Rows: {nrows}',
-                   rf'Columns: {ncols}',
-                   rf'Nonzeros: {nnz} of {nrows * ncols} ({100 * nnz / (nrows * ncols):6.2f}%)',
-                   rf'Forward solves: {fwd_solves}',
-                   rf'Reverse solves: {rev_solves}',
-                   rf'Total solves: {fwd_solves + rev_solves} vs. '
-                   rf'{min(nrows, ncols)} ({pct:6.2f}% improvement)',
-                   rf'Timestamp: {timestamp.strftime("%Y-%m-%d %H:%M:%S")}')
-
-        if html:
-            print('<hr style="width:100%;text-align:left;margin-left:0">', file=out_stream)
-            print('<table>\n', file=out_stream)
-            col_count = 0
-            for s in summary:
-                if col_count == 0:
-                    print('<tr>\n', file=out_stream)
-                print(f'<td>{s}</td>\n', file=out_stream)
-                col_count += 1
-                if col_count == 2:
-                    print('</tr>\n', file=out_stream)
-                    col_count = 0
-            print('</table>\n', file=out_stream)
-        else:
-            for s in summary:
-                print(s, file=out_stream)
+        if summary:
+            if html:
+                print('<pre>\n', file=out_stream)
+            self.summary(out_stream=out_stream)
+            if html:
+                print('</pre>\n', file=out_stream)
 
         if html:
             out_stream.write(f'</body>\n'
@@ -990,7 +959,6 @@ class Coloring(object):
 
         pyplot.close(fig)
 
-    @staticmethod
     def display_bokeh(source, output_file='total_coloring.html', show=False, _max_colors=200):
         """
         Display a plot of the sparsity pattern, showing grouping by color.
@@ -1021,191 +989,190 @@ class Coloring(object):
 
         if isinstance(source, str):
             coloring = Coloring.load(source)
-            timestamp = datetime.datetime.fromtimestamp(pathlib.Path(source).stat().st_mtime)
             source_name = pathlib.Path(source).absolute()
         elif isinstance(source, Coloring):
             coloring = source
-            timestamp = datetime.datetime.now()
             source_name = ''
         elif hasattr(source, '_coloring_info'):
             coloring = source._coloring_info['coloring']
-            timestamp = datetime.datetime.now()
             source_name = source._problem()._name
         else:
             raise ValueError(f'display_bokeh was expecting the source to be a valid coloring file '
                              f'or an instance of driver but instead got f{type(source)}')
 
-        nrows, ncols = coloring._shape
-        aspect_ratio = ncols / nrows
+        if coloring is None:
+            # Save and show
+            summary_div = PreText(text='No total derivative coloring found.',
+                                  styles={'font-size': '12pt'})
 
-        tot_size, tot_colors, fwd_solves, rev_solves, pct = coloring._solves_info()
-
-        data = {}
-
-        # The row and column indices of the individual jacobian elements
-        data['col_idx'] = np.tile(np.arange(ncols, dtype=int), nrows)
-        data['row_idx'] = np.repeat(np.arange(nrows, dtype=int), ncols)
-
-        # The indices of the responses and desvars obtained by binning the row/col indices
-        desvar_idx_bins = np.cumsum(coloring._col_var_sizes)
-        response_idx_bins = np.cumsum(coloring._row_var_sizes)
-
-        if hasattr(coloring, '_source_to_promname'):
-            col_var_map = coloring._source_to_promname
+            fig = PreText(text='')
         else:
-            col_var_map = {name: name for name in coloring._col_vars}
+            nrows, ncols = coloring._shape
+            aspect_ratio = ncols / nrows
 
-        response_idx = np.digitize(data['row_idx'], response_idx_bins)
-        desvar_idx = np.digitize(data['col_idx'], desvar_idx_bins)
+            tot_size, tot_colors, fwd_solves, rev_solves, pct = coloring._solves_info()
 
-        data['pattern'] = np.full(nrows * ncols, '', dtype=str)
-        data['pattern'][...] = np.asarray(desvar_idx % 2 + response_idx % 2, dtype=str)
-        data['fwd_color_idx'] = np.full(nrows * ncols, '', dtype=object)
-        data['rev_color_idx'] = np.full(nrows * ncols, '', dtype=object)
+            data = {}
 
-        # Add the color group information to the data source
-        fwd_map = {}
-        if coloring._fwd is not None:
-            for idx_fwd, (_cols, _nz_rows) in enumerate(coloring.color_nonzero_iter('fwd')):
-                for _row_idx, _col_idx in zip(_nz_rows, _cols):
-                    fwd_grp_idxs = itertools.product(_row_idx, [_col_idx])
-                    fwd_map.update({(i, j): idx_fwd for i, j in fwd_grp_idxs})
+            # The row and column indices of the individual jacobian elements
+            data['col_idx'] = np.tile(np.arange(ncols, dtype=int), nrows)
+            data['row_idx'] = np.repeat(np.arange(nrows, dtype=int), ncols)
 
-        rev_map = {}
-        if coloring._rev is not None:
-            for idx_rev, (_rows, _nz_cols) in enumerate(coloring.color_nonzero_iter('rev')):
-                for _row_idx, _col_idx in zip(_rows, _nz_cols):
-                    rev_grp_idxs = itertools.product([_row_idx], _col_idx)
-                    rev_map.update({(i, j): idx_rev for i, j in rev_grp_idxs})
+            have_vars = None not in (coloring._col_vars, coloring._row_vars,
+                                     coloring._col_var_sizes, coloring._row_var_sizes)
 
-        for i in range(nrows * ncols):
-            r = data['row_idx'][i]
-            c = data['col_idx'][i]
-            if (r, c) in fwd_map:
-                data['fwd_color_idx'][i] = str(fwd_map[r, c])
-            if (r, c) in rev_map:
-                data['rev_color_idx'][i] = str(rev_map[r, c])
+            # The indices of the responses and desvars obtained by binning the row/col indices
+            if have_vars:
+                desvar_idx_bins = [] if coloring._col_var_sizes is None else np.cumsum(coloring._col_var_sizes)
+                response_idx_bins = [] if coloring._row_var_sizes is None else np.cumsum(coloring._row_var_sizes)
 
-        data_source = ColumnDataSource(data)
+                response_idx = np.digitize(data['row_idx'], response_idx_bins)
+                desvar_idx = np.digitize(data['col_idx'], desvar_idx_bins)
 
-        HEIGHT = 600
+                data['pattern'] = np.full(nrows * ncols, '', dtype=str)
+                data['pattern'][...] = np.asarray(desvar_idx % 2 + response_idx % 2, dtype=str)
+            data['fwd_color_idx'] = np.full(nrows * ncols, '', dtype=object)
+            data['rev_color_idx'] = np.full(nrows * ncols, '', dtype=object)
 
-        fig = figure(toolbar_location="above",
-                     x_range=(-1, ncols + 1), y_range=(nrows + 1, -1),
-                     x_axis_location="above", width=int(HEIGHT * aspect_ratio), height=HEIGHT,
-                     sizing_mode='scale_both')
+            # Add the color group information to the data source
+            fwd_map = {}
+            if coloring._fwd is not None:
+                for idx_fwd, (_cols, _nz_rows) in enumerate(coloring.color_nonzero_iter('fwd')):
+                    for _row_idx, _col_idx in zip(_nz_rows, _cols):
+                        fwd_grp_idxs = itertools.product(_row_idx, [_col_idx])
+                        fwd_map.update({(i, j): idx_fwd for i, j in fwd_grp_idxs})
 
-        fig.xaxis.visible = False
-        fig.yaxis.visible = False
+            rev_map = {}
+            if coloring._rev is not None:
+                for idx_rev, (_rows, _nz_cols) in enumerate(coloring.color_nonzero_iter('rev')):
+                    for _row_idx, _col_idx in zip(_rows, _nz_cols):
+                        rev_grp_idxs = itertools.product([_row_idx], _col_idx)
+                        rev_map.update({(i, j): idx_rev for i, j in rev_grp_idxs})
 
-        fig.xgrid.grid_line_color = None
-        fig.ygrid.grid_line_color = None
+            for i in range(nrows * ncols):
+                r = data['row_idx'][i]
+                c = data['col_idx'][i]
+                if (r, c) in fwd_map:
+                    data['fwd_color_idx'][i] = str(fwd_map[r, c])
+                if (r, c) in rev_map:
+                    data['rev_color_idx'][i] = str(rev_map[r, c])
 
-        # Plot the background pattern
-        gray_cm = gray(12)
-        background_mapper = CategoricalColorMapper(factors=[str(i) for i in range(3)],
-                                                   palette=gray_cm[-4:-1])
+            data_source = ColumnDataSource(data)
 
-        fig.rect(x='col_idx', y='row_idx', width=1, height=1, source=data_source, alpha=0.5,
-                 line_color=None, fill_color=transform('pattern', background_mapper))
+            HEIGHT = 600
 
-        # Plot the fwd solve groups
-        if fwd_solves > 0:
-            fwd_colors = interp_palette(list(Blues256)[:_max_colors], fwd_solves)
-            fwd_mapper = CategoricalColorMapper(factors=[str(i) for i in range(fwd_solves)],
-                                                palette=fwd_colors,
-                                                nan_color=(0, 0, 0, 0))
-            fwd_rect = fig.rect(x='col_idx', y='row_idx', width=1, height=1,
-                                source=data_source, alpha=1.0, line_color=None,
-                                fill_color=transform('fwd_color_idx', fwd_mapper))
+            fig = figure(toolbar_location="above",
+                         x_range=(-1, ncols + 1), y_range=(nrows + 1, -1),
+                         x_axis_location="above", width=int(HEIGHT * aspect_ratio), height=HEIGHT,
+                         sizing_mode='scale_both')
 
-            fig.add_layout(fwd_rect.construct_color_bar(
-                major_label_text_font_size="7px",
-                label_standoff=6,
-                border_line_color=None,
-                padding=5,
-                title='forward solves',
-            ), 'right')
+            fig.xaxis.visible = False
+            fig.yaxis.visible = False
 
-        # Plot the rev solve groups
-        if rev_solves > 0:
-            rev_colors = interp_palette(list(Reds256)[:_max_colors], rev_solves)
-            rev_mapper = CategoricalColorMapper(factors=[str(i) for i in range(rev_solves)],
-                                                palette=rev_colors,
-                                                nan_color=(0, 0, 0, 0))
-            
-            rev_rect = fig.rect(x='col_idx', y='row_idx', width=1, height=1,
-                                source=data_source, alpha=1.0, line_color=None,
-                                fill_color=transform('rev_color_idx', rev_mapper))
+            fig.xgrid.grid_line_color = None
+            fig.ygrid.grid_line_color = None
 
-            fig.add_layout(rev_rect.construct_color_bar(
-                major_label_text_font_size="7px",
-                label_standoff=6,
-                border_line_color=None,
-                padding=0,
-                title='reverse solves',
-            ), 'right')
+            # Plot the background pattern
+            if have_vars:
+                gray_cm = gray(12)
+                background_mapper = CategoricalColorMapper(factors=[str(i) for i in range(3)],
+                                                           palette=gray_cm[-4:-1])
 
-        # Add a tooltip on hover
-        desvar_col_map = {col_var_map[desvar_name]: set() for desvar_name in coloring._col_vars}
-        for col_idx in range(ncols):
-            desvar_name = col_var_map[coloring._col_vars[np.digitize(col_idx, desvar_idx_bins)]]
-            desvar_col_map[desvar_name].add(col_idx)
+                fig.rect(x='col_idx', y='row_idx', width=1, height=1, source=data_source, alpha=0.5,
+                         line_color=None, fill_color=transform('pattern', background_mapper))
 
-        resvar_col_map = {varname: set() for varname in coloring._row_vars}
-        for row_idx in range(nrows):
-            resvar_name = coloring._row_vars[np.digitize(row_idx, response_idx_bins)]
-            resvar_col_map[resvar_name].add(row_idx)
+            # Plot the fwd solve groups
+            if fwd_solves > 0:
+                fwd_colors = interp_palette(list(Blues256)[:_max_colors], fwd_solves)
+                fwd_mapper = CategoricalColorMapper(factors=[str(i) for i in range(fwd_solves)],
+                                                    palette=fwd_colors,
+                                                    nan_color=(0, 0, 0, 0))
+                fwd_rect = fig.rect(x='col_idx', y='row_idx', width=1, height=1,
+                                    source=data_source, alpha=1.0, line_color=None,
+                                    fill_color=transform('fwd_color_idx', fwd_mapper))
 
-        design_var_js = CustomJSHover(code="""
-        for (var name in varnames_map) {
-            if (varnames_map[name].has(special_vars.snap_x)) {
-                return name;
-            }
-        }
-        return ''; 
-        """, args=dict(varnames_map=desvar_col_map))
+                fig.add_layout(fwd_rect.construct_color_bar(
+                    major_label_text_font_size="7px",
+                    label_standoff=6,
+                    border_line_color=None,
+                    padding=5,
+                    title='forward solves',
+                ), 'right')
 
-        response_var_js = CustomJSHover(code="""
-        for (var name in varnames_map) {
-            if (varnames_map[name].has(special_vars.snap_y)) {
-                return name;
-            }
-        }
-        return ''; 
-        """, args=dict(varnames_map=resvar_col_map))
+            # Plot the rev solve groups
+            if rev_solves > 0:
+                rev_colors = interp_palette(list(Reds256)[:_max_colors], rev_solves)
+                rev_mapper = CategoricalColorMapper(factors=[str(i) for i in range(rev_solves)],
+                                                    palette=rev_colors,
+                                                    nan_color=(0, 0, 0, 0))
 
-        fig.add_tools(HoverTool(tooltips=[('Response', '$snap_y{0}'), # {0} triggers the formatter
-                                          ('Design Var', '$snap_x{0}'),
-                                          ('Forward solve', '@fwd_color_idx'),
-                                          ('Reverse solve', '@rev_color_idx')],
-                                formatters={'$snap_y': response_var_js,
-                                            '$snap_x': design_var_js}))
+                rev_rect = fig.rect(x='col_idx', y='row_idx', width=1, height=1,
+                                    source=data_source, alpha=1.0, line_color=None,
+                                    fill_color=transform('rev_color_idx', rev_mapper))
 
-        # Summary info
-        nnz = np.count_nonzero(np.logical_or(~(data['fwd_color_idx']==''),
-                                             ~(data['rev_color_idx']=='')))
+                fig.add_layout(rev_rect.construct_color_bar(
+                    major_label_text_font_size="7px",
+                    label_standoff=6,
+                    border_line_color=None,
+                    padding=0,
+                    title='reverse solves',
+                ), 'right')
 
-        summary = (rf'Design Vars: {len(coloring._col_var_sizes)}',
-                   rf'Responses: {len(coloring._row_var_sizes)}',
-                   rf'Rows: {nrows}',
-                   rf'Columns: {ncols}',
-                   rf'Nonzeros: {nnz} of {nrows*ncols} ({100 * nnz / (nrows*ncols):6.2f}%)',
-                   rf'Forward solves: {fwd_solves}',
-                   rf'Reverse solves: {rev_solves}',
-                   rf'Total solves: {fwd_solves + rev_solves} vs. '
-                   rf'{min(nrows, ncols)} ({pct:6.2f}% improvement)',
-                   rf'Timestamp: {timestamp.strftime("%Y-%m-%d %H:%M:%S")}')
+            # Add a tooltip on hover
+            if have_vars:
+                desvar_col_map = {desvar_name: set() for desvar_name in coloring._col_vars}
+                for col_idx in range(ncols):
+                    desvar_name = coloring._col_vars[np.digitize(col_idx, desvar_idx_bins)]
+                    desvar_col_map[desvar_name].add(col_idx)
 
-        header_divs = [Div(text=f'Total Coloring Report<br>{source_name}',
-                           styles={'font-size': '16pt', 'font-style': 'bold'})]
+                resvar_col_map = {varname: set() for varname in coloring._row_vars}
+                for row_idx in range(nrows):
+                    resvar_name = coloring._row_vars[np.digitize(row_idx, response_idx_bins)]
+                    resvar_col_map[resvar_name].add(row_idx)
 
-        summary_divs = [Div(text=s, styles={'font-size': '12pt'}) for s in summary]
+                design_var_js = CustomJSHover(code="""
+                for (var name in varnames_map) {
+                    if (varnames_map[name].has(special_vars.snap_x)) {
+                        return name;
+                    }
+                }
+                return ''; 
+                """, args=dict(varnames_map=desvar_col_map))
 
-        report_layout = column(children=[grid(header_divs, ncols=2),
+                response_var_js = CustomJSHover(code="""
+                for (var name in varnames_map) {
+                    if (varnames_map[name].has(special_vars.snap_y)) {
+                        return name;
+                    }
+                }
+                return ''; 
+                """, args=dict(varnames_map=resvar_col_map))
+
+                tooltips = [('Response', '$snap_y{0}'),  # {0} triggers the formatter
+                            ('Design Var', '$snap_x{0}'),
+                            ('Forward solve', '@fwd_color_idx'),
+                            ('Reverse solve', '@rev_color_idx')]
+                formatters = {'$snap_y': response_var_js,
+                              '$snap_x': design_var_js}
+            else:
+                tooltips = [('Forward solve', '@fwd_color_idx'),
+                            ('Reverse solve', '@rev_color_idx')]
+                formatters = {}
+
+            fig.add_tools(HoverTool(tooltips=tooltips, formatters=formatters))
+
+            ss = io.StringIO()
+            coloring.summary(out_stream=ss)
+            summary_div = PreText(text=ss.getvalue(), styles={'font-size': '12pt'})
+
+        header_div = Div(text=f'Total Coloring Report<br>{source_name}',
+                         styles={'font-size': '16pt', 'font-style': 'bold'})
+
+        report_layout = column(children=[header_div,
                                          fig,
-                                         grid(summary_divs, ncols=2)],
+                                         summary_div],
                                sizing_mode='scale_height')
+
         # Save and show
         bokeh.io.curdoc().theme = 'light_minimal'
         if output_file is not None:
@@ -2283,10 +2250,6 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
             # save metadata we used to create the coloring
             coloring._meta.update(sparsity_info)
 
-            # save the desvar and response information to the coloring
-            coloring._source_to_promname = {meta['source']: name
-                                            for name, meta in driver._designvars.items()}
-
             system = problem.model
             if fname is not None:
                 if ((system._full_comm is not None and system._full_comm.rank == 0) or
@@ -2302,6 +2265,9 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
             problem.comm.bcast(coloring, root=0)
         else:
             coloring = problem.comm.bcast(None, root=0)
+
+    coloring._meta['timestamp'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    coloring._meta['source'] = problem._name
 
     return coloring
 
@@ -2345,7 +2311,7 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
     if coloring is not None:
         if not problem.model._approx_schemes:  # avoid double display
             if driver._coloring_info['show_sparsity']:
-                coloring.display_txt()
+                coloring.display_txt(summary=False)
             if driver._coloring_info['show_summary']:
                 coloring.summary()
 
@@ -2359,12 +2325,9 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
 def _run_total_coloring_report(driver):
     reports_dir = driver._problem().get_reports_dir()
     htmlpath = pathlib.Path(reports_dir).joinpath('total_coloring.html')
-    if bokeh_resources is not None:
-        Coloring.display_bokeh(source=driver, output_file=htmlpath, show=False)
-    else:
-        with open(htmlpath, 'w') as f:
-            Coloring.display_txt(source=driver, out_stream=f, html=True)
 
+    display_coloring(source=driver, output_file=htmlpath,
+                     as_text=bokeh_resources is None, show=False)
 
 # entry point for coloring report
 def _total_coloring_report_register():
@@ -2442,9 +2405,9 @@ def _total_coloring_cmd(options, user_args):
 
             if coloring is not None:
                 if options.show_sparsity_text:
-                    coloring.display_txt()
+                    coloring.display_txt(html=False, summary=False)
                 if options.show_sparsity:
-                    coloring.display()
+                    coloring.display_bokeh(output_file=None, show=True)
                 coloring.summary()
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
@@ -2840,3 +2803,62 @@ class _ColSparsityJac(object):
             }
 
         return coo_matrix((data, (rows, cols)), shape=(self._nrows, self._ncols)), info
+
+
+def display_coloring(source, output_file='total_coloring.html', as_text=False, show=True, max_colors=200):
+    """
+    Display the coloring information from source to html format.
+
+    Parameters
+    ----------
+    source : str or Coloring or Driver
+        The source of the coloring information. If given as a string, source should
+        be a valid coloring file path. If given as a Driver, display_colroing will
+        attempt to obtain coloring information from the Driver.
+    output_file : str or Path or None
+        The output file to which the coloring display should be sent. If as_text
+        is True and output_file ends with .html, then the coloring will be sent
+        to that file as html, otherwise it will
+        the html file will be saved in a temporary file.
+    as_text : bool
+        If True, render the coloring information using plain text.
+    show : bool
+        If True, open the resulting html file in the system browser.
+    max_colors : int
+        Bokeh colormaps support at most 256 colors. Near the upper end of this interval,
+        the colors are nearly white and may be difficult to distinguish. This
+        setting sets the upper limit for the color index before the pattern repeats.
+    """
+    if isinstance(source, str):
+        coloring = Coloring.load(source)
+    elif isinstance(source, Coloring):
+        coloring = source
+    elif hasattr(source, '_coloring_info'):
+        coloring = source._coloring_info['coloring']
+    else:
+        raise ValueError(f'display_coloring was expecting the source to be a valid '
+                         f'coloring file or an instance of Coloring or driver '
+                         f'but instead got f{type(source)}')
+
+    if coloring is None:
+        return
+
+    if as_text or bokeh_resources is None:
+        if bokeh_resources is None and not as_text:
+            issue_warning("bokeh is not installed.\n"
+                          "display_coloring will render output in plain text.")
+
+        if output_file is None:
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False) as f:
+                output_file = f.name
+                coloring.display_txt(out_stream=f, html=True)
+        else:
+            with open(output_file, 'w') as f:
+                coloring.display_txt(out_stream=f, html=True)
+
+        if show:
+            webbrowser.open(f'file://{output_file}')
+
+    else:
+        coloring.display_bokeh(output_file, show=show, _max_colors=max_colors)
+
