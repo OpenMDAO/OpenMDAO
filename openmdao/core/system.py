@@ -15,7 +15,6 @@ from fnmatch import fnmatchcase
 from numbers import Integral
 
 import numpy as np
-import networkx as nx
 
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE, INF_BOUND, \
     _SetupStatus
@@ -75,10 +74,10 @@ _recordable_funcs = frozenset(['_apply_linear', '_apply_nonlinear', '_solve_line
 # the following are local metadata that will also be accessible for vars on all procs
 global_meta_names = {
     'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc', 'shape_by_conn',
-              'copy_shape'),
+              'compute_shape', 'copy_shape'),
     'output': ('units', 'shape', 'size', 'desc',
                'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags', 'shape_by_conn',
-               'copy_shape'),
+               'compute_shape', 'copy_shape'),
 }
 
 allowed_meta_names = {
@@ -1017,7 +1016,9 @@ class System(object):
         #   this var
         new_desvar_metadata = {
             'scaler': scaler,
+            'total_scaler': scaler,
             'adder': adder,
+            'total_adder': adder,
             'upper': upper,
             'lower': lower,
             'ref': ref,
@@ -1215,7 +1216,9 @@ class System(object):
             'lower': lower,
             'upper': upper,
             'adder': adder,
+            'total_adder': adder,
             'scaler': scaler,
+            'total_scaler': scaler,
         }
 
         responses[name].update(new_cons_metadata)
@@ -1264,7 +1267,7 @@ class System(object):
             responses = self._responses
 
         # Look through responses to see if there are multiple responses with that name
-        aliases = [resp['alias'] for key, resp in responses.items() if resp['name'] == name]
+        aliases = [resp['alias'] for resp in responses.values() if resp['name'] == name]
         if len(aliases) > 1 and alias is _UNDEFINED:
             msg = "{}: set_objective_options called with objective variable '{}' that has " \
                   "multiple aliases: {}. Call set_objective_options with the 'alias' argument " \
@@ -1290,8 +1293,6 @@ class System(object):
         if ref0 is _UNDEFINED:
             ref0 = None
 
-        new_obj_metadata = {}
-
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
         ref0 = format_as_float_or_array('ref0', ref0, val_if_none=None, flatten=True)
@@ -1311,10 +1312,14 @@ class System(object):
         elif adder == 0.0:
             adder = None
 
-        new_obj_metadata['scaler'] = scaler
-        new_obj_metadata['adder'] = adder
-        new_obj_metadata['ref'] = ref
-        new_obj_metadata['ref0'] = ref0
+        new_obj_metadata = {
+            'ref': ref,
+            'ref0': ref0,
+            'adder': adder,
+            'total_adder': adder,
+            'scaler': scaler,
+            'total_scaler': scaler,
+        }
 
         responses[name].update(new_obj_metadata)
 
@@ -1979,6 +1984,23 @@ class System(object):
         for subsys in self._subsystems_myproc:
             subsys._setup_recording()
 
+    def _reset_setup_vars(self):
+        """
+        Reset all the stuff that gets initialized in setup.
+        """
+        self._first_call_to_linearize = True
+        self._is_local = True
+        self._vectors = {}
+        self._full_comm = None
+        self._approx_subjac_keys = None
+
+        self.options._parent_name = self.msginfo
+        self.recording_options._parent_name = self.msginfo
+        self._design_vars = {}
+        self._responses = {}
+        self._design_vars.update(self._static_design_vars)
+        self._responses.update(self._static_responses)
+
     def _setup_procs(self, pathname, comm, mode, prob_meta):
         """
         Execute first phase of the setup process.
@@ -1998,21 +2020,11 @@ class System(object):
         prob_meta : dict
             Problem level options.
         """
-        self.pathname = pathname
-        self._set_problem_meta(prob_meta)
-        self._first_call_to_linearize = True
-        self._is_local = True
-        self._vectors = {}
-        self._full_comm = None
-        self._approx_subjac_keys = None
+        self._reset_setup_vars()
 
-        self.options._parent_name = self.msginfo
-        self.recording_options._parent_name = self.msginfo
+        self.pathname = pathname
         self._mode = mode
-        self._design_vars = {}
-        self._responses = {}
-        self._design_vars.update(self._static_design_vars)
-        self._responses.update(self._static_responses)
+        self._set_problem_meta(prob_meta)
         self.load_model_options()
 
     def _setup_var_data(self):
@@ -2069,12 +2081,14 @@ class System(object):
         if abs2meta is None:
             abs2meta = self._var_allprocs_abs2meta['output']
 
+        has_scaling = False
+
         dv = self._design_vars
         for name, meta in dv.items():
 
             units = meta['units']
-            dv[name]['total_adder'] = dv[name]['adder']
-            dv[name]['total_scaler'] = dv[name]['scaler']
+            meta['total_adder'] = meta['adder']
+            meta['total_scaler'] = meta['scaler']
 
             if units is not None:
                 # If derivatives are not being calculated, then you reach here before source
@@ -2101,11 +2115,14 @@ class System(object):
 
                 factor, offset = unit_conversion(var_units, units)
                 base_adder, base_scaler = determine_adder_scaler(None, None,
-                                                                 dv[name]['adder'],
-                                                                 dv[name]['scaler'])
+                                                                 meta['adder'],
+                                                                 meta['scaler'])
 
-                dv[name]['total_adder'] = offset + base_adder / factor
-                dv[name]['total_scaler'] = base_scaler * factor
+                meta['total_adder'] = offset + base_adder / factor
+                meta['total_scaler'] = base_scaler * factor
+
+            if meta['total_scaler'] is not None:
+                has_scaling = True
 
         resp = self._responses
         type_dict = {'con': 'constraint', 'obj': 'objective'}
@@ -2121,7 +2138,7 @@ class System(object):
                 try:
                     units_src = meta['source']
                 except KeyError:
-                    units_src = self.get_source(name)
+                    units_src = self.get_source(meta['name'])
 
                 src_units = abs2meta[units_src]['units']
 
@@ -2148,8 +2165,17 @@ class System(object):
                 meta['total_scaler'] = base_scaler * factor
                 meta['total_adder'] = offset + base_adder / factor
 
+            if meta['total_scaler'] is not None:
+                has_scaling = True
+
         for s in self._subsystems_myproc:
-            s._setup_driver_units(abs2meta)
+            has_scaling |= s._setup_driver_units(abs2meta)
+
+        if (self.comm.size > 1 and self._subsystems_allprocs and
+                self._mpi_proc_allocator.parallel):
+            has_scaling = bool(self.comm.allreduce(int(has_scaling)))
+
+        return has_scaling
 
     def _setup_connections(self):
         """
@@ -2206,7 +2232,7 @@ class System(object):
             self._doutputs = vectors['output']['linear']
             self._dresiduals = vectors['residual']['linear']
 
-        for subsys in self._subsystems_myproc:
+        for subsys in self._sorted_sys_iter():
             subsys._scale_factors = self._scale_factors
             subsys._setup_vectors(root_vectors)
 
@@ -2349,8 +2375,9 @@ class System(object):
             try:
                 old_name, old_key, old_info, old_match_type = matches[io][name]
                 _, info = tup
+
                 if old_match_type == _MatchType.RENAME:
-                    old_key = (old_name, old_key)
+                    old_key = old_using = (old_name, old_key)
                 else:
                     old_using = f"'{old_key}'"
                 if match_type == _MatchType.RENAME:
@@ -2361,8 +2388,8 @@ class System(object):
                 diff = info.compare(old_info) if info is not None and old_info is not None else ()
                 if diff:
                     raise RuntimeError(f"{self.msginfo}: {io} variable '{name}', promoted using "
-                                       f"{new_using}, was already promoted using {old_using} with "
-                                       f"different values for {diff}.")
+                                       f"'{new_using}', was already promoted using '{old_using}' "
+                                       f"with different values for {diff}.")
 
                 if old_match_type != _MatchType.PATTERN:
                     if old_key != tup[0]:
@@ -3007,6 +3034,7 @@ class System(object):
         elif scaler == 1.0:
             scaler = None
         dv['scaler'] = scaler
+        dv['total_scaler'] = scaler
 
         if isinstance(adder, np.ndarray):
             if not np.any(adder):
@@ -3014,6 +3042,7 @@ class System(object):
         elif adder == 0.0:
             adder = None
         dv['adder'] = adder
+        dv['total_adder'] = adder
 
         dv['name'] = name
         dv['upper'] = upper
@@ -3205,6 +3234,7 @@ class System(object):
         elif scaler == 1.0:
             scaler = None
         resp['scaler'] = scaler
+        resp['total_scaler'] = scaler
 
         if isinstance(adder, np.ndarray):
             if not np.any(adder):
@@ -3212,6 +3242,7 @@ class System(object):
         elif adder == 0.0:
             adder = None
         resp['adder'] = adder
+        resp['total_adder'] = adder
 
         resp['ref'] = ref
         resp['ref0'] = ref0
@@ -3222,8 +3253,8 @@ class System(object):
         resp['flat_indices'] = flat_indices
 
         if alias in responses:
-            raise TypeError(f"Constraint alias '{alias}' is a duplicate of an existing alias or "
-                            "variable name.")
+            raise TypeError(f"{self.msginfo}: Constraint alias '{alias}' is a duplicate of an "
+                            "existing alias or variable name.")
 
         responses[name] = resp
 
@@ -3492,7 +3523,7 @@ class System(object):
 
         if recurse:
             abs2prom_in = self._var_allprocs_abs2prom['input']
-            for subsys in self._subsystems_myproc:
+            for subsys in self._sorted_sys_iter():
                 dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
                                              use_prom_ivc=use_prom_ivc)
                 if use_prom_ivc:
@@ -3579,8 +3610,8 @@ class System(object):
                     if alias in prom2abs_out or alias in prom2abs_in:
                         # Constraint alias should never be the same as any openmdao variable.
                         path = prom2abs_out[prom][0] if prom in prom2abs_out else prom
-                        raise RuntimeError(f"Constraint alias '{alias}' on '{path}' is the same "
-                                           "name as an existing variable.")
+                        raise RuntimeError(f"{self.msginfo}: Constraint alias '{alias}' on '{path}'"
+                                           " is the same name as an existing variable.")
                     data['alias_path'] = self.pathname
 
                 if prom_or_alias in prom2abs_out:
@@ -3643,7 +3674,7 @@ class System(object):
 
         if recurse:
             abs2prom_in = self._var_allprocs_abs2prom['input']
-            for subsys in self._subsystems_myproc:
+            for subsys in self._sorted_sys_iter():
                 resps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
                                              use_prom_ivc=use_prom_ivc)
                 if use_prom_ivc:
@@ -3818,7 +3849,7 @@ class System(object):
             excludes = (excludes,)
 
         gather_keys = {'val', 'src_indices'}
-        need_gather = get_remote and self.comm.size > 1
+        need_gather = get_remote and self.comm is not None and self.comm.size > 1
         if metadata_keys is not None:
             keyset = set(metadata_keys)
             diff = keyset - allowed_meta_names
@@ -4041,7 +4072,8 @@ class System(object):
         list of (name, metadata) or dict of {name: metadata}
             List or dict of input names and other optional information about those inputs.
         """
-        if (self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP) and val:
+        if (self._problem_meta is None or
+                self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP) and val:
             issue_warning("Calling `list_inputs` before `final_setup` will only "
                           "display the default values of variables and will not show the result of "
                           "any `set_val` calls.")
@@ -4089,7 +4121,10 @@ class System(object):
                         meta['max'] = np.round(np.max(meta['val']), np_precision)
 
         if not inputs or (not all_procs and self.comm.rank != 0):
-            return []
+            if return_format == 'dict':
+                return {}
+            else:
+                return []
 
         if out_stream:
             self._write_table('input', inputs, hierarchical, print_arrays, all_procs,
@@ -6130,6 +6165,9 @@ class System(object):
         # return regular dict sorted by system pathname
         return {spath: data for spath, data in sorted(sys_prom_map.items(), key=lambda x: x[0])}
 
+    def _sorted_sys_iter(self):
+        yield from ()
+
     def load_case(self, case):
         """
         Pull all input and output variables from a Case into this System.
@@ -6145,3 +6183,18 @@ class System(object):
             with `prom_name=True` and `return_format='dict'`.
         """
         pass
+
+    def comm_info_iter(self):
+        """
+        Yield comm size for this system and all subsystems.
+
+        Yields
+        ------
+        tuple
+            A tuple of the form (abs_name, comm_size).
+        """
+        if MPI:
+            yield (self.pathname, self.comm.size, self.comm.rank, MPI.COMM_WORLD.rank)
+
+            for s in self._subsystems_myproc:
+                yield from s.comm_info_iter()

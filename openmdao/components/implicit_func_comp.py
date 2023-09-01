@@ -97,7 +97,8 @@ class ImplicitFuncComp(ImplicitComponent):
 
         if self.options['use_jax']:
             if jax is None:
-                raise RuntimeError(f"{self.msginfo}: jax is not installed. Try 'pip install jax'.")
+                raise RuntimeError(f"{self.msginfo}: jax is not installed. "
+                                   "Try 'pip install openmdao[jax]' with Python>=3.8.")
             self._apply_nonlinear_func_jax = omf.jax_decorate(self._apply_nonlinear_func._f)
 
         if self.options['use_jax'] and self.options['use_jit']:

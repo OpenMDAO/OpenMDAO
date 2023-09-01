@@ -227,7 +227,7 @@ class AssembledJacobian(Jacobian):
 
         sizes = system._var_sizes['output']
         for s in system.system_iter(recurse=True, include_self=True, typ=Component):
-            for res_abs_name, res_meta in s._var_abs2meta['output'].items():
+            for res_abs_name in s._var_abs2meta['output']:
                 res_offset = np.sum(sizes[iproc, :abs2idx[res_abs_name]])
 
                 for in_abs_name in s._var_abs2meta['input']:

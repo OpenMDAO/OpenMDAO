@@ -70,13 +70,13 @@ class TestCheckConfig(unittest.TestCase):
         model.add_subsystem('p2', om.IndepVarComp('x', 1.0))
 
         parallel = model.add_subsystem('parallel', om.ParallelGroup())
-        parallel.add_subsystem('c1', om.ExecComp(['y=-2.0*x']))
         parallel.add_subsystem('c2', om.ExecComp(['y=5.0*x']))
+        parallel.add_subsystem('c1', om.ExecComp(['y=-2.0*x']))
         parallel.connect('c1.y', 'c2.x')
 
         parallel = model.add_subsystem('parallel_copy', om.ParallelGroup())
-        parallel.add_subsystem('comp1', om.ExecComp(['y=-2.0*x']))
         parallel.add_subsystem('comp2', om.ExecComp(['y=5.0*x']))
+        parallel.add_subsystem('comp1', om.ExecComp(['y=-2.0*x']))
         parallel.connect('comp1.y', 'comp2.x')
 
         model.add_subsystem('c3', om.ExecComp(['y=3.0*x1+7.0*x2']))
@@ -99,11 +99,8 @@ class TestCheckConfig(unittest.TestCase):
         with assert_warning(UserWarning, msg):
             prob.run_model()
 
-        expected_warning = ("The following systems are executed out-of-order:\n"
-                            "   System 'parallel.c2' executes out-of-order with respect to its source systems ['parallel.c1']\n"
-                            "   System 'parallel_copy.comp2' executes out-of-order with respect to its source systems ['parallel_copy.comp1']\n")
-
-        testlogger.find_in('warning', expected_warning)
+        for w in testlogger.get('warning'):
+            self.assertTrue('out-of-order' not in w)
 
     def test_serial_in_parallel(self):
         prob = om.Problem()
@@ -139,8 +136,8 @@ class TestCheckConfig(unittest.TestCase):
         model.add_subsystem('p2', om.IndepVarComp('x', 1.0))
 
         parallel = model.add_subsystem('parallel', om.ParallelGroup())
-        parallel.add_subsystem('c1', om.ExecComp(['y=-2.0*x']))
         parallel.add_subsystem('c2', om.ExecComp(['y=5.0*x']))
+        parallel.add_subsystem('c1', om.ExecComp(['y=-2.0*x']))
         parallel.connect('c1.y', 'c2.x')
 
         model.add_subsystem('c3', om.ExecComp(['y=3.0*x1+7.0*x2']))
@@ -159,10 +156,8 @@ class TestCheckConfig(unittest.TestCase):
         with assert_warning(UserWarning, msg):
             prob.run_model()
 
-        expected_warning = ("The following systems are executed out-of-order:\n"
-                            "   System 'parallel.c2' executes out-of-order with respect to its source systems ['parallel.c1']\n")
-
-        testlogger.find_in('warning', expected_warning)
+        for w in testlogger.get('warning'):
+            self.assertTrue('out-of-order' not in w)
 
     def test_no_connect_parallel_group(self):
         prob = om.Problem()
@@ -229,8 +224,8 @@ class TestCheckConfig(unittest.TestCase):
 
         expected_warning = (
             "The following systems are executed out-of-order:\n"
+            "   In System 'G1', subsystem 'C1' executes out-of-order with respect to its source systems ['C2']\n"
             "   System 'C3' executes out-of-order with respect to its source systems ['C4']\n"
-            "   System 'G1.C1' executes out-of-order with respect to its source systems ['G1.C2']\n"
         )
 
         testlogger.find_in('info', expected_info)
@@ -319,8 +314,8 @@ class TestCheckConfig(unittest.TestCase):
 
         expected_warning_1 = (
             "The following systems are executed out-of-order:\n"
-            "   System 'G1.C2' executes out-of-order with respect to its source systems ['G1.N3']\n"
-            "   System 'G1.C3' executes out-of-order with respect to its source systems ['G1.C11']\n"
+            "   In System 'G1', subsystem 'C2' executes out-of-order with respect to its source systems ['N3']\n"
+            "   In System 'G1', subsystem 'C3' executes out-of-order with respect to its source systems ['C11']\n"
         )
 
         testlogger.find_in('warning', expected_warning_1)
@@ -378,8 +373,8 @@ class TestCheckConfig(unittest.TestCase):
 
         expected_warning_1 = (
             "The following systems are executed out-of-order:\n"
-            "   System 'G1.C2' executes out-of-order with respect to its source systems ['G1.N3']\n"
-            "   System 'G1.C3' executes out-of-order with respect to its source systems ['G1.C11']\n"
+            "   In System 'G1', subsystem 'C2' executes out-of-order with respect to its source systems ['N3']\n"
+            "   In System 'G1', subsystem 'C3' executes out-of-order with respect to its source systems ['C11']\n"
         )
 
         testlogger.find_in('info', expected_info)

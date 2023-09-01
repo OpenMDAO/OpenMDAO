@@ -1186,7 +1186,7 @@ class TestGroup(unittest.TestCase):
     def test_set_order(self):
 
         order_list = []
-        prob = om.Problem()
+        prob = om.Problem(allow_post_setup_reorder=False)
         model = prob.model
         model.nonlinear_solver = om.NonlinearRunOnce()
         model.add_subsystem('C1', ReportOrderComp(order_list), promotes_inputs=['x'])
@@ -1321,7 +1321,7 @@ class TestGroup(unittest.TestCase):
             def configure(self):
                 self.set_order(['C2', 'C1'])
 
-        prob = om.Problem()
+        prob = om.Problem(allow_post_setup_reorder=False)
         model = prob.model
 
         model.add_subsystem('C1', SimpleGroup())
@@ -1340,7 +1340,7 @@ class TestGroup(unittest.TestCase):
                 self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
                 self.add_subsystem('comp2', om.ExecComp('b=2*a'))
 
-        prob = om.Problem()
+        prob = om.Problem(allow_post_setup_reorder=False)
         model = prob.model
 
         model.add_subsystem('C1', SimpleGroup())
@@ -1386,6 +1386,55 @@ class TestGroup(unittest.TestCase):
         model.set_order(['C2', 'C1'])
         prob.setup()
         prob.run_model()
+
+    def test_auto_order(self):
+        p = om.Problem()
+        model = p.model
+        model.add_subsystem('C2', om.ExecComp('y=3.0*x'))
+        model.add_subsystem('C1', om.ExecComp('y=2.0*x'))
+        model.add_subsystem('C3', om.ExecComp('y=5.0*x'))
+        model.connect('C1.y', 'C2.x')
+        model.connect('C2.y', 'C3.x')
+        model.options['auto_order'] = True
+
+        p.setup()
+        p.run_model()
+
+        self.assertEqual([s.name for s in model._subsystems_myproc], ['_auto_ivc', 'C1', 'C2', 'C3'])
+
+    def test_auto_order_off(self):
+        p = om.Problem(allow_post_setup_reorder=False)
+        model = p.model
+        model.add_subsystem('C2', om.ExecComp('y=3.0*x'))
+        model.add_subsystem('C1', om.ExecComp('y=2.0*x'))
+        model.add_subsystem('C3', om.ExecComp('y=5.0*x'))
+        model.connect('C1.y', 'C2.x')
+        model.connect('C2.y', 'C3.x')
+        model.options['auto_order'] = True
+
+        with assert_warning(om.OpenMDAOWarning, "<model> <class Group>: A new execution order ['_auto_ivc', 'C1', 'C2', 'C3'] is recommended, but auto ordering has been disabled because the Problem option 'allow_post_setup_reorder' is False. It is recommended to either set `allow_post_setup_reorder` to True or to manually set the execution order to the recommended order using `set_order`."):
+            p.setup()
+
+    def test_auto_order2(self):
+        p = om.Problem()
+        model = p.model
+        sub = model.add_subsystem('sub', om.Group())
+        sub.add_subsystem('C5', om.ExecComp('y=5.0*x1 - 3.*x2'))
+        sub.add_subsystem('C1', om.ExecComp('y=2.0*x'))
+        sub.add_subsystem('C2', om.ExecComp('y=3.0*x1 + 4.*x2'))
+        sub.add_subsystem('C4', om.ExecComp('y=5.0*x'))
+        sub.add_subsystem('C3', om.ExecComp(['y=5.0*x', 'z=x']))
+        sub.connect('C1.y', ['C2.x1', 'C5.x2'])
+        sub.connect('C2.y', 'C4.x')
+        sub.connect('C4.y', 'C3.x')
+        sub.connect('C3.y', 'C2.x2')
+        sub.connect('C3.z', 'C5.x1')
+        sub.options['auto_order'] = True
+
+        p.setup()
+        p.run_model()
+
+        self.assertEqual([s.name for s in sub._subsystems_myproc], ['C1', 'C2', 'C4', 'C3', 'C5'])
 
     def test_promote_units_and_none(self):
         p = om.Problem(name='promote_units_and_none')
@@ -1831,27 +1880,6 @@ class TestGroupPromotes(unittest.TestCase):
         top = om.Problem(model=TopGroup())
 
         msg = "'sub.comp1' <class ExecComp>: input variable 'bb', promoted using ('bb', 'xx'), was already promoted using 'b*'."
-        with assert_warning(UserWarning, msg):
-            top.setup()
-
-    def test_promotes_wildcard_name(self):
-        class SubGroup(om.Group):
-            def setup(self):
-                self.add_subsystem('comp1', om.ExecComp('x=2.0+bb', bb=4.0))
-
-            def configure(self):
-                self.promotes('comp1', inputs=["b*"])
-
-        class TopGroup(om.Group):
-            def setup(self):
-                self.add_subsystem('sub', SubGroup())
-
-            def configure(self):
-                self.sub.promotes('comp1', inputs=['bb'])
-
-        top = om.Problem(model=TopGroup())
-
-        msg = "'sub.comp1' <class ExecComp>: input variable 'bb', promoted using 'bb', was already promoted using 'b*'."
         with assert_warning(UserWarning, msg):
             top.setup()
 
@@ -3767,7 +3795,7 @@ class TestFeatureSetOrder(unittest.TestCase):
         # this list will record the execution order of our C1, C2, and C3 components
         order_list = []
 
-        prob = om.Problem()
+        prob = om.Problem(allow_post_setup_reorder=False)
         model = prob.model
 
         model.add_subsystem('C1', ReportOrderComp(order_list))
@@ -3786,7 +3814,7 @@ class TestFeatureSetOrder(unittest.TestCase):
         # now swap C2 and C1 in the order
         model.set_order(['C2', 'C1', 'C3'])
 
-        # after changing the order, we must call setup again
+        # after changing the order, we must call setup again since allow_post_setup_reorder is False
         prob.setup()
         prob.run_model()
 

@@ -20,7 +20,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import sizes2offsets
 from openmdao.vectors.vector import _full_slice, _flat_full_indexer
-from openmdao.utils.indexer import indexer, slicer
+from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, DriverWarning
 import openmdao.utils.coloring as c_mod
 
@@ -91,6 +91,8 @@ class Driver(object):
         Cached linear total jacobian handling object.
     opt_result : dict
         Dictionary containing information for use in the optimization report.
+    _has_scaling : bool
+        If True, scaling has been set for this driver.
     """
 
     def __init__(self, **kwargs):
@@ -195,6 +197,8 @@ class Driver(object):
             'exit_status': 'NOT_RUN'
         }
 
+        self._has_scaling = False
+
         # Want to allow the setting of hooks on Drivers
         _setup_hooks(self)
 
@@ -282,11 +286,6 @@ class Driver(object):
         model = problem.model
 
         self._total_jac = None
-
-        self._has_scaling = (
-            np.any([r['total_scaler'] is not None for r in self._responses.values()]) or
-            np.any([dv['total_scaler'] is not None for dv in self._designvars.values()])
-        )
 
         # Determine if any design variables are discrete.
         self._designvars_discrete = [name for name, meta in self._designvars.items()
@@ -887,8 +886,6 @@ class Driver(object):
         self._objs = objs = {}
         self._cons = cons = {}
 
-        model._setup_driver_units()
-
         # driver _responses are keyed by either the alias or the promoted name
         self._responses = resps = model.get_responses(recurse=True, use_prom_ivc=True)
         for name, data in resps.items():
@@ -903,6 +900,8 @@ class Driver(object):
         self._designvars = designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
         desvar_size = sum(data['global_size'] for data in designvars.values())
 
+        self._has_scaling = model._setup_driver_units()
+
         return response_size, desvar_size
 
     def get_exit_status(self):
@@ -915,6 +914,42 @@ class Driver(object):
             String indicating result of driver run.
         """
         return 'FAIL' if self.fail else 'SUCCESS'
+
+    def check_relevance(self):
+        """
+        Check if there are constraints that don't depend on any design vars.
+
+        This usually indicates something is wrong with the problem formulation.
+        """
+        # relevance not relevant if not using derivatives
+        if not self.supports['gradients']:
+            return
+
+        problem = self._problem()
+        relevant = problem.model._relevant
+        fwd = problem._mode == 'fwd'
+
+        des_vars = self._designvars
+        constraints = self._cons
+
+        indep_list = list(des_vars)
+
+        for name, meta in constraints.items():
+
+            path = meta['source']
+
+            if fwd:
+                wrt = [v for v in indep_list if path in relevant[des_vars[v]['source']]]
+            else:
+                rels = relevant[path]
+                wrt = [v for v in indep_list if des_vars[v]['source'] in rels]
+
+            # Note: There is a hack in ScipyOptimizeDriver for older versions of COBYLA that
+            #       implements bounds on design variables by adding them as constraints.
+            #       These design variables as constraints will not appear in the wrt list.
+            if not wrt and name not in indep_list:
+                raise RuntimeError(f"{self.msginfo}: Constraint '{name}' does not depend on any "
+                                   "design variables. Please check your problem formulation.")
 
     def run(self):
         """

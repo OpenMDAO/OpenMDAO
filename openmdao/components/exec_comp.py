@@ -24,7 +24,8 @@ VAR_RGX = re.compile(r'([.]*[_a-zA-Z]\w*[ ]*\(?)')
 # Names of metadata entries allowed for ExecComp variables.
 _allowed_meta = {'value', 'val', 'shape', 'units', 'res_units', 'desc',
                  'ref', 'ref0', 'res_ref', 'lower', 'upper', 'src_indices',
-                 'flat_src_indices', 'tags', 'shape_by_conn', 'copy_shape', 'constant'}
+                 'flat_src_indices', 'tags', 'shape_by_conn', 'copy_shape', 'compute_shape',
+                 'constant'}
 
 # Names that are not allowed for input or output variables (keywords for options)
 _disallowed_names = {'has_diag_partials', 'units', 'shape', 'shape_by_conn', 'run_root_only',
@@ -332,6 +333,7 @@ class ExecComp(ExplicitComponent):
         self._exprs_info = exprs_info = []
         outs = set()
         allvars = set()
+        constants = set()
         self._requires_fd = {}
 
         for expr in exprs:
@@ -339,11 +341,10 @@ class ExecComp(ExplicitComponent):
             onames = self._parse_for_out_vars(lhs)
             vnames, fnames = self._parse_for_names(rhs)
 
+            constants.update([n for n, val in kwargs.items()
+                              if isinstance(val, dict) and 'constant' in val and val['constant']])
             # remove constants
-            vnames = vnames.difference(
-                [n for n, val in kwargs.items()
-                 if isinstance(val, dict) and 'constant' in val and val['constant']]
-            )
+            vnames = vnames.difference(constants)
 
             allvars.update(vnames)
             outs.update(onames)
@@ -374,85 +375,93 @@ class ExecComp(ExplicitComponent):
         kwargs2 = {}
         init_vals = {}
         units = self.options['units']
-        warned = False
 
         # make sure all kwargs are legit
-        for arg, val in kwargs.items():
+        for varname, val in kwargs.items():
 
-            if isinstance(val, dict) and 'constant' in val and val['constant']:
-                if 'val' not in val:
-                    raise RuntimeError(f"{self.msginfo}: arg '{arg}' in call to ExecComp() "
-                                       "is a constant but no value is given")
-                for ignored_meta in ['units', 'shape']:
-                    if ignored_meta in val:
-                        issue_warning(f"arg '{arg}' in call to ExecComp() "
-                                      f"is a constant. The {ignored_meta} will be ignored",
-                                      prefix=self.msginfo, category=SetupWarning)
-
-                self._constants[arg] = val['val']
-                continue  # TODO should still do some checking here!
-
-            if arg not in allvars:
-                msg = f"{self.msginfo}: arg '{arg}' in call to ExecComp() " \
+            if varname not in allvars and varname not in constants:
+                msg = f"{self.msginfo}: arg '{varname}' in call to ExecComp() " \
                       f"does not refer to any variable in the expressions {exprs}"
-                if arg in ('promotes', 'promotes_inputs', 'promotes_outputs'):
+                if varname in ('promotes', 'promotes_inputs', 'promotes_outputs'):
                     msg += ". Did you intend to promote variables in the 'add_subsystem' call?"
                 raise RuntimeError(msg)
 
             if isinstance(val, dict):
-                diff = set(val.keys()) - _allowed_meta
+                dct = val
+                vval = dct.get('val')
+                vshape = dct.get('shape')
+                vshape_by_conn = dct.get('shape_by_conn')
+                vcopy_shape = dct.get('copy_shape')
+                vcompute_shape = dct.get('compute_shape')
+                vconstant = dct.get('constant')
+                vunits = dct.get('units')
+
+                if vconstant:
+                    if vval is None:
+                        raise RuntimeError(f"{self.msginfo}: arg '{varname}' in call to ExecComp() "
+                                           "is a constant but no value is given")
+                    for ignored_meta in ['units', 'shape']:
+                        if ignored_meta in dct:
+                            issue_warning(f"arg '{varname}' in call to ExecComp() "
+                                          f"is a constant. The {ignored_meta} will be ignored",
+                                          prefix=self.msginfo, category=SetupWarning)
+
+                    self._constants[varname] = vval
+                    continue  # TODO should still do some checking here!
+
+                diff = set(dct.keys()) - _allowed_meta
                 if diff:
                     raise RuntimeError("%s: the following metadata names were not "
                                        "recognized for variable '%s': %s" %
-                                       (self.msginfo, arg, sorted(diff)))
+                                       (self.msginfo, varname, sorted(diff)))
 
-                kwargs2[arg] = val.copy()
+                kwargs2[varname] = dct.copy()
 
                 if units is not None:
-                    if 'units' in val and val['units'] != units:
+                    if vunits is not None and vunits != units:
                         raise RuntimeError("%s: units of '%s' have been specified for "
                                            "variable '%s', but units of '%s' have been "
                                            "specified for the entire component." %
-                                           (self.msginfo, val['units'], arg, units))
+                                           (self.msginfo, vunits, varname, units))
                     else:
-                        kwargs2[arg]['units'] = units
+                        kwargs2[varname]['units'] = units
 
                 if shape is not None:
-                    if 'shape' in val and val['shape'] != shape:
+                    if vshape is not None and vshape != shape:
                         raise RuntimeError("%s: shape of %s has been specified for "
                                            "variable '%s', but shape of %s has been "
                                            "specified for the entire component." %
-                                           (self.msginfo, val['shape'], arg, shape))
-                    elif 'val' in val and np.atleast_1d(val['val']).shape != shape:
+                                           (self.msginfo, vshape, varname, shape))
+                    elif vval is not None and np.atleast_1d(vval).shape != shape:
                         raise RuntimeError("%s: value of shape %s has been specified for "
                                            "variable '%s', but shape of %s has been "
                                            "specified for the entire component." %
-                                           (self.msginfo, np.atleast_1d(val['val']).shape,
-                                            arg, shape))
+                                           (self.msginfo, np.atleast_1d(vval).shape,
+                                            varname, shape))
                     else:
-                        init_vals[arg] = np.ones(shape)
+                        init_vals[varname] = np.ones(shape)
 
-                if 'val' in val:
-                    init_vals[arg] = val['val']
-                    del kwargs2[arg]['val']
+                if vval is not None:
+                    init_vals[varname] = vval
+                    del kwargs2[varname]['val']
 
-                if shape_by_conn or 'shape_by_conn' in val or 'copy_shape' in val:
-                    if val.get('shape') is not None or val.get('val') is not None:
+                if vshape_by_conn or vcopy_shape or vcompute_shape:
+                    if vshape is not None or vval is not None:
                         raise RuntimeError(f"{self.msginfo}: Can't set 'shape' or 'val' for "
-                                           f"variable '{arg}' along with 'copy_shape' or "
-                                           "'shape_by_conn'.")
+                                           f"variable '{varname}' along with 'copy_shape', "
+                                           "compute_shape, or 'shape_by_conn'.")
 
-                if 'shape' in val:
-                    if arg not in init_vals:
-                        init_vals[arg] = np.ones(val['shape'])
-                    elif np.atleast_1d(init_vals[arg]).shape != val['shape']:
+                if vshape is not None:
+                    if varname not in init_vals:
+                        init_vals[varname] = np.ones(vshape)
+                    elif np.atleast_1d(init_vals[varname]).shape != vshape:
                         raise RuntimeError("%s: shape of %s has been specified for variable "
                                            "'%s', but a value of shape %s has been provided." %
-                                           (self.msginfo, str(val['shape']), arg,
-                                            str(np.atleast_1d(init_vals[arg]).shape)))
-                    del kwargs2[arg]['shape']
+                                           (self.msginfo, str(vshape), varname,
+                                            str(np.atleast_1d(init_vals[varname]).shape)))
+                    del kwargs2[varname]['shape']
             else:
-                init_vals[arg] = val
+                init_vals[varname] = val
 
         if self._static_mode:
             var_rel2meta = self._static_var_rel2meta

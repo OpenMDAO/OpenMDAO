@@ -211,9 +211,18 @@ class AddSubtractComp(ExplicitComponent):
             self._input_names[input_name] = {'vec_size': vec_size, 'length': length,
                                              'units': units}
 
-    def add_output(self):
+    def add_output(self, name, val=1.0, **kwargs):
         """
         Use add_equation instead of add_output to define equation systems.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable in this component's namespace.
+        val : float or ndarray
+            The initial value of the variable being added in user-defined units. Default is 1.0.
+        **kwargs : dict
+            Keyword arguments.
         """
         raise NotImplementedError(self.msginfo + ': Use add_equation method, not add_output '
                                   'method to create an addition/subtraction relation')

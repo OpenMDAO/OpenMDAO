@@ -17,6 +17,7 @@ with open(Path(__file__).parent / "README.md", encoding="utf-8") as f:
 optional_dependencies = {
     "docs": ["matplotlib", "numpydoc>=1.1", "jupyter-book", "sphinx-sitemap", "ipyparallel", "nbconvert>=6.3"],
     "doe": ["pyDOE2"],
+    "jax": ['jax>=0.4.0; python_version>="3.8"', 'jaxlib>=0.4.0; python_version>="3.8"'],
     "notebooks": ["notebook", "ipympl"],
     "visualization": ["bokeh>=1.3.4", "matplotlib", "colorama"],
     "test": [

@@ -181,8 +181,10 @@ class NewtonSolver(NonlinearSolver):
             self._err_cache['inputs'] = system._inputs._copy_views()
             self._err_cache['outputs'] = system._outputs._copy_views()
 
-        # Execute guess_nonlinear if specified.
-        system._guess_nonlinear()
+        # Execute guess_nonlinear if specified and
+        # we have not restarted from a saved point
+        if not self._restarted:
+            system._guess_nonlinear()
 
         with Recording('Newton_subsolve', 0, self) as rec:
 
