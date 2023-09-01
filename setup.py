@@ -34,7 +34,7 @@ optional_dependencies = {
         'ipympl'
     ],
     'visualization': [
-        'bokeh>=1.3.4',
+        'bokeh>=2.4.0',
         'matplotlib',
         'colorama'
     ],
