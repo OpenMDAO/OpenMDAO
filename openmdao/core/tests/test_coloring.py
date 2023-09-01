@@ -1159,7 +1159,7 @@ class BidirectionalTestCase(unittest.TestCase):
         ), name_func=_test_func_name
     )
     @unittest.skipIf(load_npz is None, "scipy version too old")
-    def test_bidir_coloring(self, tup=('can_715', 21)):
+    def test_bidir_coloring(self, tup):
         matname, expected_colors = tup
         matdir = os.path.join(os.path.dirname(openmdao.test_suite.__file__), 'matrices')
 
