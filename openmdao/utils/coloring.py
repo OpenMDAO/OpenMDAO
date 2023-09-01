@@ -965,7 +965,7 @@ class Coloring(object):
 
         pyplot.close(fig)
 
-    def display_bokeh(source, output_file='total_coloring.html', show=False, _max_colors=200):
+    def display_bokeh(source, output_file='total_coloring.html', show=False, max_colors=200):
         """
         Display a plot of the sparsity pattern, showing grouping by color.
 
@@ -980,7 +980,7 @@ class Coloring(object):
             plots will not be saved.
         show : bool
             If True, a browswer will be opened to display the generated file.
-        _max_colors : int
+        max_colors : int
             Bokeh supports at most 256 colors in a colormap. This function reduces that number
             to some default length, otherwise both forward and reverse displays may share shades
             very near white and be difficult to distinguish. Once the number of forward or reverse
@@ -1091,7 +1091,7 @@ class Coloring(object):
 
             # Plot the fwd solve groups
             if fwd_solves > 0:
-                fwd_colors = interp_palette(list(Blues256)[:_max_colors], fwd_solves)
+                fwd_colors = interp_palette(list(Blues256)[:max_colors], fwd_solves)
                 fwd_mapper = CategoricalColorMapper(factors=[str(i) for i in range(fwd_solves)],
                                                     palette=fwd_colors,
                                                     nan_color=(0, 0, 0, 0))
@@ -1109,7 +1109,7 @@ class Coloring(object):
 
             # Plot the rev solve groups
             if rev_solves > 0:
-                rev_colors = interp_palette(list(Reds256)[:_max_colors], rev_solves)
+                rev_colors = interp_palette(list(Reds256)[:max_colors], rev_solves)
                 rev_mapper = CategoricalColorMapper(factors=[str(i) for i in range(rev_solves)],
                                                     palette=rev_colors,
                                                     nan_color=(0, 0, 0, 0))
@@ -2868,4 +2868,4 @@ def display_coloring(source, output_file='total_coloring.html', as_text=False, s
             webbrowser.open(f'file://{output_file}')
 
     else:
-        coloring.display_bokeh(output_file, show=show, _max_colors=max_colors)
+        coloring.display_bokeh(output_file, show=show, max_colors=max_colors)
