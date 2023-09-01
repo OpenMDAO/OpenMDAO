@@ -448,37 +448,48 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
         if values is _UNDEFINED:
             values = True
 
-        if case_id is not None:
-            cases = cr.get_case(case_id)
-            print(f"Using source: {cases.source}\nCase: {cases.name}")
+        def set_values(children, stack, case):
+            """
+            Set variable values in model tree from the specified Case.
 
-            def recurse(children, stack):
-                for child in children:
-                    # if 'val' in child
-                    if child['type'] == 'subsystem':
-                        if child['name'] != '_auto_ivc':
-                            stack.append(child['name'])
-                            recurse(child['children'], stack)
-                            stack.pop()
-                    elif not values:
+            If case is None, set all values to None.
+            """
+            for child in children:
+                # if 'val' in child
+                if child['type'] == 'subsystem':
+                    stack.append(child['name'])
+                    set_values(child['children'], stack, case)
+                    stack.pop()
+                elif child['type'] == 'input':
+                    if case is None:
                         child['val'] = None
-                    elif child['type'] == 'input':
-                        if cases.inputs is None:
+                        for key in ['val_min', 'val_max', 'val_min_indices', 'val_max_indices']:
+                            del child[key]
+                    elif case.inputs is None:
+                        child['val'] = 'N/A'
+                    else:
+                        path = child['name'] if not stack else '.'.join(stack + [child['name']])
+                        child['val'] = case.inputs[path]
+                elif child['type'] == 'output':
+                    if case is None:
+                        child['val'] = None
+                        for key in ['val_min', 'val_max', 'val_min_indices', 'val_max_indices']:
+                            del child[key]
+                    elif case.outputs is None:
+                        child['val'] = 'N/A'
+                    else:
+                        path = child['name'] if not stack else '.'.join(stack + [child['name']])
+                        try:
+                            child['val'] = case.outputs[path]
+                        except KeyError:
                             child['val'] = 'N/A'
-                        else:
-                            path = child['name'] if not stack else '.'.join(stack + [child['name']])
-                            child['val'] = cases.inputs[path]
-                    elif child['type'] == 'output':
-                        if cases.outputs is None:
-                            child['val'] = 'N/A'
-                        else:
-                            path = child['name'] if not stack else '.'.join(stack + [child['name']])
-                            try:
-                                child['val'] = cases.outputs[path]
-                            except KeyError:
-                                child['val'] = 'N/A'
 
-            recurse(data_dict['tree']['children'], [])
+        if values is False:
+            set_values(data_dict['tree']['children'], [], None)
+        elif case_id is not None:
+            case = cr.get_case(case_id)
+            print(f"Using source: {case.source}\nCase: {case.name}")
+            set_values(data_dict['tree']['children'], [], case)
 
         # Delete the variables key since it's not used in N2
         if 'variables' in data_dict:
@@ -725,6 +736,8 @@ def _n2_setup_parser(parser):
                         'specify both database filenames delimited with a comma.')
     parser.add_argument('-o', default=_default_n2_filename, action='store', dest='outfile',
                         help='html output file.')
+    parser.add_argument('--no_values', action='store_true', dest='no_values',
+                        help="don't display variable values.")
     parser.add_argument('--no_browser', action='store_true', dest='no_browser',
                         help="don't display in a browser.")
     parser.add_argument('--embed', action='store_true', dest='embeddable',
@@ -755,12 +768,14 @@ def _n2_cmd(options, user_args):
                 # only run the n2 here if we've had setup errors. Normally we'd wait until
                 # after final_setup in order to have correct values for all of the I/O variables.
                 n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
-                   title=options.title, path=options.path, embeddable=options.embeddable)
+                   values=not options.no_values, title=options.title, path=options.path,
+                   embeddable=options.embeddable)
                 # errors will result in exit at the end of the _check_collected_errors method
 
         def _view_model_no_errors(prob):
             n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
-               title=options.title, path=options.path, embeddable=options.embeddable)
+               values=not options.no_values, title=options.title, path=options.path,
+               embeddable=options.embeddable)
 
         hooks._register_hook('_check_collected_errors', 'Problem', pre=_view_model_w_errors)
         hooks._register_hook('final_setup', 'Problem', post=_view_model_no_errors, exit=True)
@@ -773,4 +788,5 @@ def _n2_cmd(options, user_args):
     else:
         # assume the file is a recording, run standalone
         n2(filename, outfile=options.outfile, title=options.title, path=options.path,
-           show_browser=not options.no_browser, embeddable=options.embeddable)
+           values=not options.no_values, show_browser=not options.no_browser,
+           embeddable=options.embeddable)
