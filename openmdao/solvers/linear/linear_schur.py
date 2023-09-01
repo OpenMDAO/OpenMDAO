@@ -199,9 +199,9 @@ class LinearSchur(LinearSolver):
             #### schur_jacobian ####
             ########################
 
-            system._dinputs.set_val(inpu_cache)
-            system._doutputs.set_val(outp_cache)
-            system._dresiduals.set_val(resd_cache)
+            # system._dinputs.set_val(inpu_cache)
+            # system._doutputs.set_val(outp_cache)
+            # system._dresiduals.set_val(resd_cache)
 
             subsys1._vectors["residual"]["linear"].set_val(subsys1_rhs)
 
@@ -210,7 +210,7 @@ class LinearSchur(LinearSolver):
             scope_out = self._vars_union(self._scope_out, scope_out)
             scope_in = self._vars_union(self._scope_in, scope_in)
             # system._dinputs.set_val(0.0)
-            system._doutputs.set_val(0.0)
+            # system._doutputs.set_val(0.0)
             subsys1._solve_linear(mode, self._rel_systems, scope_out, scope_in)
             # b_vec2.set_val(0.0)
             system._transfer("linear", "fwd", subsys2.name)
@@ -226,9 +226,9 @@ class LinearSchur(LinearSolver):
             #### Beg solve for subsys 2 ####
             ################################
             # b_vec2.set_val(0.0)
-            system._dinputs.set_val(inpu_cache)
-            system._doutputs.set_val(outp_cache)
-            system._dresiduals.set_val(resd_cache)
+            # system._dinputs.set_val(inpu_cache)
+            # system._doutputs.set_val(outp_cache)
+            # system._dresiduals.set_val(resd_cache)
             # subsys2._vectors["input"]["linear"].set_val(0.0)
             # system._transfer("linear", mode, subsys2.name)
 
@@ -379,9 +379,9 @@ class LinearSchur(LinearSolver):
             # ################################
             # #### Beg solve for subsys 2 ####
             # ################################
-            system._dinputs.set_val(inpu_cache)
-            system._doutputs.set_val(outp_cache)
-            system._dresiduals.set_val(resd_cache)
+            # system._dinputs.set_val(inpu_cache)
+            # system._doutputs.set_val(outp_cache)
+            # system._dresiduals.set_val(resd_cache)
 
             b_vec2.set_val(0.0)
 
