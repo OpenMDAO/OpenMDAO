@@ -427,7 +427,6 @@ class TestN2(unittest.TestCase):
                 cmd = 'openmdao n2 --no_values --no_browser %s' % self.sqlite_db_filename
             else:
                 cmd = 'openmdao n2 --no_browser %s' % self.sqlite_db_filename
-            print(f"{cmd=}")
             check_call(cmd)
 
             # Compare models from the files generated from the Problem and the recording
