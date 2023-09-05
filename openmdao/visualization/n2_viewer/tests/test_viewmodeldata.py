@@ -54,6 +54,15 @@ def extract_compressed_model(filename):
     return model_data
 
 
+def save_viewer_data(viewer_data, filename):
+    """
+    Save viewer data to JSON file for use in future testing.
+    """
+    from openmdao.utils.testing_utils import _ModelViewerDataTreeEncoder
+    with open(filename, 'w') as json_file:
+        json.dump(viewer_data['tree'], json_file, cls=_ModelViewerDataTreeEncoder, indent=4)
+
+
 class TestViewerData(unittest.TestCase):
 
     def setUp(self):
@@ -72,14 +81,6 @@ class TestViewerData(unittest.TestCase):
                 # If directory already deleted, keep going
                 if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
                     raise e
-
-    def save_viewer_data(self, viewer_data, filename):
-        """
-        Save viewer data to JSON file for use in future testing.
-        """
-        from openmdao.utils.testing_utils import _ModelViewerDataTreeEncoder
-        with open(os.path.join(self.parent_dir, filename), 'w') as json_file:
-            json.dump(viewer_data['tree'], json_file, cls=_ModelViewerDataTreeEncoder, indent=4)
 
     def check_viewer_data(self, viewer_data, filename, partials=True):
         """
