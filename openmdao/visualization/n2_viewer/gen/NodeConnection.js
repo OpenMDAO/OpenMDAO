@@ -35,6 +35,7 @@ class NodeConnection {
 
         this.tgtObj = nodes[conn.tgt];
         const tgtObjParents = [];
+
         if (!this.tgtObj) {
             console.warn(`Cannot find connection target ${conn.tgt}.`);
         }
