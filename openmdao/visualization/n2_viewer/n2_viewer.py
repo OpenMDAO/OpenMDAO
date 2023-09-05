@@ -788,5 +788,6 @@ def _n2_cmd(options, user_args):
     else:
         # assume the file is a recording, run standalone
         n2(filename, outfile=options.outfile, title=options.title, path=options.path,
-           values=not options.no_values, show_browser=not options.no_browser,
+           values=False if options.no_values else _UNDEFINED,
+           show_browser=not options.no_browser,
            embeddable=options.embeddable)
