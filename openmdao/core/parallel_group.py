@@ -1,6 +1,7 @@
 """Define the ParallelGroup class."""
 
 from openmdao.core.group import Group
+from openmdao.utils.om_warnings import issue_warning
 
 
 class ParallelGroup(Group):
@@ -65,6 +66,53 @@ class ParallelGroup(Group):
                         seen.add(name)
         else:
             yield from super()._ordered_comp_name_iter()
+
+    def _check_order(self, reorder=True, recurse=True, out_of_order=None):
+        """
+        Check if auto ordering is needed and if so, set the order appropriately.
+
+        Parameters
+        ----------
+        reorder : bool
+            If True, reorder the subsystems based on the new order.  Otherwise
+            just return the out-of-order connections.
+        recurse : bool
+            If True, call this method on all subgroups.
+        out_of_order : dict
+            Lists of out-of-order connections keyed by group pathname.
+
+        Returns
+        -------
+        dict
+            Lists of out-of-order connections keyed by group pathname.
+        """
+        if self.options['auto_order']:
+            issue_warning("auto_order is not supported in ParallelGroup. "
+                          "Ignoring auto_order option.", prefix=self.msginfo)
+
+        if out_of_order is None:
+            out_of_order = {}
+
+        if recurse:
+            for s in self._subgroups_myproc:
+                s._check_order(reorder, recurse, out_of_order)
+
+        return out_of_order
+
+    def comm_info_iter(self):
+        """
+        Yield comm size and rank for this system and all subsystems.
+
+        Yields
+        ------
+        tuple
+            A tuple of the form (abs_name, comm_size).
+        """
+        if self.comm.size > 1:
+            for info in self.comm.allgather(list(super().comm_info_iter())):
+                yield from info
+        else:
+            yield from super().comm_info_iter()
 
     def _declared_partials_iter(self):
         """

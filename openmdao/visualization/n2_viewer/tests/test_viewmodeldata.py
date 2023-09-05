@@ -185,11 +185,15 @@ class TestViewModelData(unittest.TestCase):
         Verify that the correct model structure data exists when stored as compared
         to the expected structure, using the SellarStateConnection model.
         """
-        p = om.Problem(model=SellarStateConnection())
+        p = om.Problem(model=SellarStateConnection(), allow_post_setup_reorder=False)
         p.setup()
         p.final_setup()
 
         model_viewer_data = _get_viewer_data(p)
+
+        # from openmdao.utils.testing_utils import _ModelViewerDataTreeEncoder
+        # with open(os.path.join(self.parent_dir, 'sellar_tree.json'), 'w') as json_file:
+        #     json.dump(model_viewer_data['tree'], json_file, cls=_ModelViewerDataTreeEncoder, indent=4)
 
         with open(os.path.join(self.parent_dir, 'sellar_tree.json')) as json_file:
             expected_tree = json.load(json_file)
@@ -213,7 +217,7 @@ class TestViewModelData(unittest.TestCase):
         and then pulled out of a sqlite db file and compared to the expected
         structure.  Uses the SellarStateConnection model.
         """
-        p = om.Problem(model=SellarStateConnection())
+        p = om.Problem(model=SellarStateConnection(), allow_post_setup_reorder=False)
 
         r = SqliteRecorder(self.sqlite_db_filename)
         p.driver.add_recorder(r)

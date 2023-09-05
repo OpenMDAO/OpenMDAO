@@ -81,6 +81,9 @@ CITATION = """@article{openmdao_2019,
 # Also handles sub problems
 _problem_names = []
 
+# Used to keep track of the current Problem tree if there are any subproblems
+_prob_setup_stack = []
+
 
 def _clear_problem_names():
     global _problem_names
@@ -293,6 +296,15 @@ class Problem(object):
                              "iterate over the optimization subsystems during optimization.  This "
                              "applies only when the top level nonlinear solver is of type"
                              "NonlinearRunOnce.")
+        self.options.declare('allow_post_setup_reorder', types=bool,
+                             default=True,
+                             desc="If True, the execution order of direct subsystems of any group "
+                             "that sets its 'auto_order' option to True will be automatically "
+                             "ordered according to data dependencies. If this option is False, the "
+                             "'auto_order' option will be ignored and a warning will be issued for "
+                             "each group that has set it to True. Note that subsystems of a Group "
+                             "that form a cycle will never be reordered, regardless of the value of"
+                             " the 'auto_order' option.")
         self.options.update(options)
 
         # Options passed to models
@@ -664,17 +676,20 @@ class Problem(object):
         bool
             Failure flag; True if failed to converge, False is successful.
         """
+        model = self.model
+        driver = self.driver
+
         if self._mode is None:
             raise RuntimeError(self.msginfo +
                                ": The `setup` method must be called before `run_driver`.")
 
-        if not self.model._have_output_solver_options_been_applied():
+        if not model._have_output_solver_options_been_applied():
             raise RuntimeError(self.msginfo +
                                ": Before calling `run_driver`, the `setup` method must be called "
                                "if set_output_solver_options has been called.")
 
-        if 'singular_jac_behavior' in self.driver.options:
-            self._metadata['singular_jac_behavior'] = self.driver.options['singular_jac_behavior']
+        if 'singular_jac_behavior' in driver.options:
+            self._metadata['singular_jac_behavior'] = driver.options['singular_jac_behavior']
 
         old_prefix = self._recording_iter.prefix
 
@@ -684,34 +699,38 @@ class Problem(object):
             self._recording_iter.prefix = case_prefix
 
         try:
-            if self.model.iter_count > 0 and reset_iter_counts:
-                self.driver.iter_count = 0
-                self.model._reset_iter_counts()
+            if model.iter_count > 0 and reset_iter_counts:
+                driver.iter_count = 0
+                model._reset_iter_counts()
 
             self.final_setup()
+
+            # for optimizing drivers, check that constraints are affected by design vars
+            if driver.supports['optimization'] and self._metadata['use_derivatives']:
+                driver.check_relevance()
 
             self._run_counter += 1
             record_model_options(self, self._run_counter)
 
-            self.model._clear_iprint()
+            model._clear_iprint()
 
-            if self.options['group_by_pre_opt_post'] and self.driver.supports['optimization']:
-                if self.model._run_on_opt[_OptStatus.PRE]:
+            if self.options['group_by_pre_opt_post'] and driver.supports['optimization']:
+                if model._run_on_opt[_OptStatus.PRE]:
                     self._set_opt_status(_OptStatus.PRE)
-                    self.model.run_solve_nonlinear()
+                    model.run_solve_nonlinear()
 
-                with SaveOptResult(self.driver):
+                with SaveOptResult(driver):
                     self._set_opt_status(_OptStatus.OPTIMIZING)
-                    result = self.driver.run()
+                    result = driver.run()
 
-                if self.model._run_on_opt[_OptStatus.POST]:
+                if model._run_on_opt[_OptStatus.POST]:
                     self._set_opt_status(_OptStatus.POST)
-                    self.model.run_solve_nonlinear()
+                    model.run_solve_nonlinear()
 
                 return result
             else:
-                with SaveOptResult(self.driver):
-                    return self.driver.run()
+                with SaveOptResult(driver):
+                    return driver.run()
 
         finally:
             self._recording_iter.prefix = old_prefix
@@ -945,6 +964,7 @@ class Problem(object):
         # this metadata will be shared by all Systems/Solvers in the system tree
         self._metadata = {
             'name': self._name,  # the name of this Problem
+            'pathname': None,  # the pathname of this Problem in the current tree of Problems
             'comm': comm,
             'coloring_dir': self.options['coloring_dir'],  # directory for coloring files
             'recording_iter': _RecIteration(comm.rank),  # manager of recorder iterations
@@ -981,11 +1001,23 @@ class Problem(object):
             'checking': False,  # True if check_totals or check_partials is running
             'opt_status': None,  # Tells Systems if they are in an optimization loop
             'model_options': self.model_options,  # A dict of options passed to all systems in tree
+            'allow_post_setup_reorder': self.options['allow_post_setup_reorder'],  # see option
             'singular_jac_behavior': 'warn',  # How to handle singular jac conditions
             'coloring_randgen': None,  # If total coloring is being computed, will contain a random
                                        # number generator, else None.
         }
-        model._setup(model_comm, mode, self._metadata)
+
+        if _prob_setup_stack:
+            self._metadata['pathname'] = _prob_setup_stack[-1]._metadata['pathname'] + '/' + \
+                self._name
+        else:
+            self._metadata['pathname'] = self._name
+
+        _prob_setup_stack.append(self)
+        try:
+            model._setup(model_comm, mode, self._metadata)
+        finally:
+            _prob_setup_stack.pop()
 
         # set static mode back to True in all systems in this Problem
         self._metadata['static_mode'] = True
@@ -1062,8 +1094,8 @@ class Problem(object):
                           "response variables (objectives and nonlinear constraints).",
                           category=DerivativesWarning)
 
-        if self._metadata['setup_status'] == _SetupStatus.PRE_SETUP and \
-                hasattr(self.model, '_order_set') and self.model._order_set:
+        if (not self._metadata['allow_post_setup_reorder'] and
+                self._metadata['setup_status'] == _SetupStatus.PRE_SETUP and self.model._order_set):
             raise RuntimeError(f"{self.msginfo}: Cannot call set_order without calling setup after")
 
         # set up recording, including any new recorders since last setup
@@ -1181,9 +1213,7 @@ class Problem(object):
                     isinstance(comp, ExplicitComponent)):
                 continue
 
-            name = comp.pathname
-
-            if not match_includes_excludes(name, includes, excludes):
+            if not match_includes_excludes(comp.pathname, includes, excludes):
                 continue
 
             comps.append(comp)
@@ -2103,9 +2133,9 @@ class Problem(object):
             The header line for the table.
         col_names : list of str
             List of column labels.
-        meta : OrderedDict
+        meta : dict
             Dictionary of metadata for each problem variable.
-        vals : OrderedDict
+        vals : dict
             Dictionary of values for each problem variable.
         print_arrays : bool, optional
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
@@ -2446,7 +2476,7 @@ class Problem(object):
             List of optional columns to be displayed in the independent variable table.
             Allowed values are:
             ['name', 'units', 'shape', 'size', 'desc', 'ref', 'ref0', 'res_ref',
-            'distributed', 'lower', 'upper', 'tags', 'shape_by_conn', 'copy_shape',
+            'distributed', 'lower', 'upper', 'tags', 'shape_by_conn', 'copy_shape', 'compute_shape',
             'global_size', 'global_shape', 'value'].
         print_arrays : bool, optional
             When False, in the columnar display, just display norm of any ndarrays with size > 1.

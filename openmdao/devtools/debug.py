@@ -14,6 +14,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.om_warnings import issue_warning, MPIWarning
 from openmdao.utils.reports_system import register_report
 from openmdao.utils.file_utils import text2html
+from openmdao.visualization.tables.table_builder import generate_table
 
 
 class _NoColor(object):
@@ -547,3 +548,91 @@ def prom_info_dump(system, tgt):
                 for p in abs_in2prom_info[t]:
                     print('        ', p)
     print(flush=True)
+
+
+def comm_info(system, outfile=None, verbose=False, table_format='box_grid'):
+    """
+    Display MPI communicator information for Systems in the model.
+
+    Parameters
+    ----------
+    system : System
+        A System in the model.
+    outfile : str or None
+        Name of file where output will be written. If None, output is written to stdout.
+    verbose : bool
+        If True, display comm size and rank range for all Systems. Otherwise, display only Systems
+        having a comm size different from their parent system.
+    table_format : str
+        Table format.  All formats compatible with the generate_table function are available.
+    """
+    if MPI and MPI.COMM_WORLD.size > 1:
+        dct = {}
+        for path, csize, rank, wrank in system.comm_info_iter():
+            if path not in dct:
+                dct[path] = [csize, wrank, wrank]
+            else:
+                csize, minwrnk, maxwrnk = dct[path]
+                # do min/max here *and* after the gather so we don't have to
+                # gather all the data to get the min/max
+                if wrank < minwrnk:
+                    minwrnk = wrank
+                if wrank > maxwrnk:
+                    maxwrnk = wrank
+                dct[path] = [csize, minwrnk, maxwrnk]
+
+        # collect dct from all procs so we can get the full min/max rank range
+        alldcts = system.comm.gather(dct, root=0)
+
+        if MPI.COMM_WORLD.rank == 0:
+            alldata = {}
+            sizes = {}
+            for dct in alldcts:
+                for path, v in dct.items():
+                    csize, newmin, newmax = v
+                    sizes[path] = csize
+                    if path in alldata:
+                        _, minwrnk, maxwrnk = alldata[path]
+                        if newmin < minwrnk:
+                            minwrnk = newmin
+                        if newmax > maxwrnk:
+                            maxwrnk = newmax
+                        alldata[path] = [csize, minwrnk, maxwrnk]
+                    else:
+                        alldata[path] = [csize, newmin, newmax]
+
+            table_data = []
+            headers = ['Comm Size', 'COMM_WORLD Range(s)', 'System Pathname']
+            for path, lst in sorted(alldata.items(), key=lambda x: (-x[1][0], x[0])):
+                csize, minwrnk, maxwrnk = lst
+                if verbose or path == '' or sizes[path.rpartition('.')[0]] != csize:
+                    if minwrnk == maxwrnk:
+                        rng = str(minwrnk)
+                    else:
+                        rng = f"{minwrnk} - {maxwrnk}"
+                    table_data.append([csize, rng, path])
+
+            col_meta = [
+                {'align': 'center', 'header_align': 'center'},
+                {'align': 'center', 'header_align': 'center'},
+                {}
+            ]
+            if table_format != 'tabulator':
+                col_meta[0]['max_width'] = 5
+                col_meta[1]['max_width'] = 15
+
+            probpath = system._problem_meta['pathname']
+            if outfile is None:
+                print(f"Printing comm info table for Problem '{probpath}'")
+
+            outf = generate_table(table_data, headers=headers, column_meta=col_meta,
+                                  tablefmt=table_format).display(outfile=outfile)
+
+            if outf is not None and MPI.COMM_WORLD.rank == 0:
+                print(f"comm info table for Problem '{probpath}' written to {outf}")
+    else:
+        if outfile is None:
+            print("No MPI process info available.")
+        else:
+            with open(outfile, 'w') as f:
+                print("No MPI process info available.", file=f)

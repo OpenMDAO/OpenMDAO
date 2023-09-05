@@ -2155,10 +2155,7 @@ def _get_partial_coloring_kwargs(system, options):
         if getattr(options, name) is not None:
             kwargs[name] = getattr(options, name)
 
-    recurse = not options.norecurse
-    if recurse and not system._subsystems_allprocs:
-        recurse = False
-    kwargs['recurse'] = recurse
+    kwargs['recurse'] = not options.norecurse and not system._subsystems_allprocs
 
     per_instance = getattr(options, 'per_instance')
     kwargs['per_instance'] = (per_instance is None or

@@ -15,7 +15,6 @@ from fnmatch import fnmatchcase
 from numbers import Integral
 
 import numpy as np
-import networkx as nx
 
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE, INF_BOUND, \
     _SetupStatus
@@ -75,10 +74,10 @@ _recordable_funcs = frozenset(['_apply_linear', '_apply_nonlinear', '_solve_line
 # the following are local metadata that will also be accessible for vars on all procs
 global_meta_names = {
     'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc', 'shape_by_conn',
-              'copy_shape'),
+              'compute_shape', 'copy_shape'),
     'output': ('units', 'shape', 'size', 'desc',
                'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags', 'shape_by_conn',
-               'copy_shape'),
+               'compute_shape', 'copy_shape'),
 }
 
 allowed_meta_names = {
@@ -2233,7 +2232,7 @@ class System(object):
             self._doutputs = vectors['output']['linear']
             self._dresiduals = vectors['residual']['linear']
 
-        for subsys in self._subsystems_myproc:
+        for subsys in self._sorted_sys_iter():
             subsys._scale_factors = self._scale_factors
             subsys._setup_vectors(root_vectors)
 
@@ -2376,8 +2375,9 @@ class System(object):
             try:
                 old_name, old_key, old_info, old_match_type = matches[io][name]
                 _, info = tup
+
                 if old_match_type == _MatchType.RENAME:
-                    old_key = (old_name, old_key)
+                    old_key = old_using = (old_name, old_key)
                 else:
                     old_using = f"'{old_key}'"
                 if match_type == _MatchType.RENAME:
@@ -2388,8 +2388,8 @@ class System(object):
                 diff = info.compare(old_info) if info is not None and old_info is not None else ()
                 if diff:
                     raise RuntimeError(f"{self.msginfo}: {io} variable '{name}', promoted using "
-                                       f"{new_using}, was already promoted using {old_using} with "
-                                       f"different values for {diff}.")
+                                       f"'{new_using}', was already promoted using '{old_using}' "
+                                       f"with different values for {diff}.")
 
                 if old_match_type != _MatchType.PATTERN:
                     if old_key != tup[0]:
@@ -3523,7 +3523,7 @@ class System(object):
 
         if recurse:
             abs2prom_in = self._var_allprocs_abs2prom['input']
-            for subsys in self._subsystems_myproc:
+            for subsys in self._sorted_sys_iter():
                 dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
                                              use_prom_ivc=use_prom_ivc)
                 if use_prom_ivc:
@@ -3674,7 +3674,7 @@ class System(object):
 
         if recurse:
             abs2prom_in = self._var_allprocs_abs2prom['input']
-            for subsys in self._subsystems_myproc:
+            for subsys in self._sorted_sys_iter():
                 resps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
                                              use_prom_ivc=use_prom_ivc)
                 if use_prom_ivc:
@@ -3849,7 +3849,7 @@ class System(object):
             excludes = (excludes,)
 
         gather_keys = {'val', 'src_indices'}
-        need_gather = get_remote and self.comm.size > 1
+        need_gather = get_remote and self.comm is not None and self.comm.size > 1
         if metadata_keys is not None:
             keyset = set(metadata_keys)
             diff = keyset - allowed_meta_names
@@ -4072,7 +4072,8 @@ class System(object):
         list of (name, metadata) or dict of {name: metadata}
             List or dict of input names and other optional information about those inputs.
         """
-        if (self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP) and val:
+        if (self._problem_meta is None or
+                self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP) and val:
             issue_warning("Calling `list_inputs` before `final_setup` will only "
                           "display the default values of variables and will not show the result of "
                           "any `set_val` calls.")
@@ -4120,7 +4121,10 @@ class System(object):
                         meta['max'] = np.round(np.max(meta['val']), np_precision)
 
         if not inputs or (not all_procs and self.comm.rank != 0):
-            return []
+            if return_format == 'dict':
+                return {}
+            else:
+                return []
 
         if out_stream:
             self._write_table('input', inputs, hierarchical, print_arrays, all_procs,
@@ -6161,6 +6165,9 @@ class System(object):
         # return regular dict sorted by system pathname
         return {spath: data for spath, data in sorted(sys_prom_map.items(), key=lambda x: x[0])}
 
+    def _sorted_sys_iter(self):
+        yield from ()
+
     def load_case(self, case):
         """
         Pull all input and output variables from a Case into this System.
@@ -6176,3 +6183,18 @@ class System(object):
             with `prom_name=True` and `return_format='dict'`.
         """
         pass
+
+    def comm_info_iter(self):
+        """
+        Yield comm size for this system and all subsystems.
+
+        Yields
+        ------
+        tuple
+            A tuple of the form (abs_name, comm_size).
+        """
+        if MPI:
+            yield (self.pathname, self.comm.size, self.comm.rank, MPI.COMM_WORLD.rank)
+
+            for s in self._subsystems_myproc:
+                yield from s.comm_info_iter()

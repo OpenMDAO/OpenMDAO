@@ -12,6 +12,7 @@ from html import escape
 from dataclasses import dataclass
 from numbers import Number, Integral
 from openmdao.utils.notebook_utils import notebook, display, HTML, IFrame, colab
+from openmdao.utils.om_warnings import issue_warning
 
 
 _align2symbol = {
@@ -508,12 +509,18 @@ class TableBuilder(object):
         ----------
         outfile : str or None
             The output file.  If None, assume table should be sent to stdout.
+
+        Returns
+        -------
+        str or None
+            The output file name or None if written to stdout.
         """
         if outfile is None:
             sys.stdout.write(str(self))
         else:
             with open(outfile, 'w') as f:
                 f.write(str(self))
+            return outfile
 
 
 @dataclass(frozen=True)
@@ -903,14 +910,22 @@ class TextTableBuilder(TableBuilder):
         ----------
         outfile : str or None
             If None, print this table to stdout, else write it to the named file.
+
+        Returns
+        -------
+        str or None
+            The name of the file where the table was written, or None if it was written to stdout.
         """
         if outfile is None:
             sys.stdout.write(str(self))
             sys.stdout.write('\n')
-        else:
-            with open(outfile, 'w') as f:
-                f.write(str(self))
-                f.write('\n')
+            return
+
+        with open(outfile, 'w') as f:
+            f.write(str(self))
+            f.write('\n')
+
+        return outfile
 
 
 class GithubTableBuilder(TextTableBuilder):
@@ -1183,11 +1198,17 @@ class HTMLTableBuilder(TableBuilder):
         ----------
         outfile : str
             The output file where the HTML will be written.
+
+        Returns
+        -------
+        str
+            The name of the file where the table was written.
         """
         with open(outfile, 'w', encoding='utf-8') as f:
             f.write(str(self))
+        return outfile
 
-    def display(self, outfile=_default_html_table):
+    def display(self, outfile=None):
         """
         Display this table, either in a notebook or a browser.
 
@@ -1196,9 +1217,18 @@ class HTMLTableBuilder(TableBuilder):
 
         Parameters
         ----------
-        outfile : str
+        outfile : str or None
             Table will be written to this file.
+            If None, write this table to '{_default_html_table}'.
+
+        Returns
+        -------
+        str
+            The name of the file where the table was written.
         """
+        if outfile is None:
+            outfile = _default_html_table
+
         self.write(outfile)
 
         if notebook:
@@ -1211,6 +1241,8 @@ class HTMLTableBuilder(TableBuilder):
             # open it up in the browser
             from openmdao.utils.webview import webview
             webview(outfile)
+
+        return outfile
 
 
 _tabulator_typemeta = {
@@ -1479,6 +1511,12 @@ class TabulatorJSBuilder(TableBuilder):
     def _setup_fit_columns_layout(self):
         smeta = self.sorted_meta()
         maxws = [m['max_width'] for m in smeta]
+        if None in maxws:
+            issue_warning("Can't use 'layout' of 'fitColumns' with columns that have no "
+                          "max_width set. Switching to layout of 'fitDataTable'.")
+            self._table_meta['layout'] = 'fitDataTable'
+            return
+
         mx = sum(maxws)
         pcts = [int(w / mx * 100) for w in maxws]
         rempcts = 100 - sum(pcts)
@@ -1504,11 +1542,18 @@ class TabulatorJSBuilder(TableBuilder):
         ----------
         outfile : str or None
             If not None, the output file where the HTML will be written.
+
+        Returns
+        -------
+        str
+            The output file name.
         """
         outfile = os.path.relpath(outfile)
 
         with open(outfile, 'w', encoding='utf-8') as f:
             f.write(str(self))
+
+        return outfile
 
     def __str__(self):
         """
@@ -1561,6 +1606,11 @@ class TabulatorJSBuilder(TableBuilder):
         ----------
         outfile : str or None
             If None, write this table to '{_default_tabulator_file}'.
+
+        Returns
+        -------
+        str
+            The name of the file where the table was written.
         """
         if outfile is None:
             outfile = _default_tabulator_file
@@ -1576,6 +1626,8 @@ class TabulatorJSBuilder(TableBuilder):
             # open it up in the browser
             from openmdao.utils.webview import webview
             webview(outfile)
+
+        return outfile
 
 
 def generate_table(rows, tablefmt='text', **options):

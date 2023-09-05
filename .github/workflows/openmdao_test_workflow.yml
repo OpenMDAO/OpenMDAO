@@ -26,7 +26,7 @@ jobs:
             OS: ubuntu-latest
             PY: '3.11'
             NUMPY: '1.24'
-            SCIPY: '1.10'
+            SCIPY: '1.11'
             PETSc: '3.18'
             PYOPTSPARSE: 'v2.9.2'
             # PAROPT: true
@@ -52,7 +52,7 @@ jobs:
             OS: macos-latest
             PY: '3.11'
             NUMPY: '1.24'
-            SCIPY: '1.10'
+            SCIPY: '1.11'
             PETSc: '3.18'
             # PYOPTSPARSE: 'v2.9.2'
             # PAROPT: true

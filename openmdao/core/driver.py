@@ -915,6 +915,42 @@ class Driver(object):
         """
         return 'FAIL' if self.fail else 'SUCCESS'
 
+    def check_relevance(self):
+        """
+        Check if there are constraints that don't depend on any design vars.
+
+        This usually indicates something is wrong with the problem formulation.
+        """
+        # relevance not relevant if not using derivatives
+        if not self.supports['gradients']:
+            return
+
+        problem = self._problem()
+        relevant = problem.model._relevant
+        fwd = problem._mode == 'fwd'
+
+        des_vars = self._designvars
+        constraints = self._cons
+
+        indep_list = list(des_vars)
+
+        for name, meta in constraints.items():
+
+            path = meta['source']
+
+            if fwd:
+                wrt = [v for v in indep_list if path in relevant[des_vars[v]['source']]]
+            else:
+                rels = relevant[path]
+                wrt = [v for v in indep_list if des_vars[v]['source'] in rels]
+
+            # Note: There is a hack in ScipyOptimizeDriver for older versions of COBYLA that
+            #       implements bounds on design variables by adding them as constraints.
+            #       These design variables as constraints will not appear in the wrt list.
+            if not wrt and name not in indep_list:
+                raise RuntimeError(f"{self.msginfo}: Constraint '{name}' does not depend on any "
+                                   "design variables. Please check your problem formulation.")
+
     def run(self):
         """
         Execute this driver.

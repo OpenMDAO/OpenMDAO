@@ -4,7 +4,10 @@ import unittest
 from io import StringIO
 import sqlite3
 
+from packaging.version import Version
+
 import numpy as np
+from scipy import __version__ as scipy_version
 
 import openmdao.api as om
 
@@ -439,6 +442,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "Run Number: 0",
             "    Subsystem : root",
             "        assembled_jac_type: csc",
+            "        auto_order: False",
             "    Subsystem : p1",
             "        distributed: False",
             "        run_root_only: False",
@@ -500,6 +504,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "Run Number: 1",
             "    Subsystem : root",
             "        assembled_jac_type: dense",
+            "        auto_order: False",
             ""
         ]
 
@@ -539,6 +544,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "Run Number: 0",
             "    Subsystem : root",
             "        assembled_jac_type: csc",
+            "        auto_order: False",
             "    Subsystem : p1",
             "        distributed: False",
             "        run_root_only: False",
@@ -600,6 +606,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "Run Number: 1",
             "    Subsystem : root",
             "        assembled_jac_type: dense",
+            "        auto_order: False",
             ""
         ]
 
@@ -2706,8 +2713,9 @@ class TestSqliteRecorder(unittest.TestCase):
 
     def test_cobyla_constraints(self):
         """
-        When using the COBYLA optimizer, bounds are managed by adding constraints on input
-        variables. Check that SqliteRecorder and CaseReader handle this properly.
+        Prior to SciPy Version 1.11, when using the COBYLA optimizer,
+        bounds are managed by adding constraints on input variables.
+        Check that SqliteRecorder and CaseReader handle this properly.
         """
         prob = om.Problem()
         model = prob.model
@@ -2736,9 +2744,13 @@ class TestSqliteRecorder(unittest.TestCase):
         con = case.get_constraints()
         obj = case.get_objectives()
 
-        assert_near_equal(dvs, {'x': 6.66666669, 'y': -7.33333338}, tolerance=1e-8)
-        assert_near_equal(con, {'x': 6.66666669, 'y': -7.33333338}, tolerance=1e-8)
         assert_near_equal(obj, {'f_xy': -27.33333333}, tolerance=1e-8)
+        assert_near_equal(dvs, {'x': 6.66666669, 'y': -7.33333338}, tolerance=1e-8)
+
+        if Version(scipy_version) < Version("1.11"):
+            assert_near_equal(con, {'x': 6.66666669, 'y': -7.33333338}, tolerance=1e-8)
+        else:
+            self.assertEqual(con, {})
 
     @require_pyoptsparse('IPOPT')
     def test_total_coloring_record_case_prefix(self):

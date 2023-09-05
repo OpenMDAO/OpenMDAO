@@ -184,7 +184,7 @@ class ExplicitComponent(Component):
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,
-                   shape_by_conn=False, copy_shape=None, distributed=None):
+                   shape_by_conn=False, copy_shape=None, compute_shape=None, distributed=None):
         """
         Add an output variable to the component.
 
@@ -235,6 +235,8 @@ class ExplicitComponent(Component):
         copy_shape : str or None
             If a str, that str is the name of a variable. Shape this output to match that of
             the named variable.
+        compute_shape : function or None
+            If a function, that function is called to determine the shape of this output.
         distributed : bool
             If True, this variable is a distributed variable, so it can have different sizes/values
             across MPI processes.
@@ -252,7 +254,8 @@ class ExplicitComponent(Component):
                                   lower=lower, upper=upper,
                                   ref=ref, ref0=ref0, res_ref=res_ref,
                                   tags=tags, shape_by_conn=shape_by_conn,
-                                  copy_shape=copy_shape, distributed=distributed)
+                                  copy_shape=copy_shape, compute_shape=compute_shape,
+                                  distributed=distributed)
 
     def _approx_subjac_keys_iter(self):
         is_output = self._outputs._contains_abs

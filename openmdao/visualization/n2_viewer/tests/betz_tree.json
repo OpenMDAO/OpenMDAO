@@ -378,6 +378,7 @@
         }
     ],
     "options": {
-        "assembled_jac_type": "csc"
+        "assembled_jac_type": "csc",
+        "auto_order": false
     }
 }
