@@ -37,6 +37,23 @@ DEBUG_BROWSER = False
 DEBUG_FILES = False
 
 
+def extract_compressed_model(filename):
+    """
+    Load an N2 html, find the compressed data string, uncompress and decode it.
+    """
+    file = open(filename, 'r', encoding='utf-8')
+    for line in file:
+        if re.search('var compressedModel', line):
+            b64_data = line.replace('var compressedModel = "', '').replace('";', '')
+            break
+
+    file.close()
+    compressed_data = base64.b64decode(b64_data)
+    model_data = json.loads(zlib.decompress(compressed_data).decode("utf-8"))
+
+    return model_data
+
+
 class TestViewerData(unittest.TestCase):
 
     def setUp(self):
@@ -321,29 +338,9 @@ class TestViewerData(unittest.TestCase):
         np.testing.assert_equal(viewer_data['tree']['children'][1]['options']['arr'],
                                 np.ones(2))
 
+
+@use_tempdirs
 class TestN2(unittest.TestCase):
-
-    def setUp(self):
-        if not DEBUG_FILES:
-            self.dir = mkdtemp()
-        else:
-            self.dir = os.getcwd()
-
-        self.sqlite_db_filename = os.path.join(self.dir, "sellarstate_model_view.sqlite")
-        self.compare_html_filename = os.path.join(self.dir, "compare_n2.html")
-        self.sqlite_html_filename = os.path.join(self.dir, "sqlite_n2.html")
-        self.problem_html_filename = os.path.join(self.dir, "problem_n2.html")
-        self.title_html_filename = os.path.join(self.dir, "title_n2.html")
-        self.conn_html_filename = os.path.join(self.dir, "conn_n2.html")
-
-    def tearDown(self):
-        if not DEBUG_FILES:
-            try:
-                rmtree(self.dir)
-            except OSError as e:
-                # If directory already deleted, keep going
-                if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
-                    raise e
 
     def test_n2_from_problem(self):
         """
@@ -352,16 +349,18 @@ class TestN2(unittest.TestCase):
         p = om.Problem(model=SellarStateConnection())
         p.setup()
 
-        for values in (None, True, False):
-            if values is not None:
-                n2(p, outfile=self.problem_html_filename, show_browser=DEBUG_BROWSER, values=values)
-            else:
-                n2(p, outfile=self.problem_html_filename, show_browser=DEBUG_BROWSER)
+        html_filename = "problem_n2.html"
 
-            # Check that the html file has been created and has something in it.
-            self.assertTrue(os.path.isfile(self.problem_html_filename),
-                            (self.problem_html_filename + " is not a valid file."))
-            self.assertGreater(os.path.getsize(self.problem_html_filename), 100)
+        for values in (None, True, False):
+            with self.subTest(values=values):
+                if values is not None:
+                    n2(p, outfile=html_filename, show_browser=DEBUG_BROWSER, values=values)
+                else:
+                    n2(p, outfile=html_filename, show_browser=DEBUG_BROWSER)
+
+                # Check that the html file has been created and has something in it.
+                self.assertTrue(os.path.isfile(html_filename), f"{html_filename} is not a valid file.")
+                self.assertGreater(os.path.getsize(html_filename), 100)
 
     def test_n2_from_model(self):
         """
@@ -370,70 +369,60 @@ class TestN2(unittest.TestCase):
         p = om.Problem(model=SellarStateConnection())
         p.setup()
 
+        html_filename = "model_n2.html"
+
         for values in (None, True, False):
-            if values is not None:
-                n2(p.model, outfile=self.problem_html_filename, show_browser=DEBUG_BROWSER, values=values)
-            else:
-                n2(p.model, outfile=self.problem_html_filename, show_browser=DEBUG_BROWSER)
+            with self.subTest(values=values):
+                if values is not None:
+                    n2(p.model, outfile=html_filename, show_browser=DEBUG_BROWSER, values=values)
+                else:
+                    n2(p.model, outfile=html_filename, show_browser=DEBUG_BROWSER)
 
-            # Check that the html file has been created and has something in it.
-            self.assertTrue(os.path.isfile(self.problem_html_filename),
-                            (self.problem_html_filename + " is not a valid file."))
-            self.assertGreater(os.path.getsize(self.problem_html_filename), 100)
+                # Check that the html file has been created and has something in it.
+                self.assertTrue(os.path.isfile(html_filename), f"{html_filename} is not a valid file.")
+                self.assertGreater(os.path.getsize(html_filename), 100)
 
-    def _extract_compressed_model(self, filename):
-        """
-        Load an N2 html, find the compressed data string, uncompress and decode it.
-        """
-        file = open(filename, 'r', encoding='utf-8')
-        for line in file:
-            if re.search('var compressedModel', line):
-                b64_data = line.replace('var compressedModel = "', '').replace('";', '')
-                break
-
-        file.close()
-        compressed_data = base64.b64decode(b64_data)
-        model_data = json.loads(zlib.decompress(compressed_data).decode("utf-8"))
-
-        return model_data
-
-    def test_n2_from_sqlite(self):
+    def test_n2_from_sql(self):
         """
         Test that an n2 html file is generated from a sqlite file.
         """
+        sql_filename = "sellarstate.sql"
+
         p = om.Problem(model=SellarStateConnection())
-        p.driver.add_recorder(SqliteRecorder(self.sqlite_db_filename))
+        p.driver.add_recorder(SqliteRecorder(sql_filename))
         p.setup()
         p.final_setup()
         p.cleanup()
 
-        self.maxDiff = None
-
         for values in (None, True, False):
-            if values is not None:
-                n2(p, outfile=self.compare_html_filename, show_browser=DEBUG_BROWSER, values=values)
-                n2(self.sqlite_db_filename, outfile=self.sqlite_html_filename, show_browser=DEBUG_BROWSER, values=values)
-            else:
-                n2(p, outfile=self.compare_html_filename, show_browser=DEBUG_BROWSER)
-                n2(self.sqlite_db_filename, outfile=self.sqlite_html_filename, show_browser=DEBUG_BROWSER)
+            with self.subTest(values=values):
+                n2_from_prob_html = f"n2_from_prob_{values}.html"
+                n2_from_file_html = f"n2_from_file_{values}.html"
 
-            # Check that the html file has been created and has something in it.
-            self.assertTrue(os.path.isfile(self.sqlite_html_filename),
-                            (self.sqlite_html_filename + " is not a valid file."))
-            self.assertGreater(os.path.getsize(self.sqlite_html_filename), 100)
+                if values is not None:
+                    n2(p, outfile=n2_from_prob_html, show_browser=DEBUG_BROWSER, values=values)
+                    n2(sql_filename, outfile=n2_from_file_html, show_browser=DEBUG_BROWSER, values=values)
+                else:
+                    n2(p, outfile=n2_from_prob_html, show_browser=DEBUG_BROWSER)
+                    n2(sql_filename, outfile=n2_from_file_html, show_browser=DEBUG_BROWSER)
 
-            # Check that there are no errors when running from the command line with a recording.
-            if values is False:
-                cmd = 'openmdao n2 --no_values --no_browser %s' % self.sqlite_db_filename
-            else:
-                cmd = 'openmdao n2 --no_browser %s' % self.sqlite_db_filename
-            check_call(cmd)
+                # Compare models from the files generated from the Problem and the recording
+                model_data_from_prob = extract_compressed_model(n2_from_prob_html)
+                model_data_from_file = extract_compressed_model(n2_from_file_html)
 
-            # Compare models from the files generated from the Problem and the recording
-            sqlite_model_data = self._extract_compressed_model(self.sqlite_html_filename)
-            compare_model_data = self._extract_compressed_model(self.compare_html_filename)
+                self.assertDictEqual(model_data_from_prob, model_data_from_file)
 
-            self.assertDictEqual(sqlite_model_data, compare_model_data)
+                # also check data generated using n2 command
+                n2_from_cmd_html = f"n2_from_cmd_{values}.html"
+                if values is not False:
+                    cmd = f"openmdao n2 --no_browser -o {n2_from_cmd_html} {sql_filename}"
+                else:
+                    cmd = f"openmdao n2 --no_values --no_browser  -o {n2_from_cmd_html} {sql_filename}"
+                check_call(cmd)
+
+                model_data_from_cmd = extract_compressed_model(n2_from_cmd_html)
+
+                self.assertDictEqual(model_data_from_prob, model_data_from_cmd)
 
     def test_n2_command(self):
         """
@@ -441,7 +430,12 @@ class TestN2(unittest.TestCase):
         """
         from openmdao.test_suite.scripts import sellar
         filename = os.path.abspath(sellar.__file__).replace('.pyc', '.py')  # PY2
-        check_call('openmdao n2 --no_browser %s' % filename)
+
+        browser_arg = '' if DEBUG_BROWSER else '--no_browser'
+
+        for values_arg in ('', '--no_values'):
+            with self.subTest(values_arg=values_arg):
+                check_call(f'openmdao n2 {values_arg} {browser_arg} {filename}')
 
     def test_n2_set_title(self):
         """
@@ -450,14 +444,17 @@ class TestN2(unittest.TestCase):
         p = om.Problem(model=SellarStateConnection())
         p.setup()
 
-        n2(p, outfile=self.title_html_filename, show_browser=DEBUG_BROWSER,
+        html_filename = "title_n2.html"
+
+        n2(p, outfile=html_filename, show_browser=DEBUG_BROWSER,
            title="Sellar State Connection")
 
         # Check that the html file has been created and has the correct title.
-        self.assertTrue(os.path.isfile(self.title_html_filename),
-                        (self.title_html_filename + " is not a valid file."))
+        self.assertTrue(os.path.isfile(html_filename),
+                        f"{html_filename} is not a valid file.")
+
         self.assertTrue('OpenMDAO Model Hierarchy and N2 diagram: Sellar State Connection'
-                        in open(self.title_html_filename, 'r', encoding='utf-8').read())
+                        in open(html_filename, 'r', encoding='utf-8').read())
 
     def test_n2_connection_error(self):
         """
@@ -476,14 +473,16 @@ class TestN2(unittest.TestCase):
 
         self.assertEqual(cm.exception.args[0], msg)
 
-        n2(p, outfile=self.conn_html_filename, show_browser=DEBUG_BROWSER,
+        html_filename = "conn_n2.html"
+
+        n2(p, outfile=html_filename, show_browser=DEBUG_BROWSER,
            title="Bad Connection")
 
         # Check that the html file has been created and has something in it.
-        self.assertTrue(os.path.isfile(self.conn_html_filename),
-                        (self.conn_html_filename + " is not a valid file."))
+        self.assertTrue(os.path.isfile(html_filename),
+                        f"{html_filename} is not a valid file.")
         self.assertTrue('OpenMDAO Model Hierarchy and N2 diagram: Bad Connection'
-                        in open(self.conn_html_filename, 'r', encoding='utf-8').read())
+                        in open(html_filename, 'r', encoding='utf-8').read())
 
 
 @use_tempdirs
