@@ -327,8 +327,7 @@ class SparseJacVec(om.ExplicitComponent):
         self.add_output('out3', val=np.ones(self.size))
         self.add_output('out4', val=np.ones(self.size))
 
-        # declare partials to take advantage of var sparsity in the
-        # full model
+        # declare partials to improve var sparsity in the full model
         self.declare_partials(of=['out1', 'out2'], wrt=['in1', 'in2'])
         self.declare_partials(of=['out3', 'out4'], wrt=['in3', 'in4'])
 
@@ -1857,70 +1856,68 @@ class TestProblemCheckTotals(unittest.TestCase):
         data = p.check_totals(method='cs', directional=True)
         assert_check_totals(data, atol=1e-6, rtol=1e-6)
 
-    def test_sparse_matfree_fwd(self):
+    def _build_sparse_model(self):
         prob = om.Problem()
         prob.driver = om.ScipyOptimizeDriver()
 
+        prob.model.add_subsystem('comp1', Simple(size=5))
+        prob.model.add_subsystem('comp2', Simple(size=5))
+        prob.model.add_subsystem('comp3', Simple(size=5))
+        prob.model.add_subsystem('comp4', Simple(size=5))
+
         prob.model.add_subsystem('comp', SparseJacVec(size=5))
 
-        # add some other comps and verify that they don't run as part of the
-        # optimization loop
-        comp1 = prob.model.add_subsystem('comp1', Simple(size=5))
-        comp2 = prob.model.add_subsystem('comp2', Simple(size=5))
-        comp3 = prob.model.add_subsystem('comp3', Simple(size=5))
-        comp4 = prob.model.add_subsystem('comp4', Simple(size=5))
+        prob.model.add_subsystem('comp5', Simple(size=5))
+        prob.model.add_subsystem('comp6', Simple(size=5))
+        prob.model.add_subsystem('comp7', Simple(size=5))
+        prob.model.add_subsystem('comp8', Simple(size=5))
 
-        prob.model.connect('comp.out1', 'comp1.x')
-        prob.model.connect('comp.out2', 'comp2.x')
-        prob.model.connect('comp.out3', 'comp3.x')
-        prob.model.connect('comp.out4', 'comp4.x')
+        prob.model.connect('comp1.y', 'comp.in1')
+        prob.model.connect('comp2.y', 'comp.in2')
+        prob.model.connect('comp3.y', 'comp.in3')
+        prob.model.connect('comp4.y', 'comp.in4')
 
-        prob.model.add_design_var('comp.in1')
-        prob.model.add_design_var('comp.in2')
-        prob.model.add_design_var('comp.in3')
-        prob.model.add_design_var('comp.in4')
-        prob.model.add_constraint('comp.out1', lower=-999., upper=999.)
-        prob.model.add_constraint('comp.out2', lower=-999., upper=999.)
-        prob.model.add_constraint('comp.out3', lower=-999., upper=999.)
-        prob.model.add_objective('comp.out4', index=0)
+        prob.model.connect('comp.out1', 'comp5.x')
+        prob.model.connect('comp.out2', 'comp6.x')
+        prob.model.connect('comp.out3', 'comp7.x')
+        prob.model.connect('comp.out4', 'comp8.x')
 
+        prob.model.add_design_var('comp1.x')
+        prob.model.add_design_var('comp2.x')
+        prob.model.add_design_var('comp3.x')
+        prob.model.add_design_var('comp4.x')
+
+        prob.model.add_constraint('comp5.y', lower=-999., upper=999.)
+        prob.model.add_constraint('comp6.y', lower=-999., upper=999.)
+        prob.model.add_constraint('comp7.y', lower=-999., upper=999.)
+        prob.model.add_objective('comp8.y', index=0)
+
+        return prob
+
+    def test_sparse_matfree_fwd(self):
+        prob = self._build_sparse_model()
+        m = prob.model
         prob.setup(force_alloc_complex=True, mode='fwd')
         prob.run_model()
 
-        from openmdao.utils.coloring import dynamic_total_coloring
-        dynamic_total_coloring(prob.driver, run_model=False)
+        #from openmdao.utils.coloring import dynamic_total_coloring
+        #dynamic_total_coloring(prob.driver, run_model=False)
         # prob.driver._coloring_info['dynamic'] = True
         # prob.driver._coloring_info['coloring'].display()
 
         assert_check_totals(prob.check_totals(method='cs', out_stream=None))
 
+        nsolves = [c.nsolve_linear for c in [m.comp5, m.comp6, m.comp7, m.comp8]]
+        # each DV is size 5. each output depends on 2 inputs, so 10 linear solves each.
+        # A 'dense' matfree comp would have resulted in 20 (5 x 4) linear solves each.
+        expected = [10, 10, 10, 10]
+
+        for slv, ex in zip(nsolves, expected):
+            self.assertEqual(slv, ex)
+
     def test_sparse_matfree_rev(self):
-        prob = om.Problem()
-        prob.driver = om.ScipyOptimizeDriver()
-
-        prob.model.add_subsystem('comp', SparseJacVec(size=5))
-
-        # add some other comps and verify that they don't run as part of the
-        # optimization loop
-        comp1 = prob.model.add_subsystem('comp1', Simple(size=5))
-        comp2 = prob.model.add_subsystem('comp2', Simple(size=5))
-        comp3 = prob.model.add_subsystem('comp3', Simple(size=5))
-        comp4 = prob.model.add_subsystem('comp4', Simple(size=5))
-
-        prob.model.connect('comp.out1', 'comp1.in1')
-        prob.model.connect('comp.out2', 'comp2.in1')
-        prob.model.connect('comp.out3', 'comp3.in1')
-        prob.model.connect('comp.out4', 'comp4.in1')
-
-        prob.model.add_design_var('comp.in1')
-        prob.model.add_design_var('comp.in2')
-        prob.model.add_design_var('comp.in3')
-        prob.model.add_design_var('comp.in4')
-        prob.model.add_constraint('comp1.out1', lower=-999., upper=999.)
-        prob.model.add_constraint('comp2.out1', lower=-999., upper=999.)
-        prob.model.add_constraint('comp.out3', lower=-999., upper=999.)
-        prob.model.add_objective('comp.out4', index=0)
-
+        prob = self._build_sparse_model()
+        m = prob.model
         prob.setup(force_alloc_complex=True, mode='rev')
         prob.run_model()
 
@@ -1931,14 +1928,16 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         assert_check_totals(prob.check_totals(method='cs', out_stream=None))
 
-        nsolves = [c.nsolve_linear for c in [comp1, comp2, comp3, comp4]]
+        nsolves = [c.nsolve_linear for c in [m.comp1, m.comp2, m.comp3, m.comp4]]
+        # 3 constraints of size 5 plus size 1 objective.  First 2 DVs depend on first 2
+        # constraints, so 10 linear solves.  Last 2 DVs depend on 3rd constraint (size 5)
+        # plus objective, so 6 linear solves.
+        # A 'dense' matfree comp would have resulted in 16 ((5 x 3) + 1) linear solves each.
+        expected = [10, 10, 6, 6]
 
-        J = prob.compute_totals()
-        for c, ns in zip([comp1, comp2], nsolves[:2]):
-            self.assertEqual(c.nsolve_linear, ns)
+        for slv, ex in zip(nsolves, expected):
+            self.assertEqual(slv, ex)
 
-        for c, ns in zip([comp3, comp4], nsolves[2:]):
-            self.assertEqual(c.nsolve_linear, ns)
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestProblemCheckTotalsMPI(unittest.TestCase):
