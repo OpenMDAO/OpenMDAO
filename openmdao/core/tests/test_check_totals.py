@@ -18,6 +18,8 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
 from openmdao.core.tests.test_check_partials import ParaboloidTricky, MyCompGoodPartials, \
     MyCompBadPartials, DirectionalVectorizedMatFreeComp
 from openmdao.test_suite.scripts.circle_opt import CircleOpt
+from openmdao.test_suite.components.exec_comp_for_test import ExecComp4Test
+from openmdao.core.constants import _UNDEFINED
 
 from openmdao.utils.mpi import MPI
 
@@ -275,7 +277,41 @@ class I2O2JacVec(om.ExplicitComponent):
                     d_inputs['in2'] += 5. * d_outputs['out2']
 
 
+class Simple(om.ExplicitComponent):
+    """
+    Simple matrix free component where some of/wrt partials are zero.
+    """
+
+    def __init__(self, size, **kwargs):
+        super().__init__(**kwargs)
+        self.size = size
+        self.ncomputes = 0
+        self.ncompute_partials = 0
+        self.nsolve_linear = 0
+
+    def setup(self):
+        self.add_input('x', val=np.ones(self.size))
+        self.add_output('y', val=np.ones(self.size))
+
+        self.declare_partials(of=['y'], wrt=['x'])
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = inputs['x'] * 2.0
+        self.ncomputes += 1
+
+    def compute_partials(self, inputs, partials):
+        partials['y', 'x'] = np.eye(self.size) * 2.0
+        self.ncompute_partials += 1
+
+    def _solve_linear(self, mode, rel_systems, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
+        super()._solve_linear(mode, rel_systems, scope_out, scope_in)
+        self.nsolve_linear += 1
+
+
 class SparseJacVec(om.ExplicitComponent):
+    """
+    Simple matrix free component where some of/wrt partials are zero.
+    """
 
     def __init__(self, size, **kwargs):
         super().__init__(**kwargs)
@@ -291,6 +327,8 @@ class SparseJacVec(om.ExplicitComponent):
         self.add_output('out3', val=np.ones(self.size))
         self.add_output('out4', val=np.ones(self.size))
 
+        # declare partials to take advantage of var sparsity in the
+        # full model
         self.declare_partials(of=['out1', 'out2'], wrt=['in1', 'in2'])
         self.declare_partials(of=['out3', 'out4'], wrt=['in3', 'in4'])
 
@@ -1824,6 +1862,19 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.driver = om.ScipyOptimizeDriver()
 
         prob.model.add_subsystem('comp', SparseJacVec(size=5))
+
+        # add some other comps and verify that they don't run as part of the
+        # optimization loop
+        comp1 = prob.model.add_subsystem('comp1', Simple(size=5))
+        comp2 = prob.model.add_subsystem('comp2', Simple(size=5))
+        comp3 = prob.model.add_subsystem('comp3', Simple(size=5))
+        comp4 = prob.model.add_subsystem('comp4', Simple(size=5))
+
+        prob.model.connect('comp.out1', 'comp1.x')
+        prob.model.connect('comp.out2', 'comp2.x')
+        prob.model.connect('comp.out3', 'comp3.x')
+        prob.model.connect('comp.out4', 'comp4.x')
+
         prob.model.add_design_var('comp.in1')
         prob.model.add_design_var('comp.in2')
         prob.model.add_design_var('comp.in3')
@@ -1848,25 +1899,46 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.driver = om.ScipyOptimizeDriver()
 
         prob.model.add_subsystem('comp', SparseJacVec(size=5))
+
+        # add some other comps and verify that they don't run as part of the
+        # optimization loop
+        comp1 = prob.model.add_subsystem('comp1', Simple(size=5))
+        comp2 = prob.model.add_subsystem('comp2', Simple(size=5))
+        comp3 = prob.model.add_subsystem('comp3', Simple(size=5))
+        comp4 = prob.model.add_subsystem('comp4', Simple(size=5))
+
+        prob.model.connect('comp.out1', 'comp1.in1')
+        prob.model.connect('comp.out2', 'comp2.in1')
+        prob.model.connect('comp.out3', 'comp3.in1')
+        prob.model.connect('comp.out4', 'comp4.in1')
+
         prob.model.add_design_var('comp.in1')
         prob.model.add_design_var('comp.in2')
         prob.model.add_design_var('comp.in3')
         prob.model.add_design_var('comp.in4')
-        prob.model.add_constraint('comp.out1', lower=-999., upper=999.)
-        prob.model.add_constraint('comp.out2', lower=-999., upper=999.)
+        prob.model.add_constraint('comp1.out1', lower=-999., upper=999.)
+        prob.model.add_constraint('comp2.out1', lower=-999., upper=999.)
         prob.model.add_constraint('comp.out3', lower=-999., upper=999.)
         prob.model.add_objective('comp.out4', index=0)
 
         prob.setup(force_alloc_complex=True, mode='rev')
         prob.run_model()
 
-        from openmdao.utils.coloring import dynamic_total_coloring
-        dynamic_total_coloring(prob.driver, run_model=False)
+        #from openmdao.utils.coloring import dynamic_total_coloring
+        #dynamic_total_coloring(prob.driver, run_model=False)
         # prob.driver._coloring_info['dynamic'] = True
         # prob.driver._coloring_info['coloring'].display()
 
         assert_check_totals(prob.check_totals(method='cs', out_stream=None))
 
+        nsolves = [c.nsolve_linear for c in [comp1, comp2, comp3, comp4]]
+
+        J = prob.compute_totals()
+        for c, ns in zip([comp1, comp2], nsolves[:2]):
+            self.assertEqual(c.nsolve_linear, ns)
+
+        for c, ns in zip([comp3, comp4], nsolves[2:]):
+            self.assertEqual(c.nsolve_linear, ns)
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestProblemCheckTotalsMPI(unittest.TestCase):
