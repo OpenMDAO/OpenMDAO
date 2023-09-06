@@ -293,14 +293,15 @@ class Simple(om.ExplicitComponent):
         self.add_input('x', val=np.ones(self.size))
         self.add_output('y', val=np.ones(self.size))
 
-        self.declare_partials(of=['y'], wrt=['x'])
+        rows = np.arange(self.size)
+        self.declare_partials(of=['y'], wrt=['x'], rows=rows, cols=rows)
 
     def compute(self, inputs, outputs):
         outputs['y'] = inputs['x'] * 2.0
         self.ncomputes += 1
 
     def compute_partials(self, inputs, partials):
-        partials['y', 'x'] = np.eye(self.size) * 2.0
+        partials['y', 'x'] = np.ones(self.size) * 2.0
         self.ncompute_partials += 1
 
     def _solve_linear(self, mode, rel_systems, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
@@ -1900,11 +1901,6 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.setup(force_alloc_complex=True, mode='fwd')
         prob.run_model()
 
-        #from openmdao.utils.coloring import dynamic_total_coloring
-        #dynamic_total_coloring(prob.driver, run_model=False)
-        # prob.driver._coloring_info['dynamic'] = True
-        # prob.driver._coloring_info['coloring'].display()
-
         assert_check_totals(prob.check_totals(method='cs', out_stream=None))
 
         nsolves = [c.nsolve_linear for c in [m.comp5, m.comp6, m.comp7, m.comp8]]
@@ -1915,16 +1911,38 @@ class TestProblemCheckTotals(unittest.TestCase):
         for slv, ex in zip(nsolves, expected):
             self.assertEqual(slv, ex)
 
+    def test_sparse_matfree_fwd_coloring(self):
+        prob = self._build_sparse_model()
+        m = prob.model
+        prob.setup(force_alloc_complex=True, mode='fwd')
+        prob.run_model()
+
+        from openmdao.utils.coloring import dynamic_total_coloring
+        dynamic_total_coloring(prob.driver, run_model=False)
+        prob.driver._coloring_info['dynamic'] = True
+        # prob.driver._coloring_info['coloring'].display()
+
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+
+        # reset lin solve counts
+        for c in  [m.comp5, m.comp6, m.comp7, m.comp8]:
+            c.nsolve_linear = 0
+
+        J = prob.compute_totals()
+
+        nsolves = [c.nsolve_linear for c in [m.comp5, m.comp6, m.comp7, m.comp8]]
+        # Coloring requires 2 linear solves, mixing all dependencies, so each comp gets
+        # 2 linear solves.
+        expected = [2, 2, 2, 2]
+
+        for slv, ex in zip(nsolves, expected):
+            self.assertEqual(slv, ex)
+
     def test_sparse_matfree_rev(self):
         prob = self._build_sparse_model()
         m = prob.model
         prob.setup(force_alloc_complex=True, mode='rev')
         prob.run_model()
-
-        #from openmdao.utils.coloring import dynamic_total_coloring
-        #dynamic_total_coloring(prob.driver, run_model=False)
-        # prob.driver._coloring_info['dynamic'] = True
-        # prob.driver._coloring_info['coloring'].display()
 
         assert_check_totals(prob.check_totals(method='cs', out_stream=None))
 
@@ -1934,6 +1952,33 @@ class TestProblemCheckTotals(unittest.TestCase):
         # plus objective, so 6 linear solves.
         # A 'dense' matfree comp would have resulted in 16 ((5 x 3) + 1) linear solves each.
         expected = [10, 10, 6, 6]
+
+        for slv, ex in zip(nsolves, expected):
+            self.assertEqual(slv, ex)
+
+    def test_sparse_matfree_rev_coloring(self):
+        prob = self._build_sparse_model()
+        m = prob.model
+        prob.setup(force_alloc_complex=True, mode='rev')
+        prob.run_model()
+
+        from openmdao.utils.coloring import dynamic_total_coloring
+        dynamic_total_coloring(prob.driver, run_model=False)
+        prob.driver._coloring_info['dynamic'] = True
+        # prob.driver._coloring_info['coloring'].display()
+
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+
+        # reset lin solve counts
+        for c in  [m.comp1, m.comp2, m.comp3, m.comp4]:
+            c.nsolve_linear = 0
+
+        J = prob.compute_totals()
+
+        nsolves = [c.nsolve_linear for c in [m.comp1, m.comp2, m.comp3, m.comp4]]
+        # coloring requires 2 rev solves, which combine all dependencies, so each
+        # comp gets 2 linear solves
+        expected = [2, 2, 2, 2]
 
         for slv, ex in zip(nsolves, expected):
             self.assertEqual(slv, ex)
