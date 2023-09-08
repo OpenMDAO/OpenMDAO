@@ -40,8 +40,8 @@ class Noisy(ConvergeDiverge):
 def _test_func_name(func, num, param):
     args = []
     for p in param.args:
-        if not isinstance(p, Iterable):
-            p = {p}
+        if isinstance(p, str) or not isinstance(p, Iterable):
+            p = [p]
         for item in p:
             try:
                 arg = item.__name__
@@ -164,9 +164,10 @@ class TestParallelGroups(unittest.TestCase):
         assert_near_equal(prob['c3.y'], 29.0, 1e-6)
 
     @parameterized.expand(itertools.product([om.LinearRunOnce],
-                                            [om.NonlinearBlockGS, om.NonlinearRunOnce]),
+                                            [om.NonlinearBlockGS, om.NonlinearRunOnce],
+                                            ['fwd', 'rev']),
                           name_func=_test_func_name)
-    def test_diamond(self, solver, nlsolver):
+    def test_diamond(self, solver, nlsolver, mode):
 
         prob = om.Problem()
         prob.model = Diamond()
@@ -174,7 +175,7 @@ class TestParallelGroups(unittest.TestCase):
         prob.model.linear_solver = solver()
         prob.model.nonlinear_solver = nlsolver()
 
-        prob.setup(check=False, mode='fwd')
+        prob.setup(check=False, mode=mode)
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -188,20 +189,11 @@ class TestParallelGroups(unittest.TestCase):
         assert_near_equal(J['c4.y1', 'iv.x'][0][0], 25, 1e-6)
         assert_near_equal(J['c4.y2', 'iv.x'][0][0], -40.5, 1e-6)
 
-        prob.setup(check=False, mode='rev')
-        prob.run_model()
-
-        assert_near_equal(prob['c4.y1'], 46.0, 1e-6)
-        assert_near_equal(prob['c4.y2'], -93.0, 1e-6)
-
-        J = prob.compute_totals(of=unknown_list, wrt=indep_list)
-        assert_near_equal(J['c4.y1', 'iv.x'][0][0], 25, 1e-6)
-        assert_near_equal(J['c4.y2', 'iv.x'][0][0], -40.5, 1e-6)
-
     @parameterized.expand(itertools.product([om.LinearRunOnce],
-                                            [om.NonlinearBlockGS, om.NonlinearRunOnce]),
+                                            [om.NonlinearBlockGS, om.NonlinearRunOnce],
+                                            ['fwd', 'rev']),
                           name_func=_test_func_name)
-    def test_converge_diverge(self, solver, nlsolver):
+    def test_converge_diverge(self, solver, nlsolver, mode):
 
         prob = om.Problem()
         prob.model = ConvergeDiverge()
@@ -209,7 +201,7 @@ class TestParallelGroups(unittest.TestCase):
         prob.model.linear_solver = solver()
         prob.model.nonlinear_solver = nlsolver()
 
-        prob.setup(check=False, mode='fwd')
+        prob.setup(check=False, mode=mode)
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -220,16 +212,6 @@ class TestParallelGroups(unittest.TestCase):
 
         J = prob.compute_totals(of=unknown_list, wrt=indep_list)
         assert_near_equal(J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
-
-        prob.setup(check=False, mode='rev')
-        prob.run_model()
-
-        assert_near_equal(prob['c7.y1'], -102.7, 1e-6)
-
-        J = prob.compute_totals(of=unknown_list, wrt=indep_list)
-        assert_near_equal(J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
-
-        assert_near_equal(prob['c7.y1'], -102.7, 1e-6)
 
     def test_zero_shape(self):
         raise unittest.SkipTest("zero shapes not fully supported yet")

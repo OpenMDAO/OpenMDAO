@@ -95,10 +95,26 @@ else:
             offsets_in = offsets['input']
             offsets_out = offsets['output']
 
+            def is_dup(name, io):
+                if group._var_allprocs_abs2meta[io][name]['distributed']:
+                    return False  # distributed vars are never dups
+                # if group.comm.rank == group._owning_rank[name]:
+                #     return False  # this is the owner, not a dup
+                return np.count_nonzero(group._var_sizes[io][:, allprocs_abs2idx[name]]) > 1
+
+            def get_xfer_ranks(name, io):
+                if group._var_allprocs_abs2meta[io][name]['distributed']:
+                    return []
+                idx = allprocs_abs2idx[name]
+                sizes = group._var_sizes[io][:, idx]
+                return np.nonzero(sizes)[0]
+
             # Loop through all connections owned by this system
             for abs_in, abs_out in group._conn_abs_in2out.items():
                 # Only continue if the input exists on this processor
                 if abs_in in abs2meta_in:
+                    inp_is_dup = is_dup(abs_in, 'input')
+                    out_is_dup = is_dup(abs_out, 'output')
 
                     # Get meta
                     meta_in = abs2meta_in[abs_in]
@@ -173,8 +189,26 @@ else:
                     fwd_xfer_out[sub_in].append(output_inds)
                     if rev:
                         sub_out = abs_out[mypathlen:].partition('.')[0]
-                        rev_xfer_in[sub_out].append(input_inds)
-                        rev_xfer_out[sub_out].append(output_inds)
+                        if inp_is_dup and abs_out not in abs2meta_out:
+                            # print(group.pathname, 'rank', group.comm.rank, ':', 'NOT DOING', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
+                            rev_xfer_in[sub_out]
+                            rev_xfer_out[sub_out]
+                        elif not inp_is_dup and out_is_dup and myproc == group._owning_rank[abs_in]:
+                            oidxlist = []
+                            iidxlist = []
+                            for rnk in get_xfer_ranks(abs_out, 'output'):
+                                offset = offsets_out[rnk, idx_out]
+                                oidxlist.append(np.arange(offset, offset + meta_in['size'], dtype=INT_DTYPE))
+                                iidxlist.append(input_inds)
+                            input_inds = np.concatenate(iidxlist)
+                            output_inds = np.concatenate(oidxlist)
+                            # print('MULTI', group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
+                            rev_xfer_in[sub_out].append(input_inds)
+                            rev_xfer_out[sub_out].append(output_inds)
+                        else:
+                            # print(group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
+                            rev_xfer_in[sub_out].append(input_inds)
+                            rev_xfer_out[sub_out].append(output_inds)
                 else:
                     # not a local input but still need entries in the transfer dicts to
                     # avoid hangs
@@ -207,19 +241,36 @@ else:
 
             transfers['fwd'] = xfwd = {}
             xfwd[None] = xfer_all
-            if rev:
-                transfers['rev'] = xrev = {}
-                xrev[None] = xfer_all
 
             for sname, inds in fwd_xfer_in.items():
                 transfers['fwd'][sname] = PETScTransfer(
                     vectors['input']['nonlinear'], vectors['output']['nonlinear'],
                     inds, fwd_xfer_out[sname], group.comm)
+
             if rev:
+                if rev_xfer_in:
+                    xfer_in = np.concatenate(list(rev_xfer_in.values()))
+                    xfer_out = np.concatenate(list(rev_xfer_out.values()))
+                else:
+                    xfer_in = xfer_out = np.zeros(0, dtype=INT_DTYPE)
+
+                # print(group.comm.rank, "MAKING rev global xfer", xfer_out, "-->", xfer_in, flush=True)
+                xfer_all = PETScTransfer(vectors['input']['nonlinear'], out_vec,
+                                         xfer_in, xfer_out, group.comm)
+                # print(group.comm.rank, "DONE MAKING rev global xfer", flush=True)
+
+                # print("outputs:", list(group._outputs.keys()), flush=True)
+                # print("inputs:", list(group._inputs.keys()), flush=True)
+
+                transfers['rev'] = xrev = {}
+                xrev[None] = xfer_all
+
                 for sname, inds in rev_xfer_out.items():
                     transfers['rev'][sname] = PETScTransfer(
                         vectors['input']['nonlinear'], vectors['output']['nonlinear'],
                         rev_xfer_in[sname], inds, group.comm)
+
+            # print(group.comm.rank, 'returning from setup_transfers', flush=True)
 
         def _transfer(self, in_vec, out_vec, mode='fwd'):
             """

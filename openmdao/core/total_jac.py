@@ -463,7 +463,7 @@ class _TotalJacInfo(object):
             myrank = self.comm.rank
             if get_remote:
                 myoffset = rowcol_size * myrank
-            elif not get_remote:  # rev and not get_remote
+            else:  # rev and not get_remote
                 # reduce size of vector by not including distrib vars
                 arr = np.ones(rowcol_size, dtype=bool)
                 start = end = 0
@@ -739,7 +739,7 @@ class _TotalJacInfo(object):
                 if self.jac_dist_col_mask is None:
                     ndups = 1  # we don't divide by ndups for distributed inputs
                 else:
-                    ndups = np.nonzero(sizes[:, in_var_idx])[0].size
+                    ndups = np.count_nonzero(sizes[:, in_var_idx])
             else:
                 # if the var is not distributed, convert the indices to global.
                 # We don't iterate over the full distributed size in this case.
@@ -751,7 +751,9 @@ class _TotalJacInfo(object):
                     # find the number of duplicate components in rev mode so we can divide
                     # the seed between 'ndups' procs so that at the end after we do an
                     # Allreduce, the contributions from all procs will add up properly.
-                    ndups = np.nonzero(sizes[:, in_var_idx])[0].size
+                    ndups = np.count_nonzero(sizes[:, in_var_idx])
+
+            ndups = 1
 
             # all local idxs that correspond to vars from other procs will be -1
             # so each entry of loc_i will either contain a valid local index,
@@ -1335,17 +1337,17 @@ class _TotalJacInfo(object):
             ndups, _, _, _ = self.in_idx_map[mode][i]
             if self.get_remote:
                 scratch = self.jac_scratch['rev'][0]
-                scratch[:] = self.J[i]
+                # scratch[:] = self.J[i]
 
-                self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
+                # # self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
 
-                if ndups > 1:
-                    if self.jac_dist_col_mask is not None:
-                        scratch[:] = 1.0
-                        scratch[self.jac_dist_col_mask] = (1.0 / ndups)
-                        self.J[i] *= scratch
-                    else:
-                        self.J[i] *= (1.0 / ndups)
+                # # if ndups > 1:
+                # #     if self.jac_dist_col_mask is not None:
+                # #         scratch[:] = 1.0
+                # #         scratch[self.jac_dist_col_mask] = (1.0 / ndups)
+                # #         self.J[i] *= scratch
+                # #     else:
+                # #         self.J[i] *= (1.0 / ndups)
             else:
                 scatter = self.jac_scatters[mode]
                 if scatter is not None:
@@ -1582,6 +1584,8 @@ class _TotalJacInfo(object):
                             self._save_linear_solution(cache_key, mode)
                         else:
                             model._solve_linear(mode, rel_systems)
+
+                        # print('TOP SOLVE', 'd_inputs', model._dinputs.asarray(), 'd_outputs', model._doutputs.asarray(), 'd_residuals', model._dresiduals.asarray(), flush=True)
 
                     if debug_print:
                         print(f'Elapsed Time: {time.perf_counter() - t0} secs\n', flush=True)
