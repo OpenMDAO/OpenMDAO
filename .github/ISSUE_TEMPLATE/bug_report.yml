@@ -16,7 +16,6 @@ body:
     attributes:
       label: Example
       description: Please provide an example of the code that triggers the unexpected behavior. If possible, we would appreciate a minimal test case that reproduces the issue. Alternatively, link to a file in another repository where the issue is demonstrated.
-      render: python
     validations:
       required: true
   - type: input
