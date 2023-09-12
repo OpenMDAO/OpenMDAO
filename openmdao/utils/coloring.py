@@ -1047,15 +1047,13 @@ class Coloring(object):
             if coloring._fwd is not None:
                 for idx_fwd, (_cols, _nz_rows) in enumerate(coloring.color_nonzero_iter('fwd')):
                     for _row_idx, _col_idx in zip(_nz_rows, _cols):
-                        fwd_grp_idxs = itertools.product(_row_idx, [_col_idx])
-                        fwd_map.update({(i, j): idx_fwd for i, j in fwd_grp_idxs})
+                        fwd_map.update({(i, _col_idx): idx_fwd for i in _row_idx})
 
             rev_map = {}
             if coloring._rev is not None:
                 for idx_rev, (_rows, _nz_cols) in enumerate(coloring.color_nonzero_iter('rev')):
                     for _row_idx, _col_idx in zip(_rows, _nz_cols):
-                        rev_grp_idxs = itertools.product([_row_idx], _col_idx)
-                        rev_map.update({(i, j): idx_rev for i, j in rev_grp_idxs})
+                        rev_map.update({(_row_idx, j): idx_rev for j in _col_idx})
 
             for i in range(nrows * ncols):
                 r = data['row_idx'][i]
