@@ -1527,8 +1527,30 @@ class Group(System):
                           "`allow_post_setup_reorder` to True or to manually set the execution "
                           "order to the recommended order using `set_order`.")
 
+    def _check_nondist_sizes(self):
+        # verify that nondistributed variables have same size across all procs
+        for io in ('input', 'output'):
+            sizes = self._var_sizes[io]
+            idxs = self._var_allprocs_abs2idx
+            for abs_name, meta in self._var_allprocs_abs2meta[io].items():
+                if not meta['distributed']:
+                    vsizes = sizes[:, idxs[abs_name]]
+                    unique = set(vsizes)
+                    unique.discard(0)
+                    if len(unique) > 1:
+                        # sizes differ, now find which procs don't agree
+                        rnklist = []
+                        for sz in unique:
+                            rnklist.append((sz, [i for i, s in enumerate(vsizes) if s == sz]))
+                        msg = ', '.join([f"rank(s) {r} have size {s}" for s, r in rnklist])
+                        self._collect_error(f"{self.msginfo}: Size of {io} '{abs_name}' "
+                                            f"differs between processes ({msg}).",
+                                            ident=('size', abs_name))
+
     def _top_level_post_sizes(self):
         # this runs after the variable sizes are known
+        self._check_nondist_sizes()
+
         self._setup_global_shapes()
 
         self._resolve_ambiguous_input_meta()

@@ -371,7 +371,7 @@ class _TotalJacInfo(object):
                 if self.has_output_dist['rev']:
                     sizes = model._var_sizes['output']
                     abs2idx = model._var_allprocs_abs2idx
-                    self.jac_dist_col_mask = mask = np.ones(J.shape[1], dtype=bool)
+                    self.jac_dist_col_mask = mask = np.zeros(J.shape[1], dtype=bool)
                     start = end = 0
                     for name in self.wrt:
                         meta = abs2meta_out[name]
@@ -381,7 +381,7 @@ class _TotalJacInfo(object):
                             # remote vars, which are zero everywhere except for one proc
                             sz = sizes[:, abs2idx[name]]
                             if np.count_nonzero(sz) > 1:
-                                mask[start:end] = False
+                                mask[start:end] = True
                         start = end
 
         if not approx:
@@ -736,22 +736,23 @@ class _TotalJacInfo(object):
 
             dist = in_var_meta['distributed']
             if dist:
-                if self.jac_dist_col_mask is None:
-                    ndups = 1  # we don't divide by ndups for distributed inputs
-                else:
-                    ndups = np.count_nonzero(sizes[:, in_var_idx])
+                pass
+                # if self.jac_dist_col_mask is None:
+                #     ndups = 1  # we don't divide by ndups for distributed inputs
+                # else:
+                #     ndups = np.count_nonzero(sizes[:, in_var_idx])
             else:
                 # if the var is not distributed, convert the indices to global.
                 # We don't iterate over the full distributed size in this case.
                 irange += gstart
 
-                if fwd or parallel_deriv_color:
-                    ndups = 1
-                else:
-                    # find the number of duplicate components in rev mode so we can divide
-                    # the seed between 'ndups' procs so that at the end after we do an
-                    # Allreduce, the contributions from all procs will add up properly.
-                    ndups = np.count_nonzero(sizes[:, in_var_idx])
+                # if fwd or parallel_deriv_color:
+                #     ndups = 1
+                # else:
+                #     # find the number of duplicate components in rev mode so we can divide
+                #     # the seed between 'ndups' procs so that at the end after we do an
+                #     # Allreduce, the contributions from all procs will add up properly.
+                #     ndups = np.count_nonzero(sizes[:, in_var_idx])
 
             ndups = 1
 
@@ -805,10 +806,12 @@ class _TotalJacInfo(object):
                 relsystems = relevant[path]['@all'][1]
                 if self.total_relevant_systems is not _contains_all:
                     self.total_relevant_systems.update(relsystems)
-                tup = (ndups, relsystems, cache_lin_sol, name)
+                # tup = (ndups, relsystems, cache_lin_sol, name)
+                tup = (dist, relsystems, cache_lin_sol, name)
             else:
                 self.total_relevant_systems = _contains_all
-                tup = (ndups, _contains_all, cache_lin_sol, name)
+                # tup = (ndups, _contains_all, cache_lin_sol, name)
+                tup = (dist, _contains_all, cache_lin_sol, name)
 
             idx_map.extend([tup] * (end - start))
             start = end
@@ -1334,9 +1337,21 @@ class _TotalJacInfo(object):
         elif mode == 'rev':
             # for rows corresponding to serial 'of' vars, we need to correct for
             # duplication of their seed values by dividing by the number of duplications.
-            ndups, _, _, _ = self.in_idx_map[mode][i]
+            # ndups, _, _, _ = self.in_idx_map[mode][i]
+            dist, _, _, _ = self.in_idx_map[mode][i]
             if self.get_remote:
-                scratch = self.jac_scratch['rev'][0]
+                if self.jac_dist_col_mask is not None:
+                    distpart = self.J[i, :][self.jac_dist_col_mask]
+                    scratch = np.zeros(distpart.shape, dtype=distpart.dtype)
+                    # only sum up the distrib parts
+                    self.comm.Allreduce(distpart, scratch, op=MPI.SUM)
+                    self.J[i][self.jac_dist_col_mask] = scratch
+                elif dist:
+                    scratch = self.jac_scratch['rev'][0]
+                    scratch[:] = self.J[i]
+                    self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
+
+                # scratch = self.jac_scratch['rev'][0]
                 # scratch[:] = self.J[i]
 
                 # # self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
@@ -1363,11 +1378,11 @@ class _TotalJacInfo(object):
                     scatter.scatter(self.src_petsc[mode], self.tgt_petsc[mode],
                                     addv=True, mode=False)
                     if loc >= 0:
-                        if ndups > 1:
-                            self.J[loc, :][self.nondist_loc_map[mode]] = \
-                                self.tgt_petsc[mode].array * (1.0 / ndups)
-                        else:
-                            self.J[loc, :][self.nondist_loc_map[mode]] = self.tgt_petsc[mode].array
+                        # if ndups > 1:
+                        #     self.J[loc, :][self.nondist_loc_map[mode]] = \
+                        #         self.tgt_petsc[mode].array * (1.0 / ndups)
+                        # else:
+                        self.J[loc, :][self.nondist_loc_map[mode]] = self.tgt_petsc[mode].array
 
     def single_jac_setter(self, i, mode, meta):
         """

@@ -77,8 +77,6 @@ class DistribExecComp(om.ExecComp):
             allvars.update(v)
 
         sizes, offsets = evenly_distrib_idxs(comm.size, self.arr_size)
-        start = offsets[rank]
-        end = start + sizes[rank]
 
         for name in outs:
             if name not in kwargs or not isinstance(kwargs[name], dict):
@@ -113,6 +111,40 @@ class DistribCoordComp(om.ExplicitComponent):
             outputs['outvec'] = inputs['invec'] * 2.0
         else:
             outputs['outvec'] = inputs['invec'] * 3.0
+
+
+class SimpleMixedDistrib2(om.ExplicitComponent):
+
+    def setup(self):
+        self.add_input('in_dist', shape_by_conn=True, distributed=True)
+        self.add_input('in_nd', shape_by_conn=True)
+        self.add_output('out_dist', copy_shape='in_dist', distributed=True)
+        self.add_output('out_nd', copy_shape='in_nd')
+
+    def compute(self, inputs, outputs):
+        outputs['out_nd'] = inputs['in_nd'] * 3.
+        outputs['out_dist'] = inputs['in_dist'] * 5.
+
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        Id = inputs['in_dist']
+        Is = inputs['in_nd']
+
+        if mode == 'fwd':
+            if 'out_dist' in d_outputs:
+                if 'in_dist' in d_inputs:
+                    d_outputs['out_dist'] += 5. * d_inputs['in_dist']
+            if 'out_nd' in d_outputs:
+                if 'in_nd' in d_inputs:
+                    d_outputs['out_nd'] += 3. * d_inputs['in_nd']
+
+        else:
+            if 'out_dist' in d_outputs:
+                if 'in_dist' in d_inputs:
+                    d_inputs['in_dist'] += 5. * d_outputs['out_dist']
+
+            if 'out_nd' in d_outputs:
+                if 'in_nd' in d_inputs:
+                    d_inputs['in_nd'] += 3. * d_outputs['out_nd']
 
 
 class MixedDistrib2(om.ExplicitComponent):  # for double diamond case
@@ -685,11 +717,11 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        J = prob.check_totals(method='fd', show_only_incorrect=True)
-        assert_near_equal(J['sub.parab.f_xy', 'p.x']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['sub.parab.f_xy', 'p.y']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['sub.sum.f_sum', 'p.x']['abs error'].forward, 0.0, 1e-5)
-        assert_near_equal(J['sub.sum.f_sum', 'p.y']['abs error'].forward, 0.0, 1e-5)
+        data = prob.check_totals(method='fd', show_only_incorrect=True)
+        assert_near_equal(data['sub.parab.f_xy', 'p.x']['abs error'].forward, 0.0, 1e-5)
+        assert_near_equal(data['sub.parab.f_xy', 'p.y']['abs error'].forward, 0.0, 1e-5)
+        assert_near_equal(data['sub.sum.f_sum', 'p.x']['abs error'].forward, 0.0, 1e-5)
+        assert_near_equal(data['sub.sum.f_sum', 'p.y']['abs error'].forward, 0.0, 1e-5)
 
         # rev mode
 
@@ -845,7 +877,7 @@ class MPITests2(unittest.TestCase):
             assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][mode_idx[mode]], 0.0, 1e-14)
             assert_near_equal(J['sum.f_sum', 'p.y']['abs error'][mode_idx[mode]], 0.0, 1e-14)
 
-    def run_mixed_distrib2_prob(self, mode):
+    def run_mixed_distrib2_prob(self, mode, klass=MixedDistrib2):
         size = 5
         comm = MPI.COMM_WORLD
         rank = comm.rank
@@ -859,7 +891,7 @@ class MPITests2(unittest.TestCase):
         ivc.add_output('x_nd', np.zeros(size))
 
         model.add_subsystem("indep", ivc)
-        model.add_subsystem("D1", MixedDistrib2())
+        model.add_subsystem("D1", klass())
 
         model.connect('indep.x_dist', 'D1.in_dist')
         model.connect('indep.x_nd', 'D1.in_nd')
@@ -887,6 +919,12 @@ class MPITests2(unittest.TestCase):
 
     def test_distrib_mixeddistrib2_totals_rev(self):
         prob = self.run_mixed_distrib2_prob('rev')
+
+        totals = prob.check_totals(show_only_incorrect=True, method='cs')
+        assert_check_totals(totals)
+
+    def test_distrib_simplemixeddistrib2_totals_rev(self):
+        prob = self.run_mixed_distrib2_prob('rev', klass=SimpleMixedDistrib2)
 
         totals = prob.check_totals(show_only_incorrect=True, method='cs')
         assert_check_totals(totals)

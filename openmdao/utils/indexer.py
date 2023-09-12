@@ -271,8 +271,6 @@ class Indexer(object):
                 raise
             self._shaped_inst = None
 
-        self._src_shape = sshape
-
         return self
 
     def to_json(self):
@@ -344,6 +342,24 @@ class ShapedIntIndexer(Indexer):
             String representation.
         """
         return f"{self._idx}"
+
+    def apply_offset(self, offset, flat=True):
+        """
+        Apply an offset to this index.
+
+        Parameters
+        ----------
+        offset : int
+            The offset to apply.
+        flat : bool
+            If True, return a flat index.
+
+        Returns
+        -------
+        int
+            The offset index.
+        """
+        return self._idx + offset
 
     def copy(self):
         """
@@ -519,6 +535,24 @@ class ShapedSliceIndexer(Indexer):
             String representation.
         """
         return f"{self._slice}"
+
+    def apply_offset(self, offset, flat=True):
+        """
+        Apply an offset to this index.
+
+        Parameters
+        ----------
+        offset : int
+            The offset to apply.
+        flat : bool
+            If True, return a flat index.
+
+        Returns
+        -------
+        slice
+            The offset slice.
+        """
+        return slice(self._slice.start + offset, self._slice.stop + offset, self._slice.step)
 
     def copy(self):
         """

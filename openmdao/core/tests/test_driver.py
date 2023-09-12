@@ -931,6 +931,11 @@ class TestDriverMPI(unittest.TestCase):
 
                 outputs['y'] = np.sum(y_g) + (inputs['w']-10)**2
                 outputs['z'] = x**2
+                print('-------------')
+                print(self.comm.rank, 'x', x)
+                print(self.comm.rank, 'w', inputs['w'])
+                print(self.comm.rank, 'y', outputs['y'])
+                print(self.comm.rank, 'z', outputs['z'])
 
             def compute_partials(self, inputs, J):
                 x = inputs['x']
@@ -947,10 +952,10 @@ class TestDriverMPI(unittest.TestCase):
                                     promotes=['*'])
         d_ivc.add_output('x', 2*np.ones(size))
 
-        # non-distributed indep var, 'w'
+        # distributed indep var, 'w'
         ivc = model.add_subsystem('ivc', om.IndepVarComp(distributed=False),
                                   promotes=['*'])
-        ivc.add_output('w', size)
+        ivc.add_output('w')
 
         # distributed component, 'dc'
         model.add_subsystem('dc', DistribComp(), promotes=['*'])
@@ -994,8 +999,8 @@ class TestDriverMPI(unittest.TestCase):
         # run driver
         p.run_driver()
 
-        assert_near_equal(p.get_val('dc.y', get_remote=True), [81, 96])
         assert_near_equal(p.get_val('dc.z', get_remote=True), [25, 25, 25, 81, 81])
+        assert_near_equal(p.get_val('dc.y', get_remote=True), [81, 96])
 
     def test_distrib_desvar_bug(self):
         class MiniModel(om.Group):

@@ -5476,10 +5476,10 @@ class System(object):
                 if vshape is not None:
                     val = val.reshape(vshape)
             else:
+                var_idx = self._var_allprocs_abs2idx[src]
+                sizes = self._var_sizes['output'][:, var_idx]
                 if distrib and (sdistrib or dynshape or not slocal) and not get_remote:
-                    var_idx = self._var_allprocs_abs2idx[src]
                     # sizes for src var in each proc
-                    sizes = self._var_sizes['output'][:, var_idx]
                     start = np.sum(sizes[:self.comm.rank])
                     end = start + sizes[self.comm.rank]
                     src_indices = src_indices.shaped_array(copy=True)
@@ -5498,7 +5498,12 @@ class System(object):
                                            "`get_val(<name>, get_remote=True)`.")
                 else:
                     if src_indices._flat_src:
-                        val = val.ravel()[src_indices.flat()]
+                        if distrib and not sdistrib:
+                            start = np.sum(sizes[:self.comm.rank])
+                            sinds = src_indices.apply_offset(-start, flat=True)
+                        else:
+                            sinds = src_indices.flat()
+                        val = val.ravel()[sinds]
                         # if at component level, just keep shape of the target and don't flatten
                         if not flat and not is_prom:
                             shp = vmeta['shape']
@@ -5909,7 +5914,7 @@ class System(object):
         else:
             io = 'input'
             scope = self
-        # io = 'output' if abs_name in self._var_allprocs_abs2meta['output'] else 'input'
+
         meta = scope._var_allprocs_abs2meta[io][abs_name]
         var_idx = scope._var_allprocs_abs2idx[abs_name]
         global_size = np.sum(scope._var_sizes[io][:, var_idx])

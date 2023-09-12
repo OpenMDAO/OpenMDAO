@@ -188,25 +188,37 @@ else:
                     fwd_xfer_in[sub_in].append(input_inds)
                     fwd_xfer_out[sub_in].append(output_inds)
                     if rev:
+                        iowninput = myproc == group._owning_rank[abs_in]
+                        distrib_in = meta_in['distributed']
+                        distrib_out = meta_out['distributed']
                         sub_out = abs_out[mypathlen:].partition('.')[0]
                         if inp_is_dup and abs_out not in abs2meta_out:
-                            # print(group.pathname, 'rank', group.comm.rank, ':', 'NOT DOING', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
+                            print(group.pathname, 'rank', group.comm.rank, ':', 'NOT DOING', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
                             rev_xfer_in[sub_out]
                             rev_xfer_out[sub_out]
-                        elif not inp_is_dup and out_is_dup and myproc == group._owning_rank[abs_in]:
+                        elif inp_is_dup and distrib_out and not iowninput:
+                            print(group.pathname, 'rank', group.comm.rank, ':', 'NOT DOING', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
+                            rev_xfer_in[sub_out]
+                            rev_xfer_out[sub_out]
+                        elif out_is_dup and not inp_is_dup and (iowninput or distrib_in):
                             oidxlist = []
                             iidxlist = []
                             for rnk in get_xfer_ranks(abs_out, 'output'):
                                 offset = offsets_out[rnk, idx_out]
-                                oidxlist.append(np.arange(offset, offset + meta_in['size'], dtype=INT_DTYPE))
-                                iidxlist.append(input_inds)
+                                if src_indices is None:
+                                    oidxlist.append(np.arange(offset, offset + meta_in['size'], dtype=INT_DTYPE))
+                                    iidxlist.append(input_inds)
+                                elif src_indices.size > 0:
+                                    offset -= np.sum(sizes_out[:rnk, idx_out])
+                                    oidxlist.append(np.asarray(src_indices + offset, dtype=INT_DTYPE))
+                                    iidxlist.append(input_inds)
                             input_inds = np.concatenate(iidxlist)
                             output_inds = np.concatenate(oidxlist)
-                            # print('MULTI', group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
+                            print('MULTI', group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
                             rev_xfer_in[sub_out].append(input_inds)
                             rev_xfer_out[sub_out].append(output_inds)
                         else:
-                            # print(group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
+                            print(group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
                             rev_xfer_in[sub_out].append(input_inds)
                             rev_xfer_out[sub_out].append(output_inds)
                 else:
