@@ -786,6 +786,24 @@ class ShapedArrayIndexer(Indexer):
         """
         return _truncate(f"{self._arr}".replace('\n', ''))
 
+    def apply_offset(self, offset, flat=True):
+        """
+        Apply an offset to this index.
+
+        Parameters
+        ----------
+        offset : int
+            The offset to apply.
+        flat : bool
+            If True, return a flat index.
+
+        Returns
+        -------
+        slice
+            The offset slice.
+        """
+        return self.as_array(flat=flat) + offset
+
     def copy(self):
         """
         Copy this Indexer.
@@ -990,6 +1008,26 @@ class ShapedMultiIndexer(Indexer):
             String representation.
         """
         return str(self._tup)
+
+    def apply_offset(self, offset, flat=True):
+        """
+        Apply an offset to this index.
+
+        Parameters
+        ----------
+        offset : int
+            The offset to apply.
+        flat : bool
+            If True, return a flat index.
+
+        Returns
+        -------
+        ndarray
+            The offset array.
+        """
+        if flat:
+            return self.flat() + offset
+        return self.as_array(flat=False) + offset
 
     def copy(self):
         """
@@ -1202,6 +1240,24 @@ class EllipsisIndexer(Indexer):
             String representation.
         """
         return f"{self._tup}"
+
+    def apply_offset(self, offset, flat=True):
+        """
+        Apply an offset to this index.
+
+        Parameters
+        ----------
+        offset : int
+            The offset to apply.
+        flat : bool
+            If True, return a flat index.
+
+        Returns
+        -------
+        ndarray
+            The offset array.
+        """
+        return self.as_array(flat=flat) + offset
 
     def copy(self):
         """

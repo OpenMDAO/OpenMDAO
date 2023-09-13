@@ -999,8 +999,8 @@ class TestDriverMPI(unittest.TestCase):
         # run driver
         p.run_driver()
 
+        assert_near_equal(p.get_val('dc.y', get_remote=True), [113, 113])
         assert_near_equal(p.get_val('dc.z', get_remote=True), [25, 25, 25, 81, 81])
-        assert_near_equal(p.get_val('dc.y', get_remote=True), [81, 96])
 
     def test_distrib_desvar_bug(self):
         class MiniModel(om.Group):

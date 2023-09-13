@@ -91,7 +91,7 @@ class _TotalJacInfo(object):
         (local indices, local sizes).
     in_idx_map : dict
         Mapping of jacobian row/col index to a tuple of the form
-        (ndups, relevant_systems, cache_linear_solutions_flag)
+        (dist, relevant_systems, cache_linear_solutions_flag)
     total_relevant_systems : set
         The set of names of all systems relevant to the computation of the total derivatives.
     directional : bool
@@ -669,6 +669,8 @@ class _TotalJacInfo(object):
             non_rel_outs = False
 
         for name in input_list:
+            parallel_deriv_color = None
+
             if name in self.responses and self.responses[name]['alias'] is not None:
                 path = self.responses[name]['source']
             else:
@@ -694,7 +696,7 @@ class _TotalJacInfo(object):
                 cache_lin_sol = meta['cache_linear_solution']
 
                 _check_voi_meta(name, parallel_deriv_color, simul_coloring)
-                if parallel_deriv_color:
+                if parallel_deriv_color is not None:
                     if parallel_deriv_color not in self.par_deriv_printnames:
                         self.par_deriv_printnames[parallel_deriv_color] = []
 
@@ -715,7 +717,7 @@ class _TotalJacInfo(object):
             else:  # name is not a design var or response  (should only happen during testing)
                 end += in_var_meta['global_size']
                 irange = np.arange(in_var_meta['global_size'], dtype=INT_DTYPE)
-                in_idxs = parallel_deriv_color = None
+                in_idxs = None
                 cache_lin_sol = False
 
             in_var_idx = abs2idx[path]
@@ -726,7 +728,7 @@ class _TotalJacInfo(object):
 
             # if we're doing parallel deriv coloring, we only want to set the seed on one proc
             # for each var in a given color
-            if parallel_deriv_color:
+            if parallel_deriv_color is not None:
                 if fwd:
                     relev = relevant[name]['@all'][0]['output']
                 else:
@@ -1240,6 +1242,8 @@ class _TotalJacInfo(object):
 
         dist = self.comm.size > 1
 
+        self.model._problem_meta['parallel_deriv_color'] = imeta['par_deriv_color']
+
         for i in inds:
             if not dist or self.in_loc_idxs[mode][i] >= 0:
                 rel_systems, vnames, _ = self.single_input_setter(i, imeta, mode)
@@ -1441,6 +1445,8 @@ class _TotalJacInfo(object):
         else:
             for i in inds:
                 self.simple_single_jac_scatter(i, mode)
+
+        self.model._problem_meta['parallel_deriv_color'] = None
 
     def simul_coloring_jac_setter(self, inds, mode, meta):
         """

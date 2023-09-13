@@ -56,7 +56,7 @@ else:
                                                    in_indexset).scatter
 
         @staticmethod
-        def _setup_transfers(group):
+        def _setup_transfers(group, desvars, responses):
             """
             Compute all transfers that are owned by our parent group.
 
@@ -64,11 +64,15 @@ else:
             ----------
             group : <Group>
                 Parent group.
+            desvars : dict
+                Dictionary of all design variable metadata. Keyed by absolute source name or alias.
+            responses : dict
+                Dictionary of all response variable metadata. Keyed by absolute source name or alias.
             """
             rev = group._mode != 'fwd'
 
             for subsys in group._subgroups_myproc:
-                subsys._setup_transfers()
+                subsys._setup_transfers(desvars, responses)
 
             abs2meta_in = group._var_abs2meta['input']
             abs2meta_out = group._var_abs2meta['output']
@@ -86,8 +90,14 @@ else:
             fwd_xfer_in = defaultdict(list)
             fwd_xfer_out = defaultdict(list)
             if rev:
+                has_rev_par_coloring = any([m['parallel_deriv_color'] is not None
+                                            for m in responses.values()])
                 rev_xfer_in = defaultdict(list)
                 rev_xfer_out = defaultdict(list)
+
+                # xfers that are only active when parallel coloring is not active
+                rev_xfer_in_nocolor = defaultdict(list)
+                rev_xfer_out_nocolor = defaultdict(list)
 
             allprocs_abs2idx = group._var_allprocs_abs2idx
             sizes_in = group._var_sizes['input']
@@ -98,8 +108,6 @@ else:
             def is_dup(name, io):
                 if group._var_allprocs_abs2meta[io][name]['distributed']:
                     return False  # distributed vars are never dups
-                # if group.comm.rank == group._owning_rank[name]:
-                #     return False  # this is the owner, not a dup
                 return np.count_nonzero(group._var_sizes[io][:, allprocs_abs2idx[name]]) > 1
 
             def get_xfer_ranks(name, io):
@@ -192,31 +200,43 @@ else:
                         distrib_in = meta_in['distributed']
                         distrib_out = meta_out['distributed']
                         sub_out = abs_out[mypathlen:].partition('.')[0]
-                        if inp_is_dup and abs_out not in abs2meta_out:
-                            print(group.pathname, 'rank', group.comm.rank, ':', 'NOT DOING', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
-                            rev_xfer_in[sub_out]
-                            rev_xfer_out[sub_out]
-                        elif inp_is_dup and distrib_out and not iowninput:
+                        if inp_is_dup and (abs_out not in abs2meta_out or (distrib_out and not iowninput)):
                             print(group.pathname, 'rank', group.comm.rank, ':', 'NOT DOING', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
                             rev_xfer_in[sub_out]
                             rev_xfer_out[sub_out]
                         elif out_is_dup and not inp_is_dup and (iowninput or distrib_in):
                             oidxlist = []
                             iidxlist = []
+                            oidxlist_nc = []
+                            iidxlist_nc = []
                             for rnk in get_xfer_ranks(abs_out, 'output'):
                                 offset = offsets_out[rnk, idx_out]
                                 if src_indices is None:
-                                    oidxlist.append(np.arange(offset, offset + meta_in['size'], dtype=INT_DTYPE))
-                                    iidxlist.append(input_inds)
+                                    oarr = np.arange(offset, offset + meta_in['size'], dtype=INT_DTYPE)
+                                    iarr = input_inds
                                 elif src_indices.size > 0:
                                     offset -= np.sum(sizes_out[:rnk, idx_out])
-                                    oidxlist.append(np.asarray(src_indices + offset, dtype=INT_DTYPE))
-                                    iidxlist.append(input_inds)
-                            input_inds = np.concatenate(iidxlist)
-                            output_inds = np.concatenate(oidxlist)
-                            print('MULTI', group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
+                                    oarr = np.asarray(src_indices + offset, dtype=INT_DTYPE)
+                                    iarr = input_inds
+                                if rnk == myproc or not has_rev_par_coloring:
+                                    oidxlist.append(oarr)
+                                    iidxlist.append(iarr)
+                                else:
+                                    oidxlist_nc.append(oarr)
+                                    iidxlist_nc.append(iarr)
+
+                            input_inds = np.concatenate(iidxlist) if len(iidxlist) > 1 else iidxlist[0]
+                            output_inds = np.concatenate(oidxlist) if len(oidxlist) > 1 else oidxlist[0]
                             rev_xfer_in[sub_out].append(input_inds)
                             rev_xfer_out[sub_out].append(output_inds)
+                            print('MULTI', group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
+
+                            if has_rev_par_coloring and iidxlist_nc:
+                                input_inds = np.concatenate(iidxlist_nc) if len(iidxlist_nc) > 1 else iidxlist_nc[0]
+                                output_inds = np.concatenate(oidxlist_nc) if len(oidxlist_nc) > 1 else oidxlist_nc[0]
+
+                                rev_xfer_in_nocolor[sub_out].append(input_inds)
+                                rev_xfer_out_nocolor[sub_out].append(output_inds)
                         else:
                             print(group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
                             rev_xfer_in[sub_out].append(input_inds)
@@ -231,14 +251,21 @@ else:
                         sub_out = abs_out[mypathlen:].partition('.')[0]
                         rev_xfer_in[sub_out]
                         rev_xfer_out[sub_out]
+                        if has_rev_par_coloring:
+                            rev_xfer_in_nocolor[sub_out]
+                            rev_xfer_out_nocolor[sub_out]
 
             for sname, inds in fwd_xfer_in.items():
                 fwd_xfer_in[sname] = _merge(inds)
                 fwd_xfer_out[sname] = _merge(fwd_xfer_out[sname])
+
             if rev:
                 for sname, inds in rev_xfer_out.items():
                     rev_xfer_in[sname] = _merge(rev_xfer_in[sname])
                     rev_xfer_out[sname] = _merge(inds)
+                for sname, inds in rev_xfer_out_nocolor.items():
+                    rev_xfer_in_nocolor[sname] = _merge(rev_xfer_in_nocolor[sname])
+                    rev_xfer_out_nocolor[sname] = _merge(inds)
 
             if fwd_xfer_in:
                 xfer_in = np.concatenate(list(fwd_xfer_in.values()))
@@ -266,13 +293,8 @@ else:
                 else:
                     xfer_in = xfer_out = np.zeros(0, dtype=INT_DTYPE)
 
-                # print(group.comm.rank, "MAKING rev global xfer", xfer_out, "-->", xfer_in, flush=True)
                 xfer_all = PETScTransfer(vectors['input']['nonlinear'], out_vec,
                                          xfer_in, xfer_out, group.comm)
-                # print(group.comm.rank, "DONE MAKING rev global xfer", flush=True)
-
-                # print("outputs:", list(group._outputs.keys()), flush=True)
-                # print("inputs:", list(group._inputs.keys()), flush=True)
 
                 transfers['rev'] = xrev = {}
                 xrev[None] = xfer_all
@@ -282,7 +304,18 @@ else:
                         vectors['input']['nonlinear'], vectors['output']['nonlinear'],
                         rev_xfer_in[sname], inds, group.comm)
 
-            # print(group.comm.rank, 'returning from setup_transfers', flush=True)
+                if has_rev_par_coloring and rev_xfer_in_nocolor:
+                    xfer_in = np.concatenate(list(rev_xfer_in_nocolor.values()))
+                    xfer_out = np.concatenate(list(rev_xfer_out_nocolor.values()))
+
+                    xrev[(None, 'nocolor')] = PETScTransfer(vectors['input']['nonlinear'], out_vec,
+                                                            xfer_in, xfer_out, group.comm)
+
+                    for sname, inds in rev_xfer_out_nocolor.items():
+                        transfers['rev'][(sname, 'nocolor')] = PETScTransfer(
+                            vectors['input']['nonlinear'], vectors['output']['nonlinear'],
+                            rev_xfer_in_nocolor[sname], inds, group.comm)
+
 
         def _transfer(self, in_vec, out_vec, mode='fwd'):
             """

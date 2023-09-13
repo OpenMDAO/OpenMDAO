@@ -2236,9 +2236,16 @@ class System(object):
             subsys._scale_factors = self._scale_factors
             subsys._setup_vectors(root_vectors)
 
-    def _setup_transfers(self):
+    def _setup_transfers(self, desvars, responses):
         """
         Compute all transfers that are owned by this system.
+
+        Parameters
+        ----------
+        desvars : dict
+            Dictionary of all design variable metadata. Keyed by absolute source name or alias.
+        responses : dict
+            Dictionary of all response variable metadata. Keyed by absolute source name or alias.
         """
         pass
 

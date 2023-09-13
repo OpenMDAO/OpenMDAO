@@ -1003,6 +1003,8 @@ class Problem(object):
             'model_options': self.model_options,  # A dict of options passed to all systems in tree
             'allow_post_setup_reorder': self.options['allow_post_setup_reorder'],  # see option
             'singular_jac_behavior': 'warn',  # How to handle singular jac conditions
+            'parallel_deriv_color': None,  # None unless derivatives involving a parallel deriv
+                                           # colored dv/response are currently being computed
         }
 
         if _prob_setup_stack:

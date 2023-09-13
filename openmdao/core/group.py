@@ -186,10 +186,10 @@ class Group(System):
         Sorted list of pathnames of components that are executed prior to the optimization loop.
     _post_components : list of str or None
         Sorted list of pathnames of components that are executed after the optimization loop.
-    _abs_desvars : set
-        Set of absolute design variable names.
-    _abs_responses : set
-        Set of absolute response names.
+    _abs_desvars : dict or None
+        Dict of absolute design variable metadata.
+    _abs_responses : dict or None
+        Dict of absolute response metadata.
     _relevance_graph : nx.DiGraph
         Graph of relevance connections.  Always None except in the top level Group.
     """
@@ -787,15 +787,13 @@ class Group(System):
         dict
             The relevance dictionary.
         """
-        abs_desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
-        abs_responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
-        self._abs_desvars = set(_src_name_iter(abs_desvars))
-        self._abs_responses = set(_src_name_iter(abs_responses))
+        self._abs_desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
+        self._abs_responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
         assert self.pathname == '', "Relevance can only be initialized on the top level System."
 
         if self._use_derivatives:
-            return self.get_relevant_vars(abs_desvars,
-                                          self._check_alias_overlaps(abs_responses), mode)
+            return self.get_relevant_vars(self._abs_desvars,
+                                          self._check_alias_overlaps(self._abs_responses), mode)
 
         return {'@all': ({'input': ContainsAll(), 'output': ContainsAll()}, ContainsAll())}
 
@@ -1272,7 +1270,7 @@ class Group(System):
         self._setup_vectors(self._get_root_vectors())
 
         # Transfers do not require recursion, but they have to be set up after the vector setup.
-        self._setup_transfers()
+        self._setup_transfers(self._abs_desvars, self._abs_responses)
 
         # Same situation with solvers, partials, and Jacobians.
         # If we're updating, we just need to re-run setup on these, but no recursion necessary.
@@ -3131,10 +3129,17 @@ class Group(System):
             if xfer is not None:
                 if self._has_input_scaling:
                     vec_inputs.scale_to_norm(mode='rev')
-                    xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
+
+                xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
+
+                if self._problem_meta['parallel_deriv_color'] is None:
+                    key = (sub, 'nocolor')
+                    if key in self._transfers['rev']:
+                        xfer = self._transfers['rev'][key]
+                        xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
+
+                if self._has_input_scaling:
                     vec_inputs.scale_to_phys(mode='rev')
-                else:
-                    xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
 
     def _discrete_transfer(self, sub):
         """
@@ -3195,11 +3200,18 @@ class Group(System):
                                 src_val = src_sys._discrete_outputs[src]
                             tgt_sys._discrete_inputs[tgt] = src_val
 
-    def _setup_transfers(self):
+    def _setup_transfers(self, desvars, responses):
         """
         Compute all transfers that are owned by this system.
+
+        Parameters
+        ----------
+        desvars : dict
+            Dictionary of all design variable metadata. Keyed by absolute source name or alias.
+        responses : dict
+            Dictionary of all response variable metadata. Keyed by absolute source name or alias.
         """
-        self._vector_class.TRANSFER._setup_transfers(self)
+        self._vector_class.TRANSFER._setup_transfers(self, desvars, responses)
         if self._conn_discrete_in2out:
             self._vector_class.TRANSFER._setup_discrete_transfers(self)
 
