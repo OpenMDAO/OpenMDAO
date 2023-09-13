@@ -187,7 +187,7 @@ setup(
     },
     python_requires=">=3.7",
     install_requires=[
-        'networkx>=2.0',
+        'networkx>=3.0',
         'numpy',
         'scipy',
         'requests',
