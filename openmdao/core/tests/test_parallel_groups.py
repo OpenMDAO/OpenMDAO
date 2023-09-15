@@ -642,7 +642,6 @@ class TestDesvarResponseOrdering(unittest.TestCase):
                 self.add_design_var('comp.x', 3.0)
                 self.add_constraint('comp.y', lower=4.0)
 
-
         class MyPhases(om.ParallelGroup):
             def setup(self):
                 self.add_subsystem('climb', MyPhase())
