@@ -4828,7 +4828,7 @@ class Group(System):
             for s in sorted(self._subsystems_allprocs):
                 yield s
         else:
-            yield from self._subsystems_myproc
+            yield from self._subsystems_allprocs
 
     def _solver_subsystem_iter(self, local_only=False):
         """
