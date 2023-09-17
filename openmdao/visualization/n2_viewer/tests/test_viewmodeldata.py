@@ -68,6 +68,7 @@ class TestViewerData(unittest.TestCase):
     def setUp(self):
         if not DEBUG_FILES:
             self.dir = mkdtemp()
+            os.chdir(self.dir)
         else:
             self.dir = os.getcwd()
 
@@ -75,6 +76,7 @@ class TestViewerData(unittest.TestCase):
 
     def tearDown(self):
         if not DEBUG_FILES:
+            os.chdir(self.parent_dir)
             try:
                 rmtree(self.dir)
             except OSError as e:
