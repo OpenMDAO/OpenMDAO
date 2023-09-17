@@ -341,6 +341,136 @@ class TestViewerData(unittest.TestCase):
         np.testing.assert_equal(viewer_data['tree']['children'][1]['options']['arr'],
                                 np.ones(2))
 
+    def test_system_option_too_large(self):
+        class SystemWithLargeOption(om.ExplicitComponent):
+            def initialize(self):
+                self.options.declare('large_option', types=(np.ndarray,))
+
+            def setup(self):
+                self.add_input('x', val=0.0)
+                self.add_output('f_x', val=0.0)
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                outputs['f_x'] = (x - 3.0) ** 2
+
+        prob = om.Problem()
+        comp = prob.model.add_subsystem('comp', SystemWithLargeOption())
+        comp.options['large_option'] = np.zeros(int(1e6))
+        prob.setup()
+
+        viewer_data = _get_viewer_data(prob)
+        self.assertEqual(viewer_data['tree']['children'][1]['options']['large_option'],
+                         'Too Large to Display')
+
+    def check_viewer_data_with_submodel(self, sql_filename):
+        # create sub problem
+        submodel = om.Group()
+        submodel.add_subsystem('subcomp', om.ExecComp('y = x1**2 + x2**2 + x3**2'), promotes=['*'])
+
+        subprob = om.Problem(name='subproblem', model=submodel)
+
+        # create top-level problem
+        p = om.Problem(name='top')
+        p.model.add_subsystem('submodelcomp',
+                              om.SubmodelComp(problem=subprob, inputs=['*'], outputs=['*']),
+                              promotes=['*'])
+        p.model.add_subsystem('supercomp',
+                              om.ExecComp('z = 3 * y'),
+                              promotes=['*'])
+
+        p.model.add_recorder(om.SqliteRecorder(sql_filename))
+
+        p.setup()
+        p.final_setup()
+
+        # extract viewer data from N2 for problem and subproblem
+        om.n2(p, title='N2 for Problem', outfile='N2problem.html',
+              show_browser=DEBUG_BROWSER)
+        problem_data = extract_compressed_model('N2problem.html')
+
+        om.n2(subprob, title='N2 for SubProblem', outfile='N2subprob.html',
+              show_browser=DEBUG_BROWSER)
+        subprob_data = extract_compressed_model('N2subprob.html')
+
+        self.maxDiff = None
+
+        # check problem data generated from recording against data generated from problem
+        check_call(f"openmdao n2 {sql_filename} -o N2recording.html"
+                   f"{' --no_browser' if not DEBUG_BROWSER else ''}")
+        recording_data = extract_compressed_model('N2recording.html')
+
+        self.assertDictEqual(problem_data, recording_data)
+
+        # source for run script, copied from above (without the recorder)
+        src = """if __name__ == '__main__':
+        import openmdao.api as om
+
+        # create sub problem
+        submodel = om.Group()
+        submodel.add_subsystem('subcomp', om.ExecComp('y = x1**2 + x2**2 + x3**2'), promotes=['*'])
+
+        subprob = om.Problem(name='subproblem', model=submodel)
+
+        # create top-level problem
+        p = om.Problem(name='top')
+        p.model.add_subsystem('submodelcomp',
+                              om.SubmodelComp(problem=subprob, inputs=['*'], outputs=['*']),
+                              promotes=['*'])
+        p.model.add_subsystem('supercomp',
+                              om.ExecComp('z = 3 * y'),
+                              promotes=['*'])
+
+        p.setup()
+        p.final_setup()
+
+        # verify model runs correctly
+        p.set_val('x1', 1)
+        p.set_val('x2', 2)
+        p.set_val('x3', 3)
+
+        p.run_model()
+        """
+        with open("submodel_script.py", 'w') as f:
+            f.write(src)
+
+        # check problem data generated from script against data generated from problem
+        check_call("openmdao n2 submodel_script.py -o N2_top.html"
+                   f"{' --no_browser' if not DEBUG_BROWSER else ''}")
+        n2_top_data = extract_compressed_model('N2_top.html')
+
+        self.assertDictEqual(problem_data, n2_top_data)
+
+        # check subproblem data generated from script against data generated from subproblem
+        # NOTE: design vars and responses are added in SubmodelComp's setup, which is not executed
+        #       when invoking the n2 command on the subproblem, which exits after subproblem setup
+        check_call("openmdao n2 submodel_script.py -o N2_subprob.html --problem=subproblem"
+                   f"{' --no_browser' if not DEBUG_BROWSER else ''}")
+        n2_sub_data = extract_compressed_model('N2_subprob.html')
+
+        subprob_data['design_vars'] = {}
+        subprob_data['responses'] = {}
+
+        self.assertDictEqual(subprob_data, n2_sub_data)
+
+    def test_viewer_data_with_submodel(self):
+        os.environ['OPENMDAO_REPORTS'] = '0'
+
+        from openmdao.core.problem import _clear_problem_names
+        _clear_problem_names()
+
+        self.check_viewer_data_with_submodel('recording0.sql')
+
+    def test_viewer_data_with_submodel_reports_active(self):
+        # the n2 command should disable the reports system
+        os.environ['OPENMDAO_REPORTS'] = '1'
+
+        from openmdao.core.problem import _clear_problem_names
+        _clear_problem_names()
+
+        self.check_viewer_data_with_submodel('recording1.sql')
+
+
 
 @use_tempdirs
 class TestN2(unittest.TestCase):

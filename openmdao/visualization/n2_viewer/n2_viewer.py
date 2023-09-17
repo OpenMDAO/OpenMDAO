@@ -1,6 +1,7 @@
 """Code for generating N2 diagram."""
 import inspect
 import os
+import sys
 import pathlib
 from operator import itemgetter
 
@@ -32,6 +33,7 @@ from openmdao.visualization.htmlpp import HtmlPreprocessor
 from openmdao import __version__ as openmdao_version
 
 _MAX_ARRAY_SIZE_FOR_REPR_VAL = 1000  # If var has more elements than this do not pass to N2
+_MAX_OBJECT_SIZE = 1000000           # If object is bigger than this do not pass to N2
 
 _default_n2_filename = 'n2.html'
 
@@ -209,8 +211,12 @@ def _serialize_single_option(option):
         return 'Not Recordable'
 
     val = option['val']
+
     if val is _UNDEFINED:
         return str(val)
+
+    if sys.getsizeof(val) > _MAX_OBJECT_SIZE:
+        return 'Too Large to Display'
 
     return default_noraise(val)
 
@@ -732,8 +738,8 @@ def _n2_setup_parser(parser):
     """
     parser.add_argument('file', nargs=1,
                         help='Python script or recording containing the model. '
-                        'If metadata from a parallel run was recorded in a separate file, '
-                        'specify both database filenames delimited with a comma.')
+                             'If metadata from a parallel run was recorded in a separate file, '
+                             'specify both database filenames delimited with a comma.')
     parser.add_argument('-o', default=_default_n2_filename, action='store', dest='outfile',
                         help='html output file.')
     parser.add_argument('--no_values', action='store_true', dest='no_values',
@@ -742,10 +748,12 @@ def _n2_setup_parser(parser):
                         help="don't display in a browser.")
     parser.add_argument('--embed', action='store_true', dest='embeddable',
                         help="create embeddable version.")
-    parser.add_argument('--title', default=None,
-                        action='store', dest='title', help='diagram title.')
-    parser.add_argument('--path', default=None,
-                        action='store', dest='path', help='initial path to zoom into.')
+    parser.add_argument('--title', default=None, action='store', dest='title',
+                        help='diagram title.')
+    parser.add_argument('--path', default=None, action='store', dest='path',
+                        help='initial system path to zoom into.')
+    parser.add_argument('--problem', default=None, action='store', dest='problem_name',
+                        help='name of sub-problem, if target is a sub-problem')
 
 
 def _n2_cmd(options, user_args):
@@ -760,29 +768,35 @@ def _n2_cmd(options, user_args):
         Command line options after '--' (if any).  Passed to user script.
     """
     filename = _to_filename(options.file[0])
+    probname = options.problem_name
 
     if filename.endswith('.py'):
-        def _view_model_w_errors(prob):
-            errs = prob._metadata['saved_errors']
-            if errs:
-                # only run the n2 here if we've had setup errors. Normally we'd wait until
-                # after final_setup in order to have correct values for all of the I/O variables.
-                n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
-                   values=not options.no_values, title=options.title, path=options.path,
-                   embeddable=options.embeddable)
-                # errors will result in exit at the end of the _check_collected_errors method
+        # disable the reports system, we only want the N2 report and then we exit
+        os.environ['OPENMDAO_REPORTS'] = '0'
 
-        def _view_model_no_errors(prob):
-            n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
-               values=not options.no_values, title=options.title, path=options.path,
-               embeddable=options.embeddable)
+        def _view_model_w_errors(prob):
+            # if problem name is not specified, use top-level problem (no delimiter in pathname)
+            pathname = prob._metadata['pathname']
+            if (probname is None and '/' not in pathname) or (probname == prob._name):
+                errs = prob._metadata['saved_errors']
+                if errs:
+                    # only run the n2 here if we've had setup errors. Normally we'd wait until
+                    # after final_setup in order to have correct values for all of the variables.
+                    n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
+                       values=not options.no_values, title=options.title, path=options.path,
+                       embeddable=options.embeddable)
+                    # errors will result in exit at the end of the _check_collected_errors method
+                else:
+                    # no errors, generate n2 after final_setup
+                    def _view_model_no_errors(prob):
+                        n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
+                           values=not options.no_values, title=options.title, path=options.path,
+                           embeddable=options.embeddable)
+                    hooks._register_hook('final_setup', 'Problem',
+                                         post=_view_model_no_errors, exit=True)
+                    hooks._setup_hooks(prob)
 
         hooks._register_hook('_check_collected_errors', 'Problem', pre=_view_model_w_errors)
-        hooks._register_hook('final_setup', 'Problem', post=_view_model_no_errors, exit=True)
-
-        from openmdao.utils.reports_system import _register_cmdline_report
-        # tell report system not to duplicate effort
-        _register_cmdline_report('n2')
 
         _load_and_exec(options.file[0], user_args)
     else:

@@ -521,6 +521,9 @@ def _scaling_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
+    # disable the reports system, we only want the scaling report and then we exit
+    os.environ['OPENMDAO_REPORTS'] = '0'
+
     def _set_run_driver_flag(problem):
         global _run_driver_called
         _run_driver_called.add(problem._name)
@@ -565,9 +568,6 @@ def _scaling_cmd(options, user_args):
     import atexit
     atexit.register(functools.partial(_exitfunc, options.problem))
 
-    from openmdao.utils.reports_system import _register_cmdline_report
-    # tell report system not to duplicate effort
-    _register_cmdline_report('scaling')
     _load_and_exec(options.file[0], user_args)
 
 
