@@ -193,7 +193,7 @@ def record_viewer_data(problem):
     if recorders:
         from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
         try:
-            viewer_data = _get_viewer_data(problem)
+            viewer_data = _get_viewer_data(problem, values=True)
         except TypeError as err:
             viewer_data = {}
             issue_warning(str(err))

@@ -485,8 +485,7 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
 
         for key in actual_keys:
             try:
-                new_error = assert_near_equal(
-                    actual[key], desired[key], tolerance)
+                new_error = assert_near_equal(actual[key], desired[key], tolerance)
                 error = max(error, new_error)
             except ValueError as exception:
                 msg = '{}: '.format(key) + str(exception)
