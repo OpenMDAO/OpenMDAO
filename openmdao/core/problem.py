@@ -1119,6 +1119,9 @@ class Problem(object):
                 logger = TestLogger()
             self.check_config(logger, checks=checks)
 
+        # from om_devtools.dist_idxs import dump_dist_idxs
+        # dump_dist_idxs(self, full=True)
+
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, includes=None, excludes=None,
                        compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
                        method='fd', step=None, form='forward', step_calc='abs',

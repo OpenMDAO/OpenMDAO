@@ -900,7 +900,10 @@ class TestAutoIVCParDerivBug(unittest.TestCase):
 
         prob.run_model()
 
-        assert_check_totals(prob.check_totals(method='cs', show_only_incorrect=True))#, out_stream=None))
+        # from om_devtools.dist_idxs import dump_dist_idxs
+        # dump_dist_idxs(prob, full=True)
+
+        assert_check_totals(prob.check_totals(method='cs', show_only_incorrect=True, out_stream=None))
 
 
 if __name__ == "__main__":

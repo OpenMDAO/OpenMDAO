@@ -853,7 +853,7 @@ class MPITests2(unittest.TestCase):
 
             prob.run_model()
 
-            J = prob.check_totals(method='fd', show_only_incorrect=True)
+            J = prob.check_totals(method='cs', show_only_incorrect=True)
             assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][mode_idx[mode]], 0.0, 1e-5)
             assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][mode_idx[mode]], 0.0, 1e-5)
             assert_near_equal(J['ndp.g', 'p.x']['abs error'][mode_idx[mode]], 0.0, 2e-5)

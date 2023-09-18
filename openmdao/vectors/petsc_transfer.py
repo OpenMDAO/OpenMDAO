@@ -20,6 +20,8 @@ else:
 
     from openmdao.vectors.default_transfer import DefaultTransfer, _merge
     from openmdao.core.constants import INT_DTYPE
+    from openmdao.utils.general_utils import get_rev_conns
+
 
     class PETScTransfer(DefaultTransfer):
         """
@@ -99,6 +101,8 @@ else:
                 rev_xfer_in_nocolor = defaultdict(list)
                 rev_xfer_out_nocolor = defaultdict(list)
 
+                rev_conns = get_rev_conns(group._conn_abs_in2out)
+
             allprocs_abs2idx = group._var_allprocs_abs2idx
             sizes_in = group._var_sizes['input']
             sizes_out = group._var_sizes['output']
@@ -106,9 +110,11 @@ else:
             offsets_out = offsets['output']
 
             def is_dup(name, io):
+                # return if given var is duplicated and number of procs where var doesn't exist
                 if group._var_allprocs_abs2meta[io][name]['distributed']:
-                    return False  # distributed vars are never dups
-                return np.count_nonzero(group._var_sizes[io][:, allprocs_abs2idx[name]]) > 1
+                    return False, 0  # distributed vars are never dups
+                nz = np.count_nonzero(group._var_sizes[io][:, allprocs_abs2idx[name]])
+                return nz > 1, group._var_sizes[io].shape[0] - nz
 
             def get_xfer_ranks(name, io):
                 if group._var_allprocs_abs2meta[io][name]['distributed']:
@@ -121,8 +127,8 @@ else:
             for abs_in, abs_out in group._conn_abs_in2out.items():
                 # Only continue if the input exists on this processor
                 if abs_in in abs2meta_in:
-                    inp_is_dup = is_dup(abs_in, 'input')
-                    out_is_dup = is_dup(abs_out, 'output')
+                    inp_is_dup, inp_missing = is_dup(abs_in, 'input')
+                    out_is_dup, _ = is_dup(abs_out, 'output')
 
                     # Get meta
                     meta_in = abs2meta_in[abs_in]
@@ -200,11 +206,51 @@ else:
                         distrib_in = meta_in['distributed']
                         distrib_out = meta_out['distributed']
                         sub_out = abs_out[mypathlen:].partition('.')[0]
-                        if inp_is_dup and (abs_out not in abs2meta_out or (distrib_out and not iowninput)):
+                        has_multi_conn_src = len(rev_conns[abs_out]) > 1
+
+                        if inp_is_dup and not has_multi_conn_src and (abs_out not in abs2meta_out or (distrib_out and not iowninput)):
                             print(group.pathname, 'rank', group.comm.rank, ':', 'NOT DOING', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
                             rev_xfer_in[sub_out]
                             rev_xfer_out[sub_out]
-                        elif out_is_dup and not inp_is_dup and (iowninput or distrib_in):
+                        elif out_is_dup and inp_is_dup and inp_missing > 0 and iowninput:
+                            oidxlist = []
+                            iidxlist = []
+                            oidxlist_nc = []
+                            iidxlist_nc = []
+                            oidxlist.append(output_inds)
+                            iidxlist.append(input_inds)
+                            for rnk, osize, isize in zip(range(group.comm.size), sizes_out[:, idx_out], sizes_in[:, idx_in]):
+                                if osize > 0 and isize == 0:
+                                    offset = offsets_out[rnk, idx_out]
+                                    if src_indices is None:
+                                        oarr = np.arange(offset, offset + meta_in['size'], dtype=INT_DTYPE)
+                                        iarr = input_inds
+                                    elif src_indices.size > 0:
+                                        # offset -= np.sum(sizes_out[:rnk, idx_out])
+                                        oarr = np.asarray(src_indices + offset, dtype=INT_DTYPE)
+                                        iarr = input_inds
+                                    else:
+                                        continue
+                                    if rnk == myproc or not has_rev_par_coloring:
+                                        oidxlist.append(oarr)
+                                        iidxlist.append(iarr)
+                                    else:
+                                        oidxlist_nc.append(oarr)
+                                        iidxlist_nc.append(iarr)
+
+                            input_inds = np.concatenate(iidxlist) if len(iidxlist) > 1 else iidxlist[0]
+                            output_inds = np.concatenate(oidxlist) if len(oidxlist) > 1 else oidxlist[0]
+                            rev_xfer_in[sub_out].append(input_inds)
+                            rev_xfer_out[sub_out].append(output_inds)
+                            print('MULTI', group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
+
+                            if has_rev_par_coloring and iidxlist_nc:
+                                input_inds = np.concatenate(iidxlist_nc) if len(iidxlist_nc) > 1 else iidxlist_nc[0]
+                                output_inds = np.concatenate(oidxlist_nc) if len(oidxlist_nc) > 1 else oidxlist_nc[0]
+
+                                rev_xfer_in_nocolor[sub_out].append(input_inds)
+                                rev_xfer_out_nocolor[sub_out].append(output_inds)
+                        elif out_is_dup and (not inp_is_dup or inp_missing > 0) and (iowninput or distrib_in):
                             oidxlist = []
                             iidxlist = []
                             oidxlist_nc = []
@@ -215,9 +261,11 @@ else:
                                     oarr = np.arange(offset, offset + meta_in['size'], dtype=INT_DTYPE)
                                     iarr = input_inds
                                 elif src_indices.size > 0:
-                                    offset -= np.sum(sizes_out[:rnk, idx_out])
+                                    # offset -= np.sum(sizes_out[:rnk, idx_out])
                                     oarr = np.asarray(src_indices + offset, dtype=INT_DTYPE)
                                     iarr = input_inds
+                                else:
+                                    continue
                                 if rnk == myproc or not has_rev_par_coloring:
                                     oidxlist.append(oarr)
                                     iidxlist.append(iarr)
@@ -225,11 +273,17 @@ else:
                                     oidxlist_nc.append(oarr)
                                     iidxlist_nc.append(iarr)
 
-                            input_inds = np.concatenate(iidxlist) if len(iidxlist) > 1 else iidxlist[0]
-                            output_inds = np.concatenate(oidxlist) if len(oidxlist) > 1 else oidxlist[0]
+                            if len(iidxlist) > 1:
+                                input_inds = np.concatenate(iidxlist)
+                                output_inds = np.concatenate(oidxlist)
+                            elif len(iidxlist) == 1:
+                                input_inds = iidxlist[0]
+                                output_inds = oidxlist[0]
+                            else:
+                                input_inds = output_inds = np.zeros(0, dtype=INT_DTYPE)
                             rev_xfer_in[sub_out].append(input_inds)
                             rev_xfer_out[sub_out].append(output_inds)
-                            print('MULTI', group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
+                            print('MULTI2', group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
 
                             if has_rev_par_coloring and iidxlist_nc:
                                 input_inds = np.concatenate(iidxlist_nc) if len(iidxlist_nc) > 1 else iidxlist_nc[0]
@@ -372,3 +426,7 @@ else:
                 if in_vec._alloc_complex:
                     data = in_vec._get_data()
                     data[:] = in_petsc.array
+
+                # print(in_vec._system().comm.rank, 'TRANSFER from', in_vec._system().pathname, self._in_inds, self._out_inds, flush=True)
+                # print('IN', in_vec._data.real, flush=True)
+                # print('OUT', out_vec._data.real, flush=True)

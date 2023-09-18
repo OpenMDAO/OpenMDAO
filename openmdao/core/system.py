@@ -5505,11 +5505,11 @@ class System(object):
                                            "`get_val(<name>, get_remote=True)`.")
                 else:
                     if src_indices._flat_src:
-                        if distrib and not sdistrib:
-                            start = np.sum(sizes[:self.comm.rank])
-                            sinds = src_indices.apply_offset(-start, flat=True)
-                        else:
-                            sinds = src_indices.flat()
+                        #if distrib and not sdistrib:
+                            #start = np.sum(sizes[:self.comm.rank])
+                            #sinds = src_indices.apply_offset(-start, flat=True)
+                        #else:
+                        sinds = src_indices.flat()
                         val = val.ravel()[sinds]
                         # if at component level, just keep shape of the target and don't flatten
                         if not flat and not is_prom:

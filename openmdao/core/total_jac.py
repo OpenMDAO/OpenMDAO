@@ -243,7 +243,7 @@ class _TotalJacInfo(object):
         }
         self._dist_driver_vars = driver._dist_driver_vars
 
-        abs2meta_out = model._var_allprocs_abs2meta['output']
+        all_abs2meta_out = model._var_allprocs_abs2meta['output']
 
         constraints = driver._cons
 
@@ -309,10 +309,10 @@ class _TotalJacInfo(object):
             self.modes = modes
 
         self.of_meta, self.of_size, has_of_dist = \
-            self._get_tuple_map(of, responses, abs2meta_out)
+            self._get_tuple_map(of, responses, all_abs2meta_out)
         self.has_input_dist['rev'] = self.has_output_dist['fwd'] = has_of_dist
         self.wrt_meta, self.wrt_size, has_wrt_dist = \
-            self._get_tuple_map(wrt, design_vars, abs2meta_out)
+            self._get_tuple_map(wrt, design_vars, all_abs2meta_out)
         self.has_input_dist['fwd'] = self.has_output_dist['rev'] = has_wrt_dist
 
         # always allocate a 2D dense array and we can assign views to dict keys later if
@@ -374,7 +374,7 @@ class _TotalJacInfo(object):
                     self.jac_dist_col_mask = mask = np.zeros(J.shape[1], dtype=bool)
                     start = end = 0
                     for name in self.wrt:
-                        meta = abs2meta_out[name]
+                        meta = all_abs2meta_out[name]
                         end += meta['global_size']
                         if meta['distributed']:
                             # see if we have an odd dist var like some auto_ivcs connected to
@@ -489,7 +489,7 @@ class _TotalJacInfo(object):
             owns = self.model._owning_rank
 
             abs2meta_out = self.model._var_allprocs_abs2meta['output']
-            loc_abs = self.model._var_abs2meta['output']
+            loc_abs2meta = self.model._var_abs2meta['output']
             sizes = self.model._var_sizes['output']
             abs2idx = self.model._var_allprocs_abs2idx
             full_j_tgts = []
@@ -502,7 +502,7 @@ class _TotalJacInfo(object):
 
                 is_dist = abs2meta_out[name]['distributed']
 
-                if name in loc_abs:
+                if name in loc_abs2meta:
                     end += abs2meta_out[name]['size']
 
                 if get_remote and is_dist:
@@ -532,7 +532,7 @@ class _TotalJacInfo(object):
                             full_j_srcs.append(myinds)
                             full_j_tgts.append(srcinds + offset)
 
-                if name in loc_abs:
+                if name in loc_abs2meta:
                     start = end
 
             if full_j_srcs:
@@ -1314,6 +1314,7 @@ class _TotalJacInfo(object):
             else:
                 return
 
+        # print('DERIV_VAL:', i, self.model.comm.rank, deriv_val, deriv_idxs, flush=True)
         if mode == 'fwd':
             self.J[jac_idxs, i] = deriv_val[deriv_idxs]
         else:  # rev
@@ -1321,7 +1322,7 @@ class _TotalJacInfo(object):
 
     def _jac_setter_dist(self, i, mode):
         """
-        Scatter the i'th row or allreduce the i'th column of the jacobian.
+        Scatter the i'th column or allreduce the i'th row of the jacobian.
 
         Parameters
         ----------
@@ -1343,6 +1344,7 @@ class _TotalJacInfo(object):
             # duplication of their seed values by dividing by the number of duplications.
             # ndups, _, _, _ = self.in_idx_map[mode][i]
             dist, _, _, _ = self.in_idx_map[mode][i]
+            # print('JAC_SETTER_DIST', i, self.model.comm.rank, self.J[i], flush=True)
             if self.get_remote:
                 if self.jac_dist_col_mask is not None:
                     distpart = self.J[i, :][self.jac_dist_col_mask]
@@ -1350,10 +1352,10 @@ class _TotalJacInfo(object):
                     # only sum up the distrib parts
                     self.comm.Allreduce(distpart, scratch, op=MPI.SUM)
                     self.J[i][self.jac_dist_col_mask] = scratch
-                elif dist:
-                    scratch = self.jac_scratch['rev'][0]
-                    scratch[:] = self.J[i]
-                    self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
+                #elif dist:
+                    #scratch = self.jac_scratch['rev'][0]
+                    #scratch[:] = self.J[i]
+                    # self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
 
                 # scratch = self.jac_scratch['rev'][0]
                 # scratch[:] = self.J[i]
@@ -1611,7 +1613,17 @@ class _TotalJacInfo(object):
                     if debug_print:
                         print(f'Elapsed Time: {time.perf_counter() - t0} secs\n', flush=True)
 
+                    # if isinstance(inds, int):
+                    #     print('JAC ROW (before):', self.J[inds], flush=True)
+                    # else:
+                    #     for i in inds:
+                    #         print('JAC ROW (before):', self.J[i], flush=True)
                     jac_setter(inds, mode, imeta)
+                    # if isinstance(inds, int):
+                    #     print('JAC ROW (after):', self.J[inds], flush=True)
+                    # else:
+                    #     for i in inds:
+                    #         print('JAC ROW (after):', self.J[i], flush=True)
 
         # Driver scaling.
         if self.has_scaling:

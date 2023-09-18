@@ -27,7 +27,7 @@ from openmdao.utils.array_utils import array_connection_compatible, _flatten_src
     shape_to_len
 from openmdao.utils.general_utils import common_subpath, all_ancestors, \
     convert_src_inds, ContainsAll, shape2tuple, get_connection_owner, ensure_compatible, \
-    _src_name_iter, meta2src_iter
+    _src_name_iter, meta2src_iter, get_rev_conns
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
 from openmdao.utils.graph_utils import get_sccs_topo, get_out_of_order_nodes, get_hybrid_graph
@@ -2634,23 +2634,6 @@ class Group(System):
                     return True
             return False
 
-        def get_rev_conn():
-            """
-            Return a dict mapping each connected input to a list of its connected outputs.
-
-            Returns
-            -------
-            dict
-                Dict mapping each connected input to a list of its connected outputs.
-            """
-            rev = {}
-            for tgt, src in conn.items():
-                if src in rev:
-                    rev[src].append(tgt)
-                else:
-                    rev[src] = [tgt]
-            return rev
-
         def meta2node_data(meta):
             """
             Return a dict containing select metadata for the given variable.
@@ -2706,7 +2689,7 @@ class Group(System):
                         graph.add_edge(abs_from, name, multi=False)
                     else:
                         if rev_conn is None:
-                            rev_conn = get_rev_conn()
+                            rev_conn = get_rev_conns(self._conn_global_abs_in2out)
                         if name in rev_conn:  # connected output
                             for inp in rev_conn[name]:
                                 inmeta = all_abs2meta_in[inp]

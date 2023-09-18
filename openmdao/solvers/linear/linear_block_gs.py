@@ -156,9 +156,11 @@ class LinearBlockGS(BlockLinearSolver):
                     scope_in = self._vars_union(self._scope_in, scope_in)
 
                     subsys._solve_linear(mode, self._rel_systems, scope_out, scope_in)
+                    # print(system.comm.rank, 'SOLVE LINEAR', subsys.pathname, 'd_inputs', subsys._dinputs.asarray(), 'd_outputs', subsys._doutputs.asarray(), 'd_residuals', subsys._dresiduals.asarray(), flush=True)
 
                     if subsys._iter_call_apply_linear():
                         subsys._apply_linear(None, self._rel_systems, mode, scope_out, scope_in)
+                        # print(system.comm.rank, 'APPLY LINEAR', subsys.pathname, 'd_inputs', subsys._dinputs.asarray(), 'd_outputs', subsys._doutputs.asarray(), 'd_residuals', subsys._dresiduals.asarray(), flush=True)
                     else:
                         b_vec.set_val(0.0)
                 else:   # subsys not local

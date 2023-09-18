@@ -478,7 +478,7 @@ class ExplicitComponent(Component):
             # ExplicitComponent jacobian defined with -1 on diagonal.
             d_residuals *= -1.0
 
-            # print(MPI.COMM_WORLD.rank, 'SOLVE', self.pathname, 'd_inputs', self._dinputs.asarray(), 'd_outputs', self._doutputs.asarray(), 'd_residuals', self._dresiduals.asarray(), flush=True)
+        # print(MPI.COMM_WORLD.rank, 'SOLVE', self.pathname, 'd_inputs', self._dinputs.asarray(), 'd_outputs', self._doutputs.asarray(), 'd_residuals', self._dresiduals.asarray(), flush=True)
 
     def _compute_partials_wrapper(self):
         """

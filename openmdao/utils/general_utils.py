@@ -1363,3 +1363,26 @@ def inconsistent_across_procs(comm, arr, tol=1e-15, return_array=True):
 
     comm.gather(arr, root=0)
     return comm.bcast(None, root=0)
+
+
+def get_rev_conns(conns):
+    """
+    Return a dict mapping each connected output to a list of its connected inputs.
+
+    Parameters
+    ----------
+    conns : dict
+        Dict mapping each input to its connected output.
+
+    Returns
+    -------
+    dict
+        Dict mapping each connected output to a list of its connected inputs.
+    """
+    rev = {}
+    for tgt, src in conns.items():
+        if src in rev:
+            rev[src].append(tgt)
+        else:
+            rev[src] = [tgt]
+    return rev
