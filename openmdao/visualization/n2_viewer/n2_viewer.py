@@ -164,11 +164,8 @@ def _get_var_dict(system, typ, name, is_parallel, is_implicit, values):
                     # which could be remote under MPI
                     _get_array_info(system, vec, name, prom, var_dict, from_src=False)
 
-            else:
-                var_dict['val'] = None
         except Exception as err:
             issue_warning(str(err))
-            var_dict['val'] = None
     else:  # discrete
         meta = system._var_discrete[typ][name]
         val = meta['val']
@@ -181,8 +178,6 @@ def _get_var_dict(system, typ, name, is_parallel, is_implicit, values):
         if values:
             if MPI is None or isinstance(val, (int, str, list, dict, complex, np.ndarray)):
                 var_dict['val'] = default_noraise(system.get_val(name))
-        else:
-            var_dict['val'] = None
 
     if 'surrogate_name' in meta:
         var_dict['surrogate_name'] = meta['surrogate_name']
@@ -468,7 +463,7 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
                     stack.pop()
                 elif child['type'] == 'input':
                     if case is None:
-                        child['val'] = None
+                        child.pop('val')
                         for key in ['val_min', 'val_max', 'val_min_indices', 'val_max_indices']:
                             del child[key]
                     elif case.inputs is None:
@@ -478,7 +473,7 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
                         child['val'] = case.inputs[path]
                 elif child['type'] == 'output':
                     if case is None:
-                        child['val'] = None
+                        child.pop('val')
                         for key in ['val_min', 'val_max', 'val_min_indices', 'val_max_indices']:
                             del child[key]
                     elif case.outputs is None:

@@ -471,7 +471,6 @@ class TestViewerData(unittest.TestCase):
         self.check_viewer_data_with_submodel('recording1.sql')
 
 
-
 @use_tempdirs
 class TestN2(unittest.TestCase):
 
