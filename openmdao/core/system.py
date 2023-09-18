@@ -3526,7 +3526,7 @@ class System(object):
             if (self.comm.size > 1 and self._subsystems_allprocs and
                     self._mpi_proc_allocator.parallel):
 
-                # For parallel groups, we need to make sure that the design varaible dictionary is
+                # For parallel groups, we need to make sure that the design variable dictionary is
                 # assembled in the same order under mpi as for serial runs.
                 out_by_sys = {}
 
@@ -3704,7 +3704,7 @@ class System(object):
             if (self.comm.size > 1 and self._subsystems_allprocs and
                     self._mpi_proc_allocator.parallel):
 
-                # For parallel groups, we need to make sure that the design varaible dictionary is
+                # For parallel groups, we need to make sure that the design variable dictionary is
                 # assembled in the same order under mpi as for serial runs.
                 out_by_sys = {}
 
