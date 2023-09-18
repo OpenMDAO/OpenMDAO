@@ -1201,7 +1201,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         p = om.Problem(model)
         p.setup(force_alloc_complex=True)
 
-        p.set_val('InterpSubsystem.mach', 7.0)
+        p.set_val('InterpSubsystem.mach', 7.001)  # off the table point
         p.run_model()
 
         cpd = force_check_partials(p, compact_print=False, out_stream=None, method='cs')
