@@ -356,7 +356,7 @@ class TestViewerData(unittest.TestCase):
 
         prob = om.Problem()
         comp = prob.model.add_subsystem('comp', SystemWithLargeOption())
-        comp.options['large_option'] = np.zeros(int(1e6))
+        comp.options['large_option'] = np.zeros(int(1e7))
         prob.setup()
 
         viewer_data = _get_viewer_data(prob)

@@ -33,7 +33,7 @@ from openmdao.visualization.htmlpp import HtmlPreprocessor
 from openmdao import __version__ as openmdao_version
 
 _MAX_ARRAY_SIZE_FOR_REPR_VAL = 1000  # If var has more elements than this do not pass to N2
-_MAX_OBJECT_SIZE = 1000000           # If object is bigger than this do not pass to N2
+_MAX_OBJECT_SIZE = int(1e7)          # If option value is bigger than this do not pass to N2
 
 _default_n2_filename = 'n2.html'
 
