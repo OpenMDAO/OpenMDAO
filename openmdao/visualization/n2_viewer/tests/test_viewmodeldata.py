@@ -33,8 +33,7 @@ except ImportError:
 # Whether to pop up a browser window for each N2
 DEBUG_BROWSER = False
 
-# set DEBUG_FILES to True if you want to view the generated HTML file(s)
-DEBUG_FILES = False
+parent_dir = os.path.dirname(os.path.realpath(__file__))
 
 
 def extract_compressed_model(filename):
@@ -54,6 +53,7 @@ def extract_compressed_model(filename):
     return model_data
 
 
+@use_tempdirs
 def save_viewer_data(viewer_data, filename):
     """
     Save viewer data to JSON file for use in future testing.
@@ -65,31 +65,12 @@ def save_viewer_data(viewer_data, filename):
 
 class TestViewerData(unittest.TestCase):
 
-    def setUp(self):
-        if not DEBUG_FILES:
-            self.dir = mkdtemp()
-            os.chdir(self.dir)
-        else:
-            self.dir = os.getcwd()
-
-        self.parent_dir = os.path.dirname(os.path.realpath(__file__))
-
-    def tearDown(self):
-        if not DEBUG_FILES:
-            os.chdir(self.parent_dir)
-            try:
-                rmtree(self.dir)
-            except OSError as e:
-                # If directory already deleted, keep going
-                if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
-                    raise e
-
     def check_viewer_data(self, viewer_data, filename, partials=True):
         """
         Check viewer data against expected.
         """
         # check model tree from JSON file
-        with open(os.path.join(self.parent_dir, filename)) as json_file:
+        with open(os.path.join(parent_dir, filename)) as json_file:
             expected_tree = json.load(json_file)
 
         np.testing.assert_equal(viewer_data['tree'], expected_tree, err_msg='', verbose=True)
