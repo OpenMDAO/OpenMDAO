@@ -33,7 +33,7 @@ from openmdao.visualization.htmlpp import HtmlPreprocessor
 from openmdao import __version__ as openmdao_version
 
 _MAX_ARRAY_SIZE_FOR_REPR_VAL = 1000  # If var has more elements than this do not pass to N2
-_MAX_OBJECT_SIZE = int(1e7)          # If option value is bigger than this do not pass to N2
+_MAX_OPTION_SIZE = int(1e7)          # If option value is bigger than this do not pass to N2
 
 _default_n2_filename = 'n2.html'
 
@@ -210,7 +210,7 @@ def _serialize_single_option(option):
     if val is _UNDEFINED:
         return str(val)
 
-    if sys.getsizeof(val) > _MAX_OBJECT_SIZE:
+    if sys.getsizeof(val) > _MAX_OPTION_SIZE:
         return 'Too Large to Display'
 
     return default_noraise(val)
