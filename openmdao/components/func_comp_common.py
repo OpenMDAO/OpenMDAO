@@ -9,9 +9,10 @@ from functools import partial
 
 import numpy as np
 try:
-    from jax import vmap, linear_util
+    from jax import vmap
     import jax.numpy as jnp
     from jax.config import config
+    from jax.extend import linear_util
     from jax.api_util import argnums_partial
     from jax._src.api import _jvp, _vjp
     config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats

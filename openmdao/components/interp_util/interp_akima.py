@@ -1019,7 +1019,7 @@ class InterpAkimaSemi(InterpAlgorithmSemi):
             dm3_dv = np.zeros(n_this, dtype=dtype)
             dm4_dv = np.zeros(n_this, dtype=dtype)
             dm5_dv = np.zeros(n_this, dtype=dtype)
-            dm3_dv[idx_val4] = 1.0 / (grid[idx + 1] - grid[idx])
+            dm3_dv[idx_val4] = (1.0 / (grid[idx + 1] - grid[idx])).item()
             dm3_dv[idx_val3] = - dm3_dv[idx_val4]
 
         if idx >= 2:

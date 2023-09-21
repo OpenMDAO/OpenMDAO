@@ -753,7 +753,7 @@ class Driver(object):
             elif isinstance(value, np.ndarray):
                 if isinstance(problem.model._discrete_outputs[src_name], int):
                     # Setting an integer value with a 1D array - don't want to convert to array.
-                    value = int(value)
+                    value = int(value.item())
                 else:
                     value = value.astype(int)
 

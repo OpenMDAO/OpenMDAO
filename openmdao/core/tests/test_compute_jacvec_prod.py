@@ -78,9 +78,9 @@ class SubProbComp(om.ExplicitComponent):
                     seed['comp.inp'][:] = jvp['comp.out']
 
                 if rhsname == 'comp.x':
-                    partials[self.pathname + '.out', self.pathname +'.x'][0, rhs_i] = jvp[self.pathname + '.out']
+                    partials[self.pathname + '.out', self.pathname +'.x'][0, rhs_i] = jvp[self.pathname + '.out'].item()
                 else:
-                    partials[self.pathname + '.out', self.pathname + '.inp'][0, 0] = jvp[self.pathname + '.out']
+                    partials[self.pathname + '.out', self.pathname + '.inp'][0, 0] = jvp[self.pathname + '.out'].item()
 
     def _compute_partials_rev(self, inputs, partials):
         p = self.prob

@@ -17,10 +17,12 @@ class TestImplCompSimple(om.ImplicitComponent):
             inputs['a']**2 * outputs['x']**2
 
     def solve_nonlinear(self, inputs, outputs):
-        def func(x):
-            return np.exp(x) - inputs['a']**2 * x**2
+        a = inputs['a'].item()
 
-        outputs['x'] = scipy.optimize.brentq(func, -1./inputs['a'], 0)
+        def func(x):
+            return np.exp(x) - a**2 * x**2
+
+        outputs['x'] = scipy.optimize.brentq(func, -1./a, 0)
 
 
 class TestImplCompSimpleDense(TestImplCompSimple):

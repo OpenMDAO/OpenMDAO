@@ -2870,6 +2870,8 @@ class Group(System):
             else:
                 meta['shape'] = shape
                 meta['size'] = size
+                # Passing None into shape arguments as an alias for () is deprecated (Numpy 1.20)
+                shape = shape if shape is not None else ()
                 meta['val'] = np.full(shape, meta['val'], dtype=float)
 
         # save graph info for possible later plotting
