@@ -20,7 +20,7 @@ else:
 
     from openmdao.vectors.default_transfer import DefaultTransfer, _merge
     from openmdao.core.constants import INT_DTYPE
-    from openmdao.utils.general_utils import get_rev_conns
+    from openmdao.utils.array_utils import shape_to_len
 
 
     class PETScTransfer(DefaultTransfer):
@@ -79,7 +79,7 @@ else:
             abs2meta_in = group._var_abs2meta['input']
             abs2meta_out = group._var_abs2meta['output']
             allprocs_abs2meta_out = group._var_allprocs_abs2meta['output']
-            myproc = group.comm.rank
+            myrank = group.comm.rank
 
             transfers = group._transfers = {}
             vectors = group._vectors
@@ -101,7 +101,7 @@ else:
                 rev_xfer_in_nocolor = defaultdict(list)
                 rev_xfer_out_nocolor = defaultdict(list)
 
-                rev_conns = get_rev_conns(group._conn_abs_in2out)
+                # rev_conns = get_rev_conns(group._conn_abs_in2out)
 
             allprocs_abs2idx = group._var_allprocs_abs2idx
             sizes_in = group._var_sizes['input']
@@ -112,9 +112,9 @@ else:
             def is_dup(name, io):
                 # return if given var is duplicated and number of procs where var doesn't exist
                 if group._var_allprocs_abs2meta[io][name]['distributed']:
-                    return False, 0  # distributed vars are never dups
+                    return False, 0, True  # distributed vars are never dups
                 nz = np.count_nonzero(group._var_sizes[io][:, allprocs_abs2idx[name]])
-                return nz > 1, group._var_sizes[io].shape[0] - nz
+                return nz > 1, group._var_sizes[io].shape[0] - nz, False
 
             def get_xfer_ranks(name, io):
                 if group._var_allprocs_abs2meta[io][name]['distributed']:
@@ -127,15 +127,14 @@ else:
             for abs_in, abs_out in group._conn_abs_in2out.items():
                 # Only continue if the input exists on this processor
                 if abs_in in abs2meta_in:
-                    inp_is_dup, inp_missing = is_dup(abs_in, 'input')
-                    out_is_dup, _ = is_dup(abs_out, 'output')
-
                     # Get meta
                     meta_in = abs2meta_in[abs_in]
                     meta_out = allprocs_abs2meta_out[abs_out]
 
                     idx_in = allprocs_abs2idx[abs_in]
                     idx_out = allprocs_abs2idx[abs_out]
+
+                    local_out = abs_out in abs2meta_out
 
                     # Read in and process src_indices
                     src_indices = meta_in['src_indices']
@@ -147,6 +146,7 @@ else:
                         if meta_in['size'] > sizes_out[owner, idx_out]:
                             src_indices = np.arange(meta_in['size'], dtype=INT_DTYPE)
                     else:
+                        src_shape = src_indices._src_shape
                         src_indices = src_indices.shaped_array()
 
                     # 1. Compute the output indices
@@ -163,7 +163,7 @@ else:
                                                "without declaring src_indices.",
                                                ident=(abs_out, abs_in))
                         else:
-                            rank = myproc if abs_out in abs2meta_out else owner
+                            rank = myrank if local_out else owner
                             offset = offsets_out[rank, idx_out]
                             output_inds = np.arange(offset, offset + meta_in['size'],
                                                     dtype=INT_DTYPE)
@@ -193,22 +193,25 @@ else:
                             start = end
 
                     # 2. Compute the input indices
-                    input_inds = np.arange(offsets_in[myproc, idx_in],
-                                           offsets_in[myproc, idx_in] +
-                                           sizes_in[myproc, idx_in], dtype=INT_DTYPE)
+                    input_inds = np.arange(offsets_in[myrank, idx_in],
+                                           offsets_in[myrank, idx_in] +
+                                           sizes_in[myrank, idx_in], dtype=INT_DTYPE)
 
                     # Now the indices are ready - input_inds, output_inds
                     sub_in = abs_in[mypathlen:].partition('.')[0]
                     fwd_xfer_in[sub_in].append(input_inds)
                     fwd_xfer_out[sub_in].append(output_inds)
                     if rev:
-                        iowninput = myproc == group._owning_rank[abs_in]
-                        distrib_in = meta_in['distributed']
-                        distrib_out = meta_out['distributed']
-                        sub_out = abs_out[mypathlen:].partition('.')[0]
-                        has_multi_conn_src = len(rev_conns[abs_out]) > 1
+                        inp_is_dup, inp_missing, distrib_in = is_dup(abs_in, 'input')
+                        out_is_dup, _, distrib_out = is_dup(abs_out, 'output')
+                        gsize_in = np.sum(sizes_in[:, idx_in])
+                        gsize_out = np.sum(sizes_out[:, idx_out])
 
-                        if inp_is_dup and not has_multi_conn_src and (abs_out not in abs2meta_out or (distrib_out and not iowninput)):
+                        iowninput = myrank == group._owning_rank[abs_in]
+                        sub_out = abs_out[mypathlen:].partition('.')[0]
+                        # has_multi_conn_src = len(rev_conns[abs_out]) > 1
+
+                        if inp_is_dup and (abs_out not in abs2meta_out or (distrib_out and not iowninput)):
                             print(group.pathname, 'rank', group.comm.rank, ':', 'NOT DOING', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
                             rev_xfer_in[sub_out]
                             rev_xfer_out[sub_out]
@@ -226,12 +229,11 @@ else:
                                         oarr = np.arange(offset, offset + meta_in['size'], dtype=INT_DTYPE)
                                         iarr = input_inds
                                     elif src_indices.size > 0:
-                                        # offset -= np.sum(sizes_out[:rnk, idx_out])
                                         oarr = np.asarray(src_indices + offset, dtype=INT_DTYPE)
                                         iarr = input_inds
                                     else:
                                         continue
-                                    if rnk == myproc or not has_rev_par_coloring:
+                                    if rnk == myrank or not has_rev_par_coloring:
                                         oidxlist.append(oarr)
                                         iidxlist.append(iarr)
                                     else:
@@ -261,12 +263,13 @@ else:
                                     oarr = np.arange(offset, offset + meta_in['size'], dtype=INT_DTYPE)
                                     iarr = input_inds
                                 elif src_indices.size > 0:
-                                    # offset -= np.sum(sizes_out[:rnk, idx_out])
+                                    # if distrib_in and gsize_in == shape_to_len(src_shape): # gsize_in == gsize_out:
+                                    #     offset -= np.sum(sizes_out[:rnk, idx_out])
                                     oarr = np.asarray(src_indices + offset, dtype=INT_DTYPE)
                                     iarr = input_inds
                                 else:
                                     continue
-                                if rnk == myproc or not has_rev_par_coloring:
+                                if rnk == myrank or not has_rev_par_coloring:
                                     oidxlist.append(oarr)
                                     iidxlist.append(iarr)
                                 else:

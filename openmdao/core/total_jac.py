@@ -33,6 +33,35 @@ _contains_all = ContainsAll()
 _directional_rng = np.random.default_rng(99)
 
 
+class EntryMeta(object):
+    def __init__(self):
+        pass
+
+
+class RowMeta(object):
+    def __init__(self, model):
+        pass
+
+    def by_name(self, name):
+        pass
+
+    def by_index(self, idx):
+        pass
+
+
+class ColumnMeta(object):
+    def __init__(self):
+        pass
+
+    def by_name(self, name):
+        pass
+
+    def by_index(self, idx):
+        pass
+
+
+
+
 class _TotalJacInfo(object):
     """
     Object to manage computation of total derivatives.
@@ -145,12 +174,6 @@ class _TotalJacInfo(object):
         self.get_remote = get_remote
         self.directional = directional
 
-        if isinstance(wrt, str):
-            wrt = [wrt]
-
-        if isinstance(of, str):
-            of = [of]
-
         # convert designvar and response dicts to use src or alias names
         # keys will all be absolute names or aliases after conversion
         design_vars = _src_or_alias_dict(driver._designvars)
@@ -167,8 +190,13 @@ class _TotalJacInfo(object):
         # that don't specify them, so we need these here.
         if wrt is None:
             wrt = driver_wrt
+        elif isinstance(wrt, str):
+            wrt = [wrt]
+
         if of is None:
             of = driver_of
+        elif isinstance(of, str):
+            of = [of]
 
         # Convert 'wrt' names from promoted to absolute
         prom_wrt = wrt
@@ -396,7 +424,7 @@ class _TotalJacInfo(object):
             for mode in modes:
                 self.sol2jac_map[mode] = self._get_sol2jac_map(self.output_list[mode],
                                                                self.output_meta[mode],
-                                                               abs2meta_out, mode)
+                                                               all_abs2meta_out, mode)
             self.jac_scatters = {}
             self.tgt_petsc = {n: {} for n in modes}
             self.src_petsc = {n: {} for n in modes}
@@ -420,8 +448,8 @@ class _TotalJacInfo(object):
                 self.dist_idx_map[mode] = dist_map = np.zeros(arr.size, dtype=bool)
                 start = end = 0
                 for name in self.output_list[mode]:
-                    end += abs2meta_out[name]['size']
-                    if abs2meta_out[name]['distributed']:
+                    end += all_abs2meta_out[name]['size']
+                    if all_abs2meta_out[name]['distributed']:
                         dist_map[start:end] = True
                     start = end
 
@@ -737,26 +765,10 @@ class _TotalJacInfo(object):
                 relev = None
 
             dist = in_var_meta['distributed']
-            if dist:
-                pass
-                # if self.jac_dist_col_mask is None:
-                #     ndups = 1  # we don't divide by ndups for distributed inputs
-                # else:
-                #     ndups = np.count_nonzero(sizes[:, in_var_idx])
-            else:
+            if not dist:
                 # if the var is not distributed, convert the indices to global.
                 # We don't iterate over the full distributed size in this case.
                 irange += gstart
-
-                # if fwd or parallel_deriv_color:
-                #     ndups = 1
-                # else:
-                #     # find the number of duplicate components in rev mode so we can divide
-                #     # the seed between 'ndups' procs so that at the end after we do an
-                #     # Allreduce, the contributions from all procs will add up properly.
-                #     ndups = np.count_nonzero(sizes[:, in_var_idx])
-
-            ndups = 1
 
             # all local idxs that correspond to vars from other procs will be -1
             # so each entry of loc_i will either contain a valid local index,
@@ -1012,6 +1024,8 @@ class _TotalJacInfo(object):
                 else:
                     size = voi['size']
                 indices = vois[name]['indices']
+                if indices:
+                    size = indices.indexed_src_size
                 if responses:
                     path = vois[name]['source']
 
@@ -2064,7 +2078,7 @@ def _check_voi_meta(name, parallel_deriv_color, simul_coloring):
 
 def _fix_pdc_lengths(idx_iter_dict):
     """
-    Take any parallel_deriv_color entries and make sure their index arrays are same length.
+    Take any parallel_deriv_color entries and make sure their index arrays are the same length.
 
     Parameters
     ----------
