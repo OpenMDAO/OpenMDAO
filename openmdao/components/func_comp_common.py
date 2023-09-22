@@ -12,7 +12,11 @@ try:
     from jax import vmap
     import jax.numpy as jnp
     from jax.config import config
-    from jax.extend import linear_util
+    # linear_util moved to jax.extend in jax 0.4.17, previous location is deprecated
+    try:
+        from jax.extend import linear_util
+    except ImportError:
+        from jax import linear_util
     from jax.api_util import argnums_partial
     from jax._src.api import _jvp, _vjp
     config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
