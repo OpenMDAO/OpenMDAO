@@ -529,7 +529,8 @@ class InterpND(object):
                     values[j] = 1.0
                     table = interp([grid[i]], values, interp, **opts)
                     table._compute_d_dvalues = False
-                    deriv_i[j], _, _, _ = table.evaluate(pt[i:i + 1])
+                    deriv_i_j, _, _, _ = table.evaluate(pt[i:i + 1])
+                    deriv_i[j] = deriv_i_j.item()
                     values[j] = 0.0
 
                 if i == 0:
