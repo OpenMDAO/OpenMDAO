@@ -765,8 +765,8 @@ class exampleComp(om.ExplicitComponent):
 
     def compute(self, inputs, outputs):
         # Retrieve Inputs
-        x = inputs["x"]
-        y = inputs["y"]
+        x = inputs["x"].item()
+        y = inputs["y"].item()
 
         # Compute Values
         f_xy = (x - 3.0) ** 2 + x * y + (y + 4.0) ** 2 - 3.0

@@ -26,8 +26,8 @@ class EggCrate(om.ExplicitComponent):
 
         Global optimal solution (minimum): x = 0.0; y = 0.0
         """
-        x = inputs['x']
-        y = inputs['y']
+        x = inputs['x'].item()
+        y = inputs['y'].item()
 
         outputs['f_xy'] = x**2 + y**2 + 25.0 * (sin(x)**2 + sin(y)**2)
 
@@ -35,8 +35,8 @@ class EggCrate(om.ExplicitComponent):
         """
         Jacobian for our paraboloid.
         """
-        x = inputs['x']
-        y = inputs['y']
+        x = inputs['x'].item()
+        y = inputs['y'].item()
 
         partials['f_xy', 'x'] = 2 * (x + 25 * cos(x) * sin(x))
         partials['f_xy', 'y'] = 2 * (y + 25 * cos(y) * sin(y))

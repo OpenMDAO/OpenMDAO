@@ -214,8 +214,8 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
                     con[:10] = inputs['r_con_g']
                     con[10:15] = inputs['theta_con_g']
                     con[15:20] = inputs['delta_theta_con_g']
-                    con[20] = inputs['l_conx_g']
-                    con[21] = inputs['y']
+                    con[20] = inputs['l_conx_g'].item()
+                    con[21] = inputs['y'].item()
 
             p.model.add_subsystem('mux', MuxComp())
             p.model.connect('r_con.g', 'mux.r_con_g')

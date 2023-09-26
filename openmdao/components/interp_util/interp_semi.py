@@ -180,7 +180,7 @@ class InterpNDSemi(object):
         # Loop over n_nodes because there isn't a way to vectorize.
         for j in range(n_nodes):
             val, d_x, d_values_tuple, extrapolate = table.interpolate(xi[j, :])
-            result[j] = val
+            result[j] = val.item()
             derivs_x[j, :] = d_x.ravel()
             if self._compute_d_dvalues:
                 d_values, idx = d_values_tuple

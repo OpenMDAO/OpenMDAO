@@ -32,9 +32,9 @@ class CacheLinearTestCase(unittest.TestCase):
                 self.declare_partials(of='*', wrt='*')
 
             def apply_nonlinear(self, inputs, outputs, residuals):
-                a = inputs['a']
-                b = inputs['b']
-                c = inputs['c']
+                a = inputs['a'].item()
+                b = inputs['b'].item()
+                c = inputs['c'].item()
                 x = outputs['states'][0]
                 y = outputs['states'][1]
 
@@ -42,9 +42,9 @@ class CacheLinearTestCase(unittest.TestCase):
                 residuals['states'][1] = a * y + b
 
             def solve_nonlinear(self, inputs, outputs):
-                a = inputs['a']
-                b = inputs['b']
-                c = inputs['c']
+                a = inputs['a'].item()
+                b = inputs['b'].item()
+                c = inputs['c'].item()
                 outputs['states'][0] = (-b + (b ** 2 - 4 * a * c) ** 0.5) / (2 * a)
                 outputs['states'][1] = -b/a
 

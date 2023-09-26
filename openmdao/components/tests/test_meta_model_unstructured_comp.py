@@ -768,7 +768,10 @@ class MetaModelTestCase(unittest.TestCase):
                 pass
 
             def predict(self, x):
-                return sin(x)
+                if x.size == 1:
+                    return sin(x.item())
+                else:
+                    return sin(x)
 
         class SinTwoInputsSurrogate(om.SurrogateModel):
             def train(self, x, y):
@@ -936,7 +939,10 @@ class MetaModelTestCase(unittest.TestCase):
                 pass
 
             def predict(self, x):
-                return sin(x)
+                if x.size == 1:
+                    return sin(x.item())
+                else:
+                    return sin(x)
 
         class TrigWithFdInSetup(om.MetaModelUnStructuredComp):
             def setup(self):

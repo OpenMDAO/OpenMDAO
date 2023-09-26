@@ -341,23 +341,21 @@ class InterpLagrange3Semi(InterpAlgorithmSemi):
             d_value = None
             if self._compute_d_dvalues:
                 d_value = np.empty(4, dtype=dtype)
-                d_value[0] = xx2 * xx3 * xx4 * fact1
-                d_value[1] = -xx1 * xx3 * xx4 * fact2
-                d_value[2] = xx1 * xx2 * xx4 * fact3
-                d_value[3] = -xx1 * xx2 * xx3 * fact4
+                d_value[0] = (xx2 * xx3 * xx4 * fact1).item()
+                d_value[1] = (-xx1 * xx3 * xx4 * fact2).item()
+                d_value[2] = (xx1 * xx2 * xx4 * fact3).item()
+                d_value[3] = (-xx1 * xx2 * xx3 * fact4).item()
 
                 d_value = (d_value,
                            [self._idx[idx - 1], self._idx[idx],
                             self._idx[idx + 1], self._idx[idx + 2]])
 
-        derivs[0] = q1 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p3 + p2)) +
-                          p4 * (p2 + p3) + p2 * p3) - \
-            q2 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p3 + p1)) +
-                  p4 * (p1 + p3) + p1 * p3) + \
-            q3 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p2 + p1)) +
-                  p4 * (p2 + p1) + p2 * p1) - \
-            q4 * (x[0] * (3.0 * x[0] - 2.0 * (p3 + p2 + p1)) +
-                  p1 * (p2 + p3) + p2 * p3)
+        derivs[0] = (
+            q1 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p3 + p2)) + p4 * (p2 + p3) + p2 * p3) -
+            q2 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p3 + p1)) + p4 * (p1 + p3) + p1 * p3) +
+            q3 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p2 + p1)) + p4 * (p2 + p1) + p2 * p1) -
+            q4 * (x[0] * (3.0 * x[0] - 2.0 * (p3 + p2 + p1)) + p1 * (p2 + p3) + p2 * p3)
+        ).item()
 
         return xx4 * (xx3 * (q1 * xx2 - q2 * xx1) + q3 * xx1 * xx2) - q4 * xx1 * xx2 * xx3, \
             derivs, d_value, extrap
