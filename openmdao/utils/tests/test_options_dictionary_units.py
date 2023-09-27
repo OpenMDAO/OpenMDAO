@@ -1,16 +1,18 @@
 import unittest
 
 import openmdao.api as om
+from openmdao.utils.units import convert_units
+
 
 # TODO: Turn this into a test.
 
-def units_setter(opt_dict, value):
+def units_setter(opt_meta, value):
     """
-    Check and convert new units tuple into 
+    Check and convert new units tuple into
 
     Parameters
     ----------
-    opt_dict : dict
+    opt_meta : dict
         Dictionary of entries for the option.
     value : any
         New value for the option.
@@ -20,7 +22,12 @@ def units_setter(opt_dict, value):
     any
         Post processed value to set into the option.
     """
-    new_val, new_unit = value
+    new_val, new_units = value
+    old_val, units = opt_meta['val']
+
+    converted_val = convert_units(new_val, new_units, units)
+    return (converted_val, units)
+
 
 class AviaryComp(om.ExplicitComponent):
 
@@ -30,7 +37,8 @@ class AviaryComp(om.ExplicitComponent):
         self.add_output('y', 3.0)
 
     def initialize(self):
-        self.options.declare('length', default=(12.0, 'inch'), set_function=None)
+        self.options.declare('length', default=(12.0, 'inch'),
+                             set_function=units_setter)
 
     def compute(self, inputs, outputs):
         length = self.options['length'][0]
