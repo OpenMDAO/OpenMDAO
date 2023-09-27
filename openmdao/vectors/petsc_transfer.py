@@ -116,12 +116,14 @@ else:
                 nz = np.count_nonzero(group._var_sizes[io][:, allprocs_abs2idx[name]])
                 return nz > 1, group._var_sizes[io].shape[0] - nz, False
 
+            def get_rank_sizes(name, io):
+                idx = allprocs_abs2idx[name]
+                return group._var_sizes[io][:, idx]
+
             def get_xfer_ranks(name, io):
                 if group._var_allprocs_abs2meta[io][name]['distributed']:
                     return []
-                idx = allprocs_abs2idx[name]
-                sizes = group._var_sizes[io][:, idx]
-                return np.nonzero(sizes)[0]
+                return np.nonzero(get_rank_sizes(name, io))[0]
 
             # Loop through all connections owned by this system
             for abs_in, abs_out in group._conn_abs_in2out.items():
@@ -146,8 +148,9 @@ else:
                         if meta_in['size'] > sizes_out[owner, idx_out]:
                             src_indices = np.arange(meta_in['size'], dtype=INT_DTYPE)
                     else:
-                        src_shape = src_indices._src_shape
                         src_indices = src_indices.shaped_array()
+
+                    on_iprocs = []
 
                     # 1. Compute the output indices
                     # NOTE: src_indices are relative to a single, possibly distributed variable,
@@ -189,6 +192,7 @@ else:
                                 # + inds
                                 offset = offsets_out[iproc, idx_out] - start
                                 output_inds[on_iproc] = src_indices[on_iproc] + offset
+                                on_iprocs.append(iproc)
 
                             start = end
 
@@ -204,15 +208,15 @@ else:
                     if rev:
                         inp_is_dup, inp_missing, distrib_in = is_dup(abs_in, 'input')
                         out_is_dup, _, distrib_out = is_dup(abs_out, 'output')
-                        gsize_in = np.sum(sizes_in[:, idx_in])
-                        gsize_out = np.sum(sizes_out[:, idx_out])
+                        # gsize_in = np.sum(sizes_in[:, idx_in])
+                        # gsize_out = np.sum(sizes_out[:, idx_out])
 
                         iowninput = myrank == group._owning_rank[abs_in]
                         sub_out = abs_out[mypathlen:].partition('.')[0]
                         # has_multi_conn_src = len(rev_conns[abs_out]) > 1
 
                         if inp_is_dup and (abs_out not in abs2meta_out or (distrib_out and not iowninput)):
-                            print(group.pathname, 'rank', group.comm.rank, ':', 'NOT DOING', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
+                            # print(group.pathname, 'rank', group.comm.rank, ':', 'NOT DOING', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
                             rev_xfer_in[sub_out]
                             rev_xfer_out[sub_out]
                         elif out_is_dup and inp_is_dup and inp_missing > 0 and iowninput:
@@ -244,7 +248,7 @@ else:
                             output_inds = np.concatenate(oidxlist) if len(oidxlist) > 1 else oidxlist[0]
                             rev_xfer_in[sub_out].append(input_inds)
                             rev_xfer_out[sub_out].append(output_inds)
-                            print('MULTI', group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
+                            # print('MULTI', group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
 
                             if has_rev_par_coloring and iidxlist_nc:
                                 input_inds = np.concatenate(iidxlist_nc) if len(iidxlist_nc) > 1 else iidxlist_nc[0]
@@ -263,6 +267,8 @@ else:
                                     oarr = np.arange(offset, offset + meta_in['size'], dtype=INT_DTYPE)
                                     iarr = input_inds
                                 elif src_indices.size > 0:
+                                    if distrib_in and not distrib_out and len(on_iprocs) == 1 and on_iprocs[0] == rnk:
+                                        offset -= np.sum(sizes_out[:rnk, idx_out])
                                     # if distrib_in and gsize_in == shape_to_len(src_shape): # gsize_in == gsize_out:
                                     #     offset -= np.sum(sizes_out[:rnk, idx_out])
                                     oarr = np.asarray(src_indices + offset, dtype=INT_DTYPE)
@@ -286,7 +292,7 @@ else:
                                 input_inds = output_inds = np.zeros(0, dtype=INT_DTYPE)
                             rev_xfer_in[sub_out].append(input_inds)
                             rev_xfer_out[sub_out].append(output_inds)
-                            print('MULTI2', group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
+                            # print('MULTI2', group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
 
                             if has_rev_par_coloring and iidxlist_nc:
                                 input_inds = np.concatenate(iidxlist_nc) if len(iidxlist_nc) > 1 else iidxlist_nc[0]
@@ -295,7 +301,7 @@ else:
                                 rev_xfer_in_nocolor[sub_out].append(input_inds)
                                 rev_xfer_out_nocolor[sub_out].append(output_inds)
                         else:
-                            print(group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
+                            # print(group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
                             rev_xfer_in[sub_out].append(input_inds)
                             rev_xfer_out[sub_out].append(output_inds)
                 else:

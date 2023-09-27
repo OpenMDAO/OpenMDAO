@@ -1009,17 +1009,6 @@ class Component(System):
                         if dist_in:
                             offset = np.sum(sizes_in[:iproc, i])
                             end = offset + sizes_in[iproc, i]
-                        else:
-                            if src.startswith('_auto_ivc.'):
-                                nzs = np.nonzero(vout_sizes)[0]
-                                if nzs.size == 1:
-                                    # special case where we have a 'distributed' auto_ivc output
-                                    # that has a nonzero value in only one proc, so we can treat
-                                    # it like a non-distributed output. This happens in cases
-                                    # where an auto_ivc output connects to a variable that is
-                                    # remote on at least one proc.
-                                    offset = 0
-                                    end = vout_sizes[nzs[0]]
 
                     # total sizes differ and output is distributed, so can't determine mapping
                     if offset is None:
