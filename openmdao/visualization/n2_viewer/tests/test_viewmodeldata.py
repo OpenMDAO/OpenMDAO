@@ -346,7 +346,7 @@ class TestViewerData(unittest.TestCase):
 
     def test_viewer_data_with_submodel(self):
 
-        def check_viewer_data_with_submodel(test, sql_filename):
+        def check_viewer_data_with_submodel(sql_filename):
             # create sub problem
             submodel = om.Group()
             submodel.add_subsystem('subcomp', om.ExecComp('y = x1**2 + x2**2 + x3**2'), promotes=['*'])
@@ -376,7 +376,7 @@ class TestViewerData(unittest.TestCase):
                 show_browser=DEBUG_BROWSER)
             subprob_data = extract_compressed_model('N2subprob.html')
 
-            test.maxDiff = None
+            self.maxDiff = None
 
             # check problem data generated from recording against data generated from problem
             check_call(f"openmdao n2 {sql_filename} -o N2recording.html"
@@ -422,7 +422,7 @@ class TestViewerData(unittest.TestCase):
                     f"{' --no_browser' if not DEBUG_BROWSER else ''}")
             n2_top_data = extract_compressed_model('N2_top.html')
 
-            test.assertDictEqual(problem_data, n2_top_data)
+            self.assertDictEqual(problem_data, n2_top_data)
 
             # check subproblem data generated from script against data generated from subproblem
             # NOTE: design vars and responses are added in SubmodelComp's setup, which is not executed
@@ -444,7 +444,7 @@ class TestViewerData(unittest.TestCase):
                     from openmdao.core.problem import _clear_problem_names
                     _clear_problem_names()
 
-                    check_viewer_data_with_submodel(self, f'recording{val}.sql')
+                    check_viewer_data_with_submodel(f'recording{val}.sql')
 
 
 @use_tempdirs
