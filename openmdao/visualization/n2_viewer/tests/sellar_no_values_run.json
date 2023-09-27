@@ -57,8 +57,7 @@
                     "shape": "(2,)",
                     "desc": "",
                     "implicit": false,
-                    "units": "None",
-                    "val": null
+                    "units": "None"
                 },
                 {
                     "name": "v1",
@@ -69,8 +68,7 @@
                     "shape": "(1,)",
                     "desc": "",
                     "implicit": false,
-                    "units": "None",
-                    "val": null
+                    "units": "None"
                 }
             ],
             "options": {
@@ -160,8 +158,7 @@
                                     "distributed": false,
                                     "shape": "(1,)",
                                     "desc": "",
-                                    "units": "None",
-                                    "val": null
+                                    "units": "None"
                                 },
                                 {
                                     "name": "y2_command",
@@ -172,8 +169,7 @@
                                     "shape": "(1,)",
                                     "desc": "",
                                     "implicit": true,
-                                    "units": "None",
-                                    "val": null
+                                    "units": "None"
                                 }
                             ],
                             "options": {
@@ -210,8 +206,7 @@
                             "distributed": false,
                             "shape": "(2,)",
                             "desc": "",
-                            "units": "None",
-                            "val": null
+                            "units": "None"
                         },
                         {
                             "name": "x",
@@ -221,8 +216,7 @@
                             "distributed": false,
                             "shape": "(1,)",
                             "desc": "",
-                            "units": "None",
-                            "val": null
+                            "units": "None"
                         },
                         {
                             "name": "y2",
@@ -232,8 +226,7 @@
                             "distributed": false,
                             "shape": "(1,)",
                             "desc": "",
-                            "units": "None",
-                            "val": null
+                            "units": "None"
                         },
                         {
                             "name": "y1",
@@ -244,8 +237,7 @@
                             "shape": "(1,)",
                             "desc": "",
                             "implicit": false,
-                            "units": "None",
-                            "val": null
+                            "units": "None"
                         }
                     ],
                     "options": {
@@ -275,8 +267,7 @@
                             "distributed": false,
                             "shape": "(2,)",
                             "desc": "",
-                            "units": "None",
-                            "val": null
+                            "units": "None"
                         },
                         {
                             "name": "y1",
@@ -286,8 +277,7 @@
                             "distributed": false,
                             "shape": "(1,)",
                             "desc": "",
-                            "units": "None",
-                            "val": null
+                            "units": "None"
                         },
                         {
                             "name": "y2",
@@ -298,8 +288,7 @@
                             "shape": "(1,)",
                             "desc": "",
                             "implicit": false,
-                            "units": "None",
-                            "val": null
+                            "units": "None"
                         }
                     ],
                     "options": {
@@ -337,8 +326,7 @@
                     "distributed": false,
                     "shape": "(1,)",
                     "desc": "",
-                    "units": "None",
-                    "val": null
+                    "units": "None"
                 },
                 {
                     "name": "y1",
@@ -348,8 +336,7 @@
                     "distributed": false,
                     "shape": "(1,)",
                     "desc": "",
-                    "units": "None",
-                    "val": null
+                    "units": "None"
                 },
                 {
                     "name": "y2",
@@ -359,8 +346,7 @@
                     "distributed": false,
                     "shape": "(1,)",
                     "desc": "",
-                    "units": "None",
-                    "val": null
+                    "units": "None"
                 },
                 {
                     "name": "z",
@@ -370,8 +356,7 @@
                     "distributed": false,
                     "shape": "(2,)",
                     "desc": "",
-                    "units": "None",
-                    "val": null
+                    "units": "None"
                 },
                 {
                     "name": "obj",
@@ -382,8 +367,7 @@
                     "shape": "(1,)",
                     "desc": "",
                     "implicit": false,
-                    "units": "None",
-                    "val": null
+                    "units": "None"
                 }
             ],
             "options": {
@@ -420,8 +404,7 @@
                     "distributed": false,
                     "shape": "(1,)",
                     "desc": "",
-                    "units": "None",
-                    "val": null
+                    "units": "None"
                 },
                 {
                     "name": "con1",
@@ -432,8 +415,7 @@
                     "shape": "(1,)",
                     "desc": "",
                     "implicit": false,
-                    "units": "None",
-                    "val": null
+                    "units": "None"
                 }
             ],
             "options": {
@@ -470,8 +452,7 @@
                     "distributed": false,
                     "shape": "(1,)",
                     "desc": "",
-                    "units": "None",
-                    "val": null
+                    "units": "None"
                 },
                 {
                     "name": "con2",
@@ -482,8 +463,7 @@
                     "shape": "(1,)",
                     "desc": "",
                     "implicit": false,
-                    "units": "None",
-                    "val": null
+                    "units": "None"
                 }
             ],
             "options": {

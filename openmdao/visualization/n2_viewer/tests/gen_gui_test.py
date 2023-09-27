@@ -8,11 +8,6 @@ import sys
 
 from openmdao.utils.gui_testing_utils import _GuiTestCase
 
-try:
-    from parameterized import parameterized
-except ImportError:
-    from openmdao.utils.assert_utils import SkipParameterized as parameterized
-
 # set DEBUG to True if you want to view the generated HTML file
 GUI_DIAG_SUFFIX = '_GEN_TEST.html'
 GUI_TEST_SUBDIR = 'gui_test_models'
