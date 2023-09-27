@@ -1347,7 +1347,7 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
         f = np.sqrt(P1) + P2 * P3
 
         # verify the shape matches the order and size of the input params
-        print(f.shape)
+        self.assertEqual(f.shape, (25, 5, 10))
 
         # Create regular grid interpolator instance
         interp = om.MetaModelStructuredComp(method='scipy_cubic')

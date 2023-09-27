@@ -420,8 +420,8 @@ class ImplicitComponent(Component):
             raise ValueError(f"{self.msginfo}: Residual name '{name}' already exists.")
 
         if self._problem_meta is not None:
-            if self._problem_meta['setup_status'] >= _SetupStatus.POST_SETUP:
-                raise RuntimeError(f"{self.msginfo}: Can't add residual '{name}' after setup.")
+            if self._problem_meta['setup_status'] > _SetupStatus.POST_CONFIGURE:
+                raise RuntimeError(f"{self.msginfo}: Can't add residual '{name}' after configure.")
 
         # check ref shape
         if ref is not None:
