@@ -346,6 +346,8 @@ class TestViewerData(unittest.TestCase):
 
     def test_viewer_data_with_submodel(self):
 
+        self.maxDiff = None
+
         def check_viewer_data_with_submodel(sql_filename):
             # create sub problem
             submodel = om.Group()
@@ -356,11 +358,11 @@ class TestViewerData(unittest.TestCase):
             # create top-level problem
             p = om.Problem(name='top')
             p.model.add_subsystem('submodelcomp',
-                                om.SubmodelComp(problem=subprob, inputs=['*'], outputs=['*']),
-                                promotes=['*'])
+                                  om.SubmodelComp(problem=subprob, inputs=['*'], outputs=['*']),
+                                  promotes=['*'])
             p.model.add_subsystem('supercomp',
-                                om.ExecComp('z = 3 * y'),
-                                promotes=['*'])
+                                  om.ExecComp('z = 3 * y'),
+                                  promotes=['*'])
 
             p.model.add_recorder(om.SqliteRecorder(sql_filename))
 
@@ -369,18 +371,16 @@ class TestViewerData(unittest.TestCase):
 
             # extract viewer data from N2 for problem and subproblem
             om.n2(p, title='N2 for Problem', outfile='N2problem.html',
-                show_browser=DEBUG_BROWSER)
+                  show_browser=DEBUG_BROWSER)
             problem_data = extract_compressed_model('N2problem.html')
 
             om.n2(subprob, title='N2 for SubProblem', outfile='N2subprob.html',
-                show_browser=DEBUG_BROWSER)
+                  show_browser=DEBUG_BROWSER)
             subprob_data = extract_compressed_model('N2subprob.html')
-
-            self.maxDiff = None
 
             # check problem data generated from recording against data generated from problem
             check_call(f"openmdao n2 {sql_filename} -o N2recording.html"
-                    f"{' --no_browser' if not DEBUG_BROWSER else ''}")
+                       f"{' --no_browser' if not DEBUG_BROWSER else ''}")
             recording_data = extract_compressed_model('N2recording.html')
 
             self.assertDictEqual(problem_data, recording_data)
@@ -419,7 +419,7 @@ class TestViewerData(unittest.TestCase):
 
             # check problem data generated from script against data generated from problem
             check_call("openmdao n2 submodel_script.py -o N2_top.html"
-                    f"{' --no_browser' if not DEBUG_BROWSER else ''}")
+                       f"{' --no_browser' if not DEBUG_BROWSER else ''}")
             n2_top_data = extract_compressed_model('N2_top.html')
 
             self.assertDictEqual(problem_data, n2_top_data)
@@ -428,7 +428,7 @@ class TestViewerData(unittest.TestCase):
             # NOTE: design vars and responses are added in SubmodelComp's setup, which is not executed
             #       when invoking the n2 command on the subproblem, which exits after subproblem setup
             check_call("openmdao n2 submodel_script.py -o N2_subprob.html --problem=subproblem"
-                    f"{' --no_browser' if not DEBUG_BROWSER else ''}")
+                       f"{' --no_browser' if not DEBUG_BROWSER else ''}")
             n2_sub_data = extract_compressed_model('N2_subprob.html')
 
             subprob_data['design_vars'] = {}
