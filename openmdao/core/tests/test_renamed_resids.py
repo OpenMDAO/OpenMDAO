@@ -22,15 +22,17 @@ class MyCompApprox(om.ImplicitComponent):
         self.declare_partials('res', ['*'], method='fd')
 
     def apply_nonlinear(self, inputs, outputs, residuals):
-        mm = inputs['mm'][0]
+        mm = inputs['mm'].item()
+        Re = outputs['Re'].item()
+        temp = outputs['temp'][0][0].item()
+
         T = 389.97
         cf = 0.01
-        temp = outputs['temp'][0][0]
         RE = 1.479301E9 * .0260239151 * (T / 1.8 + 110.4) / (T / 1.8) ** 2
         comb = 4.593153E-6 * 0.8 * (T + 198.72) / (RE * mm * T ** 1.5)
         temp_ratio = 1.0 + 0.035 * mm * mm + 0.45 * (temp / T - 1.0)
         CFL = cf / (1.0 + 3.59 * np.sqrt(cf) * temp_ratio)
-        residuals['res'][0] = outputs['Re'] - RE * mm
+        residuals['res'][0] = Re - RE * mm
         residuals['res'][1] = (1.0 / (1.0 +  comb * temp ** 3 / CFL) + temp) * 0.5 - temp
 
 

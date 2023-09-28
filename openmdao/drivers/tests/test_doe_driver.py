@@ -606,7 +606,7 @@ class TestDOEDriver(unittest.TestCase):
         cr = om.CaseReader("cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
-        objs = [int(cr.get_case(case).outputs['f']) for case in cases]
+        objs = [cr.get_case(case).outputs['f'].item() for case in cases]
 
         self.assertEqual(len(objs), 16)
         # Testing uniqueness. If all elements are unique, it should be the same length as the
@@ -817,7 +817,7 @@ class TestDOEDriver(unittest.TestCase):
         cr = om.CaseReader("cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
-        objs = [int(cr.get_case(case).outputs['f']) for case in cases]
+        objs = [cr.get_case(case).outputs['f'].item() for case in cases]
 
         self.assertEqual(len(objs), 104)  # The number can be verified with standalone pyDOE2
         # Testing uniqueness. If all elements are unique, it should be the same length as the number of cases
@@ -979,8 +979,8 @@ class TestDOEDriver(unittest.TestCase):
 
         for case, expected_case in zip(cases, expected):
             outputs = cr.get_case(case).outputs
-            x = outputs['x']
-            y = outputs['y']
+            x = outputs['x'].item()
+            y = outputs['y'].item()
 
             bucket = int((x + x_offset) / (x_bucket_size / samples))
             x_buckets_filled.add(bucket)
@@ -1110,8 +1110,8 @@ class TestDOEDriver(unittest.TestCase):
 
         for case in cases:
             outputs = cr.get_case(case).outputs
-            x = float(outputs['indep.x'])
-            y = float(outputs['indep.y'])
+            x = outputs['indep.x'].item()
+            y = outputs['indep.y'].item()
 
             x_buckets_filled.add(int(x/bucket_size))
             y_buckets_filled.add(int(y/bucket_size))

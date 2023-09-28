@@ -180,8 +180,8 @@ class ParaboloidAE(om.ExplicitComponent):
         """f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
         Optimal solution (minimum): x = 6.6667; y = -7.3333
         """
-        x = inputs['x']
-        y = inputs['y']
+        x = inputs['x'].item()
+        y = inputs['y'].item()
 
         if x < 1.75:
             raise om.AnalysisError('Try Again.')
@@ -190,8 +190,8 @@ class ParaboloidAE(om.ExplicitComponent):
 
     def compute_partials(self, inputs, partials):
         """ Jacobian for our paraboloid."""
-        x = inputs['x']
-        y = inputs['y']
+        x = inputs['x'].item()
+        y = inputs['y'].item()
 
         partials['f_xy', 'x'] = 2.0*x - 6.0 + y
         partials['f_xy', 'y'] = 2.0*y + 8.0 + x
@@ -272,9 +272,9 @@ class ImplCompTwoStatesAE(om.ImplicitComponent):
         self.upper = 1
         self.lower = 0
 
-        x = inputs['x']
-        y = outputs['y']
-        z = outputs['z']
+        x = inputs['x'].item()
+        y = outputs['y'].item()
+        z = outputs['z'].item()
 
         residuals['y'] = y - x - 2.0*z
         residuals['z'] = x*z + z - 4.0
@@ -528,8 +528,8 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
 
             def compute(self, inputs, outputs):
                 if self.count < 1:
-                    x = inputs['x']
-                    y = inputs['y']
+                    x = inputs['x'].item()
+                    y = inputs['y'].item()
                     outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
                 else:
                     outputs['f_xy'] = np.inf
@@ -537,8 +537,8 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
                 self.count += 1
 
             def compute_partials(self, inputs, partials):
-                x = inputs['x']
-                y = inputs['y']
+                x = inputs['x'].item()
+                y = inputs['y'].item()
 
                 partials['f_xy', 'x'] = 2.0*x - 6.0 + y
                 partials['f_xy', 'y'] = 2.0*y + 8.0 + x
@@ -778,14 +778,14 @@ class CompAtan(om.ImplicitComponent):
         self.declare_partials(of='y', wrt='y')
 
     def apply_nonlinear(self, inputs, outputs, residuals):
-        x = inputs['x']
-        y = outputs['y']
+        x = inputs['x'].item()
+        y = outputs['y'].item()
 
         residuals['y'] = (33.0 * atan(y-20.0))**2 + x
 
     def linearize(self, inputs, outputs, jacobian):
-        x = inputs['x']
-        y = outputs['y']
+        x = inputs['x'].item()
+        y = outputs['y'].item()
 
         jacobian['y', 'y'] = 2178.0*atan(y-20.0) / (y**2 - 40.0*y + 401.0)
         jacobian['y', 'x'] = 1.0
