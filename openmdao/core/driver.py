@@ -541,12 +541,11 @@ class Driver(object):
         for pattern in excl:
             if not has_match(pattern, match_names):
                 issue_warning(f"{obj.msginfo}: No matches for pattern '{pattern}' in "
-                                "recording_options['excludes'].")
+                              "recording_options['excludes'].")
         for pattern in incl:
             if not has_match(pattern, match_names):
                 issue_warning(f"{obj.msginfo}: No matches for pattern '{pattern}' in "
-                                "recording_options['includes'].")
-
+                              "recording_options['includes'].")
 
         # sort lists to ensure that vars are iterated over in the same order on all procs
         vars2record = {
