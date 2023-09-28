@@ -166,6 +166,27 @@ def check_path(path, includes, excludes, include_all_path=False):
 
     return include_all_path
 
+def has_match(pattern, names):
+    """
+    Determine whether `pattern` matches at least one name in `names`.
+
+    Parameters
+    ----------
+    pattern : str
+        glob pattern to match.
+    names : list
+        List of names to to check for a match.
+
+    Returns
+    -------
+    bool
+        True if there is a match.
+    """
+    for name in names:
+        if fnmatchcase(name, pattern):
+            return True
+
+    return False
 
 def deserialize(json_data, abs2meta, prom2abs, conns):
     """

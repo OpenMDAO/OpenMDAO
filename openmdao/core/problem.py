@@ -812,7 +812,7 @@ class Problem(object):
         """
         Set up case recording.
         """
-        self._filtered_vars_to_record = self.driver._get_vars_to_record(self.recording_options)
+        self._filtered_vars_to_record = self.driver._get_vars_to_record(self)
         self._rec_mgr.startup(self, self.comm)
 
     def add_recorder(self, recorder):
@@ -1098,8 +1098,10 @@ class Problem(object):
 
         # set up recording, including any new recorders since last setup
         if self._metadata['setup_status'] >= _SetupStatus.POST_SETUP:
-            driver._setup_recording()
-            self._setup_recording()
+            if driver._rec_mgr.has_recorders():
+                driver._setup_recording()
+            if self._rec_mgr.has_recorders():
+                self._setup_recording()
             record_viewer_data(self)
 
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:

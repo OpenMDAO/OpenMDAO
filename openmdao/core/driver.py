@@ -5,6 +5,7 @@ import sys
 import time
 import os
 import weakref
+from fnmatch import fnmatchcase
 
 import numpy as np
 
@@ -13,7 +14,7 @@ from openmdao.core.constants import INT_DTYPE, _SetupStatus
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.hooks import _setup_hooks
-from openmdao.utils.record_util import create_local_meta, check_path
+from openmdao.utils.record_util import create_local_meta, check_path, has_match
 from openmdao.utils.general_utils import _src_name_iter, _src_or_alias_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
@@ -468,20 +469,25 @@ class Driver(object):
                 else:
                     issue_warning(s, category=DriverWarning)
 
-    def _get_vars_to_record(self, recording_options):
+    def _get_vars_to_record(self, obj=None):
         """
         Get variables to record based on recording options.
 
         Parameters
         ----------
-        recording_options : <OptionsDictionary>
-            Dictionary with recording options.
+        obj : Problem or Driver
+            Parent object which has recording options.
 
         Returns
         -------
         dict
            Dictionary containing lists of variables to record.
         """
+        if obj is None:
+            obj = self
+
+        recording_options = obj.recording_options
+
         problem = self._problem()
         model = problem.model
 
@@ -489,7 +495,8 @@ class Driver(object):
         excl = recording_options['excludes']
 
         # includes and excludes for outputs are specified using promoted names
-        abs2prom = model._var_allprocs_abs2prom['output']
+        abs2prom_output = model._var_allprocs_abs2prom['output']
+        abs2prom_inputs = model._var_allprocs_abs2prom['input']
 
         # 1. If record_outputs is True, get the set of outputs
         # 2. Filter those using includes and excludes to get the baseline set of variables to record
@@ -501,7 +508,7 @@ class Driver(object):
         myinputs = myoutputs = myresiduals = []
 
         if recording_options['record_outputs']:
-            myoutputs = [n for n, prom in abs2prom.items() if check_path(prom, incl, excl)]
+            myoutputs = [n for n, prom in abs2prom_output.items() if check_path(prom, incl, excl)]
 
             model_outs = model._outputs
 
@@ -514,7 +521,7 @@ class Driver(object):
 
         elif recording_options['record_residuals']:
             myresiduals = [n for n in model._residuals._abs_iter()
-                           if check_path(abs2prom[n], incl, excl)]
+                           if check_path(abs2prom_output[n], incl, excl)]
 
         myoutputs = set(myoutputs)
         if recording_options['record_desvars']:
@@ -527,8 +534,19 @@ class Driver(object):
         # inputs (if in options). inputs use _absolute_ names for includes/excludes
         if 'record_inputs' in recording_options:
             if recording_options['record_inputs']:
-                myinputs = [n for n in model._var_allprocs_abs2prom['input']
-                            if check_path(n, incl, excl)]
+                myinputs = [n for n in abs2prom_inputs if check_path(n, incl, excl)]
+
+        # check that all exclude/include globs have at least one matching output or input name
+        match_names = set(abs2prom_output.values()) | set(abs2prom_inputs.keys())
+        for pattern in excl:
+            if not has_match(pattern, match_names):
+                issue_warning(f"{obj.msginfo}: No matches for pattern '{pattern}' in "
+                                "recording_options['excludes'].")
+        for pattern in incl:
+            if not has_match(pattern, match_names):
+                issue_warning(f"{obj.msginfo}: No matches for pattern '{pattern}' in "
+                                "recording_options['includes'].")
+
 
         # sort lists to ensure that vars are iterated over in the same order on all procs
         vars2record = {
@@ -543,7 +561,7 @@ class Driver(object):
         """
         Set up case recording.
         """
-        self._filtered_vars_to_record = self._get_vars_to_record(self.recording_options)
+        self._filtered_vars_to_record = self._get_vars_to_record()
         self._rec_mgr.startup(self, self._problem().comm)
 
     def _get_voi_val(self, name, meta, remote_vois, driver_scaling=True,

@@ -11,13 +11,13 @@ import numpy as np
 import openmdao.api as om
 from openmdao.core.driver import Driver
 from openmdao.utils.units import convert_units
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warnings
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
-from openmdao.utils.om_warnings import OMDeprecationWarning
+from openmdao.utils.om_warnings import OpenMDAOWarning
 
 from openmdao.utils.mpi import MPI
 
@@ -813,6 +813,43 @@ class TestDriver(unittest.TestCase):
         assert_near_equal(totals['sub.comp.f_xy', 'sub.y']['J_fwd'], [[1.58e2]], 1e-5)
         assert_near_equal(totals['sub.comp.f_xy', 'sub.x']['J_fd'], [[1.44e2]], 1e-5)
         assert_near_equal(totals['sub.comp.f_xy', 'sub.y']['J_fd'], [[1.58e2]], 1e-5)
+
+    def test_get_vars_to_record(self):
+        recorder = om.SqliteRecorder("cases.sql")
+
+        prob = om.Problem()
+        prob.add_recorder(recorder)
+
+        prob.model.add_subsystem('mag', om.ExecComp('y=x**2'),
+                                 promotes_inputs=['*'], promotes_outputs=['*'])
+
+        prob.model.add_subsystem('sum', om.ExecComp('z=sum(y)'),
+                                 promotes_inputs=['*'], promotes_outputs=['*'])
+
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.add_recorder(recorder)
+
+
+        prob.recording_options['record_inputs'] = True
+        prob.recording_options['excludes'] = ['*x*', '*aa*']
+        prob.recording_options['includes'] = ['*z*', '*bb*']
+
+        prob.driver.recording_options['record_inputs'] = True
+        prob.driver.recording_options['excludes'] = ['*y*', '*cc*']
+        prob.driver.recording_options['includes'] = ['*x*', '*dd*']
+
+        prob.setup()
+
+        expected_warnings = (
+            (OpenMDAOWarning, "Problem problem: No matches for pattern '*aa*' in recording_options['excludes']."),
+            (OpenMDAOWarning, "Problem problem: No matches for pattern '*bb*' in recording_options['includes']."),
+            (OpenMDAOWarning, "ScipyOptimizeDriver: No matches for pattern '*cc*' in recording_options['excludes']."),
+            (OpenMDAOWarning, "ScipyOptimizeDriver: No matches for pattern '*dd*' in recording_options['includes'].")
+        )
+
+        with assert_warnings(expected_warnings):
+            prob.final_setup()
 
 
 @use_tempdirs
