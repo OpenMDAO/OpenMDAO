@@ -650,11 +650,11 @@ class TestDriver(unittest.TestCase):
 
         totals = prob.check_totals(out_stream=None, driver_scaling=True)
 
-        for key, val in totals.items():
+        for val in totals.values():
             assert_near_equal(val['rel error'][0], 0.0, 1e-6)
 
         cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
+        cases = cr.list_cases('driver', out_stream=None)
         case = cr.get_case(cases[0])
 
         dv = case.get_design_vars()
@@ -817,7 +817,7 @@ class TestDriver(unittest.TestCase):
     def test_get_vars_to_record(self):
         recorder = om.SqliteRecorder("cases.sql")
 
-        prob = om.Problem()
+        prob = om.Problem(name='ABCD')
         prob.add_recorder(recorder)
 
         prob.model.add_subsystem('mag', om.ExecComp('y=x**2'),
@@ -842,8 +842,8 @@ class TestDriver(unittest.TestCase):
         prob.setup()
 
         expected_warnings = (
-            (OpenMDAOWarning, "Problem problem: No matches for pattern '*aa*' in recording_options['excludes']."),
-            (OpenMDAOWarning, "Problem problem: No matches for pattern '*bb*' in recording_options['includes']."),
+            (OpenMDAOWarning, "Problem ABCD: No matches for pattern '*aa*' in recording_options['excludes']."),
+            (OpenMDAOWarning, "Problem ABCD: No matches for pattern '*bb*' in recording_options['includes']."),
             (OpenMDAOWarning, "ScipyOptimizeDriver: No matches for pattern '*cc*' in recording_options['excludes']."),
             (OpenMDAOWarning, "ScipyOptimizeDriver: No matches for pattern '*dd*' in recording_options['includes'].")
         )
