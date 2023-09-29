@@ -3523,32 +3523,59 @@ class System(object):
 
         if recurse:
             abs2prom_in = self._var_allprocs_abs2prom['input']
-            for subsys in self._sorted_sys_iter():
-                dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
-                                             use_prom_ivc=use_prom_ivc)
-                if use_prom_ivc:
-                    # have to promote subsystem prom name to this level
-                    sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
-                    for dv, meta in dvs.items():
-                        if dv in sub_pro2abs_in:
-                            abs_dv = sub_pro2abs_in[dv][0]
-                            out[abs2prom_in[abs_dv]] = meta
-                        else:
-                            out[dv] = meta
-                else:
-                    out.update(dvs)
-
             if (self.comm.size > 1 and self._subsystems_allprocs and
                     self._mpi_proc_allocator.parallel):
-                my_out = out
-                out = {}
-                for all_out in self.comm.allgather(my_out):
-                    for name, meta in all_out.items():
-                        if name not in out:
-                            if name in my_out:
-                                out[name] = my_out[name]
+
+                # For parallel groups, we need to make sure that the design variable dictionary is
+                # assembled in the same order under mpi as for serial runs.
+                out_by_sys = {}
+
+                for subsys in self._sorted_sys_iter():
+                    sub_out = {}
+                    name = subsys.name
+                    dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
+                                                 use_prom_ivc=use_prom_ivc)
+                    if use_prom_ivc:
+                        # have to promote subsystem prom name to this level
+                        sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
+                        for dv, meta in dvs.items():
+                            if dv in sub_pro2abs_in:
+                                abs_dv = sub_pro2abs_in[dv][0]
+                                sub_out[abs2prom_in[abs_dv]] = meta
                             else:
-                                out[name] = meta
+                                sub_out[dv] = meta
+                    else:
+                        sub_out.update(dvs)
+
+                    out_by_sys[name] = sub_out
+
+                out_by_sys_by_rank = self.comm.allgather(out_by_sys)
+                all_outs_by_sys = {}
+                for outs in out_by_sys_by_rank:
+                    for name, meta in outs.items():
+                        all_outs_by_sys[name] = meta
+
+                for subsys_name in self._sorted_sys_iter_all_procs():
+                    for name, meta in all_outs_by_sys[subsys_name].items():
+                        if name not in out:
+                            out[name] = meta
+
+            else:
+
+                for subsys in self._sorted_sys_iter():
+                    dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
+                                                 use_prom_ivc=use_prom_ivc)
+                    if use_prom_ivc:
+                        # have to promote subsystem prom name to this level
+                        sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
+                        for dv, meta in dvs.items():
+                            if dv in sub_pro2abs_in:
+                                abs_dv = sub_pro2abs_in[dv][0]
+                                out[abs2prom_in[abs_dv]] = meta
+                            else:
+                                out[dv] = meta
+                    else:
+                        out.update(dvs)
 
         if out and self is model:
             for var, outmeta in out.items():
@@ -3674,39 +3701,82 @@ class System(object):
 
         if recurse:
             abs2prom_in = self._var_allprocs_abs2prom['input']
-            for subsys in self._sorted_sys_iter():
-                resps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
-                                             use_prom_ivc=use_prom_ivc)
-                if use_prom_ivc:
-                    # have to promote subsystem prom name to this level
-                    sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
-                    for dv, meta in resps.items():
-                        if dv in sub_pro2abs_in:
-                            abs_resp = sub_pro2abs_in[dv][0]
-                            out[abs2prom_in[abs_resp]] = meta
-                        else:
-                            out[dv] = meta
-                else:
-                    for rkey, rmeta in resps.items():
-                        if rkey in out:
-                            tdict = {'con': 'constraint', 'obj': 'objective'}
-                            rpath = rmeta['alias_path']
-                            rname = '.'.join((rpath, rmeta['name'])) if rpath else rkey
-                            rtype = tdict[rmeta['type']]
-                            ometa = out[rkey]
-                            opath = ometa['alias_path']
-                            oname = '.'.join((opath, ometa['name'])) if opath else ometa['name']
-                            otype = tdict[ometa['type']]
-                            raise NameError(f"The same response alias, '{rkey}' was declared for "
-                                            f"{rtype} '{rname}' and {otype} '{oname}'.")
-                        out[rkey] = rmeta
-
             if (self.comm.size > 1 and self._subsystems_allprocs and
                     self._mpi_proc_allocator.parallel):
-                all_outs = self.comm.allgather(out)
-                out = {}
-                for all_out in all_outs:
-                    out.update(all_out)
+
+                # For parallel groups, we need to make sure that the design variable dictionary is
+                # assembled in the same order under mpi as for serial runs.
+                out_by_sys = {}
+
+                for subsys in self._sorted_sys_iter():
+                    name = subsys.name
+                    sub_out = {}
+
+                    resps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
+                                                 use_prom_ivc=use_prom_ivc)
+                    if use_prom_ivc:
+                        # have to promote subsystem prom name to this level
+                        sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
+                        for dv, meta in resps.items():
+                            if dv in sub_pro2abs_in:
+                                abs_resp = sub_pro2abs_in[dv][0]
+                                sub_out[abs2prom_in[abs_resp]] = meta
+                            else:
+                                sub_out[dv] = meta
+                    else:
+                        for rkey, rmeta in resps.items():
+                            if rkey in out:
+                                tdict = {'con': 'constraint', 'obj': 'objective'}
+                                rpath = rmeta['alias_path']
+                                rname = '.'.join((rpath, rmeta['name'])) if rpath else rkey
+                                rtype = tdict[rmeta['type']]
+                                ometa = sub_out[rkey]
+                                opath = ometa['alias_path']
+                                oname = '.'.join((opath, ometa['name'])) if opath else ometa['name']
+                                otype = tdict[ometa['type']]
+                                raise NameError(f"The same response alias, '{rkey}' was declared"
+                                                f" for {rtype} '{rname}' and {otype} '{oname}'.")
+                            sub_out[rkey] = rmeta
+
+                    out_by_sys[name] = sub_out
+
+                out_by_sys_by_rank = self.comm.allgather(out_by_sys)
+                all_outs_by_sys = {}
+                for outs in out_by_sys_by_rank:
+                    for name, meta in outs.items():
+                        all_outs_by_sys[name] = meta
+
+                for subsys_name in self._sorted_sys_iter_all_procs():
+                    for name, meta in all_outs_by_sys[subsys_name].items():
+                        out[name] = meta
+
+            else:
+                for subsys in self._sorted_sys_iter():
+                    resps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
+                                                 use_prom_ivc=use_prom_ivc)
+                    if use_prom_ivc:
+                        # have to promote subsystem prom name to this level
+                        sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
+                        for dv, meta in resps.items():
+                            if dv in sub_pro2abs_in:
+                                abs_resp = sub_pro2abs_in[dv][0]
+                                out[abs2prom_in[abs_resp]] = meta
+                            else:
+                                out[dv] = meta
+                    else:
+                        for rkey, rmeta in resps.items():
+                            if rkey in out:
+                                tdict = {'con': 'constraint', 'obj': 'objective'}
+                                rpath = rmeta['alias_path']
+                                rname = '.'.join((rpath, rmeta['name'])) if rpath else rkey
+                                rtype = tdict[rmeta['type']]
+                                ometa = out[rkey]
+                                opath = ometa['alias_path']
+                                oname = '.'.join((opath, ometa['name'])) if opath else ometa['name']
+                                otype = tdict[ometa['type']]
+                                raise NameError(f"The same response alias, '{rkey}' was declared"
+                                                f" for {rtype} '{rname}' and {otype} '{oname}'.")
+                            out[rkey] = rmeta
 
         return out
 
