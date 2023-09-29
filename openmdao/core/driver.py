@@ -5,7 +5,6 @@ import sys
 import time
 import os
 import weakref
-from fnmatch import fnmatchcase
 
 import numpy as np
 
@@ -495,8 +494,13 @@ class Driver(object):
         excl = recording_options['excludes']
 
         # includes and excludes for outputs are specified using promoted names
+        # includes and excludes for inputs are specified using _absolute_ names
         abs2prom_output = model._var_allprocs_abs2prom['output']
         abs2prom_inputs = model._var_allprocs_abs2prom['input']
+
+        # set of promoted output names and absolute input and residual names
+        # used for matching includes/excludes
+        match_names = set()
 
         # 1. If record_outputs is True, get the set of outputs
         # 2. Filter those using includes and excludes to get the baseline set of variables to record
@@ -508,6 +512,7 @@ class Driver(object):
         myinputs = myoutputs = myresiduals = []
 
         if recording_options['record_outputs']:
+            match_names = match_names | set(abs2prom_output.values())
             myoutputs = [n for n, prom in abs2prom_output.items() if check_path(prom, incl, excl)]
 
             model_outs = model._outputs
@@ -520,6 +525,7 @@ class Driver(object):
                 myresiduals = myoutputs
 
         elif recording_options['record_residuals']:
+            match_names = match_names | self._residuals.keys()
             myresiduals = [n for n in model._residuals._abs_iter()
                            if check_path(abs2prom_output[n], incl, excl)]
 
@@ -533,11 +539,11 @@ class Driver(object):
 
         # inputs (if in options). inputs use _absolute_ names for includes/excludes
         if 'record_inputs' in recording_options:
+            match_names = match_names | set(abs2prom_inputs.keys())
             if recording_options['record_inputs']:
                 myinputs = [n for n in abs2prom_inputs if check_path(n, incl, excl)]
 
         # check that all exclude/include globs have at least one matching output or input name
-        match_names = set(abs2prom_output.values()) | set(abs2prom_inputs.keys())
         for pattern in excl:
             if not has_match(pattern, match_names):
                 issue_warning(f"{obj.msginfo}: No matches for pattern '{pattern}' in "

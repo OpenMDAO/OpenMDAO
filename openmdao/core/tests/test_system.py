@@ -5,7 +5,8 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_warnings
+from openmdao.utils.testing_utils import use_tempdirs
 
 
 class TestSystem(unittest.TestCase):
@@ -219,7 +220,6 @@ class TestSystem(unittest.TestCase):
               "must be a string value of 'list' or 'dict'"
 
         self.assertEqual(str(cm.exception), msg)
-
 
     def test_list_inputs_output_with_includes_excludes(self):
         from openmdao.test_suite.scripts.circuit_analysis import Circuit
@@ -601,6 +601,42 @@ class TestSystem(unittest.TestCase):
         c3y = p.get_val('my_group.g1.c3.y')
         expected = ((4 * 3 + 5) * 3 + 5) * 3 + 5.
         assert_near_equal(expected, c3y)
+
+    @use_tempdirs
+    def test_recording_options_includes_excludes(self):
+        import openmdao.api as om
+
+        prob = om.Problem()
+
+        mag = prob.model.add_subsystem('mag', om.ExecComp('y=x**2'),
+                                       promotes_inputs=['*'], promotes_outputs=['*'])
+
+        sum = prob.model.add_subsystem('sum', om.ExecComp('z=sum(y)'),
+                                       promotes_inputs=['*'], promotes_outputs=['*'])
+
+        recorder = om.SqliteRecorder("cases.sql")
+        mag.add_recorder(recorder)
+        sum.add_recorder(recorder)
+
+        mag.recording_options['record_inputs'] = True
+        mag.recording_options['excludes'] = ['*x*', '*aa*']
+        mag.recording_options['includes'] = ['*y*', '*bb*']
+
+        sum.recording_options['record_inputs'] = True
+        sum.recording_options['excludes'] = ['*y*', '*cc*']
+        sum.recording_options['includes'] = ['*z*', '*dd*']
+
+        prob.setup()
+
+        expected_warnings = (
+            (om.OpenMDAOWarning, "'mag' <class ExecComp>: No matches for pattern '*aa*' in recording_options['excludes']."),
+            (om.OpenMDAOWarning, "'mag' <class ExecComp>: No matches for pattern '*bb*' in recording_options['includes']."),
+            (om.OpenMDAOWarning, "'sum' <class ExecComp>: No matches for pattern '*cc*' in recording_options['excludes']."),
+            (om.OpenMDAOWarning, "'sum' <class ExecComp>: No matches for pattern '*dd*' in recording_options['includes'].")
+        )
+
+        with assert_warnings(expected_warnings):
+            prob.final_setup()
 
 
 if __name__ == "__main__":
