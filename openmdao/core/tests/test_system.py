@@ -235,6 +235,7 @@ class TestSystem(unittest.TestCase):
         model.connect('ground.V', 'circuit.Vg')
 
         p.setup()
+        p.set_solver_print(-1)
         p.run_model()
 
         # Inputs with no includes or excludes
@@ -409,7 +410,7 @@ class TestSystem(unittest.TestCase):
               "any `set_val` calls.")
 
         with assert_warning(UserWarning, msg):
-            prob.model.list_inputs(units=True, prom_name=True)
+            prob.model.list_inputs(units=True, prom_name=True, out_stream=None)
 
     def test_get_io_metadata(self):
         from openmdao.test_suite.components.sellar_feature import SellarMDA
@@ -614,7 +615,7 @@ class TestSystem(unittest.TestCase):
         sum = prob.model.add_subsystem('sum', om.ExecComp('z=sum(y)'),
                                        promotes_inputs=['*'], promotes_outputs=['*'])
 
-        recorder = om.SqliteRecorder("cases.sql")
+        recorder = om.SqliteRecorder("rec_options.sql")
         mag.add_recorder(recorder)
         sum.add_recorder(recorder)
 
@@ -633,6 +634,35 @@ class TestSystem(unittest.TestCase):
             (om.OpenMDAOWarning, "'mag' <class ExecComp>: No matches for pattern '*bb*' in recording_options['includes']."),
             (om.OpenMDAOWarning, "'sum' <class ExecComp>: No matches for pattern '*cc*' in recording_options['excludes']."),
             (om.OpenMDAOWarning, "'sum' <class ExecComp>: No matches for pattern '*dd*' in recording_options['includes'].")
+        )
+
+        with assert_warnings(expected_warnings):
+            prob.final_setup()
+
+    @use_tempdirs
+    def test_record_residuals_includes_excludes(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.sellar import SellarProblem
+
+        prob = SellarProblem()
+
+        model = prob.model
+
+        recorder = om.SqliteRecorder("rec_resids.sql")
+        model.add_recorder(recorder)
+
+        # just want record residuals
+        model.recording_options['record_inputs'] = False
+        model.recording_options['record_outputs'] = False
+        model.recording_options['record_residuals'] = True
+        model.recording_options['excludes'] = ['*y1*', '*x']   # x is an input, which we are not recording
+        model.recording_options['includes'] = ['*con*', '*z']  # z is an input, which we are not recording
+
+        prob.setup()
+
+        expected_warnings = (
+            (om.OpenMDAOWarning, "<model> <class SellarDerivatives>: No matches for pattern '*x' in recording_options['excludes']."),
+            (om.OpenMDAOWarning, "<model> <class SellarDerivatives>: No matches for pattern '*z' in recording_options['includes']."),
         )
 
         with assert_warnings(expected_warnings):

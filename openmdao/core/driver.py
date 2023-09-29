@@ -525,7 +525,7 @@ class Driver(object):
                 myresiduals = myoutputs
 
         elif recording_options['record_residuals']:
-            match_names = match_names | self._residuals.keys()
+            match_names = match_names | set(model._residuals.keys())
             myresiduals = [n for n in model._residuals._abs_iter()
                            if check_path(abs2prom_output[n], incl, excl)]
 
@@ -539,8 +539,8 @@ class Driver(object):
 
         # inputs (if in options). inputs use _absolute_ names for includes/excludes
         if 'record_inputs' in recording_options:
-            match_names = match_names | set(abs2prom_inputs.keys())
             if recording_options['record_inputs']:
+                match_names = match_names | set(abs2prom_inputs.keys())
                 myinputs = [n for n in abs2prom_inputs if check_path(n, incl, excl)]
 
         # check that all exclude/include globs have at least one matching output or input name

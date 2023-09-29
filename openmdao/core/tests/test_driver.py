@@ -851,6 +851,31 @@ class TestDriver(unittest.TestCase):
         with assert_warnings(expected_warnings):
             prob.final_setup()
 
+    def test_record_residuals_includes_excludes(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.sellar import SellarProblem
+
+        prob = SellarProblem()
+
+        recorder = om.SqliteRecorder("rec_resids.sql")
+        prob.driver.add_recorder(recorder)
+
+        # just want record residuals
+        prob.driver.recording_options['record_inputs'] = False
+        prob.driver.recording_options['record_outputs'] = False
+        prob.driver.recording_options['record_residuals'] = True
+        prob.driver.recording_options['excludes'] = ['*y1*', '*x']   # x is an input, which we are not recording
+        prob.driver.recording_options['includes'] = ['*con*', '*z']  # z is an input, which we are not recording
+
+        prob.setup()
+
+        expected_warnings = (
+            (om.OpenMDAOWarning, "Driver: No matches for pattern '*x' in recording_options['excludes']."),
+            (om.OpenMDAOWarning, "Driver: No matches for pattern '*z' in recording_options['includes']."),
+        )
+
+        with assert_warnings(expected_warnings):
+            prob.final_setup()
 
 @use_tempdirs
 class TestCheckRelevance(unittest.TestCase):

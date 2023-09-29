@@ -1980,7 +1980,7 @@ class System(object):
                     myresiduals = myoutputs
 
             elif options['record_residuals']:
-                match_names = match_names | self._residuals.keys()
+                match_names = match_names | set(self._residuals.keys())
                 myresiduals = [n for n in self._residuals._abs_iter()
                                if check_path(abs2prom_output[n], incl, excl)]
 
@@ -1988,11 +1988,11 @@ class System(object):
             for pattern in excl:
                 if not has_match(pattern, match_names):
                     issue_warning(f"{self.msginfo}: No matches for pattern '{pattern}' in "
-                                "recording_options['excludes'].")
+                                  "recording_options['excludes'].")
             for pattern in incl:
                 if not has_match(pattern, match_names):
                     issue_warning(f"{self.msginfo}: No matches for pattern '{pattern}' in "
-                                "recording_options['includes'].")
+                                  "recording_options['includes'].")
 
             self._filtered_vars_to_record = {
                 'input': myinputs,
