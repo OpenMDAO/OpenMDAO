@@ -158,7 +158,7 @@ class _TotalJacInfo(object):
             If True, perform a single directional derivative.
         """
         driver = problem.driver
-        prom2abs = problem.model._var_allprocs_prom2abs_list['output']
+        prom2abs_out = problem.model._var_allprocs_prom2abs_list['output']
         prom2abs_in = problem.model._var_allprocs_prom2abs_list['input']
         conns = problem.model._conn_global_abs_in2out
 
@@ -203,8 +203,8 @@ class _TotalJacInfo(object):
         wrt = []
         self.ivc_print_names = {}
         for name in prom_wrt:
-            if name in prom2abs:
-                wrt_name = prom2abs[name][0]
+            if name in prom2abs_out:
+                wrt_name = prom2abs_out[name][0]
             elif name in prom2abs_in:
                 in_abs = prom2abs_in[name][0]
                 wrt_name = conns[in_abs]
@@ -218,8 +218,8 @@ class _TotalJacInfo(object):
         of = []
         src_of = []
         for name in prom_of:  # these names could be aliases
-            if name in prom2abs:
-                of_name = prom2abs[name][0]
+            if name in prom2abs_out:
+                of_name = prom2abs_out[name][0]
             elif name in prom2abs_in:
                 # An auto_ivc design var can be used as a response too.
                 in_abs = prom2abs_in[name][0]
@@ -396,21 +396,36 @@ class _TotalJacInfo(object):
                 self.jac_scratch['rev'] = [scratch[0][:J.shape[1]]]
                 if self.simul_coloring is not None:  # when simul coloring, need two scratch arrays
                     self.jac_scratch['rev'].append(scratch[1][:J.shape[1]])
-                if self.has_output_dist['rev']:
-                    sizes = model._var_sizes['output']
-                    abs2idx = model._var_allprocs_abs2idx
-                    self.jac_dist_col_mask = mask = np.zeros(J.shape[1], dtype=bool)
-                    start = end = 0
-                    for name in self.wrt:
-                        meta = all_abs2meta_out[name]
-                        end += meta['global_size']
-                        if meta['distributed']:
-                            # see if we have an odd dist var like some auto_ivcs connected to
-                            # remote vars, which are zero everywhere except for one proc
-                            sz = sizes[:, abs2idx[name]]
-                            if np.count_nonzero(sz) > 1:
-                                mask[start:end] = True
-                        start = end
+                has_out_dist = self.has_output_dist['rev']
+
+                if has_out_dist:
+                    self.jac_dist_col_mask = np.zeros(J.shape[1], dtype=bool)
+
+                self.dup_mask = np.ones(J.shape[1], dtype=bool)
+
+                sizes = model._var_sizes['output']
+                abs2idx = model._var_allprocs_abs2idx
+                start = end = 0
+                for name in self.wrt:
+                    meta = all_abs2meta_out[name]
+                    varidx = abs2idx[name]
+                    end += meta['global_size']
+                    if not meta['distributed']:
+                        # see if we have an odd dist var like some auto_ivcs connected to
+                        # remote vars, which are zero everywhere except for one proc
+                        # if has_out_dist:
+                        # sz = sizes[:, varidx]
+                        # if True: # np.count_nonzero(sz) > 1:
+                        # self.jac_dist_col_mask[start:end] = True
+                        # self.dup_mask[start:end] = True
+                        #elif 0 in sizes[:, varidx]:
+                        if model._owning_rank[name] != model.comm.rank:
+                            self.dup_mask[start:end] = False
+                    start = end
+
+                need_allreduce = not np.all(self.dup_mask)
+                if not any(model.comm.allgather(need_allreduce)):
+                    self.dup_mask = None
 
         if not approx:
             for mode in modes:
@@ -657,9 +672,10 @@ class _TotalJacInfo(object):
         """
         iproc = self.comm.rank
         model = self.model
+        owning_rank = model._owning_rank
         relevant = model._relevant
         has_par_deriv_color = False
-        abs2meta_out = model._var_allprocs_abs2meta['output']
+        all_abs2meta_out = model._var_allprocs_abs2meta['output']
         var_sizes = model._var_sizes
         var_offsets = model._get_var_offsets()
         abs2idx = model._var_allprocs_abs2idx
@@ -686,15 +702,12 @@ class _TotalJacInfo(object):
         # so we just bulk check the outputs here.
         qoi_i = self.input_meta[mode]
         qoi_o = self.output_meta[mode]
+        non_rel_outs = False
         if qoi_i and qoi_o:
             for out in self.output_list[mode]:
                 if out not in qoi_o and out not in qoi_i:
                     non_rel_outs = True
                     break
-            else:
-                non_rel_outs = False
-        else:
-            non_rel_outs = False
 
         for name in input_list:
             parallel_deriv_color = None
@@ -704,12 +717,12 @@ class _TotalJacInfo(object):
             else:
                 path = name
 
-            if path not in abs2meta_out:
+            if path not in all_abs2meta_out:
                 # could be promoted input name
                 abs_in = model._var_allprocs_prom2abs_list['input'][path][0]
                 path = model._conn_global_abs_in2out[abs_in]
 
-            in_var_meta = abs2meta_out[path]
+            in_var_meta = all_abs2meta_out[path]
 
             if name in vois:
                 # if name is in vois, then it has been declared as either a design var or
@@ -753,6 +766,7 @@ class _TotalJacInfo(object):
             offsets = var_offsets['output']
             gstart = np.sum(sizes[:iproc, in_var_idx])
             gend = gstart + sizes[iproc, in_var_idx]
+            has_rank_zeros = np.count_nonzero(sizes[:, in_var_idx]) < sizes.shape[0]
 
             # if we're doing parallel deriv coloring, we only want to set the seed on one proc
             # for each var in a given color
@@ -816,16 +830,24 @@ class _TotalJacInfo(object):
                 imeta['idx_list'] = range(start, end)
                 idx_iter_dict[name] = (imeta, self.single_index_iter)
 
+            if has_rank_zeros:
+                if owning_rank[path] == iproc:
+                    do_allreduce = 1  # do allreduce with this proc's data
+                else:
+                    do_allreduce = -1  # do allreduce with zeros
+            else:
+                do_allreduce = 0  # don't do allreduce at all
+
             if path in relevant and not non_rel_outs:
                 relsystems = relevant[path]['@all'][1]
                 if self.total_relevant_systems is not _contains_all:
                     self.total_relevant_systems.update(relsystems)
                 # tup = (ndups, relsystems, cache_lin_sol, name)
-                tup = (dist, relsystems, cache_lin_sol, name)
+                tup = (do_allreduce, relsystems, cache_lin_sol, name)
             else:
                 self.total_relevant_systems = _contains_all
                 # tup = (ndups, _contains_all, cache_lin_sol, name)
-                tup = (dist, _contains_all, cache_lin_sol, name)
+                tup = (do_allreduce, _contains_all, cache_lin_sol, name)
 
             idx_map.extend([tup] * (end - start))
             start = end
@@ -1357,19 +1379,42 @@ class _TotalJacInfo(object):
             # for rows corresponding to serial 'of' vars, we need to correct for
             # duplication of their seed values by dividing by the number of duplications.
             # ndups, _, _, _ = self.in_idx_map[mode][i]
-            dist, _, _, _ = self.in_idx_map[mode][i]
+            do_allreduce, _, _, name = self.in_idx_map[mode][i]
+            local_resp = self.in_loc_idxs['rev'][i] >= 0
             # print('JAC_SETTER_DIST', i, self.model.comm.rank, self.J[i], flush=True)
             if self.get_remote:
-                if self.jac_dist_col_mask is not None:
-                    distpart = self.J[i, :][self.jac_dist_col_mask]
-                    scratch = np.zeros(distpart.shape, dtype=distpart.dtype)
-                    # only sum up the distrib parts
-                    self.comm.Allreduce(distpart, scratch, op=MPI.SUM)
-                    self.J[i][self.jac_dist_col_mask] = scratch
-                #elif dist:
-                    #scratch = self.jac_scratch['rev'][0]
-                    #scratch[:] = self.J[i]
-                    # self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
+                # if self.jac_dist_col_mask is not None:
+                #     # this happens if there are distributed 'wrt' variables
+                #     distpart = self.J[i, :][self.jac_dist_col_mask]
+                #     scratch = np.zeros(distpart.shape, dtype=distpart.dtype)
+                #     # only sum up the distrib parts
+                #     self.comm.Allreduce(distpart, scratch, op=MPI.SUM)
+                #     self.J[i][self.jac_dist_col_mask] = scratch
+                scratch = self.jac_scratch['rev'][0]
+                # if do_allreduce and self.dup_mask is None:
+                #     if do_allreduce > 0:
+                #         scratch[:] = self.J[i]
+                #     else:
+                #         scratch[:] = 0.0
+                #     self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
+                if self.dup_mask is not None:
+                    scratch[:] = 0.0
+                    scratch[self.dup_mask] = self.J[i][self.dup_mask]
+                    self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
+                # elif do_allreduce:
+                #     if do_allreduce > 0:
+                #         scratch[:] = self.J[i]
+                #     else:
+                #         scratch[:] = 0.0
+                #     self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
+
+                # elif do_allreduce:
+                #     scratch = self.jac_scratch['rev'][0]
+                #     if do_allreduce > 0:
+                #         scratch[:] = self.J[i]
+                #     else:
+                #         scratch[:] = 0.0
+                #     self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
 
                 # scratch = self.jac_scratch['rev'][0]
                 # scratch[:] = self.J[i]

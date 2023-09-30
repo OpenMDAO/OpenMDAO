@@ -216,7 +216,7 @@ else:
                         # has_multi_conn_src = len(rev_conns[abs_out]) > 1
 
                         if inp_is_dup and (abs_out not in abs2meta_out or (distrib_out and not iowninput)):
-                            # print(group.pathname, 'rank', group.comm.rank, ':', 'NOT DOING', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
+                            print(group.pathname, 'rank', group.comm.rank, ':', 'NOT DOING', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
                             rev_xfer_in[sub_out]
                             rev_xfer_out[sub_out]
                         elif out_is_dup and inp_is_dup and inp_missing > 0 and iowninput:
@@ -248,7 +248,7 @@ else:
                             output_inds = np.concatenate(oidxlist) if len(oidxlist) > 1 else oidxlist[0]
                             rev_xfer_in[sub_out].append(input_inds)
                             rev_xfer_out[sub_out].append(output_inds)
-                            # print('MULTI', group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
+                            print('MULTI', group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
 
                             if has_rev_par_coloring and iidxlist_nc:
                                 input_inds = np.concatenate(iidxlist_nc) if len(iidxlist_nc) > 1 else iidxlist_nc[0]
@@ -292,7 +292,7 @@ else:
                                 input_inds = output_inds = np.zeros(0, dtype=INT_DTYPE)
                             rev_xfer_in[sub_out].append(input_inds)
                             rev_xfer_out[sub_out].append(output_inds)
-                            # print('MULTI2', group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
+                            print('MULTI2', group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
 
                             if has_rev_par_coloring and iidxlist_nc:
                                 input_inds = np.concatenate(iidxlist_nc) if len(iidxlist_nc) > 1 else iidxlist_nc[0]
@@ -301,7 +301,7 @@ else:
                                 rev_xfer_in_nocolor[sub_out].append(input_inds)
                                 rev_xfer_out_nocolor[sub_out].append(output_inds)
                         else:
-                            # print(group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
+                            print(group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
                             rev_xfer_in[sub_out].append(input_inds)
                             rev_xfer_out[sub_out].append(output_inds)
                 else:
@@ -379,6 +379,9 @@ else:
                             vectors['input']['nonlinear'], vectors['output']['nonlinear'],
                             rev_xfer_in_nocolor[sname], inds, group.comm)
 
+                from om_devtools.dist_idxs import dump_dist_idxs
+                print(f"DIST IDXS for '{group.pathname}', rank {group.comm.rank}:", flush=True)
+                dump_dist_idxs(group)
 
         def _transfer(self, in_vec, out_vec, mode='fwd'):
             """

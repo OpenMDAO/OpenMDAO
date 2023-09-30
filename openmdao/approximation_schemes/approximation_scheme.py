@@ -566,6 +566,7 @@ class ApproximationScheme(object):
                         yield jinds[0], res
                     else:
                         yield jinds, res
+                        # print(f"APPROX: {wrt} {jinds} {res}")
 
     def compute_approximations(self, system, jac=None):
         """

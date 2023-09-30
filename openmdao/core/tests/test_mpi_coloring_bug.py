@@ -4,7 +4,7 @@ import numpy as np
 
 import openmdao.api as om
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.testing_utils import use_tempdirs
 
@@ -302,20 +302,8 @@ class Trajectory(om.Group):
         self.design_parameter_options[name]['val'] = val
         self.design_parameter_options[name]['targets'] = targets
 
-
-    def _setup_design_parameters(self):
-        if self.design_parameter_options:
-            indep = self.add_subsystem('design_params', subsys=om.IndepVarComp(),
-                                       promotes_outputs=['*'])
-
-            for name, options in self.design_parameter_options.items():
-                indep.add_output(name='design_parameters:{0}'.format(name),
-                                 val=options['val'],
-                                 shape=(1, np.prod(options['shape'])))
-
     def setup(self):
         super().setup()
-        self._setup_design_parameters()
 
         phases_group = self.add_subsystem('phases', subsys=om.ParallelGroup(), promotes_inputs=['*'],
                                           promotes_outputs=['*'])
@@ -449,19 +437,13 @@ class FiniteBurnODE(om.ExplicitComponent):
 
 def make_traj():
 
-    t = GaussLobatto()
-
     traj = Trajectory()
 
-    traj.add_design_parameter('c', val=1.5, targets={'burn1': ['c'], 'burn2': ['c']})
-
-    # First Phase (burn)
-    burn1 = Phase(ode_class=FiniteBurnODE, transcription=t)
+    burn1 = Phase(ode_class=FiniteBurnODE, transcription=GaussLobatto())
     burn1 = traj.add_phase('burn1', burn1)
     burn1.add_state('deltav', rate_source='deltav_dot')
 
-    # Third Phase (burn)
-    burn2 = Phase(ode_class=FiniteBurnODE, transcription=t)
+    burn2 = Phase(ode_class=FiniteBurnODE, transcription=GaussLobatto())
     traj.add_phase('burn2', burn2)
     burn2.add_state('deltav', rate_source='deltav_dot')
 
@@ -497,16 +479,43 @@ class TestMPIColoringBug(unittest.TestCase):
 
         p.setup(mode='rev')
 
-        # Set Initial Guesses
-        p.set_val('design_parameters:c', val=1.5)
-
         of = ['phases.burn2.indep_states.states:deltav', 'phases.burn1.collocation_constraint.defects:deltav', 'phases.burn2.collocation_constraint.defects:deltav', ]
         wrt = ['phases.burn1.indep_states.states:deltav', 'phases.burn2.indep_states.states:deltav']
 
         p.run_model()
         p.run_driver()
 
+        # assert_check_totals(p.check_totals(of=of, wrt=wrt))
         J = p.driver._compute_totals(of=of, wrt=wrt, return_format='dict')
         dd = J['phases.burn1.collocation_constraint.defects:deltav']['phases.burn1.indep_states.states:deltav']
 
         assert_near_equal(dd, np.array([[-0.75, 0.75]]), 1e-6)
+
+    def test_bug2(self):
+        size = 3
+        p = om.Problem()
+        phases = p.model.add_subsystem('phases', om.ParallelGroup())
+        phase1 = phases.add_subsystem('phase1', om.Group())
+        phase2 = phases.add_subsystem('phase2', om.Group())
+        phase1.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(size)))
+        phase2.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(size)))
+        phase1.add_subsystem('comp1', om.ExecComp('y=3.0*x', x=np.ones(size), y=np.ones(size)))
+        # phase1.add_subsystem('comp2', om.ExecComp('y=5.0*x', x=np.ones(size), y=np.ones(size)))
+        phase2.add_subsystem('comp1', om.ExecComp('y=7.0*x', x=np.ones(size), y=np.ones(size)))
+        # phase2.add_subsystem('comp2', om.ExecComp('y=9.0*x', x=np.ones(size), y=np.ones(size)))
+        phase1.connect('indep.x', 'comp1.x')
+        # phase1.connect('comp1.y', 'comp2.x')
+        phase2.connect('indep.x', 'comp1.x')
+        # phase2.connect('comp1.y', 'comp2.x')
+
+        phase1.add_design_var('indep.x')
+        phase2.add_design_var('indep.x')
+        # phase1.add_constraint('comp2.y', lower=0.0)
+        # phase2.add_constraint('comp2.y', lower=0.0)
+        phase1.add_constraint('comp1.y', lower=0.0)
+        phase2.add_constraint('comp1.y', lower=0.0)
+
+        p.setup(mode='rev')
+        p.run_model()
+
+        assert_check_totals(p.check_totals())

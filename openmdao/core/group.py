@@ -2971,6 +2971,8 @@ class Group(System):
         # either owned by (implicit) or declared by (explicit) this Group.
         # This way, we don't repeat the error checking in multiple groups.
 
+        self._dist_in_sources = defaultdict(list)
+
         for abs_in, abs_out in abs_in2out.items():
             all_meta_out = allprocs_abs2meta_out[abs_out]
             all_meta_in = allprocs_abs2meta_in[abs_in]
@@ -3008,6 +3010,8 @@ class Group(System):
                 # get input shape and src_indices from the local meta dict
                 # (input is always local)
                 if meta_in['distributed']:
+                    self._dist_in_sources[abs_out].append(abs_in)
+
                     # if output is non-distributed and input is distributed, make output shape the
                     # full distributed shape, i.e., treat it in this regard as a distributed output
                     out_shape = self._get_full_dist_shape(abs_out, all_meta_out['shape'])
@@ -3713,6 +3717,10 @@ class Group(System):
             with self._matvec_context(scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
                 jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
+                if self._owns_approx_jac and self._has_distrib_vars and mode == 'rev':
+                    pass  # DO ALLREDUCE OF parts of d_inputs where inputs are connected to distrib outputs
+                          # and only for parts in the current matvec context
+                print(f"AFTER JAC APPLY in {self.pathname}: d_inputs: {[f'{n}, {s}' for n, s in d_inputs.items()]}", flush=True)
         # Apply recursion
         else:
             if mode == 'fwd':
