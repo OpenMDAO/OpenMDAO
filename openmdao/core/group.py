@@ -4815,6 +4815,23 @@ class Group(System):
         else:
             yield from self._subsystems_myproc
 
+    def _sorted_sys_iter_all_procs(self):
+        """
+        Yield subsystem names in sorted order if Problem option allow_post_setup_reorder is True.
+
+        Otherwise, yield subsystem names in the order they were added to their parent group.
+
+        Yields
+        ------
+        System
+            A subsystem.
+        """
+        if self._problem_meta['allow_post_setup_reorder']:
+            for s in sorted(self._subsystems_allprocs):
+                yield s
+        else:
+            yield from self._subsystems_allprocs
+
     def _solver_subsystem_iter(self, local_only=False):
         """
         Iterate over subsystems that are being optimized.

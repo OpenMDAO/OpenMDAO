@@ -628,6 +628,42 @@ class TestTheoryDocExample(unittest.TestCase):
         model.add_subsystem('C1', I1O1Comp())
 
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestDesvarResponseOrdering(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_desvar_response_ordering(self):
+
+        class MyPhase(om.Group):
+            def setup(self):
+                comp = om.ExecComp("y = x + 2")
+                self.add_subsystem('comp', comp)
+                self.add_design_var('comp.x', 3.0)
+                self.add_constraint('comp.y', lower=4.0)
+
+        class MyPhases(om.ParallelGroup):
+            def setup(self):
+                self.add_subsystem('climb', MyPhase())
+                self.add_subsystem('cruise', MyPhase())
+                self.add_subsystem('descent', MyPhase())
+
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('phases', MyPhases())
+
+        prob.setup()
+
+        dvs = prob.model.get_design_vars(recurse=True, get_sizes=True, use_prom_ivc=True)
+        cons = prob.model.get_constraints(recurse=True, get_sizes=True, use_prom_ivc=False)
+
+        dv_names = [z for z in dvs.keys()]
+        con_names = [z for z in cons.keys()]
+
+        self.assertEqual(dv_names, ['phases.climb.comp.x', 'phases.cruise.comp.x', 'phases.descent.comp.x'])
+        self.assertEqual(con_names, ['phases.climb.comp.y', 'phases.cruise.comp.y', 'phases.descent.comp.y'])
+
+
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests
     mpirun_tests()
