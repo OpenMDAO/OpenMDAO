@@ -781,14 +781,6 @@ class MPITests2(unittest.TestCase):
 
         prob.run_model()
 
-        # desvar = prob.driver.get_design_var_values()
-        # con = prob.driver.get_constraint_values()
-
-        # assert_near_equal(desvar['p.x'], np.ones(size), 1e-6)
-        # assert_near_equal(con['sub.parab.f_xy'],
-        #                   np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
-        #                   1e-6)
-
         assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=1e-5)
 
     def test_distrib_group_fd_unsupported_config(self):

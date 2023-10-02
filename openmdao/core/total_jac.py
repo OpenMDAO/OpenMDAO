@@ -401,31 +401,22 @@ class _TotalJacInfo(object):
                 if has_out_dist:
                     self.jac_dist_col_mask = np.zeros(J.shape[1], dtype=bool)
 
-                self.dup_mask = np.ones(J.shape[1], dtype=bool)
+                # create a column mask to zero out contributions to the Allreduce from
+                # duplicated vars
+                self.rev_allreduce_mask = np.ones(J.shape[1], dtype=bool)
 
-                sizes = model._var_sizes['output']
-                abs2idx = model._var_allprocs_abs2idx
                 start = end = 0
                 for name in self.wrt:
                     meta = all_abs2meta_out[name]
-                    varidx = abs2idx[name]
                     end += meta['global_size']
-                    if not meta['distributed']:
-                        # see if we have an odd dist var like some auto_ivcs connected to
-                        # remote vars, which are zero everywhere except for one proc
-                        # if has_out_dist:
-                        # sz = sizes[:, varidx]
-                        # if True: # np.count_nonzero(sz) > 1:
-                        # self.jac_dist_col_mask[start:end] = True
-                        # self.dup_mask[start:end] = True
-                        #elif 0 in sizes[:, varidx]:
-                        if model._owning_rank[name] != model.comm.rank:
-                            self.dup_mask[start:end] = False
+                    if not meta['distributed'] and model._owning_rank[name] != model.comm.rank:
+                        self.rev_allreduce_mask[start:end] = False
                     start = end
 
-                need_allreduce = not np.all(self.dup_mask)
+                # if rev_allreduce_mask isn't all True on all procs, then we need to do an Allreduce
+                need_allreduce = not np.all(self.rev_allreduce_mask)
                 if not any(model.comm.allgather(need_allreduce)):
-                    self.dup_mask = None
+                    self.rev_allreduce_mask = None
 
         if not approx:
             for mode in modes:
@@ -830,24 +821,14 @@ class _TotalJacInfo(object):
                 imeta['idx_list'] = range(start, end)
                 idx_iter_dict[name] = (imeta, self.single_index_iter)
 
-            if has_rank_zeros:
-                if owning_rank[path] == iproc:
-                    do_allreduce = 1  # do allreduce with this proc's data
-                else:
-                    do_allreduce = -1  # do allreduce with zeros
-            else:
-                do_allreduce = 0  # don't do allreduce at all
-
             if path in relevant and not non_rel_outs:
                 relsystems = relevant[path]['@all'][1]
                 if self.total_relevant_systems is not _contains_all:
                     self.total_relevant_systems.update(relsystems)
-                # tup = (ndups, relsystems, cache_lin_sol, name)
-                tup = (do_allreduce, relsystems, cache_lin_sol, name)
+                tup = (relsystems, cache_lin_sol, name)
             else:
                 self.total_relevant_systems = _contains_all
-                # tup = (ndups, _contains_all, cache_lin_sol, name)
-                tup = (do_allreduce, _contains_all, cache_lin_sol, name)
+                tup = (_contains_all, cache_lin_sol, name)
 
             idx_map.extend([tup] * (end - start))
             start = end
@@ -871,7 +852,7 @@ class _TotalJacInfo(object):
             locs = None
             for ilist in simul_coloring.color_iter(mode):
                 for i in ilist:
-                    _, rel_systems, cache_lin_sol, _ = idx_map[i]
+                    rel_systems, cache_lin_sol, _ = idx_map[i]
                     _update_rel_systems(all_rel_systems, rel_systems)
                     cache |= cache_lin_sol
 
@@ -1204,7 +1185,7 @@ class _TotalJacInfo(object):
         int or None
             key used for storage of cached linear solve (if active, else None).
         """
-        _, rel_systems, cache_lin_sol, _ = self.in_idx_map[mode][idx]
+        rel_systems, cache_lin_sol, _ = self.in_idx_map[mode][idx]
 
         self._zero_vecs(mode)
 
@@ -1315,7 +1296,7 @@ class _TotalJacInfo(object):
             Not used.
         """
         for i in inds:
-            _, rel_systems, _, _ = self.in_idx_map[mode][i]
+            rel_systems, _, _ = self.in_idx_map[mode][i]
             break
 
         self._zero_vecs(mode)
@@ -1367,87 +1348,38 @@ class _TotalJacInfo(object):
         mode : str
             Direction of derivative solution.
         """
-        if self.get_remote and mode == 'fwd':
-            if self.jac_scatters[mode] is not None:
-                self.src_petsc[mode].array = self.J[:, i]
-                self.tgt_petsc[mode].array[:] = self.J[:, i]
-                self.jac_scatters[mode].scatter(self.src_petsc[mode], self.tgt_petsc[mode],
-                                                addv=False, mode=False)
-                self.J[:, i] = self.tgt_petsc[mode].array
-
-        elif mode == 'rev':
-            # for rows corresponding to serial 'of' vars, we need to correct for
-            # duplication of their seed values by dividing by the number of duplications.
-            # ndups, _, _, _ = self.in_idx_map[mode][i]
-            do_allreduce, _, _, name = self.in_idx_map[mode][i]
-            local_resp = self.in_loc_idxs['rev'][i] >= 0
-            # print('JAC_SETTER_DIST', i, self.model.comm.rank, self.J[i], flush=True)
+        if mode == 'fwd':
             if self.get_remote:
-                # if self.jac_dist_col_mask is not None:
-                #     # this happens if there are distributed 'wrt' variables
-                #     distpart = self.J[i, :][self.jac_dist_col_mask]
-                #     scratch = np.zeros(distpart.shape, dtype=distpart.dtype)
-                #     # only sum up the distrib parts
-                #     self.comm.Allreduce(distpart, scratch, op=MPI.SUM)
-                #     self.J[i][self.jac_dist_col_mask] = scratch
-                scratch = self.jac_scratch['rev'][0]
-                # if do_allreduce and self.dup_mask is None:
-                #     if do_allreduce > 0:
-                #         scratch[:] = self.J[i]
-                #     else:
-                #         scratch[:] = 0.0
-                #     self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
-                if self.dup_mask is not None:
+                if self.jac_scatters[mode] is not None:
+                    self.src_petsc[mode].array = self.J[:, i]
+                    self.tgt_petsc[mode].array[:] = self.J[:, i]
+                    self.jac_scatters[mode].scatter(self.src_petsc[mode], self.tgt_petsc[mode],
+                                                    addv=False, mode=False)
+                    self.J[:, i] = self.tgt_petsc[mode].array
+
+        else:  # rev
+            if self.get_remote:
+                if self.rev_allreduce_mask is not None:
+                    scratch = self.jac_scratch['rev'][0]
                     scratch[:] = 0.0
-                    scratch[self.dup_mask] = self.J[i][self.dup_mask]
+                    scratch[self.rev_allreduce_mask] = self.J[i][self.rev_allreduce_mask]
                     self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
-                # elif do_allreduce:
-                #     if do_allreduce > 0:
-                #         scratch[:] = self.J[i]
-                #     else:
-                #         scratch[:] = 0.0
-                #     self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
+            # else:
+            #     scatter = self.jac_scatters[mode]
+            #     if scatter is not None:
+            #         if self.dist_idx_map[mode][i]:  # distrib var, skip scatter
+            #             return
+            #         loc = self.loc_jac_idxs[mode][i]
+            #         if loc >= 0:
+            #             self.tgt_petsc[mode].array[:] = self.J[loc, :][self.nondist_loc_map[mode]]
+            #             self.src_petsc[mode].array[:] = self.J[loc, :][self.nondist_loc_map[mode]]
+            #         else:
+            #             self.src_petsc[mode].array[:] = 0.0
 
-                # elif do_allreduce:
-                #     scratch = self.jac_scratch['rev'][0]
-                #     if do_allreduce > 0:
-                #         scratch[:] = self.J[i]
-                #     else:
-                #         scratch[:] = 0.0
-                #     self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
-
-                # scratch = self.jac_scratch['rev'][0]
-                # scratch[:] = self.J[i]
-
-                # # self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
-
-                # # if ndups > 1:
-                # #     if self.jac_dist_col_mask is not None:
-                # #         scratch[:] = 1.0
-                # #         scratch[self.jac_dist_col_mask] = (1.0 / ndups)
-                # #         self.J[i] *= scratch
-                # #     else:
-                # #         self.J[i] *= (1.0 / ndups)
-            else:
-                scatter = self.jac_scatters[mode]
-                if False: # scatter is not None:
-                    if self.dist_idx_map[mode][i]:  # distrib var, skip scatter
-                        return
-                    loc = self.loc_jac_idxs[mode][i]
-                    if loc >= 0:
-                        self.tgt_petsc[mode].array[:] = self.J[loc, :][self.nondist_loc_map[mode]]
-                        self.src_petsc[mode].array[:] = self.J[loc, :][self.nondist_loc_map[mode]]
-                    else:
-                        self.src_petsc[mode].array[:] = 0.0
-
-                    scatter.scatter(self.src_petsc[mode], self.tgt_petsc[mode],
-                                    addv=True, mode=False)
-                    if loc >= 0:
-                        # if ndups > 1:
-                        #     self.J[loc, :][self.nondist_loc_map[mode]] = \
-                        #         self.tgt_petsc[mode].array * (1.0 / ndups)
-                        # else:
-                        self.J[loc, :][self.nondist_loc_map[mode]] = self.tgt_petsc[mode].array
+            #         scatter.scatter(self.src_petsc[mode], self.tgt_petsc[mode],
+            #                         addv=True, mode=False)
+            #         if loc >= 0:
+            #             self.J[loc, :][self.nondist_loc_map[mode]] = self.tgt_petsc[mode].array
 
     def single_jac_setter(self, i, mode, meta):
         """
