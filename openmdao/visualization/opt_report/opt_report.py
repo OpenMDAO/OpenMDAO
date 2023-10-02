@@ -490,8 +490,8 @@ def _sparkline(kind, meta, val, width=300):
         else:
             _eq_constraint_sparkline(ax, meta, val)
     except (ValueError, IndexError):
-        mpl.use(_backend)  # set it back
         plt.close()
+        mpl.use(_backend)  # set it back
         return '<span class="plot-unavailable">Plot unavailable</span>'
 
     tmpfile = io.BytesIO()
@@ -500,8 +500,8 @@ def _sparkline(kind, meta, val, width=300):
     encoded = base64.b64encode(tmpfile.getvalue()).decode('utf-8')
     html = f'<img width={width} src=\'data:image/png;base64,{encoded}\'>'
 
-    mpl.use(_backend)  # set it back
     plt.close()
+    mpl.use(_backend)  # set it back
 
     return html
 
@@ -674,6 +674,8 @@ def _constraint_plot(kind, meta, val, width=300):
     if not (np.isscalar(val) or val.shape == (1,)):
         raise ValueError("Value for the _constraint_plot function must be a "
                          f"scalar. Variable {meta['name']} is not a scalar")
+    else:
+        val = val.item()
 
     if kind == 'desvar' and meta['upper'] == INF_BOUND and meta['lower'] == -INF_BOUND:
         return   # nothing to plot
@@ -714,8 +716,8 @@ def _constraint_plot(kind, meta, val, width=300):
 
     html = f'<img width={width} src=\'data:image/png;base64,{encoded}\'>'
 
-    mpl.use(_backend)
     plt.close()
+    mpl.use(_backend)
 
     return html
 

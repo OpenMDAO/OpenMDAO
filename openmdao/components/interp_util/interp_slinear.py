@@ -183,7 +183,7 @@ class InterpLinearSemi(InterpAlgorithmSemi):
             # (Not much we can do for linear.)
             extrap = extrap or flag1 or flag0
 
-            slope = (val1 - val0) * h
+            slope = ((val1 - val0) * h).item()
 
             derivs = np.empty(len(dx0) + 1, dtype=x.dtype)
             derivs[0] = slope
@@ -212,8 +212,8 @@ class InterpLinearSemi(InterpAlgorithmSemi):
             d_value = None
             if self._compute_d_dvalues:
                 d_value = np.empty(2, dtype=x.dtype)
-                d_value[1] = h * (x - grid[idx])
-                d_value[0] = 1.0 - d_value[1]
+                d_value[1] = (h * (x - grid[idx])).item()
+                d_value[0] = (1.0 - d_value[1]).item()
 
                 d_value = (d_value, [self._idx[idx], self._idx[idx + 1]])
 

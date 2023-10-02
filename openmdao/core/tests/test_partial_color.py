@@ -988,7 +988,7 @@ class TestColoring(unittest.TestCase):
         [pyOptSparseDriver, ScipyOptimizeDriver],
         ), name_func=_test_func_name
     )
-    def test_simple_totals_min_improvement(self, optim):
+    def test_simple_totals_min_improvement(self, optim=ScipyOptimizeDriver):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = CounterGroup()
         if optim is None:

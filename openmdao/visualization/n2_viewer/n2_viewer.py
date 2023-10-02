@@ -1,6 +1,7 @@
 """Code for generating N2 diagram."""
 import inspect
 import os
+import sys
 import pathlib
 from operator import itemgetter
 
@@ -12,8 +13,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.parallel_group import ParallelGroup
 from openmdao.core.group import Group
-from openmdao.core.problem import Problem
-from openmdao.core.component import Component
+from openmdao.core.problem import Problem, _SetupStatus
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.constants import _UNDEFINED
 from openmdao.components.exec_comp import ExecComp
@@ -33,6 +33,7 @@ from openmdao.visualization.htmlpp import HtmlPreprocessor
 from openmdao import __version__ as openmdao_version
 
 _MAX_ARRAY_SIZE_FOR_REPR_VAL = 1000  # If var has more elements than this do not pass to N2
+_MAX_OPTION_SIZE = int(1e4)          # If option value is bigger than this do not pass to N2
 
 _default_n2_filename = 'n2.html'
 
@@ -111,7 +112,7 @@ def _get_array_info(system, vec, name, prom, var_dict, from_src=True):
     var_dict['val_max'] = ndarray_to_convert[max_indices]
 
 
-def _get_var_dict(system, typ, name, is_parallel, is_implicit):
+def _get_var_dict(system, typ, name, is_parallel, is_implicit, values):
     if name in system._var_abs2meta[typ]:
         meta = system._var_abs2meta[typ][name]
         prom = system._var_abs2prom[typ][name]
@@ -149,7 +150,7 @@ def _get_var_dict(system, typ, name, is_parallel, is_implicit):
             var_dict['units'] = meta['units']
 
         try:
-            if val.size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
+            if values and val.size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
                 if not MPI:
                     # Get the current value
                     _get_array_info(system, vec, name, prom, var_dict, from_src=True)
@@ -163,11 +164,8 @@ def _get_var_dict(system, typ, name, is_parallel, is_implicit):
                     # which could be remote under MPI
                     _get_array_info(system, vec, name, prom, var_dict, from_src=False)
 
-            else:
-                var_dict['val'] = None
         except Exception as err:
             issue_warning(str(err))
-            var_dict['val'] = None
     else:  # discrete
         meta = system._var_discrete[typ][name]
         val = meta['val']
@@ -177,10 +175,9 @@ def _get_var_dict(system, typ, name, is_parallel, is_implicit):
             'dtype': type(val).__name__,
             'is_discrete': True,
         }
-        if MPI is None or isinstance(val, (int, str, list, dict, complex, np.ndarray)):
-            var_dict['val'] = default_noraise(system.get_val(name))
-        else:
-            var_dict['val'] = type(val).__name__
+        if values:
+            if MPI is None or isinstance(val, (int, str, list, dict, complex, np.ndarray)):
+                var_dict['val'] = default_noraise(system.get_val(name))
 
     if 'surrogate_name' in meta:
         var_dict['surrogate_name'] = meta['surrogate_name']
@@ -209,15 +206,28 @@ def _serialize_single_option(option):
         return 'Not Recordable'
 
     val = option['val']
+
     if val is _UNDEFINED:
         return str(val)
+
+    if sys.getsizeof(val) > _MAX_OPTION_SIZE:
+        return 'Too Large to Display'
 
     return default_noraise(val)
 
 
-def _get_tree_dict(system, is_parallel=False):
+def _get_tree_dict(system, values=True, is_parallel=False):
     """
     Get a dictionary representation of the system hierarchy.
+
+    Parameters
+    ----------
+    system : System
+        The System at the root of the hierarchy
+    values : bool
+        If True, include variable values. If False, all values will be None.
+    is_parallel : bool
+        If True, values can be remote and are not available.
     """
     tree_dict = {
         'name': system.name if system.name else 'root',
@@ -238,7 +248,8 @@ def _get_tree_dict(system, is_parallel=False):
         tree_dict['subsystem_type'] = 'group'
         tree_dict['is_parallel'] = is_parallel
 
-        children = [_get_tree_dict(s, is_parallel) for s in system._subsystems_myproc]
+        children = [_get_tree_dict(s, values, is_parallel)
+                    for s in system._subsystems_myproc]
 
         if system.comm.size > 1:
             if system._subsystems_myproc:
@@ -305,10 +316,12 @@ def _get_tree_dict(system, is_parallel=False):
         children = []
         for typ in ['input', 'output']:
             for abs_name in system._var_abs2meta[typ]:
-                children.append(_get_var_dict(system, typ, abs_name, is_parallel, is_implicit))
+                children.append(_get_var_dict(system, typ, abs_name,
+                                              is_parallel, is_implicit, values))
 
             for prom_name in system._var_discrete[typ]:
-                children.append(_get_var_dict(system, typ, prom_name, is_parallel, is_implicit))
+                children.append(_get_var_dict(system, typ, prom_name,
+                                              is_parallel, is_implicit, values))
 
     tree_dict['children'] = children
 
@@ -358,7 +371,7 @@ def _get_declare_partials(system):
     return declare_partials_list
 
 
-def _get_viewer_data(data_source, case_id=None):
+def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
     """
     Get the data needed by the N2 viewer as a dictionary.
 
@@ -368,7 +381,10 @@ def _get_viewer_data(data_source, case_id=None):
         A Problem or Group or case recorder filename containing the model or model data.
         If the case recorder file from a parallel run has separate metadata, the
         filenames can be specified with a comma, e.g.: case.sql_0,case.sql_meta
-
+    values : bool or _UNDEFINED
+        If True, include variable values. If False, all values will be None.
+        If unspecified, this behaves as if set to True unless the data source is a Problem or
+        model for which setup is not complete, in which case it behaves as if set to False.
     case_id : int or str or None
         Case name or index of case in SQL file.
 
@@ -398,6 +414,11 @@ def _get_viewer_data(data_source, case_id=None):
         else:
             driver_opt_settings = None
 
+        # set default behavior for values flag
+        if values is _UNDEFINED:
+            values = (data_source._metadata is not None and
+                      data_source._metadata['setup_status'] >= _SetupStatus.POST_FINAL_SETUP)
+
     elif isinstance(data_source, Group):
         if not data_source.pathname:  # root group
             root_group = data_source
@@ -410,6 +431,11 @@ def _get_viewer_data(data_source, case_id=None):
             msg = f"Viewer data is not available for sub-Group '{data_source.pathname}'."
             raise TypeError(msg)
 
+        # set default behavior for values flag
+        if values is _UNDEFINED:
+            values = (data_source._problem_meta is not None and
+                      data_source._problem_meta['setup_status'] >= _SetupStatus.POST_FINAL_SETUP)
+
     elif isinstance(data_source, str):
         if ',' in data_source:
             filenames = data_source.split(',')
@@ -419,34 +445,52 @@ def _get_viewer_data(data_source, case_id=None):
 
         data_dict = cr.problem_metadata
 
-        if case_id is not None:
-            cases = cr.get_case(case_id)
-            print(f"Using source: {cases.source}\nCase: {cases.name}")
+        # set default behavior for values flag
+        if values is _UNDEFINED:
+            values = True
 
-            def recurse(children, stack):
-                for child in children:
-                    # if 'val' in child
-                    if child['type'] == 'subsystem':
-                        if child['name'] != '_auto_ivc':
-                            stack.append(child['name'])
-                            recurse(child['children'], stack)
-                            stack.pop()
-                    elif child['type'] == 'input':
-                        if cases.inputs is None:
+        def set_values(children, stack, case):
+            """
+            Set variable values in model tree from the specified Case.
+
+            If case is None, set all values to None.
+            """
+            for child in children:
+                # if 'val' in child
+                if child['type'] == 'subsystem':
+                    stack.append(child['name'])
+                    set_values(child['children'], stack, case)
+                    stack.pop()
+                elif child['type'] == 'input':
+                    if case is None:
+                        child.pop('val')
+                        for key in ['val_min', 'val_max', 'val_min_indices', 'val_max_indices']:
+                            del child[key]
+                    elif case.inputs is None:
+                        child['val'] = 'N/A'
+                    else:
+                        path = child['name'] if not stack else '.'.join(stack + [child['name']])
+                        child['val'] = case.inputs[path]
+                elif child['type'] == 'output':
+                    if case is None:
+                        child.pop('val')
+                        for key in ['val_min', 'val_max', 'val_min_indices', 'val_max_indices']:
+                            del child[key]
+                    elif case.outputs is None:
+                        child['val'] = 'N/A'
+                    else:
+                        path = child['name'] if not stack else '.'.join(stack + [child['name']])
+                        try:
+                            child['val'] = case.outputs[path]
+                        except KeyError:
                             child['val'] = 'N/A'
-                        else:
-                            path = child['name'] if not stack else '.'.join(stack + [child['name']])
-                            child['val'] = cases.inputs[path]
-                    elif child['type'] == 'output':
-                        if cases.outputs is None:
-                            child['val'] = 'N/A'
-                        else:
-                            path = child['name'] if not stack else '.'.join(stack + [child['name']])
-                            try:
-                                child['val'] = cases.outputs[path]
-                            except KeyError:
-                                child['val'] = 'N/A'
-            recurse(data_dict['tree']['children'], [])
+
+        if values is False:
+            set_values(data_dict['tree']['children'], [], None)
+        elif case_id is not None:
+            case = cr.get_case(case_id)
+            print(f"Using source: {case.source}\nCase: {case.name}")
+            set_values(data_dict['tree']['children'], [], case)
 
         # Delete the variables key since it's not used in N2
         if 'variables' in data_dict:
@@ -463,7 +507,7 @@ def _get_viewer_data(data_source, case_id=None):
                         "The source must be a Problem, model or the filename of a recording.")
 
     data_dict = {}
-    data_dict['tree'] = _get_tree_dict(root_group)
+    data_dict['tree'] = _get_tree_dict(root_group, values=values)
     data_dict['md5_hash'] = root_group._generate_md5_hash()
 
     connections_list = []
@@ -554,7 +598,7 @@ def _get_viewer_data(data_source, case_id=None):
     return data_dict
 
 
-def n2(data_source, outfile=_default_n2_filename, path=None, case_id=None,
+def n2(data_source, outfile=_default_n2_filename, path=None, values=_UNDEFINED, case_id=None,
        show_browser=True, embeddable=False, title=None, display_in_notebook=True):
     """
     Generate an HTML file containing a tree viewer.
@@ -570,6 +614,10 @@ def n2(data_source, outfile=_default_n2_filename, path=None, case_id=None,
     path : str, optional
         If specified, the n2 viewer will begin in a state that is zoomed in on the selected path.
         This path should be the absolute path of a system in the model.
+    values : bool or _UNDEFINED
+        If True, include variable values. If False, all values will be None.
+        If unspecified, this behaves as if set to True unless the data source is a Problem or
+        model for which setup is not complete, in which case it behaves as if set to False.
     case_id : int, str, or None
         Case name or index of case in SQL file if data_source is a database.
     show_browser : bool, optional
@@ -586,7 +634,7 @@ def n2(data_source, outfile=_default_n2_filename, path=None, case_id=None,
     """
     # grab the model viewer data
     try:
-        model_data = _get_viewer_data(data_source, case_id=case_id)
+        model_data = _get_viewer_data(data_source, values=values, case_id=case_id)
         err_msg = ''
     except TypeError as err:
         model_data = {}
@@ -685,18 +733,22 @@ def _n2_setup_parser(parser):
     """
     parser.add_argument('file', nargs=1,
                         help='Python script or recording containing the model. '
-                        'If metadata from a parallel run was recorded in a separate file, '
-                        'specify both database filenames delimited with a comma.')
+                             'If metadata from a parallel run was recorded in a separate file, '
+                             'specify both database filenames delimited with a comma.')
     parser.add_argument('-o', default=_default_n2_filename, action='store', dest='outfile',
                         help='html output file.')
+    parser.add_argument('--no_values', action='store_true', dest='no_values',
+                        help="don't display variable values.")
     parser.add_argument('--no_browser', action='store_true', dest='no_browser',
                         help="don't display in a browser.")
     parser.add_argument('--embed', action='store_true', dest='embeddable',
                         help="create embeddable version.")
-    parser.add_argument('--title', default=None,
-                        action='store', dest='title', help='diagram title.')
-    parser.add_argument('--path', default=None,
-                        action='store', dest='path', help='initial path to zoom into.')
+    parser.add_argument('--title', default=None, action='store', dest='title',
+                        help='diagram title.')
+    parser.add_argument('--path', default=None, action='store', dest='path',
+                        help='initial system path to zoom into.')
+    parser.add_argument('--problem', default=None, action='store', dest='problem_name',
+                        help='name of sub-problem, if target is a sub-problem')
 
 
 def _n2_cmd(options, user_args):
@@ -711,30 +763,40 @@ def _n2_cmd(options, user_args):
         Command line options after '--' (if any).  Passed to user script.
     """
     filename = _to_filename(options.file[0])
+    probname = options.problem_name
 
     if filename.endswith('.py'):
-        def _view_model_w_errors(prob):
-            errs = prob._metadata['saved_errors']
-            if errs:
-                # only run the n2 here if we've had setup errors. Normally we'd wait until
-                # after final_setup in order to have correct values for all of the I/O variables.
-                n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
-                   title=options.title, path=options.path, embeddable=options.embeddable)
-                # errors will result in exit at the end of the _check_collected_errors method
+        # disable the reports system, we only want the N2 report and then we exit
+        os.environ['OPENMDAO_REPORTS'] = '0'
 
-        def _view_model_no_errors(prob):
-            n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
-               title=options.title, path=options.path, embeddable=options.embeddable)
+        def _view_model_w_errors(prob):
+            # if problem name is not specified, use top-level problem (no delimiter in pathname)
+            pathname = prob._metadata['pathname']
+            if (probname is None and '/' not in pathname) or (probname == prob._name):
+                errs = prob._metadata['saved_errors']
+                if errs:
+                    # only run the n2 here if we've had setup errors. Normally we'd wait until
+                    # after final_setup in order to have correct values for all of the variables.
+                    n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
+                       values=not options.no_values, title=options.title, path=options.path,
+                       embeddable=options.embeddable)
+                    # errors will result in exit at the end of the _check_collected_errors method
+                else:
+                    # no errors, generate n2 after final_setup
+                    def _view_model_no_errors(prob):
+                        n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
+                           values=not options.no_values, title=options.title, path=options.path,
+                           embeddable=options.embeddable)
+                    hooks._register_hook('final_setup', 'Problem',
+                                         post=_view_model_no_errors, exit=True)
+                    hooks._setup_hooks(prob)
 
         hooks._register_hook('_check_collected_errors', 'Problem', pre=_view_model_w_errors)
-        hooks._register_hook('final_setup', 'Problem', post=_view_model_no_errors, exit=True)
-
-        from openmdao.utils.reports_system import _register_cmdline_report
-        # tell report system not to duplicate effort
-        _register_cmdline_report('n2')
 
         _load_and_exec(options.file[0], user_args)
     else:
         # assume the file is a recording, run standalone
         n2(filename, outfile=options.outfile, title=options.title, path=options.path,
-           show_browser=not options.no_browser, embeddable=options.embeddable)
+           values=False if options.no_values else _UNDEFINED,
+           show_browser=not options.no_browser,
+           embeddable=options.embeddable)
