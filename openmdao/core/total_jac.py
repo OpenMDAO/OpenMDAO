@@ -1430,7 +1430,7 @@ class _TotalJacInfo(object):
                 # #         self.J[i] *= (1.0 / ndups)
             else:
                 scatter = self.jac_scatters[mode]
-                if scatter is not None:
+                if False: # scatter is not None:
                     if self.dist_idx_map[mode][i]:  # distrib var, skip scatter
                         return
                     loc = self.loc_jac_idxs[mode][i]

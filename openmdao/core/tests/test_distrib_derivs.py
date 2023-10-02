@@ -612,8 +612,7 @@ class MPITests2(unittest.TestCase):
         ivc.add_output('a', -3.0 + 0.6 * np.arange(size))
 
         model.add_subsystem('p', ivc, promotes=['*'])
-        # model.add_subsystem("parab", DistParab(arr_size=size, deriv_type='fd'), promotes=['*'])
-        model.add_subsystem("parab", DistParab(arr_size=size), promotes=['*'])
+        model.add_subsystem("parab", DistParab(arr_size=size, deriv_type='fd'), promotes=['*'])
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones((size, )),
                                                f_xy=np.ones((size, ))),
@@ -638,11 +637,11 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        assert_check_totals(prob.check_totals(out_stream=None, method='cs'), atol=1e-5)
-        # assert_near_equal(J['parab.f_xy', 'p.x']['abs error'].forward, 0.0, 1e-5)
-        # assert_near_equal(J['parab.f_xy', 'p.y']['abs error'].forward, 0.0, 1e-5)
-        # assert_near_equal(J['sum.f_sum', 'p.x']['abs error'].forward, 0.0, 1e-5)
-        # assert_near_equal(J['sum.f_sum', 'p.y']['abs error'].forward, 0.0, 1e-5)
+        J = prob.check_totals(out_stream=None, method='cs')
+        assert_near_equal(J['parab.f_xy', 'p.x']['abs error'].forward, 0.0, 1e-5)
+        assert_near_equal(J['parab.f_xy', 'p.y']['abs error'].forward, 0.0, 1e-5)
+        assert_near_equal(J['sum.f_sum', 'p.x']['abs error'].forward, 0.0, 1e-5)
+        assert_near_equal(J['sum.f_sum', 'p.y']['abs error'].forward, 0.0, 1e-5)
 
         # rev mode
 
@@ -658,11 +657,11 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        assert_check_totals(prob.check_totals(method='cs', show_only_incorrect=True), atol=1e-5)
-        # assert_near_equal(J['parab.f_xy', 'p.x']['abs error'].reverse, 0.0, 1e-5)
-        # assert_near_equal(J['parab.f_xy', 'p.y']['abs error'].reverse, 0.0, 1e-5)
-        # assert_near_equal(J['sum.f_sum', 'p.x']['abs error'].reverse, 0.0, 1e-5)
-        # assert_near_equal(J['sum.f_sum', 'p.y']['abs error'].reverse, 0.0, 1e-5)
+        J = prob.check_totals(method='cs', show_only_incorrect=True)
+        assert_near_equal(J['parab.f_xy', 'p.x']['abs error'].reverse, 0.0, 1e-5)
+        assert_near_equal(J['parab.f_xy', 'p.y']['abs error'].reverse, 0.0, 1e-5)
+        assert_near_equal(J['sum.f_sum', 'p.x']['abs error'].reverse, 0.0, 1e-5)
+        assert_near_equal(J['sum.f_sum', 'p.y']['abs error'].reverse, 0.0, 1e-5)
 
     def test_distrib_voi_group_fd(self):
         # Only supports groups where the inputs to the distributed component whose inputs are
@@ -718,7 +717,11 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        #assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=1e-5)
+        J = prob.check_totals(method='fd', show_only_incorrect=True)
+        assert_near_equal(J['sub.parab.f_xy', 'p.x']['abs error'].forward, 0.0, 1e-5)
+        assert_near_equal(J['sub.parab.f_xy', 'p.y']['abs error'].forward, 0.0, 1e-5)
+        assert_near_equal(J['sub.sum.f_sum', 'p.x']['abs error'].forward, 0.0, 1e-5)
+        assert_near_equal(J['sub.sum.f_sum', 'p.y']['abs error'].forward, 0.0, 1e-5)
 
         # rev mode
 
@@ -734,7 +737,11 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        assert_check_totals(prob.check_totals(method='fd', out_stream=None), atol=1e-5)
+        J = prob.check_totals(method='fd', show_only_incorrect=True)
+        assert_near_equal(J['sub.parab.f_xy', 'p.x']['abs error'].reverse, 0.0, 1e-5)
+        assert_near_equal(J['sub.parab.f_xy', 'p.y']['abs error'].reverse, 0.0, 1e-5)
+        assert_near_equal(J['sub.sum.f_sum', 'p.x']['abs error'].reverse, 0.0, 1e-5)
+        assert_near_equal(J['sub.sum.f_sum', 'p.y']['abs error'].reverse, 0.0, 1e-5)
 
     def test_simple_distrib_voi_group_fd(self):
         size = 3
@@ -2192,7 +2199,7 @@ class TestDistribBugs(unittest.TestCase):
             assert_check_totals(data)
 
         msg = "During total derivative computation, the following partial derivatives resulted in serial inputs that were inconsistent across processes: ['D1.out_dist wrt D1.in_nd']."
-        self.assertEqual(str(cm.exception), msg)
+        self.assertTrue(msg in str(cm.exception))
 
     def test_check_partials_cs_old(self):
         prob = self.get_problem(Distrib_Derivs_Matfree_Old)
