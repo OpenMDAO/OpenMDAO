@@ -5,8 +5,6 @@ from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.units import convert_units
 
 
-# TODO: Turn this into a test.
-
 def units_setter(opt_meta, value):
     """
     Check and convert new units tuple into
