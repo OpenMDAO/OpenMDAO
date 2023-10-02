@@ -72,6 +72,7 @@ else:
                 Dictionary of all response variable metadata. Keyed by absolute source name or alias.
             """
             rev = group._mode != 'fwd'
+            uses_approx = group._owns_approx_jac
 
             for subsys in group._subgroups_myproc:
                 subsys._setup_transfers(desvars, responses)
@@ -97,7 +98,7 @@ else:
                 rev_xfer_in = defaultdict(list)
                 rev_xfer_out = defaultdict(list)
 
-                # xfers that are only active when parallel coloring is not active
+                # xfers that are only active when parallel coloring is not
                 rev_xfer_in_nocolor = defaultdict(list)
                 rev_xfer_out_nocolor = defaultdict(list)
 
@@ -116,14 +117,10 @@ else:
                 nz = np.count_nonzero(group._var_sizes[io][:, allprocs_abs2idx[name]])
                 return nz > 1, group._var_sizes[io].shape[0] - nz, False
 
-            def get_rank_sizes(name, io):
-                idx = allprocs_abs2idx[name]
-                return group._var_sizes[io][:, idx]
-
             def get_xfer_ranks(name, io):
                 if group._var_allprocs_abs2meta[io][name]['distributed']:
                     return []
-                return np.nonzero(get_rank_sizes(name, io))[0]
+                return np.nonzero(group._var_sizes[io][:, allprocs_abs2idx[name]])[0]
 
             # Loop through all connections owned by this system
             for abs_in, abs_out in group._conn_abs_in2out.items():
@@ -208,18 +205,17 @@ else:
                     if rev:
                         inp_is_dup, inp_missing, distrib_in = is_dup(abs_in, 'input')
                         out_is_dup, _, distrib_out = is_dup(abs_out, 'output')
-                        # gsize_in = np.sum(sizes_in[:, idx_in])
-                        # gsize_out = np.sum(sizes_out[:, idx_out])
 
                         iowninput = myrank == group._owning_rank[abs_in]
                         sub_out = abs_out[mypathlen:].partition('.')[0]
-                        # has_multi_conn_src = len(rev_conns[abs_out]) > 1
 
                         if inp_is_dup and (abs_out not in abs2meta_out or (distrib_out and not iowninput)):
-                            # print(group.pathname, 'rank', group.comm.rank, ':', 'NOT DOING', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
                             rev_xfer_in[sub_out]
                             rev_xfer_out[sub_out]
                         elif out_is_dup and inp_is_dup and inp_missing > 0 and iowninput:
+                            # if this proc owns the input and both the output and input have duplicates,
+                            # then we send the owning input to each duplicated output that doesn't have
+                            # a corresponding connected input on the same proc.
                             oidxlist = []
                             iidxlist = []
                             oidxlist_nc = []
@@ -248,9 +244,9 @@ else:
                             output_inds = np.concatenate(oidxlist) if len(oidxlist) > 1 else oidxlist[0]
                             rev_xfer_in[sub_out].append(input_inds)
                             rev_xfer_out[sub_out].append(output_inds)
-                            # print('MULTI', group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
 
                             if has_rev_par_coloring and iidxlist_nc:
+                                # keep transfers separate that shouldn't happen when partial coloring is active
                                 input_inds = np.concatenate(iidxlist_nc) if len(iidxlist_nc) > 1 else iidxlist_nc[0]
                                 output_inds = np.concatenate(oidxlist_nc) if len(oidxlist_nc) > 1 else oidxlist_nc[0]
 
@@ -269,8 +265,6 @@ else:
                                 elif src_indices.size > 0:
                                     if distrib_in and not distrib_out and len(on_iprocs) == 1 and on_iprocs[0] == rnk:
                                         offset -= np.sum(sizes_out[:rnk, idx_out])
-                                    # if distrib_in and gsize_in == shape_to_len(src_shape): # gsize_in == gsize_out:
-                                    #     offset -= np.sum(sizes_out[:rnk, idx_out])
                                     oarr = np.asarray(src_indices + offset, dtype=INT_DTYPE)
                                     iarr = input_inds
                                 else:
@@ -292,7 +286,6 @@ else:
                                 input_inds = output_inds = np.zeros(0, dtype=INT_DTYPE)
                             rev_xfer_in[sub_out].append(input_inds)
                             rev_xfer_out[sub_out].append(output_inds)
-                            # print('MULTI2', group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
 
                             if has_rev_par_coloring and iidxlist_nc:
                                 input_inds = np.concatenate(iidxlist_nc) if len(iidxlist_nc) > 1 else iidxlist_nc[0]
@@ -301,7 +294,6 @@ else:
                                 rev_xfer_in_nocolor[sub_out].append(input_inds)
                                 rev_xfer_out_nocolor[sub_out].append(output_inds)
                         else:
-                            # print(group.pathname, 'rank', group.comm.rank, ':', abs_out, '-->', abs_in, output_inds, '-->', input_inds, flush=True)
                             rev_xfer_in[sub_out].append(input_inds)
                             rev_xfer_out[sub_out].append(output_inds)
                 else:
@@ -379,9 +371,9 @@ else:
                             vectors['input']['nonlinear'], vectors['output']['nonlinear'],
                             rev_xfer_in_nocolor[sname], inds, group.comm)
 
-                from om_devtools.dist_idxs import dump_dist_idxs
+                # from om_devtools.dist_idxs import dump_dist_idxs
                 # print(f"DIST IDXS for '{group.pathname}', rank {group.comm.rank}:", flush=True)
-                dump_dist_idxs(group)
+                # dump_dist_idxs(group)
 
         def _transfer(self, in_vec, out_vec, mode='fwd'):
             """
