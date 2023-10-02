@@ -3719,10 +3719,6 @@ class Group(System):
             with self._matvec_context(scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
                 jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
-                if self._owns_approx_jac and self._has_distrib_vars and mode == 'rev':
-                    pass  # DO ALLREDUCE OF parts of d_inputs where inputs are connected to distrib outputs
-                          # and only for parts in the current matvec context
-                print(f"AFTER JAC APPLY in {self.pathname}: d_inputs: {[f'{n}, {s}' for n, s in d_inputs.items()]}", flush=True)
         # Apply recursion
         else:
             if mode == 'fwd':

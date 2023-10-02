@@ -392,8 +392,6 @@ class ExplicitComponent(Component):
             # Jacobian and vectors are all scaled, unitless
             J._apply(self, d_inputs, d_outputs, d_residuals, mode)
 
-            # print('APPLY', self.pathname, 'd_inputs', d_inputs.asarray(), 'd_outputs', d_outputs.asarray(), 'd_residuals', d_residuals.asarray(), flush=True)
-
             if not self.matrix_free:
                 # if we're not matrix free, we can skip the rest because
                 # compute_jacvec_product does nothing.
@@ -477,8 +475,6 @@ class ExplicitComponent(Component):
 
             # ExplicitComponent jacobian defined with -1 on diagonal.
             d_residuals *= -1.0
-
-        # print(MPI.COMM_WORLD.rank, 'SOLVE', self.pathname, 'd_inputs', self._dinputs.asarray(), 'd_outputs', self._doutputs.asarray(), 'd_residuals', self._dresiduals.asarray(), flush=True)
 
     def _compute_partials_wrapper(self):
         """

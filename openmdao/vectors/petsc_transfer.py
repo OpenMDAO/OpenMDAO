@@ -22,7 +22,6 @@ else:
     from openmdao.core.constants import INT_DTYPE
     from openmdao.utils.array_utils import shape_to_len
 
-
     class PETScTransfer(DefaultTransfer):
         """
         PETSc Transfer implementation for running in parallel.
@@ -69,7 +68,8 @@ else:
             desvars : dict
                 Dictionary of all design variable metadata. Keyed by absolute source name or alias.
             responses : dict
-                Dictionary of all response variable metadata. Keyed by absolute source name or alias.
+                Dictionary of all response variable metadata. Keyed by absolute source name or
+                alias.
             """
             rev = group._mode != 'fwd'
             uses_approx = group._owns_approx_jac
@@ -209,24 +209,28 @@ else:
                         iowninput = myrank == group._owning_rank[abs_in]
                         sub_out = abs_out[mypathlen:].partition('.')[0]
 
-                        if inp_is_dup and (abs_out not in abs2meta_out or (distrib_out and not iowninput)):
+                        if inp_is_dup and (abs_out not in abs2meta_out or
+                                           (distrib_out and not iowninput)):
                             rev_xfer_in[sub_out]
                             rev_xfer_out[sub_out]
                         elif out_is_dup and inp_is_dup and inp_missing > 0 and iowninput:
-                            # if this proc owns the input and both the output and input have duplicates,
-                            # then we send the owning input to each duplicated output that doesn't have
-                            # a corresponding connected input on the same proc.
+                            # if this proc owns the input and both the output and input have
+                            # duplicates, then we send the owning input to each duplicated output
+                            # that doesn't have a corresponding connected input on the same proc.
                             oidxlist = []
                             iidxlist = []
                             oidxlist_nc = []
                             iidxlist_nc = []
                             oidxlist.append(output_inds)
                             iidxlist.append(input_inds)
-                            for rnk, osize, isize in zip(range(group.comm.size), sizes_out[:, idx_out], sizes_in[:, idx_in]):
+                            for rnk, osize, isize in zip(range(group.comm.size),
+                                                         sizes_out[:, idx_out],
+                                                         sizes_in[:, idx_in]):
                                 if osize > 0 and isize == 0:
                                     offset = offsets_out[rnk, idx_out]
                                     if src_indices is None:
-                                        oarr = np.arange(offset, offset + meta_in['size'], dtype=INT_DTYPE)
+                                        oarr = np.arange(offset, offset + meta_in['size'],
+                                                         dtype=INT_DTYPE)
                                         iarr = input_inds
                                     elif src_indices.size > 0:
                                         oarr = np.asarray(src_indices + offset, dtype=INT_DTYPE)
@@ -240,19 +244,30 @@ else:
                                         oidxlist_nc.append(oarr)
                                         iidxlist_nc.append(iarr)
 
-                            input_inds = np.concatenate(iidxlist) if len(iidxlist) > 1 else iidxlist[0]
-                            output_inds = np.concatenate(oidxlist) if len(oidxlist) > 1 else oidxlist[0]
+                            if len(iidxlist) > 1:
+                                input_inds = np.concatenate(iidxlist)
+                                output_inds = np.concatenate(oidxlist)
+                            else:
+                                input_inds = iidxlist[0]
+                                output_inds = oidxlist[0]
+
                             rev_xfer_in[sub_out].append(input_inds)
                             rev_xfer_out[sub_out].append(output_inds)
 
                             if has_rev_par_coloring and iidxlist_nc:
-                                # keep transfers separate that shouldn't happen when partial coloring is active
-                                input_inds = np.concatenate(iidxlist_nc) if len(iidxlist_nc) > 1 else iidxlist_nc[0]
-                                output_inds = np.concatenate(oidxlist_nc) if len(oidxlist_nc) > 1 else oidxlist_nc[0]
+                                # keep transfers separate that shouldn't happen when partial
+                                # coloring is active
+                                if len(iidxlist_nc) > 1:
+                                    input_inds = np.concatenate(iidxlist_nc)
+                                    output_inds = np.concatenate(oidxlist_nc)
+                                else:
+                                    input_inds = iidxlist_nc[0]
+                                    output_inds = oidxlist_nc[0]
 
                                 rev_xfer_in_nocolor[sub_out].append(input_inds)
                                 rev_xfer_out_nocolor[sub_out].append(output_inds)
-                        elif out_is_dup and (not inp_is_dup or inp_missing > 0) and (iowninput or distrib_in):
+                        elif out_is_dup and (not inp_is_dup or inp_missing > 0) and (iowninput or
+                                                                                     distrib_in):
                             oidxlist = []
                             iidxlist = []
                             oidxlist_nc = []
@@ -260,10 +275,12 @@ else:
                             for rnk in get_xfer_ranks(abs_out, 'output'):
                                 offset = offsets_out[rnk, idx_out]
                                 if src_indices is None:
-                                    oarr = np.arange(offset, offset + meta_in['size'], dtype=INT_DTYPE)
+                                    oarr = np.arange(offset, offset + meta_in['size'],
+                                                     dtype=INT_DTYPE)
                                     iarr = input_inds
                                 elif src_indices.size > 0:
-                                    if distrib_in and not distrib_out and len(on_iprocs) == 1 and on_iprocs[0] == rnk:
+                                    if (distrib_in and not distrib_out and len(on_iprocs) == 1 and
+                                            on_iprocs[0] == rnk):
                                         offset -= np.sum(sizes_out[:rnk, idx_out])
                                     oarr = np.asarray(src_indices + offset, dtype=INT_DTYPE)
                                     iarr = input_inds
@@ -288,8 +305,12 @@ else:
                             rev_xfer_out[sub_out].append(output_inds)
 
                             if has_rev_par_coloring and iidxlist_nc:
-                                input_inds = np.concatenate(iidxlist_nc) if len(iidxlist_nc) > 1 else iidxlist_nc[0]
-                                output_inds = np.concatenate(oidxlist_nc) if len(oidxlist_nc) > 1 else oidxlist_nc[0]
+                                if len(iidxlist_nc) > 1:
+                                    input_inds = np.concatenate(iidxlist_nc)
+                                    output_inds = np.concatenate(oidxlist_nc)
+                                else:
+                                    input_inds = iidxlist_nc[0]
+                                    output_inds = oidxlist_nc[0]
 
                                 rev_xfer_in_nocolor[sub_out].append(input_inds)
                                 rev_xfer_out_nocolor[sub_out].append(output_inds)
@@ -430,7 +451,3 @@ else:
                 if in_vec._alloc_complex:
                     data = in_vec._get_data()
                     data[:] = in_petsc.array
-
-                # print(in_vec._system().comm.rank, 'TRANSFER from', in_vec._system().pathname, self._in_inds, self._out_inds, flush=True)
-                # print('IN', in_vec._data.real, flush=True)
-                # print('OUT', out_vec._data.real, flush=True)

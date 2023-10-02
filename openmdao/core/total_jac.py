@@ -33,35 +33,6 @@ _contains_all = ContainsAll()
 _directional_rng = np.random.default_rng(99)
 
 
-class EntryMeta(object):
-    def __init__(self):
-        pass
-
-
-class RowMeta(object):
-    def __init__(self, model):
-        pass
-
-    def by_name(self, name):
-        pass
-
-    def by_index(self, idx):
-        pass
-
-
-class ColumnMeta(object):
-    def __init__(self):
-        pass
-
-    def by_name(self, name):
-        pass
-
-    def by_index(self, idx):
-        pass
-
-
-
-
 class _TotalJacInfo(object):
     """
     Object to manage computation of total derivatives.
@@ -1331,7 +1302,6 @@ class _TotalJacInfo(object):
             else:
                 return
 
-        # print('DERIV_VAL:', i, self.model.comm.rank, deriv_val, deriv_idxs, flush=True)
         if mode == 'fwd':
             self.J[jac_idxs, i] = deriv_val[deriv_idxs]
         else:  # rev
@@ -1599,22 +1569,10 @@ class _TotalJacInfo(object):
                         else:
                             model._solve_linear(mode, rel_systems)
 
-                        # print('TOP SOLVE', 'd_inputs', model._dinputs.asarray(), 'd_outputs', model._doutputs.asarray(), 'd_residuals', model._dresiduals.asarray(), flush=True)
-
                     if debug_print:
                         print(f'Elapsed Time: {time.perf_counter() - t0} secs\n', flush=True)
 
-                    # if isinstance(inds, int):
-                    #     print('JAC ROW (before):', self.J[inds], flush=True)
-                    # else:
-                    #     for i in inds:
-                    #         print('JAC ROW (before):', self.J[i], flush=True)
                     jac_setter(inds, mode, imeta)
-                    # if isinstance(inds, int):
-                    #     print('JAC ROW (after):', self.J[inds], flush=True)
-                    # else:
-                    #     for i in inds:
-                    #         print('JAC ROW (after):', self.J[i], flush=True)
 
         # Driver scaling.
         if self.has_scaling:
