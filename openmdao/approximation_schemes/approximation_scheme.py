@@ -445,6 +445,8 @@ class ApproximationScheme(object):
             entry = [[None, None]]
             ent0 = entry[0]
             for vec, vec_idxs in vec_ind_list:
+                if vec_idxs is None:
+                    continue
                 for vinds in vec_idxs:
                     ent0[0] = vec
                     ent0[1] = vinds
