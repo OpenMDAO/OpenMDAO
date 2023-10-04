@@ -3,7 +3,8 @@ from numpy import pi
 
 import openmdao.api as om
 from openmdao.utils.mpi import MPI
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, \
+     assert_check_totals
 from openmdao.test_suite.groups.parallel_groups import FanIn, FanOut
 
 try:
@@ -464,6 +465,28 @@ class TestSubmodelComp(unittest.TestCase):
 
         self.assertTrue((3, 20, 'NL') in p.model.submodel._subprob.model._solver_print_cache)
 
+    def test_complex_step_across_submodel(self):
+        p = om.Problem()
+        subprob = om.Problem()
+        subprob.model.add_subsystem('comp', om.ExecComp('x = r*cos(theta)'), promotes=['*'])
+        submodel = om.SubmodelComp(problem=subprob)
+
+        submodel.add_input('r', name='new_r', val=20)
+        submodel.add_input('theta', name='new_theta', val=0.5)
+        submodel.add_output('x', name='new_x', val=100)
+
+        model = p.model
+        model.add_subsystem('submodel', submodel, promotes=['*'])
+        model.add_design_var('new_r')
+        model.add_design_var('new_theta')
+        model.add_objective('new_x')
+
+        p.setup(force_alloc_complex=True)
+        p.run_model()
+
+        totals = p.check_totals(method='cs')
+        assert_check_totals(totals, atol=1e-11, rtol=1e-11)
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestSubmodelCompMPI(unittest.TestCase):
@@ -485,3 +508,7 @@ class TestSubmodelCompMPI(unittest.TestCase):
         p.run_model()
         cpd = p.check_partials(method='cs', out_stream=None)
         assert_check_partials(cpd)
+
+
+if __name__ == '__main__':
+    unittest.main()
