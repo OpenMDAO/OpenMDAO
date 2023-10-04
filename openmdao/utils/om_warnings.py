@@ -200,7 +200,7 @@ def issue_warning(msg, prefix='', stacklevel=2, category=OpenMDAOWarning):
     """
     old_format = warnings.formatwarning
     warnings.formatwarning = _warn_simple_format
-    _msg = f'{prefix}: {msg}' if prefix else f'{msg}'
+    _msg = f'{prefix}: {msg}' if prefix else msg
     try:
         warnings.warn(_msg, category=category, stacklevel=stacklevel)
     finally:

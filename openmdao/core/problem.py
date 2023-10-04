@@ -8,9 +8,9 @@ import os
 import weakref
 import pathlib
 import textwrap
+import traceback
 
 from collections import defaultdict, namedtuple
-from fnmatch import fnmatchcase
 from itertools import product
 
 from io import StringIO, TextIOBase
@@ -22,15 +22,14 @@ from openmdao.core.constants import _SetupStatus
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver, record_iteration, SaveOptResult
 from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.core.system import System, _OptStatus
 from openmdao.core.group import Group
-from openmdao.core.system import System
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.solvers.solver import SolverInfo
-from openmdao.vectors.vector import _full_slice
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.error_checking.check_config import _default_checks, _all_checks, \
     _all_non_redundant_checks
@@ -44,9 +43,9 @@ from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import abs_key2rel_key
 from openmdao.utils.logger_utils import get_logger, TestLogger
 from openmdao.utils.hooks import _setup_hooks, _reset_all_hooks
-from openmdao.utils.indexer import indexer
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.array_utils import scatter_dist_to_local
+from openmdao.utils.class_util import overrides_method
 from openmdao.utils.reports_system import get_reports_to_activate, activate_reports, \
     clear_reports, get_reports_dir, _load_report_plugins
 from openmdao.utils.general_utils import ContainsAll, pad_name, LocalRangeIterable, \
@@ -81,6 +80,9 @@ CITATION = """@article{openmdao_2019,
 # Used for naming Problems when no explicit name is given
 # Also handles sub problems
 _problem_names = []
+
+# Used to keep track of the current Problem tree if there are any subproblems
+_prob_setup_stack = []
 
 
 def _clear_problem_names():
@@ -253,11 +255,15 @@ class Problem(object):
 
         if model is None:
             self.model = Group()
-        elif isinstance(model, System):
+        elif isinstance(model, Group):
+            from openmdao.core.parallel_group import ParallelGroup
+            if isinstance(model, ParallelGroup):
+                raise TypeError(f"{self.msginfo}: The value provided for 'model' "
+                                "cannot be a ParallelGroup.")
             self.model = model
         else:
             raise TypeError(self.msginfo +
-                            ": The value provided for 'model' is not a valid System.")
+                            ": The value provided for 'model' is not a Group.")
 
         if driver is None:
             driver = Driver()
@@ -283,6 +289,22 @@ class Problem(object):
         self.options.declare('coloring_dir', types=str,
                              default=os.path.join(os.getcwd(), 'coloring_files'),
                              desc='Directory containing coloring files (if any) for this Problem.')
+        self.options.declare('group_by_pre_opt_post', types=bool,
+                             default=False,
+                             desc="If True, group subsystems of the top level model into "
+                             "pre-optimization, optimization, and post-optimization, and only "
+                             "iterate over the optimization subsystems during optimization.  This "
+                             "applies only when the top level nonlinear solver is of type"
+                             "NonlinearRunOnce.")
+        self.options.declare('allow_post_setup_reorder', types=bool,
+                             default=True,
+                             desc="If True, the execution order of direct subsystems of any group "
+                             "that sets its 'auto_order' option to True will be automatically "
+                             "ordered according to data dependencies. If this option is False, the "
+                             "'auto_order' option will be ignored and a warning will be issued for "
+                             "each group that has set it to True. Note that subsystems of a Group "
+                             "that form a cycle will never be reordered, regardless of the value of"
+                             " the 'auto_order' option.")
         self.options.update(options)
 
         # Options passed to models
@@ -569,22 +591,23 @@ class Problem(object):
         if self._metadata['saved_errors'] is None:
             return
 
-        errors = self._metadata['saved_errors']
+        unique_errors = self._get_unique_saved_errors()
 
         # set the errors to None so that all future calls will immediately raise an exception.
         self._metadata['saved_errors'] = None
 
-        if errors:
+        if unique_errors:
             final_msg = [f"\nCollected errors for problem '{self._name}':"]
-            seen = set()
-            for ident, msg, exc_type, tback in errors:
-                if ident is None or ident not in seen:
-                    final_msg.append(f"   {msg}")
-                    seen.add(ident)
+            for _, msg, exc_type, tback in unique_errors:
+                final_msg.append(f"   {msg}")
 
-                # if there's only one error, include its traceback if there is one.
-                if len(errors) == 1:
-                    raise exc_type('\n'.join(final_msg)).with_traceback(tback)
+                # if there's only one error, include its traceback if it exists.
+                if len(unique_errors) == 1:
+                    if isinstance(tback, str):
+                        final_msg.append('Traceback (most recent call last):')
+                        final_msg.append(tback)
+                    else:
+                        raise exc_type('\n'.join(final_msg)).with_traceback(tback)
 
             raise RuntimeError('\n'.join(final_msg))
 
@@ -632,6 +655,9 @@ class Problem(object):
         finally:
             self._recording_iter.prefix = old_prefix
 
+    def _set_opt_status(self, status):
+        self._metadata['opt_status'] = status
+
     def run_driver(self, case_prefix=None, reset_iter_counts=True):
         """
         Run the driver on the model.
@@ -650,14 +676,20 @@ class Problem(object):
         bool
             Failure flag; True if failed to converge, False is successful.
         """
+        model = self.model
+        driver = self.driver
+
         if self._mode is None:
             raise RuntimeError(self.msginfo +
                                ": The `setup` method must be called before `run_driver`.")
 
-        if not self.model._have_output_solver_options_been_applied():
+        if not model._have_output_solver_options_been_applied():
             raise RuntimeError(self.msginfo +
                                ": Before calling `run_driver`, the `setup` method must be called "
                                "if set_output_solver_options has been called.")
+
+        if 'singular_jac_behavior' in driver.options:
+            self._metadata['singular_jac_behavior'] = driver.options['singular_jac_behavior']
 
         old_prefix = self._recording_iter.prefix
 
@@ -667,21 +699,42 @@ class Problem(object):
             self._recording_iter.prefix = case_prefix
 
         try:
-            if self.model.iter_count > 0 and reset_iter_counts:
-                self.driver.iter_count = 0
-                self.model._reset_iter_counts()
+            if model.iter_count > 0 and reset_iter_counts:
+                driver.iter_count = 0
+                model._reset_iter_counts()
 
             self.final_setup()
+
+            # for optimizing drivers, check that constraints are affected by design vars
+            if driver.supports['optimization'] and self._metadata['use_derivatives']:
+                driver.check_relevance()
 
             self._run_counter += 1
             record_model_options(self, self._run_counter)
 
-            self.model._clear_iprint()
+            model._clear_iprint()
 
-            with SaveOptResult(self.driver):
-                return self.driver.run()
+            if self.options['group_by_pre_opt_post'] and driver.supports['optimization']:
+                if model._run_on_opt[_OptStatus.PRE]:
+                    self._set_opt_status(_OptStatus.PRE)
+                    model.run_solve_nonlinear()
+
+                with SaveOptResult(driver):
+                    self._set_opt_status(_OptStatus.OPTIMIZING)
+                    result = driver.run()
+
+                if model._run_on_opt[_OptStatus.POST]:
+                    self._set_opt_status(_OptStatus.POST)
+                    model.run_solve_nonlinear()
+
+                return result
+            else:
+                with SaveOptResult(driver):
+                    return driver.run()
+
         finally:
             self._recording_iter.prefix = old_prefix
+            self._set_opt_status(None)
 
     def compute_jacvec_product(self, of, wrt, mode, seed):
         """
@@ -911,6 +964,7 @@ class Problem(object):
         # this metadata will be shared by all Systems/Solvers in the system tree
         self._metadata = {
             'name': self._name,  # the name of this Problem
+            'pathname': None,  # the pathname of this Problem in the current tree of Problems
             'comm': comm,
             'coloring_dir': self.options['coloring_dir'],  # directory for coloring files
             'recording_iter': _RecIteration(comm.rank),  # manager of recorder iterations
@@ -945,9 +999,23 @@ class Problem(object):
             'reports_dir': self.get_reports_dir(),  # directory where reports will be written
             'saved_errors': [],  # store setup errors here until after final_setup
             'checking': False,  # True if check_totals or check_partials is running
-            'model_options': self.model_options  # A dict of options passed to all systems in tree
+            'opt_status': None,  # Tells Systems if they are in an optimization loop
+            'model_options': self.model_options,  # A dict of options passed to all systems in tree
+            'allow_post_setup_reorder': self.options['allow_post_setup_reorder'],  # see option
+            'singular_jac_behavior': 'warn',  # How to handle singular jac conditions
         }
-        model._setup(model_comm, mode, self._metadata)
+
+        if _prob_setup_stack:
+            self._metadata['pathname'] = _prob_setup_stack[-1]._metadata['pathname'] + '/' + \
+                self._name
+        else:
+            self._metadata['pathname'] = self._name
+
+        _prob_setup_stack.append(self)
+        try:
+            model._setup(model_comm, mode, self._metadata)
+        finally:
+            _prob_setup_stack.pop()
 
         # set static mode back to True in all systems in this Problem
         self._metadata['static_mode'] = True
@@ -984,7 +1052,15 @@ class Problem(object):
             mode = self._orig_mode
 
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-            self.model._final_setup(self.comm)
+            self.model._final_setup(self.comm, self._orig_mode)
+
+        if self.options['group_by_pre_opt_post']:
+            if self.driver.supports['optimization']:
+                self.model._setup_iteration_lists()
+            else:
+                issue_warning(f"In Problem '{self._name}, the 'group_by_pre_opt_post' option is "
+                              "True but the driver doesn't support optimization so the option will "
+                              "be ignored.")
 
         # If set_solver_print is called after an initial run, in a multi-run scenario,
         #  this part of _final_setup still needs to happen so that change takes effect
@@ -1016,8 +1092,8 @@ class Problem(object):
                           "response variables (objectives and nonlinear constraints).",
                           category=DerivativesWarning)
 
-        if self._metadata['setup_status'] == _SetupStatus.PRE_SETUP and \
-                hasattr(self.model, '_order_set') and self.model._order_set:
+        if (not self._metadata['allow_post_setup_reorder'] and
+                self._metadata['setup_status'] == _SetupStatus.PRE_SETUP and self.model._order_set):
             raise RuntimeError(f"{self.msginfo}: Cannot call set_order without calling setup after")
 
         # set up recording, including any new recorders since last setup
@@ -1135,9 +1211,7 @@ class Problem(object):
                     isinstance(comp, ExplicitComponent)):
                 continue
 
-            name = comp.pathname
-
-            if not match_includes_excludes(name, includes, excludes):
+            if not match_includes_excludes(comp.pathname, includes, excludes):
                 continue
 
             comps.append(comp)
@@ -2057,9 +2131,9 @@ class Problem(object):
             The header line for the table.
         col_names : list of str
             List of column labels.
-        meta : OrderedDict
+        meta : dict
             Dictionary of metadata for each problem variable.
-        vals : OrderedDict
+        vals : dict
             Dictionary of values for each problem variable.
         print_arrays : bool, optional
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
@@ -2179,39 +2253,121 @@ class Problem(object):
 
         Parameters
         ----------
-        case : Case object
-            A Case from a CaseRecorder file.
+        case : Case or dict
+            A Case from a CaseReader, or a dictionary with key 'inputs' mapped to the
+            output of problem.model.list_inputs and key 'outputs' mapped to the output
+            of prob.model.list_outputs. Both list_inputs and list_outputs should be called
+            with `prom_name=True` and `return_format='dict'`.
         """
-        inputs = case.inputs if case.inputs is not None else None
-        abs2idx = self.model._var_allprocs_abs2idx
-        if inputs:
-            meta = self.model._var_allprocs_abs2meta['input']
-            abs2prom = self.model._var_allprocs_abs2prom['input']
-            for name in inputs.absolute_names():
-                if name not in abs2prom:
-                    raise KeyError(f"{self.msginfo}: Input variable, '{name}', recorded in the "
-                                   "case is not found in the model")
-                varmeta = meta[name]
-                if varmeta['distributed'] and self.model.comm.size > 1:
-                    sizes = self.model._var_sizes['input'][:, abs2idx[name]]
-                    self[name] = scatter_dist_to_local(inputs[name], self.model.comm, sizes)
-                else:
-                    self[name] = inputs[name]
+        model = self.model
 
-        outputs = case.outputs if case.outputs is not None else None
-        if outputs:
-            meta = self.model._var_allprocs_abs2meta['output']
-            abs2prom = self.model._var_allprocs_abs2prom['output']
-            for name in outputs.absolute_names():
-                if name not in abs2prom:
-                    raise KeyError(f"{self.msginfo}: Output variable, '{name}', recorded in the "
-                                   "case is not found in the model")
-                varmeta = meta[name]
-                if varmeta['distributed'] and self.model.comm.size > 1:
-                    sizes = self.model._var_sizes['output'][:, abs2idx[name]]
-                    self[name] = scatter_dist_to_local(outputs[name], self.model.comm, sizes)
+        # if model overrides load_case, then call the overloaded method
+        if overrides_method('load_case', model, System):
+            model.load_case(case)
+            return
+
+        # find all subsystems that override the load_case method
+        system_overrides = {}
+        for subsys in model.system_iter(include_self=False, recurse=True):
+            if overrides_method('load_case', subsys, System):
+                system_overrides[subsys.pathname] = subsys
+
+        def set_later(var_name):
+            # determine if variable should be set later via an overridden load_case method
+            for pathname in system_overrides:
+                if var_name.startswith(pathname + '.'):
+                    return True
+            return False
+
+        if isinstance(case, dict):
+            # case data comes from list_inputs/list_outputs, keyed on absolute pathname
+            # we need it to be keyed on promoted name
+            if 'inputs' in case:
+                inputs = {meta['prom_name']: meta for meta in case['inputs'].values()}
+            else:
+                inputs = None
+            if 'outputs' in case:
+                outputs = {meta['prom_name']: meta for meta in case['outputs'].values()}
+            else:
+                outputs = None
+        else:
+            inputs = case.inputs
+            outputs = case.outputs
+
+        abs2idx = model._var_allprocs_abs2idx
+        prom2abs_in = model._var_allprocs_prom2abs_list['input']
+        prom2abs_out = model._var_allprocs_prom2abs_list['output']
+        abs2meta_in = model._var_allprocs_abs2meta['input']
+        abs2meta_out = model._var_allprocs_abs2meta['output']
+
+        if inputs:
+            for name in inputs:
+                if set_later(name):
+                    continue
+
+                if name in prom2abs_in:
+                    for abs_name in prom2abs_in[name]:
+                        if set_later(abs_name):
+                            continue
+
+                        if isinstance(case, dict):
+                            val = inputs[name]['val']
+                        else:
+                            # need a unique abs_name to get value from a case
+                            # if there is a matching abs_name in the case, use that value
+                            # otherwise use the value of the first matching abs_name
+                            case_abs_names = case._prom2abs['input'][name]
+                            if abs_name in case_abs_names:
+                                val = case.inputs[abs_name]
+                            else:
+                                val = case.inputs[case_abs_names[0]]
+
+                        varmeta = abs2meta_in[abs_name]
+                        if varmeta['distributed'] and model.comm.size > 1:
+                            sizes = model._var_sizes['input'][:, abs2idx[abs_name]]
+                            model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
+                        else:
+                            model.set_val(abs_name, val)
                 else:
-                    self[name] = outputs[name]
+                    issue_warning(f"{model.msginfo}: Input variable, '{name}', recorded "
+                                  "in the case is not found in the model.")
+
+        if outputs:
+            for name in outputs:
+                if set_later(name):
+                    continue
+
+                # auto_ivc output may point to a promoted input name
+                if name in prom2abs_out:
+                    prom2abs = prom2abs_out
+                    abs2meta = abs2meta_out
+                else:
+                    prom2abs = prom2abs_in
+                    abs2meta = abs2meta_in
+
+                if name in prom2abs:
+                    if isinstance(case, dict):
+                        val = outputs[name]['val']
+                    else:
+                        val = outputs[name]
+
+                    for abs_name in prom2abs[name]:
+                        if set_later(abs_name):
+                            continue
+
+                        varmeta = abs2meta[abs_name]
+                        if varmeta['distributed'] and model.comm.size > 1:
+                            sizes = model._var_sizes['output'][:, abs2idx[abs_name]]
+                            model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
+                        else:
+                            model.set_val(abs_name, val)
+                else:
+                    issue_warning(f"{model.msginfo}: Output variable, '{name}', recorded "
+                                  "in the case is not found in the model.")
+
+        # call the overridden load_case method on applicable subsystems (in top-down order)
+        for sys_name in sorted(system_overrides.keys()):
+            system_overrides[sys_name].load_case(case)
 
     def check_config(self, logger=None, checks=_default_checks, out_file='openmdao_checks.out'):
         """
@@ -2318,7 +2474,7 @@ class Problem(object):
             List of optional columns to be displayed in the independent variable table.
             Allowed values are:
             ['name', 'units', 'shape', 'size', 'desc', 'ref', 'ref0', 'res_ref',
-            'distributed', 'lower', 'upper', 'tags', 'shape_by_conn', 'copy_shape',
+            'distributed', 'lower', 'upper', 'tags', 'shape_by_conn', 'copy_shape', 'compute_shape',
             'global_size', 'global_shape', 'value'].
         print_arrays : bool, optional
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
@@ -2383,6 +2539,134 @@ class Problem(object):
                 print(f'None found', file=out_stream)
 
         return problem_indep_vars
+
+    def iter_count_iter(self, include_driver=True, include_solvers=True, include_systems=False):
+        """
+        Yield iteration counts for driver, solvers and/or systems.
+
+        Parameters
+        ----------
+        include_driver : bool
+            If True, include the driver in the iteration counts.
+        include_solvers : bool
+            If True, include solvers in the iteration counts.
+        include_systems : bool
+            If True, include systems in the iteration counts.
+
+        Yields
+        ------
+        str
+            Name of the object.
+        str
+            Name of the counter.
+        int
+            Value of the counter.
+        """
+        if include_driver:
+            yield ('Driver', 'iter_count', self.driver.iter_count)
+        if include_solvers or include_systems:
+            for s in self.model.system_iter(include_self=True, recurse=True):
+                if include_systems:
+                    for it in ('iter_count', 'iter_count_apply'):
+                        val = getattr(s, it)
+                        if val > 0:
+                            yield (s.pathname, it, val)
+
+                if include_solvers:
+                    prefix = s.pathname + '.' if s.pathname else ''
+                    if s.nonlinear_solver is not None and s.nonlinear_solver._iter_count > 0:
+                        yield (prefix + 'nonlinear_solver', '_iter_count',
+                               s.nonlinear_solver._iter_count)
+                    if s.linear_solver is not None and s.linear_solver._iter_count > 0:
+                        yield (prefix + 'linear_solver', '_iter_count',
+                               s.linear_solver._iter_count)
+
+    def list_pre_post(self, outfile=None):
+        """
+        Display the pre and post optimization components.
+
+        Parameters
+        ----------
+        outfile : file-like or str or None
+            Where to send human readable output. Default is None, which sends output to stdout.
+        """
+        if self._metadata is None or self._metadata['setup_status'] < _SetupStatus.POST_SETUP:
+            raise RuntimeError(f"{self.msginfo}: list_pre_post can't be called before setup.")
+
+        if outfile is None:
+            out = sys.stdout
+        else:
+            out = open(outfile, 'w')
+
+        if not self.options['group_by_pre_opt_post']:
+            print("\nThe 'group_by_pre_opt_post' option is False, so all components will be "
+                  "included in the optimization loop.", file=out)
+
+        model = self.model
+        if model._pre_components:
+            print("\nPre-optimization components:", file=out)
+            for name in model._pre_components:
+                print(f"    {name}", file=out)
+        else:
+            print("\nPre-optimization components: []", file=out)
+
+        if model._post_components:
+            print("\nPost-optimization components:", file=out)
+            for name in model._post_components:
+                print(f"    {name}", file=out)
+        else:
+            print("\nPost-optimization components: []", file=out)
+
+    def _any_rank_has_saved_errors(self):
+        """
+        Return True if any rank has saved errors.
+
+        Returns
+        -------
+        bool
+            True if any rank has errors.
+        """
+        if self._metadata is None:
+            return False
+        else:
+            if MPI and self.comm is not None and self.comm.size > 1:
+                if self._metadata['saved_errors'] is None:
+                    nerrs = 0
+                else:
+                    nerrs = len(self._metadata['saved_errors'])
+                return self.comm.allreduce(nerrs, op=MPI.SUM) > 0
+            else:
+                return bool(self._metadata['saved_errors'])
+
+    def _get_unique_saved_errors(self):
+        """
+        Get a list of unique saved errors.
+
+        Returns
+        -------
+        list
+            List of unique saved errors.
+        """
+        unique_errors = []
+        if self._metadata is not None:
+            if self._any_rank_has_saved_errors():
+                # traceback won't pickle, so convert to string
+                if self.comm.size > 1:
+                    saved = [(ident, msg, exc_type, ''.join(traceback.format_tb(tback)))
+                             for ident, msg, exc_type, tback in self._metadata['saved_errors']]
+                    all_errors = self.comm.allgather(saved)
+                else:
+                    all_errors = [self._metadata['saved_errors']]
+
+                seen = set()
+                for errors in all_errors:
+                    for ident, msg, exc_type, tback in errors:
+                        if (ident is None and msg not in seen) or ident not in seen:
+                            unique_errors.append((ident, msg, exc_type, tback))
+                            seen.add(ident)
+                            seen.add(msg)
+
+        return unique_errors
 
 
 _ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])

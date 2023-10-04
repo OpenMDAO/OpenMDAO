@@ -26,7 +26,12 @@ _gradient_optimizers = {'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC', 'SLSQP', '
 _hessian_optimizers = {'trust-constr', 'trust-ncg'}
 _bounds_optimizers = {'L-BFGS-B', 'TNC', 'SLSQP', 'trust-constr', 'dual_annealing', 'shgo',
                       'differential_evolution', 'basinhopping'}
+if Version(scipy_version) >= Version("1.11"):
+    # COBYLA supports bounds starting with SciPy Version 1.11
+    _bounds_optimizers |= {'COBYLA'}
+
 _constraint_optimizers = {'COBYLA', 'SLSQP', 'trust-constr', 'shgo'}
+
 _constraint_grad_optimizers = _gradient_optimizers & _constraint_optimizers
 _eq_constraint_optimizers = {'SLSQP', 'trust-constr'}
 _global_optimizers = {'differential_evolution', 'basinhopping'}
@@ -213,9 +218,9 @@ class ScipyOptimizeDriver(Driver):
             msg = '{} currently does not support multiple objectives.'
             raise RuntimeError(msg.format(self.msginfo))
 
-        # Since COBYLA does not support bounds, we need to add to the _cons metadata
-        # for any bounds that need to be translated into a constraint
-        if opt == 'COBYLA':
+        # Since COBYLA did not support bounds in versions of SciPy prior to 1.11, we need to
+        # add to the _cons metadata for any bounds that need to be translated into a constraint
+        if opt == 'COBYLA' and Version(scipy_version) < Version("1.11"):
             for name, meta in self._designvars.items():
                 lower = meta['lower']
                 upper = meta['upper']

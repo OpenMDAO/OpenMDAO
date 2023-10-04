@@ -1,6 +1,7 @@
 """Define the ParallelGroup class."""
 
 from openmdao.core.group import Group
+from openmdao.utils.om_warnings import issue_warning
 
 
 class ParallelGroup(Group):
@@ -65,3 +66,99 @@ class ParallelGroup(Group):
                         seen.add(name)
         else:
             yield from super()._ordered_comp_name_iter()
+
+    def _check_order(self, reorder=True, recurse=True, out_of_order=None):
+        """
+        Check if auto ordering is needed and if so, set the order appropriately.
+
+        Parameters
+        ----------
+        reorder : bool
+            If True, reorder the subsystems based on the new order.  Otherwise
+            just return the out-of-order connections.
+        recurse : bool
+            If True, call this method on all subgroups.
+        out_of_order : dict
+            Lists of out-of-order connections keyed by group pathname.
+
+        Returns
+        -------
+        dict
+            Lists of out-of-order connections keyed by group pathname.
+        """
+        if self.options['auto_order']:
+            issue_warning("auto_order is not supported in ParallelGroup. "
+                          "Ignoring auto_order option.", prefix=self.msginfo)
+
+        if out_of_order is None:
+            out_of_order = {}
+
+        if recurse:
+            for s in self._subgroups_myproc:
+                s._check_order(reorder, recurse, out_of_order)
+
+        return out_of_order
+
+    def comm_info_iter(self):
+        """
+        Yield comm size and rank for this system and all subsystems.
+
+        Yields
+        ------
+        tuple
+            A tuple of the form (abs_name, comm_size).
+        """
+        if self.comm.size > 1:
+            for info in self.comm.allgather(list(super().comm_info_iter())):
+                yield from info
+        else:
+            yield from super().comm_info_iter()
+
+    def _declared_partials_iter(self):
+        """
+        Iterate over all declared partials.
+
+        Yields
+        ------
+        (key, meta) : (key, dict)
+            key: a tuple of the form (of, wrt)
+            meta: a dict containing the partial metadata
+        """
+        if self.comm.size > 1:
+            if self._gather_full_data():
+                gathered = self.comm.allgather(self._subjacs_info)
+            else:
+                gathered = self.comm.allgather({})
+            seen = set()
+            for rankdict in gathered:
+                for key, meta in rankdict.items():
+                    if key not in seen:
+                        yield key, meta
+                        seen.add(key)
+        else:
+            yield from super()._declared_partials_iter()
+
+    def _get_missing_partials(self, missing):
+        """
+        Return a list of (of, wrt) tuples for which derivatives have not been declared.
+
+        Parameters
+        ----------
+        missing : dict
+            Dictionary containing list of missing derivatives keyed by system pathname.
+        """
+        if self.comm.size > 1:
+            msng = {}
+            super()._get_missing_partials(msng)
+            if self._gather_full_data():
+                gathered = self.comm.allgather(msng)
+            else:
+                gathered = self.comm.allgather({})
+            seen = set()
+            for rankdict in gathered:
+                for sysname, mset in rankdict.items():
+                    if sysname not in seen:
+                        missing[sysname] = mset
+                        seen.add(sysname)
+        else:
+            super()._get_missing_partials(missing)

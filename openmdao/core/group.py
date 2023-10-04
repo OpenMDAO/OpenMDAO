@@ -13,7 +13,7 @@ import numpy as np
 import networkx as nx
 
 from openmdao.core.configinfo import _ConfigInfo
-from openmdao.core.system import System, collect_errors
+from openmdao.core.system import System, collect_errors, _OptStatus
 from openmdao.core.component import Component, _DictValues
 from openmdao.core.constants import _UNDEFINED, INT_DTYPE, _SetupStatus
 from openmdao.vectors.vector import _full_slice
@@ -26,14 +26,16 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len
 from openmdao.utils.general_utils import common_subpath, all_ancestors, \
-    convert_src_inds, ContainsAll, shape2tuple, get_connection_owner, ensure_compatible
+    convert_src_inds, ContainsAll, shape2tuple, get_connection_owner, ensure_compatible, \
+    _src_name_iter, meta2src_iter
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
+from openmdao.utils.graph_utils import get_sccs_topo, get_out_of_order_nodes, get_hybrid_graph
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
-    PromotionWarning, MPIWarning
+    PromotionWarning, MPIWarning, DerivativesWarning
 
 # regex to check for valid names.
 import re
@@ -145,7 +147,8 @@ class Group(System):
     _proc_info : dict of subsys_name: (min_procs, max_procs, weight, proc_group)
         Information used to determine MPI process allocation to subsystems.
     _subgroups_myproc : list
-        List of local subgroups.
+        List of local subgroups, (sorted by name if Problem option allow_post_setup_reorder is
+        True).
     _manual_connections : dict
         Dictionary of input_name: (output_name, src_indices) connections.
     _group_inputs : dict
@@ -179,8 +182,16 @@ class Group(System):
         List of Auto IVC warnings to be raised later.
     _shapes_graph : nx.Graph
         Dynamic shape dependency graph, or None.
-    _shape_knowns : set
-        Set of shape dependency graph nodes with known (non-dynamic) shapes.
+    _pre_components : list of str or None
+        Sorted list of pathnames of components that are executed prior to the optimization loop.
+    _post_components : list of str or None
+        Sorted list of pathnames of components that are executed after the optimization loop.
+    _abs_desvars : set
+        Set of absolute design variable names.
+    _abs_responses : set
+        Set of absolute response names.
+    _relevance_graph : nx.DiGraph
+        Graph of relevance connections.  Always None except in the top level Group.
     """
 
     def __init__(self, **kwargs):
@@ -206,7 +217,11 @@ class Group(System):
         self._contains_parallel_group = False
         self._order_set = False
         self._shapes_graph = None
-        self._shape_knowns = None
+        self._pre_components = None
+        self._post_components = None
+        self._abs_desvars = None
+        self._abs_responses = None
+        self._relevance_graph = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -215,6 +230,11 @@ class Group(System):
             self._nonlinear_solver = NonlinearRunOnce()
         if not self._linear_solver:
             self._linear_solver = LinearRunOnce()
+
+        self.options.declare('auto_order', types=bool, default=False,
+                             desc='If True the order of subsystems is determined automatically '
+                             'based on the dependency graph.  It will not break or reorder '
+                             'cycles.')
 
     def setup(self):
         """
@@ -482,7 +502,7 @@ class Group(System):
             self._group_inputs[n] = lst.copy()
 
         self.matrix_free = False
-        for subsys in self._subsystems_myproc:
+        for subsys in self._sorted_sys_iter():
             subsys._configure()
             subsys._setup_var_data()
 
@@ -497,6 +517,14 @@ class Group(System):
         # _setup_var_data again on any modified systems and their ancestors (only those that
         # are our descendents).
         self._problem_meta['config_info']._update_modified_systems(self)
+
+    def _reset_setup_vars(self):
+        """
+        Reset all the stuff that gets initialized in setup.
+        """
+        super()._reset_setup_vars()
+        self._relevance_graph = None
+        self._setup_procs_finished = False
 
     def _setup_procs(self, pathname, comm, mode, prob_meta):
         """
@@ -518,7 +546,6 @@ class Group(System):
             Problem level metadata.
         """
         super()._setup_procs(pathname, comm, mode, prob_meta)
-        self._setup_procs_finished = False
 
         nproc = comm.size
 
@@ -565,8 +592,7 @@ class Group(System):
 
             # Call the load balancing algorithm
             try:
-                sub_inds, sub_comm, sub_proc_range = self._mpi_proc_allocator(
-                    proc_info, len(allsubs), comm)
+                sub_inds, sub_comm = self._mpi_proc_allocator(proc_info, len(allsubs), comm)
             except ProcAllocationError as err:
                 if err.sub_inds is None:
                     raise RuntimeError("%s: %s" % (self.msginfo, err.msg))
@@ -603,12 +629,13 @@ class Group(System):
             s.pathname = '.'.join((self.pathname, s.name)) if self.pathname else s.name
 
         # Perform recursion
-        allsubs = self._subsystems_allprocs
         for subsys in self._subsystems_myproc:
             subsys._setup_procs(subsys.pathname, sub_comm, mode, prob_meta)
 
         # build a list of local subgroups to speed up later loops
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
+        if prob_meta['allow_post_setup_reorder']:
+            self._subgroups_myproc.sort(key=lambda x: x.name)
 
         if nproc > 1 and self._mpi_proc_allocator.parallel:
             self._problem_meta['parallel_groups'].append(self.pathname)
@@ -647,7 +674,7 @@ class Group(System):
             List of all states.
         """
         states = []
-        for subsys in self._subsystems_myproc:
+        for subsys in self._sorted_sys_iter():
             states.extend(subsys._list_states())
 
         return sorted(states)
@@ -741,12 +768,6 @@ class Group(System):
 
         self._top_level_post_sizes()
 
-        try:
-            self._problem_meta['relevant'] = self._init_relevance(mode)
-        except RuntimeError:
-            type_exc, exc, tb = sys.exc_info()
-            self._collect_error(str(exc), exc_type=type_exc, tback=tb)
-
         # determine which connections are managed by which group, and check validity of connections
         self._setup_connections()
 
@@ -766,15 +787,86 @@ class Group(System):
         dict
             The relevance dictionary.
         """
+        abs_desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
+        abs_responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
+        self._abs_desvars = set(_src_name_iter(abs_desvars))
+        self._abs_responses = set(_src_name_iter(abs_responses))
+        assert self.pathname == '', "Relevance can only be initialized on the top level System."
+
         if self._use_derivatives:
-            desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
-            responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
-
-            responses = self._check_alias_overlaps(responses)
-
-            return self.get_relevant_vars(desvars, responses, mode)
+            return self.get_relevant_vars(abs_desvars,
+                                          self._check_alias_overlaps(abs_responses), mode)
 
         return {'@all': ({'input': ContainsAll(), 'output': ContainsAll()}, ContainsAll())}
+
+    def get_relevance_graph(self, desvars, responses):
+        """
+        Return a graph of the relevance between desvars and responses.
+
+        Parameters
+        ----------
+        desvars : dict
+            Dictionary of design variable metadata.
+        responses : dict
+            Dictionary of response variable metadata.
+
+        Returns
+        -------
+        DiGraph
+            Graph of the relevance between desvars and responses.
+        """
+        if self._relevance_graph is not None:
+            return self._relevance_graph
+
+        conns = self._conn_global_abs_in2out
+        graph = get_hybrid_graph(conns)
+
+        dvs = set(meta2src_iter(desvars.values()))
+        resps = set(meta2src_iter(responses.values()))
+
+        # now add design vars and responses to the graph
+        for dv in dvs:
+            if dv not in graph:
+                graph.add_node(dv, type_='out')
+                graph.add_edge(dv.rpartition('.')[0], dv)
+
+        for res in resps:
+            if res not in graph:
+                graph.add_node(res, type_='out')
+                graph.add_edge(res.rpartition('.')[0], res)
+
+        # figure out if we can remove any edges based on zero partials we find
+        # in components.  By default all component connected outputs
+        # are also connected to all connected inputs from the same component.
+        missing_partials = {}
+        self._get_missing_partials(missing_partials)
+        missing_responses = set()
+        for pathname, missing in missing_partials.items():
+            outputs = [n for _, n in graph.out_edges(pathname)]
+            inputs = [n for n, _ in graph.in_edges(pathname)]
+            graph.remove_node(pathname)
+
+            for output in outputs:
+                found = False
+                for inp in inputs:
+                    if (output, inp) not in missing:
+                        graph.add_edge(inp, output)
+                        found = True
+
+                if not found and output in resps:
+                    missing_responses.add(output)
+
+        if missing_responses:
+            msg = (f"Constraints or objectives [{', '.join(sorted(missing_responses))}] cannot"
+                   " be impacted by the design variables of the problem because no partials "
+                   "were defined for them in their parent component(s).")
+            if self._problem_meta['singular_jac_behavior'] == 'error':
+                raise RuntimeError(msg)
+            else:
+                issue_warning(msg, category=DerivativesWarning)
+
+        self._relevance_graph = graph
+        return graph
 
     def get_relevant_vars(self, desvars, responses, mode):
         """
@@ -797,37 +889,7 @@ class Group(System):
             Dict of ({'outputs': dep_outputs, 'inputs': dep_inputs}, dep_systems)
             keyed by design vars and responses.
         """
-        conns = self._conn_global_abs_in2out
-
-        # Create a hybrid graph with components and all connected vars.  If a var is connected,
-        # also connect it to its corresponding component.  This results in a smaller graph
-        # (fewer edges) than would be the case for a pure variable graph where all inputs
-        # to a particular component would have to be connected to all outputs from that component.
-        graph = nx.DiGraph()
-        for tgt, src in conns.items():
-            if src not in graph:
-                graph.add_node(src, type_='out')
-
-            graph.add_node(tgt, type_='in')
-
-            src_sys, _, _ = src.rpartition('.')
-            graph.add_edge(src_sys, src)
-
-            tgt_sys, _, _ = tgt.rpartition('.')
-            graph.add_edge(tgt, tgt_sys)
-
-            graph.add_edge(src, tgt)
-
-        for dv in desvars:
-            if dv not in graph:
-                graph.add_node(dv, type_='out')
-                graph.add_edge(dv.rpartition('.')[0], dv)
-
-        for res in responses:
-            if res not in graph:
-                graph.add_node(res, type_='out')
-                graph.add_edge(res.rpartition('.')[0], res)
-
+        graph = self.get_relevance_graph(desvars, responses)
         nodes = graph.nodes
         grev = graph.reverse(copy=False)
         rescache = {}
@@ -839,14 +901,16 @@ class Group(System):
 
         relevant = defaultdict(dict)
 
-        for desvar, dvmeta in desvars.items():
+        for dvmeta in desvars.values():
+            desvar = dvmeta['source']
             dvset = set(self.all_connected_nodes(graph, desvar))
             parallel_deriv_color = dvmeta['parallel_deriv_color']
             if parallel_deriv_color:
                 pd_dv_locs[desvar] = set(self.all_connected_nodes(graph, desvar, local=True))
                 pd_err_chk[parallel_deriv_color][desvar] = pd_dv_locs[desvar]
 
-            for response, resmeta in responses.items():
+            for resmeta in responses.values():
+                response = resmeta['source']
                 if response not in rescache:
                     rescache[response] = set(self.all_connected_nodes(grev, response))
                     parallel_deriv_color = resmeta['parallel_deriv_color']
@@ -858,12 +922,11 @@ class Group(System):
                 common = dvset.intersection(rescache[response])
 
                 if common:
-                    dv = conns[desvar] if desvar in conns else desvar
-                    r = conns[response] if response in conns else response
                     if desvar in pd_dv_locs and pd_dv_locs[desvar]:
-                        pd_common[dv][r] = pd_dv_locs[desvar].intersection(rescache[response])
+                        pd_common[desvar][response] = \
+                            pd_dv_locs[desvar].intersection(rescache[response])
                     elif response in pd_res_locs and pd_res_locs[response]:
-                        pd_common[r][dv] = pd_res_locs[response].intersection(dvset)
+                        pd_common[response][desvar] = pd_res_locs[response].intersection(dvset)
 
                     input_deps = set()
                     output_deps = set()
@@ -871,32 +934,30 @@ class Group(System):
                     for node in common:
                         if 'type_' in nodes[node]:
                             typ = nodes[node]['type_']
-                            system = node.rpartition('.')[0]
                             if typ == 'in':  # input var
                                 input_deps.add(node)
-                                if system not in sys_deps:
-                                    sys_deps.update(all_ancestors(system))
                             else:  # output var
                                 output_deps.add(node)
-                                if system not in sys_deps:
-                                    sys_deps.update(all_ancestors(system))
+                            system = node.rpartition('.')[0]
+                            if system not in sys_deps:
+                                sys_deps.update(all_ancestors(system))
 
                 elif desvar == response:
                     input_deps = set()
                     output_deps = set([response])
                     sys_deps = set(all_ancestors(desvar.rpartition('.')[0]))
 
-                if common or desvar == response:
-                    desvar = conns[desvar] if desvar in conns else desvar
-                    response = conns[response] if response in conns else response
-                    if mode != 'rev':  # fwd or auto
-                        relevant[desvar][response] = ({'input': input_deps,
-                                                       'output': output_deps}, sys_deps)
-                    if mode != 'fwd':  # rev or auto
-                        relevant[response][desvar] = ({'input': input_deps,
-                                                       'output': output_deps}, sys_deps)
+                else:
+                    continue
 
-                    sys_deps.add('')  # top level Group is always relevant
+                if mode != 'rev':  # fwd or auto
+                    relevant[desvar][response] = ({'input': input_deps,
+                                                   'output': output_deps}, sys_deps)
+                if mode != 'fwd':  # rev or auto
+                    relevant[response][desvar] = ({'input': input_deps,
+                                                   'output': output_deps}, sys_deps)
+
+                sys_deps.add('')  # top level Group is always relevant
 
         rescache = None
 
@@ -935,18 +996,17 @@ class Group(System):
 
         voi_lists = []
         if mode != 'rev':
-            voi_lists.append((desvars, responses))
+            voi_lists.append((desvars.values(), responses.values()))
         if mode != 'fwd':
-            voi_lists.append((responses, desvars))
+            voi_lists.append((responses.values(), desvars.values()))
 
         # now calculate dependencies between each VOI and all other VOIs of the
         # other type, e.g for each input VOI wrt all output VOIs.  This is only
         # done for design vars in fwd mode or responses in rev mode. In auto mode,
         # we combine the results for fwd and rev modes.
-        for inputs, outputs in voi_lists:
-            for inp in inputs:
-                if inp in conns:
-                    inp = conns[inp]
+        for inputs_meta, outputs_meta in voi_lists:
+            for inpmeta in inputs_meta:
+                inp = inpmeta['source']
                 relinp = relevant[inp]
                 if relinp:
                     if '@all' in relinp:
@@ -958,7 +1018,8 @@ class Group(System):
                         total_outs = set()
                         total_systems = set()
 
-                    for out in outputs:
+                    for outmeta in outputs_meta:
+                        out = outmeta['source']
                         if out in relinp:
                             dct, systems = relinp[out]
                             total_inps.update(dct['input'])
@@ -1189,7 +1250,7 @@ class Group(System):
 
         return sarr, tarr, tsize, has_dist_data
 
-    def _final_setup(self, comm):
+    def _final_setup(self, comm, mode):
         """
         Perform final setup for this system and its descendant systems.
 
@@ -1199,10 +1260,14 @@ class Group(System):
         ----------
         comm : MPI.Comm or <FakeComm> or None
             The global communicator.
+        mode : str
+            Derivative direction, either 'fwd', 'rev', or 'auto'.
         """
         if self._use_derivatives:
             # must call this before vector setup because it determines if we need to alloc commplex
             self._setup_partials()
+
+        self._problem_meta['relevant'] = self._init_relevance(mode)
 
         self._setup_vectors(self._get_root_vectors())
 
@@ -1352,6 +1417,7 @@ class Group(System):
         self._resolve_group_input_defaults()
         self._setup_auto_ivcs(mode)
         self._check_prom_masking()
+        self._check_order()
 
     def _check_prom_masking(self):
         """
@@ -1379,6 +1445,87 @@ class Group(System):
                                        " promoting to a different name. This can be caused"
                                        " by promoting '*' at group level or promoting using"
                                        " dotted names.")
+
+    def _check_order(self, reorder=True, recurse=True, out_of_order=None):
+        """
+        Check if auto ordering is needed, optionally reordering subsystems if appropriate.
+
+        Parameters
+        ----------
+        reorder : bool
+            If True, reorder the subsystems based on the computed order.  Otherwise
+            just return the out-of-order connections.
+        recurse : bool
+            If True, call this method on all subgroups.
+        out_of_order : dict or None
+            Lists of out-of-order connections keyed by group pathname. Out of order connections
+            are keyed by target system name and have values that are lists of source system names.
+            If incoming value of out_of_order is None, then a new dict is created and returned.
+
+        Returns
+        -------
+        dict
+            Lists of out-of-order connections keyed by group pathname.
+        """
+        if out_of_order is None:
+            out_of_order = {}
+
+        if self.options['auto_order'] or not reorder:
+            G = self.compute_sys_graph()
+            orders = {name: i for i, name in enumerate(self._subsystems_allprocs)}
+            strongcomps, new_out_of_order = get_out_of_order_nodes(G, orders)
+
+            if new_out_of_order:
+                # group targets with all of their sources
+                tgts = {}
+                for u, v in new_out_of_order:
+                    if v not in tgts:
+                        tgts[v] = []
+                    tgts[v].append(u)
+
+                for t in tgts:
+                    tgts[t] = sorted(tgts[t])
+
+                out_of_order[self.pathname] = tgts
+                if reorder:
+                    self._set_auto_order(strongcomps, orders)
+
+        if recurse:
+            for s in self._subgroups_myproc:
+                s._check_order(reorder, recurse, out_of_order)
+
+        return out_of_order
+
+    def _set_auto_order(self, strongcomps, orders):
+        """
+        Set the order of the subsystems based on the dependency graph.
+
+        Parameters
+        ----------
+        strongcomps : list of list of str
+            List of sets of subsystem names. Each list contains subsystems that are strongly
+            connected.  Sets containing 2 or more subsystems indicate a cycle.
+        orders : dict
+            Dictionary mapping subsystem names to their index in the current ordering.
+        """
+        new_order = []
+        for strongcomp in strongcomps:
+            if len(strongcomp) > 1:
+                # never change the internal order in a cycle
+                order_list = [(name, orders[name]) for name in strongcomp]
+                new_order.extend([name for name, _ in sorted(order_list, key=lambda x: x[1])])
+            else:
+                for s in strongcomp:
+                    new_order.append(s)
+
+        if self._problem_meta['allow_post_setup_reorder']:
+            self.set_order(new_order)
+        else:
+            issue_warning(f"{self.msginfo}: A new execution order {new_order} is recommended, but "
+                          "auto ordering has been disabled because the Problem option "
+                          "'allow_post_setup_reorder' is False. It is recommended to either set "
+                          "`allow_post_setup_reorder` to True or to manually set the execution "
+                          "order to the recommended order using `set_order`.")
 
     def _top_level_post_sizes(self):
         # this runs after the variable sizes are known
@@ -1521,7 +1668,8 @@ class Group(System):
                     try:
                         if pinfo.src_shape is None:
                             pinfo.set_src_shape(root_shape)
-                        elif pinfo.src_indices is not None and root_shape != pinfo.src_shape:
+                        elif pinfo.src_indices is not None and \
+                                not array_connection_compatible(root_shape, pinfo.src_shape):
                             self._collect_error(f"When connecting '{src}' to "
                                                 f"'{pinfo.prom_path()}': Promoted src_shape of "
                                                 f"{pinfo.src_shape} for "
@@ -1623,7 +1771,10 @@ class Group(System):
         self._has_distrib_vars = False
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
 
-        for subsys in self._subsystems_myproc:
+        # sort the subsystems alphabetically in order to make the ordering
+        # of vars in vectors and other data structures independent of the
+        # execution order.
+        for subsys in self._sorted_sys_iter():
             self._has_output_scaling |= subsys._has_output_scaling
             self._has_output_adder |= subsys._has_output_adder
             self._has_resid_scaling |= subsys._has_resid_scaling
@@ -1681,9 +1832,7 @@ class Group(System):
 
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
-            mysub = self._subsystems_myproc[0] if self._subsystems_myproc else False
-            if (mysub and mysub.comm.rank == 0 and (mysub._full_comm is None or
-                                                    mysub._full_comm.rank == 0)):
+            if self._gather_full_data():
                 raw = (allprocs_discrete, allprocs_prom2abs_list, allprocs_abs2meta,
                        self._has_output_scaling, self._has_output_adder,
                        self._has_resid_scaling, self._group_inputs, self._has_distrib_vars)
@@ -1959,7 +2108,7 @@ class Group(System):
             'output': np.zeros((self.comm.size, len(all_abs2meta['output'])), dtype=INT_DTYPE),
         }
 
-        for subsys in self._subsystems_myproc:
+        for subsys in self._sorted_sys_iter():
             subsys._setup_var_sizes()
 
         iproc = self.comm.rank
@@ -2139,10 +2288,11 @@ class Group(System):
 
                 if src_indices is not None:
                     a2m = allprocs_abs2meta_in[abs_in]
-                    if (a2m['shape_by_conn'] or a2m['copy_shape']):
+                    if (a2m['shape_by_conn'] or a2m['compute_shape']):
                         self._collect_error(
-                            f"{self.msginfo}: Setting of 'src_indices' along with 'shape_by_conn' "
-                            f"or 'copy_shape' for variable '{abs_in}' is currently unsupported.")
+                            f"{self.msginfo}: Setting of 'src_indices' along with 'shape_by_conn', "
+                            f"'copy_shape', or 'compute_shape' for variable '{abs_in}' "
+                            "is unsupported.")
                         continue
 
                     if abs_in in abs2meta:
@@ -2213,7 +2363,7 @@ class Group(System):
 
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             # If running in parallel, allgather
-            if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
+            if self._gather_full_data():
                 raw = (global_abs_in2out, src_ind_inputs)
             else:
                 raw = ({}, ())
@@ -2230,12 +2380,28 @@ class Group(System):
 
     def _setup_dynamic_shapes(self):
         """
-        Add shape/size metadata for variables that were created with shape_by_conn or copy_shape.
-        """
-        all_abs2meta_out = self._var_allprocs_abs2meta['output']
-        all_abs2meta_in = self._var_allprocs_abs2meta['input']
+        Dynamically add shape/size metadata for variables.
 
+        This only happens if the user has set shape_by_conn, copy_shape, or compute_shape
+        for a variable.
+        """
         def get_group_input_shape(prom, gshapes):
+            """
+            Get the shape of the given promoted group input.
+
+            Parameters
+            ----------
+            prom : str
+                Promoted name of the group input.
+            gshapes : dict
+                Mapping of group input name to shape.
+
+            Returns
+            -------
+            tuple or None
+                If the shape of the variable is known, return the shape.
+                Otherwise, return None.
+            """
             if prom in gshapes:
                 return gshapes[prom]
 
@@ -2246,32 +2412,78 @@ class Group(System):
                     elif 'val' in d:
                         return np.asarray(d['val']).shape
 
-        def copy_var_meta(from_var, to_var, distrib_sizes, gshapes):
-            # copy size/shape info from from_var's metadata to to_var's metadata
+        def compute_var_meta(graph, to_var, shapes, func):
+            """
+            Compute shape info for the given variable using the given function.
 
+            Parameters
+            ----------
+            graph : nx.DiGraph
+                Graph containing all variables with shape info.
+            to_var : str
+                Name of variable to compute shape info for.
+            shapes : dict
+                Mapping of variable name to shape.
+            func : function
+                Function to use to compute the shape.
+
+            Returns
+            -------
+            tuple or None
+                If the shape of the variable is known, return the shape.
+                Otherwise, return None.
+            """
+            compname = to_var.rpartition('.')[0]
+            try:
+                from_shape = func(shapes)
+            except KeyError as err:
+                abs_name = f"{compname}.{err.args[0]}"
+                self._collect_error(f"{self.msginfo}: Can't compute shape of variable '{to_var}': "
+                                    f"variable '{abs_name}' doesn't exist.")
+                return
+            except Exception as err:
+                self._collect_error(f"{self.msginfo}: Error occurred while computing the shape "
+                                    f"of variable '{to_var}': {err}")
+                return
+            else:
+                graph.nodes[to_var]['shape'] = from_shape
+
+            return from_shape
+
+        def copy_var_meta(graph, from_var, to_var, distrib_sizes):
+            """
+            Copy shape info from from_var's metadata to to_var's metadata in the graph.
+
+            Parameters
+            ----------
+            graph : nx.DiGraph
+                Graph containing all variables with shape info.
+            from_var : str
+                Name of variable to copy shape info from.
+            to_var : str
+                Name of variable to copy shape info to.
+            distrib_sizes : dict
+                Mapping of distributed variable name to sizes in each rank.
+
+            Returns
+            -------
+            tuple or None
+                If the shape of the variable is known, return the shape.
+                Otherwise, return None.
+            """
             if to_var.startswith('#'):
                 return
 
             nprocs = self.comm.size
-            to_io = 'output' if to_var in all_abs2meta_out else 'input'
 
-            if from_var.startswith('#'):
-                from_dist = False
-                from_shape = gshapes[from_var[1:]]
-                from_size = shape_to_len(from_shape)
-            else:
-                from_io = 'output' if from_var in all_abs2meta_out else 'input'
+            from_meta = graph.nodes[from_var]
+            from_dist = nprocs > 1 and from_meta['distributed']
+            from_shape = from_meta['shape']
+            from_io = from_meta['io']
 
-                # transfer shape/size info from from_var to to_var
-                all_from_meta = self._var_allprocs_abs2meta[from_io][from_var]
-                from_dist = nprocs > 1 and all_from_meta['distributed']
-                from_size = all_from_meta['size']
-                from_shape = all_from_meta['shape']
-
-            all_to_meta = self._var_allprocs_abs2meta[to_io][to_var]
-            to_meta = self._var_abs2meta[to_io].get(to_var, {})
-
-            to_dist = nprocs > 1 and all_to_meta['distributed']
+            to_meta = graph.nodes[to_var]
+            to_dist = nprocs > 1 and to_meta['distributed']
+            to_io = to_meta['io']
 
             # known dist output to/from non-distributed input.  We don't allow this case because
             # non-distributed variables must have the same value on all procs and the only way
@@ -2297,23 +2509,120 @@ class Group(System):
                             f"(sizes={distrib_sizes[from_var]}).", ident=ident)
                         return
 
-            all_to_meta['shape'] = from_shape
-            all_to_meta['size'] = from_size
-            if to_meta:
-                to_meta['shape'] = from_shape
-                to_meta['size'] = from_size
-                to_meta['val'] = np.full(from_shape, to_meta['val'])
+            to_meta['shape'] = from_shape
+
             if from_var in distrib_sizes:
                 distrib_sizes[to_var] = distrib_sizes[from_var]
 
-        all_abs2prom_in = self._var_allprocs_abs2prom['input']
-        all_abs2prom_out = self._var_allprocs_abs2prom['output']
-        nprocs = self.comm.size
-        conn = self._conn_global_abs_in2out
-        rev_conn = None
+            return from_shape
+
+        def get_unresolved_knowns(graph, nodes=None):
+            """
+            Return all unresolved nodes with known shape.
+
+            Unresolved means that the node has known shape and at least one successor
+            with unknown shape.
+
+            Parameters
+            ----------
+            graph : nx.DiGraph
+                Graph containing all variables with shape info.
+            nodes : list of str or None
+                List of nodes to check.  If None, check all nodes in the graph.
+
+            Returns
+            -------
+            set of str
+                Set of nodes with known shape but at least one successor with unknown shape.
+            """
+            gnodes = graph.nodes
+            if nodes is None:
+                nodes = graph.nodes()
+
+            unresolved = set()
+            for node in nodes:
+                if gnodes[node]['shape'] is not None:  # node has known shape
+                    for succ in graph.successors(node):
+                        if gnodes[succ]['shape'] is None:
+                            unresolved.add(node)
+                            break
+
+            return unresolved
+
+        def get_actives(graph, knowns):
+            """
+            Return all active single edges and active multi nodes.
+
+            Active edges are those that are connected on one end to a known shape variable
+            and on the other end to an unknown shape variable.  Active nodes are those that
+            have unknown shape but are connected to a known shape variable.
+
+            Single edges correspond to 'shape_by_conn' and 'copy_shape' connections.
+            Multi nodes are variables that have 'compute_shape' set to True so they
+            connect to multiple nodes of the opposite io type in a component. For example
+            a 'compute_shape' output variable will connect to all inputs in the component and
+            each of those edges will be labeled as 'multi'. So a multi node is a node that
+            has 'multi' incoming edges.
+
+            Parameters
+            ----------
+            graph : nx.DiGraph
+                Graph containing all variables with shape info.
+            knowns : list of str
+                List of nodes with known shape.
+
+            Returns
+            -------
+            active_single_edges : set of (str, str)
+                Set of active 'single' edges (for copy_shape and shape_by_conn).
+            active_multi_nodes : set of str
+                Set of active nodes with 'multi' edges (for compute_shape).
+            """
+            active_single_edges = set()
+            active_multi_nodes = set()
+
+            for known in knowns:
+                for succ in graph.successors(known):
+                    if nodes[succ]['shape'] is None:
+                        if edges[known, succ]['multi']:
+                            active_multi_nodes.add(succ)
+                        else:
+                            active_single_edges.add((known, succ))
+
+            return active_single_edges, active_multi_nodes
+
+        def is_unresolved(graph, node):
+            """
+            Return True if the given node is unresolved.
+
+            Unresolved means that the node has at least one successor with unknown shape.
+
+            Parameters
+            ----------
+            graph : nx.DiGraph
+                Graph containing all variables with shape info.
+            node : str
+                Node to check.
+
+            Returns
+            -------
+            bool
+                True if the node is unresolved.
+            """
+            for s in graph.successors(node):
+                if graph.nodes[s]['shape'] is None:
+                    return True
+            return False
 
         def get_rev_conn():
-            # build reverse connection dict (src: tgts)
+            """
+            Return a dict mapping each connected input to a list of its connected outputs.
+
+            Returns
+            -------
+            dict
+                Dict mapping each connected input to a list of its connected outputs.
+            """
             rev = {}
             for tgt, src in conn.items():
                 if src in rev:
@@ -2322,32 +2631,68 @@ class Group(System):
                     rev[src] = [tgt]
             return rev
 
-        self._shapes_graph = graph = nx.Graph()
-        self._shape_knowns = knowns = set()
+        def meta2node_data(meta):
+            """
+            Return a dict containing select metadata for the given variable.
+
+            Parameters
+            ----------
+            meta : dict
+                Metadata for the variable.
+
+            Returns
+            -------
+            dict
+                Dict containing select metadata for the variable.
+            """
+            return {
+                'distributed': meta['distributed'],
+                'shape': meta['shape'],
+                'compute_shape': meta['compute_shape'],
+                'shape_by_conn': meta['shape_by_conn'],
+                'copy_shape': meta['copy_shape'],
+            }
+
+        all_abs2prom_in = self._var_allprocs_abs2prom['input']
+        nprocs = self.comm.size
+        conn = self._conn_global_abs_in2out
+        rev_conn = None
+
+        self._shapes_graph = graph = nx.DiGraph()
+        knowns = set()
         dist_sz = {}  # local distrib sizes
         my_abs2meta_out = self._var_abs2meta['output']
         my_abs2meta_in = self._var_abs2meta['input']
+        all_abs2meta_out = self._var_allprocs_abs2meta['output']
+        all_abs2meta_in = self._var_allprocs_abs2meta['input']
         grp_shapes = {}
+        compute_shape_functs = {}
+        component_io = defaultdict(list)
 
         # find all variables that have an unknown shape (across all procs) and connect them
-        # to other unknown and known shape variables to form an undirected graph.
+        # to other unknown and known shape variables to form a directed graph.
         for io in ('input', 'output'):
             for name, meta in self._var_allprocs_abs2meta[io].items():
+                compname = name.rpartition('.')[0]
+                component_io[compname, io].append(name)
+
                 if meta['shape_by_conn']:
+                    graph.add_node(name, io=io, **meta2node_data(meta))
                     if name in conn:  # it's a connected input
                         abs_from = conn[name]
-                        graph.add_edge(name, abs_from)
-                        if all_abs2meta_out[abs_from]['shape'] is not None:
-                            knowns.add(abs_from)
+                        if abs_from not in graph:
+                            from_meta = all_abs2meta_out[abs_from]
+                            graph.add_node(abs_from, io='output', **meta2node_data(from_meta))
+                        graph.add_edge(abs_from, name, multi=False)
                     else:
                         if rev_conn is None:
                             rev_conn = get_rev_conn()
                         if name in rev_conn:  # connected output
                             for inp in rev_conn[name]:
-                                graph.add_edge(name, inp)
-                                if all_abs2meta_in[inp]['shape'] is not None:
-                                    knowns.add(inp)
-                        elif not meta['copy_shape']:
+                                inmeta = all_abs2meta_in[inp]
+                                graph.add_node(inp, io='input', **meta2node_data(inmeta))
+                                graph.add_edge(inp, name, multi=False)
+                        elif not meta['compute_shape'] and not meta['copy_shape']:
                             # check to see if we can get shape from _group_inputs
                             fail = True
                             if io == 'input':
@@ -2356,20 +2701,24 @@ class Group(System):
                                 if grp_shape is not None:
                                     # use '#' to designate this as an entry that's not a variable
                                     gnode = f"#{prom}"
-                                    graph.add_edge(gnode, name)
-                                    knowns.add(gnode)
+                                    graph.add_node(gnode, io='input', shape=grp_shape,
+                                                   distributed=False, shape_by_conn=None,
+                                                   compute_shape=None)
+                                    graph.add_edge(gnode, name, multi=False)
                                     grp_shapes[prom] = grp_shape
                                     fail = False
                                 else:  # see if there are any connected inputs with known shape
                                     for n in self._var_allprocs_prom2abs_list['input'][prom]:
                                         if n != name:
                                             m = all_abs2meta_in[n]
-                                            if not m['distributed'] and not m['has_src_indices']:
-                                                if not m['shape_by_conn'] and not m['copy_shape']:
-                                                    fail = False
-                                                    knowns.add(n)
-                                                    graph.add_edge(n, name)
-                                                    break
+                                            if not (m['distributed'] or m['has_src_indices']
+                                                    or m['shape_by_conn'] or m['compute_shape']
+                                                    or m['copy_shape']):
+                                                fail = False
+                                                graph.add_node(n, io='input', known_count=0,
+                                                               **meta2node_data(all_abs2meta_in[n]))
+                                                graph.add_edge(n, name, multi=False)
+                                                break
                             if fail:
                                 self._collect_error(
                                     f"{self.msginfo}: 'shape_by_conn' was set for "
@@ -2378,16 +2727,27 @@ class Group(System):
                 if meta['copy_shape']:
                     # variable whose shape is being copied must be on the same component, and
                     # name stored in 'copy_shape' entry must be the relative name.
-                    abs_from = name.rsplit('.', 1)[0] + '.' + meta['copy_shape']
-                    if abs_from in all_abs2prom_in or abs_from in all_abs2prom_out:
-                        graph.add_edge(name, abs_from)
-                        # this is unlikely, but a user *could* do it, so we'll check
+                    abs_from = name.rpartition('.')[0] + '.' + meta['copy_shape']
+                    if abs_from in all_abs2meta_in or abs_from in all_abs2meta_out:
                         a2m = all_abs2meta_in if abs_from in all_abs2meta_in else all_abs2meta_out
-                        if a2m[abs_from]['shape'] is not None:
-                            knowns.add(abs_from)
+                        if name not in graph:
+                            graph.add_node(name, io=io, **meta2node_data(meta))
+                        if abs_from not in graph:
+                            from_io = 'input' if abs_from in all_abs2meta_in else 'output'
+                            from_meta = a2m[abs_from]
+                            graph.add_node(abs_from, io=from_io, **meta2node_data(from_meta))
+
+                        graph.add_edge(abs_from, name, multi=False)
                     else:
                         self._collect_error(f"{self.msginfo}: Can't copy shape of variable "
-                                            f"'{abs_from}'. Variable doesn't exist.")
+                                            f"'{abs_from}'. Variable doesn't exist or is not "
+                                            "continuous.")
+                elif meta['compute_shape']:
+                    compute_shape_functs[name] = meta['compute_shape']
+                    if name not in graph:
+                        graph.add_node(name, shape=meta['shape'], io=io,
+                                       compute_shape=meta['compute_shape'],
+                                       distributed=meta['distributed'])
 
                 # store known distributed size info needed for computing shapes
                 if nprocs > 1:
@@ -2398,6 +2758,20 @@ class Group(System):
                             dist_sz[name] = sz
                     else:
                         dist_sz[name] = 0
+
+        # loop over any 'compute_shape' variables and add edges to the graph
+        for name in compute_shape_functs:
+            comp_name = name.rpartition('.')[0]
+
+            # get 'opposite' io variables to use as inputs to compute_shape function
+            io = 'input' if name in all_abs2meta_out else 'output'
+
+            for abs_name in component_io[comp_name, io]:
+                meta = self._var_allprocs_abs2meta[io][abs_name]
+                if abs_name not in graph:
+                    graph.add_node(abs_name, io=io, **meta2node_data(meta))
+
+                graph.add_edge(abs_name, name, multi=True)
 
         if graph.order() == 0:
             # we don't have any shape_by_conn or copy_shape variables, so we're done
@@ -2411,56 +2785,99 @@ class Group(System):
         else:
             distrib_sizes = {}
 
-        unresolved = set()
-        seen = knowns.copy()
+        knowns = {n for n, d in graph.nodes(data=True) if d['shape'] is not None}
+        all_knowns = knowns.copy()
+        all_resolved = set()
 
-        for comps in nx.connected_components(graph):
-            comp_knowns = knowns.intersection(comps)
-            if not comp_knowns:
-                # we need at least 1 known node to resolve this component, so we fail.
-                # store the list of unresolved nodes so we have the total list at the end.
-                unresolved.update(comps)
+        nodes = graph.nodes
+        edges = graph.edges
+
+        # connected_components needs an undirected graph, so create a temporary one here
+        for comps in nx.connected_components(nx.Graph(graph)):
+
+            # treat all knowns initially as unresolved
+            unresolved_knowns = all_knowns.intersection(comps)
+            if not unresolved_knowns:
+                # no knowns in this component, so we fail.
                 continue
 
-            # because comps is a connected component, we only need 1 known node to resolve
-            # the rest
-            stack = [sorted(comp_knowns)[0]]  # sort to keep error messages consistent
-            while stack:
-                known = stack.pop()
-                if known.startswith('#'):  # it's a non-variable node (group default input)
-                    known_shape = grp_shapes[known[1:]]
-                    known_dist = False
-                else:
-                    known_a2m = all_abs2meta_in if known in all_abs2meta_in else all_abs2meta_out
-                    known_shape = known_a2m[known]['shape']
-                    known_dist = known_a2m[known]['distributed']
-                for node in graph.neighbors(known):
-                    if node in seen:
-                        if node.startswith('#'):
-                            shape = grp_shapes[node[1:]]
-                            dist = False
-                        else:
-                            a2m = all_abs2meta_in if node in all_abs2meta_in else all_abs2meta_out
-                            shape = a2m[node]['shape']
-                            dist = a2m[node]['distributed']
+            progress = 1
+            while progress:
+                progress = 0
+                unresolved_knowns = get_unresolved_knowns(graph, unresolved_knowns)
 
-                        # check to see if shapes agree
-                        # can't compare shapes if one is dist and other is not. The mismatch
-                        # will be caught later in setup_connections in that case.
-                        if shape != known_shape and not (dist ^ known_dist):
-                            self._collect_error(f"{self.msginfo}: Shape mismatch, {shape} vs. "
-                                                f"{known_shape} for variable '{node}' during "
-                                                "dynamic shape determination.")
+                active_single_edges, active_multi_nodes = get_actives(graph, unresolved_knowns)
+                for k, u in active_single_edges:
+                    shp = copy_var_meta(graph, k, u, distrib_sizes)
+                    if shp is not None:
+                        if is_unresolved(graph, u):
+                            unresolved_knowns.add(u)
+
+                        all_knowns.add(u)
+                        progress += 1
+
+                for mnode in active_multi_nodes:
+                    for k, _, data in graph.in_edges(mnode, data=True):
+                        if nodes[k]['shape'] is None and data['multi']:
+                            break
                     else:
-                        # transfer the known shape info to the unshaped variable
-                        copy_var_meta(known, node, distrib_sizes, grp_shapes)
-                        seen.add(node)
-                        stack.append(node)
+                        # all 'compute_shape' preds are known so compute shape
+                        shapes = {
+                            n.rpartition('.')[-1]: nodes[n]['shape']
+                            for n in graph.predecessors(mnode)
+                        }
+                        shp = compute_var_meta(graph, mnode, shapes, nodes[mnode]['compute_shape'])
+                        if shp is not None:
+                            if is_unresolved(graph, mnode):
+                                unresolved_knowns.add(mnode)
+                            all_knowns.add(mnode)
+                            progress += 1
+
+        # now perform a consistency check on all computed/copied shapes
+        mismatches = set()
+        for u, v, data in graph.edges(data=True):
+            if not data['multi']:
+                ushape = nodes[u]['shape']
+                vshape = nodes[v]['shape']
+                if ushape != vshape and ushape is not None and vshape is not None:
+                    udist = nodes[u]['distributed']
+                    vdist = nodes[v]['distributed']
+                    if not (udist ^ vdist):
+                        mismatches.add(tuple(sorted((u, v))))
+
+        if mismatches:
+            for u, v in mismatches:
+                self._collect_error(f"{self.msginfo}: Shape mismatch, {nodes[u]['shape']} vs. "
+                                    f"{nodes[v]['shape']} for variables '{u}' and '{v}' during "
+                                    "dynamic shape determination.")
+
+        # update variable metadata based on graph shapes
+        for node, data in graph.nodes(data=True):
+            if node.startswith('#'):
+                continue
+            io = data['io']
+            allmeta = self._var_allprocs_abs2meta[io][node]
+
+            shape = data['shape']
+            size = shape_to_len(shape)
+            allmeta['shape'] = shape
+            allmeta['size'] = size
+
+            try:
+                meta = self._var_abs2meta[io][node]
+            except KeyError:
+                pass  # node is not local, so no need to update local metadata
+            else:
+                meta['shape'] = shape
+                meta['size'] = size
+                # Passing None into shape arguments as an alias for () is deprecated (Numpy 1.20)
+                shape = shape if shape is not None else ()
+                meta['val'] = np.full(shape, meta['val'], dtype=float)
 
         # save graph info for possible later plotting
         self._shapes_graph = graph
-        self._shape_knowns = knowns
 
+        unresolved = set(graph.nodes()) - all_knowns
         if unresolved:
             unresolved = sorted(unresolved)
             self._collect_error(f"{self.msginfo}: Failed to resolve shapes for {unresolved}. "
@@ -2482,7 +2899,7 @@ class Group(System):
         allprocs_discrete_in = self._var_allprocs_discrete['input']
         allprocs_discrete_out = self._var_allprocs_discrete['output']
 
-        for subsys in self._subsystems_myproc:
+        for subsys in self._sorted_sys_iter():
             subsys._setup_connections()
 
         path_dot = pathname + '.' if pathname else ''
@@ -3068,15 +3485,15 @@ class Group(System):
 
     def set_order(self, new_order):
         """
-        Specify a new execution order for this system.
+        Specify a new execution order for subsystems in this group.
 
         Parameters
         ----------
         new_order : list of str
             List of system names in desired new execution order.
         """
-        if self._problem_meta is not None and \
-                self._problem_meta['setup_status'] == _SetupStatus.POST_CONFIGURE:
+        if self._problem_meta is not None and not self._problem_meta['allow_post_setup_reorder'] \
+                and self._problem_meta['setup_status'] == _SetupStatus.POST_CONFIGURE:
             raise RuntimeError(f"{self.msginfo}: Cannot call set_order in the configure method.")
 
         # Make sure the new_order is valid. It must contain all subsystems
@@ -3120,8 +3537,11 @@ class Group(System):
             subsystems[name] = sinfo
             sinfo.index = i
 
+        if not self._static_mode:
+            self._subsystems_myproc = [s for s, _ in self._subsystems_allprocs.values()]
+
         self._order_set = True
-        if self._problem_meta is not None:
+        if self._problem_meta is not None and not self._problem_meta['allow_post_setup_reorder']:
             # order has been changed so we need a new full setup
             self._problem_meta['setup_status'] = _SetupStatus.PRE_SETUP
 
@@ -3158,7 +3578,7 @@ class Group(System):
         """
         self._transfer('nonlinear', 'fwd')
         # Apply recursion
-        for subsys in self._subsystems_myproc:
+        for subsys in self._solver_subsystem_iter(local_only=True):
             subsys._apply_nonlinear()
 
         self.iter_count_apply += 1
@@ -3283,19 +3703,19 @@ class Group(System):
             if mode == 'fwd':
                 self._transfer('linear', mode)
                 if rel_systems is not None:
-                    for s in self._subsystems_myproc:
+                    for s in self._solver_subsystem_iter(local_only=True):
                         if s.pathname not in rel_systems:
                             # zero out dvecs of irrelevant subsystems
                             s._dresiduals.set_val(0.0)
 
-            for subsys in self._subsystems_myproc:
+            for subsys in self._solver_subsystem_iter(local_only=True):
                 if rel_systems is None or subsys.pathname in rel_systems:
                     subsys._apply_linear(jac, rel_systems, mode, scope_out, scope_in)
 
             if mode == 'rev':
                 self._transfer('linear', mode)
                 if rel_systems is not None:
-                    for s in self._subsystems_myproc:
+                    for s in self._solver_subsystem_iter(local_only=True):
                         if s.pathname not in rel_systems:
                             # zero out dvecs of irrelevant subsystems
                             s._doutputs.set_val(0.0)
@@ -3383,7 +3803,7 @@ class Group(System):
                 jac = self._assembled_jac
 
             # Only linearize subsystems if we aren't approximating the derivs at this level.
-            for subsys in self._subsystems_myproc:
+            for subsys in self._solver_subsystem_iter(local_only=True):
                 if subsys.pathname in rel_systems:
                     do_ln = sub_do_ln and (subsys._linear_solver is not None and
                                            subsys._linear_solver._linearize_children())
@@ -3397,7 +3817,7 @@ class Group(System):
                 self._assembled_jac._update(self)
 
             if sub_do_ln:
-                for subsys in self._subsystems_myproc:
+                for subsys in self._solver_subsystem_iter(local_only=True):
                     if subsys._linear_solver is not None and subsys.pathname in rel_systems:
                         subsys._linear_solver._linearize()
 
@@ -3463,7 +3883,7 @@ class Group(System):
         """
         self._subjacs_info = info = {}
 
-        for subsys in self._subsystems_myproc:
+        for subsys in self._sorted_sys_iter():
             subsys._setup_partials()
             info.update(subsys._subjacs_info)
 
@@ -3477,6 +3897,31 @@ class Group(System):
                     msg = "{}: Approx_totals is not supported on a group with a distributed "
                     msg += "component whose input '{}' is distributed using src_indices. "
                     raise RuntimeError(msg.format(self.msginfo, iname))
+
+    def _declared_partials_iter(self):
+        """
+        Iterate over all declared partials.
+
+        Yields
+        ------
+        (key, meta) : (key, dict)
+            key: a tuple of the form (of, wrt)
+            meta: a dict containing the partial metadata
+        """
+        for subsys in self._subsystems_myproc:
+            yield from subsys._declared_partials_iter()
+
+    def _get_missing_partials(self, missing):
+        """
+        Return a list of (of, wrt) tuples for which derivatives have not been declared.
+
+        Parameters
+        ----------
+        missing : dict
+            Dictionary containing list of missing derivatives keyed by system pathname.
+        """
+        for subsys in self._subsystems_myproc:
+            subsys._get_missing_partials(missing)
 
     def _approx_subjac_keys_iter(self):
         if self._owns_approx_wrt and not self.pathname:
@@ -3822,12 +4267,12 @@ class Group(System):
             if name in info:
                 meta[name] = info[name]
 
-    def compute_sys_graph(self, comps_only=False):
+    def compute_sys_graph(self, comps_only=False, add_edge_info=True):
         """
         Compute a dependency graph for subsystems in this group.
 
         Variable connection information is stored in each edge of
-        the system graph.
+        the system graph if comps_only is True and add_edge_info is True.
 
         Parameters
         ----------
@@ -3836,62 +4281,68 @@ class Group(System):
             or any of its descendants. No sub-groups will be included. Otherwise,
             a graph containing only direct children (both Components and Groups)
             of this group will be returned.
+        add_edge_info : bool (True)
+            If True and comps_only is also True, store variable connection information in each
+            edge of the system graph.
 
         Returns
         -------
         DiGraph
             A directed graph containing names of subsystems and their connections.
         """
-        input_srcs = self._conn_global_abs_in2out
-        glen = self.pathname.count('.') + 1 if self.pathname else 0
         graph = nx.DiGraph()
 
-        # add all systems as nodes in the graph so they'll be there even if
-        # unconnected.
         if comps_only:
-            systems = [s for s in self._ordered_comp_name_iter()]
+            # add all systems as nodes in the graph so they'll be there even if
+            # unconnected.
+            graph.add_nodes_from(self._ordered_comp_name_iter())
+
+            edge_data = defaultdict(lambda: defaultdict(list))
+            for in_abs, src_abs in self._conn_global_abs_in2out.items():
+                src_sys = src_abs.rpartition('.')[0]
+                tgt_sys = in_abs.rpartition('.')[0]
+
+                # store var connection data in each system to system edge.
+                if add_edge_info:
+                    edge_data[(src_sys, tgt_sys)][src_abs].append(in_abs)
+                else:
+                    graph.add_edge(src_sys, tgt_sys)
+
+            if add_edge_info:
+                for (src_sys, tgt_sys), data in edge_data.items():
+                    graph.add_edge(src_sys, tgt_sys, conns=data)
         else:
             systems = [s.name for s in self._subsystems_myproc]
 
-        if not comps_only and self.comm.size > 1 and self._mpi_proc_allocator.parallel:
-            systems = set()
-            for slist in self.comm.allgather(systems):
-                systems.update(slist)
+            if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
+                newsys = set()
+                for slist in self.comm.allgather(systems):
+                    newsys.update(slist)
+                systems = newsys
 
-        graph.add_nodes_from(systems)
+            # add all systems as nodes in the graph so they'll be there even if
+            # unconnected.
+            graph.add_nodes_from(systems)
 
-        edge_data = defaultdict(lambda: defaultdict(list))
-
-        for in_abs, src_abs in input_srcs.items():
-            if src_abs is not None:
-                if comps_only:
-                    src = src_abs.rpartition('.')[0]
-                    tgt = in_abs.rpartition('.')[0]
-                else:
-                    src = src_abs.split('.')[glen]
-                    tgt = in_abs.split('.')[glen]
-
-                # store var connection data in each system to system edge for later
-                # use in relevance calculation.
-                edge_data[(src, tgt)][src_abs].append(in_abs)
-
-        for key in edge_data:
-            src_sys, tgt_sys = key
-            if comps_only or src_sys != tgt_sys:
-                graph.add_edge(src_sys, tgt_sys, conns=edge_data[key])
+            glen = self.pathname.count('.') + 1 if self.pathname else 0
+            for in_abs, src_abs in self._conn_global_abs_in2out.items():
+                if src_abs is not None:
+                    src_sys = src_abs.split('.')[glen]
+                    tgt_sys = in_abs.split('.')[glen]
+                    if src_sys != tgt_sys:
+                        graph.add_edge(src_sys, tgt_sys)
 
         return graph
 
-    def _get_auto_ivc_out_val(self, tgts, vars_to_gather, abs2meta_in):
+    def _get_auto_ivc_out_val(self, tgts, vars_to_gather):
         # all tgts are continuous variables
         # only called from top level group
         info = None
         src_idx_found = []
         max_size = -1
         found_dup = False
-
+        abs2meta_in = self._var_abs2meta['input']
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
-
         start_val = val = None
         val_shape = None
         chosen_tgt = None
@@ -3929,108 +4380,110 @@ class Group(System):
 
         info = None
         for tgt in tgts:
-            # if tgt in vars_to_gather and tgt not in abs2meta_in:
-            if tgt in vars_to_gather and self.comm.rank != vars_to_gather[tgt]:
-                if info is None or max_size < 0:
-                    info = (tgt, np.zeros(0), True)
-                    max_size = 0
-                continue
+            if tgt in abs2meta_in:  # tgt is local
+                meta = abs2meta_in[tgt]
+                size = meta['size']
+                value = meta['val']
+                src_indices = None
+                if tgt in abs_in2prom_info:
+                    # traverse down the promotes list, (abs_in2prom_info[tgt]), to get the
+                    # final src_indices down at the component level so we can set the value of
+                    # that component input into the appropriate place(s) in the auto_ivc output.
+                    # If a tgt has no src_indices anywhere, it will not be found in
+                    # abs_in2prom_info.
+                    newshape = val_shape
+                    for pinfo in abs_in2prom_info[tgt]:
+                        if pinfo is None:
+                            continue
+                        inds, _, shape = pinfo
+                        if inds is not None:
+                            if shape is None:
+                                shape = newshape
+                                if inds._src_shape is None:
+                                    try:
+                                        inds.set_src_shape(shape)
+                                    except IndexError:
+                                        exc_class, exc, tb = sys.exc_info()
+                                        self._collect_error(f"When promoting '{pinfo.prom}' from "
+                                                            f"system '{pinfo.promoted_from}' with "
+                                                            f"src_indices {inds} and src_shape "
+                                                            f"{shape}: {exc}",
+                                                            exc_type=exc_class, tback=tb,
+                                                            ident=(pinfo.prom, pinfo.promoted_from))
 
-            # if we get here, tgt is local
-            meta = abs2meta_in[tgt]
-            size = meta['size']
-            value = meta['val']
-            src_indices = None
-            if tgt in abs_in2prom_info:
-                # traverse down the promotes list, (abs_in2prom_info[tgt]), to get the
-                # final src_indices down at the component level so we can set the value of
-                # that component input into the appropriate place(s) in the auto_ivc output.
-                # If a tgt has no src_indices anywhere, it will not be found in
-                # abs_in2prom_info.
-                newshape = val_shape
-                for pinfo in abs_in2prom_info[tgt]:
-                    if pinfo is None:
-                        continue
-                    inds, _, shape = pinfo
-                    if inds is not None:
-                        if shape is None:
-                            shape = newshape
-                            if inds._src_shape is None:
-                                try:
-                                    inds.set_src_shape(shape)
-                                except IndexError:
-                                    exc_class, exc, tb = sys.exc_info()
-                                    self._collect_error(f"When promoting '{pinfo.prom}' from system"
-                                                        f" '{pinfo.promoted_from}' with src_indices"
-                                                        f" {inds} and src_shape {shape}: {exc}",
-                                                        exc_type=exc_class, tback=tb,
-                                                        ident=(pinfo.prom, pinfo.promoted_from))
+                            if src_indices is None:
+                                src_indices = inds
+                            else:
+                                sinds = convert_src_inds(src_indices, newshape, inds, shape)
+                                # final src_indices are wrt original full sized source and are flat,
+                                # so use val_shape and flat_src=True
+                                src_indices = indexer(sinds, src_shape=val_shape, flat_src=True)
+                            newshape = src_indices.indexed_src_shape
 
-                        if src_indices is None:
-                            src_indices = inds
-                        else:
-                            sinds = convert_src_inds(src_indices, newshape, inds, shape)
-                            # final src_indices are wrt original full sized source and are flat,
-                            # so use val_shape and flat_src=True
-                            src_indices = indexer(sinds, src_shape=val_shape, flat_src=True)
-                        newshape = src_indices.indexed_src_shape
+                if src_indices is None:
+                    src_indices = meta['src_indices']
 
-            if src_indices is None:
-                src_indices = meta['src_indices']
-
-            if src_indices is not None:
-                if val is None:
-                    if val_shape is None and not found_dup:
-                        src_idx_found.append(tgt)
-                    val = value
-                else:
-                    try:
-                        if src_indices._flat_src:
-                            val.ravel()[src_indices.flat()] = value.flat
-                        else:
-                            val[src_indices()] = value
-                    except Exception as err:
-                        src = self._conn_global_abs_in2out[tgt]
-                        msg = f"{self.msginfo}: The source indices " + \
-                              f"{src_indices} do not specify a " + \
-                              f"valid shape for the connection '{src}' to " + \
-                              f"'{tgt}'. (target shape=" + \
-                              f"{meta['shape']}, indices_shape=" + \
-                              f"{src_indices.indexed_src_shape}): {err}"
-                        self._collect_error(msg, ident=(src, tgt))
-                        continue
-            else:
-                if val is None:
-                    val = value
-                elif np.ndim(value) == 0:
-                    if val.size > 1:
-                        src = self._conn_global_abs_in2out[tgt]
-                        self._collect_error(f"Shape of input '{tgt}', (), doesn't match shape "
-                                            f"{val.shape}.", ident=(src, tgt))
-                        continue
-                elif np.squeeze(val).shape != np.squeeze(value).shape:
-                    src = self._conn_global_abs_in2out[tgt]
-                    self._collect_error(f"Shape of input '{tgt}', {value.shape}, doesn't match "
-                                        f"shape {val.shape}.", ident=(src, tgt))
-                    continue
-
-                if val is not value:
-                    if val.shape:
-                        val = np.reshape(value, newshape=val.shape)
-                    else:
+                if src_indices is not None:
+                    if val is None:
+                        if val_shape is None and not found_dup:
+                            src_idx_found.append(tgt)
                         val = value
+                    else:
+                        try:
+                            if src_indices._flat_src:
+                                val.ravel()[src_indices.flat()] = value.flat
+                            else:
+                                val[src_indices()] = value
+                        except Exception as err:
+                            src = self._conn_global_abs_in2out[tgt]
+                            msg = f"{self.msginfo}: The source indices " + \
+                                f"{src_indices} do not specify a " + \
+                                f"valid shape for the connection '{src}' to " + \
+                                f"'{tgt}'. (target shape=" + \
+                                f"{meta['shape']}, indices_shape=" + \
+                                f"{src_indices.indexed_src_shape}): {err}"
+                            self._collect_error(msg, ident=(src, tgt))
+                            continue
+                else:
+                    if val is None:
+                        val = value
+                    elif np.ndim(value) == 0:
+                        if val.size > 1:
+                            src = self._conn_global_abs_in2out[tgt]
+                            self._collect_error(f"Shape of input '{tgt}', (), doesn't match shape "
+                                                f"{val.shape}.", ident=(src, tgt))
+                            continue
+                    elif np.squeeze(val).shape != np.squeeze(value).shape:
+                        src = self._conn_global_abs_in2out[tgt]
+                        self._collect_error(f"Shape of input '{tgt}', {value.shape}, doesn't match "
+                                            f"shape {val.shape}.", ident=(src, tgt))
+                        continue
 
-                if tgt not in vars_to_gather:
-                    found_dup = True
+                    if val is not value:
+                        if val.shape:
+                            val = np.reshape(value, newshape=val.shape)
+                        else:
+                            val = value
 
-            if tgt == chosen_tgt:
-                max_size = size
-                info = (tgt, val, False)
-            elif chosen_tgt is None and size > max_size:
-                max_size = size
-                info = (tgt, val, False)
+                    if tgt not in vars_to_gather:
+                        found_dup = True
 
-            val = start_val
+                if tgt == chosen_tgt or (chosen_tgt is None and size > max_size):
+                    max_size = size
+                    info = (tgt, val, False)
+
+                keep_val = val
+                val = start_val
+
+        if tgt in vars_to_gather:  # tgt var is remote somewhere (but not distributed)
+            owner = vars_to_gather[tgt]
+            if owner == self.comm.rank:  # this rank 'owns' the var
+                val = keep_val
+                self.comm.bcast(val, root=owner)
+            else:
+                val = self.comm.bcast(None, root=owner)
+
+            info = (tgt, val, False)
 
         if src_idx_found:  # auto_ivc connected to local vars with src_indices
             self._collect_error("Attaching src_indices to inputs requires that the shape of the "
@@ -4092,12 +4545,11 @@ class Group(System):
         conns.update(auto_conns)
         auto_ivc.auto2tgt = auto2tgt
 
-        abs2meta_in = self._var_abs2meta['input']
         vars2gather = self._vars_to_gather
 
         for src, tgts in auto2tgt.items():
             prom = self._var_allprocs_abs2prom['input'][tgts[0]]
-            ret = self._get_auto_ivc_out_val(tgts, vars2gather, abs2meta_in)
+            ret = self._get_auto_ivc_out_val(tgts, vars2gather)
             if ret is None:  # setup error occurred. Try to continue
                 continue
             tgt, val, remote = ret
@@ -4346,6 +4798,272 @@ class Group(System):
             else:
                 yield s.pathname
 
+    def _sorted_sys_iter(self):
+        """
+        Yield subsystems in sorted order if Problem option allow_post_setup_reorder is True.
+
+        Otherwise, yield subsystems in the order they were added to their parent group.
+
+        Yields
+        ------
+        System
+            A subsystem.
+        """
+        if self._problem_meta['allow_post_setup_reorder']:
+            for s in sorted(self._subsystems_myproc, key=lambda s: s.name):
+                yield s
+        else:
+            yield from self._subsystems_myproc
+
+    def _sorted_sys_iter_all_procs(self):
+        """
+        Yield subsystem names in sorted order if Problem option allow_post_setup_reorder is True.
+
+        Otherwise, yield subsystem names in the order they were added to their parent group.
+
+        Yields
+        ------
+        System
+            A subsystem.
+        """
+        if self._problem_meta['allow_post_setup_reorder']:
+            for s in sorted(self._subsystems_allprocs):
+                yield s
+        else:
+            yield from self._subsystems_allprocs
+
+    def _solver_subsystem_iter(self, local_only=False):
+        """
+        Iterate over subsystems that are being optimized.
+
+        If called on the top level Group when the Group is under an optimizer, this will
+        iterate over only the subsystems required to obtain the desired objectives and constraints.
+
+        Parameters
+        ----------
+        local_only : bool
+            If True, only iterate over local subsystems.
+
+        Yields
+        ------
+        System
+            A subsystem.
+        """
+        opt_status = self._problem_meta['opt_status']
+
+        if opt_status is None:
+            # we're not under an optimizer loop, so return all subsystems
+            if local_only:
+                yield from self._subsystems_myproc
+            else:
+                for s, _ in self._subsystems_allprocs.values():
+                    yield s
+        else:
+            for s, _ in self._subsystems_allprocs.values():
+                if not local_only or s._is_local:
+                    if s._run_on_opt[opt_status]:
+                        yield s
+
+    def _setup_iteration_lists(self):
+        """
+        Set up the lists containing the pre, iterated, and post subsets of systems.
+
+        This should only be called on the top level Group.
+        """
+        assert self.pathname == '', "call setup_iteration_lists on the top level Group only!"
+
+        # Find any groups that have a nl solver that computes gradients, because we can't
+        # split up the systems in those groups without inserting zeros into the jacobian.
+        # Also find any components that have the 'always_opt' option set to True and force them
+        # to be part of the optimization iteration.
+        if self.nonlinear_solver is not None and self.nonlinear_solver.supports['gradients']:
+            issue_warning("The top level group has a nonlinear solver that computes gradients, so "
+                          "the entire model will be included in the optimization iteration.")
+            return
+
+        grad_groups = []
+        always_opt = {}
+        for s in self.system_iter(recurse=True, include_self=True):
+            if isinstance(s, Group):
+                if s.nonlinear_solver is not None and s.nonlinear_solver.supports['gradients']:
+                    grad_groups.append(s.pathname)
+            elif s.options['always_opt']:
+                always_opt[s.pathname] = None
+
+        dvs = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
+        responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
+
+        if not dvs or not responses:
+            return
+
+        graph = self.get_relevance_graph(dvs, responses)
+
+        dvs = set([meta['source'] for meta in dvs.values()])
+        responses = [meta['source'] for meta in responses.values()]
+
+        # we don't want _auto_ivc dependency to force all subsystems to be iterated, so split
+        # the _auto_ivc node into two nodes, one for design vars and one for everything else.
+        if '_auto_ivc' in graph:
+            edges = list(graph.edges('_auto_ivc'))
+            graph.add_node('_auto_ivc_other')
+
+            for src, tgt in edges:
+                if tgt not in dvs:
+                    newtgt = tgt.replace('_auto_ivc', '_auto_ivc_other')
+                    graph.add_node(newtgt, type_='out')
+                    graph.add_edge('_auto_ivc_other', newtgt)
+                    for u, v in graph.edges(tgt):
+                        graph.add_edge(newtgt, v)
+                    graph.remove_node(tgt)
+
+        # add 'reverse' connections from inputs and outputs to their component
+        # if it exists in order to keep component and its vars in the same SCC.
+        # Also add 'reverse' connections between connected inputs and outputs
+        # belonging to the same component if the component is not in the graph so
+        # that they will be in the same SCC.
+        # Also, for any 'always_opt' components, loop them into a response to
+        # force them to be in the opt SCC.
+        edges_to_add = []
+        for src, tgt in graph.edges():
+            varsrc = 'type_' in graph.nodes[src]
+            vartgt = 'type_' in graph.nodes[tgt]
+            if varsrc and not vartgt:  # tgt is a system
+                edges_to_add.append((tgt, src))  # connect from system back to var
+                if tgt in always_opt and always_opt[tgt] is None:
+                    always_opt[tgt] = [tgt]
+            elif vartgt and not varsrc:  # src is a system
+                edges_to_add.append((tgt, src))  # connect from var back to system
+                if src in always_opt and always_opt[src] is None:
+                    always_opt[src] = [src]
+            elif vartgt and varsrc:  # both are var nodes
+                srcsys = src.rpartition('.')[0]
+                tgtsys = tgt.rpartition('.')[0]
+                if srcsys == tgtsys:
+                    edges_to_add.append((tgt, src))  # connect from tgt back to src
+                    if tgtsys in always_opt:
+                        always_opt[tgtsys].append(tgt)
+                    else:
+                        always_opt[tgtsys] = [tgt]
+            else:
+                # this should never happen
+                raise RuntimeError(f"Unexpected graph connection between {src} and {tgt}.")
+
+        graph.add_edges_from(edges_to_add)
+
+        # One way to determine the contents of the pre/opt/post sets is to add edges from the
+        # response variables to the design variables (there are already edges,
+        # directly or indirectly, from the design variables to the response variables)
+        # and then find the strongly connected components of the resulting graph.  get_sccs_topo
+        # returns the strongly connected components in topological order, so we can use it to give
+        # us pre, iterated, and post subsets of the systems.
+
+        # add edges between response vars and design vars to form a strongly
+        # connected component for all systems involved in the optimization iteration.
+        for res in responses:
+            for dv in dvs:
+                graph.add_edge(res, dv)
+
+        if always_opt:
+            # loop 'always_opt' components (or their outputs if the component is not in the graph)
+            # into a response to force them to be in the opt SCC.
+            for tgts in always_opt.values():
+                for tgt in tgts:
+                    graph.add_edge(tgt, responses[0])
+                    graph.add_edge(responses[0], tgt)
+
+        if grad_groups:
+            if self.comm.size > 1:
+                grad_groups = self.comm.allgather(grad_groups)
+                grad_groups = {g for grp in grad_groups for g in grp}
+
+            remaining = set(grad_groups)
+            for name in sorted(grad_groups, key=lambda x: x.count('.')):
+                prefix = name + '.'
+                match = {n for n in remaining if n.startswith(prefix)}
+                remaining -= match
+
+            gradlist = '\n'.join(sorted(remaining))
+            issue_warning("The following groups have a nonlinear solver that computes gradients "
+                          f"and will be treated as atomic for the purposes of determining "
+                          f"which systems are included in the optimization iteration: "
+                          f"\n{gradlist}\n")
+
+            # remaining groups are not contained within a higher level nl solver
+            # using gradient group, so make new connections to/from them to
+            # all systems that they contain.  This will force them to be
+            # treated as 'atomic' within the graph, so that if they contain
+            # any dv or response systems, or if their children are connected to
+            # both dv *and* response systems, then all systems within them will
+            # be included in the 'opt' set.
+            toadd = []
+            for grp in remaining:
+                prefix = grp + '.'
+                for node in graph:
+                    if node.startswith(prefix):
+                        toadd.append((grp, node))
+                        toadd.append((node, grp))
+
+            graph.add_edges_from(toadd)
+
+        sccs = get_sccs_topo(graph)
+
+        pre = addto = set()
+        post = set()
+        iterated = set()
+        for strong_con in sccs:
+            if dvs.intersection(strong_con):
+                for s in strong_con:
+                    if 'type_' in graph.nodes[s]:
+                        s = s.rpartition('.')[0]
+                    if s not in iterated:
+                        iterated.update(all_ancestors(s))
+                addto = post
+            else:
+                for s in strong_con:
+                    if 'type_' in graph.nodes[s]:
+                        s = s.rpartition('.')[0]
+                    if s not in addto:
+                        addto.update(all_ancestors(s))
+
+        # change _auto_ivc_other back to _auto_ivc.
+        # Note that this could cause _auto_ivc to be in multiple places, but that's ok.
+        for iterset in (pre, iterated, post):
+            iterset.discard('_auto_ivc_other')
+            if iterset:
+                iterset.add('_auto_ivc')
+
+        # remove _auto_ivc from pre and post if it's in iterated
+        if '_auto_ivc' in iterated:
+            pre.discard('_auto_ivc')
+            post.discard('_auto_ivc')
+        elif '_auto_ivc' in pre:
+            post.discard('_auto_ivc')
+
+        if pre:
+            self._run_on_opt[_OptStatus.PRE] = True
+        if post:
+            self._run_on_opt[_OptStatus.POST] = True
+
+        groups = set()
+        for s in self.system_iter(recurse=True):
+            if isinstance(s, Group):
+                groups.add(s.pathname)
+            if s.pathname in iterated:
+                s._run_on_opt[_OptStatus.OPTIMIZING] = True
+            else:
+                # set OPTIMIZING to False because its default value is True
+                s._run_on_opt[_OptStatus.OPTIMIZING] = False
+
+            if s.pathname in pre:
+                s._run_on_opt[_OptStatus.PRE] = True
+            if s.pathname in post:
+                s._run_on_opt[_OptStatus.POST] = True
+
+        self._relevance_graph = None  # reset graph since we've modified it
+
+        self._pre_components = sorted(pre - groups)
+        self._post_components = sorted(post - groups)
+
     @property
     def model_options(self):
         """
@@ -4360,3 +5078,24 @@ class Group(System):
             The model options metadata provided by the associated Problem object.
         """
         return self._problem_meta['model_options']
+
+    def _gather_full_data(self):
+        """
+        Return True if this system should contribute full data to an allgather.
+
+        This prevents sending a lot of unnecessary data across the network when
+        the data is duplicated across multiple processes.
+
+        Returns
+        -------
+        bool
+            True if this system should contribute its full data. Otherwise it
+            should contribute only an 'empty' version of the data.  What
+            'empty' means depends on the structure of the data being gathered.
+        """
+        if self._mpi_proc_allocator.parallel:
+            if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
+                return self._subsystems_myproc[0]._full_comm is None or \
+                    self._subsystems_myproc[0]._full_comm.rank == 0
+
+        return False

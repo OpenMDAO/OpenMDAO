@@ -11,6 +11,7 @@ except ImportError:
     ipy = display = HTML = IFrame = None
 
 from openmdao.utils.om_warnings import issue_warning
+from openmdao.utils.om_warnings import warn_deprecation
 
 colab = 'google.colab' in sys.modules
 
@@ -89,7 +90,7 @@ def display_source(reference, hide_doc_string=False):
         display(get_code(reference, hide_doc_string))
 
 
-def show_options_table(reference, recording_options=False):
+def show_options_table(reference, recording_options=False, options_dict='options'):
     """
     Return the options table of the given reference path.
 
@@ -97,27 +98,36 @@ def show_options_table(reference, recording_options=False):
     ----------
     reference : str or object
         Dot path of desired class or function or an instance.
-
     recording_options : bool
         If True, display recording options instead of options.
+    options_dict : str
+        The string name of the attribute of the reference object
+        that provides to OptionsDictionary.
 
     Returns
     -------
     IPython.display
         Options table of the given class or function.
     """
+    from openmdao.utils.options_dictionary import OptionsDictionary
+
     if isinstance(reference, str):
         obj = _get_object_from_reference(reference)()
     else:
         obj = reference
 
     if ipy:
-        if not hasattr(obj, "options"):
-            opt = obj
-        elif not recording_options:
-            opt = obj.options
-        else:
+        if recording_options:
+            warn_deprecation('Argument `recording_options` is deprecated. Use '
+                             '`options_dict="recording_options" to remove this '
+                             'warning.')
             opt = obj.recording_options
+        elif isinstance(obj, OptionsDictionary):
+            opt = obj
+        elif hasattr(obj, options_dict):
+            opt = getattr(obj, options_dict)
+        else:
+            raise AttributeError(f'Object {reference} has no attribute {options_dict}.')
 
         return display(HTML(str(opt.to_table(fmt='html', display=False))))
     else:

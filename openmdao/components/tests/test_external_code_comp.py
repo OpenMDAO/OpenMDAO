@@ -281,8 +281,8 @@ class ParaboloidExternalCodeComp(om.ExternalCodeComp):
         self.options['command'] = ('python extcode_paraboloid.py {} {}').format(self.input_file, self.output_file)
 
     def compute(self, inputs, outputs):
-        x = inputs['x']
-        y = inputs['y']
+        x = inputs['x'].item()
+        y = inputs['y'].item()
 
         # generate the input file for the paraboloid external code
         with open(self.input_file, 'w') as input_file:
@@ -322,8 +322,8 @@ class ParaboloidExternalCodeCompFD(om.ExternalCodeComp):
         self.declare_partials(of='*', wrt='*', method='fd')
 
     def compute(self, inputs, outputs):
-        x = inputs['x']
-        y = inputs['y']
+        x = inputs['x'].item()
+        y = inputs['y'].item()
 
         # generate the input file for the paraboloid external code
         with open(self.input_file, 'w') as input_file:
@@ -365,8 +365,8 @@ class ParaboloidExternalCodeCompDerivs(om.ExternalCodeComp):
         self.declare_partials(of='*', wrt='*')
 
     def compute(self, inputs, outputs):
-        x = inputs['x']
-        y = inputs['y']
+        x = inputs['x'].item()
+        y = inputs['y'].item()
 
         # generate the input file for the paraboloid external code
         with open(self.input_file, 'w') as input_file:

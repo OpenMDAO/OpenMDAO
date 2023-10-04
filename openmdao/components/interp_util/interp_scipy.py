@@ -237,7 +237,7 @@ class InterpScipy(InterpAlgorithm):
                     gradient[i] = self._evaluate_splines(local_derivs,
                                                          x[: i],
                                                          ki,
-                                                         compute_gradients=False)
+                                                         compute_gradients=False).item()
 
             # All values have been folded down to a single dimensional array
             # compute the final interpolated results, and gradient w.r.t. the

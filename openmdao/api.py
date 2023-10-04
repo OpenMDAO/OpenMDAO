@@ -59,6 +59,7 @@ from openmdao.surrogate_models.response_surface import ResponseSurface
 from openmdao.surrogate_models.surrogate_model import SurrogateModel, \
     MultiFiSurrogateModel
 
+from openmdao.utils.coloring import display_coloring
 from openmdao.utils.indexer import slicer, indexer
 from openmdao.utils.find_cite import print_citations
 from openmdao.utils.spline_distributions import cell_centered
@@ -108,7 +109,7 @@ from openmdao.utils.units import convert_units, unit_conversion
 
 # Warning Options
 from openmdao.utils.om_warnings import issue_warning, reset_warnings, OpenMDAOWarning, \
-    SetupWarning, DistributedComponentWarning, CaseRecorderWarning,\
+    SetupWarning, DistributedComponentWarning, CaseRecorderWarning, \
     DriverWarning, CacheWarning, PromotionWarning, UnusedOptionWarning, DerivativesWarning, \
     MPIWarning, UnitsWarning, SolverWarning, OMDeprecationWarning, \
     OMInvalidCheckDerivativesOptionsWarning

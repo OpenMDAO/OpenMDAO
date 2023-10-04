@@ -26,13 +26,13 @@ jobs:
             OS: ubuntu-latest
             PY: '3.11'
             NUMPY: '1.24'
-            SCIPY: '1.10'
+            SCIPY: '1.11'
             PETSc: '3.18'
             PYOPTSPARSE: 'v2.9.2'
-            PAROPT: true
+            # PAROPT: true
             SNOPT: '7.7'
             OPTIONAL: '[all]'
-            JAX: '0.4.2'
+            JAX: '0.4.14'
             BANDIT: true
             TESTS: true
             # set DEBUG to create an interactive debugging session just before testflo is run.
@@ -52,13 +52,13 @@ jobs:
             OS: macos-latest
             PY: '3.11'
             NUMPY: '1.24'
-            SCIPY: '1.10'
+            SCIPY: '1.11'
             PETSc: '3.18'
             # PYOPTSPARSE: 'v2.9.2'
             # PAROPT: true
             # SNOPT: '7.7'
             OPTIONAL: '[all]'
-            JAX: '0.4.2'
+            JAX: '0.4.14'
             TESTS: true
 
           # test minimal install
@@ -94,7 +94,7 @@ jobs:
             PYOPTSPARSE: 'v2.9.2'
             SNOPT: '7.7'
             OPTIONAL: '[all]'
-            JAX: '0.4.2'
+            JAX: '0.4.14'
             BUILD_DOCS: true
 
     runs-on: ${{ matrix.OS }}
@@ -500,6 +500,7 @@ jobs:
           echo "============================================================="
           copy .coveragerc $HOME
           cd $HOME
+          Set-DisplayResolution -Width 1920 -Height 1080 -Force
           testflo -n 2 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20
 
       - name: Submit coverage

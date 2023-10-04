@@ -25,12 +25,16 @@ optional_dependencies = {
     'doe': [
         'pyDOE2'
     ],
+    'jax': [
+        'jax>=0.4.0; python_version>="3.8"',
+        'jaxlib>=0.4.0; python_version>="3.8"'
+    ],
     'notebooks': [
         'notebook',
         'ipympl'
     ],
     'visualization': [
-        'bokeh>=1.3.4',
+        'bokeh>=2.4.0',
         'matplotlib',
         'colorama'
     ],

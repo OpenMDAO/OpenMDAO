@@ -1109,6 +1109,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                 self.add_output('Vd', 0.0, units="m/s",
                                 desc="Slipstream air velocity, downstream of rotor")
 
+                self.declare_partials('*', '*')  # do this else compute_partials won't run at all
+
             def compute(self, inputs, outputs):
                 a = inputs['a']
                 Vu = inputs['Vu']
@@ -1116,6 +1118,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                 outputs['Vd'] = Vu * (1 - 2 * a)
 
             def compute_partials(self, inputs, J):
+                raise RuntimeError("Error raised from compute_partials!")
                 Vu = inputs['Vu']
 
                 J['Vd', 'a'] = -2.0 * Vu
@@ -1137,11 +1140,11 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        with self.assertRaises(KeyError) as context:
+        with self.assertRaises(RuntimeError) as context:
             prob.run_driver()
 
-        msg = 'Variable name pair ("Vd", "a") must first be declared.'
-        self.assertTrue(msg in str(context.exception))
+        msg = "'a_disk' <class ReducedActuatorDisc>: Error calling compute_partials(), Error raised from compute_partials!"
+        self.assertEqual(context.exception.args[0], msg)
 
     def test_simple_paraboloid_upper_COBYLA(self):
 
@@ -1951,8 +1954,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
             prob.run_driver()
 
         self.assertEqual(str(msg.exception),
-                         "Constraints or objectives [('parab.z', inds=[0, 1, 2])] cannot be impacted by the design " + \
-                         "variables of the problem.")
+                         'Constraints or objectives [parab.z] cannot be impacted by the design variables of the problem because no partials were defined for them in their parent component(s).')
 
     def test_singular_jac_error_desvars(self):
         prob = om.Problem()
@@ -2006,12 +2008,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.model.add_design_var('x', lower=-50, upper=50)
         prob.model.add_design_var('y', lower=-50, upper=50)
-        prob.model.add_objective('parab.f_xy')
+        prob.model.add_objective('parab.z')
 
         prob.model.add_constraint('const.g', lower=0, upper=10.)
-
-        # This constraint produces a zero row.
-        prob.model.add_constraint('parab.z', equals=12.)
 
         prob.setup()
 
@@ -2035,12 +2034,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.model.add_design_var('x', lower=-50, upper=50)
         prob.model.add_design_var('y', lower=-50, upper=50)
-        prob.model.add_objective('parab.f_xy')
+        prob.model.add_objective('parab.z')
 
         prob.model.add_constraint('const.g', lower=0, upper=10.)
-
-        # This constraint produces a zero row.
-        prob.model.add_constraint('parab.z', equals=12.)
 
         prob.setup()
 
@@ -2049,38 +2045,47 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         with assert_warning(UserWarning, msg):
             prob.run_driver()
 
-    def test_singular_jac_error_desvars_multidim_indices_dv(self):
-        prob = om.Problem()
-        prob.model.add_subsystem('parab',
-                                 om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0 - 0*z'], shape=(3,2,2)),
-                                 promotes_inputs=['x', 'y', 'z'])
+    def test_singular_jac_desvars_multidim_indices_dv(self):
+        expected_msg = "Design variables [('z', inds=[(0, 1, 0), (1, 0, 1), (1, 1, 0)])] " \
+                       "have no impact on the constraints or objective."
 
-        prob.model.add_subsystem('const', om.ExecComp('g = x + y', shape=(3,2,2)), promotes_inputs=['x', 'y'])
+        for option in ['error', 'warn', 'ignore']:
+            with self.subTest(f'singular_jac_behavior = {option}'):
+                prob = om.Problem()
+                prob.model.add_subsystem('parab',
+                                        om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0 - 0*z'], shape=(3,2,2)),
+                                        promotes_inputs=['x', 'y', 'z'])
 
-        prob.model.set_input_defaults('x', np.ones((3,2,2)) * 3.0)
-        prob.model.set_input_defaults('y', np.ones((3,2,2)) * -4.0)
+                prob.model.add_subsystem('const', om.ExecComp('g = x + y', shape=(3,2,2)), promotes_inputs=['x', 'y'])
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['singular_jac_behavior'] = 'error'
+                prob.model.set_input_defaults('x', np.ones((3,2,2)) * 3.0)
+                prob.model.set_input_defaults('y', np.ones((3,2,2)) * -4.0)
 
-        prob.model.add_design_var('x', lower=-50, upper=50)
-        prob.model.add_design_var('y', lower=-50, upper=50)
+                prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False)
+                prob.driver.options['singular_jac_behavior'] = option
 
-        # Design var z does not affect any quantities.
-        prob.model.add_design_var('z', lower=-50, upper=50, indices=[2,5,6], flat_indices=True)
+                prob.model.add_design_var('x', lower=-50, upper=50)
+                prob.model.add_design_var('y', lower=-50, upper=50)
 
-        prob.model.add_objective('parab.f_xy', index=6, flat_indices=True)
+                # Design var z does not affect any quantities.
+                prob.model.add_design_var('z', lower=-50, upper=50, indices=[2,5,6], flat_indices=True)
 
-        prob.model.add_constraint('const.g', lower=0, upper=10.)
+                prob.model.add_objective('parab.f_xy', index=6, flat_indices=True)
 
-        prob.setup()
+                prob.model.add_constraint('const.g', lower=0, upper=10.)
 
-        with self.assertRaises(RuntimeError) as msg:
-            prob.run_driver()
+                prob.setup()
 
-        self.assertEqual(str(msg.exception),
-                         "Design variables [('z', inds=[(0, 1, 0), (1, 0, 1), (1, 1, 0)])] have no impact on the constraints or objective.")
+                # run the optimization
+                if option == 'error':
+                    with self.assertRaises(RuntimeError) as ctx:
+                        prob.run_driver()
+                    self.assertEqual(str(ctx.exception), expected_msg)
+                elif option == 'warn':
+                    with assert_warning(om.DerivativesWarning, expected_msg):
+                        prob.run_driver()
+                else:
+                    prob.run_driver()
 
     def test_singular_jac_error_desvars_multidim_indices_con(self):
         prob = om.Problem()

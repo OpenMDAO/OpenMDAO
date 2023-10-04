@@ -434,6 +434,70 @@ class IndicesTestCase2(unittest.TestCase):
         assert_near_equal(J['G1.par2.c5.y', 'G1.par2.p.x'][0], np.array([20., 25.]), 1e-6)
         assert_near_equal(J['G1.par1.c4.y', 'G1.par1.p.x'][0], np.array([8., 0.]), 1e-6)
 
+    def test_src_indices_rev(self):
+        class DummyComp(om.ExplicitComponent):
+            def initialize(self):
+                self.options.declare('a',default=0.)
+                self.options.declare('b',default=0.)
+
+            def setup(self):
+                self.add_input('x')
+                self.add_output('y', 0.)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = self.options['a']*inputs['x'] + self.options['b']
+
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                if mode=='rev':
+                    if 'y' in d_outputs:
+                        if 'x' in d_inputs:
+                            d_inputs['x'] += self.options['a'] * d_outputs['y']
+                            # print(self.pathname, 'compute_jvp: dinputs[x]', d_inputs['x'])
+                else:
+                    raise RuntimeError("fwd mode not supported")
+
+        class DummyGroup(om.ParallelGroup):
+            def setup(self):
+                self.add_subsystem('C1',DummyComp(a=1,b=2.))
+                self.add_subsystem('C2',DummyComp(a=3.,b=4.))
+
+        class Top(om.Group):
+            def setup(self):
+                self.add_subsystem('dvs',om.IndepVarComp(), promotes=['*'])
+
+                # this only currently works if we make dvs.x a distributed output.
+                if self.comm.rank == 0:
+                    self.dvs.add_output('x', [1.], distributed=True)
+                else:
+                    self.dvs.add_output('x', [2.], distributed=True)
+
+                # making dvs.x a non-distributed variable as below results in
+                # one deriv being zero and the other being the sum of the two
+                # parallel derivs.
+                # self.dvs.add_output('x',[1.,2.])
+
+                self.add_subsystem('par',DummyGroup())
+                self.connect('x','par.C1.x',src_indices=[0])
+                self.connect('x','par.C2.x',src_indices=[1])
+
+        prob = om.Problem(model=Top())
+        prob.model.add_design_var('x',lower=0.,upper=1.)
+
+        # None or string
+        deriv_color = 'deriv_color'
+
+        # compute derivatives for made-up y constraints in parallel
+        prob.model.add_constraint('par.C1.y',
+                                lower=1.0,
+                                parallel_deriv_color=deriv_color)
+        prob.model.add_constraint('par.C2.y',
+                                lower=1.0,
+                                parallel_deriv_color=deriv_color)
+
+        prob.setup(mode='rev')
+        prob.run_model()
+        assert_check_totals(prob.check_totals())
+
 
 class SumComp(om.ExplicitComponent):
     def __init__(self, size):
@@ -777,12 +841,83 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         model.add_objective('dc3.y', index=2, parallel_deriv_color=pdc)
 
         prob = om.Problem(model=model, name='parallel_deriv_coloring_overlap_err')
+        prob.setup(mode='rev')
         with self.assertRaises(Exception) as ctx:
-            prob.setup(mode='rev')
+            prob.final_setup()
         self.assertEqual(str(ctx.exception),
-           "\nCollected errors for problem 'parallel_deriv_coloring_overlap_err':"
-           "\n   <model> <class Group>: response 'pg.dc2.y' has overlapping dependencies on the "
+           "<model> <class Group>: response 'pg.dc2.y' has overlapping dependencies on the "
            "same rank with other responses in parallel_deriv_color 'a'.")
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestAutoIVCParDerivBug(unittest.TestCase):
+    N_PROCS = 4
+
+    def test_auto_ivc_par_deriv_bug(self):
+        class SimpleAero(om.ExplicitComponent):
+            """Simple aerodynamic model"""
+
+            def initialize(self):
+                self.options.declare( "CLwing", default=0.5, desc="Wing lift factor", )
+                self.options.declare( "CLtail", default=0.25, desc="tail lift factor", )
+                self.options.declare( "CDwing", default=0.05, desc="Wing drag factor", )
+                self.options.declare( "CDtail", default=0.025, desc="tail drag factor", )
+
+            def setup(self):
+                # Inputs
+                self.add_input('alpha', 0.1, desc="Angle of attack of wing")
+                self.add_input('tail_angle', 0.01, desc="Angle of attack of tail")
+
+                # Outputs
+                self.add_output('L', 0.0, desc="Total lift")
+                self.add_output('D', 0.0, desc="Total drag")
+
+                # Set options
+                self.CLwing = self.options["CLwing"]
+                self.CDwing = self.options["CDwing"]
+                self.CLtail = self.options["CLtail"]
+                self.CDtail = self.options["CDtail"]
+
+                self.declare_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                """ A simple surrogate for a 2 dof aero problem"""
+                outputs['L'] = self.CLwing * inputs['alpha'] + self.CLtail * inputs['tail_angle']
+                outputs['D'] = self.CDwing * inputs['alpha'] ** 2 + self.CDtail * inputs['tail_angle'] ** 2
+
+            def compute_partials(self, inputs, partials):
+                """Analytical derivatives"""
+                partials['L', 'alpha'] = self.CLwing
+                partials['L', 'tail_angle'] = self.CLtail
+                partials['D', 'alpha'] = 2 * self.CDwing * inputs['alpha']
+                partials['D', 'tail_angle'] = 2 * self.CDtail * inputs['tail_angle']
+
+        # Use parallel group to solve flight conditions simultaneously
+        flight_conds = om.ParallelGroup()
+        flight_conds.add_subsystem("cruise", SimpleAero(CLwing=0.5, CDwing=0.05, CLtail=0.25, CDtail=0.025))
+        flight_conds.add_subsystem("maneuver", SimpleAero(CLwing=0.75, CDwing=0.25, CLtail=0.45, CDtail=0.15))
+
+        # build the model
+        prob = om.Problem()
+        prob.model.add_subsystem('flight_conditions', flight_conds)
+
+        # Set dvs for each flight condition
+        prob.model.add_design_var('flight_conditions.cruise.alpha', lower=-50, upper=50)
+        prob.model.add_design_var('flight_conditions.cruise.tail_angle', lower=-50, upper=50)
+        prob.model.add_design_var('flight_conditions.maneuver.alpha', lower=-50, upper=50)
+        prob.model.add_design_var('flight_conditions.maneuver.tail_angle', lower=-50, upper=50)
+        # Use the parallel derivative option to solve lift constraint simultaneously
+        prob.model.add_constraint('flight_conditions.cruise.L', equals=1.0, parallel_deriv_color="lift")
+        prob.model.add_constraint('flight_conditions.maneuver.L', equals=2.5, parallel_deriv_color="lift")
+        # Set cruise drag as objective
+        prob.model.add_objective('flight_conditions.cruise.D')
+
+        prob.setup(mode='rev', force_alloc_complex=True)
+
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests

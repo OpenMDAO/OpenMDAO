@@ -524,6 +524,8 @@ class NonlinearSolver(Solver):
         Saved output values from last successful solve, if any.
     _prev_fail : bool
         If True, previous solve failed.
+    _restarted : bool
+        If True, solve was restarted from a sucessful point.
     """
 
     def __init__(self, **kwargs):
@@ -534,6 +536,7 @@ class NonlinearSolver(Solver):
         self._err_cache = {}
         self._output_cache = None
         self._prev_fail = False
+        self._restarted = False
 
     def _declare_options(self):
         """
@@ -792,7 +795,7 @@ class NonlinearSolver(Solver):
         Perform a Gauss-Seidel iteration over this Solver's subsystems.
         """
         system = self._system()
-        for subsys, _ in system._subsystems_allprocs.values():
+        for subsys in system._solver_subsystem_iter(local_only=False):
             system._transfer('nonlinear', 'fwd', subsys.name)
 
             if subsys._is_local:
@@ -819,6 +822,9 @@ class NonlinearSolver(Solver):
                 # the outputs using the cache.
                 if self._prev_fail and self._output_cache is not None:
                     system._outputs.set_val(self._output_cache)
+                    self._restarted = True
+                else:
+                    self._restarted = False
 
                 self.solve()
 
@@ -1103,7 +1109,7 @@ class BlockLinearSolver(LinearSolver):
             self._rhs_vec[:] = self._system()._dresiduals.asarray()
         else:
             self._rhs_vec[:] = self._system()._doutputs.asarray()
-        # print("Updating RHS vec to", self._rhs_vec)
+        # print(self._system().pathname, "Updating RHS vec to", self._rhs_vec)  # DO NOT DELETE
 
     def _set_complex_step_mode(self, active):
         """

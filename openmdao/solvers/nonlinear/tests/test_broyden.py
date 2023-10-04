@@ -58,7 +58,7 @@ class MixedEquation(om.ImplicitComponent):
         c = inputs['c']
         x = np.empty((5, ))
         x[:2] = outputs['x12']
-        x[2] = outputs['x3']
+        x[2] = outputs['x3'].item()
         x[3:] = outputs['x45']
 
         d = np.array([3, 2, 1.5, 1, 0.5])

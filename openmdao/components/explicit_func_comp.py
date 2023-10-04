@@ -15,7 +15,6 @@ try:
     import jax
     from jax import jit
     import jax.numpy as jnp
-    from jax.numpy import DeviceArray
     from jax.config import config
     config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
 except Exception:
@@ -23,6 +22,15 @@ except Exception:
     if not isinstance(err, ImportError):
         traceback.print_tb(tb)
     jax = None
+
+if jax is not None:
+    try:
+        from jax import Array as JaxArray
+    except ImportError:
+        # versions of jax before 0.3.18 do not have the jax.Array base class
+        raise RuntimeError(f"An unsupported version of jax is installed. "
+                           "OpenMDAO requires 'jax>=4.0' and 'jaxlib>=4.0'. "
+                           "Try 'pip install openmdao[jax]' with Python>=3.8.")
 
 
 class ExplicitFuncComp(ExplicitComponent):
@@ -66,7 +74,8 @@ class ExplicitFuncComp(ExplicitComponent):
 
         if self.options['use_jax']:
             if jax is None:
-                raise RuntimeError(f"{self.msginfo}: jax is not installed. Try 'pip install jax'.")
+                raise RuntimeError(f"{self.msginfo}: jax is not installed. "
+                                   "Try 'pip install openmdao[jax]' with Python>=3.8.")
             self._compute_jax = omf.jax_decorate(self._compute._f)
 
         self._tangents = None
@@ -103,7 +112,7 @@ class ExplicitFuncComp(ExplicitComponent):
             else:
                 kwargs = omf._filter_dict(meta, omf._allowed_add_input_args)
                 if use_jax:
-                    # make sure internal openmdao values are numpy arrays and not DeviceArrays
+                    # make sure internal openmdao values are numpy arrays and not jax Arrays
                     self._dev_arrays_to_np_arrays(kwargs)
                 self.add_input(name, **kwargs)
 
@@ -111,13 +120,13 @@ class ExplicitFuncComp(ExplicitComponent):
             _check_var_name(self, name)
             kwargs = _copy_with_ignore(meta, omf._allowed_add_output_args, ignore=('resid',))
             if use_jax:
-                # make sure internal openmdao values are numpy arrays and not DeviceArrays
+                # make sure internal openmdao values are numpy arrays and not jax Arrays
                 self._dev_arrays_to_np_arrays(kwargs)
             self.add_output(name, **kwargs)
 
     def _dev_arrays_to_np_arrays(self, meta):
         if 'val' in meta:
-            if isinstance(meta['val'], DeviceArray):
+            if isinstance(meta['val'], JaxArray):
                 meta['val'] = np.asarray(meta['val'])
 
     def _linearize(self, jac=None, sub_do_ln=False):

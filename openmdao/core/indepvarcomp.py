@@ -5,6 +5,7 @@ import numpy as np
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.general_utils import make_set, ensure_compatible
+from openmdao.recorders.recording_iteration_stack import Recording
 
 
 class IndepVarComp(ExplicitComponent):
@@ -109,8 +110,26 @@ class IndepVarComp(ExplicitComponent):
 
         super()._configure_check()
 
-    def add_output(self, name, val=1.0, shape=None, units=None, desc='', tags=None,
-                   shape_by_conn=False, copy_shape=None, distributed=None):
+    def add_input(self, name, val=1.0, **kwargs):
+        """
+        Add an input variable to the component.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable in this component's namespace.
+        val : float or ndarray
+            The initial value of the variable being added in user-defined units. Default is 1.0.
+        **kwargs : named args
+            Remaining args.
+        """
+        raise RuntimeError(f"Can't add input '{name}' to IndepVarComp '{self.name}'. IndepVarComps "
+                           "are not allowed to have inputs. If you want IndepVarComp-like behavior"
+                           " for some outputs of a component that has inputs, you can tag those "
+                           "outputs with 'openmdao:indep_var' and 'openmdao:allow_desvar' and they "
+                           "will be treated as independent variables.")
+
+    def add_output(self, name, val=1.0, **kwargs):
         """
         Add an independent variable to this component.
 
@@ -118,43 +137,21 @@ class IndepVarComp(ExplicitComponent):
         ----------
         name : str
             Name of the variable in this component's namespace.
-        val : float or list or tuple or ndarray
+        val : float or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
-        shape : int or tuple or list or None
-            Shape of this variable, only required if val is not an array.
-            Default is None.
-        units : str or None
-            Units in which the output variables will be provided to the component during execution.
-            Default is None, which means it has no units.
-        desc : str
-            Description of the variable.
-        tags : str or list of strs
-            User defined tags that can be used to filter what gets listed when calling
-            list_outputs.
-        shape_by_conn : bool
-            If True, shape this output to match its connected input(s).
-        copy_shape : str or None
-            If a str, that str is the name of a variable. Shape this output to match that of
-            the named variable.
-        distributed : bool
-            If True, this variable is a distributed variable, so it can have different sizes/values
-            across MPI processes.
+        **kwargs : named args
+            Remaining args passed to the base class add_output.
 
         Returns
         -------
         dict
             Metadata for added variable.
         """
-        if tags is None:
-            tags = {'openmdao:indep_var', 'openmdao:allow_desvar'}
-        else:
-            tags = make_set(tags) | {'openmdao:indep_var', 'openmdao:allow_desvar'}
-
-        kwargs = {'shape': shape, 'units': units, 'desc': desc,
-                  'tags': tags, 'shape_by_conn': shape_by_conn,
-                  'copy_shape': copy_shape, 'distributed': distributed,
-                  }
-        return super().add_output(name, val, **kwargs)
+        tags = {'openmdao:indep_var', 'openmdao:allow_desvar'}
+        if 'tags' in kwargs and kwargs['tags'] is not None:
+            tags.update(make_set(kwargs['tags'], name='tags'))
+        kwargs['tags'] = tags
+        return super().add_output(name, val=val, **kwargs)
 
     def add_discrete_output(self, name, val, desc='', tags=None):
         """
@@ -195,8 +192,23 @@ class IndepVarComp(ExplicitComponent):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        # define this as empty for IndepVarComp to avoid overhead of ExplicitComponent._linearize.
+        # define this for IndepVarComp to avoid overhead of ExplicitComponent._linearize.
         pass
+
+    def _apply_nonlinear(self):
+        """
+        Compute residuals. The model is assumed to be in a scaled state.
+        """
+        # define this for IndepVarComp to avoid overhead of ExplicitComponent._apply_nonlinear.
+        self.iter_count_apply += 1
+
+    def _solve_nonlinear(self):
+        """
+        Compute outputs. The model is assumed to be in a scaled state.
+        """
+        # define this for IndepVarComp to avoid overhead of ExplicitComponent._solve_nonlinear.
+        with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
+            pass
 
 
 class _AutoIndepVarComp(IndepVarComp):
@@ -285,7 +297,8 @@ class _AutoIndepVarComp(IndepVarComp):
             'lower': None,
             'upper': None,
             'shape_by_conn': False,
-            'copy_shape': None
+            'compute_shape': None,
+            'copy_shape': None,
         }
 
         self._static_var_rel2meta[name] = metadata

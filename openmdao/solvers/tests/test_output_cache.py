@@ -88,12 +88,20 @@ class NLBGSGroup(om.Group):
         solver.options["err_on_non_converge"] = True
         self.linear_solver = om.DirectSolver(assemble_jac=True)
 
+    def initialize(self):
+        self.options.declare('use_guess', types=bool, default=False)
+
+    def guess_nonlinear(self, inputs, outputs, residuals):
+        if self.options['use_guess']:
+            # this guess will cause an AnalysisError
+            outputs["coupling.balance.x"] = -1.
+
 
 class TestOutputCache(unittest.TestCase):
     def test_coupled_system(self):
         prob = om.Problem()
         model = prob.model
-        model.add_subsystem(f"simple", NLBGSGroup())
+        model.add_subsystem("simple", NLBGSGroup())
 
         prob.setup()
 
@@ -141,3 +149,51 @@ class TestOutputCache(unittest.TestCase):
         expected = "NewtonSolver in 'coupling' <class CoupledGroup>: Option 'restart_from_successful' does nothing unless option 'err_on_non_converge' is set to True."
         with assert_warning(om.SolverWarning, expected):
             prob.run_model()
+
+    def test_coupled_system_with_guess_nonlinear(self):
+        prob = om.Problem()
+        simple = prob.model.add_subsystem("simple", NLBGSGroup())
+
+        prob.setup()
+
+        #
+        # initial run, result will be cached since 'restart_from_successful' is enabled
+        #
+
+        prob.set_val("simple.coupling.sub_comp1.a", val=5.0)
+        prob.set_val("simple.coupling.sub_comp2.b", val=10.0)
+
+        prob.run_model()
+
+        assert_near_equal(prob['simple.coupling.sub_comp1.z'][0], 15.66717076361843, 1e-6)
+        assert_near_equal(prob['simple.coupling.sub_comp2.z'][0], 15.66717076361843, 1e-6)
+        assert_near_equal(prob['simple.coupling.balance.x'][0], 6.6054982979676495, 1e-6)
+
+        #
+        # use the guess which will cause the run to fail
+        #
+
+        simple.options['use_guess'] = True
+
+        try:
+            prob.run_model()
+        except om.AnalysisError:
+            pass
+        else:
+            self.fail("Expected AnalysisError")
+
+        #
+        # run again, should restart from valid point and NOT use the guess
+        #
+
+        prob.set_val("simple.coupling.sub_comp1.x", val=2.0)
+        prob.set_val("simple.coupling.sub_comp2.b", val=3.0)
+        prob.run_model()
+
+        assert_near_equal(prob['simple.coupling.sub_comp1.z'][0], 8.51905504, 1e-6)
+        assert_near_equal(prob['simple.coupling.sub_comp2.z'][0], 8.51905504, 1e-6)
+        assert_near_equal(prob['simple.coupling.balance.x'][0], 6.28613102, 1e-6)
+
+
+if __name__ == "__main__":
+    unittest.main()

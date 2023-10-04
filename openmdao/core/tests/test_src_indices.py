@@ -572,7 +572,8 @@ class DoubleNestedParallelMultipointTestCase(unittest.TestCase):
 
         assert_check_totals(p.check_totals(of=['par.G1.G1p.C1_1.y', 'par.G1.G1p.C1_2.y',
                                                'par.G2.G2p.C2_1.y', 'par.G2.G2p.C2_2.y',
-                                               'par.G3.G3s.C3_1.y', 'par.G3.G3s.C3_2.y'], wrt=['x']))
+                                               'par.G3.G3s.C3_1.y', 'par.G3.G3s.C3_2.y'], wrt=['x'],
+                                           show_only_incorrect=True))
 
 
 class TestNestedInputDefaults(unittest.TestCase):

@@ -9,7 +9,7 @@ import numpy as np
 from openmdao.components.interp_util.interp_akima import InterpAkima, Interp1DAkima
 from openmdao.components.interp_util.interp_bsplines import InterpBSplines
 from openmdao.components.interp_util.interp_cubic import InterpCubic
-from openmdao.components.interp_util.interp_lagrange2 import InterpLagrange2, Interp3DLagrange2,\
+from openmdao.components.interp_util.interp_lagrange2 import InterpLagrange2, Interp3DLagrange2, \
     Interp2DLagrange2, Interp1DLagrange2
 from openmdao.components.interp_util.interp_lagrange3 import InterpLagrange3, Interp3DLagrange3, \
     Interp2DLagrange3, Interp1DLagrange3
@@ -362,7 +362,7 @@ class InterpND(object):
             # TODO: it might be possible to vectorize over n_nodes.
             for j in range(n_nodes):
                 val, d_x, d_values, d_grid = table.evaluate(xi[j, ...])
-                result[j] = val
+                result[j] = val.item()
                 derivs_x[j, :] = d_x.ravel()
                 if d_values is not None:
                     if derivs_val is None:
@@ -442,7 +442,7 @@ class InterpND(object):
                 for k in range(nx):
                     x_pt = np.atleast_2d(xi[k])
                     val, _, d_values, _ = table.evaluate(x_pt)
-                    result[j, k] = val
+                    result[j, k] = val.item()
                     if d_values is not None:
                         if derivs_val is None:
                             dv_shape = [n_nodes, nx]
@@ -529,7 +529,8 @@ class InterpND(object):
                     values[j] = 1.0
                     table = interp([grid[i]], values, interp, **opts)
                     table._compute_d_dvalues = False
-                    deriv_i[j], _, _, _ = table.evaluate(pt[i:i + 1])
+                    deriv_i_j, _, _, _ = table.evaluate(pt[i:i + 1])
+                    deriv_i[j] = deriv_i_j.item()
                     values[j] = 0.0
 
                 if i == 0:

@@ -168,7 +168,8 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
         del options['min_improve_pct']
 
     if 'dynamic_total_coloring' in options:
-        p.driver.declare_coloring(tol=1e-15, min_improve_pct=min_improve_pct)
+        if options['dynamic_total_coloring']:
+            p.driver.declare_coloring(tol=1e-15, min_improve_pct=min_improve_pct)
         del options['dynamic_total_coloring']
 
     p.driver.options.update(options)
@@ -213,8 +214,8 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
                     con[:10] = inputs['r_con_g']
                     con[10:15] = inputs['theta_con_g']
                     con[15:20] = inputs['delta_theta_con_g']
-                    con[20] = inputs['l_conx_g']
-                    con[21] = inputs['y']
+                    con[20] = inputs['l_conx_g'].item()
+                    con[21] = inputs['y'].item()
 
             p.model.add_subsystem('mux', MuxComp())
             p.model.connect('r_con.g', 'mux.r_con_g')
@@ -283,8 +284,8 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         p.model._solve_count = 0
         p_color.model._solve_count = 0
 
-        J = p.driver._compute_totals()
-        J_color = p_color.driver._compute_totals()
+        p.driver._compute_totals()
+        p_color.driver._compute_totals()
 
         # coloring saves 16 solves per driver iter  (5 vs 21)
         self.assertEqual(p.model._solve_count, 21)
@@ -304,8 +305,8 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         p.model._solve_count = 0
         p_color.model._solve_count = 0
 
-        J = p.driver._compute_totals()
-        J_color = p_color.driver._compute_totals()
+        p.driver._compute_totals()
+        p_color.driver._compute_totals()
 
         # coloring saves 16 solves per driver iter  (5 vs 21)
         self.assertEqual(p.model._solve_count, 21)
@@ -324,8 +325,8 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         p.model._solve_count = 0
         p_color.model._solve_count = 0
 
-        J = p.driver._compute_totals()
-        J_color = p_color.driver._compute_totals()
+        p.driver._compute_totals()
+        p_color.driver._compute_totals()
 
         # coloring saves 16 solves per driver iter  (5 vs 21)
         self.assertEqual(p.model._solve_count, 21)
@@ -357,8 +358,8 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         p.model._solve_count = 0
         p_color.model._solve_count = 0
 
-        J = p.driver._compute_totals()
-        J_color = p_color.driver._compute_totals()
+        p.driver._compute_totals()
+        p_color.driver._compute_totals()
 
         # coloring saves 16 solves per driver iter  (5 vs 21)
         self.assertEqual(p.model._solve_count, 21)
@@ -377,8 +378,8 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         p.model._solve_count = 0
         p_color.model._solve_count = 0
 
-        J = p.driver._compute_totals()
-        J_color = p_color.driver._compute_totals()
+        p.driver._compute_totals()
+        p_color.driver._compute_totals()
 
         # coloring saves 16 solves per driver iter  (5 vs 21)
         self.assertEqual(p.model._solve_count, 21)
@@ -398,8 +399,8 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         p.model._solve_nl_count = 0
         p_color.model._solve_nl_count = 0
 
-        J = p.driver._compute_totals()
-        J_color = p_color.driver._compute_totals()
+        p.driver._compute_totals()
+        p_color.driver._compute_totals()
 
         # coloring saves 16 solves per driver iter  (5 vs 21)
         self.assertEqual(p.model._solve_nl_count, 21)
@@ -419,8 +420,8 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         p.model._solve_nl_count = 0
         p_color.model._solve_nl_count = 0
 
-        J = p.driver._compute_totals()
-        J_color = p_color.driver._compute_totals()
+        p.driver._compute_totals()
+        p_color.driver._compute_totals()
 
         # coloring saves 16 solves per driver iter  (5 vs 21)
         self.assertEqual(p.model._solve_nl_count, 21)
@@ -530,8 +531,8 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         p.model._solve_count = 0
         p_color.model._solve_count = 0
 
-        J = p.driver._compute_totals()
-        J_color = p_color.driver._compute_totals()
+        p.driver._compute_totals()
+        p_color.driver._compute_totals()
 
         # coloring saves 16 solves per driver iter  (5 vs 21)
         self.assertEqual(p.model._solve_count, 21)
@@ -611,8 +612,8 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         p.model._solve_count = 0
         p_color.model._solve_count = 0
 
-        J = p.driver._compute_totals()
-        J_color = p_color.driver._compute_totals()
+        p.driver._compute_totals()
+        p_color.driver._compute_totals()
 
         # coloring saves 11 solves per driver iter  (11 vs 22)
         self.assertEqual(p.model._solve_count, 22)
@@ -620,8 +621,9 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
 
         # improve coverage of coloring.py
         coloring = p_color.driver._coloring_info['coloring']
-        coloring.display_txt()
-        coloring.display(show=False)
+        om.display_coloring(source=coloring, output_file=None, as_text=True, show=False)
+        om.display_coloring(source=coloring, output_file=None, as_text=False, show=False)
+
         with open(os.devnull, 'w') as f:
             array_viz(coloring.get_dense_sparsity(), prob=p_color, stream=f)
             array_viz(coloring.get_dense_sparsity(), stream=f)
@@ -651,12 +653,44 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         p.model._solve_count = 0
         p_color.model._solve_count = 0
 
-        J = p.driver._compute_totals()
-        J_color = p_color.driver._compute_totals()
+        p.driver._compute_totals()
+        p_color.driver._compute_totals()
 
         # coloring saves 11 solves per driver iter  (11 vs 22)
         self.assertEqual(p.model._solve_count, 22)
         self.assertEqual(p_color.model._solve_count, 11)
+
+    def test_dynamic_fwd_simul_coloring_pyoptsparse_slsqp(self):
+        try:
+            from pyoptsparse import OPT
+        except ImportError:
+            raise unittest.SkipTest("This test requires pyoptsparse.")
+
+        try:
+            OPT('SLSQP')
+        except:
+            raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
+
+        p_color = run_opt(pyOptSparseDriver, 'fwd', optimizer='SLSQP', print_results=False,
+                          dynamic_total_coloring=True)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
+
+        # Tests a bug where coloring ran the model when not needed.
+        self.assertEqual(p_color.model.iter_count, 9)
+
+        # run w/o coloring
+        p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SLSQP', print_results=False)
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+
+        p.model._solve_count = 0
+        p_color.model._solve_count = 0
+
+        p.driver._compute_totals()
+        p_color.driver._compute_totals()
+
+        # coloring saves 16 solves per driver iter  (5 vs 21)
+        self.assertEqual(p.model._solve_count, 21)
+        self.assertEqual(p_color.model._solve_count, 5)
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_total_coloring_auto_con_alias_pyoptsparse(self):
@@ -672,8 +706,8 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         p.model._solve_count = 0
         p_color.model._solve_count = 0
 
-        J = p.driver._compute_totals()
-        J_color = p_color.driver._compute_totals()
+        p.driver._compute_totals()
+        p_color.driver._compute_totals()
 
         # coloring saves 16 solves per driver iter  (5 vs 21)
         self.assertEqual(p.model._solve_count, 21)
@@ -701,8 +735,8 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         p.model._solve_count = 0
         p_color.model._solve_count = 0
 
-        J = p.driver._compute_totals()
-        J_color = p_color.driver._compute_totals()
+        p.driver._compute_totals()
+        p_color.driver._compute_totals()
 
         # coloring saves 16 solves per driver iter  (5 vs 21)
         self.assertEqual(p.model._solve_count, 21)
@@ -737,8 +771,8 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         p.model._solve_count = 0
         p_color.model._solve_count = 0
 
-        J = p.driver._compute_totals()
-        J_color = p_color.driver._compute_totals()
+        p.driver._compute_totals()
+        p_color.driver._compute_totals()
 
         # coloring saves 16 solves per driver iter  (5 vs 21)
         self.assertEqual(p.model._solve_count, 21)
@@ -755,8 +789,8 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         p.model._solve_count = 0
         p_color.model._solve_count = 0
 
-        J = p.driver._compute_totals()
-        J_color = p_color.driver._compute_totals()
+        p.driver._compute_totals()
+        p_color.driver._compute_totals()
 
         # coloring should have been aborted since it couldn't improve more than 99% so solve counts should match
         self.assertEqual(p.model._solve_count, 21)
@@ -775,8 +809,8 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         p.model._solve_count = 0
         p_color.model._solve_count = 0
 
-        J = p.driver._compute_totals()
-        J_color = p_color.driver._compute_totals()
+        p.driver._compute_totals()
+        p_color.driver._compute_totals()
 
         # coloring saves 16 solves per driver iter  (5 vs 21)
         self.assertEqual(p.model._solve_count, 21)
@@ -799,7 +833,8 @@ class SimulColoringScipyTestCase(unittest.TestCase):
                                               'l_conx.g', 'y', 'circle.area'],
                                           wrt=['x', 'y', 'r'])
         self.assertEqual(coloring.total_solves(), 5)
-        coloring.display_txt()  # leave this in because at one point it caused an exception
+        om.display_coloring(source=coloring, as_text=True, show=False)  # leave this in because at one point it caused an exception
+        om.display_coloring(source=coloring, show=False)
 
     def test_simul_coloring_example(self):
 
@@ -1010,7 +1045,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
 
         self.assertTrue('Jacobian shape: (22, 21)  (13.42% nonzero)' in summary)
         self.assertTrue('FWD solves: 5   REV solves: 0' in summary)
-        self.assertTrue('Total colors vs. total size: 5 vs 21  (76.2% improvement)' in summary)
+        self.assertTrue('Total colors vs. total size: 5 vs 21  (76.19% improvement)' in summary)
         self.assertTrue('Time to compute sparsity:' in summary)
         self.assertTrue('Time to compute coloring:' in summary)
 
@@ -1025,7 +1060,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
 
         self.assertTrue('Jacobian shape: (50, 50)  (100.00% nonzero)' in summary)
         self.assertTrue('FWD solves: 50   REV solves: 0' in summary)
-        self.assertTrue('Total colors vs. total size: 50 vs 50  (0.0% improvement)' in summary)
+        self.assertTrue('Total colors vs. total size: 50 vs 50  (0.00% improvement)' in summary)
         self.assertFalse('Time to compute sparsity:' in summary)
         self.assertTrue('Time to compute coloring:' in summary)
 
@@ -1060,8 +1095,8 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
         p.model._solve_count = 0
         p_color.model._solve_count = 0
 
-        J = p.driver._compute_totals()
-        J_color = p_color.driver._compute_totals()
+        p.driver._compute_totals()
+        p_color.driver._compute_totals()
 
         # coloring saves 16 solves per driver iter  (11 vs 22)
         self.assertEqual(p.model._solve_count, 22)
@@ -1115,6 +1150,7 @@ class BidirectionalTestCase(unittest.TestCase):
             builder.add_block_diag([(1,1)] * (n-1), 0, 0)
             builder.color('auto')
             tot_size, tot_colors, fwd_solves, rev_solves, pct = builder.coloring._solves_info()
+
             self.assertEqual(tot_colors, 3)
 
     @parameterized.expand(itertools.product(
@@ -1396,7 +1432,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
         p.run_driver()
 
         p = self._build_model(ofnames=['w', 'x', 'y', 'z'], wrtnames=['a', 'b', 'c', 'd'],
-                                sizes=[3, 4, 5, 6], color='partial', fixed=True)
+                              sizes=[3, 4, 5, 6], color='partial', fixed=True)
 
         with self.assertRaises(RuntimeError) as ctx:
             p.run_driver()

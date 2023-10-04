@@ -20,7 +20,6 @@ from openmdao.visualization.tables.table_builder import generate_table
 _reports_registry = {}
 _default_reports = ['scaling', 'total_coloring', 'n2', 'optimizer', 'inputs']
 _active_reports = set()  # these reports will actually run (assuming their hook funcs are triggered)
-_cmdline_reports = set()  # cmdline reports registered here so default reports aren't modified
 _reports_dir = os.environ.get('OPENMDAO_REPORTS_DIR', './reports')  # top dir for the reports
 _plugins_loaded = False  # use this to ensure plugins only loaded once
 
@@ -122,11 +121,6 @@ class Report(object):
                 return args[1]
         else:
             raise AttributeError(f"Attribute '{name}' not found.")
-
-
-def _register_cmdline_report(name):
-    global _cmdline_reports
-    _cmdline_reports.add(name)
 
 
 def reports_active():
@@ -252,8 +246,6 @@ def activate_report(name, instance=None):
     if name not in _reports_registry:
         issue_warning(f"No report with the name '{name}' is registered.")
         return
-    if name in _cmdline_reports:
-        return  # skip it if it's already being run from the command line
 
     if not reports_active():
         return

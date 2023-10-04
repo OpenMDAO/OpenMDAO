@@ -1019,32 +1019,32 @@ class InterpAkimaSemi(InterpAlgorithmSemi):
             dm3_dv = np.zeros(n_this, dtype=dtype)
             dm4_dv = np.zeros(n_this, dtype=dtype)
             dm5_dv = np.zeros(n_this, dtype=dtype)
-            dm3_dv[idx_val4] = 1.0 / (grid[idx + 1] - grid[idx])
-            dm3_dv[idx_val3] = - dm3_dv[idx_val4]
+            dm3_dv[idx_val4] = (1.0 / (grid[idx + 1] - grid[idx])).item()
+            dm3_dv[idx_val3] = (- dm3_dv[idx_val4]).item()
 
         if idx >= 2:
             m1 = (val2 - val1) / (grid[idx - 1] - grid[idx - 2])
             if compute_local_train:
-                dm1_dv[idx_val2] = 1.0 / (grid[idx - 1] - grid[idx - 2])
-                dm1_dv[idx_val1] = - dm1_dv[idx_val2]
+                dm1_dv[idx_val2] = (1.0 / (grid[idx - 1] - grid[idx - 2])).item()
+                dm1_dv[idx_val1] = (- dm1_dv[idx_val2]).item()
 
         if idx >= 1:
             m2 = (val3 - val2) / (grid[idx] - grid[idx - 1])
             if compute_local_train:
-                dm2_dv[idx_val3] = 1.0 / (grid[idx] - grid[idx - 1])
-                dm2_dv[idx_val2] = - dm2_dv[idx_val3]
+                dm2_dv[idx_val3] = (1.0 / (grid[idx] - grid[idx - 1])).item()
+                dm2_dv[idx_val2] = (- dm2_dv[idx_val3]).item()
 
         if idx < ngrid - 2:
             m4 = (val5 - val4) / (grid[idx + 2] - grid[idx + 1])
             if compute_local_train:
-                dm4_dv[idx_val5] = 1.0 / (grid[idx + 2] - grid[idx + 1])
-                dm4_dv[idx_val4] = - dm4_dv[idx_val5]
+                dm4_dv[idx_val5] = (1.0 / (grid[idx + 2] - grid[idx + 1])).item()
+                dm4_dv[idx_val4] = (- dm4_dv[idx_val5]).item()
 
         if idx < ngrid - 3:
             m5 = (val6 - val5) / (grid[idx + 3] - grid[idx + 2])
             if compute_local_train:
-                dm5_dv[idx_val6] = 1.0 / (grid[idx + 3] - grid[idx + 2])
-                dm5_dv[idx_val5] = - dm5_dv[idx_val6]
+                dm5_dv[idx_val6] = (1.0 / (grid[idx + 3] - grid[idx + 2])).item()
+                dm5_dv[idx_val5] = (- dm5_dv[idx_val6]).item()
 
         if idx == 0:
             m2 = 2 * m3 - m4
@@ -1148,7 +1148,7 @@ class InterpAkimaSemi(InterpAlgorithmSemi):
                 da_dv[idx_val3] = 1.0
                 dc_dv = dd_dv = 0
 
-        deriv_dx[0] = b + dx * (2.0 * c + 3.0 * d * dx)
+        deriv_dx[0] = (b + dx * (2.0 * c + 3.0 * d * dx)).item()
         if compute_local_train:
             deriv_dv = da_dv + dx * (db_dv + dx * (dc_dv + dx * dd_dv))
 
