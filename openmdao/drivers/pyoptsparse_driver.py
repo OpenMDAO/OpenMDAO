@@ -353,14 +353,38 @@ class pyOptSparseDriver(Driver):
         return self.pyopt_solution.userSensCalls if self.pyopt_solution else None
 
     def get_prom_name(self, name):
-        problem = self._problem()
-        model = problem.model
-        abs2prom_out = model._var_allprocs_abs2prom['output']
+        """
+        Get promoted name for specified variable.
+        """
         try:
-            return abs2prom_out[name]
+            return self.abs2prom_out[name]
         except KeyError:
             # auto_ivc vars are already keyed on promoted input name
             return name
+
+    def prom_names_list(self, lst):
+        """
+        Convert a list of variable names to promoted names.
+        """
+        return [self.get_prom_name(n) for n in lst]
+
+    def prom_names_dict(self, dct):
+        """
+        Convert a dictionary keyed on variable names to be keyed on promoted names.
+        """
+        return {self.get_prom_name(k): v for k, v in dct.items()}
+
+    def prom_names_jac(self, jac):
+        """
+        Convert a jacobian keyed on variable names to be keyed on promoted names.
+        """
+        new_jac = {}
+        for of in jac:
+            new_jac[self.get_prom_name(of)] = of_dict = {}
+            for wrt in jac[of]:
+                of_dict[self.get_prom_name(wrt)] = jac[of][wrt]
+
+        return new_jac
 
     def run(self):
         """
@@ -377,6 +401,9 @@ class pyOptSparseDriver(Driver):
         problem = self._problem()
         model = problem.model
         relevant = model._relevant
+
+        self.abs2prom_out = model._var_allprocs_abs2prom['output']
+
         self.pyopt_solution = None
         self._total_jac = None
         self.iter_count = 0
@@ -411,13 +438,14 @@ class pyOptSparseDriver(Driver):
 
         # Add all design variables
         self._indep_list = indep_list = list(self._designvars)
-        self._indep_list_prom_names = indep_list_prom_names = []
+        self._indep_list_prom = indep_list_prom = []
 
         input_vals = self.get_design_var_values()
 
         for name, meta in self._designvars.items():
+            # translate absolute var names to promoted names for pyoptsparse
             prom_name = self.get_prom_name(name)
-            indep_list_prom_names.append(prom_name)
+            indep_list_prom.append(prom_name)
 
             size = meta['global_size'] if meta['distributed'] else meta['size']
             if pyoptsparse_version is None or pyoptsparse_version < Version('2.6.1'):
@@ -437,8 +465,7 @@ class pyOptSparseDriver(Driver):
         # Add all objectives
         objs = self.get_objective_values()
         for name in objs:
-            prom_name = self.get_prom_name(name)
-            opt_prob.addObj(prom_name)
+            opt_prob.addObj(self.get_prom_name(name))
             self._quantities.append(name)
 
         cons_to_remove = set()
@@ -480,20 +507,20 @@ class pyOptSparseDriver(Driver):
                 rels = relevant[path]
                 wrt = [v for v in indep_list if self._designvars[v]['source'] in rels]
 
+            prom_name = self.get_prom_name(name)
+
             if not wrt:
                 issue_warning(f"Equality constraint '{prom_name}' does not depend on any design "
                               "variables and was not added to the optimization.")
                 cons_to_remove.add(name)
                 continue
 
-            prom_name = self.get_prom_name(name)
-
             # convert wrt to use promoted names
-            wrt_prom = [self.get_prom_name(v) for v in wrt]
+            wrt_prom = self.prom_names_list(wrt)
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
-                jac_prom = {self.get_prom_name(n): j for n, j in jac.items()}
+                jac_prom = self.prom_names_jac(jac)
                 opt_prob.addConGroup(prom_name, size,
                                      lower=lower - _y_intercepts[name],
                                      upper=upper - _y_intercepts[name],
@@ -502,9 +529,10 @@ class pyOptSparseDriver(Driver):
                 if name in self._res_subjacs:
                     resjac = self._res_subjacs[name]
                     jac = {n: resjac[self._designvars[n]['source']] for n in wrt}
-                    jac_prom = {self.get_prom_name(n): j for n, j in jac.items()}
+                    jac_prom = self.prom_names_jac(jac)
                 else:
                     jac = None
+                    jac_prom = None
 
                 opt_prob.addConGroup(prom_name, size, lower=lower, upper=upper, wrt=wrt_prom, jac=jac_prom)
                 self._quantities.append(name)
@@ -529,19 +557,18 @@ class pyOptSparseDriver(Driver):
 
             prom_name = self.get_prom_name(name)
 
-            # convert wrt to use promoted names
-            wrt_prom = [self.get_prom_name(v) for v in wrt]
-
             if not wrt:
-                issue_warning(f"Inequality constraint '{name}' does not depend on any design "
+                issue_warning(f"Inequality constraint '{prom_name}' does not depend on any design "
                               "variables and was not added to the optimization.")
                 cons_to_remove.add(name)
                 continue
 
+            # convert wrt to use promoted names
+            wrt_prom = self.prom_names_list(wrt)
+
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
-                jac_prom = {self.get_prom_name(n): j for n, j in jac.items()}
-
+                jac_prom = self.prom_names_jac(jac)
                 opt_prob.addConGroup(prom_name, size,
                                      upper=upper - _y_intercepts[name],
                                      lower=lower - _y_intercepts[name],
@@ -550,11 +577,10 @@ class pyOptSparseDriver(Driver):
                 if name in self._res_subjacs:
                     resjac = self._res_subjacs[name]
                     jac = {n: resjac[self._designvars[n]['source']] for n in wrt}
-                    jac_prom = {self.get_prom_name(n): j for n, j in jac.items()}
+                    jac_prom = self.prom_names_jac(jac)
                 else:
                     jac = None
                     jac_prom = None
-
                 opt_prob.addConGroup(prom_name, size, upper=upper, lower=lower, wrt=wrt_prom, jac=jac_prom)
                 self._quantities.append(name)
 
@@ -643,8 +669,8 @@ class pyOptSparseDriver(Driver):
         # Pull optimal parameters back into framework and re-run, so that
         # framework is left in the right final state
         dv_dict = sol.getDVs()
-        for name, prom_name in zip(self._indep_list, self._indep_list_prom_names):
-            self.set_design_var(name, dv_dict[prom_name])
+        for name in indep_list:
+            self.set_design_var(name, dv_dict[self.get_prom_name(name)])
 
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             try:
@@ -714,8 +740,8 @@ class pyOptSparseDriver(Driver):
             signal.signal(sigusr, self._signal_handler)
 
         try:
-            for name, prom_name in zip(self._indep_list, self._indep_list_prom_names):
-                self.set_design_var(name, dv_dict[prom_name])
+            for name in self._indep_list:
+                self.set_design_var(name, dv_dict[self.get_prom_name(name)])
 
             # print("Setting DV")
             # print(dv_dict)
@@ -724,6 +750,8 @@ class pyOptSparseDriver(Driver):
             if self._user_termination_flag:
                 func_dict = self.get_objective_values()
                 func_dict.update(self.get_constraint_values(lintype='nonlinear'))
+                # convert func_dict to use promoted names
+                func_dict = self.prom_names_dict(func_dict)
                 return func_dict, 2
 
             # Execute the model
@@ -759,6 +787,9 @@ class pyOptSparseDriver(Driver):
         if fail > 0 and self._fill_NANs:
             for name in func_dict:
                 func_dict[name].fill(np.NAN)
+
+        # convert func_dict to use promoted names
+        func_dict = self.prom_names_dict(func_dict)
 
         # print("Functions calculated")
         # print(dv_dict)
@@ -804,7 +835,7 @@ class pyOptSparseDriver(Driver):
             try:
                 self._in_user_function = True
                 sens_dict = self._compute_totals(of=self._quantities,
-                                                 wrt=self._indep_list_prom_names,
+                                                 wrt=self._indep_list,
                                                  return_format=self._total_jac_format)
 
                 # First time through, check for zero row/col.
@@ -830,9 +861,10 @@ class pyOptSparseDriver(Driver):
                 # TODO: look into getting rid of all of these conversions!
                 new_sens = {}
                 res_subjacs = self._res_subjacs
-                for okey in func_dict:
+
+                for okey in self._quantities:
                     new_sens[okey] = newdv = {}
-                    for ikey in dv_dict:
+                    for ikey in self._designvars.keys():
                         ikey_src = self._designvars[ikey]['source']
                         if okey in res_subjacs and ikey_src in res_subjacs[okey]:
                             arr = sens_dict[okey][ikey]
@@ -852,20 +884,25 @@ class pyOptSparseDriver(Driver):
         if fail > 0:
             # We need to cobble together a sens_dict of the correct size.
             # Best we can do is return zeros or NaNs.
-            for okey, oval in func_dict.items():
+            for okey in self._quantities:
                 if okey not in sens_dict:
                     sens_dict[okey] = {}
+                oval = func_dict[self.get_prom_name(okey)]
                 osize = len(oval)
-                for ikey, ival in dv_dict.items():
+                for ikey in self._designvars.keys():
+                    ival = dv_dict[self.get_prom_name(ikey)]
                     isize = len(ival)
                     if ikey not in sens_dict[okey] or self._fill_NANs:
                         sens_dict[okey][ikey] = np.zeros((osize, isize))
                         if self._fill_NANs:
                             sens_dict[okey][ikey].fill(np.NAN)
 
-        # print("Derivatives calculated")
+        # convert sens_dict to use promoted names
+        sens_dict = self.prom_names_jac(sens_dict)
+
+        print("Derivatives calculated")
         # print(dv_dict)
-        # print(sens_dict, flush=True)
+        print(sens_dict, flush=True)
         self._in_user_function = False
         return sens_dict, fail
 
