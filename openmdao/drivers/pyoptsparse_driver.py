@@ -352,6 +352,16 @@ class pyOptSparseDriver(Driver):
         """
         return self.pyopt_solution.userSensCalls if self.pyopt_solution else None
 
+    def get_prom_name(self, name):
+        problem = self._problem()
+        model = problem.model
+        abs2prom_out = model._var_allprocs_abs2prom['output']
+        try:
+            return abs2prom_out[name]
+        except KeyError:
+            # auto_ivc vars are already keyed on promoted input name
+            return name
+
     def run(self):
         """
         Excute pyOptsparse.
@@ -401,16 +411,21 @@ class pyOptSparseDriver(Driver):
 
         # Add all design variables
         self._indep_list = indep_list = list(self._designvars)
+        self._indep_list_prom_names = indep_list_prom_names = []
+
         input_vals = self.get_design_var_values()
 
         for name, meta in self._designvars.items():
+            prom_name = self.get_prom_name(name)
+            indep_list_prom_names.append(prom_name)
+
             size = meta['global_size'] if meta['distributed'] else meta['size']
             if pyoptsparse_version is None or pyoptsparse_version < Version('2.6.1'):
-                opt_prob.addVarGroup(name, size, type='c',
+                opt_prob.addVarGroup(prom_name, size, type='c',
                                      value=input_vals[name],
                                      lower=meta['lower'], upper=meta['upper'])
             else:
-                opt_prob.addVarGroup(name, size, varType='c',
+                opt_prob.addVarGroup(prom_name, size, varType='c',
                                      value=input_vals[name],
                                      lower=meta['lower'], upper=meta['upper'])
 
@@ -422,7 +437,8 @@ class pyOptSparseDriver(Driver):
         # Add all objectives
         objs = self.get_objective_values()
         for name in objs:
-            opt_prob.addObj(name)
+            prom_name = self.get_prom_name(name)
+            opt_prob.addObj(prom_name)
             self._quantities.append(name)
 
         cons_to_remove = set()
@@ -465,25 +481,32 @@ class pyOptSparseDriver(Driver):
                 wrt = [v for v in indep_list if self._designvars[v]['source'] in rels]
 
             if not wrt:
-                issue_warning(f"Equality constraint '{name}' does not depend on any design "
+                issue_warning(f"Equality constraint '{prom_name}' does not depend on any design "
                               "variables and was not added to the optimization.")
                 cons_to_remove.add(name)
                 continue
 
+            prom_name = self.get_prom_name(name)
+
+            # convert wrt to use promoted names
+            wrt_prom = [self.get_prom_name(v) for v in wrt]
+
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
-                opt_prob.addConGroup(name, size,
+                jac_prom = {self.get_prom_name(n): j for n, j in jac.items()}
+                opt_prob.addConGroup(prom_name, size,
                                      lower=lower - _y_intercepts[name],
                                      upper=upper - _y_intercepts[name],
-                                     linear=True, wrt=wrt, jac=jac)
+                                     linear=True, wrt=wrt_prom, jac=jac_prom)
             else:
                 if name in self._res_subjacs:
                     resjac = self._res_subjacs[name]
                     jac = {n: resjac[self._designvars[n]['source']] for n in wrt}
+                    jac_prom = {self.get_prom_name(n): j for n, j in jac.items()}
                 else:
                     jac = None
 
-                opt_prob.addConGroup(name, size, lower=lower, upper=upper, wrt=wrt, jac=jac)
+                opt_prob.addConGroup(prom_name, size, lower=lower, upper=upper, wrt=wrt_prom, jac=jac_prom)
                 self._quantities.append(name)
 
         # Add all inequality constraints
@@ -504,6 +527,11 @@ class pyOptSparseDriver(Driver):
                 rels = relevant[path]
                 wrt = [v for v in indep_list if self._designvars[v]['source'] in rels]
 
+            prom_name = self.get_prom_name(name)
+
+            # convert wrt to use promoted names
+            wrt_prom = [self.get_prom_name(v) for v in wrt]
+
             if not wrt:
                 issue_warning(f"Inequality constraint '{name}' does not depend on any design "
                               "variables and was not added to the optimization.")
@@ -512,17 +540,22 @@ class pyOptSparseDriver(Driver):
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
-                opt_prob.addConGroup(name, size,
+                jac_prom = {self.get_prom_name(n): j for n, j in jac.items()}
+
+                opt_prob.addConGroup(prom_name, size,
                                      upper=upper - _y_intercepts[name],
                                      lower=lower - _y_intercepts[name],
-                                     linear=True, wrt=wrt, jac=jac)
+                                     linear=True, wrt=wrt_prom, jac=jac_prom)
             else:
                 if name in self._res_subjacs:
                     resjac = self._res_subjacs[name]
                     jac = {n: resjac[self._designvars[n]['source']] for n in wrt}
+                    jac_prom = {self.get_prom_name(n): j for n, j in jac.items()}
                 else:
                     jac = None
-                opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt, jac=jac)
+                    jac_prom = None
+
+                opt_prob.addConGroup(prom_name, size, upper=upper, lower=lower, wrt=wrt_prom, jac=jac_prom)
                 self._quantities.append(name)
 
         for name in cons_to_remove:
@@ -610,8 +643,8 @@ class pyOptSparseDriver(Driver):
         # Pull optimal parameters back into framework and re-run, so that
         # framework is left in the right final state
         dv_dict = sol.getDVs()
-        for name in indep_list:
-            self.set_design_var(name, dv_dict[name])
+        for name, prom_name in zip(self._indep_list, self._indep_list_prom_names):
+            self.set_design_var(name, dv_dict[prom_name])
 
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             try:
@@ -681,8 +714,8 @@ class pyOptSparseDriver(Driver):
             signal.signal(sigusr, self._signal_handler)
 
         try:
-            for name in self._indep_list:
-                self.set_design_var(name, dv_dict[name])
+            for name, prom_name in zip(self._indep_list, self._indep_list_prom_names):
+                self.set_design_var(name, dv_dict[prom_name])
 
             # print("Setting DV")
             # print(dv_dict)
@@ -771,7 +804,7 @@ class pyOptSparseDriver(Driver):
             try:
                 self._in_user_function = True
                 sens_dict = self._compute_totals(of=self._quantities,
-                                                 wrt=self._indep_list,
+                                                 wrt=self._indep_list_prom_names,
                                                  return_format=self._total_jac_format)
 
                 # First time through, check for zero row/col.
