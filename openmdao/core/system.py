@@ -6277,9 +6277,9 @@ class System(object):
             for s in self._subsystems_myproc:
                 yield from s.comm_info_iter()
 
-    def dist_offset_iter(self, io):
+    def dist_range_iter(self, io):
         """
-        Yield names and distributed offsets of all local and remote variables in this system.
+        Yield names and distributed ranges of all local and remote variables in this system.
 
         Parameters
         ----------
@@ -6289,16 +6289,15 @@ class System(object):
         Yields
         ------
         tuple
-            A tuple of the form (abs_name, rank, offset).
+            A tuple of the form ((abs_name, rank), start, end).
         """
-        system = self._system()
-        sizes = system._var_sizes
-        vmeta = system._var_allprocs_abs2meta
+        sizes = self._var_sizes
+        vmeta = self._var_allprocs_abs2meta
 
         total = 0
-        for rank in range(system.comm.size):
+        for rank in range(self.comm.size):
             for ivar, vname in enumerate(vmeta[io]):
                 sz = sizes[io][rank, ivar]
                 if sz > 0:
-                    yield vname, rank, total
+                    yield (vname, rank), total, total + sz
                 total += sz
