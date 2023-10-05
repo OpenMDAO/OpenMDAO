@@ -4853,27 +4853,29 @@ class System(object):
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
-        for sub in self.system_iter(include_self=True, recurse=True):
-            sub.under_complex_step = active
-            sub._inputs.set_complex_step_mode(active)
-            sub._outputs.set_complex_step_mode(active)
-            sub._residuals.set_complex_step_mode(active)
+        self.under_complex_step = active
+        self._inputs.set_complex_step_mode(active)
+        self._outputs.set_complex_step_mode(active)
+        self._residuals.set_complex_step_mode(active)
 
-            if sub._doutputs._alloc_complex:
-                sub._doutputs.set_complex_step_mode(active)
-                sub._dinputs.set_complex_step_mode(active)
-                sub._dresiduals.set_complex_step_mode(active)
-                if sub.nonlinear_solver:
-                    sub.nonlinear_solver._set_complex_step_mode(active)
+        if self._doutputs._alloc_complex:
+            self._doutputs.set_complex_step_mode(active)
+            self._dinputs.set_complex_step_mode(active)
+            self._dresiduals.set_complex_step_mode(active)
+            if self.nonlinear_solver:
+                self.nonlinear_solver._set_complex_step_mode(active)
 
-                if sub.linear_solver:
-                    sub.linear_solver._set_complex_step_mode(active)
+            if self.linear_solver:
+                self.linear_solver._set_complex_step_mode(active)
 
-                if sub._owns_approx_jac:
-                    sub._jacobian.set_complex_step_mode(active)
+            if self._owns_approx_jac:
+                self._jacobian.set_complex_step_mode(active)
 
-                if sub._assembled_jac:
-                    sub._assembled_jac.set_complex_step_mode(active)
+            if self._assembled_jac:
+                self._assembled_jac.set_complex_step_mode(active)
+
+        for sub in self.system_iter(include_self=False, recurse=True):
+            sub._set_complex_step_mode(active)
 
     def cleanup(self):
         """

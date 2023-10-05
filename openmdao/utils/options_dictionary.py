@@ -347,7 +347,7 @@ class OptionsDictionary(object):
 
     def declare(self, name, default=_UNDEFINED, values=None, types=None, desc='',
                 upper=None, lower=None, check_valid=None, allow_none=False, recordable=True,
-                deprecation=None):
+                set_function=None, deprecation=None):
         r"""
         Declare an option.
 
@@ -379,6 +379,9 @@ class OptionsDictionary(object):
             If True, allow None as a value regardless of values or types.
         recordable : bool
             If True, add to recorder.
+        set_function : None or function
+            User-supplied function with arguments (Options metadata, value) that pre-processes
+            value and returns a new value.
         deprecation : str or tuple or None
             If None, it is not deprecated. If a str, use as a DeprecationWarning
             during __setitem__ and __getitem__.  If a tuple of the form (msg, new_name),
@@ -437,6 +440,7 @@ class OptionsDictionary(object):
             'has_been_set': default_provided,
             'allow_none': allow_none,
             'recordable': recordable,
+            'set_function': set_function,
             'deprecation': deprecation,
         }
 
@@ -520,6 +524,10 @@ class OptionsDictionary(object):
             name, meta = self._handle_deprecation(name, meta)
 
         self._assert_valid(name, value)
+
+        # General function test
+        if meta['set_function'] is not None:
+            value = meta['set_function'](meta, value)
 
         meta['val'] = value
         meta['has_been_set'] = True
