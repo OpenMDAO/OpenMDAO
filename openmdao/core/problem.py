@@ -1638,7 +1638,7 @@ class Problem(object):
     def check_totals(self, of=None, wrt=None, out_stream=_DEFAULT_OUT_STREAM, compact_print=False,
                      driver_scaling=False, abs_err_tol=1e-6, rel_err_tol=1e-6, method='fd',
                      step=None, form=None, step_calc='abs', show_progress=False,
-                     show_only_incorrect=False, directional=False):
+                     show_only_incorrect=False, directional=False, sort=False):
         """
         Check total derivatives for the model vs. finite difference.
 
@@ -1688,6 +1688,8 @@ class Problem(object):
         directional : bool
             If True, compute a single directional derivative for each 'of' in rev mode or each
             'wrt' in fwd mode.
+        sort : bool
+            If True, sort the subjacobian keys alphabetically.
 
         Returns
         -------
@@ -1866,8 +1868,12 @@ class Problem(object):
         resp = self.driver._responses
         do_steps = len(Jfds) > 1
 
+        Jcalc_items = Jcalc.items()
+        if sort:
+            Jcalc_items = sorted(Jcalc_items, key=lambda x: x[0])
+
         for Jfd, step in Jfds:
-            for key, val in Jcalc.items():
+            for key, val in Jcalc_items:
                 if key not in data['']:
                     data[''][key] = {}
                 meta = data[''][key]
@@ -1917,7 +1923,7 @@ class Problem(object):
 
         _assemble_derivative_data(data, rel_err_tol, abs_err_tol, out_stream, compact_print,
                                   [model], {'': fd_args}, totals=total_info, lcons=lcons,
-                                  show_only_incorrect=show_only_incorrect)
+                                  show_only_incorrect=show_only_incorrect, sort=sort)
 
         if not do_steps:
             _fix_check_data(data)
@@ -2931,7 +2937,7 @@ def _fix_check_data(data):
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
                               compact_print, system_list, global_options, totals=False,
                               indep_key=None, print_reverse=False,
-                              show_only_incorrect=False, lcons=None):
+                              show_only_incorrect=False, lcons=None, sort=False):
     """
     Compute the relative and absolute errors in the given derivatives and print to the out_stream.
 
@@ -2962,6 +2968,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         Set to True if output should print only the subjacs found to be incorrect.
     lcons : list or None
         For total derivatives only, list of outputs that are actually linear constraints.
+    sort : bool
+        If True, sort subjacobian keys alphabetically.
     """
     suppress_output = out_stream is None
 
