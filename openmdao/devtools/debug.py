@@ -654,12 +654,14 @@ def show_dist_var_conns(group, rev=False, out_stream=_DEFAULT_OUT_STREAM):
     """
     Show all distributed variable connections in the given group and below.
 
+    The ranks displayed will be relative to the communicator of the given top group.
+
     Parameters
     ----------
     group : Group
-        The group to be searched.
+        The top level group to be searched.  Connections in all subgroups will also be displayed.
     rev : bool
-        If True show reverse transfers.
+        If True show reverse transfers instead of forward transfers.
     out_stream : file-like
         Where the output will go.
 
@@ -687,8 +689,8 @@ def show_dist_var_conns(group, rev=False, out_stream=_DEFAULT_OUT_STREAM):
 
     for g in group.system_iter(typ=Group, include_self=True):
         if g._transfers[direction]:
-            in_ranges = list(g.dist_range_iter('input'))
-            out_ranges = list(g.dist_range_iter('output'))
+            in_ranges = list(g.dist_range_iter('input', group.comm))
+            out_ranges = list(g.dist_range_iter('output', group.comm))
 
             inmapper = DataRangeMapper.create(in_ranges)
             outmapper = DataRangeMapper.create(out_ranges)
@@ -752,7 +754,10 @@ def show_dist_var_conns(group, rev=False, out_stream=_DEFAULT_OUT_STREAM):
 
                     gdict[g.pathname][sub] = strs
 
+    do_ranks = False
+
     if group.comm.size > 1:
+        do_ranks = True
         final = {}
         gatherlist = group.comm.gather(gdict, root=0)
         if group.comm.rank == 0:
@@ -777,36 +782,39 @@ def show_dist_var_conns(group, rev=False, out_stream=_DEFAULT_OUT_STREAM):
 
     if group.comm.rank == 0:
         fwd = direction == 'fwd'
-        for gpath, subdct in gdict.items():
+        for gpath, subdct in sorted(gdict.items(), key=lambda x: x[0]):
             indent = 0 if gpath == '' else gpath.count('.') + 1
             pad = '   ' * indent
             printer(f"{pad}In Group '{gpath}'", file=out_stream)
-            for sub, strs in subdct.items():
+            for sub, strs in sorted(subdct.items(), key=lambda x: x[0]):
                 if fwd:
                     printer(f"{pad}   {arrow} {sub}", file=out_stream)
                 else:
                     printer(f"{pad}   {sub} {arrow}", file=out_stream)
                 for s, ranks in strs.items():
-                    oranks = np.empty(len(ranks), dtype=int)
-                    iranks = np.empty(len(ranks), dtype=int)
-                    for i, (ornk, irnk) in enumerate(sorted(ranks)):
-                        oranks[i] = ornk
-                        iranks[i] = irnk
+                    if do_ranks:
+                        oranks = np.empty(len(ranks), dtype=int)
+                        iranks = np.empty(len(ranks), dtype=int)
+                        for i, (ornk, irnk) in enumerate(sorted(ranks)):
+                            oranks[i] = ornk
+                            iranks[i] = irnk
 
-                    if np.all(oranks == oranks[0]):
-                        orstr = str(oranks[0])
-                    else:
-                        orstr = str(sorted(oranks))
+                        if np.all(oranks == oranks[0]):
+                            orstr = str(oranks[0])
+                        else:
+                            orstr = str(sorted(oranks))
 
-                    if np.all(iranks == iranks[0]):
-                        irstr = str(iranks[0])
-                    else:
-                        irstr = str(sorted(iranks))
+                        if np.all(iranks == iranks[0]):
+                            irstr = str(iranks[0])
+                        else:
+                            irstr = str(sorted(iranks))
 
-                    if orstr == irstr and '[' not in orstr:
-                        printer(f"{pad}      {s}    rank {orstr}", file=out_stream)
+                        if orstr == irstr and '[' not in orstr:
+                            printer(f"{pad}      {s}    rank {orstr}", file=out_stream)
+                        else:
+                            printer(f"{pad}      {s}    ranks {orstr} {arrow} {irstr}", file=out_stream)
                     else:
-                        printer(f"{pad}      {s}    ranks {orstr} {arrow} {irstr}", file=out_stream)
+                        printer(f"{pad}      {s}", file=out_stream)
 
         return gdict
 

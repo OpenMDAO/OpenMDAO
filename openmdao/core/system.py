@@ -6277,7 +6277,7 @@ class System(object):
             for s in self._subsystems_myproc:
                 yield from s.comm_info_iter()
 
-    def dist_range_iter(self, io):
+    def dist_range_iter(self, io, top_comm):
         """
         Yield names and distributed ranges of all local and remote variables in this system.
 
@@ -6294,10 +6294,17 @@ class System(object):
         sizes = self._var_sizes
         vmeta = self._var_allprocs_abs2meta
 
+        topranks = np.arange(top_comm.size)
+
+        myrank = self.comm.rank
+        toprank = top_comm.rank
+
+        mytopranks = topranks[toprank - myrank: toprank - myrank + self.comm.size]
+
         total = 0
         for rank in range(self.comm.size):
             for ivar, vname in enumerate(vmeta[io]):
                 sz = sizes[io][rank, ivar]
                 if sz > 0:
-                    yield (vname, rank), total, total + sz
+                    yield (vname, mytopranks[rank]), total, total + sz
                 total += sz
