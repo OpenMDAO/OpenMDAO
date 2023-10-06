@@ -121,6 +121,8 @@ class DefaultTransfer(Transfer):
                     sub_out = abs_out[mypathlen:].split('.', 1)[0]
                     rev_xfer_in[sub_out].append(input_inds)
                     rev_xfer_out[sub_out].append(output_inds)
+                else:
+                    continue
 
         tot_size = 0
         for sname, inds in fwd_xfer_in.items():

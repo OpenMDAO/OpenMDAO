@@ -708,9 +708,9 @@ def show_dist_var_conns(group, rev=False, out_stream=_DEFAULT_OUT_STREAM):
 
                     conns = {}
                     for iidx, oidx in zip(transfer._in_inds, transfer._out_inds):
-                        idata, irind = inmapper.index2data_and_rel_ind(iidx)
+                        idata, irind = inmapper.index2rel_data(iidx)
                         ivar, irank = idata
-                        odata, orind = outmapper.index2data_and_rel_ind(oidx)
+                        odata, orind = outmapper.index2rel_data(oidx)
                         ovar, orank = odata
 
                         if odata not in conns:

@@ -69,7 +69,7 @@ class DataRangeMapper(object):
         """
         return self._data2range[data]
 
-    def index2data(self, idx):
+    def _index2data(self, idx):
         """
         Find the data corresponding to the given index.
 
@@ -83,7 +83,18 @@ class DataRangeMapper(object):
         object or None
             The data corresponding to the given index, or None if not found.
         """
-        raise NotImplementedError("index2data method must be implemented by subclass.")
+        raise NotImplementedError("_index2data method must be implemented by subclass.")
+
+    def __getitem__(self, idx):
+        """
+        Find the data corresponding to the given index.
+
+        Parameters
+        ----------
+        idx : int
+            The index into the full array.
+        """
+        return self._index2data(idx)
 
     def indices2data(self, idxs):
         """
@@ -99,11 +110,11 @@ class DataRangeMapper(object):
         list of (object, int)
             The data corresponding to each of the given indices.
         """
-        data = [self.index2data(idx) for idx in idxs]
+        data = [self._index2data(idx) for idx in idxs]
         if None in data:
             missing = []
             for idx in idxs:
-                d = self.index2data(idx)
+                d = self._index2data(idx)
                 if d is None:
                     missing.append(idx)
             raise RuntimeError(f"Indices {sorted(missing)} are not in any range.")
@@ -175,7 +186,7 @@ class RangeTree(DataRangeMapper):
         self.size = ranges[-1][2] - ranges[0][1]
         self.root = self.build(ranges)
 
-    def index2data(self, idx):
+    def _index2data(self, idx):
         """
         Find the data corresponding to the given index.
 
@@ -200,7 +211,7 @@ class RangeTree(DataRangeMapper):
             else:
                 return node.data
 
-    def index2data_and_rel_ind(self, idx):
+    def index2rel_data(self, idx):
         """
         Find the data and relative index corresponding to the matched range.
 
@@ -290,7 +301,7 @@ class FlatRangeMapper(DataRangeMapper):
             self.ranges[start:stop] = [rng] * (stop - start)
             self.add_range(data, start, stop)
 
-    def index2data(self, idx):
+    def _index2data(self, idx):
         """
         Find the data corresponding to the given index.
 
@@ -309,7 +320,7 @@ class FlatRangeMapper(DataRangeMapper):
         except IndexError:
             return None
 
-    def index2data_and_rel_ind(self, idx):
+    def index2rel_data(self, idx):
         """
         Find the data and relative index corresponding to the matched range.
 
@@ -394,7 +405,7 @@ if __name__ == '__main__':
     flat = FlatRangeMapper(ranges)
 
     for i in range(34):
-        rname, rind = rtree.index2data_and_rel_ind(i)
-        fname, find = flat.index2data_and_rel_ind(i)
+        rname, rind = rtree.index2rel_data(i)
+        fname, find = flat.index2rel_data(i)
         assert rname == fname and rind == find, f'i = {i}, rname = {rname}, rind = {rind}, fname = {fname}, find = {find}'
         print(i, rname, rind, fname, find)

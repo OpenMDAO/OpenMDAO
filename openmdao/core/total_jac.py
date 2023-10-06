@@ -376,11 +376,16 @@ class _TotalJacInfo(object):
                 # duplicated vars
                 self.rev_allreduce_mask = np.ones(J.shape[1], dtype=bool)
 
+                voimeta = self.output_meta['rev']
                 start = end = 0
-                for name in self.wrt:
-                    meta = all_abs2meta_out[name]
-                    end += meta['global_size']
-                    if not meta['distributed'] and model._owning_rank[name] != model.comm.rank:
+                for name, pname in zip(wrt, prom_wrt):
+                    vmeta = all_abs2meta_out[name]
+                    if pname in voimeta:
+                        meta = voimeta[pname]
+                        end += meta['size']
+                    else:
+                        end += vmeta['global_size']
+                    if not vmeta['distributed'] and model._owning_rank[name] != model.comm.rank:
                         self.rev_allreduce_mask[start:end] = False
                     start = end
 
@@ -1295,6 +1300,7 @@ class _TotalJacInfo(object):
         """
         deriv_idxs, jac_idxs, _ = self.sol2jac_map[mode]
         deriv_val = self.output_vec[mode].asarray()
+
         if not self.get_remote:
             loc_idx = self.loc_jac_idxs[mode][i]
             if loc_idx >= 0:
@@ -1334,22 +1340,6 @@ class _TotalJacInfo(object):
                     scratch[:] = 0.0
                     scratch[self.rev_allreduce_mask] = self.J[i][self.rev_allreduce_mask]
                     self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
-            # else:
-            #     scatter = self.jac_scatters[mode]
-            #     if scatter is not None:
-            #         if self.dist_idx_map[mode][i]:  # distrib var, skip scatter
-            #             return
-            #         loc = self.loc_jac_idxs[mode][i]
-            #         if loc >= 0:
-            #             self.tgt_petsc[mode].array[:] = self.J[loc, :][self.nondist_loc_map[mode]]
-            #             self.src_petsc[mode].array[:] = self.J[loc, :][self.nondist_loc_map[mode]]
-            #         else:
-            #             self.src_petsc[mode].array[:] = 0.0
-
-            #         scatter.scatter(self.src_petsc[mode], self.tgt_petsc[mode],
-            #                         addv=True, mode=False)
-            #         if loc >= 0:
-            #             self.J[loc, :][self.nondist_loc_map[mode]] = self.tgt_petsc[mode].array
 
     def single_jac_setter(self, i, mode, meta):
         """

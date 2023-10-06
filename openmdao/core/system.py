@@ -6285,6 +6285,8 @@ class System(object):
         ----------
         io : str
             Either 'input' or 'output'.
+        top_comm : MPI.Comm or None
+            The top-level MPI communicator.
 
         Yields
         ------
@@ -6308,3 +6310,25 @@ class System(object):
                 if sz > 0:
                     yield (vname, mytopranks[rank]), total, total + sz
                 total += sz
+
+    def local_range_iter(self, io):
+        """
+        Yield names and local ranges of all local variables in this system.
+
+        Parameters
+        ----------
+        io : str
+            Either 'input' or 'output'.
+
+        Yields
+        ------
+        tuple
+            A tuple of the form (abs_name, start, end).
+        """
+        vmeta = self._var_allprocs_abs2meta
+
+        offset = 0
+        for vname, size in zip(vmeta[io], self._var_sizes[io][self.comm.rank]):
+            if size > 0:
+                yield vname, offset, offset + size
+            offset += size

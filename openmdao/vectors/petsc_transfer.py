@@ -72,7 +72,6 @@ else:
                 alias.
             """
             rev = group._mode != 'fwd'
-            uses_approx = group._owns_approx_jac
 
             for subsys in group._subgroups_myproc:
                 subsys._setup_transfers(desvars, responses)
@@ -101,8 +100,6 @@ else:
                 # xfers that are only active when parallel coloring is not
                 rev_xfer_in_nocolor = defaultdict(list)
                 rev_xfer_out_nocolor = defaultdict(list)
-
-                # rev_conns = get_rev_conns(group._conn_abs_in2out)
 
             allprocs_abs2idx = group._var_allprocs_abs2idx
             sizes_in = group._var_sizes['input']
@@ -301,6 +298,7 @@ else:
                                 output_inds = oidxlist[0]
                             else:
                                 input_inds = output_inds = np.zeros(0, dtype=INT_DTYPE)
+
                             rev_xfer_in[sub_out].append(input_inds)
                             rev_xfer_out[sub_out].append(output_inds)
 
@@ -391,10 +389,6 @@ else:
                         transfers['rev'][(sname, 'nocolor')] = PETScTransfer(
                             vectors['input']['nonlinear'], vectors['output']['nonlinear'],
                             rev_xfer_in_nocolor[sname], inds, group.comm)
-
-                # from om_devtools.dist_idxs import dump_dist_idxs
-                # print(f"DIST IDXS for '{group.pathname}', rank {group.comm.rank}:", flush=True)
-                # dump_dist_idxs(group)
 
         def _transfer(self, in_vec, out_vec, mode='fwd'):
             """
