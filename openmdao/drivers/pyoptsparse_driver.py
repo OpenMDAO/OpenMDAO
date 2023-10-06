@@ -376,7 +376,7 @@ class pyOptSparseDriver(Driver):
 
     def _prom_names_jac(self, jac):
         """
-        Convert a jacobian keyed on variable names to be keyed on promoted names.
+        Convert a nested dict jacobian keyed on variable names to be keyed on promoted names.
         """
         new_jac = {}
         for of in jac:
@@ -569,7 +569,7 @@ class pyOptSparseDriver(Driver):
 
             if meta['linear']:
                 jac = {w: _lin_jacs[name][w] for w in wrt}
-                jac_prom = self._prom_names_jac(jac)
+                jac_prom = self._prom_names_dict(jac)
                 opt_prob.addConGroup(prom_name, size,
                                      upper=upper - _y_intercepts[name],
                                      lower=lower - _y_intercepts[name],
